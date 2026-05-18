@@ -2,7 +2,7 @@
 
 This directory holds the checked-in study snapshot for the stress / ethanol / ciprofloxacin promoter study. Use it to see the current study phase, the active LatentDNA review path, and the linked study notes.
 
-- Binding file: [bindings/latentdna.yaml](../../../../../docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml)
+- Binding file: [contexts/latentdna/binding.yaml](../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml)
 - Workspace snapshot consumer doc: [stress-ethanol-cipro-representation-comparison.md](../../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
 - Active deliverables: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`, `reference_to_plan_centroid_heatmap`, `reference_standard_strength_audit`

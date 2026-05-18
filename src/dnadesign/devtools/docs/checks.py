@@ -237,10 +237,12 @@ STUDY_OPS_CONTRACT_PART_KEYS = {
     "preflight",
 }
 STUDY_OPS_CONTRACT_PARTS_DIR = "contract"
-STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/pipeline.yaml"
+STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/command-groups/pipeline.yaml"
 STUDY_LEGACY_PIPELINE_REFS = {
     "manifest:operations/pipeline.yaml",
+    "manifest:operations/runtime/pipeline.yaml",
     "operations/pipeline.yaml",
+    "operations/runtime/pipeline.yaml",
 }
 STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
 STUDY_RECORD_ROUTER_FILES = (
@@ -252,13 +254,13 @@ STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
     "docs/README.md",
     "docs/studies/README.md",
     "docs/studies/reference/study-status-ops-surfaces.md",
-    "docs/studies/stress_ethanol_cipro_growth/contracts/status.md",
-    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
     "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal.md",
-    "docs/studies/retron_hairpin_design/contracts/status.md",
-    "docs/studies/retron_hairpin_design/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/status.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/preflight.md",
 )
 LEGACY_STUDY_STATUS_SURFACE_TERMS = (
     "Study status adapters",
@@ -346,22 +348,22 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "docs/studies/stress_ethanol_cipro_growth/contracts/status.md": {
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md": {
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/contracts/status.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/status.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
     },
-    "docs/studies/retron_hairpin_design/contracts/preflight.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
         "owner_boundary": "studies",
@@ -405,11 +407,11 @@ OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/studies/README.md",
     "docs/studies/stress_ethanol_cipro_growth/record/status.md",
     "src/dnadesign/ops/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
 )
 STUDY_EXECUTION_SOURCE_DOC_PATHS = (
     "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -1627,10 +1629,15 @@ def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -
     if not isinstance(payload, dict):
         return [f"{ops_path}: ops.study.yaml for study {study_id!r} must be a mapping."]
 
-    legacy_pipeline_path = operations_root / "pipeline.yaml"
-    if legacy_pipeline_path.exists():
+    legacy_pipeline_paths = (
+        operations_root / "pipeline.yaml",
+        operations_root / "runtime" / "pipeline.yaml",
+    )
+    for legacy_pipeline_path in legacy_pipeline_paths:
+        if not legacy_pipeline_path.exists():
+            continue
         issues.append(
-            f"{legacy_pipeline_path}: study pipeline belongs under operations/runtime/pipeline.yaml "
+            f"{legacy_pipeline_path}: study pipeline belongs under operations/runtime/command-groups/pipeline.yaml "
             "so OPS contracts, runtime plans, and contract fragments stay separate."
         )
 
@@ -1642,7 +1649,7 @@ def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -
         if pipeline_ref in STUDY_LEGACY_PIPELINE_REFS:
             issues.append(
                 f"{ops_path}: record_sources.pipeline_ref must use {STUDY_RUNTIME_PIPELINE_REF!r}, "
-                "not the legacy flat operations/pipeline.yaml path."
+                "not a legacy flat pipeline path."
             )
 
     parts = payload.get("parts")

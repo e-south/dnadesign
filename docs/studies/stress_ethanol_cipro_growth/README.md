@@ -4,8 +4,8 @@
 **Last verified:** 2026-05-18
 
 This study keeps only the ontology router at the root. Durable factual state,
-operating declarations, route maps, bindings, contracts, and audits live in
-typed subdirectories.
+operating declarations, route maps, context bindings, and audits live in typed
+subdirectories.
 
 ### Directory Ontology
 
@@ -18,13 +18,20 @@ stress_ethanol_cipro_growth/
     status.md
   operations/      # machine-readable operating contracts
     ops.study.yaml
+    catalog/       # OPS status/preflight catalog docs
     contract/
+      lifecycle/
+      surfaces/
+      status/
+      readiness/
     runtime/
-      pipeline.yaml
+      command-groups/
+        pipeline.yaml
   routes/          # one-hop router plus focused route details
     README.md
-  contracts/       # status/preflight contracts and registry sidecars
-  bindings/        # cross-tool study bindings
+  contexts/        # durable cross-tool context
+    latentdna/
+      binding.yaml
   audits/          # typed sync/readiness evidence
     readiness/     # prose readiness and contract audits
     usr-sync/      # machine-readable USR sync evidence
@@ -32,7 +39,7 @@ stress_ethanol_cipro_growth/
 
 Use `routes/README.md` first for owner-surface navigation. Use
 `record/status.md` only for factual current state, `operations/ops.study.yaml`
-for lifecycle/preflight declarations, and `operations/runtime/pipeline.yaml`
-for command groups. Use `contracts/` when the task is status or readiness,
-`bindings/` when a tool needs durable study context, and `audits/readiness/` or
-`audits/usr-sync/` for evidence payloads.
+for lifecycle/preflight declarations, and `operations/runtime/command-groups/pipeline.yaml`
+for command groups. Use `operations/catalog/` when the task is status or
+readiness, `contexts/latentdna/` when LatentDNA needs durable study context, and
+`audits/readiness/` or `audits/usr-sync/` for evidence payloads.

@@ -17,7 +17,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Construct anchor/context refresh | `usr` plus `construct` | `complete` | [Construct](source/construct.md) |
 | LatentDNA comparison surface | `latentdna` | `attention` | [LatentDNA](analysis/latentdna.md) (`routes/analysis/latentdna.md`) |
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
-| OPAL campaigns | `opal` | `candidate_table_materialized_pre_assay` | [OPAL](decision/opal.md) (`routes/decision/opal.md`) |
+| OPAL campaigns | `opal` | `candidate_table_materialized_pre_assay` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
 
 ### Terminology Guardrails
 

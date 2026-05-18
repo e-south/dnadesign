@@ -5,6 +5,11 @@ Study: `stress_ethanol_cipro_growth`
 DenseGen workspace: `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro`
 Dataset basis: overlay-aware `usr:densegen/study_stress_ethanol_cipro` at `157,160` accepted arrays
 
+Historical note: this audit records the contract posture observed on
+2026-04-17. Treat findings as evidence for later hardening, not as the live
+navigation contract; current routes live under
+`docs/studies/stress_ethanol_cipro_growth/routes/`.
+
 ### Purpose
 
 This audit package is meant to support a follow-on development specification for the DenseGen stress-study analysis surface: plot generation, plot manifest behavior, notebook gallery behavior, Stage A to Stage B bridge semantics, and study-record alignment.
@@ -25,7 +30,7 @@ This audit package is meant to support a follow-on development specification for
 ### Prioritized Findings
 
 1. High: the DenseGen default plot surface is not one contract.
-`docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml` declares `dataset_metadata_heatmap` in the default plot set and treats the video as optional, but the executable workspace config defaults to `[dataset_source_inventory, stage_a_summary, placement_map, run_health, tfbs_usage]` and `run_plots_from_config()` auto-appends `dense_array_video_showcase` whenever `plots.video.enabled` is true. The notebook gallery then hides `dataset_metadata_heatmap`. The study docs, workspace defaults, and notebook-visible surface therefore describe different “defaults”.
+`docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml` declares `dataset_metadata_heatmap` in the default plot set and treats the video as optional, but the executable workspace config defaults to `[dataset_source_inventory, stage_a_summary, placement_map, run_health, tfbs_usage]` and `run_plots_from_config()` auto-appends `dense_array_video_showcase` whenever `plots.video.enabled` is true. The notebook gallery then hides `dataset_metadata_heatmap`. The study docs, workspace defaults, and notebook-visible surface therefore describe different “defaults”.
 
 2. High: the Stage-A companion plot is not honoring its own bridge contract.
 The `sampling_vs_length_ridgeline` variant is described as showing accepted TFBS length counts by regulator, but the normal `stage_a_summary` render path only declares `pools` as required input. The companion receives the Stage-A dataframe and only opportunistically uses output records if they were loaded for some other selected plot. When accepted-output annotations are missing, the right panel silently falls back to retained Stage-A pool lengths. That means the same chart can represent different populations while keeping the same title and legend.
@@ -168,7 +173,7 @@ study docs, stress_ethanol_cipro_growth status, and LatentDNA routes use DenseGe
 
 ### Key Evidence Ledger
 
-- Study pipeline default plot claim: `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml`
+- Study pipeline default plot claim: `docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml`
 - Study status and current attention surface: `docs/studies/stress_ethanol_cipro_growth/record/status.md`
 - Study downstream route ladder: `docs/studies/stress_ethanol_cipro_growth/routes/README.md`
 - DenseGen workspace runtime defaults: `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml`

@@ -331,6 +331,6 @@ Keep these top-level study files concise and record-backed:
 
 - `docs/studies/stress_ethanol_cipro_growth/record/status.md`
 - `docs/studies/stress_ethanol_cipro_growth/routes/README.md`
-- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml`
 
 They should stay scoped and cheap to refresh.

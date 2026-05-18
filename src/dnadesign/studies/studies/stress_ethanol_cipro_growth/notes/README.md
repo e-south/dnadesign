@@ -13,7 +13,7 @@ record plane but still worth checking into the repo.
   actions.
 - `docs/studies/stress_ethanol_cipro_growth/routes/README.md` stays a one-hop route
   map for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL.
-- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml` stays structural:
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml` stays structural:
   study-owned runtime bindings, execution surfaces, and downstream entry
   points.
 - `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/deliverables/`

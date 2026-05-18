@@ -121,7 +121,7 @@ def resolve_stress_ethanol_cipro_growth_context(
             active_study=None,
             required_paths={},
             missing_required_files=(),
-            pipeline_path=resolved_study_dir / "operations" / "runtime" / "pipeline.yaml",
+            pipeline_path=resolved_study_dir / "operations" / "runtime" / "command-groups" / "pipeline.yaml",
             pipeline_present=False,
             datasets_entries=(),
             study_pipeline={},
@@ -175,7 +175,7 @@ def resolve_stress_ethanol_cipro_growth_context(
         "operations/ops.study.yaml": resolved_study_dir / "operations" / "ops.study.yaml",
     }
     missing_required_files = tuple(name for name, path in required_paths.items() if not path.exists())
-    pipeline_path = resolved_study_dir / "operations" / "runtime" / "pipeline.yaml"
+    pipeline_path = resolved_study_dir / "operations" / "runtime" / "command-groups" / "pipeline.yaml"
     evidence: dict[str, object] = {
         "requested_study_dir": requested_study_dir,
         "study_dir": str(resolved_study_dir),
@@ -520,7 +520,9 @@ def _declared_execution_surface_payload(*, contract_payload: dict[str, dict[str,
 
 
 def _resolve_pipeline_path(*, ops_contract: StudyOpsContract, repo_root: Path, study_root: Path) -> Path:
-    pipeline_ref = ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/pipeline.yaml"
+    pipeline_ref = (
+        ops_contract.record_sources.get("pipeline_ref") or "manifest:operations/runtime/command-groups/pipeline.yaml"
+    )
     return resolve_path_ref(
         pipeline_ref,
         repo_root=repo_root,

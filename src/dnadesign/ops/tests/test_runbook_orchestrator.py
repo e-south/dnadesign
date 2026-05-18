@@ -1043,6 +1043,7 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
     import dnadesign.ops.orchestrator.infer_fill as infer_fill
 
     repo_root = tmp_path
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\nversion='0.0.0'\n", encoding="utf-8")
     study_dir = repo_root / "docs" / "studies" / "demo"
     (study_dir / "operations").mkdir(parents=True)
     workspace_root = repo_root / "workspace"
@@ -1056,12 +1057,37 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
     (study_dir / "operations" / "ops.study.yaml").write_text(
         yaml.safe_dump(
             {
+                "version": 2,
+                "study_id": "demo",
+                "lifecycle": {
+                    "mode": "sequential",
+                    "phase_order": ["infer_batch_preparation"],
+                    "current_phase": {
+                        "strategy": "explicit",
+                        "id": "infer_batch_preparation",
+                    },
+                },
+                "phases": [
+                    {
+                        "id": "infer_batch_preparation",
+                        "status": "in_progress",
+                    },
+                ],
                 "execution_surfaces": {
                     "infer_sequence_views": {
                         "surface_type": "runbook",
                         "runbook_ref": "repo:runbooks/infer.yaml",
                     }
-                }
+                },
+                "preflight": {
+                    "default_scope": "next",
+                    "group_phase_bindings": {"infer": "infer_batch_preparation"},
+                    "next_scope": {
+                        "target_phase_groups": {"infer_batch_preparation": ["infer"]},
+                        "runtime_phase_groups": ["infer"],
+                        "runtime_shared_groups": [],
+                    },
+                },
             }
         ),
         encoding="utf-8",

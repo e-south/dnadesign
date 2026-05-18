@@ -4,6 +4,10 @@ Date: 2026-04-17
 Study: `stress_ethanol_cipro_growth`
 Audience: dev-spec author
 
+Historical note: this audit records the contract posture observed on
+2026-04-17. Some findings describe issues that were later fixed; use current
+status/route files for live navigation and this note as historical evidence.
+
 ### Purpose
 
 Audit DenseGen and the stress_ethanol_cipro_growth status surface against repo-wide
@@ -98,7 +102,7 @@ not share one authoritative plot-surface contract.
 
 Current drift:
 
-- `operations/runtime/pipeline.yaml` declares `dataset_metadata_heatmap` as a default plot.
+- `operations/runtime/command-groups/pipeline.yaml` declares `dataset_metadata_heatmap` as a default plot.
 - the DenseGen workspace config omits it from `plots.default`
 - the notebook gallery hides it
 - the plot manifest can retain it from prior runs
@@ -114,7 +118,7 @@ Why this matters:
 
 Evidence:
 
-- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml:6-18`
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml:6-18`
 - `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml:308-340`
 - `src/dnadesign/densegen/src/viz/plot_inventory.py:24`
 - `src/dnadesign/densegen/src/cli/notebook_cells_template_gallery.py:25-75`
@@ -187,7 +191,7 @@ Evidence:
 - `docs/studies/stress_ethanol_cipro_growth/routes/README.md:1-9`
 - `docs/studies/stress_ethanol_cipro_growth/record/status.md:45-51`
 - `docs/studies/README.md:16-35`
-- `docs/studies/stress_ethanol_cipro_growth/contracts/status.md:25-31`
+- `docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md:25-31`
 
 #### 7. DenseGen exposes a public contract for USR output, but not for its
 analysis surface
@@ -272,7 +276,7 @@ The smallest reversible improvement is not a broad refactor. It is:
 1. define one public DenseGen analysis-surface API,
 2. update stress_ethanol_cipro_growth status to consume only that API,
 3. fail visibly on degraded analysis-surface states,
-4. then align `operations/runtime/pipeline.yaml`, notebook gallery rules, and route docs to that
+4. then align `operations/runtime/command-groups/pipeline.yaml`, notebook gallery rules, and route docs to that
    same contract.
 
 ### Mutation Boundary For The Dev Spec
@@ -304,7 +308,7 @@ The dev spec may authorize changes in these areas:
 - stress_ethanol_cipro_growth status skill and study status package wiring
 - OPS/status routing that consumes study-owned analysis metadata
 - `docs/studies/...` record surfaces such as `record/status.md`, `routes/README.md`, and
-  `operations/runtime/pipeline.yaml`
+  `operations/runtime/command-groups/pipeline.yaml`
 - DenseGen code that defines or exports a public analysis-surface contract
 - DenseGen notebook/gallery/plot inventory behavior
 - plot registry / plot inventory / manifest semantics

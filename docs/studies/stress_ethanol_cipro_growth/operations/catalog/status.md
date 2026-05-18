@@ -38,7 +38,7 @@ The status provider reads these study-owned files:
 
 - `operations/ops.study.yaml`: lifecycle, current phase, artifacts, execution surfaces, and preflight shape
 - `record/datasets.yaml`: affiliated dataset ids, row counts, and sync posture
-- `operations/runtime/pipeline.yaml`: DenseGen, Infer, LatentDNA, Cluster, and OPAL bindings for this study
+- `operations/runtime/command-groups/pipeline.yaml`: DenseGen, Infer, LatentDNA, Cluster, and OPAL bindings for this study
 - `routes/README.md`: one-hop handoffs into owner tools
 - `record/status.md`: human-readable current-state note
 
@@ -49,5 +49,5 @@ selected X column.
 ### Next Surface
 
 Use [preflight](preflight.md) for command-level readiness and blockers. Use
-[routes](../routes/README.md) after the state question is answered and the next task is
-to operate a specific owner tool.
+[routes](../../routes/README.md) after the state question is answered and the next
+task is to operate a specific owner tool.

@@ -107,9 +107,9 @@ def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit(
     assert "Released-product Snapback in `de033` remains the primitive owner" in status
     assert "Scar-nick through the `scar_nick` subpackage remains the primitive owner" in status
     assert "### Quick Route" in routes
-    assert "[Released-product Snapback](released-product-snapback.md)" in routes
-    assert "[Scar-nick base-junction](scar-nick-base-junction.md)" in routes
-    assert "[YIU boundary check](yiu-boundary-check.md)" in routes
+    assert "[Released-product Snapback](product/released-product-snapback.md)" in routes
+    assert "[Scar-nick base-junction](product/scar-nick-base-junction.md)" in routes
+    assert "[YIU boundary check](quality/yiu-boundary-check.md)" in routes
     assert "Keep this page as a one-hop route map" in routes
     assert "## Released-Product Snapback Route" in snapback_route
     assert "Surface role: `primary-execution`" in snapback_route

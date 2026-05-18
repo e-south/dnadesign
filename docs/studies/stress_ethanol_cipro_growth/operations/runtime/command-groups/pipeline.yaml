@@ -228,7 +228,7 @@ study_pipeline:
         - Default study batch posture is dataset-local sidecar completeness, so running both main and reference lanes is allowed and preserves distinct dataset/view/alias identities.
         - If optimizing strictly for unique Evo2 forward passes, the 144 known overlapping inputs can be reused through an explicit cross-dataset materialization or skip policy, but that is an optimization rather than a fidelity fix.
   latentdna:
-    binding: docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml
+    binding: docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml
     doc: src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
     latest_materialization:
       checked: 2026-05-17

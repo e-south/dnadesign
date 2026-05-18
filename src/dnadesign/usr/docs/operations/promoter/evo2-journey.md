@@ -10,7 +10,7 @@
 **Last verified:** 2026-03-20
 
 Use this page when you need the full promoter-study Evo2 path in one place before choosing a concrete runbook.
-If you are checking the live study record, start with [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/contracts/status.md).
+If you are checking the live study record, start with [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md).
 If you need blockers or next-run readiness, switch to `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`.
 
 If you are entering from Ops, use `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` for the current snapshot record and `uv run ops catalog show studies.stress-ethanol-cipro-growth.status --json` to inspect its related LatentDNA route entry.
@@ -32,7 +32,7 @@ The study record is the right place for current phase, dataset posture, and down
 5. Validate the optional Notify side branch only when watcher behavior matters.
    Use [Notify operations route](../../../../../../docs/notify/README.md) or the operator manual [Notify: consuming Universal Sequence Record events](../../../../../../docs/notify/usr-events.md).
 6. Hand off into the next study-owned downstream branch.
-   Use [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/contracts/status.md) plus the checked-in study `routes/README.md` when you need the live study-specific DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL handoff rather than the generic route.
+   Use [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md) plus the checked-in study `routes/README.md` when you need the live study-specific DenseGen, Construct, Infer, LatentDNA, Cluster, or OPAL handoff rather than the generic route.
    Use [Stress ethanol/cipro representation comparison](../../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md) when the stress study's anchor and construct-context datasets already carry the vector columns you want to compare in latent space.
    Continue to [cluster exploratory clustering workflow](../../../../cluster/docs/workflows/exploratory-clustering.md) when you want exploratory grouping next.
    Continue to [USR dataset with infer-derived X -> OPAL active learning](../../../../opal/docs/workflows/usr-infer-x-active-learning.md) only after a separate study-owned downstream decision names a concrete feature bundle worth carrying into OPAL.
@@ -47,7 +47,7 @@ The study record is the right place for current phase, dataset posture, and down
 
 ### Choose the next deep procedure
 
-- If you need one maintained study snapshot for current-status checks, use [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/contracts/status.md).
+- If you need one maintained study snapshot for current-status checks, use [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md).
 - If you need the study-bound LatentDNA comparison workspace and workflow next, use [Stress ethanol/cipro representation comparison](../../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md).
 - If you need template-backed contexts such as `template_1kb` before feature extraction, use [Construct -> USR -> Infer shared dataset runbook](../assembly/construct-infer-shared-dataset-runbook.md).
 - If DenseGen, manual, and wildtype sources still need explicit merge/carry setup, use [Multi-source shared dataset assembly](../assembly/multi-source-shared-dataset.md).

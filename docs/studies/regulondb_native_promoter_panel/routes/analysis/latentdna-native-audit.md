@@ -12,7 +12,7 @@ Parent router: [README.md](../README.md).
 - Current state: `local_feature_review_ready`
 - Entry artifact: native/full and later core60 7B vector and scalar feature surfaces
 - Workspace: `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel`
-- Binding: `docs/studies/regulondb_native_promoter_panel/bindings/latentdna.yaml`
+- Binding: `docs/studies/regulondb_native_promoter_panel/contexts/latentdna/binding.yaml`
 - Route note: Native cohorts use `regulondb__*` fields. They must not derive
   DenseGen metadata or alias native sigma factors into `sig35_variant`.
   The native/full and core60 contracts both name intermediate embeddings,

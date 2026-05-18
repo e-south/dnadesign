@@ -1,5 +1,11 @@
 ## RegulonDB Ops Contract Parts
 
-These YAML files are loaded by `../ops.study.yaml`. Keep lifecycle phases,
-artifact refs, execution surfaces, snapshot scope, and preflight checks here.
-Put command groups and downstream binding context in `../runtime/pipeline.yaml`.
+These YAML fragments are loaded by `../ops.study.yaml`.
+
+- `lifecycle/`: lifecycle mode and phase order.
+- `surfaces/`: artifacts and execution-surface refs.
+- `status/`: snapshot scope.
+- `readiness/`: providerless readiness metadata and checks.
+
+Put command groups and downstream context in
+`../runtime/command-groups/pipeline.yaml`.

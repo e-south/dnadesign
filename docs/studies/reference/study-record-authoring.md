@@ -18,14 +18,18 @@ docs/studies/<study-id>/
     status.md
   operations/
     ops.study.yaml
+    catalog/      # optional OPS status/preflight catalog docs
     contract/      # optional split parts loaded by ops.study.yaml
+      lifecycle/
+      surfaces/
+      status/
+      readiness/
     runtime/
-      pipeline.yaml  # optional exact command groups/runtime context
+      command-groups/
+        pipeline.yaml  # optional exact command groups/runtime context
   routes/
     README.md      # optional, preferred once the study spans owner surfaces
     ...            # optional focused route details for bulky owner surfaces
-  contracts/     # optional, status/preflight docs and registry sidecars
-  bindings/      # optional, cross-tool study bindings
   contexts/      # optional, long-form rationale and handoff notes
   compiler/      # optional, study-owned compiler inputs/config
   workbench/     # optional, durable ontology, design-set, and provenance records
@@ -45,18 +49,18 @@ docs/studies/<study-id>/
 - `operations/contract/`, when present, stores split YAML sections referenced
   by `operations/ops.study.yaml` `parts`. Use it when lifecycle, artifact,
   execution-surface, or preflight declarations would make the entrypoint hard
-  to scan.
-- `operations/runtime/pipeline.yaml`, when present, records exact command groups or
+  to scan. Keep fragments under `lifecycle/`, `surfaces/`, `status/`, and
+  `readiness/`.
+- `operations/catalog/`, when present, stores status/preflight catalog docs and
+  adjacent registry sidecars for studies with concrete OPS providers.
+- `operations/runtime/command-groups/pipeline.yaml`, when present, records exact command groups or
   runtime context that should not be reconstructed from generic tool docs.
 - `routes/README.md`, when present, is the study-owned one-hop handoff page.
 - `routes/`, when present, keeps focused owner-surface details out of the
   one-hop router.
-- `contracts/`, when present, stores status/preflight contract docs and
-  adjacent registry sidecars.
-- `bindings/`, when present, stores cross-tool study bindings such as
-  LatentDNA context.
 - `contexts/`, when present, stores long-form rationale or handoff notes that
-  should not crowd the router.
+  should not crowd the router. Tool bindings that are durable study context,
+  such as LatentDNA binding files, live under context-specific subdirectories.
 - `compiler/`, when present, stores study-owned compiler input/config records
   such as registries or convenience label lists.
 - `workbench/`, when present, stores study-specific hypotheses, ontology terms,
@@ -95,10 +99,11 @@ implementation.
 10. Add `routes/README.md` when the study spans several owner surfaces.
 11. Add `routes/` detail pages when route detail would otherwise bloat the
     one-hop router.
-12. Add `contracts/` when the study owns concrete status/preflight providers.
-13. Add `bindings/` when cross-tool study context needs a durable home outside
-    the root control plane.
-14. Add `contexts/` when long-form rationale or handoff notes need a durable
+12. Add `operations/catalog/` when the study owns concrete status/preflight
+    providers.
+13. Add `contexts/<tool>/` when cross-tool study context needs a durable home
+    outside the root control plane.
+14. Add broader `contexts/` pages when long-form rationale or handoff notes need a durable
     home outside the router.
 15. Add `compiler/` when the study owns narrow compiler inputs or normalization
     metadata.
@@ -106,7 +111,7 @@ implementation.
     durable study-owned home; split it into `ontology/`, `design_sets/`, and
     `provenance/` when the records would otherwise flatten at the workbench
     root.
-17. Add `operations/runtime/pipeline.yaml` when the study has exact Construct, Infer,
+17. Add `operations/runtime/command-groups/pipeline.yaml` when the study has exact Construct, Infer,
     batch, or Notify command groups.
 18. Refresh evidence with:
     `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/record/campaign.yaml`

@@ -15,7 +15,7 @@ surface. Keep status questions in `../../record/status.md` or `ops progress`.
   and candidate-X scorecard are available, but `design_structure_summary` and
   `sigma35_ordinal_audit` remain pending before the full primary review path is
   current.
-- Binding file: `docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml`
+- Binding file: `docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
 - Read-only snapshot command: `uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run`

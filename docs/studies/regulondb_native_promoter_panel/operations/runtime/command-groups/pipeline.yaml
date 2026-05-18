@@ -121,7 +121,7 @@ native_agent_bootstrap:
   open_first:
     - manifest:record/status.md
     - manifest:routes/README.md
-    - manifest:operations/runtime/pipeline.yaml
+    - manifest:operations/runtime/command-groups/pipeline.yaml
   pair_with:
     - code-change-discipline
   must_preserve:

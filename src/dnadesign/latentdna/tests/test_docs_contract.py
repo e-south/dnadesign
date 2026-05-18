@@ -39,16 +39,21 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
         repo_root / "src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md"
     ).read_text(encoding="utf-8")
     latentdna_binding = yaml.safe_load(
-        (repo_root / "docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml").read_text(encoding="utf-8")
-    )
-    study_pipeline = yaml.safe_load(
-        (repo_root / "docs/studies/stress_ethanol_cipro_growth/operations/runtime/pipeline.yaml").read_text(
+        (repo_root / "docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml").read_text(
             encoding="utf-8"
         )
+    )
+    study_pipeline = yaml.safe_load(
+        (
+            repo_root / "docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml"
+        ).read_text(encoding="utf-8")
     )
     study_routes = (repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/README.md").read_text(encoding="utf-8")
     study_latentdna_route = (
         repo_root / "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md"
+    ).read_text(encoding="utf-8")
+    study_latentdna_review_surfaces = (
+        repo_root / "docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/review-surfaces.md"
     ).read_text(encoding="utf-8")
     study_status = (repo_root / "docs/studies/stress_ethanol_cipro_growth/record/status.md").read_text(encoding="utf-8")
 
@@ -126,7 +131,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Artifact naming grammar" in reference_index
     assert "ops/status.registry.yaml" in operations
 
-    assert "bindings/latentdna.yaml" in workspace_readme
+    assert "contexts/latentdna/binding.yaml" in workspace_readme
     assert "workspace_snapshot.json" in workspace_readme
     assert "UMAP role: appendix orientation only" in workspace_readme
     assert "Reference metadata sources:" in workspace_readme
@@ -169,26 +174,29 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
 
     assert "The study phase is `infer_batch_preparation`" in study_status
     assert "Current LatentDNA decision surfaces:" in study_status
-    assert "representation_health_summary" in study_status
-    assert "candidate_decision_frontier" in study_status
-    assert "candidate_x_selection_scorecard" in study_status
-    assert "balanced_design_family_margin_gallery" in study_status
-    assert "sigma35_margin_ladder_gallery" in study_status
-    assert "sigma35_stress_margin_gallery" in study_status
     assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_status
     assert "Preferred infer family: `evo2_7b`" in study_status
     assert "Supported infer families: `evo2_7b`, `evo2_20b`" in study_status
     assert "LatentDNA browser default family: `evo2_7b`" in study_status
-    assert "LatentDNA gate:" in study_status
-    assert "LatentDNA primary review path:" in study_status
-    assert "LatentDNA companion visuals:" in study_status
-    assert "LatentDNA appendix support:" in study_status
-    assert "available 7B sequence-view feature" in study_status
-    assert "sidecars" in study_status
     assert "eight canonical 7B+20B" not in study_status
-    assert "secondary review material" in study_status
-    assert "Pooling semantics guardrail" in study_status
-    assert "not a native bidirectional Evo2 state" in study_status
+    assert "../contexts/latentdna/review-surfaces.md" in study_status
+
+    assert "representation_health_summary" in study_latentdna_review_surfaces
+    assert "candidate_decision_frontier" in study_latentdna_review_surfaces
+    assert "candidate_x_selection_scorecard" in study_latentdna_review_surfaces
+    assert "balanced_design_family_margin_gallery" in study_latentdna_review_surfaces
+    assert "sigma35_margin_ladder_gallery" in study_latentdna_review_surfaces
+    assert "sigma35_stress_margin_gallery" in study_latentdna_review_surfaces
+    assert "### Gate" in study_latentdna_review_surfaces
+    assert "### Primary Review Path" in study_latentdna_review_surfaces
+    assert "### Companion Visuals" in study_latentdna_review_surfaces
+    assert "### Appendix Support" in study_latentdna_review_surfaces
+    assert "available 7B sequence-view feature" in study_latentdna_review_surfaces
+    assert "sidecars" in study_latentdna_review_surfaces
+    assert "eight canonical 7B+20B" not in study_latentdna_review_surfaces
+    assert "secondary review material" in study_latentdna_review_surfaces
+    assert "Pooling Semantics Guardrail" in study_latentdna_review_surfaces
+    assert "not a native bidirectional Evo2 state" in study_latentdna_review_surfaces
 
 
 def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:

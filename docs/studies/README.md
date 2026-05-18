@@ -31,8 +31,9 @@ For the checked-in Retron hairpin effort, start from
 `docs/studies/retron_hairpin_design/routes/README.md` or the repo-local
 `.agents/skills/retron-hairpin-study/SKILL.md` when the request is about MSD
 labels, design references, visuals, or GenBank/FASTA outputs. Use pinned
-`retron-hairpin-design-status` and `retron-hairpin-design-preflight` commands only for
-explicit status or readiness questions.
+registry ids `studies.retron-hairpin-design.status` and
+`studies.retron-hairpin-design.preflight` only for explicit status or
+readiness questions.
 
 ### Authority chain
 
@@ -54,16 +55,19 @@ Each checked-in live study keeps these artifacts:
     and lists `parts` under `operations/contract/`.
   - `operations/contract/`: optional split lifecycle, artifact,
     execution-surface, snapshot, and preflight declarations loaded by
-    `ops.study.yaml`
-  - `operations/runtime/pipeline.yaml`: optional machine-readable runtime context for
+    `ops.study.yaml`. Keep fragment files under semantic sublanes such as
+    `lifecycle/`, `surfaces/`, `status/`, and `readiness/`.
+  - `operations/catalog/`: optional status/preflight catalog pages and registry
+    sidecars for studies with concrete OPS providers.
+  - `operations/runtime/command-groups/pipeline.yaml`: optional machine-readable runtime context for
     exact command groups or automation bootstrap
 - `routes/README.md`: optional one-hop handoff map for current owner surfaces
 - `routes/`: optional focused route-detail pages when one owner surface would
   otherwise turn the router into a workflow encyclopedia
-- `contracts/`: optional status/preflight contracts and their registry sidecars
-- `bindings/`: optional cross-tool study bindings such as LatentDNA context
 - `contexts/`: optional long-form study rationale or handoff notes that are not
-  current task routers
+  current task routers. Tool bindings that are durable study context, such as
+  LatentDNA bindings, live under context-specific subdirectories instead of a
+  root-level config shelf.
 - `compiler/`: optional study-owned compiler input/config records when a study
   has a narrow compiler surface
 - `workbench/`: optional study-specific experimental workbench for hypotheses,
@@ -90,20 +94,28 @@ docs/studies/<study-id>/
     status.md
   operations/
     ops.study.yaml
+    catalog/
+      status.md
+      status.registry.yaml
+      preflight.md
+      preflight.registry.yaml
     contract/
-      lifecycle.yaml
-      phases.yaml
-      artifacts.yaml
-      execution_surfaces.yaml
-      snapshot.yaml
-      preflight.yaml
+      lifecycle/
+        mode.yaml
+        phases.yaml
+      surfaces/
+        artifacts.yaml
+        execution_surfaces.yaml
+      status/
+        snapshot.yaml
+      readiness/
+        preflight.yaml
     runtime/
-      pipeline.yaml
+      command-groups/
+        pipeline.yaml
   routes/
     README.md    # optional, preferred once the study spans owner surfaces
     ...          # optional focused route details for bulky owner surfaces
-  contracts/     # optional, status/preflight docs and registry sidecars
-  bindings/      # optional, cross-tool study bindings
   contexts/      # optional, long-form rationale and handoff notes
   compiler/      # optional, study-owned compiler inputs/config
   workbench/     # optional, durable ontology, design-set, and provenance records
@@ -128,6 +140,6 @@ instead of growing a study-local tool.
 - [Study index](index.yaml)
 - [Retron hairpin route map](retron_hairpin_design/routes/README.md)
 - [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)
-- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/contracts/status.md)
-- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/contracts/preflight.md)
+- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/operations/catalog/status.md)
+- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/operations/catalog/preflight.md)
 - [Documentation index](../README.md)

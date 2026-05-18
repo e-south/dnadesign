@@ -16,6 +16,11 @@ require_file() {
   [[ -f "$path" ]] && pass "found ${path#$REPO_ROOT/}" || fail "missing file $path"
 }
 
+require_section() {
+  local section="$1"
+  grep -Fxq "$section" "$SKILL_FILE" && pass "section present: $section" || fail "section missing: $section"
+}
+
 require_pattern() {
   local pattern="$1"
   local label="$2"
@@ -43,17 +48,60 @@ require_max_lines() {
   fi
 }
 
+require_frontmatter_yaml() {
+  if uv run python - "$SKILL_FILE" <<'PY'
+from pathlib import Path
+import sys
+
+import yaml
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+if not text.startswith("---\n"):
+    raise SystemExit("missing opening frontmatter delimiter")
+try:
+    frontmatter = text.split("---", 2)[1]
+except IndexError as exc:
+    raise SystemExit("missing closing frontmatter delimiter") from exc
+payload = yaml.safe_load(frontmatter)
+if not isinstance(payload, dict):
+    raise SystemExit("frontmatter is not a mapping")
+if payload.get("name") != path.parent.name:
+    raise SystemExit("frontmatter name does not match skill folder")
+description = payload.get("description")
+if not isinstance(description, str) or not description.strip():
+    raise SystemExit("frontmatter description is missing")
+if len(description) > 260:
+    raise SystemExit(f"frontmatter description exceeds hard budget: {len(description)} > 260")
+if "Do not use for another study or for family-level routing" not in description:
+    raise SystemExit("frontmatter must reject other studies and family-level routing")
+metadata = payload.get("metadata")
+if not isinstance(metadata, dict):
+    raise SystemExit("frontmatter metadata is missing")
+version = metadata.get("version")
+if not isinstance(version, str) or version.count(".") != 2:
+    raise SystemExit("frontmatter metadata.version must be semver-shaped")
+PY
+  then
+    pass "frontmatter parses as YAML and stays within discovery budget"
+  else
+    fail "frontmatter parses as YAML and stays within discovery budget"
+  fi
+}
+
 require_file "$SKILL_FILE"
-require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contracts/status.md"
-require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contracts/preflight.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/status.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/preflight.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/construct.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/cluster.md"
-require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/candidate-table.md"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/ops/status.registry.yaml"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py"
@@ -66,6 +114,8 @@ require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
 require_file "$REFERENCE_DIR/external-sources.md"
 
+require_frontmatter_yaml
+require_section "## Required Deliverables"
 require_pattern '^name: stress-ethanol-cipro-growth-status$' "skill name is study-specific"
 require_pattern 'studies\.stress-ethanol-cipro-growth\.status' "skill names study status command"
 require_pattern 'studies\.stress-ethanol-cipro-growth\.preflight' "skill names study preflight command"
@@ -75,7 +125,7 @@ require_pattern 'Do not generalize it to another study' "skill guardrail rejects
 require_pattern 'OPAL candidate-table details are meaningful only in this study' "skill keeps OPAL table study-owned"
 require_pattern 'status/probes/' "skill reference exposes probe subpackage" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern '^## References$' "skill exposes progressive-disclosure references"
-require_pattern 'routes/decision/opal\.md' "skill routes OPAL detail after one-hop map"
+require_pattern 'routes/decision/opal/README\.md' "skill routes OPAL detail after one-hop map"
 require_pattern 'routes/analysis/latentdna\.md' "skill routes LatentDNA detail after one-hop map"
 
 require_absent 'promoter-study-status' "skill has no old status kind"
@@ -93,7 +143,8 @@ require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/so
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md" 80 "Infer route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/construct.md" 80 "Construct route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/cluster.md" 80 "Cluster route detail stays bounded"
-require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal.md" 100 "OPAL route detail stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md" 100 "OPAL route detail stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md" 80 "OPAL command detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md" 120 "LatentDNA route detail stays bounded"
 
 if [[ $failures -eq 0 ]]; then

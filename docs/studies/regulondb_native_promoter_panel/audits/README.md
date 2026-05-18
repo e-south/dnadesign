@@ -5,4 +5,4 @@
 
 Use this folder for RegulonDB native promoter panel audit evidence.
 
-- `usr-sync/`: machine-readable USR sync/diff/pull evidence for native promoter datasets.
+- `usr-sync/usr/`: machine-readable USR sync/diff/pull evidence for native promoter datasets.

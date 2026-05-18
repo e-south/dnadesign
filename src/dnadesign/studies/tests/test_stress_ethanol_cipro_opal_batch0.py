@@ -860,9 +860,10 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
             STUDY_DOCS / "record" / "campaign.yaml",
             STUDY_DOCS / "record" / "datasets.yaml",
             STUDY_DOCS / "operations" / "ops.study.yaml",
-            STUDY_DOCS / "operations" / "contract" / "artifacts.yaml",
+            STUDY_DOCS / "operations" / "contract" / "surfaces" / "artifacts.yaml",
             STUDY_DOCS / "routes" / "README.md",
-            STUDY_DOCS / "routes" / "decision" / "opal.md",
+            STUDY_DOCS / "routes" / "decision" / "opal" / "README.md",
+            STUDY_DOCS / "contexts" / "opal" / "candidate-table.md",
             STUDY_DOCS / "record" / "status.md",
             BATCH0_README,
         ]
@@ -886,17 +887,21 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
 
 def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None:
     routes = (STUDY_DOCS / "routes" / "README.md").read_text(encoding="utf-8")
-    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal.md").read_text(encoding="utf-8")
-    pipeline = yaml.safe_load((STUDY_DOCS / "operations" / "runtime" / "pipeline.yaml").read_text(encoding="utf-8"))
+    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal" / "README.md").read_text(encoding="utf-8")
+    opal_commands = (STUDY_DOCS / "routes" / "decision" / "opal" / "campaign-commands.md").read_text(encoding="utf-8")
+    pipeline = yaml.safe_load(
+        (STUDY_DOCS / "operations" / "runtime" / "command-groups" / "pipeline.yaml").read_text(encoding="utf-8")
+    )
     opal_notebook = pipeline["study_pipeline"]["opal"]["notebook"]
 
-    assert "routes/decision/opal.md" in routes
-    assert "Pre-run campaign viewer generation (writes notebook)" in opal_route
-    assert "uv run opal notebook generate" in opal_route
-    assert "uv run opal notebook run" in opal_route
-    assert "Post-run status command" in opal_route
+    assert "routes/decision/opal/README.md" in routes
+    assert "Campaign configs and commands" in opal_route
+    assert "Pre-run campaign viewer generation" in opal_commands
+    assert "uv run opal notebook generate" in opal_commands
+    assert "uv run opal notebook run" in opal_commands
+    assert "Post-run status command" in opal_commands
     assert "campaign-specific artifact viewer" in opal_route
-    assert "Per-ID provenance trace" in opal_route
+    assert "Per-ID provenance trace" in opal_commands
     assert "opal_batch0.provenance" in opal_route
     assert "studies.stress-ethanol-cipro-growth.status" in routes
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
@@ -906,7 +911,7 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:
     registry = yaml.safe_load(
-        (STUDY_DOCS / "contracts" / "registry" / "status.registry.yaml").read_text(encoding="utf-8")
+        (STUDY_DOCS / "operations" / "catalog" / "status.registry.yaml").read_text(encoding="utf-8")
     )
     relation_targets = {relation["target"] for relation in registry["relations"]}
 
@@ -917,11 +922,13 @@ def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_mat
 def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() -> None:
     routes_path = STUDY_DOCS / "routes" / "README.md"
     routes = routes_path.read_text(encoding="utf-8")
-    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal.md").read_text(encoding="utf-8")
+    opal_route = (STUDY_DOCS / "routes" / "decision" / "opal" / "README.md").read_text(encoding="utf-8")
+    opal_context = (STUDY_DOCS / "contexts" / "opal" / "candidate-table.md").read_text(encoding="utf-8")
     latentdna_route = (STUDY_DOCS / "routes" / "analysis" / "latentdna.md").read_text(encoding="utf-8")
 
     assert len(routes.splitlines()) <= 140
-    assert "routes/decision/opal.md" in routes
+    assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
     assert "candidate_table_materialized_pre_assay" in opal_route
+    assert "observed-label store" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

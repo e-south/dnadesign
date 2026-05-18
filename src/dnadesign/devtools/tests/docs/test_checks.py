@@ -421,7 +421,7 @@ def test_find_study_record_doc_issues_accepts_split_ops_contract_layout(tmp_path
     study_root = tmp_path / "docs" / "studies" / "demo_study"
     for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
         _write(study_root / required_name, "placeholder\n")
-    _write(study_root / "operations" / "runtime" / "pipeline.yaml", "version: 1\n")
+    _write(study_root / "operations" / "runtime" / "command-groups" / "pipeline.yaml", "version: 1\n")
     _write(
         study_root / "operations" / "ops.study.yaml",
         yaml.safe_dump(
@@ -429,18 +429,18 @@ def test_find_study_record_doc_issues_accepts_split_ops_contract_layout(tmp_path
                 "version": 2,
                 "study_id": "demo_study",
                 "record_sources": {
-                    "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
+                    "pipeline_ref": "manifest:operations/runtime/command-groups/pipeline.yaml",
                 },
                 "parts": {
-                    "lifecycle": "contract/lifecycle.yaml",
-                    "phases": "contract/phases.yaml",
-                    "preflight": "contract/preflight.yaml",
+                    "lifecycle": "contract/lifecycle/mode.yaml",
+                    "phases": "contract/lifecycle/phases.yaml",
+                    "preflight": "contract/readiness/preflight.yaml",
                 },
             },
             sort_keys=False,
         ),
     )
-    for part_name in ("lifecycle.yaml", "phases.yaml", "preflight.yaml"):
+    for part_name in ("lifecycle/mode.yaml", "lifecycle/phases.yaml", "readiness/preflight.yaml"):
         _write(study_root / "operations" / "contract" / part_name, "{}\n")
 
     issues = _find_study_record_doc_issues(tmp_path)
@@ -502,7 +502,7 @@ def test_find_study_record_doc_issues_rejects_flat_ops_contract_sprawl(tmp_path:
 
     issues = _find_study_record_doc_issues(tmp_path)
 
-    assert any("operations/runtime/pipeline.yaml" in issue for issue in issues)
+    assert any("operations/runtime/command-groups/pipeline.yaml" in issue for issue in issues)
     assert any("parts.lifecycle duplicates an inline lifecycle section" in issue for issue in issues)
     assert any("operations/contract/" in issue for issue in issues)
 
@@ -519,7 +519,7 @@ def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms
         "Verify the active study selector, `family`, and `record_root` in the study index.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "status.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "status.md",
         "The selected study entry must declare `family` and `record_root`.\n",
     )
 
@@ -3261,7 +3261,7 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
         "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "preflight.md",
         "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
     )
 
@@ -3280,7 +3280,7 @@ def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path:
         "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
     )
     _write(
-        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "contracts" / "preflight.md",
+        tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth" / "operations" / "catalog" / "preflight.md",
         "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
     )
 

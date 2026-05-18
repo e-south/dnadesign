@@ -32,7 +32,7 @@ def _base_payload() -> dict[str, object]:
         "record_sources": {
             "narrative_ref": "manifest:record/status.md",
             "datasets_ref": "manifest:record/datasets.yaml",
-            "pipeline_ref": "manifest:operations/runtime/pipeline.yaml",
+            "pipeline_ref": "manifest:operations/runtime/command-groups/pipeline.yaml",
             "campaign_ref": "manifest:record/campaign.yaml",
         },
         "lifecycle": {
@@ -154,12 +154,20 @@ def test_load_study_ops_contract_accepts_split_parts(tmp_path: Path) -> None:
         }
     }
     root_payload = {key: value for key, value in payload.items() if key not in split_keys}
-    root_payload["parts"] = {key: f"contract/{key}.yaml" for key in split_keys}
+    root_payload["parts"] = {
+        "lifecycle": "contract/lifecycle/mode.yaml",
+        "phases": "contract/lifecycle/phases.yaml",
+        "artifacts": "contract/surfaces/artifacts.yaml",
+        "execution_surfaces": "contract/surfaces/execution_surfaces.yaml",
+        "snapshot": "contract/status/snapshot.yaml",
+        "preflight": "contract/readiness/preflight.yaml",
+    }
     study_root = _write_contract(tmp_path, root_payload)
     contract_root = study_root / "operations" / "contract"
-    contract_root.mkdir(parents=True)
-    for key in split_keys:
-        (contract_root / f"{key}.yaml").write_text(
+    for key, rel_path in root_payload["parts"].items():
+        part_path = contract_root / rel_path.removeprefix("contract/")
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        part_path.write_text(
             yaml.safe_dump(payload[key], sort_keys=False),
             encoding="utf-8",
         )
@@ -174,11 +182,11 @@ def test_load_study_ops_contract_accepts_split_parts(tmp_path: Path) -> None:
 
 def test_load_study_ops_contract_rejects_split_part_that_duplicates_inline_section(tmp_path: Path) -> None:
     payload = _base_payload()
-    payload["parts"] = {"preflight": "contract/preflight.yaml"}
+    payload["parts"] = {"preflight": "contract/readiness/preflight.yaml"}
     study_root = _write_contract(tmp_path, payload)
     contract_root = study_root / "operations" / "contract"
-    contract_root.mkdir(parents=True)
-    (contract_root / "preflight.yaml").write_text("default_scope: next\n", encoding="utf-8")
+    (contract_root / "readiness").mkdir(parents=True)
+    (contract_root / "readiness" / "preflight.yaml").write_text("default_scope: next\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="duplicates an inline preflight section"):
         load_study_ops_contract(study_root)

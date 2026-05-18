@@ -41,4 +41,4 @@ cursors, or infer a hidden readiness graph from generic runbooks.
 actionable phase and defer later-lane blockers. `--scope full` reports the full
 declared suite.
 
-Use [routes](../routes/README.md) for the owner handoff after blockers are clear.
+Use [routes](../../routes/README.md) for the owner handoff after blockers are clear.

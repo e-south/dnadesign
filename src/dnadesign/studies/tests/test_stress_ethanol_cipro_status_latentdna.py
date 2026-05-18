@@ -27,7 +27,7 @@ LATENTDNA_DOC = "src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-rep
 
 
 def _write_latentdna_binding_fixture(tmp_path: Path) -> Path:
-    binding_path = tmp_path / "docs" / "studies" / "demo_study" / "bindings" / "latentdna.yaml"
+    binding_path = tmp_path / "docs" / "studies" / "demo_study" / "contexts" / "latentdna" / "binding.yaml"
     binding_path.parent.mkdir(parents=True, exist_ok=True)
     binding_path.write_text(
         yaml.safe_dump(

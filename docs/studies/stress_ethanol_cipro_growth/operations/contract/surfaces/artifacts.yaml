@@ -46,7 +46,7 @@ reference_feature_dataset:
   ref: repo:src/dnadesign/usr/datasets/infer_prom_eth_cip_reference_views_7b
 latentdna_binding:
   artifact_type: file
-  ref: repo:docs/studies/stress_ethanol_cipro_growth/bindings/latentdna.yaml
+  ref: repo:docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml
 latentdna_workspace_snapshot:
   artifact_type: file
   ref: repo:src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
