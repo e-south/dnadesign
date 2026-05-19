@@ -35,18 +35,40 @@ class RetronMsdRegistry:
     caps: dict[str, dict[str, Any]]
     constructs: dict[str, dict[str, Any]]
 
-    def build_reference(self, parsed: ParsedMsdConstructLabel) -> MsdDesignReferenceV1:
-        return self.build_reference_from_parts(parsed)
+    def build_reference(
+        self,
+        parsed: ParsedMsdConstructLabel,
+        *,
+        payload_metadata: dict[str, Any] | None = None,
+        cap_metadata: dict[str, Any] | None = None,
+        scar_nick_metadata: dict[str, Any] | None = None,
+        source_notes: str | None = None,
+    ) -> MsdDesignReferenceV1:
+        return self.build_reference_from_parts(
+            parsed,
+            payload_metadata=payload_metadata,
+            cap_metadata=cap_metadata,
+            scar_nick_metadata=scar_nick_metadata,
+            source_notes=source_notes,
+        )
 
     def build_reference_from_parts(
         self,
         parsed: ParsedMsdConstructLabel,
         *,
+        payload_metadata: dict[str, Any] | None = None,
         cap_metadata: dict[str, Any] | None = None,
         scar_nick_metadata: dict[str, Any] | None = None,
         source_notes: str | None = None,
     ) -> MsdDesignReferenceV1:
-        payload = self._require_mapping(self.payloads, parsed.payload_id, label="payload")
+        payload = self._optional_mapping(self.payloads, parsed.payload_id, label="payload")
+        if payload is None and payload_metadata is None:
+            self._require_mapping(self.payloads, parsed.payload_id, label="payload")
+        payload = dict(payload or {})
+        if payload_metadata is not None:
+            if not isinstance(payload_metadata, dict):
+                raise RetronMsdRegistryError(f"payload metadata must be a mapping: {parsed.payload_id}")
+            payload.update(payload_metadata)
         cap = self._optional_mapping(self.caps, parsed.cap_id, label="cap")
         if cap is None and cap_metadata is None:
             self._require_mapping(self.caps, parsed.cap_id, label="cap")

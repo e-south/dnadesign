@@ -4,7 +4,7 @@ surface: study-runtime-command-group-map
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
 last_verified: 2026-05-18
-entrypoint: self
+entrypoint: docs/studies/retron_hairpin_design/operations/runtime/command-groups/README.md
 canonical_payload: pipeline.yaml
 ---
 

@@ -17,7 +17,7 @@ Route Retron MSD work as a genetic compiler: compile a reference, materialize on
 
 In scope:
 - Retron MSD shorthand IDs and explicit part sets.
-- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, and selected public primitive sources.
+- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal sequences, and selected public cap/stem-base primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
@@ -36,14 +36,15 @@ Out of scope:
 
 - The first decision is input completeness: compile now, or route missing constraints.
 - Complete user-provided parts are validated and compiled without solver work.
+- User-provided labels are the source of truth for a live request; do not replace them with a checked-in cohort spec or scar-compatible analog.
 - Compiler specs are parsed at the boundary, then compile from trusted part structures.
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
-- Solved primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
+- Solved cap and stem-base primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, user-selected cap/foldback segment, payload complement,
   right base + 3' flank. Snapback subsection annotations are emitted only when
   topology is supplied.
-- Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGT-RACAG-MXMM` style suffixes.
+- Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGG-RACAG-MXMX` style suffixes.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
 - Materialized plot deliverables require ViennaRNA status `ok`; publish
@@ -68,6 +69,8 @@ Out of scope:
 - Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
   and use `selector.mode=rank` for the preferred explicit primitive
   combination.
+- If a user provides concrete labels, pass those exact labels with `--id` or a transient typed spec.
+- Checked-in 177-194 specs are named study fixtures, not substitutes for arbitrary user input.
 - Need sequence, visual, or GenBank: materialize with `--spec` or explicit
   payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
 - Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
@@ -100,10 +103,11 @@ Out of scope:
   per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
   `composition_overview.svg`, `composition_overview.png`, and a
   secondary-structure subtitle containing the mismatch profile.
-- If sequence subcomponents are missing, report the exact missing IDs or the
-  primitive route needed; cap IDs require explicit 5'->3' sequence/source;
+- If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
+  spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
 - If `S0` is non-ligatable and the user explicitly says it is a control, rerun with the S0-control opt-in and verify `scar_nick.s0_match_required=false`.
+- If lint fails because `S0!=M` and the user did not explicitly opt in, stop with the exact failing label; do not substitute bases, profile, cap, or construct number.
 - For missing constraints, name the missing fields and the primitive route.
 - For generated artifacts, name the output directory and contracts produced.
 

@@ -12,6 +12,14 @@ OLD_SKILL_NAME="snapback""-hairpin-study"
 OLD_SKILL_DIR="$REPO_ROOT/.agents/skills/$OLD_SKILL_NAME"
 failures=0
 SIZE_BUDGET_LINES=180
+EXPECTED_REFERENCE_FILES=(
+  external-sources.md
+  msd-design-references.md
+  refresh-loop.md
+  route-matrix.md
+  study-surfaces.md
+  test-matrix.md
+)
 
 TMP_COMBINED="$(mktemp)"
 trap 'rm -f "$TMP_COMBINED"' EXIT
@@ -141,6 +149,7 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/runtime/c
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/ops.study.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/workspaces.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/compiler.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/materialize.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/snapback.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/surfaces/execution/commands/yiu.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/scope.yaml"
@@ -148,6 +157,7 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/next-scope.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/context_consolidation.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/msd_design_reference_catalog.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/msd_single_unit_materialize.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py"
@@ -161,6 +171,7 @@ require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/int
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/registry.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/sequence_inputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/composition_payload.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/output_guards.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/materialized_outputs.py"
@@ -172,6 +183,22 @@ require_file "$REFERENCE_DIR/study-surfaces.md"
 require_file "$REFERENCE_DIR/msd-design-references.md"
 require_file "$REFERENCE_DIR/test-matrix.md"
 require_file "$REFERENCE_DIR/external-sources.md"
+
+for ref in "$REFERENCE_DIR"/*.md; do
+  ref_name="$(basename "$ref")"
+  listed=false
+  for expected in "${EXPECTED_REFERENCE_FILES[@]}"; do
+    if [[ "$ref_name" == "$expected" ]]; then
+      listed=true
+      break
+    fi
+  done
+  if [[ "$listed" == true ]]; then
+    pass "reference file is listed: $ref_name"
+  else
+    fail "unlisted reference file: $ref_name"
+  fi
+done
 
 for stale_surface in cli.py compiler.py errors.py; do
   if [[ -e "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/$stale_surface" ]]; then
@@ -200,10 +227,11 @@ else
 fi
 
 cat "$SKILL_FILE" > "$TMP_COMBINED"
-while IFS= read -r ref; do
+for ref_name in "${EXPECTED_REFERENCE_FILES[@]}"; do
+  ref="$REFERENCE_DIR/$ref_name"
   printf '\n' >> "$TMP_COMBINED"
   cat "$ref" >> "$TMP_COMBINED"
-done < <(find "$REFERENCE_DIR" -maxdepth 1 -type f -name '*.md' | sort)
+done
 {
   printf '\n'
   cat "$ROOT_AGENTS"
@@ -288,6 +316,7 @@ budgets = {
     "outputs/manifests.py": 450,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
+    "catalog/sequence_inputs.py": 120,
 }
 violations = []
 for filename, budget in budgets.items():
@@ -354,6 +383,11 @@ require_pattern 'code-change-discipline' "skill routes contract work outward"
 require_pattern '\.agents/skills/retron-hairpin-study/SKILL\.md' "root AGENTS mention the skill" "$ROOT_AGENTS"
 require_pattern '\.agents/skills/retron-hairpin-study/SKILL\.md' "cruncher AGENTS mentions the skill" "$CRUNCHER_AGENTS"
 reject_pattern "$OLD_SKILL_NAME" "old skill route removed"
+if grep -REq 'fallback' "$SKILL_FILE" "$REFERENCE_DIR" "$REPO_ROOT/docs/studies/retron_hairpin_design"; then
+  fail "skill and Retron study docs avoid fallback language"
+else
+  pass "skill and Retron study docs avoid fallback language"
+fi
 reject_pattern 'whether the answer came from snapshot posture' "top-level skill no longer requires snapshot posture" "$SKILL_FILE"
 reject_pattern 'current phase and next route' "top-level skill no longer reports phase by default" "$SKILL_FILE"
 require_pattern 'Pair with `harness-engineering`' "skill explains harness pairing" "$SKILL_FILE"

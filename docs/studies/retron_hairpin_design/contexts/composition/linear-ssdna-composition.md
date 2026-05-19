@@ -106,109 +106,17 @@ The four-base spans are the sticky-overhang/base-junction semantics used for
 cloning an insert into an expression vector that houses the multicopy ssDNA.
 Construct should treat them as ordinary sequence spans plus annotations.
 
-### First Dogfood Target
+### Historical Retron-43 Dogfood Fixture
 
-Start with a manual literal composition rather than resolving Cruncher outputs:
+The retron-43/TetO `x8` Construct workspace is historical evidence for the
+generic composition and review-plot stack. It is not the current Retron MSD
+materialization recipe and should not be used as a template for new study
+outputs. Current MSD output requests start from the study CLI `materialize`
+route, emit one MSD unit per design, and do not expose `--repeat-count`.
 
-```text
-composition_id: retron43_teto_manual_x8
-unit: retron43_teto_unit
-repeat_count: 8
-topology: linear_ssdna
-folding.scope: canonical_component_unit
-usr.enabled: false
-```
-
-Required outputs:
-
-- assembled sequence JSON and FASTA;
-- segment and annotation span JSON;
-- validation report;
-- GenBank and feature CSV for Benchling handoff;
-- canonical component-span QA `sequence_evidence_map_v1` at
-  `visual/sequence_evidence_map_v1.json` for BaseRender and ViennaRNA
-  annotation. This renders the representative 5-prime-flank-through-3-prime-
-  flank unit, not all repeated copies, and suppresses exact-span annotation
-  duplicates such as payload labels that already exist as physical segment
-  owners. BaseRender renders this as a paired top/bottom-strand view with
-  component backdrops spanning both rows, solid light Watson-Crick connectors,
-  text-only annotation labels rather than separate annotation rectangles, and
-  highlighted left/right stem-base regions on both strands. The current dogfood
-  render carries publication-facing labels (`TetO primary`, `Foldback`, `Cap`,
-  `TetO complement`, flank and stem-base labels), component hues, and backdrop
-  styles in `visual.display_profile` on the study config; Construct and
-  Folding consume that profile as data instead of hard-coding Retron terms.
-  The render uses one pinned small display font size, stronger component
-  backdrops, and collision-safe label tiering close to the relevant strand;
-- canonical folding input at
-  `folding/secondary_structure_input_sequence.json`;
-- generated BaseRender component-span QA job and SVG render path;
-- `secondary_structure_prediction_v1` folding request, preflight, and
-  prediction artifacts through the uv-managed ViennaRNA Python API. If a future
-  config selects a missing advisory CLI backend, the prediction status must be
-  explicit rather than silently green.
-- ViennaRNA-native secondary-structure SVG artifacts annotated with dnadesign
-  component hues, section labels, stem-base highlights, upright
-  counter-rotated nucleotide text, coordinate metadata, cap-right orientation
-  metadata, label collision metadata, a single fitted dnadesign background
-  canvas, closer left/right stem-base labels, optional bold/stroked stem-base
-  nucleotide emphasis, and a centered title/subtitle stack when a snapback-cap
-  section is present. Section labels and subtitle lines use one pinned
-  annotation font size. Visible summary wording should stay concise and
-  publication-facing, not machine-key-heavy.
-- generated two-row composition review SVG and high-resolution PNG sibling
-  under `visual/reviews/` that stack the ViennaRNA annotated structure above
-  the BaseRender component-span SVG and balance visual weight by keeping the
-  folded plot readable while scaling and emboldening the component-span row
-  enough that neither subplot visually
-  dominates. The review omits the standalone BaseRender component-span title
-  because the top title/subtitle already identifies the composition. BaseRender
-  remains the linear component-span renderer and should not duplicate
-  ViennaRNA's fold layout.
-
-Current checked-in Construct surface:
-
-- config:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
-- validate:
-  `uv run construct compose validate --config src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
-- run:
-  `uv run construct compose run --config src/dnadesign/construct/workspaces/retron43_teto_manual_x8/config.composition.yaml`
-- BaseRender component-span QA:
-  `uv run baserender job run src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/baserender_jobs/component_span_qa_svg.yaml`
-- composition review SVG and high-resolution PNG:
-  `uv run construct compose review --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
-- Folding preflight:
-  `uv run folding preflight --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
-- Folding run:
-  `uv run folding run --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
-- Folding plot publish:
-  `uv run folding plot --bundle src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8 --layout naview --emphasize-stem-bases`
-  Bundle mode resolves `folding/secondary_structure_prediction_v1.json`,
-  `folding/secondary_structure_input_sequence.json`,
-  `visual/sequence_evidence_map_v1.json`, and
-  `visual/viennarna_secondary_structure/` through the bundle manifest.
-- folding backend:
-  `ViennaRNA` via the uv-managed `viennarna` package, imported as `RNA`, using
-  `RNA.fold_compound(...).mfe()` on a T-to-U RNA surrogate mapped back to
-  original DNA coordinates
-- generated bundle:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8`
-- generated folding prediction:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/folding/secondary_structure_prediction_v1.json`
-- generated canonical visual contract:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/sequence_evidence_map_v1.json`
-- generated BaseRender component-span SVG:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/renders/component_span_qa_svg/component_span_qa.svg`
-- generated ViennaRNA-native structure plot manifest:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json`
-- generated ViennaRNA-native annotated SVG:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/viennarna_secondary_structure/secondary_structure.annotated.svg`
-- generated two-row composition review SVG and high-resolution PNG:
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/reviews/composition_overview.svg`
-  `src/dnadesign/construct/workspaces/retron43_teto_manual_x8/outputs/retron43_teto_manual_x8/visual/reviews/composition_overview.png`
-
-Do not commit generated `outputs/` artifacts unless explicitly requested.
+Use the completed implementation record for exact legacy commands and generated
+paths:
+[generic linear ssDNA composition plan](../../../../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md).
 
 ### Persistent Alignment Checklist
 
@@ -258,7 +166,7 @@ that agents need before opening the full spec:
   `manifest/configs/composition/`; and groups each `variants/<design-id>/`
   bundle into `sequences/`, `plots/`, semantic `manifest/` groups, and
   `runtime/construct/`. Variant IDs preserve cap/base/profile ontology with
-  uppercase suffixes such as `C172-LCGGT-RACAG-MXMM`. If payload or cap sequences are missing, the route must
+  uppercase suffixes such as `C172-LCGGG-RACAG-MXMX`. If payload or cap sequences are missing, the route must
   fail before generating placeholder GenBank or plot files. The CLI does not
   expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through

@@ -22,6 +22,8 @@ study-phase reporting.
 
 - Start with input completeness, not study phase.
 - If all required parts are present, validate and compile.
+- Preserve exact user-specified labels. Checked-in cohorts are examples or named
+  study fixtures, not replacements for live user input.
 - If a part is missing, route to the smallest primitive solver.
 - If sequence or visual artifacts are requested, materialize one MSD unit per
   design and keep complete-unit repeat expansion out of the compiler.

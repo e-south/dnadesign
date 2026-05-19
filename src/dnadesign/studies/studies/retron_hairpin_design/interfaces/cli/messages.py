@@ -102,7 +102,7 @@ def materialize_warnings(variants: list[dict[str, Any]]) -> list[str]:
         "Folding was attempted for every variant, but "
         f"{folding_warning_count} variant(s) reported {', '.join(statuses)}. "
         "Install ViennaRNA or run where the configured ViennaRNA backend is available; "
-        "no fallback prediction was used."
+        "no substitute prediction was used."
     ]
 
 

@@ -5,6 +5,7 @@ next_scope:
     msd_design_reference_catalog:
     - study_record
     - msd_reference_compile
+    - msd_materialize_readiness
     scar_nick_base_junction_context:
     - study_record
     snapback_released_probe:

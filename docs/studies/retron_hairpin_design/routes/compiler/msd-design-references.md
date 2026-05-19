@@ -41,8 +41,6 @@ design-set provenance.
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
 - Full cohort materialization spec:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`
-- Non-default S0-control materialization spec:
-  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml`
 - Public module: `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py`
 - Typed compiler spec: `retron_msd_compiler_spec_v1`
 
@@ -52,7 +50,8 @@ Lint one label:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
-  --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+  --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" \
+  --allow-non-ligatable-s0
 ```
 
 Lint a typed spec:
@@ -68,12 +67,14 @@ Compile the current workbench-backed label input:
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
+  --allow-non-ligatable-s0 \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
   --format json
 ```
 
 Materialize the full checked-in cohort from explicit 5'->3' cap/foldback
-segments:
+segments. This is a named study fixture, not a substitute for arbitrary
+user-provided labels:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
@@ -83,25 +84,20 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
   --format json
 ```
 
-Materialize the explicit non-default S0-control request:
-
-```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
-  --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml \
-  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-non-ligatable-s0-control-20260518 \
-  --render-format png \
-  --format json
-```
-
 `C###` cap IDs are not implicit de033 lookups; materialization specs must
 provide each cap as a literal 5'->3' sequence or an explicit public primitive
 source. If topology is absent, the compiler emits the whole supplied
 cap/foldback segment and omits subsection labels.
 
-Non-ligatable S0 controls are not the default. Use
-`--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true` only when the
-request intentionally preserves an `S0!=M` control. Profile drift still fails,
-and emitted references mark `scar_nick.s0_match_required=false`.
+For live user-provided labels, pass those exact labels with `--id` or write a
+transient typed spec from those labels. Do not replace the request with the
+checked-in 177-194 cohort, alter bases, or select a scar-compatible analog to
+make validation pass.
+
+Non-ligatable S0 controls are not the default. Use `--allow-non-ligatable-s0`
+or `allow_non_ligatable_s0: true` only when the request intentionally preserves
+an `S0!=M` control. Profile drift still fails, and emitted references mark
+`scar_nick.s0_match_required=false`.
 
 ### Boundaries
 
@@ -125,6 +121,10 @@ The compiler does not infer de033 sequence or topology from an id pattern.
 Sequence-producing specs must provide a literal 5'->3' cap sequence or an
 explicit public primitive source. Topology is only needed for subsection
 annotations or topology-specific claims.
+Manual custom payload or cap IDs can compile from a typed spec when that spec
+supplies literal `payload_sequences` and `cap_sequences`. Payload primitive
+sources are not accepted until a dedicated public payload-source contract
+exists.
 
 The emitted `msd_design_catalog_v1` is the Reader-facing bridge. Reader should
 not parse Construct, Folding, BaseRender, or Cruncher internals. Ad hoc compiles

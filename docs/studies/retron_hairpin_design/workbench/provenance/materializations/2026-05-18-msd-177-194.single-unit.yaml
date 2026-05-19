@@ -6,19 +6,20 @@ run_kind: materialize
 status: verified_checked_in_full_cohort
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
 compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml
-reason: The checked-in 177-194 cohort materializes from a typed spec because TetR, C172, and C26 are explicit user/source-selected sequences. The malformed operator-supplied 177 label remains a fail-fast request error, but C26 topology is not required for literal cap/foldback segment assembly or cap-right plot orientation.
+reason: The checked-in 177-194 cohort materializes from a typed spec because TetR, C172, and C26 are explicit user/source-selected sequences. The first record preserves the operator-specified pES-retron-177 C172/LCGGG/RACAG/MXMX control with an explicit non-ligatable-S0 opt-in; C26 topology is not required for literal cap/foldback segment assembly or cap-right plot orientation.
 validated_at: 2026-05-19
 validated_request:
   requested_label_count: 18
   checked_in_label_count: 18
-  invalid_requested_labels:
-    - requested_label: "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMM"
-      checked_in_label: "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
-      lint_status: failed_profile_mismatch
-      lint_error: "MSD construct label provided profile MXMM but left/right bases imply MXMX."
-      required_resolution: correct the declared profile, correct the left/right bases, or use the checked-in valid cohort label before materialize
+  allow_non_ligatable_s0: true
+  preserved_operator_labels:
+    - label: "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX"
+      msd_design_id: msd-tetr-C172-LCGGG-RACAG-MXMX
+      profile_s3s2s1s0: MXMX
+      s0_match_required: false
+  invalid_requested_labels: []
   valid_checked_in_label_input: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
-  fail_fast_invariant: do not emit sequence, GenBank, or plot deliverables when any requested label fails MSD profile validation
+  fail_fast_invariant: do not alter user-provided labels to satisfy scar compatibility; profile drift still blocks sequence, GenBank, and plot deliverables
 command_template:
   cwd: repo:.
   argv:
@@ -61,7 +62,7 @@ selected_sequence_sources:
       visual_orientation_status: whole_foldback_segment_anchors_cap_right
 observed_output:
   output_policy: transient_not_checked_in
-  output_dir: docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-single-unit-cap-right-20260519  # pragma: allowlist secret
+  output_dir: docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-user-fidelity-20260519  # pragma: allowlist secret
   record_count: 18
   folding_status: ok
   visual_orientation:

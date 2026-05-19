@@ -182,27 +182,28 @@ the vendor diagram. Those are separate frame-transform facts.
 8. Emit near hits only when the logical topology itself drifts, not when the
    current code's route family excludes a valid retained strand.
 
-### CLI Contract
+### Current CLI Contract
 
-Add a command or mode whose name matches the biological objective:
+Use the released-product target-search route for the read-only probe:
 
 ```bash
-uv run cruncher snapback screen \
+uv run cruncher snapback released-target-search \
   --workspace-root src/dnadesign/cruncher/workspaces/de033 \
-  --target-origin 0 \
-  --stem-bp 3 \
-  --cap-nt 3 \
   --nick-preset neb_nicking_v1 \
   --nick-additional-preset thermo_nicking_v1 \
   --release-preset type_iis_release_v1 \
-  --allow-retained-strands top,bottom \
-  --use-vendor-footprints \
-  --emit-mechanism-ledger
+  --release-variant-id BspQI \
+  --nick-boundary 0 \
+  --paired-bp 3 \
+  --cap-nt 3 \
+  --allow-top-active-routes \
+  --allow-precut-footprint-outside-active-product \
+  --json
 ```
 
-The existing `released-target-search` command may remain, but its default
-should not be treated as the canonical screen for this study unless it includes
-the retained-active route semantics above.
+Do not add a separate `screen` alias for this study unless it preserves the
+same retained-active route semantics through the public released-product
+contract.
 
 ### Output Contract
 
@@ -287,13 +288,12 @@ Negative tests:
 
 ### Readiness Definition
 
-The implementation is ready when a fresh `de033` screen, using real nickase and
-release presets, reports exact origin-0, stem-3, cap-3 hits for the
-hand-validated enzyme family and emits a mechanism ledger explaining why each
-hit works.
+The implementation is ready when a fresh `de033` released-product probe, using
+real nickase and release presets, reports exact origin-0, stem-3, cap-3 hits for
+the hand-validated enzyme family and emits a mechanism ledger explaining why
+each hit works.
 
-The first implementation slice is `cruncher snapback screen`. It preserves the
-released-product evaluator, but makes retained top and bottom active-product
-routes, oriented vendor footprints, and the origin-0/stem-3/cap-3 target
-topology the default screen semantics. The command emits a
-`snapback_screen_report_v1` payload with a mechanism ledger.
+The current implementation slice is the released-product target-search probe.
+It preserves the released-product evaluator while keeping retained top and
+bottom active-product routes, oriented vendor footprints, and the
+origin-0/stem-3/cap-3 target topology explicit in the command contract.

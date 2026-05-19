@@ -33,7 +33,6 @@ workbench/
       2026-05-18-msd-177-194.compile.yaml
     materializations/
       2026-05-18-msd-177-194.single-unit.yaml
-      2026-05-18-msd-177-194.non-ligatable-s0-control.yaml
   outputs/        # generated and gitignored
 ```
 

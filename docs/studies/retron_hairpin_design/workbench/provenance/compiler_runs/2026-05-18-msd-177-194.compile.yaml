@@ -4,7 +4,7 @@ study_id: retron_hairpin_design
 run_id: 2026-05-18-msd-177-194.compile
 run_kind: compile
 status: verified
-verified_at: "2026-05-18"
+verified_at: "2026-05-19"
 git_revision: f6602324f400b0d1eecd8b011e823eef2bcb1a5d # pragma: allowlist secret
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
 command:
@@ -18,6 +18,7 @@ command:
     - compile
     - --input
     - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+    - --allow-non-ligatable-s0
     - --out-dir
     - /tmp/dnadesign_retron_msd_design_references
     - --format
@@ -25,7 +26,7 @@ command:
 inputs:
   label_input:
     path: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
-    sha256: 8e01026027bbc9faf116f96e21f7be96182f7ceff23904b2e7a760b308f898ca # pragma: allowlist secret
+    sha256: bdaa6d96c7630be15fad0f755001c77576ef27da3ed580d9d1f3f5a7a3d07b32 # pragma: allowlist secret
     role: convenience compiler input mirrored from the workbench design set
   registry:
     path: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
@@ -41,8 +42,8 @@ observed_output:
   record_count: 18
   catalog_contract: msd_design_catalog_v1
   bundle_contract: msd_design_catalog_bundle_v1
-  catalog_sha256: 7db1e5d4ff8dc7a6f8378eb05c3f8a9e5bdafa2208080f65eb22923985a74c7b # pragma: allowlist secret
-  reference_index_sha256: 3454f1249e2968c5086a9791065b7a96ca735be1792d0c107a1c6c8da6133ffd # pragma: allowlist secret
+  catalog_sha256: 348a59fe6afcf88d01de5865aa5b8b5b14e8904f365edab12ad8c912b96c39d6 # pragma: allowlist secret
+  reference_index_sha256: 4460fe5329be7de366d17d0344be8fe964cb6dbfae3f32161379b5a48cda2a27 # pragma: allowlist secret
   top_level_layout: [README.md, manifest.json, msd_design_catalog_v1.json, reference_index.tsv, references]
 handoff_policy:
   persistent_meaning: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml

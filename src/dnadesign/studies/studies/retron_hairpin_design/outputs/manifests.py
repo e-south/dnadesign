@@ -90,6 +90,7 @@ def sequence_index_row(
     genbank_path = root / str(curated["genbank"])
     row: dict[str, object] = {
         "construct_id": record.construct_id,
+        "construct_label": record.construct_label,
         "msd_design_id": record.msd_design_id,
         "composition_id": composition_id,
         "unit_count": MSD_UNIT_REPEAT_COUNT,
@@ -169,6 +170,7 @@ def write_reference_index(path: Path, rows: list[dict[str, object]]) -> None:
 def write_sequence_index(path: Path, rows: list[dict[str, object]]) -> None:
     fieldnames = [
         "construct_id",
+        "construct_label",
         "msd_design_id",
         "composition_id",
         "unit_count",

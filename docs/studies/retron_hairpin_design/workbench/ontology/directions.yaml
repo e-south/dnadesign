@@ -14,7 +14,7 @@ directions:
   - id: cap_permissiveness
     label: Cap permissiveness
     question: Does a 172-cap context tolerate a 26-derived basal base route?
-    effect_tags: [cap_crossover, cap_172, base_26_derived]
+    effect_tags: [cap_crossover, cap_172, base_26_derived, non_ligatable_s0_control]
   - id: base_failure_probe
     label: Base failure probe
     question: Does a 43-like basal base route drive failure even with the 26 cap?
@@ -50,6 +50,7 @@ effect_tags:
   double_wobble: Two G:T wobble positions in the S3/S2/S1 window.
   failure_probe: Tests whether the basal route, rather than the cap, drives failure.
   mxmm_replicate: Comparator replicate of an MXMM profile route.
+  non_ligatable_s0_control: Deliberate S0!=M control; requires explicit compiler opt-in and must not be substituted with a scar-compatible base.
   s1_gt_wobble: G:T wobble at S1.
   s1_hard: Hard mismatch at S1.
   s2_gt_wobble: G:T wobble at S2.

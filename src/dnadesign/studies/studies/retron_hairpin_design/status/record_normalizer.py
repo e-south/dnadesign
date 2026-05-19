@@ -231,7 +231,7 @@ def _load_status_excerpt(path: Path, *, max_lines: int = 8) -> tuple[str, ...]:
     )
     if preferred:
         return preferred
-    return _fallback_status_excerpt(raw_lines, max_lines=max_lines)
+    return _status_excerpt_from_unheaded_text(raw_lines, max_lines=max_lines)
 
 
 def _extract_status_section_excerpt(
@@ -261,7 +261,7 @@ def _extract_status_section_excerpt(
     return tuple(lines)
 
 
-def _fallback_status_excerpt(raw_lines: Sequence[str], *, max_lines: int) -> tuple[str, ...]:
+def _status_excerpt_from_unheaded_text(raw_lines: Sequence[str], *, max_lines: int) -> tuple[str, ...]:
     lines: list[str] = []
     for raw_line in raw_lines:
         line = raw_line.strip()

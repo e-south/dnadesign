@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from ...catalog.sequence_inputs import validate_dna_sequence
 from ...compiler.exceptions import RetronMsdCompilerError
 
 
@@ -72,7 +73,13 @@ def sequence_override_map(values: list[str], *, label: str) -> dict[str, str]:
         key, separator, value = text.partition("=")
         if separator != "=" or not key.strip() or not value.strip():
             raise RetronMsdCompilerError(f"{label} override must be ID=SEQUENCE.")
-        overrides[key.strip()] = value.strip()
+        override_id = key.strip()
+        if override_id in overrides:
+            raise RetronMsdCompilerError(f"Duplicate {label} override ID: {override_id}.")
+        try:
+            overrides[override_id] = validate_dna_sequence(value, label=f"{label} override {override_id}")
+        except ValueError as exc:
+            raise RetronMsdCompilerError(str(exc)) from exc
     return overrides
 
 

@@ -14,11 +14,14 @@ These are not generated outputs and not experimental rationale.
   the workbench design-set record.
 - `inputs/msd_design_177_194_cap_sources_spec.yaml`: full checked-in
   materialization spec with TetR selected literally and C172/C26 supplied as
-  explicit 5'->3' cap/foldback segment sequences.
-- `inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml`:
-  operator-requested non-default materialization spec. It explicitly allows
-  the C172/LCGGG/RACAG/MXMX control with `s0_match_required=false`; profile
-  drift still fails.
+  explicit 5'->3' cap/foldback segment sequences. The pES-retron-177 entry is
+  the operator-specified C172/LCGGG/RACAG/MXMX control and sets
+  `allow_non_ligatable_s0: true`; profile drift still fails.
+
+Typed specs may also carry manual custom payload/cap IDs when the same spec
+provides literal `payload_sequences` and `cap_sequences`. Payload primitive
+sources are not accepted until a dedicated public payload-source contract
+exists.
 
 Persistent cohort meaning belongs in `../workbench/design_sets/`. Generated
 catalogs and sequence bundles belong in explicit transient or caller-owned

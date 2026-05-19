@@ -1,11 +1,15 @@
 contract: retron_msd_compiler_spec_v1
 schema_version: 1
+allow_non_ligatable_s0: true
 
-# Full materialization spec for the valid workbench-backed 177-194 labels.
+# Full materialization spec for the workbench-backed 177-194 labels.
+# The first label is an intentional non-ligatable-S0 control; preserve the
+# operator-specified bases/profile rather than substituting a scar-compatible
+# route.
 # Cap/foldback segments are selected as explicit 5'->3' sequences from the
 # checked-in cap source lookup, not inferred from a cap-id pattern.
 labels:
-  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+  - pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
   - pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM
   - pES-retron-179-msd[TetR]; C172-LAGTG-RCAAT-MXMM
   - pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM

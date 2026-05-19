@@ -31,7 +31,6 @@ intent:
     - repo:docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
     - repo:docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
     - repo:docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
-    - repo:docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml
     - repo:docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md
     - repo:docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md
     - repo:src/dnadesign/cruncher/docs/dev/audits/2026-04-19-retron-p4-hairpin-variant.md
@@ -47,16 +46,15 @@ command_groups:
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM" --format json
+      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" --allow-non-ligatable-s0 --format json
       - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint --spec path/to/retron_msd_compiler_spec.yaml --format json
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json
+      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json
   - id: msd_single_unit_materialize
     purpose: Materialize scar-compatible or explicitly declared non-ligatable-S0 Retron MSD labels into transient single-unit GenBank, FASTA/CSV, native secondary-structure PNG, composition-review SVG, and high-resolution composition-review PNG bundles from typed TetR/C172/C26 specs.
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
       - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml --out-dir docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-non-ligatable-s0-control-20260518 --render-format png --format json
   - id: snapback_released_probe
     purpose: Confirm the allowed-policy exact-hit versus near-hit posture for the released-product 0/3/3 lane against the real release-enzyme catalog with the Type IIS release enzyme pinned to BspQI before any mutating solve run.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
@@ -64,7 +62,7 @@ command_groups:
     commands:
       - uv run cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --json
   - id: snapback_released_solve
-    purpose: Materialize the BspQI-pinned released-product exact-hit bundle, or the bounded near-hit fallback when exact hits are absent, and emit one plot per hit after the read-only probe is clean.
+    purpose: Materialize the BspQI-pinned released-product exact-hit bundle, or the bounded near-hit route when exact hits are absent, and emit one plot per hit after the read-only probe is clean.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
     mutates_outputs: true
     commands:
@@ -97,19 +95,20 @@ native_agent_bootstrap:
   open_first:
     - repo:.agents/skills/retron-hairpin-study/SKILL.md
     - manifest:routes/README.md
-    - repo:docs/studies/retron_hairpin_design/workbench/README.md
-    - repo:docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
-    - manifest:compiler/catalog/msd_design_registry.yaml
-    - manifest:compiler/inputs/msd_design_hit_labels.txt
-    - manifest:compiler/catalog/msd_cap_sources.yaml
-    - manifest:compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
-    - repo:docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md
+    - manifest:compiler/README.md
+    - repo:docs/studies/retron_hairpin_design/routes/compiler/msd-design-references.md
+  cohort_fixture_refs:
+    materialize_checked_in_177_194_only:
+      - manifest:compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
+      - manifest:compiler/inputs/msd_design_hit_labels.txt
+      - repo:docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
   pair_with:
     - harness-engineering
     - code-change-discipline
   must_preserve:
     - start compiler-style requests from provided parts and desired outputs, not study phase
     - complete Retron MSD labels compile directly into design-reference catalogs
+    - live user-provided labels are authoritative; do not substitute checked-in cohort labels or scar-compatible analogs to make lint green
     - persistent experimental meaning lives in workbench design-set and run-provenance records; msd_design_hit_labels.txt is only a convenience compiler input
     - Retron MSD design-reference compilation is study-owned, uses
       user-provided labels or typed compiler specs plus registry metadata, emits a shallow

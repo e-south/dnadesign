@@ -4,6 +4,7 @@ study_id: retron_hairpin_design
 design_set_id: scar_nick_profile_panel_v1
 title: Scar-nick profile panel v1
 authority: persistent study workbench design cohort
+allow_non_ligatable_s0: true
 label_count: 18
 source_refs:
   directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
@@ -12,12 +13,13 @@ source_refs:
   cap_source_lookup: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
   compiler_module: src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py
 input_hashes:
-  convenience_label_input_sha256: 8e01026027bbc9faf116f96e21f7be96182f7ceff23904b2e7a760b308f898ca # pragma: allowlist secret
+  convenience_label_input_sha256: bdaa6d96c7630be15fad0f755001c77576ef27da3ed580d9d1f3f5a7a3d07b32 # pragma: allowlist secret
   registry_sha256: 9b0716e4dc2f7df3241f9bd570612dd76d9e37908b0f8421aca0012a202dd1ba # pragma: allowlist secret
   cap_source_lookup_sha256: f5cdc3f13c5d860529478e1bdf31681e7372623b49c047652cda3513099139e6 # pragma: allowlist secret
 selection_basis:
   - Study-selected Retron MSD labels pES-retron-177 through pES-retron-194.
   - Preserve cap/base/profile ontology in every expected msd_design_id.
+  - Preserve operator-specified labels exactly; do not substitute scar-compatible bases to make lint green.
   - Keep cap/shortening, scar-nick, and YIU evidence as source references rather than inline tool internals.
 compiler_contract:
   label_contract: lab-facing Retron MSD shorthand ID
@@ -25,18 +27,19 @@ compiler_contract:
   materialized_output_contract: msd_single_unit_sequence_bundle_v1
 designs:
   - construct_id: pES-retron-177
-    label: pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
-    expected_msd_design_id: msd-tetr-C172-LCGGT-RACAG-MXMM
+    label: pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
+    expected_msd_design_id: msd-tetr-C172-LCGGG-RACAG-MXMX
     payload_id: TetR
     cap_id: C172
-    left_base: CGGT
+    left_base: CGGG
     right_base: ACAG
-    profile_s3s2s1s0: MXMM
+    profile_s3s2s1s0: MXMX
+    s0_match_required: false
     direction_ids: [cap_permissiveness]
-    effect_tags: [cap_crossover, cap_172, base_26_derived]
+    effect_tags: [cap_crossover, cap_172, base_26_derived, non_ligatable_s0_control]
     nick_orientation:
     nickase:
-    rationale: 26-derived base / 172-cap crossover; tests 172-cap permissiveness.
+    rationale: Operator-specified 26-derived base / 172-cap crossover with non-ligatable S0 control; tests 172-cap permissiveness without substituting bases.
   - construct_id: pES-retron-178
     label: pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM
     expected_msd_design_id: msd-tetr-C26-LCAAG-RCTCG-MXMM

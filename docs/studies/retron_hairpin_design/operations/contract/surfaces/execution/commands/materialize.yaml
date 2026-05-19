@@ -1,4 +1,4 @@
-msd_design_reference_lint:
+msd_single_unit_materialize_lint:
   surface_type: command
   cwd_ref: repo:.
   argv:
@@ -8,12 +8,11 @@ msd_design_reference_lint:
   - -m
   - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
   - lint
-  - --id
-  - pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
-  - --allow-non-ligatable-s0
+  - --spec
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
   - --format
   - json
-msd_design_reference_compile:
+msd_single_unit_materialize:
   surface_type: command
   cwd_ref: repo:.
   argv:
@@ -22,11 +21,12 @@ msd_design_reference_compile:
   - python
   - -m
   - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
-  - compile
-  - --input
-  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
-  - --allow-non-ligatable-s0
+  - materialize
+  - --spec
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
   - --out-dir
-  - /tmp/dnadesign_retron_msd_design_references
+  - /tmp/dnadesign_retron_msd_sequences
+  - --render-format
+  - png
   - --format
   - json

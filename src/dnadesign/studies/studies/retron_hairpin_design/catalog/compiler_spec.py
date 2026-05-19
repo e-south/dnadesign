@@ -21,8 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
-from .msd_ids import MsdDesignPartInput, parse_msd_construct_label, parse_msd_design_parts
+from .msd_ids import (
+    MsdDesignPartInput,
+    compute_scar_nick_profile,
+    parse_msd_construct_label,
+    parse_msd_design_parts,
+)
 from .registry import load_retron_msd_registry
+from .sequence_inputs import validate_dna_sequence
 
 
 class MsdCompilerSpecError(ValueError):
@@ -59,12 +65,16 @@ class ScarNickStemBaseSourceSpec(MsdCompilerSpecModel):
     selector: RankedPrimitiveSelectorSpec
 
 
-class SequenceInputSpec(MsdCompilerSpecModel):
+class LiteralSequenceInputSpec(MsdCompilerSpecModel):
+    sequence: str
+
+
+class CapSequenceInputSpec(MsdCompilerSpecModel):
     sequence: str | None = None
     source: SnapbackCapSourceSpec | None = None
 
     @model_validator(mode="after")
-    def _validate_sequence_or_source(self) -> "SequenceInputSpec":
+    def _validate_sequence_or_source(self) -> "CapSequenceInputSpec":
         if self.sequence is None and self.source is None:
             raise ValueError("sequence input requires sequence or source.")
         if self.sequence is not None and self.source is not None:
@@ -108,8 +118,8 @@ class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
     allow_non_ligatable_s0: bool = False
     labels: list[str] = Field(default_factory=list)
     designs: list[MsdDesignInputSpec] = Field(default_factory=list)
-    payload_sequences: dict[str, SequenceInputSpec] = Field(default_factory=dict)
-    cap_sequences: dict[str, SequenceInputSpec] = Field(default_factory=dict)
+    payload_sequences: dict[str, LiteralSequenceInputSpec] = Field(default_factory=dict)
+    cap_sequences: dict[str, CapSequenceInputSpec] = Field(default_factory=dict)
 
     @field_validator("labels")
     @classmethod
@@ -119,7 +129,27 @@ class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
             raise ValueError("labels must not contain blank entries.")
         return labels
 
-    @field_validator("payload_sequences", "cap_sequences", mode="before")
+    @field_validator("payload_sequences", mode="before")
+    @classmethod
+    def _coerce_payload_sequence_inputs(cls, value: Any) -> Any:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("sequence maps must be mappings.")
+        coerced = {}
+        for key, item in value.items():
+            if isinstance(item, str):
+                coerced[key] = {"sequence": item}
+                continue
+            if isinstance(item, dict) and "source" in item:
+                raise ValueError(
+                    f"payload_sequences.{key} accepts only literal sequence; "
+                    "payload primitive sources need a dedicated public contract."
+                )
+            coerced[key] = item
+        return coerced
+
+    @field_validator("cap_sequences", mode="before")
     @classmethod
     def _coerce_sequence_inputs(cls, value: Any) -> Any:
         if value is None:
@@ -156,12 +186,18 @@ def load_msd_compiler_spec(
 
     cap_sequences, cap_metadata = _resolve_cap_sequences(spec.cap_sequences)
     payload_sequences = _resolve_literal_sequence_map(spec.payload_sequences, label="payload_sequences")
+    payload_metadata = {payload_id: {} for payload_id in payload_sequences}
     records: list[MsdDesignReferenceV1] = []
     allow_s0_exception = allow_non_ligatable_s0 or spec.allow_non_ligatable_s0
 
     for label in spec.labels:
+        parsed = parse_msd_construct_label(label, allow_non_ligatable_s0=allow_s0_exception)
         records.append(
-            registry.build_reference(parse_msd_construct_label(label, allow_non_ligatable_s0=allow_s0_exception))
+            registry.build_reference(
+                parsed,
+                payload_metadata=payload_metadata.get(parsed.payload_id),
+                cap_metadata=cap_metadata.get(parsed.cap_id),
+            )
         )
     for design in spec.designs:
         parts, scar_nick_metadata = _resolve_design_parts(design)
@@ -169,6 +205,7 @@ def load_msd_compiler_spec(
         records.append(
             registry.build_reference_from_parts(
                 parsed,
+                payload_metadata=payload_metadata.get(parts.payload_id),
                 cap_metadata=cap_metadata.get(parts.cap_id),
                 scar_nick_metadata=scar_nick_metadata,
                 source_notes=design.source_notes,
@@ -176,6 +213,7 @@ def load_msd_compiler_spec(
         )
 
     _reject_duplicate_design_ids(records)
+    _validate_cap_topology_bounds(records, cap_sequences=cap_sequences)
     return ResolvedMsdCompilerSpec(
         spec_path=spec_path,
         catalog=MsdDesignCatalogV1(records=records),
@@ -199,21 +237,17 @@ def _load_mapping(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _resolve_literal_sequence_map(values: dict[str, SequenceInputSpec], *, label: str) -> dict[str, str]:
+def _resolve_literal_sequence_map(values: dict[str, LiteralSequenceInputSpec], *, label: str) -> dict[str, str]:
     resolved: dict[str, str] = {}
     for key, entry in values.items():
         if not isinstance(key, str) or not key.strip():
             raise MsdCompilerSpecError(f"{label} contains a blank key.")
-        if entry.source is not None:
-            raise MsdCompilerSpecError(f"{label}.{key} does not support primitive sources; provide a literal sequence.")
-        if entry.sequence is None:
-            raise MsdCompilerSpecError(f"{label}.{key} requires a literal sequence.")
         resolved[key.strip()] = _dna_sequence(entry.sequence, label=f"{label}.{key}.sequence")
     return resolved
 
 
 def _resolve_cap_sequences(
-    values: dict[str, SequenceInputSpec],
+    values: dict[str, CapSequenceInputSpec],
 ) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
     sequences: dict[str, str] = {}
     metadata: dict[str, dict[str, Any]] = {}
@@ -223,6 +257,7 @@ def _resolve_cap_sequences(
         cap_id = key.strip()
         if entry.sequence is not None:
             sequences[cap_id] = _dna_sequence(entry.sequence, label=f"cap_sequences.{cap_id}.sequence")
+            metadata[cap_id] = {}
             continue
         if entry.source is None:
             raise MsdCompilerSpecError(f"cap_sequences.{cap_id} requires sequence or source.")
@@ -260,6 +295,13 @@ def _resolve_design_parts(design: MsdDesignInputSpec) -> tuple[MsdDesignPartInpu
         if primitive.nicked_strand not in {"top", "bottom"}:
             raise MsdCompilerSpecError(
                 f"Selected scar_nick primitive {primitive.primitive_id} must expose nicked_strand top or bottom."
+            )
+        observed_profile = compute_scar_nick_profile(left_base=primitive.left_base, right_base=primitive.right_base)
+        if primitive.profile_s3s2s1s0 != observed_profile:
+            raise MsdCompilerSpecError(
+                f"Selected scar_nick primitive {primitive.primitive_id} profile {primitive.profile_s3s2s1s0} "
+                f"does not match left/right bases {primitive.left_base}/{primitive.right_base}; "
+                f"observed {observed_profile}."
             )
         scar_nick_metadata = {
             "route_status": "resolved",
@@ -325,13 +367,10 @@ def _select_ranked(primitives: list[Any], *, selector: RankedPrimitiveSelectorSp
 
 
 def _dna_sequence(value: str, *, label: str) -> str:
-    text = str(value or "").strip()
-    if not text:
-        raise MsdCompilerSpecError(f"{label} cannot be empty.")
-    invalid = sorted(set(text.upper()) - {"A", "C", "G", "T"})
-    if invalid:
-        raise MsdCompilerSpecError(f"{label} contains non-DNA bases: {''.join(invalid)}.")
-    return text
+    try:
+        return validate_dna_sequence(value, label=label)
+    except ValueError as exc:
+        raise MsdCompilerSpecError(str(exc)) from exc
 
 
 def _reject_duplicate_design_ids(records: list[MsdDesignReferenceV1]) -> None:
@@ -344,6 +383,24 @@ def _reject_duplicate_design_ids(records: list[MsdDesignReferenceV1]) -> None:
     )
     if duplicate_ids:
         raise MsdCompilerSpecError(f"Compiler spec emits duplicate MSD design id(s): {', '.join(duplicate_ids)}")
+
+
+def _validate_cap_topology_bounds(
+    records: list[MsdDesignReferenceV1],
+    *,
+    cap_sequences: dict[str, str],
+) -> None:
+    for record in records:
+        topology = record.cap.snapback_topology
+        sequence = cap_sequences.get(record.cap.id)
+        if topology is None or sequence is None:
+            continue
+        topology_end = topology.foldback_return_span.end
+        if topology_end > len(sequence):
+            raise MsdCompilerSpecError(
+                f"cap_sequences.{record.cap.id}.sequence is {len(sequence)} nt but supplied topology ends at "
+                f"{topology_end}; provide a matching literal cap/foldback segment or use a cap id without topology."
+            )
 
 
 __all__ = [

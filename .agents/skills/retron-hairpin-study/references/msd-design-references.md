@@ -18,10 +18,16 @@ If the user provides a typed `retron_msd_compiler_spec_v1`, parse labels or
 explicit design parts from the spec. If any primitive is missing, route instead
 of guessing.
 
+User-provided labels are authoritative for a live request. Do not switch to a
+checked-in cohort spec, alter left/right bases, or choose a scar-compatible
+analog just to make validation pass. If validation needs an intentional
+non-ligatable-S0 control, require `--allow-non-ligatable-s0` or
+`allow_non_ligatable_s0: true` and still preserve the exact label.
+
 Minimum complete materialized deliverable:
 
 - complete reference fields above
-- concrete payload sequence for every payload id
+- concrete literal payload sequence for every payload id
 - concrete cap sequence for every cap id, either literal or from an explicit
   public primitive source
 
@@ -56,6 +62,10 @@ catalog.
   user-selected cap/foldback segment, payload complement, right base + 3'
   flank. Snapback subsection labels are optional topology metadata, not a
   requirement for literal sequence assembly.
+- Manual custom payload or cap IDs can compile from a typed spec when that spec
+  supplies literal `payload_sequences` and `cap_sequences`. Payload primitive
+  sources are not accepted until a dedicated public payload-source contract
+  exists.
 - `C###` cap IDs are symbolic. Known cap sequences live in
   `msd_cap_sources.yaml`: `C26=AGGC`, `C43=tCCTCAGcccGCTGAGGa`, and the
   selected `C172-C176` de033 source labels. The compiler does not infer de033
@@ -69,7 +79,8 @@ Lint one label:
 
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
-  --id "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM" \
+  --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" \
+  --allow-non-ligatable-s0 \
   --format json
 ```
 
@@ -86,6 +97,7 @@ Compile the selected hit list:
 ```bash
 uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
+  --allow-non-ligatable-s0 \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
   --format json
 ```
@@ -105,8 +117,9 @@ The same `compile` and `materialize` commands accept `--spec` instead of
 `--id` or `--input`; do not mix those input surfaces in one command.
 `C###` cap IDs are not implicit de033 lookups; materialization specs must
 provide each cap as a literal 5'->3' sequence or an explicit public primitive
-source. If topology is absent, the whole supplied cap/foldback segment is
-materialized as one segment and subsection labels are omitted.
+source. Payload sequences are literal today. If topology is absent, the whole
+supplied cap/foldback segment is materialized as one segment and subsection
+labels are omitted.
 
 For persistent experimental provenance, update the workbench design set and run
 records. Generated compile/materialize bundles remain transient unless an
@@ -123,7 +136,10 @@ GenBank files or verify plot paths.
 - Recompute scar-nick profile from left/right bases.
 - Reject profile drift.
 - Reject non-ligatable `S0`.
-- Reject unknown payload/cap registry entries.
+- Admit non-ligatable `S0` only under explicit control opt-in; never substitute
+  bases or profiles to satisfy the default rule.
+- Reject unknown payload/cap registry entries unless the typed spec supplies
+  explicit literal sequences for those IDs.
 - Reject mixed `--spec` and ad hoc `--id`/`--input` sources.
 - Reject primitive source selectors that return multiple options; use
   `selector.mode=rank` for the explicit combination until a separate expansion
@@ -162,7 +178,7 @@ catalogs and frozen references under `manifest/catalog/`, indexes under
 `runtime/construct/` for the producer bundle. `runtime/construct/manifest/`
 mirrors the same semantic grouping for producer metadata. Variant directory
 names preserve scar-nick ontology in the suffix, for example
-`msd-tetr-C172-LCGGT-RACAG-MXMM`, with cap, left base, right base, and mismatch
+`msd-tetr-C172-LCGGG-RACAG-MXMX`, with cap, left base, right base, and mismatch
 profile uppercase. `manifest/indexes/sequence_index.tsv` carries the `open -R`
 Finder reveal command for each forward GenBank file.
 

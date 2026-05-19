@@ -8,10 +8,11 @@
 - This study now routes Retron MSD product work as a genetic compiler:
   user-provided or study-selected parts become frozen
   `msd_design_reference_v1` / `msd_design_catalog_v1` records first.
-- Complete labels or complete part sets should compile directly. Missing
-  cap/shortening constraints route to released-product Snapback; missing
-  basal left/right base, terminal-nick, or profile constraints route to
-  scar-nick.
+- Complete labels or complete part sets should compile directly. User-provided
+  labels must be preserved exactly; do not substitute scar-compatible bases,
+  profiles, caps, or construct numbers to make validation pass. Missing
+  cap/shortening constraints route to released-product Snapback; missing basal
+  left/right base, terminal-nick, or profile constraints route to scar-nick.
 - Sequence artifact output is one MSD unit per design: 5' flank + left base,
   payload primary, a user-selected cap/foldback segment, payload complement,
   right base + 3' flank. Snapback subsection labels are emitted only when
@@ -33,7 +34,7 @@
 ### Quick route
 
 - Compiler/product route:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - GenBank/native-structure-PNG/review-PNG route for the full checked-in cohort:
   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json`
 - Status route for explicit progress/history questions only:
@@ -49,7 +50,8 @@
   compilation, not a new generic top-level tool and not a workspace family.
 - The compiler validates user-provided payload, cap, left base, right base,
   and optional profile code; it recomputes `S3/S2/S1/S0` and fails fast on
-  profile drift or non-ligatable `S0`.
+  profile drift or non-ligatable `S0` unless the caller explicitly opts into an
+  `S0!=M` control.
 - The selected 177-194 scar-nick labels compile into one catalog from
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt`.
 - Known cap sequences live in

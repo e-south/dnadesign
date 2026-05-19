@@ -2,7 +2,7 @@
 # Authoritative cohort provenance lives in:
 # docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
 # One lab-facing construct label per non-comment line.
-pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
 pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM
 pES-retron-179-msd[TetR]; C172-LAGTG-RCAAT-MXMM
 pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM
