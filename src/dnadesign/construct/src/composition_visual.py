@@ -219,11 +219,21 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
         "unit_copies": _canonical_unit_copy_meta(view),
         "representative_unit_copies": [representative.to_dict()],
         "span_backdrops": [
-            *_segment_span_backdrops(segment_spans, view, display_profile=display_profile),
+            *_segment_span_backdrops(
+                segment_spans,
+                view,
+                annotation_spans=annotation_spans,
+                display_profile=display_profile,
+            ),
             *_annotation_span_backdrops(annotation_spans, view, display_profile=display_profile),
         ],
         "segment_labels": [
-            *_segment_label_entries(segment_spans, view, display_profile=display_profile),
+            *_segment_label_entries(
+                segment_spans,
+                view,
+                annotation_spans=annotation_spans,
+                display_profile=display_profile,
+            ),
             *_annotation_label_entries(annotation_spans, view, display_profile=display_profile),
         ],
         "legend_exclude_tags": _legend_exclude_tags(segment_spans, annotation_spans),
@@ -248,13 +258,19 @@ def _segment_span_backdrops(
     segment_spans: list[Any],
     view: dict[str, Any],
     *,
+    annotation_spans: list[Any],
     display_profile: Any,
 ) -> list[dict[str, object]]:
     backdrops: list[dict[str, object]] = []
+    has_snapback_subsections = _has_snapback_subsection_annotations(annotation_spans)
     for span in segment_spans:
         styles = display_profile.component_styles
         configured_style = styles.get(span.segment_id) or styles.get(span.role)
-        if _suppresses_overview_markup(span.segment_id, span.role):
+        if _suppresses_overview_markup(
+            span.segment_id,
+            span.role,
+            has_snapback_subsections=has_snapback_subsections,
+        ):
             continue
         if configured_style is None and span.segment_id not in display_profile.component_labels:
             continue
@@ -280,11 +296,17 @@ def _segment_label_entries(
     segment_spans: list[Any],
     view: dict[str, Any],
     *,
+    annotation_spans: list[Any],
     display_profile: Any,
 ) -> list[dict[str, object]]:
     labels: list[dict[str, object]] = []
+    has_snapback_subsections = _has_snapback_subsection_annotations(annotation_spans)
     for span in segment_spans:
-        if _suppresses_overview_markup(span.segment_id, span.role):
+        if _suppresses_overview_markup(
+            span.segment_id,
+            span.role,
+            has_snapback_subsections=has_snapback_subsections,
+        ):
             continue
         text = display_profile.component_labels.get(span.segment_id)
         if not text:
@@ -326,13 +348,19 @@ def _annotation_label_entries(
     return labels
 
 
-def _suppresses_overview_markup(identifier: str, role: str) -> bool:
-    suppressed = {
-        "snapback_foldback_geometry",
-        "snapback_retained_stem",
-        "snapback_foldback_return",
-    }
-    return identifier in suppressed or role in suppressed
+def _has_snapback_subsection_annotations(annotation_spans: list[Any]) -> bool:
+    subsection_ids = {"snapback_retained_stem", "snapback_cap", "snapback_foldback_return"}
+    return any(span.annotation_id in subsection_ids or span.role in subsection_ids for span in annotation_spans)
+
+
+def _suppresses_overview_markup(identifier: str, role: str, *, has_snapback_subsections: bool = False) -> bool:
+    if identifier in {"snapback_retained_stem", "snapback_foldback_return"}:
+        return True
+    if role in {"snapback_retained_stem", "snapback_foldback_return"}:
+        return True
+    if identifier == "snapback_foldback_geometry" or role == "snapback_foldback_geometry":
+        return has_snapback_subsections
+    return False
 
 
 def _annotation_span_backdrops(

@@ -984,6 +984,47 @@ constructs:
     assert not {"snapback_retained_stem", "snapback_cap", "snapback_foldback_return"} & {
         row["feature_id"] for row in feature_rows
     }
+    visual_contract = json.loads((variant_dir / "manifest" / "visual" / "sequence_evidence_map_v1.json").read_text())
+    labels_by_text = {label["text"]: label for label in visual_contract["meta"]["segment_labels"]}
+    assert labels_by_text["Foldback"]["start"] == flank_5p_len + len(_TETO_PAYLOAD)
+    assert labels_by_text["Foldback"]["end"] == labels_by_text["Foldback"]["start"] + len("AGGC")
+    assert not {"Cap", "Foldback stem", "Foldback return"} & set(labels_by_text)
+    assert any(
+        backdrop["semantic"] == "snapback_foldback_geometry" for backdrop in visual_contract["meta"]["span_backdrops"]
+    )
+
+    annotation_manifest = json.loads(
+        (
+            variant_dir
+            / "runtime"
+            / "construct"
+            / "visual"
+            / "viennarna_secondary_structure"
+            / "secondary_structure.annotation_manifest.json"
+        ).read_text()
+    )
+    layout_normalization = annotation_manifest["layout_normalization"]
+    assert layout_normalization["applied"] is True
+    assert layout_normalization["requested_orientation"] == "cap_right"
+    sections_by_id = {section["section_id"]: section for section in annotation_manifest["section_annotations"]}
+    anchor_section = sections_by_id[layout_normalization["anchor"]]
+    assert anchor_section["label"] == "Foldback"
+    assert "snapback_foldback_geometry" in anchor_section["semantic_tokens"]
+    assert anchor_section["section_kind"] == "cap_foldback"
+
+    annotated_svg = (
+        variant_dir
+        / "runtime"
+        / "construct"
+        / "visual"
+        / "viennarna_secondary_structure"
+        / "secondary_structure.annotated.svg"
+    ).read_text()
+    composition_overview_svg = (variant_dir / "plots" / "composition_overview.svg").read_text()
+    assert 'data-dnadesign-orientation="cap_right"' in annotated_svg
+    assert 'data-dnadesign-section-label="Foldback"' in annotated_svg
+    assert 'data-dnadesign-source-orientation="cap_right"' in composition_overview_svg
+    assert 'data-dnadesign-section-label="Foldback"' in composition_overview_svg
 
 
 def test_retron_msd_materialize_requires_viennarna_for_deliverable_plots(

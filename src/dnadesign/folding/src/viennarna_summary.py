@@ -125,10 +125,12 @@ def _cap_summary(
     visual_contract: SequenceEvidenceMapV1,
     section_annotations: list[dict[str, object]],
 ) -> str:
-    section = next(
-        (item for item in section_annotations if str(item.get("section_kind", "")) == "cap"),
-        None,
-    )
+    section = next((item for item in section_annotations if str(item.get("section_kind", "")) == "cap"), None)
+    if section is None:
+        section = next(
+            (item for item in section_annotations if str(item.get("section_kind", "")) == "cap_foldback"),
+            None,
+        )
     if section is None:
         return ""
     start = int(section["start"])

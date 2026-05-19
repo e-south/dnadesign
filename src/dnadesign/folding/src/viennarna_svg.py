@@ -784,6 +784,8 @@ def _owner_ids_for_span(
 
 def _section_kind(label: str) -> str:
     lowered = str(label).strip().lower()
+    if lowered == "foldback":
+        return "cap_foldback"
     if "stem base" in lowered or lowered in {"left base", "right base"}:
         return "stem_base"
     if "cap" in lowered:
@@ -793,6 +795,8 @@ def _section_kind(label: str) -> str:
 
 def _section_semantic(label: str) -> str:
     lowered = str(label).strip().lower()
+    if lowered == "foldback":
+        return "snapback_foldback_geometry"
     if lowered == "cap":
         return "snapback_cap"
     if lowered == "foldback stem":
@@ -826,6 +830,9 @@ def _append_style_declarations(style: str, declarations: tuple[str, ...]) -> str
 def _cap_section(section_annotations: list[dict[str, object]]) -> dict[str, object] | None:
     for section in section_annotations:
         if str(section.get("section_kind", "")) == "cap":
+            return section
+    for section in section_annotations:
+        if str(section.get("section_kind", "")) == "cap_foldback":
             return section
     return None
 
