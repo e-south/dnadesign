@@ -214,6 +214,19 @@ def test_parse_msd_construct_label_rejects_non_ligatable_s0() -> None:
         parse_msd_construct_label("pES-retron-177-msd[TetR]; C172-LCGGT-RCCAA")
 
 
+def test_parse_msd_construct_label_allows_non_ligatable_s0_with_explicit_opt_in() -> None:
+    parsed = parse_msd_construct_label(
+        "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX",
+        allow_non_ligatable_s0=True,
+    )
+
+    assert parsed.left_base == "CGGG"
+    assert parsed.right_base == "ACAG"
+    assert parsed.profile_s3s2s1s0 == "MXMX"
+    assert parsed.s0_match_required is False
+    assert parsed.msd_design_id == "msd-tetr-C172-LCGGG-RACAG-MXMX"
+
+
 def test_retron_msd_lint_cli_reports_reference_json(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
 
@@ -326,6 +339,43 @@ cap_sequences:
     assert payload["status"] == "ok"
     assert payload["record_count"] == 1
     assert payload["records"][0]["construct_label"] == "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+
+
+def test_retron_msd_lint_spec_allows_non_ligatable_s0_when_declared(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+allow_non_ligatable_s0: true
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172: GAGAGACTC
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    record = json.loads(result.stdout)["records"][0]
+    assert record["msd_design_id"] == "msd-tetr-C172-LCGGG-RACAG-MXMX"
+    assert record["scar_nick"]["s0_match_required"] is False
 
 
 def test_retron_msd_lint_spec_resolves_public_primitive_sources(tmp_path: Path) -> None:
@@ -660,6 +710,34 @@ def test_retron_msd_compile_cli_writes_catalog(tmp_path: Path) -> None:
     assert catalog["records"][0]["construct_id"] == "pES-retron-177"
 
 
+def test_retron_msd_compile_cli_allows_non_ligatable_s0_with_explicit_flag(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "compiled"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "compile",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX",
+            "--allow-non-ligatable-s0",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    record = payload["records"][0]
+    assert record["msd_design_id"] == "msd-tetr-C172-LCGGG-RACAG-MXMX"
+    assert record["scar_nick"]["profile_s3s2s1s0"] == "MXMX"
+    assert record["scar_nick"]["s0_match_required"] is False
+
+
 def test_retron_msd_compile_text_reports_output_nudges(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "compiled"
@@ -805,6 +883,33 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
     assert "cap(s): C172" in payload["error"]
     assert "--payload-sequence ID=ACGT" in payload["next_step"]
     assert "explicit 5'->3' cap sequences" in payload["next_step"]
+
+
+def test_retron_msd_materialize_flag_admits_non_ligatable_s0_before_sequence_checks(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    out_dir = tmp_path / "sequence_bundle"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "materialize",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX",
+            "--allow-non-ligatable-s0",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--out-dir",
+            out_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "requires concrete sequence subcomponents" in payload["error"]
+    assert "must be scar-compatible" not in payload["error"]
 
 
 def test_retron_msd_materialize_accepts_literal_cap_segment_without_snapback_topology(

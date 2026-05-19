@@ -2824,6 +2824,18 @@ def test_docs_root_heading_style_check_accepts_level_two_title_and_lower_section
     assert issues == []
 
 
+def test_docs_root_heading_style_check_ignores_generated_output_markdown(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "README.md", "## Documentation Index\n")
+    _write(
+        tmp_path / "docs" / "studies" / "demo" / "workbench" / "outputs" / "bundle" / "README.md",
+        "# Generated Bundle\n",
+    )
+
+    issues = _find_docs_root_heading_style_issues(tmp_path)
+
+    assert issues == []
+
+
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:
     source = tmp_path / "docs" / "source.md"
     target = tmp_path / "docs" / "target.md"

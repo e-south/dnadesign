@@ -784,6 +784,8 @@ def _find_docs_root_heading_style_issues(repo_root: Path) -> list[str]:
 
     issues: list[str] = []
     for path in sorted(docs_root.rglob("*.md")):
+        if "outputs" in path.relative_to(repo_root).parts:
+            continue
         headings = _collect_markdown_headings_outside_fences(path)
         if not headings:
             continue

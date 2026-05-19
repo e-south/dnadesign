@@ -93,7 +93,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.11"
+    assert metadata["version"] == "0.7.12"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -180,6 +180,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     )
     workbench_materialization = _read(
         "docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
+    )
+    workbench_nondefault_materialization = _read(
+        "docs/studies/retron_hairpin_design/workbench/provenance/materializations/"
+        "2026-05-18-msd-177-194.non-ligatable-s0-control.yaml"
     )
     pipeline = _read("docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml")
     command_group_map = _read("docs/studies/retron_hairpin_design/operations/runtime/command-groups/README.md")
@@ -270,6 +274,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "retron_msd_design_set_v1" in workbench_design_set
     assert "retron_msd_compiler_run_record_v1" in workbench_compile_run
     assert "retron_msd_materialization_record_v1" in workbench_materialization
+    assert "retron_msd_materialization_record_v1" in workbench_nondefault_materialization
     assert "msd_design_hit_labels.txt` remains a convenience compiler input" in workbench_readme
     assert "ontology/" in workbench_readme
     assert "design_sets/" in workbench_readme
@@ -353,6 +358,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "flat references" in pipeline
     assert "id: msd_single_unit_materialize" in pipeline
     assert "msd_design_177_194_cap_sources_spec.yaml" in pipeline
+    assert "msd_design_177_194_non_ligatable_s0_control_spec.yaml" in pipeline
     assert "msd_single_unit_materialize:" in ops_study
     assert "sequence_manifest.json" in pipeline
     assert "secondary_structure.native.png" in pipeline
@@ -398,6 +404,12 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
             "docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
         )
     )
+    nondefault_materialization = yaml.safe_load(
+        _read(
+            "docs/studies/retron_hairpin_design/workbench/provenance/materializations/"
+            "2026-05-18-msd-177-194.non-ligatable-s0-control.yaml"
+        )
+    )
     label_lines = [
         line.strip()
         for line in _read("docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt").splitlines()
@@ -412,6 +424,8 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     assert compiler_run["schema_version"] == 1
     assert materialization["contract"] == "retron_msd_materialization_record_v1"
     assert materialization["schema_version"] == 1
+    assert nondefault_materialization["contract"] == "retron_msd_materialization_record_v1"
+    assert nondefault_materialization["schema_version"] == 1
 
     known_directions = {direction["id"]: direction for direction in directions["directions"]}
     known_effect_tags = set(directions["effect_tags"])
@@ -489,12 +503,26 @@ def test_retron_hairpin_workbench_design_set_records_compile_and_trace_provenanc
     assert "plots/composition_overview.svg" in materialization["expected_output"]["per_design_deliverables"]
     assert "plots/composition_overview.png" in materialization["expected_output"]["per_design_deliverables"]
 
+    assert nondefault_materialization["status"] == "verified_non_default_s0_control"
+    assert nondefault_materialization["request_contract"]["allow_non_ligatable_s0"] is True
+    nondefault_label = nondefault_materialization["request_contract"]["accepted_non_ligatable_s0_labels"][0]
+    assert nondefault_label["label"] == "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX"
+    assert nondefault_label["profile_s3s2s1s0"] == "MXMX"
+    assert nondefault_label["s0_match_required"] is False
+    assert nondefault_materialization["observed_output"]["record_count"] == 18
+    assert nondefault_materialization["observed_output"]["folding_status"] == "ok"
+
 
 def test_retron_hairpin_workbench_keeps_root_bounded_by_record_lanes() -> None:
     workbench = _repo_root() / "docs" / "studies" / "retron_hairpin_design" / "workbench"
+    generated_dirs = {"outputs"}
 
     visible_root_files = {path.name for path in workbench.iterdir() if path.is_file() and not path.name.startswith(".")}
-    visible_root_dirs = {path.name for path in workbench.iterdir() if path.is_dir() and not path.name.startswith(".")}
+    visible_root_dirs = {
+        path.name
+        for path in workbench.iterdir()
+        if path.is_dir() and not path.name.startswith(".") and path.name not in generated_dirs
+    }
 
     assert visible_root_files == {"README.md"}
     assert visible_root_dirs == {"design_sets", "ontology", "provenance"}
@@ -507,6 +535,9 @@ def test_retron_hairpin_workbench_keeps_root_bounded_by_record_lanes() -> None:
     assert (workbench / "provenance" / "compiler_runs" / "2026-05-18-msd-177-194.compile.yaml").exists()
     assert (workbench / "provenance" / "materializations" / "README.md").exists()
     assert (workbench / "provenance" / "materializations" / "2026-05-18-msd-177-194.single-unit.yaml").exists()
+    assert (
+        workbench / "provenance" / "materializations" / "2026-05-18-msd-177-194.non-ligatable-s0-control.yaml"
+    ).exists()
 
 
 def test_named_study_records_keep_root_bounded_by_semantic_lanes() -> None:

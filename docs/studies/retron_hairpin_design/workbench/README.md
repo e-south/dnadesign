@@ -16,7 +16,7 @@ Use it for:
 
 Do not use it for:
 
-- generated compiler bundles;
+- generated compiler bundles as durable records;
 - Cruncher, Construct, Folding, or BaseRender internals;
 - generic tool runbooks.
 
@@ -33,6 +33,8 @@ workbench/
       2026-05-18-msd-177-194.compile.yaml
     materializations/
       2026-05-18-msd-177-194.single-unit.yaml
+      2026-05-18-msd-177-194.non-ligatable-s0-control.yaml
+  outputs/        # generated and gitignored
 ```
 
 ### Route By Question
@@ -52,3 +54,5 @@ artifact-service behavior.
 
 `../compiler/inputs/msd_design_hit_labels.txt` remains a convenience compiler input.
 The design set under `design_sets/` is the authoritative cohort record.
+Generated review bundles may live under ignored `outputs/` for local inspection,
+but provenance in `provenance/materializations/` is the durable record.

@@ -22,7 +22,7 @@ status/preflight and docs-contract checks.
 | Need | Start Here | Canonical Payload |
 | --- | --- | --- |
 | Compile MSD labels or specs into frozen references | [Compiler lane](lanes/compiler.yaml) | `pipeline.yaml:command_groups[id=msd_design_reference_catalog]` |
-| Emit GenBank, native-structure PNG, and review plots for selected sequence sources | [Materialize lane](lanes/materialize.yaml) | `pipeline.yaml:command_groups[id=msd_single_unit_materialize]` |
+| Emit GenBank, native-structure PNG, and review plots for selected sequence sources or explicit S0 controls | [Materialize lane](lanes/materialize.yaml) | `pipeline.yaml:command_groups[id=msd_single_unit_materialize]` |
 | Solve or audit released-product cap geometry | [Snapback lane](lanes/snapback.yaml) | `pipeline.yaml:command_groups[id=snapback_released_*]` |
 | Regenerate scar-nick base-junction panel outputs | [Scar-nick lane](lanes/scar-nick.yaml) | `pipeline.yaml:command_groups[id=scar_nick_profile_panel]` |
 | Contrast mismatch-boundary language only | [YIU lane](lanes/yiu.yaml) | `pipeline.yaml:command_groups[id=yiu_boundary_check]` |

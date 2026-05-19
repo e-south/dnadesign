@@ -21,7 +21,8 @@ def next_step_for_error(exc: Exception) -> str:
         return "Correct the declared -MWX profile or omit it so the compiler derives S3/S2/S1/S0 from the bases."
     if "S0" in message:
         return (
-            "Route the left/right base feasibility question to scar-nick before compiling; the compiler requires S0=M."
+            "Route the left/right base feasibility question to scar-nick before compiling; the compiler requires S0=M "
+            "unless this is a deliberate control rerun with --allow-non-ligatable-s0."
         )
     if "Unknown cap" in message:
         return (

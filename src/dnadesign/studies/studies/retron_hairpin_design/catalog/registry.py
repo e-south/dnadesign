@@ -87,6 +87,7 @@ class RetronMsdRegistry:
                     "left_base": parsed.left_base,
                     "right_base": parsed.right_base,
                     "profile_s3s2s1s0": parsed.profile_s3s2s1s0,
+                    "s0_match_required": parsed.s0_match_required,
                     "route_status": scar_nick.get("route_status", "unresolved"),
                     "nick_orientation": scar_nick.get("nick_orientation"),
                     "nickase": scar_nick.get("nickase"),

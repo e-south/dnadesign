@@ -61,6 +61,11 @@ def lint_command(
         help="Typed retron_msd_compiler_spec_v1 YAML/JSON file to parse and validate.",
     ),
     study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
+    allow_non_ligatable_s0: bool = typer.Option(
+        False,
+        "--allow-non-ligatable-s0",
+        help="Admit deliberate non-S0=M control labels and mark scar_nick.s0_match_required=false.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_norm = format_option(output_format)
@@ -68,7 +73,11 @@ def lint_command(
         if spec_file is not None:
             if label is not None:
                 raise RetronMsdCompilerError("Use either lint --spec or lint --id, not both.")
-            resolved = load_msd_compiler_spec(spec_file, study_dir=study_dir)
+            resolved = load_msd_compiler_spec(
+                spec_file,
+                study_dir=study_dir,
+                allow_non_ligatable_s0=allow_non_ligatable_s0,
+            )
             emit(
                 {
                     "status": "ok",
@@ -81,7 +90,11 @@ def lint_command(
             return
         if label is None:
             raise RetronMsdCompilerError("Provide --id or --spec for lint.")
-        reference = build_msd_design_reference(label, study_dir=study_dir)
+        reference = build_msd_design_reference(
+            label,
+            study_dir=study_dir,
+            allow_non_ligatable_s0=allow_non_ligatable_s0,
+        )
     except (
         MsdIdError,
         RetronMsdRegistryError,
@@ -137,6 +150,11 @@ def materialize_command(
         "--render-format",
         help="BaseRender component-span export format. Repeat for png/svg/pdf.",
     ),
+    allow_non_ligatable_s0: bool = typer.Option(
+        False,
+        "--allow-non-ligatable-s0",
+        help="Admit deliberate non-S0=M control labels and mark scar_nick.s0_match_required=false.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_norm = format_option(output_format)
@@ -146,11 +164,19 @@ def materialize_command(
         cli_cap_sequences = sequence_override_map(cap_sequence, label="cap sequence")
         if spec_file is None:
             labels = collect_labels(ids, input_file)
-            catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+            catalog = compile_msd_design_catalog(
+                labels,
+                study_dir=study_dir,
+                allow_non_ligatable_s0=allow_non_ligatable_s0,
+            )
             resolved_payload_sequences: dict[str, str] = {}
             resolved_cap_sequences: dict[str, str] = {}
         else:
-            resolved = load_msd_compiler_spec(spec_file, study_dir=study_dir)
+            resolved = load_msd_compiler_spec(
+                spec_file,
+                study_dir=study_dir,
+                allow_non_ligatable_s0=allow_non_ligatable_s0,
+            )
             catalog = resolved.catalog
             resolved_payload_sequences = resolved.payload_sequences
             resolved_cap_sequences = resolved.cap_sequences
@@ -226,6 +252,11 @@ def compile_command(
     ),
     study_dir: Path = typer.Option(_DEFAULT_STUDY_DIR, "--study-dir", help="Retron hairpin study directory."),
     out_dir: Path = typer.Option(..., "--out-dir", help="Directory for emitted design-reference catalog."),
+    allow_non_ligatable_s0: bool = typer.Option(
+        False,
+        "--allow-non-ligatable-s0",
+        help="Admit deliberate non-S0=M control labels and mark scar_nick.s0_match_required=false.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_norm = format_option(output_format)
@@ -233,9 +264,17 @@ def compile_command(
         reject_mixed_design_sources(ids=ids, input_file=input_file, spec_file=spec_file)
         if spec_file is None:
             labels = collect_labels(ids, input_file)
-            catalog = compile_msd_design_catalog(labels, study_dir=study_dir)
+            catalog = compile_msd_design_catalog(
+                labels,
+                study_dir=study_dir,
+                allow_non_ligatable_s0=allow_non_ligatable_s0,
+            )
         else:
-            catalog = load_msd_compiler_spec(spec_file, study_dir=study_dir).catalog
+            catalog = load_msd_compiler_spec(
+                spec_file,
+                study_dir=study_dir,
+                allow_non_ligatable_s0=allow_non_ligatable_s0,
+            ).catalog
         catalog_path = write_msd_design_catalog(catalog, out_dir=out_dir)
     except (
         MsdIdError,

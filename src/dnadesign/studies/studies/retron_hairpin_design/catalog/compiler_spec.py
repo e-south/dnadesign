@@ -105,6 +105,7 @@ class MsdDesignInputSpec(MsdCompilerSpecModel):
 class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
     contract: Literal["retron_msd_compiler_spec_v1"]
     schema_version: Literal[1] = 1
+    allow_non_ligatable_s0: bool = False
     labels: list[str] = Field(default_factory=list)
     designs: list[MsdDesignInputSpec] = Field(default_factory=list)
     payload_sequences: dict[str, SequenceInputSpec] = Field(default_factory=dict)
@@ -142,7 +143,12 @@ class ResolvedMsdCompilerSpec:
     cap_sequences: dict[str, str]
 
 
-def load_msd_compiler_spec(path: str | Path, *, study_dir: str | Path) -> ResolvedMsdCompilerSpec:
+def load_msd_compiler_spec(
+    path: str | Path,
+    *,
+    study_dir: str | Path,
+    allow_non_ligatable_s0: bool = False,
+) -> ResolvedMsdCompilerSpec:
     spec_path = Path(path).expanduser().resolve()
     payload = _load_mapping(spec_path)
     spec = RetronMsdCompilerSpecV1.model_validate(payload)
@@ -151,12 +157,15 @@ def load_msd_compiler_spec(path: str | Path, *, study_dir: str | Path) -> Resolv
     cap_sequences, cap_metadata = _resolve_cap_sequences(spec.cap_sequences)
     payload_sequences = _resolve_literal_sequence_map(spec.payload_sequences, label="payload_sequences")
     records: list[MsdDesignReferenceV1] = []
+    allow_s0_exception = allow_non_ligatable_s0 or spec.allow_non_ligatable_s0
 
     for label in spec.labels:
-        records.append(registry.build_reference(parse_msd_construct_label(label)))
+        records.append(
+            registry.build_reference(parse_msd_construct_label(label, allow_non_ligatable_s0=allow_s0_exception))
+        )
     for design in spec.designs:
         parts, scar_nick_metadata = _resolve_design_parts(design)
-        parsed = parse_msd_design_parts(parts)
+        parsed = parse_msd_design_parts(parts, allow_non_ligatable_s0=allow_s0_exception)
         records.append(
             registry.build_reference_from_parts(
                 parsed,

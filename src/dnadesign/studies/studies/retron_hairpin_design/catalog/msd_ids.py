@@ -36,6 +36,7 @@ class ParsedMsdConstructLabel:
     left_base: str
     right_base: str
     profile_s3s2s1s0: str
+    s0_match_required: bool = True
 
     @property
     def msd_design_id(self) -> str:
@@ -93,11 +94,22 @@ def canonical_msd_construct_label(parts: MsdDesignPartInput) -> str:
     return f"{construct_id}-msd[{payload_id}]; {cap_id}-L{left_base}-R{right_base}-{observed_profile}"
 
 
-def parse_msd_design_parts(parts: MsdDesignPartInput) -> ParsedMsdConstructLabel:
-    return parse_msd_construct_label(canonical_msd_construct_label(parts))
+def parse_msd_design_parts(
+    parts: MsdDesignPartInput,
+    *,
+    allow_non_ligatable_s0: bool = False,
+) -> ParsedMsdConstructLabel:
+    return parse_msd_construct_label(
+        canonical_msd_construct_label(parts),
+        allow_non_ligatable_s0=allow_non_ligatable_s0,
+    )
 
 
-def parse_msd_construct_label(label: str) -> ParsedMsdConstructLabel:
+def parse_msd_construct_label(
+    label: str,
+    *,
+    allow_non_ligatable_s0: bool = False,
+) -> ParsedMsdConstructLabel:
     text = str(label or "").strip()
     match = _MSD_LABEL_RE.fullmatch(text)
     if match is None:
@@ -113,7 +125,7 @@ def parse_msd_construct_label(label: str) -> ParsedMsdConstructLabel:
             f"MSD construct label provided profile {provided_profile.upper()} but left/right bases imply "
             f"{observed_profile}."
         )
-    if observed_profile[3] != "M":
+    if observed_profile[3] != "M" and not allow_non_ligatable_s0:
         raise MsdIdError(f"MSD construct label must be scar-compatible with S0=M; observed {observed_profile}.")
     return ParsedMsdConstructLabel(
         construct_id=match.group("construct_id"),
@@ -123,6 +135,7 @@ def parse_msd_construct_label(label: str) -> ParsedMsdConstructLabel:
         left_base=left_base,
         right_base=right_base,
         profile_s3s2s1s0=observed_profile,
+        s0_match_required=observed_profile[3] == "M",
     )
 
 

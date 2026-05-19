@@ -41,6 +41,8 @@ design-set provenance.
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
 - Full cohort materialization spec:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`
+- Non-default S0-control materialization spec:
+  `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml`
 - Public module: `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py`
 - Typed compiler spec: `retron_msd_compiler_spec_v1`
 
@@ -81,10 +83,25 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
   --format json
 ```
 
+Materialize the explicit non-default S0-control request:
+
+```bash
+uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
+  --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_non_ligatable_s0_control_spec.yaml \
+  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-non-ligatable-s0-control-20260518 \
+  --render-format png \
+  --format json
+```
+
 `C###` cap IDs are not implicit de033 lookups; materialization specs must
 provide each cap as a literal 5'->3' sequence or an explicit public primitive
 source. If topology is absent, the compiler emits the whole supplied
 cap/foldback segment and omits subsection labels.
+
+Non-ligatable S0 controls are not the default. Use
+`--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true` only when the
+request intentionally preserves an `S0!=M` control. Profile drift still fails,
+and emitted references mark `scar_nick.s0_match_required=false`.
 
 ### Boundaries
 
@@ -93,7 +110,7 @@ This compiler is intentionally study-owned and is not registered as a top-level
 `retron_msd_compiler_spec_v1` design parts into the same trusted structure:
 `construct_id`, payload/target, cap id, left/right scar-nick bases, and
 optional profile code. It recomputes the `S3/S2/S1/S0` profile and fails fast
-if the provided code drifts or `S0` is not ligatable.
+if the provided code drifts or `S0` is not ligatable without explicit opt-in.
 
 Compiler specs may point at solved Snapback foldback primitives or scar-nick
 stem-base primitives only through public `dnadesign.cruncher.snapback` and

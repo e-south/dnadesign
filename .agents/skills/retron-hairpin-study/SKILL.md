@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD compiler work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.11
+  version: 0.7.12
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -55,8 +55,7 @@ Out of scope:
 - GenBank/CSV output uses display labels, keeps raw ids in machine qualifiers, and avoids duplicate full component spans as same-span annotations.
 - Persistent hypotheses/design-set meaning lives in `workbench/`; generated
   outputs go to explicit transient or caller-owned directories.
-- Contracts fail fast on profile drift, non-ligatable `S0=M` violations, unknown registry
-  parts, or missing artifacts.
+- Default `S0=M` is required. Profile drift, non-ligatable S0 labels without explicit control opt-in, unknown registry parts, and missing artifacts fail fast. Deliberate controls require `--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true`, and emitted references must carry `scar_nick.s0_match_required=false`.
 - Status/preflight commands are optional progress tools, not default answer
   posture.
 
@@ -71,6 +70,7 @@ Out of scope:
   combination.
 - Need sequence, visual, or GenBank: materialize with `--spec` or explicit
   payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
+- Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in
   `docs/studies/retron_hairpin_design/routes/README.md`.
@@ -103,6 +103,7 @@ Out of scope:
 - If sequence subcomponents are missing, report the exact missing IDs or the
   primitive route needed; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
+- If `S0` is non-ligatable and the user explicitly says it is a control, rerun with the S0-control opt-in and verify `scar_nick.s0_match_required=false`.
 - For missing constraints, name the missing fields and the primitive route.
 - For generated artifacts, name the output directory and contracts produced.
 
@@ -172,9 +173,4 @@ Should not trigger:
 
 ## References
 
-- [msd-design-references.md](references/msd-design-references.md)
-- [route-matrix.md](references/route-matrix.md)
-- [study-surfaces.md](references/study-surfaces.md)
-- [refresh-loop.md](references/refresh-loop.md)
-- [test-matrix.md](references/test-matrix.md)
-- [external-sources.md](references/external-sources.md)
+- [msd-design-references.md](references/msd-design-references.md), [route-matrix.md](references/route-matrix.md), [study-surfaces.md](references/study-surfaces.md), [refresh-loop.md](references/refresh-loop.md), [test-matrix.md](references/test-matrix.md), [external-sources.md](references/external-sources.md)
