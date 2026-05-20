@@ -18,10 +18,12 @@ from ...core.selection_contracts import (
     resolve_selection_objective_mode,
     resolve_selection_tie_handling,
 )
-from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...runtime.run_round import RunRoundRequest, run_round
+from ...storage.artifacts import append_round_log_event
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
+from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_run_summary_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -42,6 +44,14 @@ def _resolve_summary_selection_mode(sel_params: dict[str, object]) -> tuple[str,
     tie_handling = resolve_selection_tie_handling(sel_params, error_cls=OpalError)
     objective_mode = resolve_selection_objective_mode(sel_params, error_cls=OpalError)
     return tie_handling, objective_mode
+
+
+def _append_cli_round_event(cfg, cfg_path: Path, round_index: int, stage: str, **payload: object) -> None:
+    ws = CampaignWorkspace.from_config(cfg, cfg_path)
+    append_round_log_event(
+        ws.round_logs_dir(int(round_index)) / "round.log.jsonl",
+        {"ts": now_iso(), "round": int(round_index), "stage": stage, **payload},
+    )
 
 
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
@@ -68,8 +78,18 @@ def cmd_run(
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
+        _append_cli_round_event(cfg, cfg_path, int(round), "command_start", command="run")
         store = store_from_cfg(cfg)
+        _append_cli_round_event(cfg, cfg_path, int(round), "records_load_start")
         df = store.load()
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "records_load_done",
+            rows=int(len(df)),
+            columns=int(len(df.columns)),
+        )
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 

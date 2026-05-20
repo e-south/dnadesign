@@ -88,3 +88,31 @@ def test_log_json_summary(tmp_path):
     out = json.loads(res.stdout)
     assert out["events"] == 5
     assert out["predict_rows"] == 2
+
+
+def test_progress_json_summary(tmp_path):
+    _, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "progress", "-c", str(campaign), "--round", "all", "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+    assert out["schema_version"] == "opal.campaign_progress.v1"
+    assert out["status"] == "done"
+    assert out["round_count"] == 1
+    assert out["rounds"][0]["predict"]["rows"] == 2
+
+
+def test_progress_rejects_missing_explicit_round(tmp_path):
+    _, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "progress", "-c", str(campaign), "--round", "7", "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert "--round 7 not found" in payload["error"]["message"]

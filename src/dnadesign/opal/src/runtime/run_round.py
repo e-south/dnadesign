@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import shutil
 import time
 from pathlib import Path
@@ -42,10 +43,12 @@ def _log(enabled: bool, msg: str) -> None:
         print_stderr(msg)
 
 
-def _clear_round_dir(rdir: Path) -> None:
+def _clear_round_dir(rdir: Path, *, preserve_logs: bool = False) -> None:
     if not rdir.exists():
         return
     for child in rdir.iterdir():
+        if preserve_logs and child.name == "logs":
+            continue
         try:
             if child.is_dir():
                 shutil.rmtree(child)
@@ -53,6 +56,27 @@ def _clear_round_dir(rdir: Path) -> None:
                 child.unlink()
         except Exception as exc:
             raise OpalError(f"Failed to clear round directory {rdir}: {exc}") from exc
+
+
+def _round_dir_has_blocking_entries(rdir: Path) -> bool:
+    entries = list(rdir.iterdir())
+    if not entries:
+        return False
+    if len(entries) != 1 or entries[0].name != "logs" or not entries[0].is_dir():
+        return True
+    children = list(entries[0].iterdir())
+    if len(children) != 1 or children[0].name != "round.log.jsonl":
+        return True
+    allowed = {"command_start", "records_load_start", "records_load_done"}
+    try:
+        stages = {
+            str(json.loads(line).get("stage"))
+            for line in children[0].read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+    except Exception:
+        return True
+    return not stages or not stages.issubset(allowed)
 
 
 def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> RunRoundResult:
@@ -65,12 +89,13 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     rdir = ws.round_dir(req.as_of_round)
     store.assert_unique_ids(df)
 
-    if not req.allow_resume and rdir.exists() and any(rdir.iterdir()):
+    if not req.allow_resume and rdir.exists() and _round_dir_has_blocking_entries(rdir):
         raise OpalError(
             f"Round {int(req.as_of_round)} already contains artifacts in {rdir}. Use --resume to overwrite."
         )
     if req.allow_resume:
-        _clear_round_dir(rdir)
+        _clear_round_dir(rdir, preserve_logs=True)
+    round_log_path = rdir / "logs" / "round.log.jsonl"
 
     inputs = RoundInputs(cfg=cfg, req=req, ws=ws, store=store, df=df, rdir=rdir)
 
@@ -91,12 +116,9 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         ),
     )
 
-    t0 = time.perf_counter()
-    training = stage_training(inputs)
-
     ensure_dir(rdir)
     append_round_log_event(
-        rdir / "logs" / "round.log.jsonl",
+        round_log_path,
         {
             "ts": now_iso(),
             "stage": "start",
@@ -126,6 +148,22 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             },
         },
     )
+    t0 = time.perf_counter()
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "stage": "training_start"},
+    )
+    training = stage_training(inputs)
+    append_round_log_event(
+        round_log_path,
+        {
+            "ts": now_iso(),
+            "round": int(req.as_of_round),
+            "stage": "training_done",
+            "n_train": len(training.train_ids),
+            "y_dim": int(training.y_dim),
+        },
+    )
 
     run_id, _, rctx = build_round_ctx(
         cfg=cfg,
@@ -133,10 +171,18 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         y_dim=training.y_dim,
         n_train=len(training.train_ids),
     )
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "run_context"},
+    )
 
     tx = get_transform_x(cfg.data.transforms_x.name, cfg.data.transforms_x.params)
     tctx = rctx.for_plugin(category="transform_x", name=cfg.data.transforms_x.name, plugin=tx)
 
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "x_matrices_start"},
+    )
     xbundle = stage_x_matrices(
         inputs=inputs,
         plan=training.plan,
@@ -145,7 +191,29 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         tctx=tctx,
         rctx=rctx,
     )
+    append_round_log_event(
+        round_log_path,
+        {
+            "ts": now_iso(),
+            "round": int(req.as_of_round),
+            "run_id": run_id,
+            "stage": "x_matrices_done",
+            "n_train": len(xbundle.id_order_train),
+            "n_pool": len(xbundle.id_order_pool),
+            "x_dim": int(xbundle.X_train.shape[1]),
+        },
+    )
 
+    append_round_log_event(
+        round_log_path,
+        {
+            "ts": now_iso(),
+            "round": int(req.as_of_round),
+            "run_id": run_id,
+            "stage": "scoring_start",
+            "n_pool": len(xbundle.id_order_pool),
+        },
+    )
     score = stage_scoring(
         inputs=inputs,
         rctx=rctx,
@@ -158,6 +226,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         y_dim=training.y_dim,
     )
 
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "artifacts_start"},
+    )
     artifacts = write_round_artifacts(
         inputs=inputs,
         run_id=run_id,
@@ -165,6 +237,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         training=training,
         xbundle=xbundle,
         score=score,
+    )
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "artifacts_done"},
     )
 
     run_events = build_run_events(
@@ -176,11 +252,19 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         artifacts=artifacts,
     )
 
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "ledger_append_start"},
+    )
     append_ledgers(
         ws=ws,
         run_pred_events=run_events.run_pred_events,
         run_meta_event=run_events.run_meta_event,
         verbose=req.verbose,
+    )
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "ledger_append_done"},
     )
 
     metrics_by_name: Dict[str, List[float]] = {"score": score.y_obj_scalar.astype(float).tolist()}
@@ -243,6 +327,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         _log(req.verbose, "[writeback] records label_hist skipped; prediction_records=ledger_only.")
 
     total_duration = time.perf_counter() - t0
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "state_update_start"},
+    )
     update_campaign_state(
         ws=ws,
         cfg=cfg,
@@ -261,29 +349,35 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         fit_duration=score.fit_duration,
         records_label_hist_updated=records_label_hist_updated,
     )
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "state_update_done"},
+    )
 
     append_round_log_event(
-        rdir / "logs" / "round.log.jsonl",
+        round_log_path,
         {
             "ts": now_iso(),
             "round": int(req.as_of_round),
+            "run_id": run_id,
             "stage": "fit",
             "oob_r2": getattr(score.fit_metrics, "oob_r2", None),
         },
     )
     append_round_log_event(
-        rdir / "logs" / "round.log.jsonl",
+        round_log_path,
         {
             "ts": now_iso(),
             "round": int(req.as_of_round),
+            "run_id": run_id,
             "stage": "selection",
             "top_k": int(score.top_k),
             "effective": int(score.selected_effective),
         },
     )
     append_round_log_event(
-        rdir / "logs" / "round.log.jsonl",
-        {"ts": now_iso(), "round": int(req.as_of_round), "stage": "done"},
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "done"},
     )
 
     return RunRoundResult(

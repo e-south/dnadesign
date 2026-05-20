@@ -54,6 +54,14 @@ def select_run_meta(
         sel = df_runs[df_runs["run_id"].astype(str) == str(run_id)]
         if sel.empty:
             raise OpalError(f"run_id not found in ledger: {run_id}")
+        if round_sel is not None:
+            round_matches = sel[sel["as_of_round"] == int(round_sel)]
+            if round_matches.empty:
+                rounds = sorted({int(value) for value in sel["as_of_round"].dropna().tolist()})
+                raise OpalError(
+                    f"run_id {run_id!r} belongs to round(s) {rounds}, but --round selected {int(round_sel)}."
+                )
+            sel = round_matches
         return sel.sort_values(["run_id"]).tail(1).iloc[0]
     if round_sel is None:
         round_sel = int(df_runs["as_of_round"].max())
@@ -103,13 +111,21 @@ def load_round_log(path: Path) -> List[Dict[str, Any]]:
     return events
 
 
-def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[str] = None) -> Dict[str, Any]:
     events = list(events)
     if not events:
-        return {"events": 0, "events_total": 0, "run_count": 0}
+        return {"events": 0, "events_total": 0, "run_count": 0, "run_id": run_id}
 
     run_count = sum(1 for e in events if e.get("stage") == "start")
     events_total = len(events)
+    run_id_filter_applied = False
+    if run_id is not None:
+        run_events = [e for e in events if str(e.get("run_id", "")) == str(run_id)]
+        if run_events:
+            events = run_events
+            run_id_filter_applied = True
+        else:
+            raise OpalError(f"round.log.jsonl has no events for run_id={run_id}")
     if run_count > 1:
         last_start_idx = None
         for i, e in enumerate(events):
@@ -139,7 +155,7 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 return _parse_ts(e.get("ts"))
         return None
 
-    start_ts = _first_ts("start")
+    start_ts = _first_ts("start") or _first_ts("command_start") or _first_ts("run_context")
     done_ts = _last_ts("done")
     fit_start = _first_ts("fit_start")
     fit_done = _last_ts("fit")
@@ -154,6 +170,8 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         "events": len(events),
         "events_total": events_total,
         "run_count": run_count,
+        "run_id": run_id,
+        "run_id_filter_applied": run_id_filter_applied,
         "stage_counts": stages,
         "predict_batches": predict_batches,
         "predict_rows": predict_rows,

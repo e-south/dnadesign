@@ -146,7 +146,7 @@ def write_campaign_yaml(
     path.write_text(yaml.safe_dump(cfg, sort_keys=False))
 
 
-def write_round_log(path: Path) -> None:
+def write_round_log(path: Path, *, run_id: str | None = None, round_index: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
@@ -155,6 +155,12 @@ def write_round_log(path: Path) -> None:
         {"ts": "2025-01-01T00:00:07+00:00", "stage": "predict_batch", "rows": 2},
         {"ts": "2025-01-01T00:00:08+00:00", "stage": "done"},
     ]
+    if run_id is not None:
+        for line in lines:
+            line["run_id"] = str(run_id)
+    if round_index is not None:
+        for line in lines:
+            line["round"] = int(round_index)
     path.write_text("\n".join([json.dumps(line) for line in lines]))
 
 
@@ -169,7 +175,7 @@ def write_state(
     round_dir.mkdir(parents=True, exist_ok=True)
     round_log = round_dir / "logs" / "round.log.jsonl"
     if not round_log.exists():
-        write_round_log(round_log)
+        write_round_log(round_log, run_id=run_id, round_index=round_index)
     st = CampaignState(
         campaign_slug="demo",
         campaign_name="Demo",

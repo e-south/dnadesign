@@ -485,6 +485,33 @@ opal log --config <yaml> [--round <k|latest>] [--json]
 
 * If a round has been re-run (multiple `start` events in the same log), the summary focuses on the **latest run**.
 
+---
+
+### `progress`
+
+Summarize campaign progress from `state.json` and round logs.
+
+**Usage**
+
+```bash
+opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--json]
+```
+
+**Flags**
+
+* `--config, -c`: Path to `configs/campaign.yaml` or a campaign directory (required unless `$OPAL_CONFIG` is set).
+* `--round, -r`: Round selector (`latest`, `all`, or an integer).
+* `--json`: Output as machine-readable JSON (default output is plain text).
+
+**Notes**
+
+* This is the campaign-generic progress surface for operators and harnesses.
+* The JSON payload uses schema `opal.campaign_progress.v1` and reports per-round
+  status, last stage, elapsed seconds, prediction batch count, log path, and
+  summarized stage counts.
+* Study probes and campaign dashboards should consume this primitive instead of
+  parsing OPAL round-log paths directly.
+
 ### `validate`
 
 End-to-end table checks (essentials present; X non-null, finite, and fixed-length).
@@ -655,6 +682,28 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 
 ---
 
+### `review`
+
+Persist a campaign-scoped review bundle from completed OPAL run artifacts.
+
+**Usage**
+
+```bash
+opal review --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out-dir <dir>] [--plots/--no-plots] [--json]
+```
+
+**Notes**
+
+* Writes `outputs/review/manifest.json`, `outputs/review/review.md`,
+  `outputs/review/index.html`, and portable review plots under
+  `outputs/review/plots/`.
+* Reads campaign ledgers and per-round artifacts; it does not rerun OPAL and
+  does not mutate records or labels.
+* If a round has multiple run IDs, pass `--run-id` so the review does not mix
+  reruns.
+
+---
+
 ### `campaign-reset` (advanced)
 
 Reset a campaign to a clean slate: prune OPAL-derived columns from `records.parquet`, remove `outputs/`, remove `notebooks/`, and clear `state.json`.
@@ -735,7 +784,7 @@ Campaign-scoped commands require explicit config context:
 1. **Explicit flag** (`--config`)
 2. **Environment variable** (`OPAL_CONFIG`)
 
-Passing a **directory** to `--config` is supported only for `opal plot`, `opal notebook`, and `opal objective-meta`.
+Passing a **directory** to `--config` is supported only for `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
 Other campaign-scoped commands require a YAML config path.
 `plot_config` paths are resolved relative to the `configs/campaign.yaml` that declares them.
 For scripts and CI, pass `--config` explicitly.

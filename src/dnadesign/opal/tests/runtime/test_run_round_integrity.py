@@ -479,6 +479,53 @@ def test_run_round_blocks_when_round_dir_has_any_entry_without_resume(tmp_path: 
         )
 
 
+def test_run_round_allows_cli_prerun_log_without_resume(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    records_path = tmp_path / "records.parquet"
+    _write_records(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    round_log.parent.mkdir(parents=True, exist_ok=True)
+    round_log.write_text(
+        "\n".join(
+            [
+                '{"ts":"2025-01-01T00:00:00+00:00","stage":"command_start"}',
+                '{"ts":"2025-01-01T00:00:01+00:00","stage":"records_load_done"}',
+            ]
+        )
+    )
+
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+    res = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert res.ok is True
+
+
 def test_run_round_resume_cleans_round_dir(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

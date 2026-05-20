@@ -289,6 +289,8 @@ def stage_scoring(
     cfg = inputs.cfg
     req = inputs.req
     rdir = inputs.rdir
+    round_index = int(req.as_of_round)
+    run_id = str(rctx.get("core/run_id", default=""))
 
     yops_cfg = getattr(cfg.training, "y_ops", []) or []
     _log(
@@ -299,6 +301,8 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "round": round_index,
+            "run_id": run_id,
             "stage": "yops_fit_transform",
             "ops": [p.name for p in yops_cfg],
         },
@@ -312,6 +316,8 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "round": round_index,
+            "run_id": run_id,
             "stage": "fit_start",
             "model": cfg.model.name,
             "n_train": len(id_order_train),
@@ -344,6 +350,8 @@ def stage_scoring(
                 rdir / "logs" / "round.log.jsonl",
                 {
                     "ts": now_iso(),
+                    "round": round_index,
+                    "run_id": run_id,
                     "stage": "predict_batch",
                     "batch": int(bi + 1),
                     "of": int(num_batches),
@@ -377,6 +385,8 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "round": round_index,
+            "run_id": run_id,
             "stage": "yops_inverse_done",
             "ops": [p.name for p in yops_cfg],
         },
@@ -564,6 +574,8 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "round": round_index,
+            "run_id": run_id,
             "stage": "objective_done",
             "score_ref": score_ref,
             "uncertainty_ref": uncertainty_ref,
@@ -577,6 +589,8 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "round": round_index,
+            "run_id": run_id,
             "stage": "selection_done",
             "strategy": sel_name,
             "tie_handling": tie_handling,
