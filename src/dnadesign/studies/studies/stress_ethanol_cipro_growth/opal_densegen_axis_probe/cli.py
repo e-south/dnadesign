@@ -49,6 +49,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         budget=int(args.budget),
         seed=int(args.seed),
         rounds=int(args.rounds),
+        candidate_cap_per_split=args.candidate_cap,
         gate=args.gate,
         splits=splits,
         apply=bool(args.apply),
@@ -68,6 +69,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         "gate": plan.gate,
         "stop_after": plan.stop_after,
         "rounds": plan.rounds,
+        "candidate_cap_per_split": plan.candidate_cap_per_split,
         "splits": _compact_split_metadata(split_metadata),
         "commands": plan.commands,
     }
@@ -193,12 +195,43 @@ def _progress_probe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _plot_probe(args: argparse.Namespace) -> int:
+    from .plotting import generate_probe_campaign_plots
+
+    repo_root = _repo_root_from(Path.cwd())
+    run_root = _resolve_repo_path(repo_root, Path(args.run_root))
+    payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round))
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("opal_densegen_axis_probe_v0 configured plots")
+        print(f"run_root={payload['run_root']}")
+        print(f"campaign_count={payload['campaign_count']}")
+        print(f"any_fail={payload['any_fail']}")
+        print(f"mpl_config_dir={payload['mpl_config_dir']}")
+    return 1 if payload["any_fail"] else 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the stress ethanol/cipro DenseGen axis OPAL probe.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     run = subparsers.add_parser("run", help="Plan or execute the scratch OPAL probe.")
-    run.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
+    run.add_argument(
+        "--budget",
+        type=int,
+        default=DEFAULT_BUDGET,
+        help="Initial labeled seed count before OPAL selections are added round over round.",
+    )
     run.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    run.add_argument(
+        "--candidate-cap",
+        type=int,
+        default=None,
+        help=(
+            "Optional maximum scratch candidate rows per split for fast dogfood. "
+            "The cap includes initial labels and balanced eval rows; omit for the full candidate table."
+        ),
+    )
     run.add_argument(
         "--rounds",
         type=int,
@@ -233,6 +266,13 @@ def _build_parser() -> argparse.ArgumentParser:
     progress = subparsers.add_parser("progress", help="Summarize OPAL round-log progress for a probe run root.")
     progress.add_argument("--run-root", required=True)
     progress.add_argument("--json", action="store_true", help="Emit machine-readable JSON progress.")
+    plot = subparsers.add_parser(
+        "plot",
+        help="Generate configured OPAL plots for all scratch campaigns in one Python process.",
+    )
+    plot.add_argument("--run-root", required=True)
+    plot.add_argument("--round", default="all", help="Round selector passed to OPAL plot generation.")
+    plot.add_argument("--json", action="store_true", help="Emit machine-readable JSON plot summary.")
     return parser
 
 
@@ -248,6 +288,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _report_probe(args)
         if args.command == "progress":
             return _progress_probe(args)
+        if args.command == "plot":
+            return _plot_probe(args)
     except (ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")
     parser.error(f"unsupported command: {args.command}")

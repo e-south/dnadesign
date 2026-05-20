@@ -33,8 +33,9 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
     decision_path = layout.decision_path
     metrics_present = metrics_path.exists()
     decision_present = decision_path.exists()
-    scratch_records_path = layout.scratch_records_path
-    scratch_records_present = scratch_records_path.exists()
+    split_ids = _split_ids_from_metadata(layout) if splits_present else []
+    split_records_paths = [layout.split_records_path(split_id) for split_id in split_ids]
+    scratch_records_present = bool(split_records_paths) and all(path.exists() for path in split_records_paths)
     shared_sidecar_present = _resolve_repo_path(repo_root, SHARED_OBSERVED_LABEL_SIDECAR).exists()
     planned_campaign_count = (
         len(list(layout.scratch_campaigns_dir.glob("*"))) if layout.scratch_campaigns_dir.exists() else 0
@@ -78,7 +79,13 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
         problems.append("decision_value_invalid")
     if metrics_present:
         problems.extend(_metrics_problems(metrics_path))
-    problems.extend(records_manifest_problems(scratch_records_path, _resolve_repo_path(repo_root, CANDIDATE_RECORDS)))
+    source_records = _resolve_repo_path(repo_root, CANDIDATE_RECORDS)
+    if split_records_paths:
+        for path in split_records_paths:
+            problems.extend(records_manifest_problems(path, source_records))
+    elif layout.scratch_records_path.exists():
+        problems.extend(records_manifest_problems(layout.scratch_records_path, source_records))
+        scratch_records_present = True
     if planned_campaign_count > 0 and not scratch_records_present:
         problems.append("scratch_records_missing_for_planned_campaigns")
     if not root.exists():
@@ -180,6 +187,23 @@ def _split_metadata_problems(layout: ProbeArtifactLayout) -> list[str]:
                 )
             )
     return problems
+
+
+def _split_ids_from_metadata(layout: ProbeArtifactLayout) -> list[str]:
+    try:
+        metadata = json.loads(layout.split_metadata_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(metadata, Mapping):
+        return []
+    split_ids: list[str] = []
+    for split_id, payload in metadata.items():
+        if not isinstance(payload, Mapping):
+            continue
+        value = payload.get("split_id", split_id)
+        if isinstance(value, str) and value:
+            split_ids.append(value)
+    return sorted(dict.fromkeys(split_ids))
 
 
 def _metrics_problems(metrics_path: Path) -> list[str]:

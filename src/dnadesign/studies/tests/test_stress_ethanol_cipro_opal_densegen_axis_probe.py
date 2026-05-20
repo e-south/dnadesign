@@ -10,10 +10,12 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+import yaml
 
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.artifacts import (
     ProbeArtifactLayout,
+    ProbePlan,
     RunSpec,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.axis_oracle import (
@@ -40,6 +42,8 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
     _split_metadata_for_all,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.execution import (
+    materialize_probe_inputs,
+    run_opal_rounds_for_probe,
     selected_ids_from_round,
     write_followup_label_input,
 )
@@ -56,11 +60,16 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.progress import (
     summarize_probe_progress,
 )
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.records_manifest import (
+    records_manifest_problems,
+)
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.review import build_probe_review
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.scratch import (
     _clone_records_file,
     _make_training_input,
     _run_command,
+    _write_campaign_plot_config,
+    _write_records_subset,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.source_contract import (
     validate_candidate_x_surface,
@@ -341,6 +350,42 @@ def test_build_train_ids_is_stratified_and_reuses_positive_ids_for_null() -> Non
     }
 
 
+def test_build_train_ids_allows_small_nondivisible_initial_budget() -> None:
+    rows = []
+    for axis_class in AXIS_CLASS_TO_LOGIC4:
+        for idx in range(4):
+            rows.append(
+                {
+                    "id": f"{axis_class}-{idx}",
+                    "axis_class": axis_class,
+                    "quality_flag": "ok",
+                    "sigma35_variant": "f" if idx < 2 else "e",
+                }
+            )
+    labels = pd.DataFrame(rows)
+
+    train_ids, metadata = build_train_ids(labels, budget=6, seed=7, split_id="random_id", return_metadata=True)
+
+    selected = labels[labels["id"].isin(train_ids)]
+    class_counts = selected.groupby("axis_class").size().to_dict()
+    assert len(train_ids) == 6
+    assert sorted(class_counts.values()) == [1, 1, 2, 2]
+    assert set(class_counts) == set(AXIS_CLASS_TO_LOGIC4)
+    assert metadata["class_budget"] == class_counts
+
+
+def test_build_train_ids_rejects_budget_too_small_for_axis_coverage() -> None:
+    labels = pd.DataFrame(
+        [
+            {"id": axis_class, "axis_class": axis_class, "quality_flag": "ok", "sigma35_variant": "f"}
+            for axis_class in AXIS_CLASS_TO_LOGIC4
+        ]
+    )
+
+    with pytest.raises(ValueError, match="seed every axis class"):
+        build_train_ids(labels, budget=3, seed=7, split_id="random_id")
+
+
 def test_build_train_ids_excludes_leave_sigma35_variant_pool() -> None:
     rows = []
     for axis_class in AXIS_CLASS_TO_LOGIC4:
@@ -366,6 +411,34 @@ def test_build_train_ids_excludes_leave_sigma35_variant_pool() -> None:
 
     selected = labels[labels["id"].isin(train_ids)]
     assert metadata["heldout_sigma35"] not in set(selected["sigma35_variant"])
+
+
+def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign" / "configs" / "campaign.yaml"
+    config_path.parent.mkdir(parents=True)
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=tmp_path / "campaign",
+        config_path=config_path,
+        label_input_path=tmp_path / "labels.parquet",
+        sidecar_path=tmp_path / "observed_labels.parquet",
+    )
+
+    _write_campaign_plot_config(run)
+
+    payload = yaml.safe_load((config_path.parent / "plots.yaml").read_text(encoding="utf-8"))
+    plot_names = {plot["name"] for plot in payload["plots"]}
+    assert payload["plot_defaults"]["output"]["save_data"] is True
+    assert plot_names == {"score_selected_over_rounds", "feature_importance_heatmap", "selected_vec8_summary"}
+    assert {plot["kind"] for plot in payload["plots"]} == {
+        "metric_over_rounds",
+        "feature_importance_heatmap",
+        "vector_summary_heatmap",
+    }
 
 
 def test_persisted_split_metadata_keeps_large_id_lists_out_of_json() -> None:
@@ -526,6 +599,20 @@ def test_build_plan_multi_round_commands_include_followup_ingest_and_run(tmp_pat
     assert any("--round 2" in command and "vec8-b2.parquet" in command for command in rendered)
 
 
+def test_build_plan_uses_budget_as_probe_selection_k(tmp_path: Path) -> None:
+    plan = build_plan(
+        run_root=tmp_path / "probe",
+        budget=6,
+        seed=7,
+        gate="cipro-random",
+        splits=("random_id",),
+        rounds=2,
+    )
+
+    assert plan.budget == 6
+    assert {run.selection_k for run in plan.runs} == {6}
+
+
 def test_build_plan_rejects_unknown_stop_stage(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unsupported stop_after"):
         build_plan(
@@ -550,6 +637,139 @@ def test_build_plan_rejects_invalid_round_count(tmp_path: Path) -> None:
         )
 
 
+def test_build_plan_rejects_candidate_cap_not_larger_than_initial_budget(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="candidate-cap"):
+        build_plan(
+            run_root=tmp_path / "probe",
+            budget=6,
+            seed=7,
+            gate="cipro-random",
+            splits=("random_id",),
+            candidate_cap_per_split=6,
+        )
+
+
+def test_split_metadata_caps_eval_ids_for_fast_dogfood(tmp_path: Path) -> None:
+    rows = []
+    for axis_class in AXIS_CLASS_TO_LOGIC4:
+        for idx in range(8):
+            rows.append(
+                {
+                    "id": f"{axis_class}-{idx}",
+                    "axis_class": axis_class,
+                    "quality_flag": "ok",
+                    "sigma35_variant": "f",
+                }
+            )
+    labels = pd.DataFrame(rows)
+    plan = build_plan(
+        run_root=tmp_path / "probe",
+        budget=6,
+        seed=7,
+        gate="cipro-random",
+        splits=("random_id",),
+        candidate_cap_per_split=12,
+    )
+
+    metadata = _split_metadata_for_all(labels, plan=plan)["random_id"]
+
+    assert len(metadata["train_ids"]) == 6
+    assert len(metadata["eval_ids"]) == 6
+    assert metadata["candidate_cap_per_split"] == 12
+    assert metadata["eval_full_count"] == 26
+
+
+def test_materialize_probe_inputs_writes_split_scoped_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source_records = tmp_path / CANDIDATE_RECORDS
+    source_records.parent.mkdir(parents=True)
+    ids = ["random-train", "random-eval", "leave-train", "leave-eval"]
+    pd.DataFrame(
+        {
+            "id": ids,
+            "sequence": ["AAAA", "CCCC", "GGGG", "TTTT"],
+            X_COLUMN: [[0.0, 1.0]] * len(ids),
+        }
+    ).to_parquet(source_records, index=False)
+    run_root = tmp_path / "probe"
+    layout = ProbeArtifactLayout(run_root)
+    runs = [
+        RunSpec(
+            campaign_key="cipro",
+            oracle_id=ORACLE_ID,
+            split_id="random_id",
+            run_key="cipro_positive_random_id",
+            target_class="cipro_only",
+            workdir=layout.campaign_workdir("cipro_positive_random_id"),
+            config_path=layout.campaign_config_path("cipro_positive_random_id"),
+            label_input_path=layout.campaign_label_input_path("cipro_positive_random_id"),
+            sidecar_path=layout.campaign_sidecar_path("cipro_positive_random_id", "random_id"),
+        ),
+        RunSpec(
+            campaign_key="cipro",
+            oracle_id=ORACLE_ID,
+            split_id="leave_sigma35_variant",
+            run_key="cipro_positive_leave_sigma35_variant",
+            target_class="cipro_only",
+            workdir=layout.campaign_workdir("cipro_positive_leave_sigma35_variant"),
+            config_path=layout.campaign_config_path("cipro_positive_leave_sigma35_variant"),
+            label_input_path=layout.campaign_label_input_path("cipro_positive_leave_sigma35_variant"),
+            sidecar_path=layout.campaign_sidecar_path("cipro_positive_leave_sigma35_variant", "leave_sigma35_variant"),
+        ),
+    ]
+    plan = ProbePlan(
+        run_root=run_root,
+        budget=1,
+        seed=7,
+        rounds=1,
+        candidate_cap_per_split=2,
+        gate="all",
+        splits=("random_id", "leave_sigma35_variant"),
+        apply=True,
+        runs=runs,
+    )
+    labels = pd.DataFrame(
+        {
+            "oracle_id": [ORACLE_ID] * len(ids),
+            "id": ids,
+            "sequence": ["AAAA", "CCCC", "GGGG", "TTTT"],
+            "axis_class": ["cipro_only"] * len(ids),
+            "quality_flag": ["ok"] * len(ids),
+            "vec8": [[0, 0, 1, 1, 0, 0, 1, 1]] * len(ids),
+            "v00": [0.0] * len(ids),
+            "v10": [0.0] * len(ids),
+            "v01": [1.0] * len(ids),
+            "v11": [1.0] * len(ids),
+            "y00_star": [0.0] * len(ids),
+            "y10_star": [0.0] * len(ids),
+            "y01_star": [1.0] * len(ids),
+            "y11_star": [1.0] * len(ids),
+            "intensity_log2_offset_delta": [0.0] * len(ids),
+        }
+    )
+
+    import dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.scratch as scratch_mod
+
+    monkeypatch.setattr(scratch_mod, "_write_campaign_config", lambda *args, **kwargs: None)
+
+    materialize_probe_inputs(
+        repo_root=tmp_path,
+        plan=plan,
+        labels=labels,
+        null_labels=labels.assign(oracle_id=NULL_ORACLE_ID),
+        split_metadata={
+            "random_id": {"train_ids": ["random-train"], "eval_ids": ["random-eval"]},
+            "leave_sigma35_variant": {"train_ids": ["leave-train"], "eval_ids": ["leave-eval"]},
+        },
+        copy_mode="clone",
+    )
+
+    random_records = pd.read_parquet(layout.split_records_path("random_id"))
+    leave_records = pd.read_parquet(layout.split_records_path("leave_sigma35_variant"))
+    assert sorted(random_records["id"].astype(str).tolist()) == ["random-eval", "random-train"]
+    assert sorted(leave_records["id"].astype(str).tolist()) == ["leave-eval", "leave-train"]
+    assert not layout.scratch_records_path.exists()
+
+
 def test_selected_ids_from_round_rejects_duplicate_selection_ids(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
@@ -568,6 +788,17 @@ def test_selected_ids_from_round_rejects_null_selection_ids(tmp_path: Path) -> N
 
     with pytest.raises(RuntimeError, match="null id"):
         selected_ids_from_round("cipro_positive_random_id", workdir, 0)
+
+
+def test_selected_ids_from_round_rejects_unexpected_selection_count(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path.parent.mkdir(parents=True)
+    rows = "\n".join(f"candidate-{idx},1.0" for idx in range(7))
+    selection_path.write_text(f"id,score\n{rows}\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="expected 6 selected"):
+        selected_ids_from_round("cipro_positive_random_id", workdir, 0, expected_k=6)
 
 
 def test_followup_label_input_rejects_duplicate_selected_ids(tmp_path: Path) -> None:
@@ -596,6 +827,73 @@ def test_followup_label_input_rejects_duplicate_selected_ids(tmp_path: Path) -> 
             already_labeled=set(),
             round_index=1,
         )
+
+
+def test_run_opal_rounds_reuses_existing_ingest_and_selection_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "probe"
+    workdir = run_root / "scratch_campaigns" / "cipro_positive_random_id"
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=workdir,
+        config_path=workdir / "configs" / "campaign.yaml",
+        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        sidecar_path=workdir / "observed_labels.parquet",
+        selection_k=1,
+    )
+    run.config_path.parent.mkdir(parents=True)
+    run.config_path.write_text("campaign_slug: test\n", encoding="utf-8")
+    pd.DataFrame(
+        {
+            "id": ["train-1", "selected-r0"],
+            "observed_round": [0, 1],
+        }
+    ).to_parquet(run.sidecar_path, index=False)
+    for round_index, candidate_id in [(0, "selected-r0"), (1, "selected-r1")]:
+        selection_path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+        selection_path.parent.mkdir(parents=True)
+        selection_path.write_text(f"id,score\n{candidate_id},1.0\n", encoding="utf-8")
+    plan = ProbePlan(
+        run_root=run_root,
+        budget=1,
+        seed=7,
+        rounds=2,
+        candidate_cap_per_split=None,
+        gate="cipro-random",
+        splits=("random_id",),
+        apply=True,
+        stop_after="status",
+        runs=[run],
+    )
+    commands: list[list[str]] = []
+
+    def fake_run_command(command: list[str], **_: object) -> None:
+        commands.append(command)
+
+    import dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.scratch as scratch
+
+    monkeypatch.setattr(scratch, "_run_command", fake_run_command)
+
+    labeled_ids_by_run = run_opal_rounds_for_probe(
+        repo_root=tmp_path,
+        plan=plan,
+        labels_by_oracle={ORACLE_ID: pd.DataFrame(), NULL_ORACLE_ID: pd.DataFrame()},
+        split_metadata={"random_id": {"train_ids": ["train-1"]}},
+        machine_readable=True,
+    )
+
+    opal_subcommands = [command[3] for command in commands if len(command) > 3 and command[:3] == ["uv", "run", "opal"]]
+    assert "init" not in opal_subcommands
+    assert "ingest-y" not in opal_subcommands
+    assert "run" not in opal_subcommands
+    assert {"validate", "status"}.issubset(opal_subcommands)
+    assert labeled_ids_by_run["cipro_positive_random_id"] == {"train-1", "selected-r0"}
 
 
 def test_audit_run_root_reports_pending_source_gate(tmp_path: Path) -> None:
@@ -772,6 +1070,24 @@ def test_clone_records_file_requires_manifest_for_existing_scratch_file(tmp_path
         _clone_records_file(src, dst, copy_mode="full")
 
 
+def test_write_records_subset_has_manifest_without_source_size_mismatch(tmp_path: Path) -> None:
+    src = tmp_path / "source.parquet"
+    dst = tmp_path / "scratch" / "records.parquet"
+    pd.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "sequence": ["AAAA", "CCCC", "GGGG"],
+            "x": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+        }
+    ).to_parquet(src, index=False)
+
+    _write_records_subset(src, dst, ids=["a", "c"])
+
+    subset = pd.read_parquet(dst)
+    assert sorted(subset["id"].tolist()) == ["a", "c"]
+    assert records_manifest_problems(dst, src) == []
+
+
 def test_make_training_input_requires_all_train_ids() -> None:
     labels = pd.DataFrame(
         {
@@ -885,6 +1201,142 @@ def test_evaluate_run_rejects_partial_prediction_ledgers(tmp_path: Path) -> None
         )
 
 
+def test_evaluate_run_respects_capped_split_eval_ids(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    eval_ids = [f"eval-{idx}" for idx in range(1, 7)]
+    config_path = _write_probe_prediction_campaign(
+        workdir,
+        pd.DataFrame(
+            {
+                "id": eval_ids,
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
+                "pred__score_selected": [1.0 - (idx * 0.01) for idx in range(len(eval_ids))],
+            }
+        ),
+    )
+    labels = pd.DataFrame(
+        {
+            "id": ["train-1", *eval_ids, "eval-outside-cap"],
+            "axis_class": ["background_only", *(["cipro_only"] * len(eval_ids)), "cipro_only"],
+            "quality_flag": ["ok"] * (len(eval_ids) + 2),
+        }
+    )
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=workdir,
+        config_path=config_path,
+        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        sidecar_path=workdir / "sidecar.parquet",
+    )
+
+    metrics = _evaluate_run(
+        run=run,
+        positive_labels=labels,
+        run_labels=labels,
+        split_metadata={
+            "train_ids": ["train-1"],
+            "eval_ids": eval_ids,
+            "candidate_cap_per_split": 7,
+            "eval_full_count": 7,
+        },
+    )
+
+    assert metrics["eval_count"] == 6
+    assert metrics["candidate_cap_per_split"] == 7
+    assert metrics["eval_full_count"] == 7
+    assert metrics["selected_count_in_eval"] == 6
+    assert metrics["selected_ids"] == eval_ids
+
+
+def test_evaluate_run_rejects_less_than_six_evaluable_selected_ids(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    config_path = _write_probe_prediction_campaign(
+        workdir,
+        pd.DataFrame(
+            {
+                "id": ["eval-1"],
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]],
+                "pred__score_selected": [1.0],
+                "sel__is_selected": [True],
+                "sel__rank_competition": [1],
+            }
+        ),
+    )
+    labels = pd.DataFrame(
+        {
+            "id": ["train-1", "eval-1"],
+            "axis_class": ["background_only", "cipro_only"],
+            "quality_flag": ["ok", "ok"],
+        }
+    )
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=workdir,
+        config_path=config_path,
+        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        sidecar_path=workdir / "sidecar.parquet",
+    )
+
+    with pytest.raises(RuntimeError, match="expected 6 evaluable selected"):
+        _evaluate_run(
+            run=run,
+            positive_labels=labels,
+            run_labels=labels,
+            split_metadata={"train_ids": ["train-1"], "eval_ids": ["eval-1"]},
+        )
+
+
+def test_evaluate_run_rejects_more_than_six_evaluable_selected_ids(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    eval_ids = [f"eval-{idx}" for idx in range(7)]
+    config_path = _write_probe_prediction_campaign(
+        workdir,
+        pd.DataFrame(
+            {
+                "id": eval_ids,
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
+                "pred__score_selected": [1.0] * len(eval_ids),
+                "sel__is_selected": [True] * len(eval_ids),
+                "sel__rank_competition": [1] * len(eval_ids),
+            }
+        ),
+    )
+    labels = pd.DataFrame(
+        {
+            "id": ["train-1", *eval_ids],
+            "axis_class": ["background_only", *(["cipro_only"] * len(eval_ids))],
+            "quality_flag": ["ok"] * (len(eval_ids) + 1),
+        }
+    )
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=workdir,
+        config_path=config_path,
+        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        sidecar_path=workdir / "sidecar.parquet",
+    )
+
+    with pytest.raises(RuntimeError, match="expected 6 evaluable selected"):
+        _evaluate_run(
+            run=run,
+            positive_labels=labels,
+            run_labels=labels,
+            split_metadata={"train_ids": ["train-1"], "eval_ids": eval_ids},
+        )
+
+
 def test_evaluate_run_requires_prediction_schema(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     config_path = _write_probe_prediction_campaign(
@@ -964,26 +1416,27 @@ def test_evaluate_run_rejects_duplicate_prediction_ids(tmp_path: Path) -> None:
 
 def test_evaluate_run_scores_actual_selected_rows_not_highest_unselected_score(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
+    selected_ids = [f"eval-selected-{idx}" for idx in range(6)]
     config_path = _write_probe_prediction_campaign(
         workdir,
         pd.DataFrame(
             {
-                "id": ["eval-high-unselected", "eval-selected"],
+                "id": ["eval-high-unselected", *selected_ids],
                 "pred__y_hat_model": [
                     [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0],
-                    [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0],
+                    *([[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]] * len(selected_ids)),
                 ],
-                "pred__score_selected": [0.99, 0.5],
-                "sel__is_selected": [False, True],
-                "sel__rank_competition": [2, 1],
+                "pred__score_selected": [0.99, *([0.5] * len(selected_ids))],
+                "sel__is_selected": [False, *([True] * len(selected_ids))],
+                "sel__rank_competition": [7, *range(1, 7)],
             }
         ),
     )
     labels = pd.DataFrame(
         {
-            "id": ["train-1", "eval-high-unselected", "eval-selected"],
-            "axis_class": ["background_only", "background_only", "cipro_only"],
-            "quality_flag": ["ok", "ok", "ok"],
+            "id": ["train-1", "eval-high-unselected", *selected_ids],
+            "axis_class": ["background_only", "background_only", *(["cipro_only"] * len(selected_ids))],
+            "quality_flag": ["ok"] * (len(selected_ids) + 2),
         }
     )
     run = RunSpec(
@@ -1005,7 +1458,7 @@ def test_evaluate_run_scores_actual_selected_rows_not_highest_unselected_score(t
         split_metadata={"train_ids": ["train-1"]},
     )
 
-    assert metrics["selected_ids"] == ["eval-selected"]
+    assert metrics["selected_ids"] == selected_ids
     assert metrics["selected_target_precision_at_k_true"] == 1.0
 
 
@@ -1163,6 +1616,54 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
         feature_dir / "feature_importance.csv",
         index=False,
     )
+    plots_dir = workdir / "outputs" / "plots"
+    plots_dir.mkdir(parents=True)
+    media_path = plots_dir / "score_selected_over_rounds_rall.png"
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (320, 240), "white")
+    draw = ImageDraw.Draw(image)
+    draw.line((20, 220, 300, 20), fill="black", width=3)
+    image.save(media_path)
+    csv_path = plots_dir / "score_selected_over_rounds_rall.csv"
+    pd.DataFrame(
+        {
+            "round": [0],
+            "cohort": ["selected"],
+            "metric": ["pred__score_selected"],
+            "summary": ["mean"],
+            "value": [0.5],
+        }
+    ).to_csv(csv_path, index=False)
+    plot_manifest_path = plots_dir / "score_selected_over_rounds_rall.manifest.json"
+    plot_manifest = {
+        "schema_version": "opal.plot_artifact.v1",
+        "name": "score_selected_over_rounds",
+        "kind": "metric_over_rounds",
+        "status": "written",
+        "generated_at": "2026-05-20T00:00:00+00:00",
+        "run_id": "run-0",
+        "rounds": "all",
+        "params": {},
+        "outputs": [
+            {"role": "media", "path": str(media_path), "exists": True},
+            {"role": "tidy_csv", "path": str(csv_path), "exists": True},
+        ],
+        "manifest_path": str(plot_manifest_path),
+    }
+    plot_manifest_path.write_text(json.dumps(plot_manifest), encoding="utf-8")
+    (plots_dir / "plot_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.plot_manifest_index.v1",
+                "generated_at": "2026-05-20T00:00:00+00:00",
+                "output_dir": str(plots_dir),
+                "plot_count": 1,
+                "manifests": [plot_manifest],
+            }
+        ),
+        encoding="utf-8",
+    )
     (reports_dir / "metrics.json").write_text(
         json.dumps(
             _valid_metrics_payload(
@@ -1175,6 +1676,10 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
                         "target_class": "cipro_only",
                         "train_count": 1,
                         "eval_count": 2,
+                        "run_id": "run-0",
+                        "as_of_round": 0,
+                        "selection_k": 6,
+                        "selected_count_in_eval": 6,
                         "selected_target_precision_at_k_true": 0.5,
                         "target_lift_at_k_true": 2.0,
                         "off_target_class_distribution_true": {
@@ -1206,9 +1711,15 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
     review_text = Path(payload["review"]).read_text(encoding="utf-8")
     assert "OPAL campaign run review artifacts remain campaign-scoped" in review_text
     assert "PASS_CIPRO_RANDOM_GATE" in review_text
+    assert "Configured OPAL Plots" in review_text
     index_text = Path(payload["index"]).read_text(encoding="utf-8")
     assert "DenseGen axis probe review" in index_text
     assert "cipro_positive_random_id" in index_text
+    assert "score_selected_over_rounds" in index_text
+    manifest = json.loads(Path(payload["review_manifest"]).read_text(encoding="utf-8"))
+    assert manifest["opal_configured_plots"][0]["plot_count"] == 1
+    assert manifest["plot_quality"]["plot_count"] == 1
+    assert manifest["plot_quality"]["problem_count"] == 0
     assert probe_main(["report", "--run-root", str(run_root), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["decision"] == "DEBUG"
 

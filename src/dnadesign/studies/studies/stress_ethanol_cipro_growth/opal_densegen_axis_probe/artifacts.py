@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .constants import SCRATCH_DATASET
+from .constants import DEFAULT_TOP_K, SCRATCH_DATASET
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,7 @@ class RunSpec:
     config_path: Path
     label_input_path: Path
     sidecar_path: Path
+    selection_k: int = DEFAULT_TOP_K
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class ProbePlan:
     budget: int
     seed: int
     rounds: int
+    candidate_cap_per_split: int | None
     gate: str | None
     splits: tuple[str, ...]
     apply: bool
@@ -169,6 +171,15 @@ class ProbeArtifactLayout:
     def scratch_records_path(self) -> Path:
         return self.scratch_dataset_dir / "records.parquet"
 
+    def split_dataset(self, split_id: str) -> str:
+        return f"{SCRATCH_DATASET}_{str(split_id)}"
+
+    def split_dataset_dir(self, split_id: str) -> Path:
+        return self.scratch_usr_dir / self.split_dataset(split_id)
+
+    def split_records_path(self, split_id: str) -> Path:
+        return self.split_dataset_dir(split_id) / "records.parquet"
+
     def campaign_workdir(self, run_key: str) -> Path:
         return self.scratch_campaigns_dir / run_key
 
@@ -178,5 +189,6 @@ class ProbeArtifactLayout:
     def campaign_label_input_path(self, run_key: str, round_index: int = 0) -> Path:
         return self.campaign_workdir(run_key) / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
 
-    def campaign_sidecar_path(self, run_key: str) -> Path:
-        return self.scratch_dataset_dir / "_opal" / run_key / "observed_labels.parquet"
+    def campaign_sidecar_path(self, run_key: str, split_id: str | None = None) -> Path:
+        dataset_dir = self.split_dataset_dir(split_id) if split_id is not None else self.scratch_dataset_dir
+        return dataset_dir / "_opal" / run_key / "observed_labels.parquet"

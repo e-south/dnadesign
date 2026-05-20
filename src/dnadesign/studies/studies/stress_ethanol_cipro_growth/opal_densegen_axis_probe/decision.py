@@ -9,10 +9,9 @@ import numpy as np
 import pandas as pd
 
 from .artifacts import ProbePlan, RunSpec
-from .axis_oracle import _ok_labels, build_train_ids
+from .axis_oracle import _ok_labels, build_balanced_eval_ids, build_train_ids
 from .constants import (
     AXIS_CLASS_TO_LOGIC4,
-    DEFAULT_TOP_K,
     NULL_ORACLE_ID,
     ORACLE_ID,
     QUALITY_FLAGS,
@@ -23,6 +22,7 @@ from .prediction_scoring import (
     label_lookup,
     macro_f1,
     predicted_axis_classes,
+    selected_bool_mask,
     top_ids_from_prediction_frame,
     validate_prediction_selection_contract,
 )
@@ -48,8 +48,10 @@ def _evaluate_run(
     true_labels = label_lookup(positive_labels)
     oracle_labels = label_lookup(run_labels)
     train_ids = set(map(str, split_metadata["train_ids"]))
-    if run.split_id == "leave_sigma35_variant":
-        eval_ids = set(map(str, split_metadata["eval_ids"]))
+    if "eval_ids" in split_metadata:
+        eval_ids = set(map(str, split_metadata["eval_ids"])) - train_ids
+    elif run.split_id == "leave_sigma35_variant":
+        raise RuntimeError(f"split metadata for scored run {run.run_key} missing eval_ids")
     else:
         eval_ids = set(_ok_labels(positive_labels)["id"].astype(str).tolist()) - train_ids
 
@@ -62,6 +64,10 @@ def _evaluate_run(
         "train_count": int(len(train_ids)),
         "eval_count": int(len(eval_ids)),
     }
+    if split_metadata.get("candidate_cap_per_split") is not None:
+        row["candidate_cap_per_split"] = int(split_metadata["candidate_cap_per_split"])
+    if split_metadata.get("eval_full_count") is not None:
+        row["eval_full_count"] = int(split_metadata["eval_full_count"])
     if predictions.empty:
         raise RuntimeError(f"missing OPAL prediction artifacts for scored run {run.run_key}: {run.workdir}")
     run_ids = sorted({str(value) for value in predictions["run_id"].dropna().tolist()})
@@ -98,7 +104,23 @@ def _evaluate_run(
         frame["oracle_axis_class"].astype(str), frame["pred_axis_class"].astype(str)
     )
 
-    selected_ids = top_ids_from_prediction_frame(frame, k=DEFAULT_TOP_K)
+    selection_k = int(run.selection_k)
+    selected_mask = selected_bool_mask(frame)
+    row["selected_count_in_eval"] = int(selected_mask.sum())
+    row["selection_k"] = selection_k
+    if int(row["selected_count_in_eval"]) != selection_k:
+        raise RuntimeError(
+            f"scored run {run.run_key} expected {selection_k} evaluable selected id(s) "
+            f"inside split {run.split_id}, got {row['selected_count_in_eval']}. "
+            "This usually means the scratch candidate pool is not split-scoped, tie handling expanded top_k, "
+            "or selection artifacts are stale."
+        )
+    selected_ids = top_ids_from_prediction_frame(frame, k=selection_k)
+    if len(selected_ids) != selection_k:
+        raise RuntimeError(
+            f"scored run {run.run_key} could not resolve {selection_k} selected id(s) "
+            f"inside split {run.split_id}, got {len(selected_ids)}."
+        )
     selected_true = true_labels.reindex(selected_ids).astype(str).tolist()
     selected_oracle = oracle_labels.reindex(selected_ids).astype(str).tolist()
     true_eval_classes = frame["true_axis_class"].astype(str).tolist()
@@ -376,6 +398,9 @@ def _compact_split_metadata(split_metadata: Mapping[str, Mapping[str, Any]]) -> 
             "split_id": metadata.get("split_id", split_id),
             "budget": metadata.get("budget"),
             "per_class": metadata.get("per_class"),
+            "class_budget": metadata.get("class_budget"),
+            "candidate_cap_per_split": metadata.get("candidate_cap_per_split"),
+            "eval_full_count": metadata.get("eval_full_count"),
             "seed": metadata.get("seed"),
             "heldout_sigma35": metadata.get("heldout_sigma35"),
             "train_count": len(metadata.get("train_ids", [])),
@@ -399,6 +424,20 @@ def _split_metadata_for_all(labels: pd.DataFrame, *, plan: ProbePlan) -> dict[st
         train_ids, metadata = build_train_ids(
             labels, budget=plan.budget, seed=plan.seed, split_id=split_id, return_metadata=True
         )
+        if plan.candidate_cap_per_split is not None:
+            eval_ids = list(map(str, metadata.get("eval_ids", [])))
+            eval_budget = int(plan.candidate_cap_per_split) - len(train_ids)
+            if eval_budget < 4:
+                raise ValueError("--candidate-cap must leave at least four eval rows after the initial budget")
+            if len(eval_ids) > eval_budget:
+                metadata["eval_full_count"] = int(len(eval_ids))
+                metadata["eval_ids"] = build_balanced_eval_ids(
+                    labels,
+                    eval_ids=eval_ids,
+                    budget=eval_budget,
+                    seed=plan.seed,
+                )
+                metadata["candidate_cap_per_split"] = int(plan.candidate_cap_per_split)
         metadata["train_ids"] = train_ids
         metadata_by_split[split_id] = metadata
     return metadata_by_split

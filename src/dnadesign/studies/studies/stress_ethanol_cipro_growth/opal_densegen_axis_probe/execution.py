@@ -24,7 +24,13 @@ def materialize_probe_inputs(
 
     from .decision import _persisted_split_metadata
     from .plan import validate_scratch_paths
-    from .scratch import _clone_records_file, _make_training_input, _write_campaign_config, _write_json, _write_parquet
+    from .scratch import (
+        _make_training_input,
+        _write_campaign_config,
+        _write_json,
+        _write_parquet,
+        _write_records_subset,
+    )
 
     layout = ProbeArtifactLayout(plan.run_root)
     for path in (layout.labels_dir, layout.splits_dir, layout.reports_dir, layout.scratch_campaigns_dir):
@@ -37,11 +43,13 @@ def materialize_probe_inputs(
         _write_parquet(layout.eval_ids_path(split_id), pd.DataFrame({"id": list(metadata["eval_ids"])}))
 
     if plan.runs:
-        _clone_records_file(
-            _resolve_repo_path(repo_root, CANDIDATE_RECORDS),
-            layout.scratch_records_path,
-            copy_mode=copy_mode,
-        )
+        source_records = _resolve_repo_path(repo_root, CANDIDATE_RECORDS)
+        for split_id, metadata in split_metadata.items():
+            split_ids = {
+                *map(str, metadata.get("train_ids", [])),
+                *map(str, metadata.get("eval_ids", [])),
+            }
+            _write_records_subset(source_records, layout.split_records_path(split_id), ids=sorted(split_ids))
 
     labels_by_oracle = {ORACLE_ID: labels, NULL_ORACLE_ID: null_labels}
     for run in plan.runs:
@@ -52,7 +60,13 @@ def materialize_probe_inputs(
         _write_parquet(layout.campaign_label_input_path(run.run_key, 0), training_input)
 
 
-def selected_ids_from_round(run_key: str, workdir: Path, round_index: int) -> list[str]:
+def selected_ids_from_round(
+    run_key: str,
+    workdir: Path,
+    round_index: int,
+    *,
+    expected_k: int | None = None,
+) -> list[str]:
     import pandas as pd
 
     selection_path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
@@ -80,7 +94,40 @@ def selected_ids_from_round(run_key: str, workdir: Path, round_index: int) -> li
             f"selection artifact contains duplicate selected id(s) for {run_key} round {int(round_index)}: "
             f"{preview}{suffix}"
         )
+    if expected_k is not None and len(ids) != int(expected_k):
+        raise RuntimeError(
+            f"selection artifact for {run_key} round {int(round_index)} expected {int(expected_k)} "
+            f"selected id(s), got {len(ids)}"
+        )
     return ids
+
+
+def _observed_label_ids_for_round(sidecar_path: Path, round_index: int) -> set[str]:
+    import pandas as pd
+
+    if not sidecar_path.exists():
+        return set()
+    try:
+        frame = pd.read_parquet(sidecar_path, columns=["id", "observed_round"])
+    except (KeyError, ValueError) as exc:
+        raise RuntimeError(f"observed-label sidecar missing id/observed_round columns: {sidecar_path}") from exc
+    round_frame = frame.loc[pd.to_numeric(frame["observed_round"], errors="coerce") == int(round_index)]
+    if round_frame.empty:
+        return set()
+    if round_frame["id"].isna().any():
+        raise RuntimeError(f"observed-label sidecar has null id for round {int(round_index)}: {sidecar_path}")
+    ids = {str(value).strip() for value in round_frame["id"].tolist()}
+    if any(not candidate_id for candidate_id in ids):
+        raise RuntimeError(f"observed-label sidecar has blank id for round {int(round_index)}: {sidecar_path}")
+    return ids
+
+
+def _round_selection_exists(workdir: Path, round_index: int) -> bool:
+    return (workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv").exists()
+
+
+def _campaign_has_mutable_state(run: Any) -> bool:
+    return run.sidecar_path.exists() or (run.workdir / "outputs" / "rounds").exists()
 
 
 def write_followup_label_input(
@@ -143,36 +190,54 @@ def run_opal_rounds_for_probe(
         _run_command(_opal_validate_command(run.config_path), cwd=repo_root, machine_readable=machine_readable)
         if RUN_STAGES.index(plan.stop_after) < RUN_STAGES.index("init"):
             continue
-        _run_command(_opal_init_command(run.config_path), cwd=repo_root, machine_readable=machine_readable)
+        if not _campaign_has_mutable_state(run):
+            _run_command(_opal_init_command(run.config_path), cwd=repo_root, machine_readable=machine_readable)
         if RUN_STAGES.index(plan.stop_after) < RUN_STAGES.index("ingest"):
             continue
 
         run_labels = labels_by_oracle[run.oracle_id]
-        _run_command(_opal_ingest_command(run.config_path, 0), cwd=repo_root, machine_readable=machine_readable)
+        round_label_ids = _observed_label_ids_for_round(run.sidecar_path, 0)
+        if round_label_ids:
+            labeled_ids.update(round_label_ids)
+        else:
+            _run_command(_opal_ingest_command(run.config_path, 0), cwd=repo_root, machine_readable=machine_readable)
+            labeled_ids.update(map(str, split_metadata[run.split_id]["train_ids"]))
         if RUN_STAGES.index(plan.stop_after) < RUN_STAGES.index("run"):
             continue
 
         for round_index in range(plan.rounds):
             if round_index > 0:
-                selected_ids = selected_ids_from_round(run.run_key, run.workdir, round_index - 1)
-                write_followup_label_input(
-                    layout=layout,
-                    run_key=run.run_key,
-                    labels=run_labels,
-                    selected_ids=selected_ids,
-                    already_labeled=labeled_ids,
-                    round_index=round_index,
-                )
+                round_label_ids = _observed_label_ids_for_round(run.sidecar_path, round_index)
+                if round_label_ids:
+                    labeled_ids.update(round_label_ids)
+                else:
+                    selected_ids = selected_ids_from_round(
+                        run.run_key,
+                        run.workdir,
+                        round_index - 1,
+                        expected_k=run.selection_k,
+                    )
+                    write_followup_label_input(
+                        layout=layout,
+                        run_key=run.run_key,
+                        labels=run_labels,
+                        selected_ids=selected_ids,
+                        already_labeled=labeled_ids,
+                        round_index=round_index,
+                    )
+                    _run_command(
+                        _opal_ingest_command(run.config_path, round_index),
+                        cwd=repo_root,
+                        machine_readable=machine_readable,
+                    )
+            if _round_selection_exists(run.workdir, round_index):
+                selected_ids_from_round(run.run_key, run.workdir, round_index, expected_k=run.selection_k)
+            else:
                 _run_command(
-                    _opal_ingest_command(run.config_path, round_index),
+                    _opal_run_command(run.config_path, round_index),
                     cwd=repo_root,
                     machine_readable=machine_readable,
                 )
-            _run_command(
-                _opal_run_command(run.config_path, round_index),
-                cwd=repo_root,
-                machine_readable=machine_readable,
-            )
 
         if RUN_STAGES.index(plan.stop_after) >= RUN_STAGES.index("status"):
             _run_command(_opal_status_command(run.config_path), cwd=repo_root, machine_readable=machine_readable)

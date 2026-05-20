@@ -117,12 +117,16 @@ def build_plan(
     seed: int,
     gate: str | None,
     splits: Iterable[str],
+    candidate_cap_per_split: int | None = None,
     rounds: int = 1,
     apply: bool = False,
     stop_after: str = "status",
 ) -> ProbePlan:
     stop = _validate_stop_after(stop_after)
     round_count = _validate_rounds(rounds)
+    cap = None if candidate_cap_per_split is None else int(candidate_cap_per_split)
+    if cap is not None and cap <= int(budget):
+        raise ValueError("--candidate-cap must be greater than --budget")
     split_tuple = tuple(dict.fromkeys(str(split).strip() for split in splits if str(split).strip()))
     if not split_tuple:
         split_tuple = ("random_id", "leave_sigma35_variant")
@@ -138,7 +142,7 @@ def build_plan(
         workdir = layout.campaign_workdir(run_key)
         config_path = layout.campaign_config_path(run_key)
         label_input_path = layout.campaign_label_input_path(run_key)
-        sidecar_path = layout.campaign_sidecar_path(run_key)
+        sidecar_path = layout.campaign_sidecar_path(run_key, split_id)
         runs.append(
             RunSpec(
                 campaign_key=campaign_key,
@@ -150,6 +154,7 @@ def build_plan(
                 config_path=config_path,
                 label_input_path=label_input_path,
                 sidecar_path=sidecar_path,
+                selection_k=int(budget),
             )
         )
         commands.extend(_opal_commands(config_path, stop_after=stop, rounds=round_count))
@@ -158,6 +163,7 @@ def build_plan(
         budget=int(budget),
         seed=int(seed),
         rounds=round_count,
+        candidate_cap_per_split=cap,
         gate=gate,
         splits=split_tuple,
         apply=bool(apply),

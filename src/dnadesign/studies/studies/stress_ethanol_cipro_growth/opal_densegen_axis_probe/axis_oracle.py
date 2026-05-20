@@ -362,6 +362,40 @@ def _deterministic_sample(ids: Sequence[str], *, n: int, rng: np.random.Generato
     return sorted(map(str, ordered[positions].tolist()))
 
 
+def _balanced_class_budgets(*, budget: int, seed: int, require_each_class: bool = True) -> dict[str, int]:
+    axis_classes = list(AXIS_CLASS_TO_LOGIC4)
+    total = int(budget)
+    if require_each_class and total < len(axis_classes):
+        raise ValueError(f"budget must be >= {len(axis_classes)} to seed every axis class")
+    base = total // len(axis_classes)
+    remainder = total % len(axis_classes)
+    counts = {axis_class: base for axis_class in axis_classes}
+    if remainder:
+        rng = np.random.default_rng(int(seed) + 7919)
+        extra_classes = rng.choice(np.asarray(axis_classes, dtype=object), size=remainder, replace=False)
+        for axis_class in map(str, extra_classes.tolist()):
+            counts[axis_class] += 1
+    return counts
+
+
+def build_balanced_eval_ids(
+    labels: pd.DataFrame,
+    *,
+    eval_ids: Sequence[str],
+    budget: int,
+    seed: int,
+) -> list[str]:
+    class_budgets = _balanced_class_budgets(budget=int(budget), seed=int(seed))
+    eval_id_set = set(map(str, eval_ids))
+    pool = _ok_labels(labels).loc[lambda frame: frame["id"].astype(str).isin(eval_id_set)].copy()
+    rng = np.random.default_rng(int(seed) + 104729)
+    sampled_ids: list[str] = []
+    for axis_class in AXIS_CLASS_TO_LOGIC4:
+        class_ids = pool.loc[pool["axis_class"].astype(str) == axis_class, "id"].astype(str).tolist()
+        sampled_ids.extend(_deterministic_sample(class_ids, n=class_budgets[axis_class], rng=rng))
+    return sorted(sampled_ids)
+
+
 def build_train_ids(
     labels: pd.DataFrame,
     *,
@@ -370,12 +404,17 @@ def build_train_ids(
     split_id: Literal["random_id", "leave_sigma35_variant"],
     return_metadata: bool = False,
 ) -> list[str] | tuple[list[str], dict[str, Any]]:
-    if int(budget) % len(AXIS_CLASS_TO_LOGIC4) != 0:
-        raise ValueError(f"budget must be divisible by {len(AXIS_CLASS_TO_LOGIC4)}")
+    class_budgets = _balanced_class_budgets(budget=int(budget), seed=int(seed))
     per_class = int(budget) // len(AXIS_CLASS_TO_LOGIC4)
     rng = np.random.default_rng(int(seed))
     pool = _ok_labels(labels)
-    metadata: dict[str, Any] = {"split_id": split_id, "budget": int(budget), "per_class": per_class, "seed": int(seed)}
+    metadata: dict[str, Any] = {
+        "split_id": split_id,
+        "budget": int(budget),
+        "per_class": per_class,
+        "class_budget": dict(class_budgets),
+        "seed": int(seed),
+    }
     if split_id == "leave_sigma35_variant":
         variants = sorted(v for v in pool["sigma35_variant"].dropna().astype(str).unique().tolist() if v)
         if not variants:
@@ -389,7 +428,7 @@ def build_train_ids(
     train_ids: list[str] = []
     for axis_class in AXIS_CLASS_TO_LOGIC4:
         class_ids = pool.loc[pool["axis_class"].astype(str) == axis_class, "id"].astype(str).tolist()
-        sampled = _deterministic_sample(class_ids, n=per_class, rng=rng)
+        sampled = _deterministic_sample(class_ids, n=class_budgets[axis_class], rng=rng)
         train_ids.extend(sampled)
     train_ids = sorted(train_ids)
     metadata["train_count"] = int(len(train_ids))

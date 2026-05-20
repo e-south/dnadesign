@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -19,7 +20,6 @@ from .constants import (
     DENSEGEN_SIDECAR,
     FORBIDDEN_EXACT_COLUMNS,
     FORBIDDEN_PREFIXES,
-    SCRATCH_DATASET,
     SFXI_INTENSITY_COLUMNS,
     SFXI_STATE_COLUMNS,
 )
@@ -110,7 +110,59 @@ def _clone_records_file(src: Path, dst: Path, *, copy_mode: str) -> None:
         shutil.copy2(src, dst)
     else:
         raise ValueError("--copy-mode must be clone or full")
-    _write_json(records_manifest_path(dst), records_manifest_payload(src, dst))
+    _write_json(records_manifest_path(dst), records_manifest_payload(src, dst, copy_mode=copy_mode))
+
+
+def _stable_id_hash(ids: Sequence[str]) -> str:
+    payload = "\n".join(sorted(map(str, ids))).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _write_records_subset(src: Path, dst: Path, *, ids: Sequence[str]) -> None:
+    requested_ids = sorted(set(map(str, ids)))
+    if not requested_ids:
+        raise ValueError("records subset requires at least one id")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    expected_hash = _stable_id_hash(requested_ids)
+    if dst.exists():
+        problems = records_manifest_problems(dst, src)
+        manifest_path = records_manifest_path(dst)
+        if problems:
+            raise RuntimeError(
+                "scratch records.parquet already exists without a matching source manifest. "
+                f"Use a fresh --run-root or remove the stale scratch dataset: {', '.join(problems)}"
+            )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("copy_mode") != "subset" or manifest.get("subset_ids_sha256") != expected_hash:
+            raise RuntimeError(
+                "scratch records.parquet already exists for a different subset. "
+                "Use a fresh --run-root or remove the stale scratch dataset."
+            )
+        return
+
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+
+    dataset = ds.dataset(str(src), format="parquet")
+    table = dataset.to_table(filter=ds.field("id").isin(requested_ids))
+    found_ids = set(table.column("id").to_pylist()) if table.num_rows else set()
+    missing = sorted(set(requested_ids) - set(map(str, found_ids)))
+    if missing:
+        preview = ", ".join(missing[:5])
+        suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
+        raise RuntimeError(f"records subset is missing requested id(s): {preview}{suffix}")
+    pq.write_table(table, dst)
+    _write_json(
+        records_manifest_path(dst),
+        records_manifest_payload(
+            src,
+            dst,
+            copy_mode="subset",
+            row_count=int(table.num_rows),
+            subset_id_count=len(requested_ids),
+            subset_ids_sha256=expected_hash,
+        ),
+    )
 
 
 def _make_training_input(labels: pd.DataFrame, train_ids: Sequence[str]) -> pd.DataFrame:
@@ -136,20 +188,22 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
     if not isinstance(cfg, dict):
         raise ValueError(f"campaign config must be a mapping: {source_config}")
     slug = f"opal_axis_probe_v0_{run.run_key}"
-    sidecar_rel = run.sidecar_path.relative_to(layout.scratch_dataset_dir)
+    dataset = layout.split_dataset(run.split_id)
+    dataset_dir = layout.split_dataset_dir(run.split_id)
+    sidecar_rel = run.sidecar_path.relative_to(dataset_dir)
     cfg["campaign"]["name"] = f"{cfg['campaign']['name']} [{run.run_key}]"
     cfg["campaign"]["slug"] = slug
     cfg["campaign"]["workdir"] = str(run.workdir)
     cfg["data"]["location"] = {
         "kind": "usr",
         "path": str(layout.scratch_usr_dir),
-        "dataset": SCRATCH_DATASET,
+        "dataset": dataset,
     }
     cfg["data"]["y_column_name"] = f"opal__{slug}__y"
     cfg["labels"] = {
         "source": {
             "kind": "usr_sidecar",
-            "dataset": SCRATCH_DATASET,
+            "dataset": dataset,
             "path": str(sidecar_rel),
         },
         "y_space": "sfxi_vec8",
@@ -158,9 +212,68 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
         "batch_column": "batch_id",
         "dedup_policy": "latest_by_round",
     }
+    selection = cfg.setdefault("selection", {})
+    selection_params = selection.setdefault("params", {})
+    selection_params["top_k"] = int(run.selection_k)
+    selection_params["tie_handling"] = "ordinal"
     cfg["writeback"] = {"prediction_records": "ledger_only"}
+    cfg["plot_config"] = "plots.yaml"
     run.config_path.parent.mkdir(parents=True, exist_ok=True)
     run.config_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    _write_campaign_plot_config(run)
+
+
+def _write_campaign_plot_config(run: RunSpec) -> None:
+    setpoint = list(CAMPAIGNS[run.campaign_key]["target_vec8"])
+    plot_config = {
+        "plot_defaults": {
+            "output": {
+                "format": "png",
+                "dpi": 180,
+                "save_data": True,
+            }
+        },
+        "plots": [
+            {
+                "name": "score_selected_over_rounds",
+                "kind": "metric_over_rounds",
+                "tags": ["rounds", "dogfood"],
+                "params": {
+                    "metric": "pred__score_selected",
+                    "cohort": ["selected", "top_k", "all_pool"],
+                    "top_k": 6,
+                    "summaries": ["mean", "median", "q25", "q75"],
+                    "title": f"{run.run_key}: score over rounds",
+                },
+            },
+            {
+                "name": "feature_importance_heatmap",
+                "kind": "feature_importance_heatmap",
+                "tags": ["rounds", "dogfood", "model"],
+                "params": {
+                    "top_n": 128,
+                    "sort": "max_importance",
+                    "cluster": False,
+                    "title": f"{run.run_key}: feature importance over rounds",
+                },
+            },
+            {
+                "name": "selected_vec8_summary",
+                "kind": "vector_summary_heatmap",
+                "tags": ["rounds", "dogfood", "vector"],
+                "params": {
+                    "vector_field": "pred__y_hat_model",
+                    "cohort": "selected",
+                    "include_setpoint": True,
+                    "setpoint": setpoint,
+                    "channel_labels": [*SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS],
+                    "title": f"{run.run_key}: selected vec8 summary",
+                },
+            },
+        ],
+    }
+    path = run.config_path.parent / "plots.yaml"
+    path.write_text(yaml.safe_dump(plot_config, sort_keys=False), encoding="utf-8")
 
 
 def _run_command(command: Sequence[str], *, cwd: Path, machine_readable: bool = False) -> None:
