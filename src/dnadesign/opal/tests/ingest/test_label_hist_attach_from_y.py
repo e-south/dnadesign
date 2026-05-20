@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -19,17 +20,22 @@ from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records(path: Path) -> None:
-    df = pd.DataFrame(
-        {
-            "id": ["a", "b", "c", "d"],
-            "sequence": ["AAA", "BBB", "CCC", "DDD"],
-            "bio_type": ["dna"] * 4,
-            "alphabet": ["dna_4"] * 4,
-            "X": [[0.1], [0.2], [0.3], [0.4]],
-            "Y": [[0.1], [0.2], None, None],
-        }
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b", "c", "d"], type=pa.string()),
+                "sequence": pa.array(["AAA", "BBB", "CCC", "DDD"], type=pa.string()),
+                "bio_type": pa.array(["dna"] * 4, type=pa.string()),
+                "alphabet": pa.array(["dna_4"] * 4, type=pa.string()),
+                "X": pa.FixedSizeListArray.from_arrays(
+                    pa.array([0.1, 0.2, 0.3, 0.4], type=pa.float32()),
+                    1,
+                ),
+                "Y": pa.array([[0.1], [0.2], None, None], type=pa.list_(pa.float64())),
+            }
+        ),
+        path,
     )
-    df.to_parquet(path, index=False)
 
 
 def test_label_hist_attach_from_y(tmp_path: Path) -> None:
@@ -77,5 +83,5 @@ def test_label_hist_attach_from_y(tmp_path: Path) -> None:
     )
     assert res.exit_code == 0, res.stdout
 
-    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0"])
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0", "--resume"])
     assert res.exit_code == 0, res.stdout

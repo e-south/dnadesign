@@ -6,11 +6,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.storage.records_io import RecordsIO
 from dnadesign.opal.src.storage.x_contracts import validate_x_parquet_column
 
 
@@ -88,3 +90,15 @@ def test_validate_x_parquet_column_rejects_scalar_physical_schema(tmp_path: Path
 
     with pytest.raises(OpalError, match="must be stored as a Parquet fixed_size_list"):
         validate_x_parquet_column(records, x_column="X")
+
+
+def test_records_save_atomic_preserves_fixed_size_x_schema(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    _write_fixed_size_x(records, [[0.1, 0.2], [0.3, 0.4]])
+    df = pd.read_parquet(records, engine="pyarrow")
+    df["Y"] = pd.Series([[0.1], None], dtype=object)
+
+    RecordsIO(records).save_atomic(df)
+
+    report = validate_x_parquet_column(records, x_column="X")
+    assert report.x_dim == 2

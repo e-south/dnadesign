@@ -102,6 +102,9 @@ def test_progress_json_summary(tmp_path):
     assert out["schema_version"] == "opal.campaign_progress.v1"
     assert out["status"] == "done"
     assert out["round_count"] == 1
+    assert out["locks"]["campaign"]["scope"] == "local_host"
+    assert "warnings" in out
+    assert "run_scope" in out["rounds"][0]["summary"]
     assert out["rounds"][0]["predict"]["rows"] == 2
 
 

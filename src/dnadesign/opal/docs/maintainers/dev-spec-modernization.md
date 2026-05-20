@@ -1,6 +1,8 @@
 # OPAL Modernization Development Specification
 
 **Status:** Draft for engineering planning and review
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-05-20
 **Audience:** OPAL maintainers, study integrators, and developer-experience owners
 **Date:** 2026-05-20
 **Scope:** OPAL campaign runtime, reporting, plot artifacts, CLI JSON surfaces, and generated marimo review notebooks
@@ -591,7 +593,7 @@ Update these docs as implementation lands:
 | P3: Plot artifact manifests | Add per-plot manifests and aggregate plot manifest; report failures structurally | P1 | Medium; all plot plugins affected indirectly | Every configured plot produces success/failed/skipped manifest | Runner-level manifest wrapper minimizes plugin edits |
 | P4: Generic plot primitives | Add `metric_over_rounds`, `feature_importance_heatmap`, `vector_summary_heatmap`, overlap/composition/uncertainty/support/calibration primitives | P3 | Medium; temptation to over-abstract | New primitives pass data-shape contracts and avoid study names | Keep SFXI-specific plots during transition as configured diagnostics |
 | P5: Marimo review notebook modernization | Public view-model API, manifest-backed plot cards, lazy accordions, smoke checks | P3 | Medium; generated artifacts are durable | Notebook uses public imports and manifest authority; smoke checks pass | Keep old template behind explicit legacy flag for one release if needed |
-| P6: Dogfood expansion and CI gates | Add broader synthetic and real-data smoke coverage with explicit evidence labels | P1-P5 depending gate | High; runtime cost and study availability | Reports distinguish cipro/random, random-all, leave-sigma35, and real assay evidence | Keep expensive gates optional/nightly; never block core OPAL unit tests on study-specific benchmarks |
+| P6: Dogfood expansion and CI gates | Add broader synthetic and real-data smoke coverage with explicit evidence labels, including multi-round synthetic probe loops owned by study code | P1-P5 depending gate | High; runtime cost and study availability | Reports distinguish cipro/random, random-all, leave-sigma35, multi-round synthetic pressure tests, and real assay evidence | Keep expensive gates optional/nightly; never block core OPAL unit tests on study-specific benchmarks |
 
 ## N. Risks And Tradeoffs
 

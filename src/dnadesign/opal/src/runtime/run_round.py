@@ -67,7 +67,14 @@ def _round_dir_has_blocking_entries(rdir: Path) -> bool:
     children = list(entries[0].iterdir())
     if len(children) != 1 or children[0].name != "round.log.jsonl":
         return True
-    allowed = {"command_start", "records_load_start", "records_load_done"}
+    allowed = {
+        "command_start",
+        "x_validate_start",
+        "x_validate_done",
+        "records_load_start",
+        "records_load_done",
+        "abort",
+    }
     try:
         stages = {
             str(json.loads(line).get("stage"))

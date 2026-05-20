@@ -13,6 +13,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
@@ -54,8 +55,26 @@ def write_feature_importance_csv(path: Path, df: pd.DataFrame) -> str:
 
 def append_round_log_event(path: Path, event: dict) -> None:
     ensure_dir(path.parent)
+    event = dict(event)
+    stage = str(event.get("stage", "unknown"))
+    event.setdefault("schema_version", "opal.progress_event.v1")
+    event.setdefault("event_id", uuid.uuid4().hex)
+    event.setdefault("phase", _infer_progress_phase(stage))
+    event.setdefault("severity", "info")
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(event, separators=(",", ":")) + "\n")
+
+
+def _infer_progress_phase(stage: str) -> str:
+    if stage.startswith("command_"):
+        return "command"
+    if stage.startswith("records_load") or stage in {"preflight", "preflight_start", "preflight_done"}:
+        return "preflight"
+    if stage in {"abort", "aborted"} or stage.endswith("_abort"):
+        return "abort"
+    if stage.startswith("finalize"):
+        return "finalize"
+    return "run"
 
 
 def write_round_ctx(path: Path, ctx: dict) -> str:

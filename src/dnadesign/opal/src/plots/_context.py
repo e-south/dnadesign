@@ -10,7 +10,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,6 +33,7 @@ class PlotContext:
     format: str  # "png" (default) | "svg" | "pdf"
     logger: logging.Logger
     save_data: bool  # if true, plugins should save tidy data
+    saved_data_paths: list[Path] = field(default_factory=list)
 
     def save_df(self, df: "pd.DataFrame", filename: str | None = None) -> Path:
         """
@@ -44,4 +45,5 @@ class PlotContext:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         target = self.output_dir / (filename or (self.filename.rsplit(".", 1)[0] + ".csv"))
         df.to_csv(target, index=False)
+        self.saved_data_paths.append(target)
         return target

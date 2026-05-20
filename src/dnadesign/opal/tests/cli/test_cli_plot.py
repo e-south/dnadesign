@@ -7,6 +7,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -22,6 +23,11 @@ def _plot_minimal(ctx: PlotContext, params: dict) -> None:
     ctx.output_dir.mkdir(parents=True, exist_ok=True)
     out = ctx.output_dir / ctx.filename
     out.write_text(f"ok:{params.get('tag', 'none')}")
+
+
+@register_plot("test_plot_cli_no_output")
+def _plot_no_output(ctx: PlotContext, params: dict) -> None:
+    return None
 
 
 def test_plot_cli_writes_output(tmp_path):
@@ -44,6 +50,18 @@ def test_plot_cli_writes_output(tmp_path):
 
     out_path = Path(workdir) / "outputs" / "plots" / "mini.png"
     assert out_path.exists()
+    manifest_path = Path(workdir) / "outputs" / "plots" / "mini.manifest.json"
+    index_path = Path(workdir) / "outputs" / "plots" / "plot_manifest.json"
+    assert manifest_path.exists()
+    assert index_path.exists()
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["schema_version"] == "opal.plot_artifact.v1"
+    assert manifest["name"] == "mini"
+    assert manifest["status"] == "written"
+    assert manifest["outputs"][0]["role"] == "media"
+    index = json.loads(index_path.read_text())
+    assert index["schema_version"] == "opal.plot_manifest_index.v1"
+    assert index["plot_count"] == 1
 
 
 def test_plot_cli_list_registry(tmp_path):
@@ -53,6 +71,12 @@ def test_plot_cli_list_registry(tmp_path):
     assert res.exit_code == 0, res.stdout
     assert "test_plot_cli_minimal" in res.stdout
 
+    res_json = runner.invoke(app, ["--no-color", "plot", "--list", "--json"])
+    assert res_json.exit_code == 0, res_json.stdout
+    payload = json.loads(res_json.stdout)
+    assert payload["schema_version"] == "opal.plot_registry.v1"
+    assert any(row["kind"] == "test_plot_cli_minimal" for row in payload["plots"])
+
 
 def test_plot_cli_list_registry_includes_sfxi_diagnostics(tmp_path):
     app = _build()
@@ -60,11 +84,14 @@ def test_plot_cli_list_registry_includes_sfxi_diagnostics(tmp_path):
     res = runner.invoke(app, ["--no-color", "plot", "--list"])
     assert res.exit_code == 0, res.stdout
     for name in [
+        "feature_importance_heatmap",
+        "metric_over_rounds",
         "sfxi_factorial_effects",
         "sfxi_setpoint_sweep",
         "sfxi_support_diagnostics",
         "sfxi_uncertainty",
         "sfxi_intensity_scaling",
+        "vector_summary_heatmap",
     ]:
         assert name in res.stdout
     assert "sfxi_setpoint_decomposition" not in res.stdout
@@ -90,6 +117,12 @@ def test_plot_cli_describe(tmp_path):
     assert res.exit_code == 0, res.stdout
     assert "scatter_score_vs_rank" in res.stdout
 
+    res_json = runner.invoke(app, ["--no-color", "plot", "--describe", "scatter_score_vs_rank", "--json"])
+    assert res_json.exit_code == 0, res_json.stdout
+    payload = json.loads(res_json.stdout)
+    assert payload["schema_version"] == "opal.plot_description.v1"
+    assert payload["plot"]["kind"] == "scatter_score_vs_rank"
+
 
 def test_plot_cli_list_configured(tmp_path):
     workdir = tmp_path / "campaign"
@@ -109,6 +142,12 @@ def test_plot_cli_list_configured(tmp_path):
     res = runner.invoke(app, ["--no-color", "plot", "--list-config", "-c", str(campaign)])
     assert res.exit_code == 0, res.stdout
     assert "mini: test_plot_cli_minimal" in res.stdout
+
+    res_json = runner.invoke(app, ["--no-color", "plot", "--list-config", "-c", str(campaign), "--json"])
+    assert res_json.exit_code == 0, res_json.stdout
+    payload = json.loads(res_json.stdout)
+    assert payload["schema_version"] == "opal.plot_config.v1"
+    assert payload["plots"] == ["mini: test_plot_cli_minimal (enabled)"]
 
 
 def test_plot_cli_accepts_directory(tmp_path):
@@ -177,6 +216,81 @@ def test_plot_cli_rejects_bad_round_selector(tmp_path):
     res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "bad"])
     assert res.exit_code != 0, res.stdout
     assert "Invalid round selector" in res.output
+
+
+def test_plot_cli_writes_failed_manifest_when_plugin_does_not_write_output(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[{"name": "nope", "kind": "test_plot_cli_no_output"}],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign)])
+
+    assert res.exit_code == 1, res.stdout
+    manifest = json.loads((workdir / "outputs" / "plots" / "nope.manifest.json").read_text())
+    assert manifest["status"] == "failed"
+    assert manifest["error"]["category"] == "PlotDataContractError"
+
+
+def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "metric",
+                "kind": "metric_over_rounds",
+                "params": {"metric": "pred__score_selected", "cohort": ["selected", "all_pool"]},
+                "output": {"save_data": True},
+            },
+            {
+                "name": "feature_heat",
+                "kind": "feature_importance_heatmap",
+                "params": {"order_policy": "sort_index"},
+                "output": {"save_data": True},
+            },
+            {
+                "name": "vector_heat",
+                "kind": "vector_summary_heatmap",
+                "params": {"cohort": "all_pool", "channel_labels": ["y0"], "include_setpoint": True, "setpoint": [0.0]},
+                "output": {"save_data": True},
+            },
+        ],
+    )
+    from dnadesign.opal.tests._cli_helpers import write_ledger, write_state
+
+    write_state(workdir, records_path=records, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r0", round_index=0)
+    feature_dir = workdir / "outputs" / "rounds" / "round_0" / "model"
+    feature_dir.mkdir(parents=True, exist_ok=True)
+    (feature_dir / "feature_importance.csv").write_text("feature_index,importance\n0,0.25\n1,0.75\n")
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "0", "--run-id", "r0"])
+
+    assert res.exit_code == 0, res.stdout
+    index = json.loads((workdir / "outputs" / "plots" / "plot_manifest.json").read_text())
+    assert index["plot_count"] == 3
+    for name in ["metric", "feature_heat", "vector_heat"]:
+        manifest = json.loads((workdir / "outputs" / "plots" / f"{name}_r0.manifest.json").read_text())
+        assert manifest["status"] == "written"
+        assert manifest["tidy_csv"].endswith(".csv")
 
 
 def test_plot_cli_rejects_top_level_plot_keys(tmp_path):

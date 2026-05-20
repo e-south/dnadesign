@@ -66,6 +66,7 @@ def test_build_campaign_review_writes_portable_artifacts(tmp_path: Path) -> None
     html = result.index_path.read_text(encoding="utf-8")
     assert "OPAL campaign review" in html
     assert "score_vs_rank" in html
+    assert result.manifest["campaign"]["x_contract"]["canonical"] is True
 
 
 def test_review_cli_writes_json_summary(tmp_path: Path) -> None:
@@ -115,3 +116,19 @@ def test_build_campaign_review_requires_run_scoped_round_log(tmp_path: Path) -> 
 
     with pytest.raises(OpalError, match=f"round.log.jsonl has no events for run_id={run_id}"):
         build_campaign_review(campaign, run_id=run_id)
+
+
+def test_build_campaign_review_reports_stale_plot_files_when_plots_disabled(tmp_path: Path) -> None:
+    workdir, campaign, run_id = _setup_review_campaign(tmp_path)
+    stale_dir = workdir / "outputs" / "review" / "plots"
+    stale_dir.mkdir(parents=True, exist_ok=True)
+    stale_file = stale_dir / "old_score.png"
+    stale_file.write_bytes(b"old")
+
+    result = build_campaign_review(campaign, run_id=run_id, include_plots=False)
+
+    assert result.plot_paths == ()
+    assert result.manifest["plots"] == []
+    assert result.manifest["stale_artifacts"]
+    assert result.manifest["warnings"][0]["category"] == "StaleArtifactWarning"
+    assert result.manifest["stale_artifacts"][0]["path"] == str(stale_file)

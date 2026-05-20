@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.opal.src.cli.commands.init import cmd_init
@@ -23,34 +25,41 @@ from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
     label_hist_col = f"opal__{slug}__label_hist"
-    df = pd.DataFrame(
-        {
-            "id": ["a", "b", "c"],
-            "sequence": ["AAA", "AAT", "ATT"],
-            "bio_type": ["dna", "dna", "dna"],
-            "alphabet": ["dna_4", "dna_4", "dna_4"],
-            "X": [[0.1, 0.2], [0.2, 0.4], [0.3, 0.1]],
-            "Y": [None, None, None],
-            label_hist_col: [
-                [
-                    {
-                        "kind": "label",
-                        "observed_round": 0,
-                        "ts": "2024-01-01T00:00:00Z",
-                        "src": "ingest_y",
-                        "y_obs": {
-                            "value": [0.0, 0.0, 0.0, 1.0, 0.2, 0.3, 0.1, 2.0],
-                            "dtype": "vector",
-                            "schema": {"length": 8},
-                        },
-                    }
-                ],
-                [],
-                [],
-            ],
-        }
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b", "c"], type=pa.string()),
+                "sequence": pa.array(["AAA", "AAT", "ATT"], type=pa.string()),
+                "bio_type": pa.array(["dna", "dna", "dna"], type=pa.string()),
+                "alphabet": pa.array(["dna_4", "dna_4", "dna_4"], type=pa.string()),
+                "X": pa.FixedSizeListArray.from_arrays(
+                    pa.array([0.1, 0.2, 0.2, 0.4, 0.3, 0.1], type=pa.float32()),
+                    2,
+                ),
+                "Y": pa.nulls(3, type=pa.null()),
+                label_hist_col: pa.array(
+                    [
+                        [
+                            {
+                                "kind": "label",
+                                "observed_round": 0,
+                                "ts": "2024-01-01T00:00:00Z",
+                                "src": "ingest_y",
+                                "y_obs": {
+                                    "value": [0.0, 0.0, 0.0, 1.0, 0.2, 0.3, 0.1, 2.0],
+                                    "dtype": "vector",
+                                    "schema": {"length": 8},
+                                },
+                            }
+                        ],
+                        [],
+                        [],
+                    ]
+                ),
+            }
+        ),
+        records_path,
     )
-    df.to_parquet(records_path, index=False)
 
 
 @pytest.mark.parametrize(

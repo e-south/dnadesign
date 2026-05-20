@@ -18,9 +18,9 @@ from dnadesign.opal.src.analysis.campaign_progress import (
     build_ledger_status_table,
     build_records_preview,
     cli_handoff_lines,
-    projection_status_lines,
     read_optional_table,
     table_status_lines,
+    x_provenance_status_lines,
 )
 from dnadesign.opal.src.analysis.dashboard.datasets import CampaignInfo
 
@@ -45,7 +45,7 @@ def _campaign_info() -> CampaignInfo:
     )
 
 
-def test_records_contract_ready_without_projection_columns() -> None:
+def test_records_contract_ready_with_configured_x_column() -> None:
     df = pl.DataFrame(
         {
             "id": ["rec-1"],
@@ -59,9 +59,8 @@ def test_records_contract_ready_without_projection_columns() -> None:
     report = assess_records_contract(df, _campaign_info())
 
     assert report.ready
-    assert not report.projection_ready
     assert report.missing_required_columns == ()
-    assert "OPAL records remain inspectable" in "\n".join(projection_status_lines(report))
+    assert "does not inspect producer geometry" in "\n".join(x_provenance_status_lines(report))
 
 
 def test_records_contract_requires_configured_x_column() -> None:

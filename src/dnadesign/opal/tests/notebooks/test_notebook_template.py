@@ -24,9 +24,9 @@ def test_notebook_template_removes_extra_tables() -> None:
 
 def test_notebook_template_has_plot_gallery() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert "Plot gallery" in text
+    assert "Plot artifacts" in text
     assert "outputs/plots" in text
-    assert "load_plot_config" in text
+    assert "build_notebook_view_model" in text
 
 
 def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
@@ -42,15 +42,16 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
         "Records and active record",
         "Labels and predictions",
         "Plot deliverables",
-        "Optional context boundaries",
+        "X provenance and limitations",
     ]:
         assert section in text
 
 
-def test_notebook_template_uses_shared_campaign_progress_helpers() -> None:
+def test_notebook_template_uses_public_opal_helpers() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "from dnadesign.opal.src.analysis.campaign_progress import" in text
+    assert "from dnadesign.opal import" in text
+    assert "dnadesign.opal.src" not in text
     assert "assess_records_contract_for_values" in text
     assert "build_ledger_status_table" in text
     assert "build_records_preview" in text

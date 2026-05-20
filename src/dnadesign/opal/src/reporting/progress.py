@@ -19,6 +19,7 @@ from typing import Any
 
 from ..analysis.facade import CampaignAnalysis
 from ..core.utils import OpalError
+from ..storage.locks import inspect_campaign_lock
 from ..storage.state import CampaignState
 from ..storage.workspace import CampaignWorkspace
 from .summary import load_round_log, summarize_round_log
@@ -36,6 +37,26 @@ def build_campaign_progress(
     ws = analysis.workspace
     round_indices = _resolve_progress_rounds(ws, round_selector)
     rounds = [_round_progress(ws, round_index) for round_index in round_indices]
+    lock_state = inspect_campaign_lock(ws.workdir)
+    warnings = []
+    if lock_state.get("active"):
+        warnings.append(
+            {
+                "category": "ActiveLockWarning",
+                "severity": "warning",
+                "message": "Campaign lock is active on this host.",
+                "path": lock_state.get("lockfile"),
+            }
+        )
+    if lock_state.get("stale") or lock_state.get("unreadable"):
+        warnings.append(
+            {
+                "category": "StaleLockWarning",
+                "severity": "warning",
+                "message": "Campaign lock is stale or unreadable on this host.",
+                "path": lock_state.get("lockfile"),
+            }
+        )
     return {
         "schema_version": PROGRESS_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -54,6 +75,9 @@ def build_campaign_progress(
         "round_selector": round_selector or "latest",
         "status": _campaign_status(rounds),
         "round_count": len(rounds),
+        "warnings": warnings,
+        "locks": {"campaign": lock_state},
+        "stale_artifacts": [],
         "rounds": rounds,
     }
 
@@ -134,6 +158,8 @@ def _round_progress(ws: CampaignWorkspace, round_index: int) -> dict[str, Any]:
     last_event = events[-1] if events else {}
     last_predict = next((event for event in reversed(events) if event.get("stage") == "predict_batch"), {})
     status = "done" if summary.get("done_ts") else "running_or_incomplete"
+    if summary.get("aborted"):
+        status = "aborted"
     if not events:
         status = "empty_log"
     elapsed_sec = summary.get("duration_sec_total")
@@ -180,6 +206,8 @@ def _parse_ts(value: Any) -> datetime | None:
 def _campaign_status(rounds: list[dict[str, Any]]) -> str:
     if not rounds:
         return "not_started"
+    if any(row.get("status") == "aborted" for row in rounds):
+        return "aborted"
     if all(row.get("status") == "done" for row in rounds):
         return "done"
     if any(row.get("status") == "running_or_incomplete" for row in rounds):

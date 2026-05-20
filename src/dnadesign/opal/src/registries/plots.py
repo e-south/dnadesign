@@ -30,6 +30,9 @@ class PlotMeta:
     params: Dict[str, str] = field(default_factory=dict)
     requires: List[str] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
+    data_shape: str | None = None
+    tidy_schema: List[str] = field(default_factory=list)
+    failure_modes: List[str] = field(default_factory=list)
 
 
 def _dbg(msg: str) -> None:
@@ -104,6 +107,10 @@ def list_plots() -> List[str]:
     return sorted(_PLOTS.keys())
 
 
+def list_plot_kinds() -> List[str]:
+    return list_plots()
+
+
 def get_plot_meta(name: str) -> Optional[PlotMeta]:
     _ensure_all_loaded()
     fn = _PLOTS.get(name)
@@ -117,3 +124,28 @@ def get_plot_meta(name: str) -> Optional[PlotMeta]:
         summary = doc.strip().splitlines()[0].strip()
         return PlotMeta(summary=summary)
     return None
+
+
+def describe_plot_kind(name: str) -> Dict[str, object]:
+    meta = get_plot_meta(name)
+    if meta is None:
+        return {
+            "kind": name,
+            "summary": None,
+            "params": {},
+            "requires": [],
+            "notes": [],
+            "data_shape": None,
+            "tidy_schema": [],
+            "failure_modes": [],
+        }
+    return {
+        "kind": name,
+        "summary": meta.summary,
+        "params": dict(meta.params),
+        "requires": list(meta.requires),
+        "notes": list(meta.notes),
+        "data_shape": meta.data_shape,
+        "tidy_schema": list(meta.tidy_schema),
+        "failure_modes": list(meta.failure_modes),
+    }

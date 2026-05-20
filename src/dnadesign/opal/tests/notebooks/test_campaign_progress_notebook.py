@@ -25,7 +25,7 @@ def test_campaign_progress_is_not_atlas() -> None:
     assert "Campaign contract" in text
     assert "Records and active record" in text
     assert "Ledger and CLI handoff" in text
-    assert "Optional context boundaries" in text
+    assert "X provenance and limitations" in text
 
 
 def test_campaign_progress_uses_canonical_cli_handoff() -> None:

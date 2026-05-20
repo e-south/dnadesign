@@ -323,7 +323,7 @@ opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] 
 
 **Flags**
 
-* `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set). Directories are supported only for `opal plot`, `opal notebook`, and `opal objective-meta`.
+* `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set). Directories are supported only for `opal progress`, `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
 * `--round, -r`: Round selector (integer or `latest`; default: latest).
 * `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
 * `--profile/--no-profile`: Profile candidate hue/size fields from the selected run.
@@ -507,8 +507,13 @@ opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--json]
 
 * This is the campaign-generic progress surface for operators and harnesses.
 * The JSON payload uses schema `opal.campaign_progress.v1` and reports per-round
-  status, last stage, elapsed seconds, prediction batch count, log path, and
-  summarized stage counts.
+  status, last stage, elapsed seconds, prediction batch count, log path,
+  summarized stage counts, run scope, event phase counts, active lock state,
+  warnings, and stale review artifacts.
+* Round-log events written by current OPAL versions include schema
+  `opal.progress_event.v1`, an event ID, a phase (`command`, `preflight`,
+  `run`, `abort`, or `finalize`), and severity. Older logs are still readable
+  and are surfaced as legacy events.
 * Study probes and campaign dashboards should consume this primitive instead of
   parsing OPAL round-log paths directly.
 
@@ -581,6 +586,9 @@ opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
 opal plot --list
 opal plot --list-config --config <yaml-or-dir>
 opal plot --describe <plot-kind>
+opal plot --list --json
+opal plot --list-config --config <yaml-or-dir> --json
+opal plot --describe <plot-kind> --json
 ```
 
 **Flags**
@@ -594,11 +602,19 @@ opal plot --describe <plot-kind>
 * `--run-id`: Explicit run_id to disambiguate ledger predictions (required if multiple runs exist for a round).
 * `--name, -n`: Run a single plot by name; omit to run **all**.
 * `--tag`: Run plots with the given tag (repeatable).
+* `--json`: Emit machine-readable JSON for `--list`, `--list-config`, and
+  `--describe`.
 
 **Notes**
 
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
+* Every plot run writes a per-plot manifest next to the rendered media and an
+  aggregate `plot_manifest.json` index in the output directory. Manifests record
+  plot kind, params, run/round scope, inputs, media outputs, tidy CSV outputs,
+  status, generated time, schema version, warnings, and errors.
+* `output.save_data: true` asks plot plugins to write tidy CSV data; the plot
+  manifest records the CSV paths that were produced.
 * Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
 * Prefer `plot_config: plots.yaml` in configs/campaign.yaml to keep runtime config lean.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
@@ -668,10 +684,17 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 
 * `generate` writes the campaign-specific artifact viewer for records, round/run
   state, ledger readiness, selected records, labels, predictions, and
-  `outputs/plots` deliverables.
+  manifest-backed `outputs/plots` deliverables.
 * `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
 * `generate` works before the first OPAL run. Missing ledger, label,
   prediction, and plot artifacts appear as explicit notebook states.
+* Generated notebooks import public helpers from `dnadesign.opal`, build a
+  `NotebookViewModel`, and render plot cards from review and plot manifests
+  rather than treating directory contents as authoritative.
+* The notebook surface is campaign review only: records contract, X provenance,
+  ledgers, progress, selections, labels, predictions, plots, and limitations.
+  Representation browsers, UMAP atlases, and study/probe-specific visuals live
+  outside canonical OPAL notebooks.
 * When `--validate` is on and ledger runs already exist, `--round` must resolve
   in those runs. `--no-validate` skips that round check.
 * `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
@@ -701,6 +724,9 @@ opal review --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out-d
   does not mutate records or labels.
 * If a round has multiple run IDs, pass `--run-id` so the review does not mix
   reruns.
+* The manifest is authoritative. Review reports stale files that exist under
+  the review output directory but are absent from the active manifest, and it
+  validates the configured X column before publishing review evidence.
 
 ---
 
@@ -784,7 +810,7 @@ Campaign-scoped commands require explicit config context:
 1. **Explicit flag** (`--config`)
 2. **Environment variable** (`OPAL_CONFIG`)
 
-Passing a **directory** to `--config` is supported only for `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
+Passing a **directory** to `--config` is supported only for `opal progress`, `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
 Other campaign-scoped commands require a YAML config path.
 `plot_config` paths are resolved relative to the `configs/campaign.yaml` that declares them.
 For scripts and CI, pass `--config` explicitly.

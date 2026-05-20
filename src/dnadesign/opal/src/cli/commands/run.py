@@ -24,6 +24,7 @@ from ...storage.artifacts import append_round_log_event
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
 from ...storage.workspace import CampaignWorkspace
+from ...storage.x_contracts import validate_x_parquet_column
 from ..formatting import render_run_summary_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -54,6 +55,21 @@ def _append_cli_round_event(cfg, cfg_path: Path, round_index: int, stage: str, *
     )
 
 
+def _append_abort_event(cfg, cfg_path: Path, round_index: int, error: BaseException) -> None:
+    try:
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round_index),
+            "abort",
+            severity="error",
+            error_type=type(error).__name__,
+            message=str(error),
+        )
+    except Exception:
+        pass
+
+
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
@@ -75,11 +91,23 @@ def cmd_run(
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
     json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ) -> None:
+    cfg_path: Path | None = None
+    cfg = None
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         _append_cli_round_event(cfg, cfg_path, int(round), "command_start", command="run")
         store = store_from_cfg(cfg)
+        _append_cli_round_event(cfg, cfg_path, int(round), "x_validate_start")
+        x_contract = validate_x_parquet_column(store.records_path, x_column=cfg.data.x_column_name)
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "x_validate_done",
+            rows=int(x_contract.row_count),
+            x_dim=int(x_contract.x_dim),
+        )
         _append_cli_round_event(cfg, cfg_path, int(round), "records_load_start")
         df = store.load()
         _append_cli_round_event(
@@ -150,8 +178,12 @@ def cmd_run(
                 labels_as_of=int(round),
             )
     except OpalError as e:
+        if cfg is not None and cfg_path is not None:
+            _append_abort_event(cfg, cfg_path, int(round), e)
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
+        if cfg is not None and cfg_path is not None:
+            _append_abort_event(cfg, cfg_path, int(round), e)
         internal_error("run", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

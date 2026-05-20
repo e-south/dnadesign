@@ -104,6 +104,32 @@ class CampaignLock:
         return False
 
 
+def inspect_campaign_lock(workdir: Path) -> dict:
+    lockfile = Path(workdir) / ".opal.lock"
+    payload = None
+    active = False
+    stale = False
+    unreadable = False
+    if lockfile.exists():
+        try:
+            payload = _read_lock_payload(lockfile, subject="Campaign")
+            pid = payload.get("pid")
+            active = isinstance(pid, int) and _pid_is_running(pid)
+            stale = isinstance(pid, int) and not active
+        except OpalError:
+            unreadable = True
+    return {
+        "schema_version": "opal.lock_state.v1",
+        "scope": "local_host",
+        "lockfile": str(lockfile),
+        "exists": lockfile.exists(),
+        "active": active,
+        "stale": stale,
+        "unreadable": unreadable,
+        "payload": payload,
+    }
+
+
 class PathLock:
     """Serialize writes to a single shared file path on the local host."""
 

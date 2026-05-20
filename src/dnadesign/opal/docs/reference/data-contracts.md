@@ -40,13 +40,23 @@ Required columns in `records.parquet`:
 
 X and Y representation:
 
-- X: Arrow `list<float>` or JSON array string; fixed length across used rows
+- X: canonical Arrow `fixed_size_list<float32|float64>[x_dim]` or an equivalent
+  Parquet fixed-size list vector column. Values must be non-null, finite, and
+  fixed length across every used row.
+- Noncanonical vector encodings such as ragged Arrow lists, scalar cells, or JSON
+  array strings are import/normalization inputs only. They are not accepted as
+  the runtime campaign contract.
 - Y: Arrow `list<float>` when using a current-Y column. Training labels may
   instead come from a shared sidecar when `labels.source.kind: usr_sidecar`.
 
 When `records.parquet` is generated from a larger representation artifact, it
 may be an ordered subset of that artifact. It must not silently include
 reference/control rows that are outside the declared OPAL candidate universe.
+
+`opal run` and `opal review` both validate the configured X column through the
+public `validate_x_parquet_column` contract. Invalid physical schema, nulls,
+nonfinite values, or ragged vectors fail before campaign execution or review
+evidence is treated as trustworthy.
 
 ### Shared observed-label sidecar
 

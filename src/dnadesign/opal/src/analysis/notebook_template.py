@@ -43,34 +43,35 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             import marimo as mo
             import polars as pl
             from pathlib import Path
-            from dnadesign.opal.src.analysis.campaign_progress import (
+            from dnadesign.opal import (
+                CampaignAnalysis,
                 assess_records_contract_for_values,
+                available_rounds,
                 build_ledger_status_table,
+                build_notebook_view_model,
                 build_records_preview,
                 cli_handoff_lines,
-                projection_status_lines,
-                read_optional_table,
-                records_status_lines,
-                table_status_lines,
-                unavailable_table,
-            )
-            from dnadesign.opal.src.analysis.facade import (
-                CampaignAnalysis,
-                available_rounds,
                 latest_round,
                 latest_run_id,
+                load_plot_config,
+                parse_enabled,
+                parse_tags,
+                read_optional_table,
+                records_status_lines,
                 require_columns,
+                table_status_lines,
+                unavailable_table,
+                x_provenance_status_lines,
             )
-            from dnadesign.opal.src.plots.config import load_plot_config, parse_enabled, parse_tags
             return (
                 mo,
                 pl,
                 Path,
                 assess_records_contract_for_values,
                 build_ledger_status_table,
+                build_notebook_view_model,
                 build_records_preview,
                 cli_handoff_lines,
-                projection_status_lines,
                 read_optional_table,
                 records_status_lines,
                 table_status_lines,
@@ -83,6 +84,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 load_plot_config,
                 parse_enabled,
                 parse_tags,
+                x_provenance_status_lines,
             )
 
 
@@ -94,9 +96,10 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(CampaignAnalysis, config_path):
+        def _(CampaignAnalysis, build_notebook_view_model, config_path, default_round):
             campaign = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
-            return campaign
+            notebook_view_model = build_notebook_view_model(config_path, round_selector=default_round)
+            return campaign, notebook_view_model
 
 
         @app.cell
@@ -268,21 +271,22 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(projection_status_lines, records_report, mo):
-            optional_context_md = mo.md(
+        def _(x_provenance_status_lines, records_report, mo):
+            x_provenance_md = mo.md(
                 "\\n".join(
                     [
-                        "### Optional context boundaries",
+                        "### X provenance and limitations",
                         "",
-                        *projection_status_lines(records_report),
+                        *x_provenance_status_lines(records_report),
                         "",
-                        "- Sequence rendering stays with producer-owned visualization contracts "
-                        "and BaseRender public APIs.",
-                        "- This notebook does not select X by UMAP position or centroid-nearest behavior.",
+                        "- OPAL review surfaces show campaign contracts, ledgers, selections, "
+                        "labels, predictions, and OPAL plot artifacts.",
+                        "- Producer-specific representation browsers and study benchmark reports "
+                        "stay outside canonical OPAL notebooks.",
                     ]
                 )
             )
-            return optional_context_md
+            return x_provenance_md
 
 
         @app.cell
@@ -412,46 +416,57 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(campaign, plot_entries_filtered):
-            plots_dir = campaign.workspace.workdir / "outputs" / "plots"
-            plot_files = []
-            if plots_dir.exists():
-                plot_files = sorted(plots_dir.glob("*.png"))
-
-            def _latest_match(name: str):
-                candidates = [path for path in plot_files if path.name.startswith(name)]
-                if not candidates:
-                    return None
-                return max(candidates, key=lambda p: p.stat().st_mtime)
-
+        def _(Path, notebook_view_model, plot_entries_filtered):
+            plots_dir = Path(notebook_view_model["campaign"]["workdir"]) / "outputs" / "plots"
+            manifest_rows = [
+                row
+                for row in notebook_view_model.get("plot_manifests", [])
+                if row.get("status") == "written"
+            ]
+            active_by_name = {str(row.get("name")): row for row in manifest_rows}
             plot_choices = []
             missing_outputs = []
             for plot_entry_choice in plot_entries_filtered:
-                path = _latest_match(plot_entry_choice["name"])
-                if path is None:
+                _manifest = active_by_name.get(str(plot_entry_choice["name"]))
+                if _manifest is None:
                     missing_outputs.append(plot_entry_choice["name"])
                     continue
+                media_outputs = [
+                    output
+                    for output in _manifest.get("outputs", [])
+                    if output.get("role") == "media" and output.get("exists")
+                ]
+                if not media_outputs:
+                    missing_outputs.append(plot_entry_choice["name"])
+                    continue
+                path = Path(media_outputs[0]["path"])
                 label = f"{plot_entry_choice['name']} ({path.name})"
                 plot_choices.append(
-                    {"label": label, "path": path, "entry": plot_entry_choice}
+                    {
+                        "label": label,
+                        "path": path,
+                        "entry": plot_entry_choice,
+                        "manifest": _manifest,
+                    }
                 )
-            return plots_dir, plot_choices, missing_outputs
+            stale_plot_artifacts = notebook_view_model.get("stale_artifacts", [])
+            return plots_dir, plot_choices, missing_outputs, stale_plot_artifacts
 
 
         @app.cell
-        def _(mo, objective_is_sfxi, plot_cfg_error, plot_choices, plots_dir, missing_outputs):
+        def _(mo, objective_is_sfxi, plot_cfg_error, plot_choices, plots_dir, missing_outputs, stale_plot_artifacts):
             plot_ui = None
             filter_note = "SFXI plots only." if objective_is_sfxi else "Non-SFXI plots only."
             if plot_cfg_error:
                 plot_gallery_note = (
-                    "### Plot gallery (outputs/plots)\\n\\n"
+                    "### Plot artifacts (`outputs/plots`)\\n\\n"
                     f"Plot config unavailable: `{plot_cfg_error}`"
                 )
             elif not plot_choices:
                 _lines = [
-                    "### Plot gallery (outputs/plots)",
+                    "### Plot artifacts (`outputs/plots`)",
                     "",
-                    f"No plot outputs found in `{plots_dir}`.",
+                    f"No manifest-backed plot outputs found in `{plots_dir}`.",
                     "Run `uv run opal plot -c <campaign.yaml>` to generate plots.",
                 ]
                 _lines.append(filter_note)
@@ -459,11 +474,15 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     _lines.append(
                         f"Configured plots without outputs: {', '.join(missing_outputs)}"
                     )
+                if stale_plot_artifacts:
+                    _lines.append(f"Stale artifact warnings: `{len(stale_plot_artifacts)}`")
                 plot_gallery_note = "\\n".join(_lines)
             else:
                 labels = [plot_choice["label"] for plot_choice in plot_choices]
                 plot_ui = mo.ui.dropdown(labels, value=labels[0], label="Plot")
-                plot_gallery_note = "### Plot gallery (outputs/plots)\\n\\n" + filter_note
+                plot_gallery_note = "### Plot artifacts (`outputs/plots`)\\n\\n" + filter_note
+                if stale_plot_artifacts:
+                    plot_gallery_note += f"\\n\\nStale artifact warnings: `{len(stale_plot_artifacts)}`"
             return plot_ui, plot_gallery_note
 
 
@@ -484,18 +503,27 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 if choice is None:
                     raise ValueError(f"Plot selection not found: {selected}")
                 plot_entry_selected = choice["entry"]
+                _manifest = choice["manifest"]
                 _plot_tags_str = (
                     ", ".join(plot_entry_selected["tags"])
                     if plot_entry_selected["tags"]
                     else "none"
                 )
+                tidy_csv = _manifest.get("tidy_csv") or "none"
+                params = _manifest.get("params") or {}
                 details = [
                     plot_gallery_note,
                     "",
                     f"**Plot**: `{plot_entry_selected['name']}`",
                     f"Kind: `{plot_entry_selected['kind']}`",
                     f"Tags: `{_plot_tags_str}`",
+                    f"Status: `{_manifest.get('status')}`",
+                    f"Generated: `{_manifest.get('generated_at')}`",
+                    f"Run ID: `{_manifest.get('run_id')}`",
+                    f"Rounds: `{_manifest.get('rounds')}`",
                     f"File: `{choice['path']}`",
+                    f"Tidy CSV: `{tidy_csv}`",
+                    f"Params: `{params}`",
                 ]
                 plot_panel = mo.vstack(
                     [
@@ -686,12 +714,12 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             header_md,
             ledger_status_df,
             mo,
-            optional_context_md,
             plot_panel,
             record_selector,
             records_preview_df,
             round_run_controls,
             run_summary_md,
+            x_provenance_md,
         ):
             round_run_panel = mo.vstack([round_run_controls, run_summary_md])
             ledger_panel = mo.vstack(
@@ -728,9 +756,10 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                             "Records and active record": records_panel,
                             "Labels and predictions": data_panel,
                             "Plot deliverables": plot_panel,
-                            "Optional context boundaries": optional_context_md,
+                            "X provenance and limitations": x_provenance_md,
                         },
                         multiple=True,
+                        lazy=True,
                     ),
                 ]
             )

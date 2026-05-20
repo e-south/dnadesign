@@ -22,8 +22,10 @@ import polars as pl
 import typer
 
 from ..analysis.facade import RoundSelector
+from ..core.utils import now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir
+from ..plots.manifests import build_plot_manifest, write_plot_manifest, write_plot_manifest_index
 from ..registries.plots import get_plot
 from ..storage.data_access import RecordsStore
 from ..storage.workspace import CampaignWorkspace
@@ -101,6 +103,7 @@ def run_plots(req: PlotRequest) -> bool:
     builtin_resolved = {k: p for k, p in builtins.items() if p.exists()}
 
     any_fail = False
+    manifests_by_dir: dict[Path, list[dict[str, Any]]] = {}
 
     for entry in req.plots_cfg:
         if not isinstance(entry, dict):
@@ -251,6 +254,7 @@ def run_plots(req: PlotRequest) -> bool:
             save_data=save_data,
         )
 
+        started_at = now_iso()
         try:
             ctx.output_dir.mkdir(parents=True, exist_ok=True)
             debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
@@ -272,13 +276,41 @@ def run_plots(req: PlotRequest) -> bool:
                 )
 
             get_plot(pkind)(ctx, params)
+            manifest = build_plot_manifest(
+                name=pname,
+                kind=pkind,
+                params=params,
+                context=ctx,
+                status="written",
+                started_at=started_at,
+            )
+            write_plot_manifest(manifest)
+            manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
+            if manifest.get("status") != "written":
+                any_fail = True
+                typer.secho(f"[fail] {pname} ({pkind}) did not write expected media", fg=typer.colors.RED)
+                continue
             typer.secho(
                 f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}",
                 fg=typer.colors.GREEN,
             )
-        except Exception:
+        except Exception as exc:
             any_fail = True
+            manifest = build_plot_manifest(
+                name=pname,
+                kind=pkind,
+                params=params,
+                context=ctx,
+                status="failed",
+                started_at=started_at,
+                error=exc,
+            )
+            write_plot_manifest(manifest)
+            manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
             typer.secho(f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
             traceback.print_exc()
+
+    for output_dir, manifests in manifests_by_dir.items():
+        write_plot_manifest_index(output_dir, manifests)
 
     return any_fail

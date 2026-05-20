@@ -25,6 +25,8 @@ uv run opal plot --config /path/to/campaign.yaml \
 uv run opal plot --list
 uv run opal plot --list-config --config /path/to/campaign.yaml
 uv run opal plot --describe scatter_score_vs_rank
+uv run opal plot --list --json
+uv run opal plot --describe metric_over_rounds --json
 ```
 
 ### Minimal YAML schema
@@ -102,6 +104,36 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 
 ---
 
+### Artifact manifests
+
+Configured plots are manifest-backed artifacts. Each plot attempt writes:
+
+- rendered media such as `score_vs_rank.png`;
+- optional tidy CSVs when `output.save_data: true` and the plugin calls
+  `context.save_df(...)`;
+- a per-plot manifest named like `<plot-stem>.manifest.json`;
+- an aggregate `plot_manifest.json` index in the output directory.
+
+The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
+
+| field | purpose |
+| --- | --- |
+| `name`, `kind` | configured plot instance and registered plot primitive |
+| `status` | `success` or `failed` |
+| `run_id`, `rounds` | explicit run/round scope used for input resolution |
+| `params` | merged plot parameters after defaults and presets |
+| `inputs` | resolved built-in and custom data paths with file size and mtime |
+| `outputs.media` | rendered image/SVG/PDF files |
+| `outputs.tidy_csv` | tidy CSV files saved by the plugin |
+| `metadata` | `PlotMeta` summary, data shape, tidy schema, and failure modes |
+| `warnings`, `error` | structured nonfatal and fatal plot outcomes |
+
+Review and generated notebook surfaces should read manifests first. Extra files
+on disk are advisory only; they can trigger stale-file warnings, but they are
+not current evidence unless referenced by the active manifest.
+
+---
+
 ### SFXI diagnostics plots
 
 These plots reuse shared SFXI math and are safe to run without retraining.
@@ -113,6 +145,23 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   `outputs/rounds/round_<k>/model/feature_importance.csv`.
   - params: `order_policy` (`preserve|sort_index`), `alpha`, `figsize_in`
   - requires feature importance artifacts (for example RF with `emit_feature_importance: true`)
+- **`feature_importance_heatmap`**: matrix heatmap of feature importance over rounds.
+  - rows are stable feature IDs, columns are rounds, values are importances
+  - params: `order_policy` (`preserve|sort_index|top_mean`), `top_n`,
+    `figsize_in`, `cmap`
+  - writes tidy CSV columns `feature_id`, `feature_index`, `round`,
+    `importance`, and `rank`
+- **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
+  - params: `metric`, `cohorts`, `summaries`, `top_k`, `threshold`,
+    `reference_lines`, `figsize_in`
+  - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, `value`,
+    and `n`
+- **`vector_summary_heatmap`**: vector-channel summary over rounds.
+  - rows are an optional setpoint reference followed by chronological rounds
+  - params: `vector_field`, `cohorts`, `channel_labels`, `include_setpoint`,
+    `setpoint`, `aggregation`, `top_k`, `figsize_in`, `cmap`
+  - writes tidy CSV columns `row_type`, `round`, `cohort`, `channel`, and
+    `value`
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
@@ -165,9 +214,19 @@ plots:
 1. Create a module in `dnadesign/opal/src/plots/` and register it:
 
 ```python
-from ..registries.plots import register_plot
+from ..registries.plots import PlotMeta, register_plot
 
-@register_plot("my_cool_plot")
+@register_plot(
+    "my_cool_plot",
+    meta=PlotMeta(
+        summary="Short operator-facing purpose.",
+        requires=("records", "ledger_predictions_dir"),
+        data_shape="scalar_over_rounds",
+        tidy_schema=("round", "cohort", "metric", "summary", "value"),
+        failure_modes=("missing metric column", "ambiguous run_id"),
+        params={"metric": "numeric field to summarize"},
+    ),
+)
 def render(context, params):
     # context: campaign_dir, workspace, rounds, data_paths, output_dir, filename, dpi, format, logger, save_data
     # - Read from context.data_paths (e.g., "records", your custom sources)
@@ -187,3 +246,11 @@ plots:
     kind: my_cool_plot
     params: { ... }
 ```
+
+Plot kinds should be data-shape primitives rather than campaign-specific one-offs.
+Prefer categories such as scalar over rounds, vector over rounds, matrix heatmap,
+categorical composition, selected overlap, attribution matrix,
+uncertainty/support distribution, objective decomposition, candidate audit table,
+or calibration. Campaign semantics such as SFXI setpoints or study metadata
+should configure those primitives through `params:` and input data, not fork the
+plot ontology unless a genuinely new data shape is required.

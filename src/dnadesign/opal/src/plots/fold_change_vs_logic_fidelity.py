@@ -16,6 +16,7 @@ from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
+from ._cohort_utils import selected_mask
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import (
     annotate_plot_meta,
@@ -311,7 +312,7 @@ def render(context, params: dict) -> None:
 
     # Selection mask (if present)
     sel_mask = (
-        df["sel__is_selected"].fillna(False).astype(bool).to_numpy()
+        selected_mask(df["sel__is_selected"], allow_null_false=True).to_numpy()
         if "sel__is_selected" in df.columns
         else np.zeros(lf.shape[0], dtype=bool)
     )

@@ -29,6 +29,11 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 - `plot_config`: optional path to a separate plots YAML
 - `plot_defaults`, `plot_presets`, `plots`: optional plot-only keys when using inline plot config
 
+`plot_config` configures review and inspection artifacts. Runtime round
+execution does not depend on plot rendering; failed plots should fail the plot
+command and surface in manifests, not silently change model training,
+prediction, objective scoring, or selection.
+
 ### Required v2 selection params
 
 `selection.params` is explicit and channel-driven.

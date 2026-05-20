@@ -20,13 +20,15 @@ from html import escape
 from pathlib import Path
 from typing import Any, Mapping
 
+import numpy as np
 import pandas as pd
 
 from ..analysis.facade import CampaignAnalysis
 from ..core.rounds import resolve_round_index_from_runs
-from ..core.utils import ExitCodes, OpalError, write_json
+from ..core.utils import ExitCodes, OpalError, read_json, write_json
 from ..plots._mpl_utils import apply_plot_style, ensure_mpl_config_dir, scatter_smart
 from ..storage.ledger import LedgerReader
+from ..storage.x_contracts import validate_x_parquet_column
 from .summary import load_round_log, select_run_meta, summarize_round_log, summarize_run_meta
 
 REVIEW_SCHEMA_VERSION = "opal.campaign_review.v1"
@@ -76,6 +78,10 @@ def build_campaign_review(
     cfg = analysis.config
     ws = analysis.workspace
     reader = LedgerReader(ws)
+    x_contract = validate_x_parquet_column(
+        analysis.records_store().records_path,
+        x_column=cfg.data.x_column_name,
+    )
     runs_df = reader.read_runs()
     round_index = resolve_round_index_from_runs(runs_df, round_selector)
     run_meta_row = select_run_meta(runs_df, round_sel=round_index, run_id=run_id)
@@ -114,6 +120,18 @@ def build_campaign_review(
         if fi_status["status"] == "written":
             plot_paths.append(Path(str(fi_status["path"])))
 
+    referenced_plot_paths = [Path(str(row["path"])) for row in plot_statuses if row.get("path")]
+    stale_artifacts = detect_review_stale_artifacts(review_dir, referenced_paths=referenced_plot_paths)
+    warnings = [
+        {
+            "category": "StaleArtifactWarning",
+            "severity": "warning",
+            "message": f"Review artifact exists on disk but is absent from the active manifest: {row['path']}",
+            "path": row["path"],
+        }
+        for row in stale_artifacts
+    ]
+
     manifest = _jsonable(
         {
             "schema_version": REVIEW_SCHEMA_VERSION,
@@ -124,6 +142,13 @@ def build_campaign_review(
                 "workdir": str(ws.workdir),
                 "config_path": str(analysis.config_path),
                 "x_column": cfg.data.x_column_name,
+                "x_contract": {
+                    "schema_version": "opal.x_matrix_contract.v1",
+                    "physical_type": "fixed_size_list",
+                    "x_dim": int(x_contract.x_dim),
+                    "row_count": int(x_contract.row_count),
+                    "canonical": True,
+                },
                 "y_column": cfg.data.y_column_name,
                 "model": cfg.model.name,
                 "selection": cfg.selection.selection.name,
@@ -139,6 +164,8 @@ def build_campaign_review(
             "selection": selection_summary,
             "selection_preview": selection_preview,
             "plots": plot_statuses,
+            "stale_artifacts": stale_artifacts,
+            "warnings": warnings,
             "artifacts": {
                 "manifest": str(manifest_path),
                 "review_markdown": str(review_path),
@@ -164,6 +191,50 @@ def build_campaign_review(
         plot_paths=tuple(plot_paths),
         manifest=manifest,
     )
+
+
+def load_review_manifest(path: str | Path) -> dict[str, Any]:
+    manifest_path = Path(path)
+    payload = read_json(manifest_path)
+    if not isinstance(payload, dict):
+        raise OpalError(f"Review manifest is not a JSON object: {manifest_path}")
+    if payload.get("schema_version") != REVIEW_SCHEMA_VERSION:
+        raise OpalError(f"Unsupported review manifest schema at {manifest_path}: {payload.get('schema_version')!r}")
+    payload.setdefault("stale_artifacts", [])
+    payload.setdefault("warnings", [])
+    return payload
+
+
+def detect_review_stale_artifacts(
+    review_dir: str | Path,
+    *,
+    referenced_paths: list[Path] | tuple[Path, ...] = (),
+) -> list[dict[str, Any]]:
+    review_path = Path(review_dir)
+    plots_path = review_path / "plots"
+    if not plots_path.exists():
+        return []
+    referenced = {str(Path(path).resolve()) for path in referenced_paths}
+    stale = []
+    for path in sorted(plots_path.iterdir()):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in {".png", ".svg", ".pdf", ".csv", ".json"}:
+            continue
+        if str(path.resolve()) in referenced:
+            continue
+        stat = path.stat()
+        stale.append(
+            {
+                "category": "StaleArtifactWarning",
+                "severity": "warning",
+                "path": str(path),
+                "size_bytes": int(stat.st_size),
+                "mtime_ns": int(stat.st_mtime_ns),
+                "reason": "file is not referenced by the active review manifest",
+            }
+        )
+    return stale
 
 
 def _jsonable(value: Any) -> Any:
@@ -192,6 +263,7 @@ def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
     selection = manifest.get("selection") or {}
     preview = manifest.get("selection_preview") or []
     plots = manifest.get("plots") or []
+    warnings = manifest.get("warnings") or []
     lines = [
         "# OPAL campaign review",
         "",
@@ -249,6 +321,10 @@ def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
         lines.extend(f"- {plot.get('name')}: `{plot.get('status')}` {plot.get('path', '')}" for plot in plots)
     else:
         lines.append("No plots requested.")
+    if warnings:
+        lines.extend(["", "## Warnings", ""])
+        for warning in warnings:
+            lines.append(f"- `{warning.get('category')}`: {warning.get('message')}")
     lines.append("")
     return "\n".join(lines)
 
@@ -260,6 +336,15 @@ def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) 
     selection = manifest.get("selection") or {}
     preview = manifest.get("selection_preview") or []
     plots = manifest.get("plots") or []
+    warnings = manifest.get("warnings") or []
+    warning_cards = [
+        '<article class="warning">'
+        f"<h3>{_e(warning.get('category'))}</h3>"
+        f"<p>{_e(warning.get('message'))}</p>"
+        f"<code>{_e(warning.get('path'))}</code>"
+        "</article>"
+        for warning in warnings
+    ]
     plot_cards: list[str] = []
     for plot in plots:
         if plot.get("status") != "written" or not plot.get("path"):
@@ -314,6 +399,10 @@ def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) 
       <section>
         <h2>Plots</h2>
         <div class="plot-grid">{"".join(plot_cards) if plot_cards else "<p>No plots written.</p>"}</div>
+      </section>
+      <section>
+        <h2>Warnings</h2>
+        <div class="plot-grid">{"".join(warning_cards) if warning_cards else "<p>No warnings.</p>"}</div>
       </section>
       <section>
         <h2>Selected Records</h2>
@@ -439,11 +528,28 @@ def _read_review_predictions(
     return df
 
 
+def _selected_mask(values: pd.Series) -> pd.Series:
+    if values.isna().any():
+        raise OpalError(
+            "Campaign review predictions contain null sel__is_selected values.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    if not pd.api.types.is_bool_dtype(values):
+        bad = values.loc[~values.map(lambda value: isinstance(value, (bool, np.bool_)))]
+        if not bad.empty:
+            preview = ", ".join(repr(value) for value in bad.head(5).tolist())
+            raise OpalError(
+                f"Campaign review predictions sel__is_selected must be boolean; got {preview}",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+    return values.astype(bool)
+
+
 def _selection_summary(predictions: pd.DataFrame) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     df = predictions.copy()
     df["pred__score_selected"] = pd.to_numeric(df["pred__score_selected"], errors="raise")
     df["sel__rank_competition"] = pd.to_numeric(df["sel__rank_competition"], errors="raise").astype(int)
-    selected = df[df["sel__is_selected"].astype(bool)].sort_values(["sel__rank_competition", "id"]).copy()
+    selected = df[_selected_mask(df["sel__is_selected"])].sort_values(["sel__rank_competition", "id"]).copy()
     preview_rows = selected.head(25)
     preview = [
         {
@@ -477,7 +583,7 @@ def _write_score_vs_rank_plot(predictions: pd.DataFrame, path: Path, *, title: s
     df["pred__score_selected"] = pd.to_numeric(df["pred__score_selected"], errors="raise")
     df["sel__rank_competition"] = pd.to_numeric(df["sel__rank_competition"], errors="raise").astype(int)
     df = df.sort_values(["sel__rank_competition", "id"])
-    selected = df["sel__is_selected"].astype(bool)
+    selected = _selected_mask(df["sel__is_selected"])
     fig, ax = plt.subplots(figsize=(8.5, 5.0), constrained_layout=True)
     scatter_smart(
         ax,

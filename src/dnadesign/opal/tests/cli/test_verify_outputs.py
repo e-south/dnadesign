@@ -13,6 +13,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.opal.src.cli.commands.init import cmd_init
@@ -145,39 +147,46 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
     records_path = workdir / "records.parquet"
 
     label_hist_col = "opal__demo__label_hist"
-    df = pd.DataFrame(
-        {
-            "id": ["a", "b", "c", "d"],
-            "bio_type": ["dna"] * 4,
-            "sequence": ["AAAA", "AAAT", "AATT", "ATTT"],
-            "alphabet": ["dna_4"] * 4,
-            "x_vec": [[0.1, 0.2], [0.2, 0.4], [0.3, 0.1], [0.4, 0.3]],
-            "y_scalar": [None, None, None, None],
-            label_hist_col: [
-                [
-                    {
-                        "kind": "label",
-                        "observed_round": 0,
-                        "ts": "2024-01-01T00:00:00Z",
-                        "src": "ingest_y",
-                        "y_obs": {"value": [0.1], "dtype": "vector"},
-                    }
-                ],
-                [
-                    {
-                        "kind": "label",
-                        "observed_round": 0,
-                        "ts": "2024-01-01T00:00:00Z",
-                        "src": "ingest_y",
-                        "y_obs": {"value": [0.2], "dtype": "vector"},
-                    }
-                ],
-                [],
-                [],
-            ],
-        }
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b", "c", "d"], type=pa.string()),
+                "bio_type": pa.array(["dna"] * 4, type=pa.string()),
+                "sequence": pa.array(["AAAA", "AAAT", "AATT", "ATTT"], type=pa.string()),
+                "alphabet": pa.array(["dna_4"] * 4, type=pa.string()),
+                "x_vec": pa.FixedSizeListArray.from_arrays(
+                    pa.array([0.1, 0.2, 0.2, 0.4, 0.3, 0.1, 0.4, 0.3], type=pa.float32()),
+                    2,
+                ),
+                "y_scalar": pa.nulls(4, type=pa.null()),
+                label_hist_col: pa.array(
+                    [
+                        [
+                            {
+                                "kind": "label",
+                                "observed_round": 0,
+                                "ts": "2024-01-01T00:00:00Z",
+                                "src": "ingest_y",
+                                "y_obs": {"value": [0.1], "dtype": "vector"},
+                            }
+                        ],
+                        [
+                            {
+                                "kind": "label",
+                                "observed_round": 0,
+                                "ts": "2024-01-01T00:00:00Z",
+                                "src": "ingest_y",
+                                "y_obs": {"value": [0.2], "dtype": "vector"},
+                            }
+                        ],
+                        [],
+                        [],
+                    ]
+                ),
+            }
+        ),
+        records_path,
     )
-    df.to_parquet(records_path)
 
     campaign_yaml = workdir / "campaign.yaml"
     campaign_yaml.write_text(

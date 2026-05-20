@@ -17,8 +17,8 @@ def _():
         build_ledger_status_table,
         build_records_preview,
         cli_handoff_lines,
-        projection_status_lines,
         records_status_lines,
+        x_provenance_status_lines,
     )
     from dnadesign.opal.src.analysis.dashboard.datasets import (
         campaign_label_from_path,
@@ -43,8 +43,8 @@ def _():
         load_parquet_cached,
         mo,
         pl,
-        projection_status_lines,
         records_status_lines,
+        x_provenance_status_lines,
     )
 
 
@@ -201,9 +201,9 @@ def _(build_records_preview, mo, pl, record_selector, records_df, records_report
 
 
 @app.cell
-def _(mo, projection_status_lines, records_report):
-    projection_md = mo.md("\n".join(projection_status_lines(records_report)))
-    return (projection_md,)
+def _(mo, records_report, x_provenance_status_lines):
+    x_provenance_md = mo.md("\n".join(x_provenance_status_lines(records_report)))
+    return (x_provenance_md,)
 
 
 @app.cell
@@ -221,8 +221,8 @@ def _(mo):
                 "### Sequence visualization boundary",
                 "",
                 "OPAL treats sequence rendering as a producer-owned visualization contract.",
-                "DenseGen and other producer notebooks should call BaseRender through public APIs "
-                "and their own render contracts.",
+                "Producer notebooks should call their rendering systems through public APIs "
+                "and own their visual contracts outside canonical OPAL campaign review.",
                 "This notebook keeps OPAL focused on campaign progress, ledgers, selections, and record inspection.",
             ]
         )
@@ -240,11 +240,11 @@ def _(
     cli_md,
     ledger_status_df,
     mo,
-    projection_md,
     record_selector,
     records_error_md,
     records_preview_df,
     visual_boundary_md,
+    x_provenance_md,
 ):
     header = mo.md(
         "\n".join(
@@ -266,7 +266,7 @@ def _(
         ]
     )
     ledger_panel = mo.vstack([mo.md("### Ledger readiness"), mo.ui.table(ledger_status_df, page_size=8), cli_md])
-    context_panel = mo.vstack([projection_md, visual_boundary_md])
+    context_panel = mo.vstack([x_provenance_md, visual_boundary_md])
     mo.vstack(
         [
             header,
@@ -275,9 +275,10 @@ def _(
                     "Campaign contract": campaign_panel,
                     "Records and active record": records_panel,
                     "Ledger and CLI handoff": ledger_panel,
-                    "Optional context boundaries": context_panel,
+                    "X provenance and limitations": context_panel,
                 },
                 multiple=True,
+                lazy=True,
             ),
         ]
     )

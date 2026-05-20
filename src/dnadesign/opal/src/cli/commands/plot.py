@@ -21,10 +21,10 @@ from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suf
 from ...core.utils import OpalError, print_stdout
 from ...plots.config import list_configured_plots, load_plot_config
 from ...plots.runner import PlotRequest, resolve_run_round, run_plots
-from ...registries.plots import get_plot_meta, list_plots
+from ...registries.plots import describe_plot_kind, get_plot_meta, list_plots
 from ..formatting import bullet_list
 from ..registry import cli_command
-from ._common import print_config_context
+from ._common import json_out, print_config_context
 
 
 @cli_command("plot", help="Generate plots from plot_config (preferred) or inline 'plots:'.")
@@ -67,6 +67,7 @@ def cmd_plot(
         "--tag",
         help="Run plots with the given tag (repeatable).",
     ),
+    json_output: bool = typer.Option(False, "--json/--text", help="Output JSON for list/describe surfaces."),
 ) -> None:
     """
     Runs all plots by default (or a single plot via --name).
@@ -79,6 +80,14 @@ def cmd_plot(
             meta = get_plot_meta(describe)
         except KeyError as e:
             raise ValueError(str(e)) from e
+        if json_output:
+            json_out(
+                {
+                    "schema_version": "opal.plot_description.v1",
+                    "plot": describe_plot_kind(describe),
+                }
+            )
+            return
         print_stdout(f"Plot: {describe}")
         if meta is None:
             print_stdout("No metadata available for this plot.")
@@ -86,6 +95,12 @@ def cmd_plot(
             print_stdout(f"Summary: {meta.summary}")
             if meta.requires:
                 print_stdout(bullet_list("Required fields", meta.requires))
+            if meta.data_shape:
+                print_stdout(f"Data shape: {meta.data_shape}")
+            if meta.tidy_schema:
+                print_stdout(bullet_list("Tidy CSV schema", meta.tidy_schema))
+            if meta.failure_modes:
+                print_stdout(bullet_list("Failure modes", meta.failure_modes))
             if meta.params:
                 rows = [f"{k}: {v}" for k, v in meta.params.items()]
                 print_stdout(bullet_list("Params", rows))
@@ -94,6 +109,14 @@ def cmd_plot(
         return
 
     if list_registry and not list_config:
+        if json_output:
+            json_out(
+                {
+                    "schema_version": "opal.plot_registry.v1",
+                    "plots": [describe_plot_kind(name) for name in list_plots()],
+                }
+            )
+            return
         rows = []
         for name in list_plots():
             meta = get_plot_meta(name)
@@ -109,7 +132,8 @@ def cmd_plot(
     cfg = analysis.config
     store = analysis.records_store()
     ws = analysis.workspace
-    print_config_context(campaign_yaml, cfg=cfg, records_path=store.records_path)
+    if not json_output:
+        print_config_context(campaign_yaml, cfg=cfg, records_path=store.records_path)
 
     try:
         plot_cfg = load_plot_config(
@@ -125,6 +149,32 @@ def cmd_plot(
         raise
 
     if list_registry or list_config:
+        if json_output:
+            if list_config and not list_registry:
+                json_out(
+                    {
+                        "schema_version": "opal.plot_config.v1",
+                        "config_path": str(campaign_yaml),
+                        "plots": list_configured_plots(
+                            plots_cfg=plot_cfg.plots,
+                            plot_presets=plot_cfg.plot_presets,
+                        ),
+                    }
+                )
+                return
+            payload: dict[str, object] = {
+                "schema_version": "opal.plot_cli_list.v1",
+                "config_path": str(campaign_yaml),
+            }
+            if list_registry:
+                payload["registered_plots"] = [describe_plot_kind(name) for name in list_plots()]
+            if list_config:
+                payload["configured_plots"] = list_configured_plots(
+                    plots_cfg=plot_cfg.plots,
+                    plot_presets=plot_cfg.plot_presets,
+                )
+            json_out(payload)
+            return
         if list_registry:
             rows = []
             for name in list_plots():

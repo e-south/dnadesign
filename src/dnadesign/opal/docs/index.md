@@ -46,6 +46,8 @@ These pages are contract-oriented lookups for schema, data surfaces, CLI behavio
 - [Data contracts and ledgers](./reference/data-contracts.md): artifact schemas, ledgers, and persistence surfaces.
 - [CLI commands](./reference/cli.md): command interfaces and argument contracts.
 - [Plots](./reference/plots.md): plotting outputs, expectations, and usage.
+- [Review manifests](./reference/review-manifests.md): campaign review bundle schema and stale-artifact behavior.
+- [Notebooks](./reference/notebooks.md): generated marimo notebook contract and public view-model surface.
 
 ### Maintainers
 

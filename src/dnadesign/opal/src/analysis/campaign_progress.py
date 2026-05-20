@@ -20,7 +20,6 @@ import polars as pl
 from .dashboard.datasets import CampaignInfo
 
 OPAL_RECORD_IDENTITY_COLUMNS = ("id", "bio_type", "sequence", "alphabet")
-DEFAULT_PROJECTION_COLUMNS = ("cluster__ldn_v1__umap_x", "cluster__ldn_v1__umap_y")
 
 
 @dataclass(frozen=True)
@@ -31,15 +30,10 @@ class RecordsContractReport:
     missing_required_columns: tuple[str, ...]
     x_column: str | None
     label_hist_column: str | None
-    projection_columns_present: tuple[str, ...]
 
     @property
     def ready(self) -> bool:
         return not self.missing_required_columns
-
-    @property
-    def projection_ready(self) -> bool:
-        return all(col in self.projection_columns_present for col in DEFAULT_PROJECTION_COLUMNS)
 
 
 @dataclass(frozen=True)
@@ -71,7 +65,6 @@ def required_record_columns(info: CampaignInfo | None) -> tuple[str, ...]:
 def assess_records_contract(df: pl.DataFrame, info: CampaignInfo | None) -> RecordsContractReport:
     required = required_record_columns(info)
     columns = set(df.columns)
-    projection_present = tuple(col for col in DEFAULT_PROJECTION_COLUMNS if col in columns)
     return RecordsContractReport(
         row_count=int(df.height),
         column_count=len(df.columns),
@@ -79,7 +72,6 @@ def assess_records_contract(df: pl.DataFrame, info: CampaignInfo | None) -> Reco
         missing_required_columns=tuple(col for col in required if col not in columns),
         x_column=info.x_column if info is not None else None,
         label_hist_column=campaign_label_hist_column(info),
-        projection_columns_present=projection_present,
     )
 
 
@@ -93,7 +85,6 @@ def assess_records_contract_for_values(
     if x_column:
         required.append(str(x_column))
     columns = set(df.columns)
-    projection_present = tuple(col for col in DEFAULT_PROJECTION_COLUMNS if col in columns)
     label_hist_column = f"opal__{campaign_slug}__label_hist" if campaign_slug else None
     return RecordsContractReport(
         row_count=int(df.height),
@@ -102,7 +93,6 @@ def assess_records_contract_for_values(
         missing_required_columns=tuple(col for col in dict.fromkeys(required) if col not in columns),
         x_column=str(x_column) if x_column else None,
         label_hist_column=label_hist_column,
-        projection_columns_present=projection_present,
     )
 
 
@@ -122,17 +112,16 @@ def records_status_lines(report: RecordsContractReport) -> list[str]:
     return lines
 
 
-def projection_status_lines(report: RecordsContractReport) -> list[str]:
-    if report.projection_ready:
+def x_provenance_status_lines(report: RecordsContractReport) -> list[str]:
+    if report.x_column:
+        x_state = "**present**" if report.x_column not in report.missing_required_columns else "**missing**"
         return [
-            "- Projection context: **available**",
-            "- Projection columns are optional OPAL context, not campaign readiness requirements.",
+            f"- X column: `{report.x_column}` ({x_state})",
+            "- OPAL treats X as an explicit candidate-table contract and does not inspect producer geometry.",
         ]
-    missing = [col for col in DEFAULT_PROJECTION_COLUMNS if col not in report.projection_columns_present]
     return [
-        "- Projection context: **not available**",
-        "- OPAL records remain inspectable without LatentDNA/UMAP columns.",
-        "- Missing optional projection columns: " + ", ".join(f"`{col}`" for col in missing),
+        "- X column: **not configured**",
+        "- OPAL records remain inspectable, but campaign execution needs an explicit X column.",
     ]
 
 
@@ -153,10 +142,6 @@ def build_records_preview(df: pl.DataFrame, report: RecordsContractReport, *, li
         exprs.append(pl.col(report.x_column).is_not_null().alias("x_present"))
     if report.label_hist_column and report.label_hist_column in df.columns:
         exprs.append(pl.col(report.label_hist_column).is_not_null().alias("label_hist_present"))
-    for col in DEFAULT_PROJECTION_COLUMNS:
-        if col in df.columns:
-            exprs.append(pl.col(col))
-
     if not exprs:
         return df.head(limit)
     return df.select(exprs).head(limit)
