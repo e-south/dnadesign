@@ -1,7 +1,7 @@
 ## Reliability Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 This index maps reliability behavior, CI lane intent, and operations runbooks.

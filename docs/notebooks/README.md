@@ -1,7 +1,7 @@
 ## Running marimo notebooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 This document is a practical quickstart for running repository notebooks with marimo. Read it when you want to launch notebooks quickly; deeper notebook patterns and UI guidance are in [marimo reference](marimo-reference.md).
 

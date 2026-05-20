@@ -1,7 +1,7 @@
 ## Marimo notebooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 This reference captures practical marimo patterns used across this repository, including reactivity rules, UI usage, and notebook code conventions. Read it when authoring or reviewing marimo notebooks and you need concrete examples plus guardrails.
 

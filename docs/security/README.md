@@ -1,7 +1,7 @@
 ## Security Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 This index covers security policy, secrets handling, and supply-chain hygiene references.

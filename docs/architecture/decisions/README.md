@@ -1,7 +1,7 @@
 ## Architecture Decision Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 ADRs capture accepted architectural decisions and their consequences.
