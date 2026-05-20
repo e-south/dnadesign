@@ -125,6 +125,32 @@ class SecondaryStructurePairingSummaryV1(FoldingContractModel):
     intended_missed_count: int = Field(ge=0)
 
 
+class SecondaryStructureContiguousWatsonCrickStemRunV1(FoldingContractModel):
+    start_offset: int
+    end_offset: int
+    length_bp: int = Field(ge=1)
+    primary_start: int = Field(ge=0)
+    primary_end: int = Field(gt=0)
+    complement_start: int = Field(ge=0)
+    complement_end: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "SecondaryStructureContiguousWatsonCrickStemRunV1":
+        if self.end_offset <= self.start_offset:
+            raise ValueError("stem run end_offset must be > start_offset.")
+        if self.length_bp != self.end_offset - self.start_offset:
+            raise ValueError("stem run length_bp must equal end_offset - start_offset.")
+        if self.primary_end <= self.primary_start:
+            raise ValueError("stem run primary span end must be > start.")
+        if self.complement_end <= self.complement_start:
+            raise ValueError("stem run complement span end must be > start.")
+        if self.primary_end - self.primary_start != self.length_bp:
+            raise ValueError("stem run primary span length must equal length_bp.")
+        if self.complement_end - self.complement_start != self.length_bp:
+            raise ValueError("stem run complement span length must equal length_bp.")
+        return self
+
+
 class SecondaryStructureIntendedPairingQaV1(FoldingContractModel):
     pairing_id: str
     primary_start: int = Field(ge=0)
@@ -133,6 +159,11 @@ class SecondaryStructureIntendedPairingQaV1(FoldingContractModel):
     complement_end: int = Field(gt=0)
     expected_pair_count: int = Field(ge=0)
     predicted_pair_count: int = Field(ge=0)
+    predicted_watson_crick_pair_count: int = Field(default=0, ge=0)
+    contiguous_watson_crick_stem_bp: int = Field(default=0, ge=0)
+    contiguous_watson_crick_stem_runs: list[SecondaryStructureContiguousWatsonCrickStemRunV1] = Field(
+        default_factory=list
+    )
     status: Literal["fully_recovered", "partially_recovered", "missed"]
 
     @field_validator("pairing_id")

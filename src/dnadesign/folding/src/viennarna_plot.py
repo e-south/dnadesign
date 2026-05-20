@@ -118,6 +118,7 @@ def publish_viennarna_structure_svg(
         nucleotide_annotations=nucleotide_annotations,
         unit_copy_spans=unit_copy_spans(visual_contract),
         intended_pair_lookup=intended_pair_lookup(visual_contract),
+        intended_pairing_metrics=tuple(item.model_dump(mode="json") for item in prediction_model.qa.intended_pairings),
         visual_contract=visual_contract,
         emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
     )
@@ -183,7 +184,8 @@ def enrich_prediction_pairing_qa(
         raise FoldingConfigError("Sequence evidence map length does not match folding prediction input.")
 
     copy_spans = unit_copy_spans(visual_contract)
-    predicted_pairs = {pair_key(pair.left, pair.right) for pair in prediction_model.result.pair_map}
+    predicted_pair_labels = {pair_key(pair.left, pair.right): pair.pair for pair in prediction_model.result.pair_map}
+    predicted_pairs = set(predicted_pair_labels)
     cross_copy_pairings = cross_copy_pairing_annotations(
         prediction_model,
         unit_copy_spans=copy_spans,
@@ -191,6 +193,7 @@ def enrich_prediction_pairing_qa(
     intended_pairings = intended_pairing_qa(
         visual_contract,
         predicted_pairs=predicted_pairs,
+        predicted_pair_labels=predicted_pair_labels,
     )
     summary = SecondaryStructurePairingSummaryV1(
         predicted_pair_count=len(prediction_model.result.pair_map),

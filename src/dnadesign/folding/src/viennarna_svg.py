@@ -85,6 +85,7 @@ def annotate_svg_surface(
     nucleotide_annotations: list[dict[str, object]],
     unit_copy_spans: tuple[dict[str, int | str], ...],
     intended_pair_lookup: dict[tuple[int, int], tuple[str, ...]],
+    intended_pairing_metrics: tuple[dict[str, object], ...] = (),
     visual_contract: SequenceEvidenceMapV1 | None,
     emphasize_stem_base_nucleotides: bool = True,
 ) -> SvgAnnotationResult:
@@ -96,7 +97,11 @@ def annotate_svg_surface(
         emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
     )
     _style_native_structure_layers(surface)
-    section_annotations = _section_annotations(surface, visual_contract=visual_contract)
+    section_annotations = _section_annotations(
+        surface,
+        visual_contract=visual_contract,
+        intended_pairing_metrics=intended_pairing_metrics,
+    )
     layout_normalization = _normalize_structure_orientation(surface, section_annotations)
     _add_semantic_edge_layer(
         surface,
@@ -284,6 +289,7 @@ def _section_annotations(
     surface: SvgSurface,
     *,
     visual_contract: SequenceEvidenceMapV1 | None,
+    intended_pairing_metrics: tuple[dict[str, object], ...],
 ) -> list[dict[str, object]]:
     if visual_contract is None:
         return []
@@ -310,10 +316,20 @@ def _section_annotations(
         owner_ids = _owner_ids_for_span(visual_contract, start=start, end=end)
         semantic_tokens = tuple(dict.fromkeys(component_token((owner_id,)) for owner_id in owner_ids))
         section_semantic = _section_semantic(text)
+        stem_metric = _stem_metric_for_section(
+            label=text,
+            start=start,
+            end=end,
+            intended_pairing_metrics=intended_pairing_metrics,
+        )
+        stem_label = "" if stem_metric is None else _stem_metric_label(stem_metric)
+        metric_payload = {} if stem_metric is None or not stem_label else _stem_metric_section_payload(stem_metric)
         annotations.append(
             {
                 "section_id": f"section_{index:02d}_{slug_token(text)}",
                 "label": text,
+                **({"label_subtitle": stem_label} if stem_label else {}),
+                **metric_payload,
                 "section_kind": _section_kind(text),
                 "section_semantic": section_semantic,
                 "start": start,
@@ -326,6 +342,62 @@ def _section_annotations(
             }
         )
     return annotations
+
+
+def _stem_metric_for_section(
+    *,
+    label: str,
+    start: int,
+    end: int,
+    intended_pairing_metrics: tuple[dict[str, object], ...],
+) -> dict[str, object] | None:
+    lowered = label.lower()
+    if "complement" in lowered or "reverse complement" in lowered:
+        return None
+    candidates: list[dict[str, object]] = []
+    for metric in intended_pairing_metrics:
+        try:
+            primary_start = int(metric["primary_start"])
+            primary_end = int(metric["primary_end"])
+            observed = int(metric.get("contiguous_watson_crick_stem_bp") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if observed <= 0:
+            continue
+        exact_match = primary_start == start and primary_end == end
+        contains_primary = start <= primary_start and primary_end <= end
+        overlaps_primary = start < primary_end and primary_start < end
+        if exact_match or contains_primary or overlaps_primary:
+            candidates.append(metric)
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda item: (
+            int(item.get("contiguous_watson_crick_stem_bp") or 0),
+            int(item.get("predicted_watson_crick_pair_count") or 0),
+        ),
+    )
+
+
+def _stem_metric_label(metric: dict[str, object]) -> str:
+    observed = int(metric.get("contiguous_watson_crick_stem_bp") or 0)
+    expected = int(metric.get("expected_pair_count") or 0)
+    if observed <= 0:
+        return ""
+    if expected > 0 and observed < expected:
+        return f"stem {observed}/{expected} bp"
+    return f"stem {observed} bp"
+
+
+def _stem_metric_section_payload(metric: dict[str, object]) -> dict[str, object]:
+    return {
+        "stem_metric": "contiguous_watson_crick",
+        "pairing_id": str(metric.get("pairing_id") or ""),
+        "contiguous_watson_crick_stem_bp": int(metric.get("contiguous_watson_crick_stem_bp") or 0),
+        "predicted_watson_crick_pair_count": int(metric.get("predicted_watson_crick_pair_count") or 0),
+        "expected_pair_count": int(metric.get("expected_pair_count") or 0),
+    }
 
 
 def _normalize_structure_orientation(
@@ -678,6 +750,8 @@ def _add_section_label_layer(
     placed_annotations: list[dict[str, object]] = []
     for section in section_annotations:
         is_stem_base = _is_stem_base_section(section)
+        label = str(section["label"])
+        label_subtitle = str(section.get("label_subtitle") or "").strip()
         reserved_boxes = [*title_boxes] if is_stem_base else [*title_boxes, *extra_view_boxes]
         anchor = (float(section["anchor_x"]), float(section["anchor_y"]))
         if bool(layout_normalization.get("applied")):
@@ -689,8 +763,8 @@ def _add_section_label_layer(
                 ),
                 angle_degrees=float(layout_normalization.get("angle_degrees", 0.0)),
             )
-        label_width = max(24.0, len(str(section["label"])) * 5.4)
-        label_height = 11.0
+        label_width = max(24.0, len(label) * 5.4, len(label_subtitle) * 4.6)
+        label_height = 22.0 if label_subtitle else 11.0
         label_x, label_y, box, attempts = _place_label_without_collisions(
             anchor,
             center=center,
@@ -717,18 +791,19 @@ def _add_section_label_layer(
                 "style": "stroke: #94A3B8; stroke-width: 0.7px; stroke-opacity: 0.72;",
             },
         )
-        leader.set("data-dnadesign-section-label", str(section["label"]))
+        leader.set("data-dnadesign-section-label", label)
+        title_y = label_y - 4.5 if label_subtitle else label_y
         text = ET.SubElement(
             layer,
             f"{{{SVG_NS}}}text",
             {
                 "class": "dnadesign-section-label",
                 "x": f"{label_x:.3f}",
-                "y": f"{label_y:.3f}",
+                "y": f"{title_y:.3f}",
                 "text-anchor": "middle",
                 "dominant-baseline": "middle",
                 "data-dnadesign-section-id": str(section["section_id"]),
-                "data-dnadesign-section-label": str(section["label"]),
+                "data-dnadesign-section-label": label,
                 "style": (
                     f"font-family: DejaVu Sans, Arial, sans-serif; font-size: {_format_px(_ANNOTATION_FONT_SIZE_PX)}; "
                     f"font-weight: 600; fill: {color}; stroke: #FFFFFF; stroke-width: 2px; "
@@ -736,7 +811,35 @@ def _add_section_label_layer(
                 ),
             },
         )
-        text.text = str(section["label"])
+        text.text = label
+        if label_subtitle:
+            subtitle_attrs = {
+                "class": "dnadesign-section-label-subtitle",
+                "x": f"{label_x:.3f}",
+                "y": f"{label_y + 6.8:.3f}",
+                "text-anchor": "middle",
+                "dominant-baseline": "middle",
+                "data-dnadesign-section-id": str(section["section_id"]),
+                "data-dnadesign-section-label": label,
+                "data-dnadesign-stem-metric": str(section.get("stem_metric") or ""),
+                "data-dnadesign-contiguous-watson-crick-stem-bp": str(
+                    section.get("contiguous_watson_crick_stem_bp") or ""
+                ),
+                "data-dnadesign-predicted-watson-crick-pair-count": str(
+                    section.get("predicted_watson_crick_pair_count") or ""
+                ),
+                "data-dnadesign-expected-pair-count": str(section.get("expected_pair_count") or ""),
+                "style": (
+                    "font-family: DejaVu Sans, Arial, sans-serif; font-size: 7.5px; "
+                    "font-weight: 600; fill: #475569; stroke: #FFFFFF; stroke-width: 1.5px; "
+                    "paint-order: stroke fill; stroke-linejoin: round;"
+                ),
+            }
+            pairing_id = str(section.get("pairing_id") or "").strip()
+            if pairing_id:
+                subtitle_attrs["data-dnadesign-pairing-id"] = pairing_id
+            subtitle = ET.SubElement(layer, f"{{{SVG_NS}}}text", subtitle_attrs)
+            subtitle.text = label_subtitle
         output = dict(section)
         output.update(
             {

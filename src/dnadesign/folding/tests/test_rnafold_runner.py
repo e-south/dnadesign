@@ -20,6 +20,13 @@ from pathlib import Path
 import pytest
 
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1
+from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+    SecondaryStructurePredictionBackendV1,
+    SecondaryStructurePredictionDnaPolicyV1,
+    SecondaryStructurePredictionInputV1,
+    SecondaryStructurePredictionResultV1,
+    SecondaryStructurePredictionV1,
+)
 from dnadesign.folding import (
     enrich_prediction_pairing_qa,
     parse_rnafold_stdout,
@@ -28,7 +35,17 @@ from dnadesign.folding import (
     run_prediction_request,
 )
 from dnadesign.folding.src.errors import FoldingConfigError
-from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox
+from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox, _stem_metric_label
+
+_CONTIGUOUS_STEM_SEQUENCE = "GACGATATCGTC"
+_CONTIGUOUS_STEM_PAIR_MAP = [
+    {"left": 0, "right": 11, "pair": "GC"},
+    {"left": 1, "right": 10, "pair": "GU"},
+    {"left": 2, "right": 9, "pair": "CG"},
+    {"left": 3, "right": 8, "pair": "AU"},
+    {"left": 4, "right": 7, "pair": "UA"},
+    {"left": 5, "right": 6, "pair": "GT"},
+]
 
 
 def _write_assembled_sequence(tmp_path: Path, sequence: str = "GCAT") -> tuple[Path, str]:
@@ -148,6 +165,104 @@ def _python_api_request(
             },
         }
     )
+
+
+def _contiguous_stem_prediction(
+    *,
+    sequence_sha256: str = "abc",
+    sequence_id: str = "demo",
+) -> SecondaryStructurePredictionV1:
+    return SecondaryStructurePredictionV1(
+        prediction_id=f"{sequence_id}.viennarna.canonical_component_unit",
+        status="ok",
+        input=SecondaryStructurePredictionInputV1(
+            sequence_id=sequence_id,
+            sequence_sha256=sequence_sha256,
+            alphabet="dna",
+            topology="linear_ssdna",
+            length=len(_CONTIGUOUS_STEM_SEQUENCE),
+        ),
+        backend=SecondaryStructurePredictionBackendV1(
+            name="ViennaRNA",
+            version="2.7.2",
+            command=["RNA.fold_compound", "mfe"],
+        ),
+        dna_policy=SecondaryStructurePredictionDnaPolicyV1(
+            mode="convert_t_to_u_for_rna_backend",
+            submitted_alphabet="rna_surrogate",
+            coordinates_mapped_to="original_dna_sequence",
+        ),
+        result=SecondaryStructurePredictionResultV1(
+            dot_bracket="(((((())))))",
+            mfe_kcal_mol=-4.1,
+            pair_map=_CONTIGUOUS_STEM_PAIR_MAP,
+        ),
+    )
+
+
+def _write_contiguous_stem_visual_contract(
+    path: Path,
+    *,
+    include_segment_labels: bool,
+) -> None:
+    payload: dict[str, object] = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "demo",
+        "topology_kind": "linear_ssdna",
+        "alphabet": "dna",
+        "primary_sequence": _CONTIGUOUS_STEM_SEQUENCE,
+        "owners": [
+            {
+                "owner_id": "demo.payload_primary",
+                "row_id": "primary",
+                "start": 0,
+                "end": 6,
+                "display_label": "MSD TetO",
+                "short_label": "",
+            },
+            {
+                "owner_id": "demo.payload_complement",
+                "row_id": "primary",
+                "start": 6,
+                "end": 12,
+                "display_label": "MSD TetO complement",
+                "short_label": "",
+            },
+        ],
+        "pairings": [
+            {
+                "pairing_id": "demo.payload_rc",
+                "primary_start": 0,
+                "primary_end": 6,
+                "complement_start": 6,
+                "complement_end": 12,
+                "display_label": "payload_rc",
+                "short_label": "intended RC",
+            }
+        ],
+    }
+    if include_segment_labels:
+        payload["meta"] = {
+            "span_backdrops": [
+                {
+                    "semantic": "payload_primary",
+                    "start": 0,
+                    "end": 6,
+                    "edge_color": "#F58518",
+                },
+                {
+                    "semantic": "payload_complement",
+                    "start": 6,
+                    "end": 12,
+                    "edge_color": "#E45756",
+                },
+            ],
+            "segment_labels": [
+                {"text": "MSD TetO", "start": 0, "end": 6, "label_side": "above"},
+                {"text": "MSD TetO complement", "start": 6, "end": 12, "label_side": "above"},
+            ],
+        }
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
 def test_expand_root_viewbox_keeps_normalized_geometry_centered_with_asymmetric_labels() -> None:
@@ -798,6 +913,70 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert 'data-dnadesign-stem-base-emphasis="true"' not in no_emphasis
 
 
+def test_publish_viennarna_structure_svg_labels_payload_with_contiguous_stem_metric(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        """
+__version__ = "2.7.2"
+
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="80">\\n')
+        handle.write('<g id="pairs">\\n')
+        for left, right in ((1, 12), (2, 11), (3, 10), (4, 9), (5, 8), (6, 7)):
+            handle.write(f'<line class="basepairs" id="{left},{right}" x1="{left}" y1="0" x2="{right}" y2="20" />\\n')
+        handle.write('</g><g id="seq">\\n')
+        for index, base in enumerate(sequence):
+            handle.write(f'<text class="nucleotide" x="{index * 8}" y="40">{base}</text>\\n')
+        handle.write('</g>\\n</svg>\\n')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+    assembled, sequence_sha256 = _write_assembled_sequence(tmp_path, sequence=_CONTIGUOUS_STEM_SEQUENCE)
+    prediction = _contiguous_stem_prediction(sequence_sha256=sequence_sha256)
+    visual_contract = tmp_path / "sequence_evidence_map_v1.json"
+    _write_contiguous_stem_visual_contract(visual_contract, include_segment_labels=True)
+    enriched = enrich_prediction_pairing_qa(prediction, visual_contract_path=visual_contract)
+
+    publish_viennarna_structure_svg(
+        enriched,
+        assembled_sequence_path=assembled,
+        visual_contract_path=visual_contract,
+        output_dir=tmp_path / "visual" / "viennarna_secondary_structure",
+    )
+
+    annotated = (tmp_path / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg").read_text(
+        encoding="utf-8"
+    )
+    assert ">stem 3/6 bp<" in annotated
+    assert 'data-dnadesign-section-label="MSD TetO"' in annotated
+    assert 'data-dnadesign-stem-metric="contiguous_watson_crick"' in annotated
+    assert 'data-dnadesign-contiguous-watson-crick-stem-bp="3"' in annotated
+    assert 'data-dnadesign-predicted-watson-crick-pair-count="4"' in annotated
+    annotation_manifest = json.loads(
+        (
+            tmp_path / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotation_manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    primary_section = next(
+        section for section in annotation_manifest["section_annotations"] if section["label"] == "MSD TetO"
+    )
+    assert primary_section["label_subtitle"] == "stem 3/6 bp"
+    assert primary_section["contiguous_watson_crick_stem_bp"] == 3
+    assert primary_section["predicted_watson_crick_pair_count"] == 4
+
+
 def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(tmp_path: Path) -> None:
     request = _request(tmp_path, executable="unused")
     result = parse_rnafold_stdout(
@@ -881,3 +1060,174 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
     assert enriched.qa.intended_pairings[0].status == "fully_recovered"
     written = json.loads((tmp_path / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8"))
     assert written["qa"]["pairing_summary"]["cross_copy_pair_count"] == 2
+
+
+def test_enrich_prediction_pairing_qa_reports_contiguous_watson_crick_stem_runs(tmp_path: Path) -> None:
+    prediction = _contiguous_stem_prediction()
+    visual_contract = tmp_path / "sequence_evidence_map_v1.json"
+    _write_contiguous_stem_visual_contract(visual_contract, include_segment_labels=False)
+
+    enriched = enrich_prediction_pairing_qa(
+        prediction,
+        visual_contract_path=visual_contract,
+    )
+
+    intended = enriched.qa.intended_pairings[0]
+    assert intended.predicted_pair_count == 6
+    assert intended.predicted_watson_crick_pair_count == 4
+    assert intended.contiguous_watson_crick_stem_bp == 3
+    assert [run.length_bp for run in intended.contiguous_watson_crick_stem_runs] == [1, 3]
+    assert intended.contiguous_watson_crick_stem_runs[-1].primary_start == 2
+    assert intended.contiguous_watson_crick_stem_runs[-1].primary_end == 5
+    assert intended.contiguous_watson_crick_stem_runs[-1].complement_start == 7
+    assert intended.contiguous_watson_crick_stem_runs[-1].complement_end == 10
+
+
+def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjacent_primitives(
+    tmp_path: Path,
+) -> None:
+    sequence = "ACGATGGAACCATCGT"
+    visual_contract = tmp_path / "sequence_evidence_map_v1.json"
+    visual_contract.write_text(
+        json.dumps(
+            {
+                "contract_kind": "sequence_evidence_map_v1",
+                "state_id": "demo",
+                "topology_kind": "linear_ssdna",
+                "alphabet": "dna",
+                "primary_sequence": sequence,
+                "effect_tags": [
+                    {
+                        "tag_id": "demo.stem_base_left",
+                        "tag_kind": "stem_base_left",
+                        "row_id": "primary",
+                        "start": 0,
+                        "end": 1,
+                        "display_label": "Left Base",
+                        "short_label": "",
+                    },
+                    {
+                        "tag_id": "demo.snapback_retained_stem",
+                        "tag_kind": "snapback_retained_stem",
+                        "row_id": "primary",
+                        "start": 5,
+                        "end": 7,
+                        "display_label": "Foldback stem",
+                        "short_label": "",
+                    },
+                    {
+                        "tag_id": "demo.snapback_cap",
+                        "tag_kind": "snapback_cap",
+                        "row_id": "primary",
+                        "start": 7,
+                        "end": 9,
+                        "display_label": "Cap",
+                        "short_label": "",
+                    },
+                    {
+                        "tag_id": "demo.snapback_foldback_return",
+                        "tag_kind": "snapback_foldback_return",
+                        "row_id": "primary",
+                        "start": 9,
+                        "end": 11,
+                        "display_label": "Foldback return",
+                        "short_label": "",
+                    },
+                    {
+                        "tag_id": "demo.stem_base_right",
+                        "tag_kind": "stem_base_right",
+                        "row_id": "primary",
+                        "start": 15,
+                        "end": 16,
+                        "display_label": "Right Base",
+                        "short_label": "",
+                    },
+                ],
+                "pairings": [
+                    {
+                        "pairing_id": "demo.payload_rc",
+                        "primary_start": 1,
+                        "primary_end": 5,
+                        "complement_start": 11,
+                        "complement_end": 15,
+                        "display_label": "payload_rc",
+                        "short_label": "intended RC",
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    prediction = SecondaryStructurePredictionV1(
+        prediction_id="demo.viennarna.canonical_component_unit",
+        status="ok",
+        input=SecondaryStructurePredictionInputV1(
+            sequence_id="demo",
+            sequence_sha256=hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
+            alphabet="dna",
+            topology="linear_ssdna",
+            length=len(sequence),
+        ),
+        backend=SecondaryStructurePredictionBackendV1(
+            name="ViennaRNA",
+            version="2.7.2",
+            command=["RNA.fold_compound", "mfe"],
+        ),
+        dna_policy=SecondaryStructurePredictionDnaPolicyV1(
+            mode="convert_t_to_u_for_rna_backend",
+            submitted_alphabet="rna_surrogate",
+            coordinates_mapped_to="original_dna_sequence",
+        ),
+        result=SecondaryStructurePredictionResultV1(
+            dot_bracket="(((((((())))))))",
+            mfe_kcal_mol=-5.5,
+            pair_map=[
+                {"left": 0, "right": 15, "pair": "AT"},
+                {"left": 1, "right": 14, "pair": "CG"},
+                {"left": 2, "right": 13, "pair": "GC"},
+                {"left": 3, "right": 12, "pair": "AT"},
+                {"left": 4, "right": 11, "pair": "TA"},
+                {"left": 5, "right": 10, "pair": "GC"},
+                {"left": 6, "right": 9, "pair": "CG"},
+                {"left": 7, "right": 8, "pair": "AT"},
+            ],
+        ),
+    )
+
+    enriched = enrich_prediction_pairing_qa(prediction, visual_contract_path=visual_contract)
+
+    intended = enriched.qa.intended_pairings[0]
+    assert intended.expected_pair_count == 4
+    assert intended.predicted_pair_count == 4
+    assert intended.predicted_watson_crick_pair_count == 7
+    assert intended.contiguous_watson_crick_stem_bp == 7
+    assert [run.length_bp for run in intended.contiguous_watson_crick_stem_runs] == [7]
+    run = intended.contiguous_watson_crick_stem_runs[0]
+    assert run.start_offset == -1
+    assert run.end_offset == 6
+    assert run.primary_start == 0
+    assert run.primary_end == 7
+    assert run.complement_start == 9
+    assert run.complement_end == 16
+
+
+def test_stem_metric_label_omits_payload_denominator_for_effective_extension() -> None:
+    assert (
+        _stem_metric_label(
+            {
+                "contiguous_watson_crick_stem_bp": 7,
+                "expected_pair_count": 4,
+            }
+        )
+        == "stem 7 bp"
+    )
+    assert (
+        _stem_metric_label(
+            {
+                "contiguous_watson_crick_stem_bp": 3,
+                "expected_pair_count": 4,
+            }
+        )
+        == "stem 3/4 bp"
+    )
