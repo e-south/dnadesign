@@ -357,7 +357,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(objective_name, parse_enabled, parse_tags, plot_cfg):
+        def _(parse_enabled, parse_tags, plot_cfg):
             plot_entries = []
             if plot_cfg is not None:
                 for plot_entry_item in plot_cfg.plots:
@@ -395,28 +395,11 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     plot_entries.append(
                         {"name": name, "kind": kind, "tags": _plot_tags_list}
                     )
-            objective_is_sfxi = str(objective_name).lower().startswith("sfxi")
-
-            def _is_sfxi_kind(kind: str) -> bool:
-                return str(kind).lower().startswith("sfxi_")
-
-            if objective_is_sfxi:
-                plot_entries_filtered = [
-                    plot_entry_filter
-                    for plot_entry_filter in plot_entries
-                    if _is_sfxi_kind(plot_entry_filter["kind"])
-                ]
-            else:
-                plot_entries_filtered = [
-                    plot_entry_filter
-                    for plot_entry_filter in plot_entries
-                    if not _is_sfxi_kind(plot_entry_filter["kind"])
-                ]
-            return objective_is_sfxi, plot_entries_filtered
+            return plot_entries
 
 
         @app.cell
-        def _(Path, notebook_view_model, plot_entries_filtered):
+        def _(Path, notebook_view_model, plot_entries):
             plots_dir = Path(notebook_view_model["campaign"]["workdir"]) / "outputs" / "plots"
             manifest_rows = [
                 row
@@ -426,7 +409,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             active_by_name = {str(row.get("name")): row for row in manifest_rows}
             plot_choices = []
             missing_outputs = []
-            for plot_entry_choice in plot_entries_filtered:
+            for plot_entry_choice in plot_entries:
                 _manifest = active_by_name.get(str(plot_entry_choice["name"]))
                 if _manifest is None:
                     missing_outputs.append(plot_entry_choice["name"])
@@ -454,9 +437,9 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, objective_is_sfxi, plot_cfg_error, plot_choices, plots_dir, missing_outputs, stale_plot_artifacts):
+        def _(mo, plot_cfg_error, plot_choices, plots_dir, missing_outputs, stale_plot_artifacts):
             plot_ui = None
-            filter_note = "SFXI plots only." if objective_is_sfxi else "Non-SFXI plots only."
+            gallery_scope = "All configured plots with written manifests."
             if plot_cfg_error:
                 plot_gallery_note = (
                     "### Plot artifacts (`outputs/plots`)\\n\\n"
@@ -468,8 +451,8 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     "",
                     f"No manifest-backed plot outputs found in `{plots_dir}`.",
                     "Run `uv run opal plot -c <campaign.yaml>` to generate plots.",
+                    gallery_scope,
                 ]
-                _lines.append(filter_note)
                 if missing_outputs:
                     _lines.append(
                         f"Configured plots without outputs: {', '.join(missing_outputs)}"
@@ -480,7 +463,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             else:
                 labels = [plot_choice["label"] for plot_choice in plot_choices]
                 plot_ui = mo.ui.dropdown(labels, value=labels[0], label="Plot")
-                plot_gallery_note = "### Plot artifacts (`outputs/plots`)\\n\\n" + filter_note
+                plot_gallery_note = "### Plot artifacts (`outputs/plots`)\\n\\n" + gallery_scope
                 if stale_plot_artifacts:
                     plot_gallery_note += f"\\n\\nStale artifact warnings: `{len(stale_plot_artifacts)}`"
             return plot_ui, plot_gallery_note

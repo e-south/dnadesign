@@ -32,6 +32,7 @@ from .src.analysis.facade import (
 )
 from .src.analysis.notebook_template import render_campaign_notebook
 from .src.config.loader import load_config
+from .src.plots.api import run_campaign_plots
 from .src.plots.config import load_plot_config, parse_enabled, parse_tags
 from .src.plots.manifests import load_plot_artifact_manifest, load_plot_manifest_index
 from .src.registries.plots import describe_plot_kind, list_plot_kinds
@@ -69,6 +70,7 @@ __all__ = [
     "render_campaign_notebook",
     "render_campaign_progress_text",
     "require_columns",
+    "run_campaign_plots",
     "smoke_check_notebook",
     "table_status_lines",
     "unavailable_table",

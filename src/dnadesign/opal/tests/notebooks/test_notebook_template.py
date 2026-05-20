@@ -27,6 +27,15 @@ def test_notebook_template_has_plot_gallery() -> None:
     assert "Plot artifacts" in text
     assert "outputs/plots" in text
     assert "build_notebook_view_model" in text
+    assert "All configured plots with written manifests." in text
+
+
+def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert "SFXI plots only" not in text
+    assert "Non-SFXI plots only" not in text
+    assert "plot_entries_filtered" not in text
 
 
 def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
