@@ -336,6 +336,7 @@ src/dnadesign/usr/datasets/**
 !src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md
 
 # Common local project dirs
+/.var/
 /campaigns/
 /datasets/
 /prototypes/

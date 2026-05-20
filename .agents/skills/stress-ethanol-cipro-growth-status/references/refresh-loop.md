@@ -8,7 +8,7 @@ surface that answers the question.
 1. Read `docs/studies/README.md` and `docs/studies/index.yaml`.
 2. Run `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`.
 3. Escalate to
-   `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
+   `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`
    only for blocker or next-run readiness questions.
 4. Open `docs/studies/<study-id>/routes/README.md` only after the record or
    blocker question is answered. Open `routes/decision/opal/README.md` or
@@ -36,7 +36,7 @@ surface that answers the question.
 
 ## Explicit escalation for blockers
 
-- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
+- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`
 - Use this for `what blocks execution here?` or `what should run next on this
   host?`
 
@@ -46,7 +46,7 @@ surface that answers the question.
 | --- | --- | --- | --- |
 | Where is the study now? | `studies.stress-ethanol-cipro-growth.status` | study id, current phase, dataset ids, row counts, downstream posture, next surface | selector fields or required record files are missing |
 | Which exploratory-analysis artifacts are available? | `studies.stress-ethanol-cipro-growth.status` plus `routes/README.md` | `analysis_surfaces.densegen`, `analysis_surfaces.latentdna`, or `analysis_surfaces.cluster` with ids, commands, and artifact paths | route inventory is missing for the owning tool or the study omits the needed workspace/doc binding |
-| What blocks execution here? | `studies.stress-ethanol-cipro-growth.preflight --scope next` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `operations/ops.study.yaml` or declared execution surfaces are missing |
+| What blocks execution here? | `studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30` | `scope`, `phase_id`, `check_group`, `kind`, `surface_id`, `artifact_id` | `operations/ops.study.yaml` or declared execution surfaces are missing |
 | Which dataset sync posture is current? | `record/datasets.yaml` plus `usr.data-plane.hpc-sync` | dataset id, remote profile, audit JSON path, explicit drift summary | sync-enabled dataset entries or audit evidence are missing |
 | Which owner surface should I open next? | `docs/studies/<study-id>/routes/README.md` | owner tool, entry artifact, primary doc or workspace, first command | the study spans owner surfaces but no route map is checked in |
 
@@ -68,19 +68,22 @@ surface that answers the question.
 - Missing registry, stale selector, or missing study directory: repair
   `docs/studies/index.yaml` and the required record files, then rerun status.
 - Missing or incomplete command-level evidence: rerun
-  `studies.stress-ethanol-cipro-growth.preflight --scope next` and summarize the
-  blocker with `kind`, `surface_id`, and `artifact_id`.
+  `studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30`
+  and summarize the blocker with `kind`, `surface_id`, and `artifact_id`.
 - Missing sync posture: refresh the explicit `usr diff --audit-json-out` audit
   named by `record/datasets.yaml`, then summarize it through `usr.data-plane.hpc-sync`.
-- Missing downstream handoff or stale source growth: report the checked-in
-  `source/handoff mode` instead of inventing a downstream-ready state.
+- Missing downstream handoff or stale source growth: report whether the checked-in
+  OPAL candidate feature table is materialized and validated before describing
+  campaign readiness.
 
 ## Source and handoff language
 
-- Use `source/handoff mode` when the canonical consolidated feature dataset is
-  still planned.
+- Use OPAL candidate-table language when the canonical downstream handoff is
+  `usr_prom_eth_cip_opal_candidates`.
 - Do not invent feature-matrix or downstream campaign readiness when the
   checked-in study record does not declare it.
+- Do not let LatentDNA appendix/native review state block OPAL readiness after
+  candidate X has been selected and the candidate table is materialized.
 - If `operations/ops.study.yaml` declares default notify-enabled Infer presets as the
   submit-readiness contract, keep those environment, profile, and plan blockers
   explicit.

@@ -2,7 +2,7 @@
 name: stress-ethanol-cipro-growth-status
 description: Report record-backed status for stress_ethanol_cipro_growth. Use for current phase, active datasets, preflight, or LatentDNA/OPAL handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 1.0.4
+  version: 1.0.6
   category: workflow-automation
   tags: [studies, stress-ethanol-cipro-growth, status, routes, preflight]
 ---
@@ -22,11 +22,22 @@ In scope:
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`
 - one-hop routing through `docs/studies/stress_ethanol_cipro_growth/routes/README.md`,
   with OPAL and LatentDNA detail under `docs/studies/stress_ethanol_cipro_growth/routes/`
+- OPAL candidate-table and DenseGen axis-probe context pages linked from the
+  OPAL route after that route is selected
 
 Out of scope:
 - family-level or cross-study status routing
 - status for `regulondb_native_promoter_panel` or any other study
 - reconstructing current state from workspaces when the checked-in record is missing
+
+## Success Criteria
+
+- Status answers come from the checked-in study record and OPS provider.
+- Missing or mismatched study ids fail visibly instead of being reconstructed
+  from workspace scratch outputs.
+- OPAL and LatentDNA details stay behind the one-hop route map.
+- Preflight evidence is machine-readable JSON when blocker/readiness state is
+  requested.
 
 ## Workflow
 
@@ -77,3 +88,4 @@ Should not trigger:
 - [refresh-loop.md](references/refresh-loop.md)
 - [study-surfaces.md](references/study-surfaces.md)
 - [external-sources.md](references/external-sources.md)
+- [test-matrix.md](references/test-matrix.md)

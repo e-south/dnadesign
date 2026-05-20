@@ -1,0 +1,84 @@
+"""Study-owned DenseGen axis OPAL probe package."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+STUDY_ID = "stress_ethanol_cipro_growth"
+ORACLE_ID = "densegen_part_axis_vec8_v0"
+NULL_ORACLE_ID = "permuted_densegen_part_axis_vec8_v0"
+DEFAULT_SEED = 7
+DEFAULT_BUDGET = 96
+DEFAULT_TOP_K = 6
+RUN_STAGES = ("materialize", "validate", "init", "ingest", "run", "status")
+
+STATE_ORDER = ("baseline_or_no_stress", "ethanol", "ciprofloxacin", "ethanol_plus_ciprofloxacin")
+SFXI_STATE_COLUMNS = ("v00", "v10", "v01", "v11")
+SFXI_INTENSITY_COLUMNS = ("y00_star", "y10_star", "y01_star", "y11_star")
+
+AXIS_CLASS_TO_LOGIC4: dict[str, list[int]] = {
+    "background_only": [0, 0, 0, 0],
+    "ethanol_only": [0, 1, 0, 1],
+    "cipro_only": [0, 0, 1, 1],
+    "dual_axis_and": [0, 0, 0, 1],
+}
+
+PLAN_TO_AXIS_CLASS: dict[str, str] = {
+    "background_only": "background_only",
+    "ethanol": "ethanol_only",
+    "ciprofloxacin": "cipro_only",
+    "ethanol_ciprofloxacin": "dual_axis_and",
+}
+
+CAMPAIGNS: dict[str, dict[str, Any]] = {
+    "cipro": {
+        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml",
+        "base_slug": "stress_eth_cip_cipro_rf_sfxi_topn",
+        "target_class": "cipro_only",
+        "target_vec8": [0, 0, 1, 1, 0, 0, 1, 1],
+    },
+    "ethanol": {
+        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml",
+        "base_slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+        "target_class": "ethanol_only",
+        "target_vec8": [0, 1, 0, 1, 0, 1, 0, 1],
+    },
+    "dual": {
+        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml",
+        "base_slug": "stress_eth_cip_and_rf_sfxi_topn",
+        "target_class": "dual_axis_and",
+        "target_vec8": [0, 0, 0, 1, 0, 0, 0, 1],
+    },
+}
+
+SPLITS = ("random_id", "leave_sigma35_variant")
+ORACLES = (ORACLE_ID, NULL_ORACLE_ID)
+
+CANDIDATE_RECORDS = Path("src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet")
+DENSEGEN_SIDECAR = Path("src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor/_derived/densegen.parquet")
+SHARED_OBSERVED_LABEL_SIDECAR = Path(
+    "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/observed_labels.parquet"
+)
+RUN_ROOT_PREFIX = Path(".var") / "studies" / STUDY_ID / "opal_densegen_axis_probe"
+X_COLUMN = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+SCRATCH_DATASET = "opal_densegen_axis_probe_candidates"
+
+FORBIDDEN_PREFIXES = ("latentdna__", "infer__")
+FORBIDDEN_EXACT_COLUMNS = {
+    "umap_x",
+    "umap_y",
+    "cluster",
+    "cluster_label",
+    "opal_prediction",
+    "opal_selection",
+}
+
+QUALITY_FLAGS = (
+    "ok",
+    "missing_used_tfbs_detail",
+    "malformed_used_tfbs_detail",
+    "missing_sigma35_variant",
+    "plan_axis_mismatch",
+    "unsupported_plan",
+)

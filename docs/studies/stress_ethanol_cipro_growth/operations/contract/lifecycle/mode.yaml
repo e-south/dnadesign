@@ -16,8 +16,9 @@ phase_order:
 - infer_reference_context_reverse_complement_seq_and_anchor_mean_7b
 - infer_reference_views_7b
 - latentdna_reference_normalization_audit
+- opal_candidate_table_pre_assay
 - infer_anchor_only_20b
 - infer_anchor_plus_template_20b
 current_phase:
   strategy: explicit
-  id: latentdna_reference_normalization_audit
+  id: opal_candidate_table_pre_assay

@@ -23,6 +23,7 @@ import yaml
 
 from dnadesign.opal import validate_x_parquet_column
 
+EXPECTED_OPAL_CANDIDATE_ROLE = "opal_candidate_feature_table"
 REQUIRED_OPAL_COLUMNS: tuple[str, ...] = ("id", "bio_type", "sequence", "alphabet")
 VIEW_PROVENANCE_COLUMNS: tuple[str, ...] = ("source_class", "design_family")
 DENSEGEN_KEY_COLUMNS: tuple[str, ...] = (
@@ -73,6 +74,11 @@ def _normal_text(value: Any) -> str:
     if _is_missing(value):
         return ""
     return str(value).strip()
+
+
+def _blank_text_mask(series: pd.Series) -> pd.Series:
+    text = series.astype("string").str.strip()
+    return text.isna() | text.eq("")
 
 
 def _read_required_parquet(path: str | Path, *, label: str, columns: list[str] | None = None) -> pd.DataFrame:
@@ -140,7 +146,7 @@ def _validate_required_opal_values(records: pd.DataFrame, *, label: str) -> None
     if missing_columns:
         raise ValueError(f"{label} missing required OPAL columns: {missing_columns}")
     for column in REQUIRED_OPAL_COLUMNS:
-        missing_mask = records[column].map(lambda value: not _normal_text(value))
+        missing_mask = _blank_text_mask(records[column])
         if missing_mask.any():
             if column == "id":
                 sample = records.index[missing_mask].tolist()[:5]
@@ -149,22 +155,73 @@ def _validate_required_opal_values(records: pd.DataFrame, *, label: str) -> None
             raise ValueError(f"{label} required column {column!r} has null/blank values (sample_ids={sample_ids})")
 
 
-def _validate_candidate_provenance_values(records: pd.DataFrame) -> None:
+def _allowed_value_set(values: Sequence[str] | None) -> set[str] | None:
+    if values is None:
+        return None
+    allowed = {_normal_text(value) for value in values if _normal_text(value)}
+    if not allowed:
+        raise ValueError("candidate feature table allowed provenance values must not be empty")
+    return allowed
+
+
+def _validate_column_allowed_values(records: pd.DataFrame, *, column: str, allowed_values: set[str] | None) -> None:
+    if allowed_values is None:
+        return
+    values = records[column].astype("string").str.strip()
+    bad_mask = ~values.isin(sorted(allowed_values))
+    if bad_mask.any():
+        sample_values = sorted({str(value) for value in values[bad_mask].dropna().head(5).tolist()})
+        sample_ids = records.loc[bad_mask, "id"].astype(str).tolist()[:5]
+        raise ValueError(
+            f"candidate feature table provenance column {column!r} contains values outside "
+            f"{sorted(allowed_values)} (sample_values={sample_values}, sample_ids={sample_ids})"
+        )
+
+
+def _validate_required_null_columns(records: pd.DataFrame, *, columns: Sequence[str]) -> None:
+    for column in columns:
+        non_null_mask = ~_blank_text_mask(records[column])
+        if non_null_mask.any():
+            sample_ids = records.loc[non_null_mask, "id"].astype(str).tolist()[:5]
+            raise ValueError(
+                f"candidate feature table provenance column {column!r} must be null/blank "
+                f"for the OPAL candidate universe (sample_ids={sample_ids})"
+            )
+
+
+def _validate_candidate_provenance_values(
+    records: pd.DataFrame,
+    *,
+    allowed_source_classes: Sequence[str] | None = None,
+    allowed_design_families: Sequence[str] | None = None,
+    required_null_provenance_columns: Sequence[str] = (),
+) -> None:
     for column in REQUIRED_NON_NULL_CANDIDATE_PROVENANCE_COLUMNS:
-        missing_mask = records[column].map(lambda value: not _normal_text(value))
+        missing_mask = _blank_text_mask(records[column])
         if missing_mask.any():
             sample_ids = records.loc[missing_mask, "id"].astype(str).tolist()[:5]
             raise ValueError(
                 f"candidate feature table provenance column {column!r} has null/blank values (sample_ids={sample_ids})"
             )
 
-    bad_role = records["opal_candidate__role"].astype(str) != "opal_candidate_feature_table"
+    bad_role = records["opal_candidate__role"].astype(str) != EXPECTED_OPAL_CANDIDATE_ROLE
     if bad_role.any():
         sample_ids = records.loc[bad_role, "id"].astype(str).tolist()[:5]
         raise ValueError(
             "candidate feature table provenance column 'opal_candidate__role' must be "
-            f"'opal_candidate_feature_table' (sample_ids={sample_ids})"
+            f"'{EXPECTED_OPAL_CANDIDATE_ROLE}' (sample_ids={sample_ids})"
         )
+    _validate_column_allowed_values(
+        records,
+        column="opal_candidate__source_class",
+        allowed_values=_allowed_value_set(allowed_source_classes),
+    )
+    _validate_column_allowed_values(
+        records,
+        column="opal_candidate__design_family",
+        allowed_values=_allowed_value_set(allowed_design_families),
+    )
+    _validate_required_null_columns(records, columns=required_null_provenance_columns)
 
 
 def _validate_required_opal_table_values(table: pa.Table, *, label: str) -> None:
@@ -178,10 +235,17 @@ def validate_candidate_feature_table(
     *,
     records_path: str | Path,
     x_column: str,
+    expected_rows: int | None = None,
+    allowed_source_classes: Sequence[str] | None = None,
+    allowed_design_families: Sequence[str] | None = None,
+    required_null_provenance_columns: Sequence[str] = (),
     view_rows_path: str | Path | None = None,
     view_row_id_column: str = "construct__anchor_id",
 ) -> dict[str, int]:
     """Validate the OPAL candidate feature table contract."""
+
+    if expected_rows is not None and int(expected_rows) <= 0:
+        raise ValueError("candidate feature table expected_rows must be a positive integer")
 
     parquet_path = Path(records_path)
     if not parquet_path.exists():
@@ -191,18 +255,36 @@ def validate_candidate_feature_table(
     except Exception as exc:
         raise ValueError(f"failed to read candidate feature table schema at {parquet_path}: {exc}") from exc
 
-    required_columns = (*REQUIRED_OPAL_COLUMNS, *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS, x_column)
+    required_null_columns = tuple(dict.fromkeys(str(column) for column in required_null_provenance_columns))
+    required_columns = (
+        *REQUIRED_OPAL_COLUMNS,
+        *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS,
+        *required_null_columns,
+        x_column,
+    )
     missing = [column for column in required_columns if column not in schema_names]
     if missing:
         raise ValueError(f"candidate feature table missing required columns: {missing}")
 
+    records_columns = list(
+        dict.fromkeys((*REQUIRED_OPAL_COLUMNS, *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS, *required_null_columns))
+    )
     records = _read_required_parquet(
         parquet_path,
         label="candidate feature table records_path",
-        columns=[*REQUIRED_OPAL_COLUMNS, *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS],
+        columns=records_columns,
     )
+    if expected_rows is not None and int(len(records)) != int(expected_rows):
+        raise ValueError(
+            f"candidate feature table row count {len(records)} does not equal expected {int(expected_rows)}"
+        )
     _validate_required_opal_values(records, label="candidate feature table")
-    _validate_candidate_provenance_values(records)
+    _validate_candidate_provenance_values(
+        records,
+        allowed_source_classes=allowed_source_classes,
+        allowed_design_families=allowed_design_families,
+        required_null_provenance_columns=required_null_columns,
+    )
     ids = records["id"].astype(str)
     if ids.duplicated().any():
         sample = ids[ids.duplicated()].unique().tolist()[:5]
@@ -263,6 +345,47 @@ def _configured_view_row_id_column(config: Mapping[str, Any]) -> str:
     return "construct__anchor_id"
 
 
+def _configured_expected_rows(config: Mapping[str, Any]) -> int | None:
+    candidate_table = _candidate_table_config(config)
+    raw_rows = candidate_table.get("expected_rows")
+    if raw_rows is None:
+        return None
+    if isinstance(raw_rows, bool) or not isinstance(raw_rows, int) or raw_rows <= 0:
+        raise ValueError("candidate_feature_table.expected_rows must be a positive integer")
+    return int(raw_rows)
+
+
+def _configured_allowed_source_classes(config: Mapping[str, Any]) -> tuple[str, ...] | None:
+    materialization = _candidate_table_config(config).get("materialization")
+    if not isinstance(materialization, Mapping):
+        return None
+    values = materialization.get("include_source_class")
+    if values is None:
+        return None
+    return tuple(_normal_text(value) for value in values if _normal_text(value))
+
+
+def _configured_allowed_design_families(config: Mapping[str, Any]) -> tuple[str, ...] | None:
+    materialization = _candidate_table_config(config).get("materialization")
+    if not isinstance(materialization, Mapping):
+        return None
+    values = materialization.get("allowed_design_families")
+    if values is None:
+        return None
+    return tuple(_normal_text(value) for value in values if _normal_text(value))
+
+
+def _configured_required_null_provenance_columns(config: Mapping[str, Any]) -> tuple[str, ...]:
+    materialization = _candidate_table_config(config).get("materialization")
+    if not isinstance(materialization, Mapping):
+        return ()
+    return tuple(
+        f"opal_candidate__{_normal_text(column)}"
+        for column in materialization.get("exclude_non_null_columns") or ()
+        if _normal_text(column)
+    )
+
+
 def _configured_candidate_feature_table_ids(config: Mapping[str, Any], *, repo_root: str | Path) -> set[str]:
     records = _read_required_parquet(
         _configured_records_path(config, repo_root=repo_root),
@@ -311,6 +434,10 @@ def validate_configured_candidate_feature_table(config: Mapping[str, Any], *, re
     return validate_candidate_feature_table(
         records_path=_resolve_repo_path(root, records_path),
         x_column=x_column,
+        expected_rows=_configured_expected_rows(config),
+        allowed_source_classes=_configured_allowed_source_classes(config),
+        allowed_design_families=_configured_allowed_design_families(config),
+        required_null_provenance_columns=_configured_required_null_provenance_columns(config),
         view_rows_path=_configured_view_rows_path(config, repo_root=root),
         view_row_id_column=_configured_view_row_id_column(config),
     )
@@ -600,18 +727,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Materialize the OPAL candidate feature table.")
     parser.add_argument("--config", default=Path(__file__).with_name("sampling.yaml"), type=Path)
     parser.add_argument("--repo-root", type=Path, default=None)
+    parser.add_argument("--validate-existing", action="store_true", help="Validate the configured records.parquet.")
     parser.add_argument("--write", action="store_true", help="Write records.parquet; default is dry-run only.")
     parser.add_argument("--chunk-size", type=int, default=512, help="Rows per parquet write chunk.")
     args = parser.parse_args(argv)
+    if args.validate_existing and args.write:
+        parser.error("--validate-existing cannot be combined with --write")
 
     config = _load_sampling_config(args.config)
     repo_root = args.repo_root or _repo_root_from(args.config)
-    report = materialize_configured_candidate_feature_table(
-        config,
-        repo_root=repo_root,
-        write=bool(args.write),
-        chunk_size=int(args.chunk_size),
-    )
+    if args.validate_existing:
+        report: dict[str, Any] = {
+            "mode": "validate_existing",
+            **validate_configured_candidate_feature_table(config, repo_root=repo_root),
+        }
+    else:
+        report = materialize_configured_candidate_feature_table(
+            config,
+            repo_root=repo_root,
+            write=bool(args.write),
+            chunk_size=int(args.chunk_size),
+        )
     print(json.dumps(report, sort_keys=True))
     return 0
 

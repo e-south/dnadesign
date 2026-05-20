@@ -468,6 +468,178 @@ def test_build_stress_ethanol_cipro_growth_preflight_progress_uses_only_contract
     ]
 
 
+def test_build_stress_ethanol_cipro_growth_preflight_progress_blocks_latentdna_semantic_attention(
+    tmp_path: Path,
+) -> None:
+    contract = StudyOpsContract(
+        study_id="demo_study",
+        status_kind="stress-ethanol-cipro-growth-status",
+        preflight_kind="stress-ethanol-cipro-growth-preflight",
+        phase_order=("latentdna_reference_normalization_audit",),
+        snapshot_summary_scope="repo",
+        preflight=StudyPreflightContract(
+            default_scope="next",
+            group_phase_bindings={"latentdna": "latentdna_reference_normalization_audit"},
+            next_scope=StudyPreflightNextScopeContract(
+                target_phase_groups={"latentdna_reference_normalization_audit": ("latentdna",)},
+                runtime_phase_groups=(),
+                runtime_shared_groups=(),
+            ),
+        ),
+        current_phase_id="latentdna_reference_normalization_audit",
+        phases=(StudyPhaseContract(id="latentdna_reference_normalization_audit", status="in_progress"),),
+        raw_payload={},
+    )
+
+    state, summary, evidence = build_stress_ethanol_cipro_growth_preflight_progress(
+        context=StressEthanolCiproGrowthPreflightResolvedContext(
+            contract=contract,
+            study_id="demo_study",
+            study_repo_root=tmp_path,
+            resolved_study_dir=tmp_path / "docs" / "studies" / "demo_study",
+            study_pipeline={},
+            execution_surface_index={},
+            dataset_index={},
+            phase_states=tuple(phase.as_dict() for phase in contract.phases),
+            current_phase="latentdna_reference_normalization_audit",
+            next_ready_phase=None,
+            dataset_refresh_states=(),
+            infer_runtime=SimpleNamespace(
+                preferred_model_family=None,
+                supported_model_families=(),
+                infer_notify_profile_paths={},
+                infer_notify_profile_errors={},
+            ),
+            infer_phase_targets={},
+            scope_plan=SimpleNamespace(
+                scope="next",
+                target_phase_id="latentdna_reference_normalization_audit",
+                included_groups=("latentdna",),
+                phase_scoped_groups=("latentdna",),
+            ),
+            latentdna_readiness={
+                "configured": True,
+                "state": "attention",
+                "summary": "LatentDNA primary readiness attention: missing source aliases: reference_core60",
+                "missing_source_datasets": ["reference_core60"],
+                "missing_decision_deliverables": [],
+                "pending_deliverables": [],
+                "missing_appendix_source_datasets": [],
+                "appendix_state": "ok",
+                "snapshot_ref": "workspace_snapshot.json",
+                "workspace_id": "demo_study",
+            },
+        ),
+        evidence={},
+        dependencies=StressEthanolCiproGrowthPreflightCoordinatorDependencies(
+            run_preflight_command=lambda argv, *, cwd, timeout_seconds=180: _execution(
+                tuple(argv),
+                cwd,
+                returncode=0,
+            ),
+            safe_json_loads=lambda text: {"ok": True} if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+            environ={},
+        ),
+    )
+
+    assert state == "attention"
+    assert "blocked by: latentdna.readiness.semantic" in summary
+    assert evidence["blocked_by"] == ["latentdna.readiness.semantic"]
+    checks = {check["id"]: check for check in evidence["checks"]}
+    assert checks["latentdna.readiness.semantic"]["state"] == "attention"
+    assert checks["latentdna.readiness.semantic"]["details"]["missing_source_datasets"] == ["reference_core60"]
+    assert checks["latentdna.readiness.semantic"]["details"]["missing_appendix_source_datasets"] == []
+
+
+def test_build_stress_ethanol_cipro_growth_preflight_progress_treats_latentdna_appendix_drift_as_nonblocking(
+    tmp_path: Path,
+) -> None:
+    contract = StudyOpsContract(
+        study_id="demo_study",
+        status_kind="stress-ethanol-cipro-growth-status",
+        preflight_kind="stress-ethanol-cipro-growth-preflight",
+        phase_order=("latentdna_reference_normalization_audit",),
+        snapshot_summary_scope="repo",
+        preflight=StudyPreflightContract(
+            default_scope="next",
+            group_phase_bindings={"latentdna": "latentdna_reference_normalization_audit"},
+            next_scope=StudyPreflightNextScopeContract(
+                target_phase_groups={"latentdna_reference_normalization_audit": ("latentdna",)},
+                runtime_phase_groups=(),
+                runtime_shared_groups=(),
+            ),
+        ),
+        current_phase_id="latentdna_reference_normalization_audit",
+        phases=(StudyPhaseContract(id="latentdna_reference_normalization_audit", status="in_progress"),),
+        raw_payload={},
+    )
+
+    state, summary, evidence = build_stress_ethanol_cipro_growth_preflight_progress(
+        context=StressEthanolCiproGrowthPreflightResolvedContext(
+            contract=contract,
+            study_id="demo_study",
+            study_repo_root=tmp_path,
+            resolved_study_dir=tmp_path / "docs" / "studies" / "demo_study",
+            study_pipeline={},
+            execution_surface_index={},
+            dataset_index={},
+            phase_states=tuple(phase.as_dict() for phase in contract.phases),
+            current_phase="latentdna_reference_normalization_audit",
+            next_ready_phase=None,
+            dataset_refresh_states=(),
+            infer_runtime=SimpleNamespace(
+                preferred_model_family=None,
+                supported_model_families=(),
+                infer_notify_profile_paths={},
+                infer_notify_profile_errors={},
+            ),
+            infer_phase_targets={},
+            scope_plan=SimpleNamespace(
+                scope="next",
+                target_phase_id="latentdna_reference_normalization_audit",
+                included_groups=("latentdna",),
+                phase_scoped_groups=("latentdna",),
+            ),
+            latentdna_readiness={
+                "configured": True,
+                "state": "ok",
+                "summary": "LatentDNA primary readiness ok.",
+                "missing_source_datasets": [],
+                "missing_decision_deliverables": [],
+                "pending_deliverables": [],
+                "missing_appendix_source_datasets": ["regulondb_native_core60"],
+                "appendix_state": "attention",
+                "snapshot_ref": "workspace_snapshot.json",
+                "workspace_id": "demo_study",
+            },
+        ),
+        evidence={},
+        dependencies=StressEthanolCiproGrowthPreflightCoordinatorDependencies(
+            run_preflight_command=lambda argv, *, cwd, timeout_seconds=180: _execution(
+                tuple(argv),
+                cwd,
+                returncode=0,
+            ),
+            safe_json_loads=lambda text: {"ok": True} if text else None,
+            choose_command_summary=lambda *_args, fallback, **_kwargs: fallback,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+            environ={},
+        ),
+    )
+
+    assert state == "ok"
+    assert "ready" in summary
+    assert evidence["blocked_by"] == []
+    checks = {check["id"]: check for check in evidence["checks"]}
+    assert checks["latentdna.readiness.semantic"]["state"] == "ok"
+    assert checks["latentdna.readiness.semantic"]["details"]["missing_source_datasets"] == []
+    assert checks["latentdna.readiness.semantic"]["details"]["missing_appendix_source_datasets"] == [
+        "regulondb_native_core60"
+    ]
+
+
 def test_build_stress_ethanol_cipro_growth_preflight_progress_resolves_command_cwd_from_resolved_study_dir(
     tmp_path: Path,
 ) -> None:

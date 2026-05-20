@@ -32,8 +32,10 @@ materialization; missing, duplicate, or null sidecar rows are hard failures.
   create candidate rows.
 - Do not mint one USR dataset per campaign unless a campaign needs a distinct
   candidate universe, a distinct `X`, or a distinct data-validation contract.
-- LatentDNA owns the evidence for selecting `X`; the study owns materializing
-  the table; OPAL owns round state, scoring, active selection, and ledgers.
+- LatentDNA owns the completed evidence for selecting `X`; the study owns
+  materializing the table; OPAL owns round state, scoring, active selection,
+  and ledgers. RegulonDB/native appendix views are review context, not OPAL
+  readiness inputs.
 
 ### Target Label Contract
 

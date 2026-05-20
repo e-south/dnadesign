@@ -3,20 +3,20 @@ doc_id: study-stress-ethanol-cipro-growth-route-analysis-latentdna
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-05-18
+last_verified: 2026-05-19
 parent_route: ../README.md
 type: route
 plane: data-plane
 owner_boundary: latentdna
 surface_role: downstream-analysis
-current_state: attention
+current_state: x_selected_appendix_optional
 entry_artifact: infer_sequence_view_sidecars
 exit_artifact: latentdna_reference_normalization_audit_surfaces
 ---
 
 ## LatentDNA Route Detail
 
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-19
 
 Use this only after `routes/README.md` selects the LatentDNA comparison
 surface. Keep status questions in `../../record/status.md` or `ops progress`.
@@ -27,10 +27,10 @@ surface. Keep status questions in `../../record/status.md` or `ops progress`.
 - Plane: `data-plane`
 - Surface role: `downstream-analysis`
 - Owner-boundary: `latentdna`
-- Current state: `attention`; generated view rows, plots, notebook outputs,
-  and candidate-X scorecard are available, but `design_structure_summary` and
-  `sigma35_ordinal_audit` remain pending before the full primary review path is
-  current.
+- Current state: `x_selected_appendix_optional`; generated view rows, plots,
+  notebook outputs, and the candidate-X scorecard are available. The selected
+  OPAL X is fixed for the current pre-assay handoff; appendix-native review
+  surfaces remain interpretive and nonblocking for OPAL.
 - Binding file: `docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml`
 - Primary doc: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
 - Workspace: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/README.md`
@@ -72,13 +72,19 @@ surface. Keep status questions in `../../record/status.md` or `ops progress`.
 - The preferred infer family is now `evo2_7b`; 20B is a comparison lane, not the default browser gate.
 - Sigma-35 ordinal interpretation follows the reverse-alphabetical promoter
   ladder on the active subset: `f > e > d > c > b`.
-- Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`
+- OPAL handoff X-selection state: complete for
+  `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
+- Snapshot attention surfaces: appendix-native review only; primary
+  candidate-X readiness is complete for the OPAL pre-assay handoff.
 
 ### Appendix Boundaries
 
 - `native_tf_axis_orientation_audit` is the BaeR/CpxR/LexA regulator landmark
   audit over the existing `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
   view. It is not an OPAL input.
+- RegulonDB native promoter/core60 sources are appendix review sources. They
+  should not be listed as primary LatentDNA readiness sources and should not
+  block OPAL candidate-table or campaign readiness.
 - BioCyc GO sidecars support regulator interpretation in appendix enrichment
   surfaces. They are source-backed annotation sidecars, not phenotype labels
   and not OPAL candidate-selection inputs.

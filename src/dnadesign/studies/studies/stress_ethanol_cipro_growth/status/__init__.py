@@ -1,15 +1,9 @@
-from .ops.provider import (
-    provide_stress_ethanol_cipro_growth_preflight,
-    provide_stress_ethanol_cipro_growth_status,
-)
-from .service import (
-    STUDY_STATUS_SERVICE,
-    StressEthanolCiproGrowthStatusService,
-)
+"""Status package for the stress_ethanol_cipro_growth study.
 
-__all__ = [
-    "StressEthanolCiproGrowthStatusService",
-    "STUDY_STATUS_SERVICE",
-    "provide_stress_ethanol_cipro_growth_preflight",
-    "provide_stress_ethanol_cipro_growth_status",
-]
+Import concrete submodules directly. The package root intentionally exports no
+service or provider facade so OPS registry imports stay metadata-cheap.
+"""
+
+from __future__ import annotations
+
+__all__: list[str] = []

@@ -38,6 +38,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Candidate table and label-source semantics:
   `../../../contexts/opal/candidate-table.md`
+- Scratch synthetic-oracle probe:
+  `../../../contexts/opal/densegen-axis-probe-v0.md`
 - Campaign configs and commands: `campaign-commands.md`
 
 ### Candidate Table Contract
@@ -47,6 +49,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - Candidate universe: dense generated promoters only; archive SFXI, native,
   reference, and control rows remain review context.
 - X column: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
+- X-selection state: LatentDNA selected this pre-assay X; RegulonDB/native
+  appendix visualizations do not gate OPAL campaign readiness.
 - Shared labels: `_opal/observed_labels.parquet` under the candidate table
   dataset.
 
@@ -57,8 +61,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   `opal_batch0.provenance` to verify that DenseGen sidecar resolution is
   complete by `id`.
 - For transient simulation campaigns that must not mutate shared USR records,
-  copy the candidate table into a campaign-local `records.parquet` and use
-  `data.location.kind: local`.
+  copy the candidate table into an isolated local data root. If the campaign
+  uses `labels.source.kind: usr_sidecar`, configure a scratch USR root with
+  `data.location.kind: usr`; otherwise use a campaign-local `records.parquet`
+  with `data.location.kind: local`.
 - If pruning shared USR records, use campaign-scoped pruning only. Broad OPAL
   namespace cleanup can delete other campaign columns.
 - The OPAL notebook is the campaign-specific artifact viewer for records,

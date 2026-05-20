@@ -107,6 +107,10 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert latentdna_binding["source_datasets"]["reference_native"] == "usr_promoter_references"
     assert latentdna_binding["source_datasets"]["reference_core60"] == "construct_prom_eth_cip_reference_core60"
     assert latentdna_binding["source_datasets"]["reference_contexts"] == "construct_prom_eth_cip_reference_contexts"
+    assert latentdna_binding["appendix_source_datasets"] == {
+        "regulondb_native_promoters": "usr_regulondb_native_promoters",
+        "regulondb_native_core60": "usr_regulondb_native_promoter_core60",
+    }
     assert (
         latentdna_binding["default_geometry_inventory"]["working_candidate"]
         == "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
@@ -154,7 +158,8 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "sigma35_centroid_distance_gallery" in study_latentdna_route
     assert "sigma35_stress_margin_gallery" in study_latentdna_route
     assert "context_pair_summary" in study_latentdna_route
-    assert "Snapshot attention surfaces: `design_structure_summary`, `sigma35_ordinal_audit`" in study_latentdna_route
+    assert "candidate-X readiness is complete for the OPAL pre-assay handoff" in study_latentdna_route
+    assert "RegulonDB native promoter/core60 sources are appendix review sources" in study_latentdna_route
     assert (
         "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`"
         in study_latentdna_route
@@ -172,8 +177,10 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "not as native bidirectional encodings" in study_latentdna_route
     assert "eight canonical 7B+20B" not in study_latentdna_route
 
-    assert "The study phase is `infer_batch_preparation`" in study_status
+    assert "Declared phase: `opal_candidate_table_pre_assay`" in study_status
+    assert "RegulonDB/native appendix visualization no longer gates OPAL readiness" in study_status
     assert "Current LatentDNA decision surfaces:" in study_status
+    assert "LatentDNA X-selection: `complete`" in study_status
     assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_status
     assert "Preferred infer family: `evo2_7b`" in study_status
     assert "Supported infer families: `evo2_7b`, `evo2_20b`" in study_status

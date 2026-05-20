@@ -6,3 +6,5 @@ Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
 
 - [Candidate table](candidate-table.md): shared USR candidate-table and label
   source contract.
+- [DenseGen axis probe v0](densegen-axis-probe-v0.md): scratch-only
+  synthetic-oracle probe for OPAL/LatentDNA readiness.

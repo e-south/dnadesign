@@ -6,7 +6,7 @@
 **Entry artifact:** `docs/studies/stress_ethanol_cipro_growth/` plus the study-owned execution surfaces declared in `operations/ops.study.yaml`
 **Exit artifact:** a read-only command-level readiness summary for this study
 **Registry-id:** studies.stress-ethanol-cipro-growth.preflight
-**Summary:** Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+**Summary:** Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL candidate-table surfaces.
 **Execution-kind:** iterative
 **Status-kind:** stress-ethanol-cipro-growth-preflight
 
@@ -40,5 +40,16 @@ cursors, or infer a hidden readiness graph from generic runbooks.
 `--scope next` uses the study-owned lifecycle contract to focus the next
 actionable phase and defer later-lane blockers. `--scope full` reports the full
 declared suite.
+
+The LatentDNA phase uses the study-owned semantic check
+`latentdna.readiness.semantic` for primary X-selection readiness fields such as
+`missing_source_datasets`, `missing_decision_deliverables`, and
+`pending_deliverables`. Appendix-only RegulonDB/native review sources are
+reported as appendix drift, not OPAL blockers.
+
+The current main-path `--scope next` focus is `opal_candidate_table_pre_assay`.
+That readiness gate validates `usr_prom_eth_cip_opal_candidates` and its
+selected fixed-length X column without depending on LatentDNA appendix
+visualizations.
 
 Use [routes](../../../routes/README.md) for the owner handoff after blockers are clear.

@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-05-14
+- Last verified: 2026-05-19
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -8,7 +8,7 @@
 - LatentDNA binding: `../contexts/latentdna/binding.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: current after local pull from BU SCC `cluster`
-- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete for the expanded RegulonDB-native audit quota, so the next execution-readiness question is downstream LatentDNA review or optional DenseGen plot refresh, not GPU Infer submission.
+- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete. The next main-path readiness question is the OPAL candidate feature table and pre-assay campaign handoff, not GPU Infer submission or RegulonDB-native appendix visualization.
 
 ### Current Datasets
 
@@ -29,8 +29,8 @@
 
 ### Current Phase
 
-- Declared phase: `latentdna_reference_normalization_audit`
-- Superseded note: previous study prose said, "The study phase is `infer_batch_preparation`"; current local status has advanced to `latentdna_reference_normalization_audit` after the completed 7B Infer sidecar refresh.
+- Declared phase: `opal_candidate_table_pre_assay`
+- Superseded note: previous study prose treated `latentdna_reference_normalization_audit` as the current main-path phase. LatentDNA has selected the working pre-assay X, so RegulonDB/native appendix visualization no longer gates OPAL readiness.
 - DenseGen growth: `parallel_optional`
 - Merged anchor set: `complete`
 - Construct context expansion: `complete`
@@ -39,14 +39,14 @@
 - Supported infer families: `evo2_7b`, `evo2_20b`
 - Secondary/debug-required family: `evo2_20b`
 - LatentDNA browser default family: `evo2_7b`
-- Current next surface: `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
+- Current next surface: `docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md`
 - Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
 - Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
 - Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
 
-The study is still pre-assay representation triage. LatentDNA has promoted a
-working pre-assay candidate `X` for downstream planning, but it has not promoted
-a phenotype-validated final `X`.
+Pre-assay representation triage has selected the current OPAL `X`. It is not a
+phenotype-validated final representation, but it is the chosen fixed-length
+input for the next OPAL active-learning handoff.
 
 ### Current Infer Coverage
 
@@ -75,7 +75,7 @@ Completed 7B sidecar lanes:
 ### Current Downstream Posture
 
 - DenseGen analysis surface: `attention`; the source dataset is ready, but the operator-visible plot inventory contains stale artifacts and should be refreshed before relying on DenseGen plots as current.
-- LatentDNA: `attention`; the native TF-axis route is configured as a first-class appendix overlay over the existing study context view, and local view rows/plots/notebook outputs have been regenerated, but `design_structure_summary` and `sigma35_ordinal_audit` remain pending before the full primary review path is current.
+- LatentDNA X-selection: `complete`; `intermediate_embedding_7b_context_anchor_mean_bidir_concat` is the selected pre-assay X for the OPAL candidate table.
 - LatentDNA native TF-axis overlay: `current`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
 - RegulonDB functional annotation sidecars: `current`; `usr_regulondb_native_promoters/_relations/` now carries BioCyc KB 29.6 regulator GO terms, promoter-regulator-GO term rows, and regulator coverage rows. LatentDNA now has a separate BioCyc GO biological-process appendix plot that reuses the native plan-margin tail tables for interpretation. These are source-backed annotation sidecars, not OPAL inputs or mechanistic labels.
 - Cluster: `planned`; use `../routes/README.md` for the current exploratory-clustering handoff.
@@ -102,5 +102,5 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
 - Keep `native_tf_axis_orientation_audit` as an appendix axis-orientation audit: the current generated test supports the LexA/cipro direction and does not support the BaeR/CpxR ethanol direction.
 - Use the BioCyc GO sidecars only for source-backed regulator interpretation in appendix enrichment surfaces; keep downstream claims at the level of RegulonDB-associated regulator terms.
 - If a linear readout/probe audit is added later, make it a LatentDNA appendix diagnostic with fold-safe preprocessing and no OPAL coupling.
-- Re-run `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` after regeneration and confirm the LatentDNA attention flag clears or is still explained by a concrete generated-artifact gap.
+- Re-run `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` after candidate-table or campaign-state changes and confirm OPAL readiness remains tied to `usr_prom_eth_cip_opal_candidates`, not LatentDNA appendix artifacts.
 - Refresh DenseGen plots/notebook if operator-visible DenseGen EDA is needed for current study interpretation.

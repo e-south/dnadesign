@@ -705,6 +705,128 @@ def test_build_stress_ethanol_cipro_growth_status_surfaces_configured_latentdna_
     assert "LatentDNA readiness is not ok" in evidence["attention_reasons"]
 
 
+def test_build_stress_ethanol_cipro_growth_status_surfaces_missing_latentdna_sources_in_summary(
+    tmp_path: Path,
+) -> None:
+    study_context = replace(
+        _make_study_context(tmp_path),
+        densegen_row_target=8,
+        densegen_row_gap=0,
+    )
+    status_context = StressEthanolCiproGrowthStatusResolvedContext(
+        infer_runtime=StressEthanolCiproGrowthInferRuntimeResolvedContext(
+            preferred_model_family="evo2_7b",
+            supported_model_families=("evo2_7b",),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+    latentdna_state = {
+        "configured": True,
+        "state": "attention",
+        "summary": "LatentDNA primary readiness attention: missing source aliases: reference_core60",
+        "missing_source_datasets": ["reference_core60"],
+        "missing_appendix_source_datasets": ["regulondb_native_core60"],
+        "appendix_state": "attention",
+    }
+
+    state, summary, evidence = build_stress_ethanol_cipro_growth_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=StressEthanolCiproGrowthStatusDependencies(
+            infer_runtime=StressEthanolCiproGrowthInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_latentdna_readiness=lambda **kwargs: latentdna_state,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "attention"
+    assert "missing source aliases: reference_core60" in summary
+    assert evidence["latentdna"]["missing_source_datasets"] == ["reference_core60"]
+    assert evidence["latentdna"]["missing_appendix_source_datasets"] == ["regulondb_native_core60"]
+
+
+def test_build_stress_ethanol_cipro_growth_status_keeps_latentdna_appendix_drift_nonblocking(
+    tmp_path: Path,
+) -> None:
+    study_context = replace(
+        _make_study_context(tmp_path),
+        densegen_row_target=8,
+        densegen_row_gap=0,
+    )
+    status_context = StressEthanolCiproGrowthStatusResolvedContext(
+        infer_runtime=StressEthanolCiproGrowthInferRuntimeResolvedContext(
+            preferred_model_family="evo2_7b",
+            supported_model_families=("evo2_7b",),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        ),
+    )
+    latentdna_state = {
+        "configured": True,
+        "state": "ok",
+        "summary": "LatentDNA primary readiness ok.",
+        "missing_source_datasets": [],
+        "missing_appendix_source_datasets": ["regulondb_native_core60"],
+        "appendix_state": "attention",
+    }
+
+    state, summary, evidence = build_stress_ethanol_cipro_growth_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=StressEthanolCiproGrowthStatusDependencies(
+            infer_runtime=StressEthanolCiproGrowthInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cuda:0"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda *, phase_id, model_family: bool(
+                model_family and model_family in phase_id
+            ),
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_latentdna_readiness=lambda **kwargs: latentdna_state,
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "ok"
+    assert "LatentDNA primary readiness ok." not in summary
+    assert "attention_reasons" not in evidence
+    assert evidence["latentdna"]["missing_appendix_source_datasets"] == ["regulondb_native_core60"]
+
+
 def test_build_stress_ethanol_cipro_growth_status_surfaces_sequence_view_and_feature_completion_sections(
     tmp_path: Path,
 ) -> None:

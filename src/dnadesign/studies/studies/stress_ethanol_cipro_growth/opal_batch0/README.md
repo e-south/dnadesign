@@ -63,6 +63,15 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batc
 Add `--write` only when the operator is ready to create or replace the generated
 `records.parquet`.
 
+Validate the already-materialized OPAL handoff table before pre-assay campaign
+readiness:
+
+```bash
+uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.candidate_table \
+  --config src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml \
+  --validate-existing
+```
+
 Check the ID-level provenance chain without reading the vector-valued X payload:
 
 ```bash

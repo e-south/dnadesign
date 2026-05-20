@@ -9,3 +9,4 @@ Command fragments group read-only checks by owner lane.
 - `notify/`: Notify profile-doctor and event-resolution checks split by
   subcommand family.
 - `latentdna.yaml`: LatentDNA status/snapshot command surface.
+- `opal.yaml`: OPAL candidate-table contract check for the selected X handoff.

@@ -35,6 +35,13 @@ require_absent() {
   if grep -Eq "$pattern" "$path"; then fail "$label"; else pass "$label"; fi
 }
 
+require_tree_absent() {
+  local pattern="$1"
+  local label="$2"
+  local path="$3"
+  if rg -n "$pattern" "$path" -g '*.py' >/dev/null; then fail "$label"; else pass "$label"; fi
+}
+
 require_max_lines() {
   local path="$1"
   local max_lines="$2"
@@ -89,15 +96,44 @@ PY
   fi
 }
 
+require_bounded_preflight_commands() {
+  if uv run python - "$ROOT_DIR" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth" <<'PY'
+from pathlib import Path
+import sys
+
+roots = [Path(value) for value in sys.argv[1:]]
+bad: list[str] = []
+for root in roots:
+    for path in sorted(root.rglob("*.md")):
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if (
+                "studies.stress-ethanol-cipro-growth.preflight" in line
+                and "--scope next" in line
+                and "--command-timeout-seconds 30" not in line
+            ):
+                bad.append(f"{path}:{line_number}: {line.strip()}")
+if bad:
+    raise SystemExit("\n".join(bad))
+PY
+  then
+    pass "documented stress preflight commands keep the 30s timeout"
+  else
+    fail "documented stress preflight commands keep the 30s timeout"
+  fi
+}
+
 require_file "$SKILL_FILE"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify/profile-doctor.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify/resolve-events.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/opal.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/sequence-views.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/completion.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/notify.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/latentdna_reference_normalization_audit.yaml"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/opal_candidate_table_pre_assay.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md"
@@ -107,6 +143,7 @@ require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decisio
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/candidate-table.md"
+require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/densegen.yaml"
 require_file "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/lanes/infer.yaml"
@@ -120,12 +157,22 @@ require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_grow
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/runtime_dependencies.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/semantic_completeness.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/sequence_view_contracts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/README.md"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/__init__.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/__main__.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/axis_oracle.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/decision.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/prediction_ledger.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/progress.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/status.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
 require_file "$REFERENCE_DIR/external-sources.md"
 
 require_frontmatter_yaml
+require_bounded_preflight_commands
 require_section "## Required Deliverables"
 require_section "## Trigger Tests"
 require_pattern '^name: stress-ethanol-cipro-growth-status$' "skill name is study-specific"
@@ -140,6 +187,22 @@ require_pattern '^## References$' "skill exposes progressive-disclosure referenc
 require_pattern 'routes/decision/opal/README\.md' "skill routes OPAL detail after one-hop map"
 require_pattern 'routes/analysis/latentdna\.md' "skill routes LatentDNA detail after one-hop map"
 require_pattern 'command-groups/README\.md' "skill routes runtime command groups through progressive map"
+require_pattern 'opal_candidate_table_pre_assay' "preflight contract documents current OPAL main-path gate" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
+require_pattern 'opal\.candidate_table\.contract' "OPAL preflight checks validate candidate-table contract" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/opal_candidate_table_pre_assay.yaml"
+require_pattern 'appendix_source_datasets' "LatentDNA binding separates appendix sources" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml"
+require_pattern 'latentdna\.readiness\.semantic' "preflight contract documents LatentDNA semantic readiness" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
+require_pattern 'missing_source_datasets' "preflight contract exposes LatentDNA missing-source details" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
+require_pattern 'latentdna\.readiness\.semantic' "preflight provider emits LatentDNA semantic readiness check" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight.py"
+require_pattern 'missing_source_datasets' "preflight provider emits LatentDNA missing-source details" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight.py"
+require_pattern 'LatentDNA primary readiness attention' "LatentDNA readiness summary reports primary attention" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/latentdna_readiness.py"
+require_pattern 'missing_appendix_source_datasets' "LatentDNA readiness exposes appendix drift separately" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/latentdna_readiness.py"
+require_pattern 'densegen-axis-probe-v0\.md' "OPAL route links the DenseGen probe context" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md"
+require_pattern 'densegen-axis-probe-v0\.md' "OPAL context index links the DenseGen probe context" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/README.md"
+require_pattern '__all__: list\[str\] = \[\]' "DenseGen probe package root exports no compatibility API" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/__init__.py"
+require_pattern 'python -m dnadesign\.studies\.studies\.stress_ethanol_cipro_growth\.opal_densegen_axis_probe report --run-root' "DenseGen probe context documents runnable report command" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md"
+require_pattern 'python -m dnadesign\.studies\.studies\.stress_ethanol_cipro_growth\.opal_densegen_axis_probe progress --run-root' "DenseGen probe context documents runnable progress command" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md"
+require_absent 'uv run opal_densegen_axis_probe' "DenseGen probe context avoids non-existent project script" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md"
+require_tree_absent 'dnadesign\.opal\.src' "DenseGen probe uses public OPAL API only" "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe"
 
 require_absent 'promoter-study-status' "skill has no old status kind"
 require_absent 'promoter-study-preflight' "skill has no old preflight kind"
@@ -163,6 +226,11 @@ require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/runtime_dependencies.py" 140 "runtime probe module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/semantic_completeness.py" 200 "semantic-completeness probe module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/sequence_view_contracts.py" 240 "sequence-view probe module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/axis_oracle.py" 450 "DenseGen axis-oracle module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/decision.py" 450 "DenseGen probe decision module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/prediction_ledger.py" 120 "DenseGen probe prediction-ledger module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/cli.py" 280 "DenseGen probe CLI module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/status.py" 220 "DenseGen probe status module stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md" 140 "stress study route map stays one-hop"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md" 80 "DenseGen route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md" 80 "Infer route detail stays bounded"
@@ -171,6 +239,7 @@ require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/an
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md" 100 "OPAL route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md" 80 "OPAL command detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md" 120 "LatentDNA route detail stays bounded"
+require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md" 180 "DenseGen probe context stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/sequence-views.yaml" 120 "Infer sequence-view readiness fragment stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/infer_batch_preparation/notify.yaml" 100 "Infer Notify readiness fragment stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md" 70 "runtime command-group map stays one-hop"

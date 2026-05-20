@@ -14,14 +14,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from ..service import STUDY_STATUS_SERVICE
-
 
 def provide_stress_ethanol_cipro_growth_status(
     *,
     repo_root: Path | None,
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
+    from ..service import STUDY_STATUS_SERVICE
+
     context = STUDY_STATUS_SERVICE.load_context(
         repo_root=repo_root,
         study_root=inputs.get("study_dir"),
@@ -34,6 +34,8 @@ def provide_stress_ethanol_cipro_growth_preflight(
     repo_root: Path | None,
     inputs: Mapping[str, object],
 ) -> tuple[str, str, dict[str, object]]:
+    from ..service import STUDY_STATUS_SERVICE
+
     context = STUDY_STATUS_SERVICE.load_context(
         repo_root=repo_root,
         study_root=inputs.get("study_dir"),

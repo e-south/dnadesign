@@ -12,6 +12,8 @@ next_scope:
     - infer_batch_plan
     latentdna_reference_normalization_audit:
     - latentdna
+    opal_candidate_table_pre_assay:
+    - opal
   runtime_phase_groups:
   - infer
   - notify

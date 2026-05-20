@@ -1,0 +1,16 @@
+checks:
+  opal_candidate_table_pre_assay:
+  - kind: dataset_snapshot
+    check_id: opal.candidate_table.rows
+    check_group: opal
+    summary: OPAL candidate feature table is materialized at the expected densegen-only row count.
+    required: true
+    artifact: opal_candidate_feature_table
+    target_rows: 157160
+    row_count_mode: exact
+  - kind: command
+    check_id: opal.candidate_table.contract
+    check_group: opal
+    summary: OPAL candidate feature table contract validates with the selected fixed-length X column.
+    required: true
+    surface: opal_candidate_table_contract

@@ -8,6 +8,7 @@ candidate_feature_table:
   dataset_id: usr_prom_eth_cip_opal_candidates
   role: opal_candidate_feature_table
   records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet
+  expected_rows: 157160
   required_columns: ["id", "bio_type", "sequence", "alphabet"]
   x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
   x_source:

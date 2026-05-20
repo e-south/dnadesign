@@ -103,7 +103,7 @@ def test_retron_hairpin_docs_keep_primary_scar_nick_and_contrast_lanes_explicit(
     yiu_route = _read_repo("docs/studies/retron_hairpin_design/routes/quality/yiu-boundary-check.md")
     skill = _read_repo(".agents/skills/retron-hairpin-study/SKILL.md")
 
-    assert "This study now routes Retron MSD product work as a genetic compiler" in status
+    assert "This study now routes Retron MSD product work through a study-owned compiler" in status
     assert "Released-product Snapback in `de033` remains the primitive owner" in status
     assert "Scar-nick through the `scar_nick` subpackage remains the primitive owner" in status
     assert "### Quick Route" in routes

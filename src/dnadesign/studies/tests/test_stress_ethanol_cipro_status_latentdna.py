@@ -44,6 +44,10 @@ def _write_latentdna_binding_fixture(tmp_path: Path) -> Path:
                     "reference_core60": "promoter/demo_reference_core60",
                     "reference_contexts": "promoter/demo_reference_contexts",
                 },
+                "appendix_source_datasets": {
+                    "regulondb_native_promoters": "usr_regulondb_native_promoters",
+                    "regulondb_native_core60": "usr_regulondb_native_promoter_core60",
+                },
                 "supported_model_families": ["evo2_20b", "evo2_7b"],
                 "default_model_family": "evo2_20b",
                 "required_wildtype_references": ["spyp", "sulap", "j23105"],
@@ -234,7 +238,17 @@ def test_inspect_stress_ethanol_cipro_growth_latentdna_readiness_uses_binding_an
         "reference_core60": "promoter/demo_reference_core60",
         "reference_contexts": "promoter/demo_reference_contexts",
     }
+    assert readiness["appendix_source_datasets"] == {
+        "regulondb_native_core60": "usr_regulondb_native_promoter_core60",
+        "regulondb_native_promoters": "usr_regulondb_native_promoters",
+    }
     assert readiness["missing_source_datasets"] == ["reference_contexts", "reference_core60"]
+    assert readiness["missing_appendix_source_datasets"] == [
+        "regulondb_native_core60",
+        "regulondb_native_promoters",
+    ]
+    assert readiness["appendix_state"] == "attention"
+    assert "appendix source drift" in readiness["appendix_summary"]
     assert readiness["ok_deliverables"] == [
         "dataset_overview",
         "representation_health_summary",
@@ -250,6 +264,63 @@ def test_inspect_stress_ethanol_cipro_growth_latentdna_readiness_uses_binding_an
         "pooled_logits_20b_full_context_1kb",
         "pooled_logits_7b_anchor_60bp",
         "pooled_logits_7b_full_context_1kb",
+    ]
+
+
+def test_inspect_stress_ethanol_cipro_growth_latentdna_appendix_sources_are_nonblocking(
+    tmp_path: Path,
+) -> None:
+    binding_path = _write_latentdna_binding_fixture(tmp_path)
+    snapshot_path = _write_latentdna_snapshot_fixture(tmp_path)
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    payload["sources"]["reference_core60"] = {
+        "kind": "usr",
+        "path": "src/dnadesign/usr/datasets/promoter/demo_reference_core60",
+        "dataset_id": "promoter/demo_reference_core60",
+        "row_count": 3,
+        "columns": ["id", "sequence"],
+        "vector_columns": ["infer__evo2_20b__..."],
+    }
+    payload["sources"]["reference_contexts"] = {
+        "kind": "usr",
+        "path": "src/dnadesign/usr/datasets/promoter/demo_reference_contexts",
+        "dataset_id": "promoter/demo_reference_contexts",
+        "row_count": 3,
+        "columns": ["id", "sequence"],
+        "vector_columns": ["infer__evo2_20b__..."],
+    }
+    for deliverable_id in (
+        "design_structure_summary",
+        "sigma35_ordinal_audit",
+        "context_robustness_summary",
+    ):
+        payload["deliverables"][deliverable_id]["status"] = "ok"
+        payload["deliverables"][deliverable_id]["freshness"] = "ok"
+        payload["deliverables"][deliverable_id]["artifact_paths"] = [f"plots/{deliverable_id}"]
+        payload["deliverables"][deliverable_id]["warnings"] = []
+    snapshot_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    study_context = _make_study_context(tmp_path)
+    study_context = replace(
+        study_context,
+        study_pipeline={
+            **study_context.study_pipeline,
+            "latentdna": {
+                "binding": binding_path.relative_to(tmp_path).as_posix(),
+                "doc": LATENTDNA_DOC,
+            },
+        },
+    )
+
+    readiness = inspect_stress_ethanol_cipro_growth_latentdna_readiness(study_context=study_context)
+
+    assert readiness["state"] == "ok"
+    assert readiness["summary"] == "LatentDNA primary readiness ok."
+    assert readiness["missing_source_datasets"] == []
+    assert readiness["pending_deliverables"] == []
+    assert readiness["appendix_state"] == "attention"
+    assert readiness["missing_appendix_source_datasets"] == [
+        "regulondb_native_core60",
+        "regulondb_native_promoters",
     ]
 
 
@@ -345,6 +416,7 @@ def test_stress_ethanol_cipro_latentdna_binding_accepts_generic_source_dataset_k
         "native_source_record_features_7b": "usr_regulondb_native_promoters/_derived/infer",
         "native_source_records": "usr_regulondb_native_promoters",
     }
+    assert binding["appendix_source_datasets"] == {}
     assert binding["required_wildtype_references"] == []
     assert sorted(snapshot["sources"]) == [
         "core60_tss_upstream",
@@ -357,6 +429,7 @@ def test_stress_ethanol_cipro_latentdna_binding_accepts_generic_source_dataset_k
         "core60_tss_upstream_7b_core60_mean_log_likelihood_total",
         "core60_tss_upstream_7b_core60_mean_output_layer_features",
     ]
+    assert snapshot["missing_appendix_sources"] == []
     assert snapshot["missing_decision_deliverables"] == []
 
 

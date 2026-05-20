@@ -426,6 +426,78 @@ def test_candidate_feature_table_validation_does_not_pandas_load_x(
     ]
 
 
+def test_candidate_feature_table_validation_enforces_exact_population_contract(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+    _write_fixed_x_records(
+        records,
+        {
+            "id": ["a", "b", "c"],
+            "bio_type": ["dna", "dna", "dna"],
+            "sequence": ["AAAA", "CCCC", "GGGG"],
+            "alphabet": ["dna_4", "dna_4", "dna_4"],
+            x_col: [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            **_candidate_provenance(
+                3,
+                source_classes=["densegen", "densegen", "native"],
+                design_families=["ethanol", "ciprofloxacin", "control"],
+            ),
+        },
+        x_col=x_col,
+    )
+
+    with pytest.raises(ValueError, match="row count 3 does not equal expected 2"):
+        validate_candidate_feature_table(records_path=records, x_column=x_col, expected_rows=2)
+
+    with pytest.raises(ValueError, match="opal_candidate__source_class"):
+        validate_candidate_feature_table(
+            records_path=records,
+            x_column=x_col,
+            expected_rows=3,
+            allowed_source_classes=["densegen"],
+        )
+
+    _write_fixed_x_records(
+        records,
+        {
+            "id": ["a", "b"],
+            "bio_type": ["dna", "dna"],
+            "sequence": ["AAAA", "CCCC"],
+            "alphabet": ["dna_4", "dna_4"],
+            x_col: [[0.1, 0.2], [0.3, 0.4]],
+            **_candidate_provenance(2, design_families=["ethanol", "control"]),
+        },
+        x_col=x_col,
+    )
+    with pytest.raises(ValueError, match="opal_candidate__design_family"):
+        validate_candidate_feature_table(
+            records_path=records,
+            x_column=x_col,
+            allowed_design_families=["ethanol", "ciprofloxacin"],
+        )
+
+    provenance = _candidate_provenance(1)
+    provenance["opal_candidate__sfxi_ref__collection_id"] = ["archive-sfxi"]
+    _write_fixed_x_records(
+        records,
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAAA"],
+            "alphabet": ["dna_4"],
+            x_col: [[0.1, 0.2]],
+            **provenance,
+        },
+        x_col=x_col,
+    )
+    with pytest.raises(ValueError, match="opal_candidate__sfxi_ref__collection_id"):
+        validate_candidate_feature_table(
+            records_path=records,
+            x_column=x_col,
+            required_null_provenance_columns=["opal_candidate__sfxi_ref__collection_id"],
+        )
+
+
 def test_candidate_feature_table_validation_allows_ordered_latentdna_view_subset(tmp_path: Path) -> None:
     records = tmp_path / "records.parquet"
     view_rows = tmp_path / "view_rows.parquet"
@@ -671,6 +743,9 @@ def test_candidate_table_materializer_filters_dense_plan_subset_and_writes_x(tmp
     assert not records_path.exists()
 
     assert candidate_table_main(["--config", str(config_path), "--repo-root", str(tmp_path), "--write"]) == 0
+    assert (
+        candidate_table_main(["--config", str(config_path), "--repo-root", str(tmp_path), "--validate-existing"]) == 0
+    )
     records = pd.read_parquet(records_path)
     assert records["id"].tolist() == ["a", "b"]
     assert records[x_col].map(list).tolist() == [[1.0, 2.0], [3.0, 4.0]]

@@ -37,6 +37,7 @@ from .infer_runtime import (
     StressEthanolCiproGrowthInferRuntimeResolvedContext,
     resolve_stress_ethanol_cipro_growth_infer_runtime_context,
 )
+from .latentdna_readiness import inspect_stress_ethanol_cipro_growth_latentdna_readiness
 from .record_normalizer import StressEthanolCiproGrowthResolvedContext
 
 
@@ -72,6 +73,7 @@ class StressEthanolCiproGrowthPreflightResolvedContext:
     infer_runtime: StressEthanolCiproGrowthInferRuntimeResolvedContext
     infer_phase_targets: dict[str, StressEthanolCiproGrowthInferPhaseTarget]
     scope_plan: StudyPreflightPlan
+    latentdna_readiness: Mapping[str, object] | None = None
 
 
 def resolve_stress_ethanol_cipro_growth_preflight_context(
@@ -103,6 +105,11 @@ def resolve_stress_ethanol_cipro_growth_preflight_context(
         contract=contract.preflight,
         runtime_phase_ids=tuple(infer_phase_targets),
     )
+    latentdna_readiness = (
+        inspect_stress_ethanol_cipro_growth_latentdna_readiness(study_context=study_context)
+        if "latentdna" in scope_plan.included_groups
+        else None
+    )
     study_id = study_context.study_id or study_context.resolved_study_dir.name
     phase_states = tuple(dict(phase) for phase in study_context.phase_states)
     return StressEthanolCiproGrowthPreflightResolvedContext(
@@ -120,6 +127,7 @@ def resolve_stress_ethanol_cipro_growth_preflight_context(
         infer_runtime=infer_runtime,
         infer_phase_targets=infer_phase_targets,
         scope_plan=scope_plan,
+        latentdna_readiness=latentdna_readiness,
     )
 
 
@@ -173,6 +181,10 @@ def build_stress_ethanol_cipro_growth_preflight_progress(
         ),
     ):
         add_check(check)
+    if "latentdna" in enabled_groups:
+        check = _build_latentdna_readiness_check(context=context)
+        if check is not None:
+            add_check(check)
     for check in _build_dataset_refresh_checks(context=context):
         add_check(check)
 
@@ -271,6 +283,50 @@ def _build_dataset_refresh_checks(
             )
         )
     return tuple(checks)
+
+
+def _build_latentdna_readiness_check(
+    *,
+    context: StressEthanolCiproGrowthPreflightResolvedContext,
+) -> PreflightCheck | None:
+    readiness = context.latentdna_readiness
+    if readiness is None:
+        return None
+    state_text = str(readiness.get("state") or "").strip()
+    if state_text == "ok":
+        state = "ok"
+    elif state_text in {"missing", "not_configured"}:
+        state = "missing"
+    else:
+        state = "attention"
+    phase_id = (
+        context.contract.preflight.group_phase_bindings.get("latentdna")
+        or context.scope_plan.target_phase_id
+        or context.current_phase
+    )
+    summary = str(readiness.get("summary") or "").strip()
+    if not summary:
+        summary = "LatentDNA readiness is not ok." if state != "ok" else "LatentDNA readiness ok."
+    return build_state_check(
+        check_id="latentdna.readiness.semantic",
+        kind="latentdna_readiness",
+        required=True,
+        check_group="latentdna",
+        phase="latentdna",
+        phase_id=str(phase_id or "").strip() or None,
+        state=state,
+        summary=summary,
+        surface_id="latentdna_workspace_snapshot",
+        details={
+            "missing_source_datasets": list(readiness.get("missing_source_datasets") or []),
+            "missing_appendix_source_datasets": list(readiness.get("missing_appendix_source_datasets") or []),
+            "appendix_state": readiness.get("appendix_state"),
+            "missing_decision_deliverables": list(readiness.get("missing_decision_deliverables") or []),
+            "pending_deliverables": list(readiness.get("pending_deliverables") or []),
+            "snapshot_ref": readiness.get("snapshot_ref"),
+            "workspace_id": readiness.get("workspace_id"),
+        },
+    )
 
 
 def _infer_freshness_phase_id(*, context: StressEthanolCiproGrowthPreflightResolvedContext) -> str | None:

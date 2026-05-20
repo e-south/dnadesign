@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from .latentdna_contract import (
+    binding_appendix_source_datasets,
     binding_decision_deliverables,
     binding_default_model_family,
     binding_model_families,
@@ -45,15 +46,21 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
         return {
             "configured": binding_path is not None and binding_path.is_file(),
             "state": "error",
+            "summary": f"LatentDNA binding is invalid: {binding_error}",
             "doc": doc_path,
             "binding_ref": None if binding_path is None else str(binding_path),
             "workspace_ref": None,
             "snapshot_ref": None,
             "workspace_id": None,
             "source_datasets": {},
+            "appendix_source_datasets": {},
             "decision_deliverables": [],
             "ok_deliverables": [],
             "pending_deliverables": [],
+            "missing_source_datasets": [],
+            "missing_appendix_source_datasets": [],
+            "appendix_state": "unknown",
+            "appendix_summary": "LatentDNA appendix sources were not inspected because the binding is invalid.",
             "export_ids": [],
             "exports_ok": False,
             "browser_default_geometry_ids": [],
@@ -68,15 +75,21 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
         return {
             "configured": False,
             "state": "not_configured",
+            "summary": "LatentDNA binding is not configured.",
             "doc": doc_path,
             "binding_ref": None if binding_path is None else str(binding_path),
             "workspace_ref": None,
             "snapshot_ref": None,
             "workspace_id": None,
             "source_datasets": {},
+            "appendix_source_datasets": {},
             "decision_deliverables": [],
             "ok_deliverables": [],
             "pending_deliverables": [],
+            "missing_source_datasets": [],
+            "missing_appendix_source_datasets": [],
+            "appendix_state": "not_configured",
+            "appendix_summary": "LatentDNA appendix sources are not configured.",
             "export_ids": [],
             "exports_ok": True,
             "browser_default_geometry_ids": [],
@@ -97,6 +110,7 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
         snapshot_error = str(exc)
     decision_deliverables = binding_decision_deliverables(binding, snapshot=snapshot)
     source_datasets = binding_source_datasets(binding)
+    appendix_source_datasets = binding_appendix_source_datasets(binding)
     deliverables_payload = snapshot.get("deliverables") if isinstance(snapshot, Mapping) else {}
     exports_payload = snapshot.get("exports") if isinstance(snapshot, Mapping) else {}
     browser_payload = snapshot.get("browser") if isinstance(snapshot, Mapping) else {}
@@ -105,6 +119,9 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
     )
     missing_decision_deliverables = (
         list(snapshot.get("missing_decision_deliverables") or []) if isinstance(snapshot, Mapping) else []
+    )
+    missing_appendix_sources = (
+        list(snapshot.get("missing_appendix_sources") or []) if isinstance(snapshot, Mapping) else []
     )
 
     ok_deliverables = [
@@ -141,20 +158,32 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
         state = "attention"
     else:
         state = "ok"
+    summary = _latentdna_readiness_summary(
+        state=state,
+        missing_binding_sources=missing_binding_sources,
+        pending_deliverables=pending_deliverables,
+        export_statuses=export_statuses,
+        snapshot_error=snapshot_error,
+    )
 
     return {
         "configured": True,
         "state": state,
+        "summary": summary,
         "doc": doc_path,
         "binding_ref": None if binding_path is None else str(binding_path),
         "workspace_ref": None if workspace_ref is None else str(workspace_ref),
         "snapshot_ref": None if snapshot_path is None else str(snapshot_path),
         "workspace_id": str(binding.get("workspace_id")),
         "source_datasets": source_datasets,
+        "appendix_source_datasets": appendix_source_datasets,
         "decision_deliverables": decision_deliverables,
         "ok_deliverables": ok_deliverables,
         "pending_deliverables": pending_deliverables,
         "missing_source_datasets": missing_binding_sources,
+        "missing_appendix_source_datasets": missing_appendix_sources,
+        "appendix_state": "attention" if missing_appendix_sources else "ok",
+        "appendix_summary": _latentdna_appendix_summary(missing_appendix_sources=missing_appendix_sources),
         "missing_decision_deliverables": missing_decision_deliverables,
         "export_ids": export_ids,
         "exports_ok": all(status == "ok" for status in export_statuses) if export_statuses else True,
@@ -167,3 +196,36 @@ def inspect_stress_ethanol_cipro_growth_latentdna_readiness(
         "last_updated_at": None if snapshot is None else snapshot.get("last_updated_at"),
         **({"error": snapshot_error} if snapshot_error is not None else {}),
     }
+
+
+def _latentdna_readiness_summary(
+    *,
+    state: str,
+    missing_binding_sources: list[object],
+    pending_deliverables: list[object],
+    export_statuses: list[str],
+    snapshot_error: str | None,
+) -> str:
+    if snapshot_error is not None:
+        return f"LatentDNA snapshot is invalid: {snapshot_error}"
+    parts: list[str] = []
+    if missing_binding_sources:
+        parts.append("missing source aliases: " + ", ".join(str(item) for item in missing_binding_sources))
+    if pending_deliverables:
+        parts.append("pending decision deliverables: " + ", ".join(str(item) for item in pending_deliverables))
+    non_ok_exports = [status for status in export_statuses if status != "ok"]
+    if non_ok_exports:
+        parts.append("non-ok exports: " + ", ".join(non_ok_exports))
+    if parts:
+        return "LatentDNA primary readiness attention: " + "; ".join(parts)
+    if state == "missing":
+        return "LatentDNA snapshot is missing."
+    return "LatentDNA primary readiness ok."
+
+
+def _latentdna_appendix_summary(*, missing_appendix_sources: list[object]) -> str:
+    if missing_appendix_sources:
+        return "LatentDNA appendix source drift: missing aliases: " + ", ".join(
+            str(item) for item in missing_appendix_sources
+        )
+    return "LatentDNA appendix sources ok."

@@ -5,7 +5,7 @@ lane_id: latentdna
 owner: latentdna
 last_verified: 2026-05-18
 surface_role: downstream-analysis
-current_state: attention
+current_state: x_selected_appendix_optional
 route_detail: repo:docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md
 canonical_payload:
   path: repo:docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml
@@ -17,4 +17,5 @@ entry_artifacts:
 exit_artifacts:
   - representation_health_summary
   - candidate_x_selection_scorecard
-navigation_note: Open this lane for representation-browser and X-selection questions after the study route selects LatentDNA.
+  - native_tf_axis_orientation_audit
+navigation_note: Open this lane for X-selection provenance, representation-browser review, or appendix-native interpretation.

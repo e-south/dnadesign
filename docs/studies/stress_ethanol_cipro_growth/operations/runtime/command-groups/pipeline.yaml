@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-05-08
+  last_verified: 2026-05-19
   navigation:
     command_group_map: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md
     lane_sidecars:
@@ -240,23 +240,23 @@ study_pipeline:
     doc: src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
     latest_materialization:
       checked: 2026-05-17
-      workspace_snapshot_state: attention_pending_primary_decision_deliverables
+      workspace_snapshot_state: x_selected_appendix_optional
       deep_validation: passed
       ok_decision_deliverables:
         - dataset_overview
+        - design_structure_summary
+        - sigma35_ordinal_audit
         - context_robustness_summary
         - candidate_decision_frontier
         - candidate_x_selection_scorecard
-      pending_decision_deliverables:
-        - design_structure_summary
-        - sigma35_ordinal_audit
+      pending_decision_deliverables: []
       browser_default_geometry_count: 6
       candidate_x_selection:
         working_candidate: intermediate_embedding_7b_context_anchor_mean_bidir_concat
         conservative_baseline: intermediate_embedding_7b_anchor_60bp
         strength_standard_lens: intermediate_embedding_7b_full_context_anchor_mean
         note: Bidirectional context-anchor mean is the working pre-assay X because it best balances health, Sigma-35 ordering, DenseGen plan separation, and reference-to-plan margins. It is not phenotype-validated.
-      note: The native lineage metadata/config route is updated and local generated view rows, plots, snapshot, and notebook artifacts have been regenerated against the expanded 7B sidecar-backed materialization.
+      note: Candidate-X selection is complete for OPAL pre-assay handoff. Native lineage metadata/config remains appendix review context and does not gate OPAL readiness.
       reference_strength_probe:
         status: superseded_by_reference_standard_strength_audit
         root: src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/plots/reference_standard_strength_audit
@@ -289,6 +289,9 @@ study_pipeline:
       ethanol_factor: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
       cipro_factor: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
       and: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml
+    progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
+    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
+    densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run-root> --json
     notebook:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true

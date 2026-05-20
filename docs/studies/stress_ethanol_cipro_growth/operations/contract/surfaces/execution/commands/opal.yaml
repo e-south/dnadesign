@@ -1,0 +1,61 @@
+opal_candidate_table_contract:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_batch0.candidate_table
+  - --config
+  - src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml
+  - --validate-existing
+opal_campaign_progress_json:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - opal
+  - progress
+  - -c
+  - src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+  - --round
+  - latest
+  - --json
+opal_campaign_review_json:
+  surface_type: command
+  writes_artifacts: true
+  argv:
+  - uv
+  - run
+  - opal
+  - review
+  - -c
+  - src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+  - --round
+  - latest
+  - --json
+densegen_axis_probe_progress_json:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe
+  - progress
+  - --run-root
+  - <run-root>
+  - --json
+densegen_axis_probe_report_json:
+  surface_type: command
+  writes_artifacts: true
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe
+  - report
+  - --run-root
+  - <run-root>
+  - --json
