@@ -15,3 +15,8 @@ Run with:
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run --gate source
 ```
+
+Use `--rounds N` to run a synthetic multi-round OPAL loop in scratch space.
+Round 0 ingests the planned train IDs. Later rounds ingest labels for the
+previous round's OPAL-selected candidates, using the study-owned DenseGen oracle
+or permuted null for that scratch run only.

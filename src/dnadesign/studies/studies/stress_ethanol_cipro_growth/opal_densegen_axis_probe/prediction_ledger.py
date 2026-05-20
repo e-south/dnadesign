@@ -18,6 +18,8 @@ def read_probe_predictions(config_path: Path) -> pd.DataFrame:
             "id",
             "pred__y_hat_model",
             "pred__score_selected",
+            "sel__rank_competition",
+            "sel__is_selected",
         ],
         round_selector="latest",
         require_run_id=True,

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from .artifacts import ProbePlan, RunSpec
-from .axis_oracle import _ok_labels, build_train_ids, class_from_logic4
+from .axis_oracle import _ok_labels, build_train_ids
 from .constants import (
     AXIS_CLASS_TO_LOGIC4,
     DEFAULT_TOP_K,
@@ -19,57 +19,19 @@ from .constants import (
     STATE_ORDER,
 )
 from .prediction_ledger import prediction_id_problems, read_probe_predictions
+from .prediction_scoring import (
+    label_lookup,
+    macro_f1,
+    predicted_axis_classes,
+    top_ids_from_prediction_frame,
+    validate_prediction_selection_contract,
+)
 
 PASS_CIPRO_RANDOM_GATE = "PASS_CIPRO_RANDOM_GATE"
 PASS_RANDOM_ALL_GATE = "PASS_RANDOM_ALL_GATE"
 PASS_LEAVE_SIGMA35_GATE = "PASS_LEAVE_SIGMA35_GATE"
 PASS_FULL_MATRIX_GATE = "PASS_FULL_MATRIX_GATE"
 PASS_SCOPED_GATE = "PASS_SCOPED_GATE"
-
-
-def _macro_f1(y_true: Sequence[str], y_pred: Sequence[str]) -> float:
-    labels = list(AXIS_CLASS_TO_LOGIC4)
-    true = np.asarray(list(y_true), dtype=object)
-    pred = np.asarray(list(y_pred), dtype=object)
-    if true.size == 0:
-        return float("nan")
-    scores: list[float] = []
-    for label in labels:
-        tp = int(np.sum((true == label) & (pred == label)))
-        fp = int(np.sum((true != label) & (pred == label)))
-        fn = int(np.sum((true == label) & (pred != label)))
-        denom = (2 * tp) + fp + fn
-        scores.append(0.0 if denom == 0 else float((2 * tp) / denom))
-    return float(np.mean(scores))
-
-
-def _label_lookup(labels: pd.DataFrame, *, class_column: str = "axis_class") -> pd.Series:
-    return labels.set_index(labels["id"].astype(str))[class_column]
-
-
-def _top_ids_from_predictions(predictions: pd.DataFrame, eval_ids: set[str], *, k: int) -> list[str]:
-    if predictions.empty:
-        return []
-    frame = predictions.loc[predictions["id"].astype(str).isin(eval_ids)].copy()
-    if frame.empty:
-        return []
-    score_col = "pred__score_selected"
-    if score_col not in frame.columns:
-        raise RuntimeError(f"OPAL predictions missing required column: {score_col}")
-    frame[score_col] = pd.to_numeric(frame[score_col], errors="coerce")
-    if not np.isfinite(frame[score_col].to_numpy(dtype=float)).all():
-        raise RuntimeError(f"OPAL predictions contain non-finite {score_col} values")
-    frame = frame.sort_values([score_col, "id"], ascending=[False, True])
-    return frame["id"].astype(str).head(int(k)).tolist()
-
-
-def _predicted_axis_class(value: Any) -> str:
-    vec = np.asarray(value, dtype=float).ravel()
-    if vec.size != 8:
-        raise RuntimeError(f"OPAL prediction pred__y_hat_model must be vec8, got {vec.size} values")
-    if not np.isfinite(vec).all():
-        raise RuntimeError("OPAL prediction pred__y_hat_model contains non-finite values")
-    return class_from_logic4(vec[:4])
 
 
 def _evaluate_run(
@@ -83,8 +45,8 @@ def _evaluate_run(
         predictions = read_probe_predictions(run.config_path)
     except Exception as exc:
         raise RuntimeError(f"failed to read OPAL predictions for scored run {run.run_key}: {exc}") from exc
-    true_labels = _label_lookup(positive_labels)
-    oracle_labels = _label_lookup(run_labels)
+    true_labels = label_lookup(positive_labels)
+    oracle_labels = label_lookup(run_labels)
     train_ids = set(map(str, split_metadata["train_ids"]))
     if run.split_id == "leave_sigma35_variant":
         eval_ids = set(map(str, split_metadata["eval_ids"]))
@@ -110,7 +72,13 @@ def _evaluate_run(
         raise RuntimeError(f"OPAL prediction artifacts for scored run {run.run_key} must contain one as_of_round")
     row["run_id"] = run_ids[0]
     row["as_of_round"] = rounds[0]
-    required_prediction_columns = {"id", "pred__y_hat_model", "pred__score_selected"}
+    required_prediction_columns = {
+        "id",
+        "pred__y_hat_model",
+        "pred__score_selected",
+        "sel__is_selected",
+        "sel__rank_competition",
+    }
     missing_prediction_columns = sorted(required_prediction_columns - set(predictions.columns))
     if missing_prediction_columns:
         raise RuntimeError(
@@ -119,21 +87,22 @@ def _evaluate_run(
     prediction_problems = prediction_id_problems(predictions, eval_ids, run_key=run.run_key)
     if prediction_problems:
         raise RuntimeError(f"OPAL prediction artifacts invalid: {'; '.join(prediction_problems)}")
+    validate_prediction_selection_contract(predictions)
 
     frame = predictions.loc[predictions["id"].astype(str).isin(eval_ids)].copy()
-    frame["pred_axis_class"] = [_predicted_axis_class(value) for value in frame["pred__y_hat_model"].tolist()]
+    frame["pred_axis_class"] = predicted_axis_classes(frame["pred__y_hat_model"].tolist())
     frame["true_axis_class"] = frame["id"].astype(str).map(true_labels)
     frame["oracle_axis_class"] = frame["id"].astype(str).map(oracle_labels)
-    row["axis4_macro_f1_true"] = _macro_f1(frame["true_axis_class"].astype(str), frame["pred_axis_class"].astype(str))
-    row["axis4_macro_f1_oracle"] = _macro_f1(
+    row["axis4_macro_f1_true"] = macro_f1(frame["true_axis_class"].astype(str), frame["pred_axis_class"].astype(str))
+    row["axis4_macro_f1_oracle"] = macro_f1(
         frame["oracle_axis_class"].astype(str), frame["pred_axis_class"].astype(str)
     )
 
-    selected_ids = _top_ids_from_predictions(predictions, eval_ids, k=DEFAULT_TOP_K)
-    selected_true = [str(true_labels.get(candidate_id)) for candidate_id in selected_ids]
-    selected_oracle = [str(oracle_labels.get(candidate_id)) for candidate_id in selected_ids]
-    true_eval_classes = [str(true_labels.get(candidate_id)) for candidate_id in eval_ids]
-    oracle_eval_classes = [str(oracle_labels.get(candidate_id)) for candidate_id in eval_ids]
+    selected_ids = top_ids_from_prediction_frame(frame, k=DEFAULT_TOP_K)
+    selected_true = true_labels.reindex(selected_ids).astype(str).tolist()
+    selected_oracle = oracle_labels.reindex(selected_ids).astype(str).tolist()
+    true_eval_classes = frame["true_axis_class"].astype(str).tolist()
+    oracle_eval_classes = frame["oracle_axis_class"].astype(str).tolist()
 
     def _lift(classes: Sequence[str], selected_classes: Sequence[str]) -> tuple[float, float, float]:
         if not classes or not selected_classes:
@@ -374,6 +343,7 @@ def _format_plan_text(
         f"run_root: {plan.run_root}",
         f"gate: {plan.gate or 'all'}",
         f"stop_after: {plan.stop_after}",
+        f"rounds: {plan.rounds}",
         f"planned_runs: {len(plan.runs)}",
         f"quality_ok_fraction: {safety.get('quality_ok_fraction')}",
         f"x_surface: {safety.get('x_surface')}",

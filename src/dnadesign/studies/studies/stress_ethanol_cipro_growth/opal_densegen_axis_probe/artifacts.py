@@ -46,6 +46,7 @@ class ProbePlan:
     run_root: Path
     budget: int
     seed: int
+    rounds: int
     gate: str | None
     splits: tuple[str, ...]
     apply: bool
@@ -174,8 +175,8 @@ class ProbeArtifactLayout:
     def campaign_config_path(self, run_key: str) -> Path:
         return self.campaign_workdir(run_key) / "configs" / "campaign.yaml"
 
-    def campaign_label_input_path(self, run_key: str) -> Path:
-        return self.campaign_workdir(run_key) / "inputs" / "r0" / "vec8-b0.parquet"
+    def campaign_label_input_path(self, run_key: str, round_index: int = 0) -> Path:
+        return self.campaign_workdir(run_key) / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
 
     def campaign_sidecar_path(self, run_key: str) -> Path:
         return self.scratch_dataset_dir / "_opal" / run_key / "observed_labels.parquet"

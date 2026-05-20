@@ -94,11 +94,13 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_dens
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --budget 96 \
-  --seed 7 \
-  --splits random_id,leave_sigma35_variant \
-  --apply
+  --budget 96 --seed 7 --rounds 3 --splits random_id,leave_sigma35_variant --apply
 ```
+
+`--rounds` controls a scratch active-learning loop: round 0 uses the planned
+training split, and later rounds label the previous OPAL selections from the
+study-owned DenseGen oracle or permuted null before rerunning OPAL. Synthetic
+labels still never enter the shared observed-label sidecar.
 
 By default, apply-mode run roots must live under:
 
@@ -116,9 +118,7 @@ candidate-table X-column scan:
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --gate cipro-random \
-  --stop-after validate \
-  --apply
+  --gate cipro-random --stop-after validate --apply
 ```
 
 Audit a materialized run root:
@@ -176,5 +176,5 @@ Missing prediction ledgers after a scored OPAL stage are execution contract
 failures and should raise a CLI error rather than producing a research
 decision.
 
-The probe is valuable only if it changes a concrete OPAL/LatentDNA readiness or
+The probe is valuable only if it changes a concrete OPAL readiness or
 assay-design decision.

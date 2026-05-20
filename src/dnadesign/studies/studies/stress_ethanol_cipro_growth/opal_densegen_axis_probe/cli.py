@@ -6,56 +6,13 @@ import argparse
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
-from .artifacts import ProbeArtifactLayout, ProbePlan
-from .constants import CANDIDATE_RECORDS, DEFAULT_BUDGET, DEFAULT_SEED, NULL_ORACLE_ID, ORACLE_ID, RUN_STAGES, SPLITS
+from .artifacts import ProbeArtifactLayout
+from .constants import DEFAULT_BUDGET, DEFAULT_SEED, NULL_ORACLE_ID, ORACLE_ID, RUN_STAGES, SPLITS
+from .execution import materialize_probe_inputs, run_opal_rounds_for_probe
 from .paths import _default_run_root, _repo_root_from, _resolve_repo_path, validate_run_root_policy
 from .status import _format_status_text, audit_run_root
-
-
-def _materialize_probe_inputs(
-    *,
-    repo_root: Path,
-    plan: ProbePlan,
-    labels: Any,
-    null_labels: Any,
-    split_metadata: Mapping[str, Mapping[str, Any]],
-    copy_mode: str,
-) -> None:
-    import pandas as pd
-
-    from .decision import _persisted_split_metadata
-    from .plan import validate_scratch_paths
-    from .scratch import _clone_records_file, _make_training_input, _write_campaign_config, _write_json, _write_parquet
-
-    run_root = plan.run_root
-    layout = ProbeArtifactLayout(run_root)
-    for path in (layout.labels_dir, layout.splits_dir, layout.reports_dir, layout.scratch_campaigns_dir):
-        path.mkdir(parents=True, exist_ok=True)
-    _write_parquet(layout.densegen_labels_path, labels)
-    _write_parquet(layout.null_labels_path, null_labels)
-    _write_json(layout.split_metadata_path, _persisted_split_metadata(split_metadata))
-    for split_id, metadata in split_metadata.items():
-        train_frame = pd.DataFrame({"id": list(metadata["train_ids"])})
-        _write_parquet(layout.train_ids_path(split_id), train_frame)
-        eval_frame = pd.DataFrame({"id": list(metadata["eval_ids"])})
-        _write_parquet(layout.eval_ids_path(split_id), eval_frame)
-
-    if plan.runs:
-        _clone_records_file(
-            _resolve_repo_path(repo_root, CANDIDATE_RECORDS),
-            layout.scratch_records_path,
-            copy_mode=copy_mode,
-        )
-
-    labels_by_oracle = {ORACLE_ID: labels, NULL_ORACLE_ID: null_labels}
-    for run in plan.runs:
-        validate_scratch_paths(run_root=run_root, label_sidecar_path=run.sidecar_path)
-        _write_campaign_config(repo_root, run, run_root)
-        train_ids = split_metadata[run.split_id]["train_ids"]
-        training_input = _make_training_input(labels_by_oracle[run.oracle_id], train_ids)
-        _write_parquet(run.label_input_path, training_input)
 
 
 def _run_probe(args: argparse.Namespace) -> int:
@@ -71,8 +28,8 @@ def _run_probe(args: argparse.Namespace) -> int:
         _split_metadata_for_all,
         _write_decision,
     )
-    from .plan import _opal_commands, build_plan
-    from .scratch import _load_candidate_inputs, _run_command, _write_json
+    from .plan import build_plan
+    from .scratch import _load_candidate_inputs, _write_json
     from .source_contract import validate_candidate_x_surface
 
     repo_root = _repo_root_from(Path.cwd())
@@ -91,6 +48,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         run_root=run_root,
         budget=int(args.budget),
         seed=int(args.seed),
+        rounds=int(args.rounds),
         gate=args.gate,
         splits=splits,
         apply=bool(args.apply),
@@ -109,6 +67,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         "planned_runs": len(plan.runs),
         "gate": plan.gate,
         "stop_after": plan.stop_after,
+        "rounds": plan.rounds,
         "splits": _compact_split_metadata(split_metadata),
         "commands": plan.commands,
     }
@@ -122,7 +81,7 @@ def _run_probe(args: argparse.Namespace) -> int:
 
     null_labels = make_permuted_labels(labels, seed=int(args.seed))
 
-    _materialize_probe_inputs(
+    materialize_probe_inputs(
         repo_root=repo_root,
         plan=plan,
         labels=labels,
@@ -133,14 +92,23 @@ def _run_probe(args: argparse.Namespace) -> int:
 
     metrics: list[dict[str, Any]] = []
     scored = RUN_STAGES.index(plan.stop_after) >= RUN_STAGES.index("run")
+    labeled_ids_by_run: dict[str, set[str]] = {}
     if args.gate != "source":
+        labels_by_oracle = {ORACLE_ID: labels, NULL_ORACLE_ID: null_labels}
+        labeled_ids_by_run = run_opal_rounds_for_probe(
+            repo_root=repo_root,
+            plan=plan,
+            labels_by_oracle=labels_by_oracle,
+            split_metadata=split_metadata,
+            machine_readable=bool(args.json),
+        )
         for run in plan.runs:
-            for command in _opal_commands(run.config_path, stop_after=plan.stop_after):
-                _run_command(command, cwd=repo_root, machine_readable=bool(args.json))
             if scored:
                 run_labels = labels if run.oracle_id == ORACLE_ID else null_labels
                 run_metadata = dict(split_metadata[run.split_id])
-                run_metadata["train_ids"] = split_metadata[run.split_id]["train_ids"]
+                run_metadata["train_ids"] = sorted(
+                    labeled_ids_by_run.get(run.run_key, set(map(str, split_metadata[run.split_id]["train_ids"])))
+                )
                 metrics.append(
                     _evaluate_run(
                         run=run,
@@ -231,6 +199,12 @@ def _build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="Plan or execute the scratch OPAL probe.")
     run.add_argument("--budget", type=int, default=DEFAULT_BUDGET)
     run.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    run.add_argument(
+        "--rounds",
+        type=int,
+        default=1,
+        help="Number of synthetic OPAL label/run rounds per scratch campaign.",
+    )
     run.add_argument("--splits", default="random_id,leave_sigma35_variant")
     run.add_argument("--gate", choices=["source", "cipro-random", "random-all", "leave-sigma35", "all"], default="all")
     run.add_argument("--run-root", default=None)

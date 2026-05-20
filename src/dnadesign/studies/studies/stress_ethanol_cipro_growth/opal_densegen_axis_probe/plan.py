@@ -9,6 +9,13 @@ from .artifacts import ProbeArtifactLayout, ProbePlan, RunSpec
 from .constants import CAMPAIGNS, ORACLE_ID, ORACLES, RUN_STAGES, SHARED_OBSERVED_LABEL_SIDECAR, SPLITS
 
 
+def _validate_rounds(rounds: int) -> int:
+    value = int(rounds)
+    if value < 1:
+        raise ValueError("--rounds must be >= 1")
+    return value
+
+
 def _gate_matrix(gate: str | None, splits: tuple[str, ...]) -> list[tuple[str, str, str]]:
     gate = (gate or "all").strip().lower()
     if gate == "source":
@@ -37,37 +44,70 @@ def _validate_stop_after(stop_after: str) -> str:
     return value
 
 
-def _opal_commands(config_path: Path, *, stop_after: str = "status") -> list[list[str]]:
+def _label_input_path(config_path: Path, round_index: int) -> Path:
+    return config_path.parent.parent / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
+
+
+def _opal_validate_command(config_path: Path) -> list[str]:
     config = str(config_path)
-    stop = _validate_stop_after(stop_after)
-    staged: list[tuple[str, list[str]]] = [
-        ("validate", ["uv", "run", "opal", "validate", "-c", config]),
-        ("init", ["uv", "run", "opal", "init", "-c", config]),
-        (
-            "ingest",
-            [
-                "uv",
-                "run",
-                "opal",
-                "ingest-y",
-                "-c",
-                config,
-                "--round",
-                "0",
-                "--in",
-                str(config_path.parent.parent / "inputs" / "r0" / "vec8-b0.parquet"),
-                "--unknown-sequences",
-                "error",
-                "--apply",
-            ],
-        ),
-        ("run", ["uv", "run", "opal", "run", "-c", config, "--round", "0", "--resume", "--json"]),
-        ("status", ["uv", "run", "opal", "status", "-c", config, "--with-ledger", "--json"]),
+    return ["uv", "run", "opal", "validate", "-c", config]
+
+
+def _opal_init_command(config_path: Path) -> list[str]:
+    config = str(config_path)
+    return ["uv", "run", "opal", "init", "-c", config]
+
+
+def _opal_ingest_command(config_path: Path, round_index: int) -> list[str]:
+    config = str(config_path)
+    return [
+        "uv",
+        "run",
+        "opal",
+        "ingest-y",
+        "-c",
+        config,
+        "--round",
+        str(int(round_index)),
+        "--in",
+        str(_label_input_path(config_path, int(round_index))),
+        "--unknown-sequences",
+        "error",
+        "--apply",
     ]
+
+
+def _opal_run_command(config_path: Path, round_index: int) -> list[str]:
+    config = str(config_path)
+    return ["uv", "run", "opal", "run", "-c", config, "--round", str(int(round_index)), "--resume", "--json"]
+
+
+def _opal_status_command(config_path: Path) -> list[str]:
+    config = str(config_path)
+    return ["uv", "run", "opal", "status", "-c", config, "--with-ledger", "--json"]
+
+
+def _opal_commands(config_path: Path, *, stop_after: str = "status", rounds: int = 1) -> list[list[str]]:
+    stop = _validate_stop_after(stop_after)
+    round_count = _validate_rounds(rounds)
+    commands: list[list[str]] = []
     if stop == "materialize":
-        return []
-    cutoff = RUN_STAGES.index(stop)
-    return [command for stage, command in staged if RUN_STAGES.index(stage) <= cutoff]
+        return commands
+    commands.append(_opal_validate_command(config_path))
+    if RUN_STAGES.index(stop) < RUN_STAGES.index("init"):
+        return commands
+    commands.append(_opal_init_command(config_path))
+    if RUN_STAGES.index(stop) < RUN_STAGES.index("ingest"):
+        return commands
+    if RUN_STAGES.index(stop) < RUN_STAGES.index("run"):
+        commands.append(_opal_ingest_command(config_path, 0))
+        return commands
+    for round_index in range(round_count):
+        commands.append(_opal_ingest_command(config_path, round_index))
+        commands.append(_opal_run_command(config_path, round_index))
+    if RUN_STAGES.index(stop) >= RUN_STAGES.index("status"):
+        commands.append(_opal_status_command(config_path))
+    return commands
 
 
 def build_plan(
@@ -77,10 +117,12 @@ def build_plan(
     seed: int,
     gate: str | None,
     splits: Iterable[str],
+    rounds: int = 1,
     apply: bool = False,
     stop_after: str = "status",
 ) -> ProbePlan:
     stop = _validate_stop_after(stop_after)
+    round_count = _validate_rounds(rounds)
     split_tuple = tuple(dict.fromkeys(str(split).strip() for split in splits if str(split).strip()))
     if not split_tuple:
         split_tuple = ("random_id", "leave_sigma35_variant")
@@ -110,11 +152,12 @@ def build_plan(
                 sidecar_path=sidecar_path,
             )
         )
-        commands.extend(_opal_commands(config_path, stop_after=stop))
+        commands.extend(_opal_commands(config_path, stop_after=stop, rounds=round_count))
     return ProbePlan(
         run_root=run_root,
         budget=int(budget),
         seed=int(seed),
+        rounds=round_count,
         gate=gate,
         splits=split_tuple,
         apply=bool(apply),
