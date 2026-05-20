@@ -120,6 +120,55 @@ print(json.dumps(sorted(
     assert imported_modules == []
 
 
+def test_stress_status_provider_import_does_not_load_service_or_heavy_stacks() -> None:
+    imported_modules = _run_python(
+        """
+import importlib
+import json
+import sys
+
+importlib.import_module('dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider')
+watched = {
+    'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
+    'dnadesign.densegen',
+    'dnadesign.infer',
+    'dnadesign.usr',
+    'numpy',
+    'pandas',
+    'pyarrow',
+    'yaml',
+}
+print(json.dumps(sorted(name for name in sys.modules if name in watched)))
+"""
+    )
+
+    assert imported_modules == []
+
+
+def test_retron_status_provider_import_does_not_load_service_or_heavy_stacks() -> None:
+    imported_modules = _run_python(
+        """
+import importlib
+import json
+import sys
+
+importlib.import_module('dnadesign.studies.studies.retron_hairpin_design.status.ops.provider')
+watched = {
+    'dnadesign.studies.studies.retron_hairpin_design.status.service',
+    'dnadesign.cruncher',
+    'dnadesign.usr',
+    'numpy',
+    'pandas',
+    'pyarrow',
+    'yaml',
+}
+print(json.dumps(sorted(name for name in sys.modules if name in watched)))
+"""
+    )
+
+    assert imported_modules == []
+
+
 def test_status_registry_fragments_reject_unknown_top_level_keys(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -307,6 +356,21 @@ print(json.dumps(sorted(
         'dnadesign.infer',
     } or name.startswith('dnadesign.baserender')
 )))
+"""
+    )
+
+    assert imported_modules == []
+
+
+def test_infer_fill_import_does_not_import_studies_package() -> None:
+    imported_modules = _run_python(
+        """
+import importlib
+import json
+import sys
+
+importlib.import_module('dnadesign.ops.orchestrator.infer_fill')
+print(json.dumps(sorted(name for name in sys.modules if name.startswith('dnadesign.studies'))))
 """
     )
 

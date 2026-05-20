@@ -13,6 +13,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from dnadesign.ops.preflight import (
@@ -405,6 +406,61 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
         runbook_root / "infer_anchor_only_20b.yaml",
         runbook_root / "infer_anchor_only_7b.yaml",
     ]
+
+
+def test_dataset_snapshot_check_can_require_exact_rows(tmp_path: Path) -> None:
+    base = _contract()
+    contract = replace(
+        base,
+        preflight=replace(
+            base.preflight,
+            check_specs={
+                "infer_batch_preparation": (
+                    {
+                        "kind": "dataset_snapshot",
+                        "check_id": "infer.construct.contexts.rows",
+                        "check_group": "infer",
+                        "summary": "Construct contexts have the expected exact row count.",
+                        "required": True,
+                        "artifact": "construct_context_dataset",
+                        "target_rows": 2,
+                        "row_count_mode": "exact",
+                    },
+                )
+            },
+        ),
+    )
+
+    checks = build_contract_preflight_checks(
+        repo_root=tmp_path,
+        study_root=tmp_path / "docs" / "studies" / "demo_study",
+        contract=contract,
+        dataset_index={
+            "promoter/demo_construct_contexts": {
+                "dataset": "promoter/demo_construct_contexts",
+                "exists": True,
+                "records_path": str(tmp_path / "usr_root" / "promoter" / "demo_construct_contexts" / "records.parquet"),
+                "rows": 3,
+            }
+        },
+        execution_surface_index={},
+        enabled_groups={"infer"},
+        environ={},
+        dependencies=ContractPreflightCheckDependencies(
+            run_preflight_command=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no commands expected")),
+            safe_json_loads=lambda text: json.loads(text or "") if text else None,
+            choose_command_summary=choose_command_summary,
+            inspect_local_gpu_inventory=lambda: {"count": 0, "devices": [], "probe_error": None},
+        ),
+    )
+
+    assert len(checks) == 1
+    assert checks[0].state == "attention"
+    assert checks[0].summary == (
+        "Construct contexts have the expected exact row count. Current rows 3 do not equal expected 2."
+    )
+    assert checks[0].details["row_count_mode"] == "exact"
+    assert checks[0].details["row_delta"] == 1
 
 
 def test_contract_environment_flag_state_reads_declared_environment_checks() -> None:

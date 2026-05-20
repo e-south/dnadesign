@@ -802,6 +802,12 @@ def _validated_preflight_checks(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
                         f"target_rows: {contract_path}"
                     )
+                row_count_mode = _string_or_none(spec.get("row_count_mode")) or "at_least"
+                if row_count_mode not in {"at_least", "exact"}:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} has unsupported "
+                        f"row_count_mode {row_count_mode!r}: {contract_path}"
+                    )
             if kind in {
                 "runbook_plan",
                 "workspace_layout",

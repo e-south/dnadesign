@@ -16,16 +16,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import yaml
-
 from dnadesign.infer import plan_sequence_view_feature_inventory_completion_from_config
-from dnadesign.studies.core.record_loader import load_study_ops_contract
 
 from ..runbooks.path_policy import WORKSPACE_AUDIT_RELATIVE_DIR
 from ..runbooks.schema import OrchestrationRunbookV1, is_infer_workflow_id, load_orchestration_runbook
 from .execute import BatchExecutionResult, execute_batch_plan
 from .plan import BatchPlan, build_batch_plan
 from .state import ActiveJobResolution, resolve_active_job_resolution
+from .study_runbooks import discover_infer_runbook_paths_for_study, resolve_active_study_dir
 
 InferFillLaneAction = Literal["run", "skip_complete", "skip_unsupported", "blocked"]
 
@@ -131,43 +129,6 @@ class InferFillPlan:
             "errors": list(self.errors),
             "lanes": [lane.as_dict() for lane in self.lanes],
         }
-
-
-def resolve_active_study_dir(*, repo_root: Path) -> Path:
-    index_path = repo_root / "docs" / "studies" / "index.yaml"
-    payload = _read_yaml_mapping(index_path)
-    active_study_id = str(payload.get("active_study_id") or "").strip()
-    if not active_study_id:
-        raise ValueError(f"active_study_id is required in {index_path}")
-    studies = payload.get("studies") or ()
-    if not isinstance(studies, Sequence) or isinstance(studies, (str, bytes)):
-        raise ValueError(f"studies must be a list in {index_path}")
-    for entry in studies:
-        if not isinstance(entry, Mapping):
-            continue
-        if str(entry.get("study_id") or "").strip() != active_study_id:
-            continue
-        record_root = str(entry.get("record_root") or "").strip()
-        if not record_root:
-            raise ValueError(f"active study {active_study_id} is missing record_root in {index_path}")
-        return (repo_root / record_root).resolve()
-    raise ValueError(f"active study {active_study_id} is not declared in {index_path}")
-
-
-def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) -> tuple[Path, ...]:
-    contract = load_study_ops_contract(study_dir)
-    surfaces = contract.execution_surfaces
-    paths: list[Path] = []
-    for surface in surfaces.values():
-        if not isinstance(surface, Mapping):
-            continue
-        if str(surface.get("surface_type") or "").strip() != "runbook":
-            continue
-        runbook_ref = str(surface.get("runbook_ref") or "").strip()
-        if not runbook_ref:
-            continue
-        paths.append(_resolve_path_ref(runbook_ref, repo_root=repo_root, manifest_dir=study_dir))
-    return _dedupe_paths(paths)
 
 
 def build_infer_fill_plan(
@@ -470,29 +431,6 @@ def _mapping_int(payload: Mapping[str, object], field: str) -> int:
     if isinstance(value, bool):
         raise ValueError(f"completion field {field} must be an integer, not boolean")
     return int(value or 0)
-
-
-def _read_yaml_mapping(path: Path) -> Mapping[str, object]:
-    if not path.exists():
-        raise FileNotFoundError(f"file not found: {path}")
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, Mapping):
-        raise ValueError(f"yaml root must be a mapping: {path}")
-    return payload
-
-
-def _resolve_path_ref(ref: str, *, repo_root: Path, manifest_dir: Path) -> Path:
-    text = str(ref or "").strip()
-    if not text:
-        raise ValueError("path ref must be non-empty")
-    if text.startswith("repo:"):
-        return (repo_root / text.removeprefix("repo:")).resolve()
-    if text.startswith("manifest:"):
-        return (manifest_dir / text.removeprefix("manifest:")).resolve()
-    path = Path(text).expanduser()
-    if path.is_absolute():
-        return path.resolve()
-    return (repo_root / path).resolve()
 
 
 def _dedupe_paths(paths: Sequence[Path]) -> tuple[Path, ...]:

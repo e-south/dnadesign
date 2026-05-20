@@ -10,8 +10,19 @@ set -euo pipefail
 
 # Notify boundary reminder: Notify watches USR <dataset>/.events.log, not DenseGen outputs/meta/events.jsonl.
 
+DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
+DENSEGEN_VALIDATE_ARGS="${DENSEGEN_VALIDATE_ARGS:---probe-solver}"
+DENSEGEN_RUN_ARGS="${DENSEGEN_RUN_ARGS:-}"
+
+if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
+  echo "Missing DenseGen config: $DENSEGEN_CONFIG"
+  echo "Set DENSEGEN_CONFIG=/abs/path/to/config.yaml or submit from a DenseGen workspace." >&2
+  exit 2
+fi
+
 JOB_ID_VALUE="${JOB_ID:-manual}"
-DENSEGEN_TRACE_DIR="${DENSEGEN_TRACE_DIR:-$PWD/outputs/logs/ops/runtime}"
+DENSEGEN_WORKSPACE_ROOT="$(cd "$(dirname "$DENSEGEN_CONFIG")" && pwd -P)"
+DENSEGEN_TRACE_DIR="${DENSEGEN_TRACE_DIR:-$DENSEGEN_WORKSPACE_ROOT/outputs/logs/ops/runtime}"
 mkdir -p "$DENSEGEN_TRACE_DIR"
 DENSEGEN_TRACE_FILE="${DENSEGEN_TRACE_DIR}/dnadesign_densegen_cpu.${JOB_ID_VALUE}.trace.log"
 DENSEGEN_TRACE_FILTER_AWK='
@@ -28,10 +39,6 @@ else
 fi
 echo "DenseGen runtime trace: $DENSEGEN_TRACE_FILE"
 
-DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
-DENSEGEN_VALIDATE_ARGS="${DENSEGEN_VALIDATE_ARGS:---probe-solver}"
-DENSEGEN_RUN_ARGS="${DENSEGEN_RUN_ARGS:-}"
-
 VALIDATE_ARGS=()
 RUN_ARGS=()
 if [[ -n "$DENSEGEN_VALIDATE_ARGS" ]]; then
@@ -39,12 +46,6 @@ if [[ -n "$DENSEGEN_VALIDATE_ARGS" ]]; then
 fi
 if [[ -n "$DENSEGEN_RUN_ARGS" ]]; then
   read -r -a RUN_ARGS <<< "$DENSEGEN_RUN_ARGS"
-fi
-
-if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
-  echo "Missing DenseGen config: $DENSEGEN_CONFIG"
-  echo "Set DENSEGEN_CONFIG=/abs/path/to/config.yaml or submit from a DenseGen workspace." >&2
-  exit 2
 fi
 
 has_fresh=0

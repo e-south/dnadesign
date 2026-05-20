@@ -430,6 +430,10 @@ def test_densegen_cpu_qsub_real_local_resume_extend_flow(tmp_path: Path) -> None
     rows_after_third = int(pq.read_table(records_path).num_rows)
     assert rows_after_third == rows_after_second
 
+    trace_path = workspace / "outputs" / "logs" / "ops" / "runtime" / "dnadesign_densegen_cpu.9001.trace.log"
+    assert trace_path.is_file()
+    assert f"DenseGen runtime trace: {trace_path}" in third.stdout
+
     state_path = workspace / "outputs" / "meta" / "run_state.json"
     payload = json.loads(state_path.read_text(encoding="utf-8"))
     assert int(payload.get("total_generated", -1)) == rows_after_third

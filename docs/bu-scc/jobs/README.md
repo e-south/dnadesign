@@ -41,7 +41,7 @@ qsub -P <project> \
 - run: `DENSEGEN_RUN_ARGS` must include exactly one of `--fresh` or `--resume`
 - actor tags: `USR_ACTOR_TOOL=densegen`, `USR_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
 - thread alignment: `OMP_NUM_THREADS=${NSLOTS:-1}`
-- runtime trace: `outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
+- runtime trace: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 - GUROBI bootstrap defaults:
   - `module load gurobi/10.0.1` when modules are available
   - `GUROBI_HOME=/share/pkg.7/gurobi/10.0.1/install`
@@ -215,7 +215,7 @@ What it does:
 Each script writes logs to:
 
 - `outputs/logs/$JOB_NAME.$JOB_ID.out`
-- DenseGen runtime traces: `outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
+- DenseGen runtime traces: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 
 Tail logs:
 

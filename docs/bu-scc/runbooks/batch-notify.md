@@ -159,7 +159,7 @@ qsub -P <project> \
 - validation: `--probe-solver`
 - run mode: `DENSEGEN_RUN_ARGS` must include exactly one of `--fresh` or `--resume`
 - override via `DENSEGEN_VALIDATE_ARGS` and `DENSEGEN_RUN_ARGS` at submit time.
-- runtime trace: `outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
+- runtime trace: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 - GUROBI runtime bootstrap defaults for BU SCC are applied in-template and can be overridden via
   `GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
 

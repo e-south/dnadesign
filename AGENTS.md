@@ -31,6 +31,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
     If external router guidance points at that script, use the repo-local checks below instead.
   - `uv run ruff check .`
   - `uv run ruff format --check .`
+  - `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
   - `uv run pytest -q`
   - `uv run python -m dnadesign.devtools.docs.checks`
 - Discover CLIs:
@@ -83,6 +84,7 @@ Rules:
 - Diff reviewed
 - Tests pass or scope-limited rationale documented
 - Ruff checks pass
+- Architecture boundary checks pass
 - Docs checks pass
 - No generated artifacts committed unintentionally
 - Changes are on a branch and ready for PR review
