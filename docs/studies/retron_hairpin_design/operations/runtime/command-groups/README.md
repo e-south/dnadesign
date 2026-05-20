@@ -14,8 +14,8 @@ canonical_payload: pipeline.yaml
 **Last verified:** 2026-05-18
 
 Use this page when an agent needs command-group orientation without opening the
-full `pipeline.yaml`. The full YAML remains the compatibility payload for OPS
-status/preflight and docs-contract checks.
+full `pipeline.yaml`. The full YAML remains the machine-readable payload for
+OPS status/preflight and docs-contract checks.
 
 ### Lane Index
 

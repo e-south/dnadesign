@@ -14,8 +14,8 @@ design study.
   split by Retron track under `contract/readiness/checks/`.
 - `runtime/command-groups/README.md`: progressive-disclosure entrypoint for
   runtime command groups.
-- `runtime/command-groups/pipeline.yaml`: compatibility payload for command
-  groups and automation bootstrap metadata.
+- `runtime/command-groups/pipeline.yaml`: machine-readable payload for command
+  groups and native-agent bootstrap metadata.
 - `runtime/command-groups/lanes/`: compiler, materialize, Snapback, scar-nick,
   and YIU navigation sidecars for agents that need one owner lane at a time.
 

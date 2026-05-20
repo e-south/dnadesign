@@ -20,6 +20,7 @@ import yaml
 from dnadesign.contracts.sequence import MsdDesignReferenceV1
 
 from .msd_ids import ParsedMsdConstructLabel
+from .strict_mapping_io import DuplicateMappingKeyError, load_unique_yaml
 
 _REGISTRY_RELATIVE_PATH = Path("compiler") / "catalog" / "msd_design_registry.yaml"
 
@@ -43,6 +44,8 @@ class RetronMsdRegistry:
         cap_metadata: dict[str, Any] | None = None,
         scar_nick_metadata: dict[str, Any] | None = None,
         source_notes: str | None = None,
+        allow_unregistered_construct: bool = False,
+        use_construct_metadata: bool = True,
     ) -> MsdDesignReferenceV1:
         return self.build_reference_from_parts(
             parsed,
@@ -50,6 +53,8 @@ class RetronMsdRegistry:
             cap_metadata=cap_metadata,
             scar_nick_metadata=scar_nick_metadata,
             source_notes=source_notes,
+            allow_unregistered_construct=allow_unregistered_construct,
+            use_construct_metadata=use_construct_metadata,
         )
 
     def build_reference_from_parts(
@@ -60,6 +65,8 @@ class RetronMsdRegistry:
         cap_metadata: dict[str, Any] | None = None,
         scar_nick_metadata: dict[str, Any] | None = None,
         source_notes: str | None = None,
+        allow_unregistered_construct: bool = False,
+        use_construct_metadata: bool = True,
     ) -> MsdDesignReferenceV1:
         payload = self._optional_mapping(self.payloads, parsed.payload_id, label="payload")
         if payload is None and payload_metadata is None:
@@ -77,10 +84,13 @@ class RetronMsdRegistry:
             if not isinstance(cap_metadata, dict):
                 raise RetronMsdRegistryError(f"cap metadata must be a mapping: {parsed.cap_id}")
             cap.update(cap_metadata)
-        construct = self.constructs.get(parsed.construct_id, {})
-        if not isinstance(construct, dict):
-            raise RetronMsdRegistryError(f"construct registry entry must be a mapping: {parsed.construct_id}")
-        scar_nick = construct.get("scar_nick", {})
+        construct = self._optional_mapping(self.constructs, parsed.construct_id, label="construct")
+        if construct is None:
+            if not allow_unregistered_construct:
+                self._require_mapping(self.constructs, parsed.construct_id, label="construct")
+            construct = {}
+        construct = dict(construct)
+        scar_nick = construct.get("scar_nick", {}) if use_construct_metadata else {}
         if scar_nick is None:
             scar_nick = {}
         if not isinstance(scar_nick, dict):
@@ -115,7 +125,7 @@ class RetronMsdRegistry:
                     "nickase": scar_nick.get("nickase"),
                     "route_note": scar_nick.get("route_note"),
                 },
-                "source_notes": source_notes or construct.get("source_notes"),
+                "source_notes": source_notes or (construct.get("source_notes") if use_construct_metadata else None),
             }
         )
 
@@ -129,6 +139,12 @@ class RetronMsdRegistry:
                     f"Unknown {label} '{key}' in MSD construct label. C### cap ids are source handles and are not "
                     "inferred from de033 by pattern; add an explicit registry entry or materialize with a "
                     f"5'->3' cap sequence/source. Available: {available}."
+                )
+            if label == "construct":
+                raise RetronMsdRegistryError(
+                    f"Unknown construct '{key}' in MSD construct label. Plain labels must reference a registered "
+                    "construct; use a typed compiler spec with explicit payload and cap sequences for a manual "
+                    f"construct. Available: {available}."
                 )
             raise RetronMsdRegistryError(f"Unknown {label} '{key}' in MSD construct label. Available: {available}.")
         return value
@@ -149,7 +165,9 @@ def load_retron_msd_registry(study_dir: str | Path) -> RetronMsdRegistry:
     if not registry_path.is_file():
         raise RetronMsdRegistryError(f"Retron MSD registry not found: {registry_path}")
     try:
-        payload = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
+        payload = load_unique_yaml(registry_path) or {}
+    except DuplicateMappingKeyError as exc:
+        raise RetronMsdRegistryError(f"Retron MSD registry contains {exc}") from exc
     except yaml.YAMLError as exc:
         raise RetronMsdRegistryError(f"Retron MSD registry is invalid YAML: {registry_path}") from exc
     if not isinstance(payload, dict):

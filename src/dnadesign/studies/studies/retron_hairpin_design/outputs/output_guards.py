@@ -98,7 +98,7 @@ def guard_catalog_output_layout(
 def guard_materialize_output_layout(
     root: Path,
     *,
-    expected_design_ids: set[str],
+    expected_variant_dirnames: set[str],
     expected_reference_filenames: set[str],
 ) -> None:
     if not root.exists():
@@ -175,7 +175,7 @@ def guard_materialize_output_layout(
     configs_dir = manifest_dir / MANIFEST_CONFIGS_DIRNAME / COMPOSITION_CONFIG_DIRNAME
     if configs_dir.exists():
         expected_config_names = {
-            f"{design_id}.linear_ssdna_composition.yaml" for design_id in expected_design_ids
+            f"{variant_dirname}.linear_ssdna_composition.yaml" for variant_dirname in expected_variant_dirnames
         } | IGNORED_OUTPUT_FILENAMES
         stale_configs = sorted(item.name for item in configs_dir.iterdir() if item.name not in expected_config_names)
         if stale_configs:
@@ -188,7 +188,9 @@ def guard_materialize_output_layout(
     if not variants_dir.exists():
         return
     stale_variants = sorted(
-        item.name for item in variants_dir.iterdir() if item.name not in expected_design_ids | IGNORED_OUTPUT_FILENAMES
+        item.name
+        for item in variants_dir.iterdir()
+        if item.name not in expected_variant_dirnames | IGNORED_OUTPUT_FILENAMES
     )
     if stale_variants:
         raise RetronMsdCompilerError(

@@ -18,6 +18,8 @@ from typing import Any
 
 import yaml
 
+from .strict_mapping_io import DuplicateMappingKeyError, load_unique_yaml
+
 _CAP_SOURCE_LOOKUP_RELATIVE_PATH = Path("compiler") / "catalog" / "msd_cap_sources.yaml"
 _CAP_SOURCE_LABEL_RE = re.compile(
     r"^(?P<construct_id>[A-Za-z0-9_.-]+)-msd\[(?P<payload_id>[A-Za-z0-9_.-]+)\];\s*"
@@ -76,7 +78,9 @@ def load_msd_cap_source_lookup(study_dir: str | Path) -> RetronMsdCapSourceLooku
     if not lookup_path.is_file():
         raise RetronMsdCapSourceError(f"Retron MSD cap source lookup not found: {lookup_path}")
     try:
-        payload = yaml.safe_load(lookup_path.read_text(encoding="utf-8")) or {}
+        payload = load_unique_yaml(lookup_path) or {}
+    except DuplicateMappingKeyError as exc:
+        raise RetronMsdCapSourceError(f"Retron MSD cap source lookup contains {exc}") from exc
     except yaml.YAMLError as exc:
         raise RetronMsdCapSourceError(f"Retron MSD cap source lookup is invalid YAML: {lookup_path}") from exc
     if not isinstance(payload, dict):

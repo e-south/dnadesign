@@ -26,6 +26,7 @@ from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from dnadesign.studies.studies.retron_hairpin_design.catalog.cap_sources import (
+    RetronMsdCapSourceError,
     load_msd_cap_source_lookup,
     parse_cap_source_label,
 )
@@ -37,6 +38,9 @@ from dnadesign.studies.studies.retron_hairpin_design.catalog.msd_ids import (
     parse_msd_construct_label,
     parse_msd_design_parts,
 )
+from dnadesign.studies.studies.retron_hairpin_design.compiler.exceptions import RetronMsdCompilerError
+from dnadesign.studies.studies.retron_hairpin_design.compiler.materialization import materialize_msd_design_artifacts
+from dnadesign.studies.studies.retron_hairpin_design.compiler.references import compile_msd_design_catalog
 from dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app import app
 
 _RUNNER = CliRunner()
@@ -93,6 +97,35 @@ def test_checked_in_cap_source_lookup_keeps_de033_sources_explicit() -> None:
         "C176": "GTGACGCAC",
     }
     assert registry.sources["C172"].source_label == "pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC"
+
+
+def test_cap_source_lookup_rejects_duplicate_yaml_mapping_keys(tmp_path: Path) -> None:
+    study_dir = tmp_path / "study"
+    compiler_dir = study_dir / "compiler" / "catalog"
+    compiler_dir.mkdir(parents=True)
+    (compiler_dir / "msd_cap_sources.yaml").write_text(
+        """
+contract: retron_msd_cap_source_lookup_v1
+schema_version: 1
+sources:
+  C172:
+    source_label: pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC
+    source_construct: pES-retron-172
+    payload_id: TetR
+    source_family: "033"
+    sequence_5to3: GAGAGACTC
+  C172:
+    source_label: pES-retron-172-msd[TetR]; 033-GGA-AGA-TCC
+    source_construct: pES-retron-172
+    payload_id: TetR
+    source_family: "033"
+    sequence_5to3: GGAAGATCC
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RetronMsdCapSourceError, match="duplicate mapping key: 'C172'"):
+        load_msd_cap_source_lookup(study_dir)
 
 
 def _install_fake_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,6 +202,46 @@ constructs:
         encoding="utf-8",
     )
     return study_dir
+
+
+def test_retron_msd_lint_cli_rejects_duplicate_registry_keys(tmp_path: Path) -> None:
+    study_dir = tmp_path / "study"
+    compiler_dir = study_dir / "compiler" / "catalog"
+    compiler_dir.mkdir(parents=True)
+    (compiler_dir / "msd_design_registry.yaml").write_text(
+        """
+contract: retron_msd_design_registry_v1
+schema_version: 1
+payloads:
+  TetR:
+    display_name: msd[teto]
+  TetR:
+    display_name: overwritten
+caps:
+  C172:
+    source_construct: retron-172
+constructs:
+  pES-retron-177: {}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--id",
+            "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "Retron MSD registry contains duplicate mapping key: 'TetR'" in payload["error"]
 
 
 def test_compute_scar_nick_profile_uses_s3_to_s0_convention() -> None:
@@ -300,6 +373,30 @@ def test_retron_msd_lint_cli_fails_fast_on_unknown_registry_part(tmp_path: Path)
     assert "Route missing cap or shortening constraints to Snapback" in payload["next_step"]
 
 
+def test_retron_msd_lint_cli_fails_fast_on_unknown_construct_label(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--id",
+            "pES-retron-typo-msd[TetR]; C172-LCGGT-RACAG-MXMM",
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert "Unknown construct 'pES-retron-typo'" in payload["error"]
+    assert "Plain labels must reference a registered construct" in payload["error"]
+    assert "typed compiler spec with explicit payload and cap sequences" in payload["next_step"]
+
+
 def test_retron_msd_lint_spec_accepts_explicit_design_parts(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     spec_path = tmp_path / "compiler_spec.yaml"
@@ -338,7 +435,52 @@ cap_sequences:
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["record_count"] == 1
-    assert payload["records"][0]["construct_label"] == "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+    record = payload["records"][0]
+    assert record["construct_label"] == "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"
+    assert record["source_notes"] is None
+    assert record["scar_nick"]["route_status"] == "unresolved"
+    assert record["scar_nick"]["nick_orientation"] is None
+
+
+def test_retron_msd_lint_spec_rejects_mixed_labels_and_designs(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+designs:
+  - construct_id: pES-retron-177
+    payload_id: TetR
+    cap_id: C172
+    left_base: CGGT
+    right_base: ACAG
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172: GAGAGACTC
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "compiler spec must use labels or designs, not both" in payload["error"]
 
 
 def test_retron_msd_lint_spec_allows_non_ligatable_s0_when_declared(tmp_path: Path) -> None:
@@ -592,6 +734,7 @@ designs:
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert "Unknown payload 'UserPayload'" in payload["error"]
+    assert "explicit payload and cap sequences" in payload["next_step"]
 
 
 def test_retron_msd_lint_spec_rejects_payload_primitive_source_without_public_contract(tmp_path: Path) -> None:
@@ -636,6 +779,116 @@ cap_sequences:
     assert "payload primitive sources need a dedicated public contract" in payload["error"]
 
 
+def test_retron_msd_lint_spec_rejects_duplicate_yaml_mapping_keys(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+payload_sequences:
+  TetR: aaaa
+cap_sequences:
+  C172: GAGAGACTC
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "duplicate mapping key: 'payload_sequences'" in payload["error"]
+
+
+def test_retron_msd_lint_spec_rejects_duplicate_json_mapping_keys(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.json"
+    spec_path.write_text(
+        """
+{
+  "contract": "retron_msd_compiler_spec_v1",
+  "schema_version": 1,
+  "labels": ["pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"],
+  "payload_sequences": {
+    "TetR": "tccctatcagtgatagaga",
+    "TetR": "aaaa"
+  },
+  "cap_sequences": {"C172": "GAGAGACTC"}
+}
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "duplicate mapping key: 'TetR'" in payload["error"]
+
+
+def test_retron_msd_lint_spec_rejects_sequence_keys_that_collide_after_trimming(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+  " TetR ": aaaa
+cap_sequences:
+  C172: GAGAGACTC
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "payload_sequences contains duplicate key after trimming: TetR" in payload["error"]
+
+
 def test_retron_msd_lint_spec_rejects_literal_cap_shorter_than_supplied_topology(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     spec_path = tmp_path / "compiler_spec.yaml"
@@ -669,6 +922,41 @@ cap_sequences:
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
     assert "cap_sequences.C172.sequence is 4 nt but supplied topology ends at 9" in payload["error"]
+
+
+def test_retron_msd_lint_spec_rejects_literal_cap_longer_than_supplied_topology(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    spec_path = tmp_path / "compiler_spec.yaml"
+    spec_path.write_text(
+        """
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+labels:
+  - pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM
+payload_sequences:
+  TetR: tccctatcagtgatagaga
+cap_sequences:
+  C172: GAGAGACTCA
+""",
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "lint",
+            "--spec",
+            spec_path.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert "cap_sequences.C172.sequence is 10 nt but supplied topology ends at 9" in payload["error"]
 
 
 def test_retron_msd_lint_spec_rejects_scar_nick_primitive_profile_drift(tmp_path: Path) -> None:
@@ -1136,6 +1424,22 @@ def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> N
     assert "explicit 5'->3' cap sequences" in payload["next_step"]
 
 
+def test_retron_msd_materialize_api_validates_direct_sequence_maps(tmp_path: Path) -> None:
+    study_dir = _write_registry(tmp_path)
+    catalog = compile_msd_design_catalog(
+        ["pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM"],
+        study_dir=study_dir,
+    )
+
+    with pytest.raises(RetronMsdCompilerError, match="payload_sequences.TetR contains non-DNA bases: N"):
+        materialize_msd_design_artifacts(
+            catalog,
+            out_dir=tmp_path / "sequence_bundle",
+            payload_sequences={"TetR": "ACNT"},
+            cap_sequences={"C172": _SNAPBACK_FOLDBACK},
+        )
+
+
 @pytest.mark.parametrize(
     ("sequence_flag", "first_value", "second_value", "error_text"),
     [
@@ -1251,6 +1555,7 @@ def test_retron_msd_materialize_preserves_construct_label_in_variant_index(
     out_dir = tmp_path / "sequence_bundle"
     requested_label = "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX"
     expected_design_id = "msd-tetr-C172-LCGGG-RACAG-MXMX"
+    expected_variant_dirname = f"pES-retron-177__{expected_design_id}"
 
     result = _RUNNER.invoke(
         app,
@@ -1280,7 +1585,7 @@ def test_retron_msd_materialize_preserves_construct_label_in_variant_index(
     assert variant["construct_id"] == "pES-retron-177"
     assert variant["construct_label"] == requested_label
     assert variant["msd_design_id"] == expected_design_id
-    assert variant["artifact_bundle"] == f"variants/{expected_design_id}"
+    assert variant["artifact_bundle"] == f"variants/{expected_variant_dirname}"
 
     rows = list(
         csv.DictReader(
@@ -1352,7 +1657,7 @@ constructs:
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["record_count"] == 1
-    variant_dir = out_dir / "variants" / "msd-tetr-C26-LCAAG-RCTCG-MXMM"
+    variant_dir = out_dir / "variants" / "pES-retron-178__msd-tetr-C26-LCAAG-RCTCG-MXMM"
     assert (variant_dir / "sequences" / "forward.gb").is_file()
     assert (variant_dir / "plots" / "secondary_structure.native.png").is_file()
 
@@ -1491,19 +1796,16 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert Path(payload["composition_configs_dir"]) == out_dir / "manifest" / "configs" / "composition"
     assert (out_dir / "manifest" / "bundle" / "manifest.json").is_file()
     assert (out_dir / "manifest" / "catalog" / "references").is_dir()
+    expected_variant_dirname = "pES-retron-177__msd-tetr-C172-LCGGT-RACAG-MXMM"
     assert (
-        out_dir
-        / "manifest"
-        / "configs"
-        / "composition"
-        / "msd-tetr-C172-LCGGT-RACAG-MXMM.linear_ssdna_composition.yaml"
+        out_dir / "manifest" / "configs" / "composition" / f"{expected_variant_dirname}.linear_ssdna_composition.yaml"
     ).is_file()
     assert payload["finder_open"] == f"open {out_dir}"
     assert "Single-unit MSD sequence bundle emitted" in payload["next_step"]
 
     variant = payload["variants"][0]
-    variant_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM"
-    expected_variant = Path("variants/msd-tetr-C172-LCGGT-RACAG-MXMM")
+    variant_dir = out_dir / "variants" / expected_variant_dirname
+    expected_variant = Path("variants") / expected_variant_dirname
     genbank_path = variant_dir / "sequences" / "forward.gb"
     revcom_genbank_path = variant_dir / "sequences" / "reverse_complement.gb"
     features_path = variant_dir / "sequences" / "features.csv"
@@ -1527,17 +1829,11 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     ]
     assert variant["unit_count"] == 1
     assert Path(variant["genbank"]) == expected_variant / "sequences" / "forward.gb"
-    assert Path(variant["reverse_complement_genbank"]) == Path(
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
-    )
-    assert Path(variant["composition_overview_svg"]) == Path(
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
-    )
-    assert Path(variant["composition_overview_png"]) == Path(
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
-    )
-    assert Path(variant["secondary_structure_native_png"]) == Path(
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
+    assert Path(variant["reverse_complement_genbank"]) == expected_variant / "sequences" / "reverse_complement.gb"
+    assert Path(variant["composition_overview_svg"]) == expected_variant / "plots" / "composition_overview.svg"
+    assert Path(variant["composition_overview_png"]) == expected_variant / "plots" / "composition_overview.png"
+    assert Path(variant["secondary_structure_native_png"]) == (
+        expected_variant / "plots" / "secondary_structure.native.png"
     )
     assert "component_span_png" not in variant
     assert "folding_png" not in variant
@@ -1637,18 +1933,15 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
         )
     )
     assert rows[0]["unit_count"] == "1"
-    assert rows[0]["genbank"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/forward.gb"
-    assert rows[0]["reverse_complement_genbank"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
+    assert rows[0]["genbank"] == (expected_variant / "sequences" / "forward.gb").as_posix()
+    assert (
+        rows[0]["reverse_complement_genbank"] == (expected_variant / "sequences" / "reverse_complement.gb").as_posix()
     )
-    assert rows[0]["composition_overview_svg"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
-    )
-    assert rows[0]["composition_overview_png"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
-    )
-    assert rows[0]["secondary_structure_native_png"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
+    assert rows[0]["composition_overview_svg"] == (expected_variant / "plots" / "composition_overview.svg").as_posix()
+    assert rows[0]["composition_overview_png"] == (expected_variant / "plots" / "composition_overview.png").as_posix()
+    assert (
+        rows[0]["secondary_structure_native_png"]
+        == (expected_variant / "plots" / "secondary_structure.native.png").as_posix()
     )
     assert "component_span_png" not in rows[0]
     assert "folding_png" not in rows[0]
@@ -1662,19 +1955,23 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     flank_3p_len = 4 + len("acagtaactcaga")
     unit_len = flank_5p_len + len(_TETO_PAYLOAD) + len(_SNAPBACK_FOLDBACK) + len(_TETO_PAYLOAD) + flank_3p_len
     assert record["sequence"]["length"] == unit_len
-    assert record["source"]["dnadesign_bundle"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM"
-    assert record["artifacts"]["genbank"] == "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/forward.gb"
-    assert record["artifacts"]["reverse_complement_genbank"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/sequences/reverse_complement.gb"
+    assert record["source"]["dnadesign_bundle"] == expected_variant.as_posix()
+    assert record["artifacts"]["genbank"] == (expected_variant / "sequences" / "forward.gb").as_posix()
+    assert (
+        record["artifacts"]["reverse_complement_genbank"]
+        == (expected_variant / "sequences" / "reverse_complement.gb").as_posix()
     )
-    assert record["artifacts"]["composition_overview_svg"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.svg"
+    assert (
+        record["artifacts"]["composition_overview_svg"]
+        == (expected_variant / "plots" / "composition_overview.svg").as_posix()
     )
-    assert record["artifacts"]["composition_overview_png"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/composition_overview.png"
+    assert (
+        record["artifacts"]["composition_overview_png"]
+        == (expected_variant / "plots" / "composition_overview.png").as_posix()
     )
-    assert record["artifacts"]["secondary_structure_native_png"] == (
-        "variants/msd-tetr-C172-LCGGT-RACAG-MXMM/plots/secondary_structure.native.png"
+    assert (
+        record["artifacts"]["secondary_structure_native_png"]
+        == (expected_variant / "plots" / "secondary_structure.native.png").as_posix()
     )
     assert "component_span_png" not in record["artifacts"]
     assert "folding_png" not in record["artifacts"]
@@ -1835,7 +2132,7 @@ def test_retron_msd_materialize_refuses_flat_legacy_sequence_layout(tmp_path: Pa
 def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "sequence_bundle"
-    stale_plots_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM" / "plots"
+    stale_plots_dir = out_dir / "variants" / "pES-retron-177__msd-tetr-C172-LCGGT-RACAG-MXMM" / "plots"
     stale_plots_dir.mkdir(parents=True)
     (stale_plots_dir / "component_span_and_folding.png").write_text("stale\n", encoding="utf-8")
 
@@ -1869,7 +2166,7 @@ def test_retron_msd_materialize_refuses_stale_legacy_plot_deliverables(tmp_path:
 def test_retron_msd_materialize_refuses_stale_variant_sequence_outputs(tmp_path: Path) -> None:
     study_dir = _write_registry(tmp_path)
     out_dir = tmp_path / "sequence_bundle"
-    stale_sequences_dir = out_dir / "variants" / "msd-tetr-C172-LCGGT-RACAG-MXMM" / "sequences"
+    stale_sequences_dir = out_dir / "variants" / "pES-retron-177__msd-tetr-C172-LCGGT-RACAG-MXMM" / "sequences"
     stale_sequences_dir.mkdir(parents=True)
     (stale_sequences_dir / "legacy_sequence.gb").write_text("stale\n", encoding="utf-8")
 
@@ -2004,6 +2301,8 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "interfaces/cli/io.py": 140,
         "interfaces/cli/messages.py": 180,
         "catalog/compiler_spec.py": 450,
+        "catalog/compiler_spec_io.py": 140,
+        "catalog/strict_mapping_io.py": 120,
         "catalog/msd_ids.py": 450,
         "catalog/registry.py": 450,
         "outputs/composition_payload.py": 450,

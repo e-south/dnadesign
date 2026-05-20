@@ -169,7 +169,8 @@ limited to `README.md`, `manifest/`, and `variants/`. Machine-readable root
 metadata is grouped by ontology: bundle manifests under `manifest/bundle/`,
 catalogs and frozen references under `manifest/catalog/`, indexes under
 `manifest/indexes/`, and generated composition configs under
-`manifest/configs/composition/`. Each `variants/<msd_design_id>/` directory is grouped into
+`manifest/configs/composition/`. Each
+`variants/<construct_id>__<msd_design_id>/` directory is grouped into
 `sequences/` for forward and reverse-complement GenBank/FASTA plus feature CSV,
 `plots/` for `secondary_structure.native.png`, `composition_overview.svg`, and
 `composition_overview.png`,
@@ -177,10 +178,11 @@ catalogs and frozen references under `manifest/catalog/`, indexes under
 `construct/`, `folding/`, `provenance/`, `reviews/`, and `visual/`, and
 `runtime/construct/` for the producer bundle. `runtime/construct/manifest/`
 mirrors the same semantic grouping for producer metadata. Variant directory
-names preserve scar-nick ontology in the suffix, for example
-`msd-tetr-C172-LCGGG-RACAG-MXMX`, with cap, left base, right base, and mismatch
-profile uppercase. `manifest/indexes/sequence_index.tsv` carries the `open -R`
-Finder reveal command for each forward GenBank file.
+names include the lab construct id/variant number and preserve scar-nick
+ontology in the suffix, for example
+`pES-retron-177__msd-tetr-C172-LCGGG-RACAG-MXMX`, with cap, left base, right
+base, and mismatch profile uppercase. `manifest/indexes/sequence_index.tsv`
+carries the `open -R` Finder reveal command for each forward GenBank file.
 
 For a materialize request, verify the bundle by checking the expected variant
 count and at least these per-design artifacts:

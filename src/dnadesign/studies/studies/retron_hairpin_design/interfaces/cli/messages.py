@@ -31,8 +31,13 @@ def next_step_for_error(exc: Exception) -> str:
         )
     if "Unknown payload" in message:
         return (
-            "Add the validated payload to compiler/catalog/msd_design_registry.yaml before compiling "
-            "a frozen design reference."
+            "Add the validated payload to compiler/catalog/msd_design_registry.yaml, or use a typed compiler spec "
+            "with explicit payload and cap sequences for manual sequence materialization."
+        )
+    if "Unknown construct" in message:
+        return (
+            "Use a registered construct label, or switch to a typed compiler spec with explicit payload and cap "
+            "sequences for a manual construct."
         )
     if "registry" in message:
         return (

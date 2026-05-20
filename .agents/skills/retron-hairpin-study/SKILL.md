@@ -1,8 +1,8 @@
 ---
 name: retron-hairpin-study
-description: Route Retron MSD compiler work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
+description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.12
+  version: 0.7.13
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -11,7 +11,7 @@ metadata:
 
 ## Purpose
 
-Route Retron MSD work as a genetic compiler: compile a reference, materialize one MSD unit, or route missing constraints to a primitive solver.
+Route Retron MSD product work: compile a reference, materialize one MSD unit, or route missing constraints to a primitive solver.
 
 ## Scope
 
@@ -44,7 +44,7 @@ Out of scope:
   payload primary, user-selected cap/foldback segment, payload complement,
   right base + 3' flank. Snapback subsection annotations are emitted only when
   topology is supplied.
-- Materialized `msd_design_id` / variant directory names must preserve the cap/base/profile ontology in filenames, using `C172-LCGGG-RACAG-MXMX` style suffixes.
+- Materialized variant directories use `<construct-id>__<msd-design-id>`, for example `pES-retron-177__msd-tetr-C172-LCGGG-RACAG-MXMX`.
 - Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
   "open in Finder" must run `materialize`; a reference catalog is not enough.
 - Materialized plot deliverables require ViennaRNA status `ok`; publish

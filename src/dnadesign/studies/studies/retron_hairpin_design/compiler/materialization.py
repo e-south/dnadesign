@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -18,8 +19,9 @@ from typing import Mapping, Sequence
 import yaml
 
 from dnadesign.construct import run_linear_ssdna_composition
-from dnadesign.contracts.sequence import MsdDesignCatalogV1
+from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
+from ..catalog.sequence_inputs import validate_dna_sequence
 from ..outputs.composition_payload import (
     composition_config_payload,
     normalize_render_formats,
@@ -65,6 +67,12 @@ class MsdSequenceBundleResult:
     variants: list[dict[str, object]]
 
 
+def variant_bundle_dirname(record: MsdDesignReferenceV1) -> str:
+    construct_token = _path_token(record.construct_id, label="construct_id")
+    design_token = _path_token(record.msd_design_id, label="msd_design_id")
+    return f"{construct_token}__{design_token}"
+
+
 def materialize_msd_design_artifacts(
     catalog: MsdDesignCatalogV1,
     *,
@@ -77,16 +85,16 @@ def materialize_msd_design_artifacts(
     run_baserender: bool = True,
 ) -> MsdSequenceBundleResult:
     formats = normalize_render_formats(render_formats)
-    payload_sequences = {str(key).strip(): str(value).strip() for key, value in payload_sequences.items()}
-    cap_sequences = {str(key).strip(): str(value).strip() for key, value in cap_sequences.items()}
+    payload_sequences = _normalize_sequence_mapping(payload_sequences, label="payload_sequences")
+    cap_sequences = _normalize_sequence_mapping(cap_sequences, label="cap_sequences")
     require_sequence_subcomponents(catalog, payload_sequences=payload_sequences, cap_sequences=cap_sequences)
 
     root = Path(out_dir).expanduser().resolve()
-    expected_design_ids = {record.msd_design_id for record in catalog.records}
+    expected_variant_dirnames = {variant_bundle_dirname(record) for record in catalog.records}
     reference_filenames = {reference_bundle_filename(record) for record in catalog.records}
     guard_materialize_output_layout(
         root,
-        expected_design_ids=expected_design_ids,
+        expected_variant_dirnames=expected_variant_dirnames,
         expected_reference_filenames=reference_filenames,
     )
     root.mkdir(parents=True, exist_ok=True)
@@ -105,9 +113,10 @@ def materialize_msd_design_artifacts(
     updated_records = []
     producer_render_formats = render_formats_for_review(formats)
     for record in catalog.records:
-        variant_dir = variants_dir / record.msd_design_id
+        variant_dirname = variant_bundle_dirname(record)
+        variant_dir = variants_dir / variant_dirname
         artifact_bundle = variant_dir / VARIANT_RUNTIME_DIRNAME / CONSTRUCT_RUNTIME_DIRNAME
-        config_path = configs_dir / f"{record.msd_design_id}.linear_ssdna_composition.yaml"
+        config_path = configs_dir / f"{variant_dirname}.linear_ssdna_composition.yaml"
         config_payload = composition_config_payload(
             record,
             artifact_bundle=artifact_bundle,
@@ -173,4 +182,26 @@ def materialize_msd_design_artifacts(
     )
 
 
-__all__ = ["MsdSequenceBundleResult", "materialize_msd_design_artifacts"]
+def _normalize_sequence_mapping(values: Mapping[str, str], *, label: str) -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for raw_key, raw_sequence in values.items():
+        sequence_id = str(raw_key).strip()
+        if not sequence_id:
+            raise RetronMsdCompilerError(f"{label} contains a blank key.")
+        if sequence_id in resolved:
+            raise RetronMsdCompilerError(f"{label} contains duplicate key after trimming: {sequence_id}.")
+        try:
+            resolved[sequence_id] = validate_dna_sequence(str(raw_sequence), label=f"{label}.{sequence_id}")
+        except ValueError as exc:
+            raise RetronMsdCompilerError(str(exc)) from exc
+    return resolved
+
+
+def _path_token(value: str, *, label: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(value).strip()).strip(".-")
+    if not token:
+        raise RetronMsdCompilerError(f"{label} cannot be represented as an MSD variant path token.")
+    return token
+
+
+__all__ = ["MsdSequenceBundleResult", "materialize_msd_design_artifacts", "variant_bundle_dirname"]

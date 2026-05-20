@@ -316,6 +316,7 @@ budgets = {
     "outputs/manifests.py": 450,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
+    "catalog/compiler_spec_io.py": 140,
     "catalog/sequence_inputs.py": 120,
 }
 violations = []

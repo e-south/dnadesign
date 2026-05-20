@@ -85,6 +85,9 @@ base-junction scar-nick work.
 - `src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py` owns typed
   `retron_msd_compiler_spec_v1` parsing, explicit part normalization, and
   public primitive-source selector checks.
+- `src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec_io.py` owns
+  fail-fast compiler-spec file loading, including duplicate JSON/YAML mapping-key
+  rejection before typed parsing.
 - `src/dnadesign/studies/studies/retron_hairpin_design/outputs/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.

@@ -94,7 +94,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.12"
+    assert metadata["version"] == "0.7.13"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -254,7 +254,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
         ]
     )
 
-    assert "Retron MSD product work as a genetic compiler" in status
+    assert "Retron MSD product work through a study-owned compiler" in status
     assert "scar-nick" in status
     assert "profile-diverse `S0=M` scar analogs" in status
     assert "Complete labels or complete part sets should compile directly" in status
@@ -373,7 +373,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "study.skill.present" not in ops_study
     assert "harness-engineering" in skill
     assert "code-change-discipline" in skill
-    assert "Route Retron MSD work as a genetic compiler" in skill
+    assert "Route Retron MSD product work" in skill
     assert "Input completeness classification" in skill
     assert 'Do not say "snapshot posture"' in skill
     assert "whether the answer came from snapshot posture" not in skill
@@ -386,6 +386,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py" in study_surfaces
     assert "src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py" in study_surfaces
     assert "src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py" in study_surfaces
+    assert "src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec_io.py" in study_surfaces
     assert "msd_design_hit_labels.txt" in pipeline
     assert "msd_cap_sources" in ops_study
     assert "msd_design_reference_catalog" in pipeline

@@ -11,16 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
+from .compiler_spec_io import MsdCompilerSpecError, load_compiler_spec_mapping
 from .msd_ids import (
     MsdDesignPartInput,
     compute_scar_nick_profile,
@@ -29,10 +28,6 @@ from .msd_ids import (
 )
 from .registry import load_retron_msd_registry
 from .sequence_inputs import validate_dna_sequence
-
-
-class MsdCompilerSpecError(ValueError):
-    """Raised when a Retron MSD compiler spec is missing required intent."""
 
 
 class MsdCompilerSpecModel(BaseModel):
@@ -162,6 +157,8 @@ class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
     def _has_design_inputs(self) -> "RetronMsdCompilerSpecV1":
         if not self.labels and not self.designs:
             raise ValueError("compiler spec requires labels or designs.")
+        if self.labels and self.designs:
+            raise ValueError("compiler spec must use labels or designs, not both.")
         return self
 
 
@@ -180,7 +177,7 @@ def load_msd_compiler_spec(
     allow_non_ligatable_s0: bool = False,
 ) -> ResolvedMsdCompilerSpec:
     spec_path = Path(path).expanduser().resolve()
-    payload = _load_mapping(spec_path)
+    payload = load_compiler_spec_mapping(spec_path)
     spec = RetronMsdCompilerSpecV1.model_validate(payload)
     registry = load_retron_msd_registry(study_dir)
 
@@ -197,6 +194,10 @@ def load_msd_compiler_spec(
                 parsed,
                 payload_metadata=payload_metadata.get(parsed.payload_id),
                 cap_metadata=cap_metadata.get(parsed.cap_id),
+                allow_unregistered_construct=_has_manual_sequence_parts(
+                    payload_metadata=payload_metadata.get(parsed.payload_id),
+                    cap_metadata=cap_metadata.get(parsed.cap_id),
+                ),
             )
         )
     for design in spec.designs:
@@ -209,6 +210,11 @@ def load_msd_compiler_spec(
                 cap_metadata=cap_metadata.get(parts.cap_id),
                 scar_nick_metadata=scar_nick_metadata,
                 source_notes=design.source_notes,
+                allow_unregistered_construct=_has_manual_sequence_parts(
+                    payload_metadata=payload_metadata.get(parts.payload_id),
+                    cap_metadata=cap_metadata.get(parts.cap_id),
+                ),
+                use_construct_metadata=False,
             )
         )
 
@@ -222,27 +228,13 @@ def load_msd_compiler_spec(
     )
 
 
-def _load_mapping(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        raise MsdCompilerSpecError(f"Retron MSD compiler spec not found: {path}")
-    try:
-        if path.suffix.lower() == ".json":
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, yaml.YAMLError) as exc:
-        raise MsdCompilerSpecError(f"Retron MSD compiler spec is invalid: {path}") from exc
-    if not isinstance(payload, dict):
-        raise MsdCompilerSpecError(f"Retron MSD compiler spec must be a mapping: {path}")
-    return payload
-
-
 def _resolve_literal_sequence_map(values: dict[str, LiteralSequenceInputSpec], *, label: str) -> dict[str, str]:
     resolved: dict[str, str] = {}
     for key, entry in values.items():
-        if not isinstance(key, str) or not key.strip():
-            raise MsdCompilerSpecError(f"{label} contains a blank key.")
-        resolved[key.strip()] = _dna_sequence(entry.sequence, label=f"{label}.{key}.sequence")
+        sequence_id = _sequence_map_key(key, label=label)
+        if sequence_id in resolved:
+            raise MsdCompilerSpecError(f"{label} contains duplicate key after trimming: {sequence_id}.")
+        resolved[sequence_id] = _dna_sequence(entry.sequence, label=f"{label}.{sequence_id}.sequence")
     return resolved
 
 
@@ -252,9 +244,9 @@ def _resolve_cap_sequences(
     sequences: dict[str, str] = {}
     metadata: dict[str, dict[str, Any]] = {}
     for key, entry in values.items():
-        if not isinstance(key, str) or not key.strip():
-            raise MsdCompilerSpecError("cap_sequences contains a blank key.")
-        cap_id = key.strip()
+        cap_id = _sequence_map_key(key, label="cap_sequences")
+        if cap_id in sequences:
+            raise MsdCompilerSpecError(f"cap_sequences contains duplicate key after trimming: {cap_id}.")
         if entry.sequence is not None:
             sequences[cap_id] = _dna_sequence(entry.sequence, label=f"cap_sequences.{cap_id}.sequence")
             metadata[cap_id] = {}
@@ -366,6 +358,20 @@ def _select_ranked(primitives: list[Any], *, selector: RankedPrimitiveSelectorSp
     return [by_rank[rank] for rank in requested]
 
 
+def _sequence_map_key(key: object, *, label: str) -> str:
+    if not isinstance(key, str) or not key.strip():
+        raise MsdCompilerSpecError(f"{label} contains a blank key.")
+    return key.strip()
+
+
+def _has_manual_sequence_parts(
+    *,
+    payload_metadata: dict[str, Any] | None,
+    cap_metadata: dict[str, Any] | None,
+) -> bool:
+    return payload_metadata is not None and cap_metadata is not None
+
+
 def _dna_sequence(value: str, *, label: str) -> str:
     try:
         return validate_dna_sequence(value, label=label)
@@ -396,10 +402,11 @@ def _validate_cap_topology_bounds(
         if topology is None or sequence is None:
             continue
         topology_end = topology.foldback_return_span.end
-        if topology_end > len(sequence):
+        if len(sequence) != topology_end:
             raise MsdCompilerSpecError(
                 f"cap_sequences.{record.cap.id}.sequence is {len(sequence)} nt but supplied topology ends at "
-                f"{topology_end}; provide a matching literal cap/foldback segment or use a cap id without topology."
+                f"{topology_end}; provide the exact topology-backed cap/foldback segment or use a cap id without "
+                "topology."
             )
 
 

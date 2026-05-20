@@ -142,11 +142,14 @@ and `variants/`. Bundle manifests live under `manifest/bundle/`, catalogs and
 frozen references under `manifest/catalog/`, indexes under `manifest/indexes/`,
 and generated composition configs under `manifest/configs/composition/`.
 
-Each `variants/<msd_design_id>/` directory groups forward/reverse-complement
-GenBank and FASTA under `sequences/`; `secondary_structure.native.png`,
-`composition_overview.svg`, and `composition_overview.png` under `plots/`;
-curated metadata under semantic `manifest/` groups; and raw producer output
-under `runtime/construct/`.
+Each `variants/<msd_design_id>/` directory groups the same semantic payload;
+materialized cohorts use `variants/<construct_id>__<msd_design_id>/` so the
+lab construct id/variant number and design-ontology suffix stay explicit.
+Forward/reverse-complement GenBank and FASTA live under `sequences/`;
+`secondary_structure.native.png`, `composition_overview.svg`, and
+`composition_overview.png` live under `plots/`; curated metadata lives under
+semantic `manifest/` groups; and raw producer output lives under
+`runtime/construct/`.
 
 ### Workbench Provenance
 

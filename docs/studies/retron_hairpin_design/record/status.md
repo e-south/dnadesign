@@ -5,7 +5,7 @@
 
 ### At a glance
 
-- This study now routes Retron MSD product work as a genetic compiler:
+- This study now routes Retron MSD product work through a study-owned compiler:
   user-provided or study-selected parts become frozen
   `msd_design_reference_v1` / `msd_design_catalog_v1` records first.
 - Complete labels or complete part sets should compile directly. User-provided

@@ -163,10 +163,12 @@ that agents need before opening the full spec:
   `variants/`; writes bundle manifests under `manifest/bundle/`, catalogs and
   frozen references under `manifest/catalog/`, indexes under
   `manifest/indexes/`, and generated single-unit composition configs under
-  `manifest/configs/composition/`; and groups each `variants/<design-id>/`
-  bundle into `sequences/`, `plots/`, semantic `manifest/` groups, and
-  `runtime/construct/`. Variant IDs preserve cap/base/profile ontology with
-  uppercase suffixes such as `C172-LCGGG-RACAG-MXMX`. If payload or cap sequences are missing, the route must
+  `manifest/configs/composition/`; and groups each
+  `variants/<construct-id>__<design-id>/` bundle into `sequences/`, `plots/`,
+  semantic `manifest/` groups, and `runtime/construct/`. Variant bundle names
+  include the lab construct id/variant number and preserve cap/base/profile
+  ontology with uppercase suffixes such as
+  `pES-retron-177__msd-tetr-C172-LCGGG-RACAG-MXMX`. If payload or cap sequences are missing, the route must
   fail before generating placeholder GenBank or plot files. The CLI does not
   expose `--repeat-count`.
 - BaseRender consumes only the generated canonical visual contract through
@@ -245,8 +247,8 @@ When returning to this work:
   Provide other complete subcomponents with `--spec` or with `--payload-sequence ID=ACGT`,
   `--cap-sequence ID=ACGT`, and no repeat-count flag; otherwise the compiler reports the missing
   subcomponent and routes back to Snapback or scar-nick. Materialized output
-  uses top-level `README.md`, `manifest/`, and `variants/`; each variant groups
-  forward/reverse-complement GenBank and FASTA under `sequences/`,
+  uses top-level `README.md`, `manifest/`, and `variants/`; each variant bundle
+  is named `<construct-id>__<design-id>` and groups forward/reverse-complement GenBank and FASTA under `sequences/`,
   `secondary_structure.native.png` plus `composition_overview.svg` and
   `composition_overview.png` under
   `plots/`, curated metadata under semantic `manifest/` groups, and raw Construct output under
