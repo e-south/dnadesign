@@ -153,6 +153,13 @@ def test_plot_cli_describe(tmp_path):
     assert payload["schema_version"] == "opal.plot_description.v1"
     assert payload["plot"]["kind"] == "scatter_score_vs_rank"
 
+    missing_json = runner.invoke(app, ["--no-color", "plot", "--describe", "definitely_missing_plot", "--json"])
+    assert missing_json.exit_code != 0, missing_json.stdout
+    error_payload = json.loads(missing_json.stdout)
+    assert error_payload["ok"] is False
+    assert error_payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert error_payload["error"]["context"] == "plot describe"
+
 
 def test_plot_cli_list_configured(tmp_path):
     workdir = tmp_path / "campaign"
@@ -177,7 +184,14 @@ def test_plot_cli_list_configured(tmp_path):
     assert res_json.exit_code == 0, res_json.stdout
     payload = json.loads(res_json.stdout)
     assert payload["schema_version"] == "opal.plot_config.v1"
-    assert payload["plots"] == ["mini: test_plot_cli_minimal (enabled)"]
+    assert payload["plots"] == [
+        {
+            "name": "mini",
+            "kind": "test_plot_cli_minimal",
+            "enabled": True,
+            "tags": [],
+        }
+    ]
 
 
 def test_plot_cli_accepts_directory(tmp_path):

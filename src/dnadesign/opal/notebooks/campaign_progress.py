@@ -12,22 +12,20 @@ def _():
     import marimo as mo
     import polars as pl
 
-    from dnadesign.opal.src.analysis.campaign_progress import (
+    from dnadesign.opal import (
         assess_records_contract,
         build_ledger_status_table,
         build_records_preview,
-        cli_handoff_lines,
-        records_status_lines,
-        x_provenance_status_lines,
-    )
-    from dnadesign.opal.src.analysis.dashboard.datasets import (
         campaign_label_from_path,
+        cli_handoff_lines,
+        diagnostics_to_lines,
         find_repo_root,
         list_campaign_paths,
         load_campaign_selection,
         load_parquet_cached,
+        records_status_lines,
+        x_provenance_status_lines,
     )
-    from dnadesign.opal.src.analysis.dashboard.diagnostics import diagnostics_to_lines
 
     return (
         Path,

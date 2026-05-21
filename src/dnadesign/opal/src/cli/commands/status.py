@@ -22,6 +22,7 @@ from ..formatting import render_status_text
 from ..registry import cli_command
 from ._common import (
     internal_error,
+    json_error,
     json_out,
     load_cli_config,
     opal_error,
@@ -149,7 +150,10 @@ def cmd_status(
         else:
             print_stdout(render_status_text(st))
     except OpalError as e:
-        opal_error("status", e)
+        if json:
+            json_error("status", e)
+        else:
+            opal_error("status", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("status", e)

@@ -101,6 +101,40 @@ def test_artifacts_audit_reports_stale_manifest_absent_files_and_bytes(tmp_path:
     assert payload["prune_plan"]["item_count"] == 2
 
 
+def test_artifacts_audit_reports_nested_stale_plot_outputs(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_artifact_campaign(tmp_path)
+    workdir = campaign.parent
+    nested_stale = workdir / "outputs" / "plots" / "metric_over_rounds" / "old_nested.png"
+    nested_stale.parent.mkdir(parents=True, exist_ok=True)
+    nested_stale.write_bytes(b"nested-stale")
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "artifacts", "audit", "-c", str(campaign), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    stale_paths = {row["path"] for row in payload["stale_artifacts"]}
+    assert str(nested_stale) in stale_paths
+
+
+def test_artifacts_audit_ignores_hidden_plot_runtime_cache(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_artifact_campaign(tmp_path)
+    workdir = campaign.parent
+    hidden_cache = workdir / "outputs" / "plots" / ".opal" / "tmp" / "mpl" / "fontlist-v390.json"
+    hidden_cache.parent.mkdir(parents=True, exist_ok=True)
+    hidden_cache.write_text("{}", encoding="utf-8")
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "artifacts", "audit", "-c", str(campaign), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    stale_paths = {row["path"] for row in payload["stale_artifacts"]}
+    assert str(hidden_cache) not in stale_paths
+
+
 def test_artifacts_audit_does_not_read_records_parquet(tmp_path: Path, monkeypatch) -> None:
     _, campaign, _ = _setup_artifact_campaign(tmp_path)
     from dnadesign.opal.src.storage import records_io

@@ -23,6 +23,7 @@ from ..formatting import render_run_meta_text, render_runs_list_text
 from ..registry import cli_group
 from ._common import (
     internal_error,
+    json_error,
     json_out,
     load_cli_config,
     opal_error,
@@ -56,7 +57,10 @@ def runs_list(
             summary_rows = [summarize_run_meta(r) for _, r in runs_df.iterrows()]
             print_stdout(render_runs_list_text(summary_rows))
     except OpalError as e:
-        opal_error("runs list", e)
+        if json:
+            json_error("runs list", e)
+        else:
+            opal_error("runs list", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("runs list", e)
@@ -86,7 +90,10 @@ def runs_show(
             print_config_context(cfg_path, cfg=cfg)
             print_stdout(render_run_meta_text(row.to_dict()))
     except OpalError as e:
-        opal_error("runs show", e)
+        if json:
+            json_error("runs show", e)
+        else:
+            opal_error("runs show", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("runs show", e)

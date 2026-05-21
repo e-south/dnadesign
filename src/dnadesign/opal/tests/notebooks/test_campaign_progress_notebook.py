@@ -18,6 +18,12 @@ def test_campaign_progress_has_no_load_button() -> None:
     assert "Click **Load**" not in text
 
 
+def test_campaign_progress_uses_public_opal_imports() -> None:
+    text = NOTEBOOK_PATH.read_text()
+    assert "from dnadesign.opal import" in text
+    assert "dnadesign.opal.src" not in text
+
+
 def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
     assert "# OPAL Campaign Progress" in text
@@ -46,3 +52,7 @@ def test_campaign_progress_has_no_diagnostics_sampling_controls() -> None:
     text = NOTEBOOK_PATH.read_text()
     assert "Diagnostics sample" not in text
     assert "diagnostics_sample_slider" not in text
+
+
+def test_legacy_prom60_archive_removed() -> None:
+    assert not Path("src/dnadesign/opal/archived/notebooks/prom60_eda_legacy.py").exists()

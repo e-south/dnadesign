@@ -71,7 +71,8 @@ The study route should include:
 
 ### Progress
 
-- [x] Archived legacy `prom60_eda` under `src/dnadesign/opal/archived/`.
+- [x] Removed the retired `prom60_eda` archive after the current public OPAL
+  notebook surface replaced it.
 - [x] Added `analysis/campaign_progress.py` helper boundary for records,
   ledger status, previews, and CLI handoff text.
 - [x] Added regression tests that forbid BaseRender, `densegen__visual`, and

@@ -630,6 +630,9 @@ opal plot --describe <plot-kind> --json
 **Notes**
 
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
+* `plot --list-config --json` emits structured plot objects with `name`,
+  `kind`, `enabled`, `tags`, and optional `preset`; text output keeps the
+  compact `name: kind (enabled)` listing.
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
 * Every plot run writes a per-plot manifest next to the rendered media and an
   aggregate `plot_manifest.json` index in the output directory. Manifests record

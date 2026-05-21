@@ -91,7 +91,10 @@ def test_log_json_summary(tmp_path):
 
 
 def test_progress_json_summary(tmp_path):
-    _, campaign, _ = _setup_workspace(tmp_path)
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    stale_plot = workdir / "outputs" / "plots" / "old.png"
+    stale_plot.parent.mkdir(parents=True, exist_ok=True)
+    stale_plot.write_bytes(b"stale")
     app = _build()
     runner = CliRunner()
 
@@ -109,6 +112,10 @@ def test_progress_json_summary(tmp_path):
     assert out["event_contract"]["aborted_rounds"] == []
     assert "run_scope" in out["rounds"][0]["summary"]
     assert out["rounds"][0]["predict"]["rows"] == 2
+    assert out["artifact_garden"]["schema_version"] == "opal.artifact_garden.v1"
+    assert out["artifact_garden"]["stale_artifact_count"] == 1
+    assert out["stale_artifacts"][0]["path"] == str(stale_plot)
+    assert any(row["category"] == "StaleArtifactWarning" for row in out["warnings"])
 
 
 def test_progress_rejects_missing_explicit_round(tmp_path):
@@ -121,4 +128,31 @@ def test_progress_rejects_missing_explicit_round(tmp_path):
     assert res.exit_code != 0, res.stdout
     payload = json.loads(res.stdout)
     assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
     assert "--round 7 not found" in payload["error"]["message"]
+
+
+def test_status_json_error_for_missing_config(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "status", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "status"
+
+
+def test_runs_list_json_error_for_missing_config(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "runs", "list", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "runs list"

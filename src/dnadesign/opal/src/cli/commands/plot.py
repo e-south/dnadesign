@@ -18,13 +18,13 @@ from typing import List, Optional
 import typer
 
 from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suffix
-from ...core.utils import OpalError, print_stdout
-from ...plots.config import list_configured_plots, load_plot_config
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...plots.config import list_configured_plot_specs, list_configured_plots, load_plot_config
 from ...plots.runner import PlotRequest, resolve_run_round, run_plots
 from ...registries.plots import describe_plot_kind, get_plot_meta, list_plots
 from ..formatting import bullet_list
 from ..registry import cli_command
-from ._common import json_out, print_config_context
+from ._common import json_error, json_out, print_config_context
 
 
 @cli_command("plot", help="Generate plots from plot_config (preferred) or inline 'plots:'.")
@@ -79,7 +79,11 @@ def cmd_plot(
         try:
             meta = get_plot_meta(describe)
         except KeyError as e:
-            raise ValueError(str(e)) from e
+            err = OpalError(f"Unknown plot kind: {describe!r}", ExitCodes.BAD_ARGS)
+            if json_output:
+                json_error("plot describe", err)
+                raise typer.Exit(code=err.exit_code) from e
+            raise typer.BadParameter(str(err), param_hint="--describe") from e
         if json_output:
             json_out(
                 {
@@ -155,7 +159,7 @@ def cmd_plot(
                     {
                         "schema_version": "opal.plot_config.v1",
                         "config_path": str(campaign_yaml),
-                        "plots": list_configured_plots(
+                        "plots": list_configured_plot_specs(
                             plots_cfg=plot_cfg.plots,
                             plot_presets=plot_cfg.plot_presets,
                         ),
@@ -169,7 +173,7 @@ def cmd_plot(
             if list_registry:
                 payload["registered_plots"] = [describe_plot_kind(name) for name in list_plots()]
             if list_config:
-                payload["configured_plots"] = list_configured_plots(
+                payload["configured_plots"] = list_configured_plot_specs(
                     plots_cfg=plot_cfg.plots,
                     plot_presets=plot_cfg.plot_presets,
                 )

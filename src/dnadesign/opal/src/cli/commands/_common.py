@@ -229,6 +229,23 @@ def json_out(obj) -> None:
     typer.echo(json.dumps(obj, indent=2, default=_json_default))
 
 
+def json_error_payload(ctx: str, e: OpalError) -> dict[str, object]:
+    return {
+        "ok": False,
+        "error": {
+            "schema_version": "opal.cli_error.v1",
+            "category": e.__class__.__name__,
+            "context": ctx,
+            "message": str(e),
+            "exit_code": int(e.exit_code),
+        },
+    }
+
+
+def json_error(ctx: str, e: OpalError) -> None:
+    json_out(json_error_payload(ctx, e))
+
+
 def internal_error(ctx: str, e: Exception) -> None:
     if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
         import traceback as _tb

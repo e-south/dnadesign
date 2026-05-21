@@ -257,6 +257,20 @@ def list_configured_plots(
     plot_presets: Dict[str, Dict[str, Any]],
 ) -> List[str]:
     rows: List[str] = []
+    for spec in list_configured_plot_specs(plots_cfg=plots_cfg, plot_presets=plot_presets):
+        status = "disabled" if not spec["enabled"] else "enabled"
+        tags = spec.get("tags") or []
+        tag_str = f" tags={tags}" if tags else ""
+        rows.append(f"{spec['name']}: {spec['kind']} ({status}){tag_str}")
+    return rows
+
+
+def list_configured_plot_specs(
+    *,
+    plots_cfg: List[Dict[str, Any]],
+    plot_presets: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    specs: List[Dict[str, Any]] = []
     for entry in plots_cfg:
         if not isinstance(entry, dict):
             raise ValueError(f"[plot] Each plot entry must be a mapping (got {type(entry).__name__}).")
@@ -285,10 +299,16 @@ def list_configured_plots(
         tags = _parse_tags(preset.get("tags"), ctx=f"preset:{preset_name}") + _parse_tags(
             entry.get("tags"), ctx=f"plot:{pname}"
         )
-        status = "disabled" if not enabled else "enabled"
-        tag_str = f" tags={tags}" if tags else ""
-        rows.append(f"{pname}: {pkind} ({status}){tag_str}")
-    return rows
+        spec: Dict[str, Any] = {
+            "name": pname,
+            "kind": pkind,
+            "enabled": enabled,
+            "tags": tags,
+        }
+        if preset_name is not None:
+            spec["preset"] = preset_name
+        specs.append(spec)
+    return specs
 
 
 def apply_data_entries(

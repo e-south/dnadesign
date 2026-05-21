@@ -275,8 +275,10 @@ def _detect_stale_siblings(
     if not root.exists():
         return []
     stale = []
-    for path in sorted(root.iterdir()):
-        if not path.is_file():
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink() or not path.is_file():
+            continue
+        if _has_hidden_path_part(path, root=root):
             continue
         if path.suffix.lower() not in _STALE_EXTENSIONS:
             continue
@@ -296,6 +298,14 @@ def _detect_stale_siblings(
             }
         )
     return stale
+
+
+def _has_hidden_path_part(path: Path, *, root: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        parts = path.parts
+    return any(part.startswith(".") for part in parts)
 
 
 def _directory_inventory(name: str, root: Path) -> dict[str, Any]:

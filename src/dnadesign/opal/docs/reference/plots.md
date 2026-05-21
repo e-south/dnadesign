@@ -152,13 +152,13 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - rows are stable feature IDs, columns are rounds, values are importances
   - params: `order_policy` (`preserve|sort_index|top_mean`), `top_n`,
     `figsize_in`, `cmap`
-  - writes tidy CSV columns `feature_id`, `feature_index`, `round`,
-    `importance`, and `rank`
+  - writes tidy CSV columns `round`, `feature_id`, `importance`, `rank`,
+    and `source_path`
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
   - params: `metric`, `cohorts`, `summaries`, `top_k`, `threshold`,
     `reference_lines`, `figsize_in`
-  - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, `value`,
-    and `n`
+  - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, and
+    `value`
 - **`vector_summary_heatmap`**: vector-channel summary over rounds.
   - rows are an optional setpoint reference followed by chronological rounds
   - params: `vector_field`, `cohorts`, `channel_labels`, `include_setpoint`,

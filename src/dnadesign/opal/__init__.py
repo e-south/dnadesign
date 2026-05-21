@@ -24,6 +24,14 @@ from .src.analysis.campaign_progress import (
     unavailable_table,
     x_provenance_status_lines,
 )
+from .src.analysis.dashboard.datasets import (
+    campaign_label_from_path,
+    find_repo_root,
+    list_campaign_paths,
+    load_campaign_selection,
+    load_parquet_cached,
+)
+from .src.analysis.dashboard.diagnostics import diagnostics_to_lines
 from .src.analysis.facade import (
     CampaignAnalysis,
     available_rounds,
@@ -86,14 +94,20 @@ __all__ = [
     "build_notebook_plot_gallery_model",
     "build_notebook_validity_lines",
     "build_records_preview",
+    "campaign_label_from_path",
     "cli_handoff_lines",
     "describe_plot_kind",
+    "diagnostics_to_lines",
     "enforce_x_matrix_memory_budget",
     "estimate_x_matrix_memory",
+    "find_repo_root",
     "latest_round",
     "latest_run_id",
+    "list_campaign_paths",
     "list_plot_kinds",
+    "load_campaign_selection",
     "load_config",
+    "load_parquet_cached",
     "load_plot_artifact_manifest",
     "load_plot_config",
     "load_plot_manifest_index",

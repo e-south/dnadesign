@@ -22,6 +22,7 @@ from ..core.utils import OpalError
 from ..storage.locks import inspect_campaign_lock
 from ..storage.state import CampaignState
 from ..storage.workspace import CampaignWorkspace
+from .artifact_garden import build_artifact_garden_audit
 from .summary import load_round_log, summarize_round_log
 
 PROGRESS_SCHEMA_VERSION = "opal.campaign_progress.v1"
@@ -59,6 +60,8 @@ def build_campaign_progress(
             }
         )
     warnings.extend(_event_contract_warnings(rounds))
+    artifact_garden, stale_artifacts, artifact_warnings = _artifact_garden_progress(analysis.config_path)
+    warnings.extend(artifact_warnings)
     return {
         "schema_version": PROGRESS_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -80,7 +83,8 @@ def build_campaign_progress(
         "warnings": warnings,
         "event_contract": event_contract,
         "locks": {"campaign": lock_state},
-        "stale_artifacts": [],
+        "artifact_garden": artifact_garden,
+        "stale_artifacts": stale_artifacts,
         "rounds": rounds,
     }
 
@@ -275,6 +279,61 @@ def _event_contract_warnings(rounds: list[dict[str, Any]]) -> list[dict[str, Any
                     "legacy_events": int(summary.get("legacy_events") or 0),
                 }
             )
+    return warnings
+
+
+def _artifact_garden_progress(config_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    try:
+        audit = build_artifact_garden_audit(config_path)
+    except Exception as exc:
+        return (
+            {
+                "schema_version": "opal.artifact_garden.unavailable",
+                "status": "unavailable",
+                "error": str(exc),
+            },
+            [],
+            [
+                {
+                    "category": "ArtifactGardenWarning",
+                    "severity": "warning",
+                    "message": f"Artifact garden audit unavailable for progress: {exc}",
+                }
+            ],
+        )
+
+    stale_artifacts = list(audit.get("stale_artifacts") or [])
+    summary = {
+        "schema_version": audit.get("schema_version"),
+        "status": "ok",
+        "local_only": audit.get("local_only"),
+        "active_manifest_count": len(audit.get("active_manifests") or []),
+        "stale_artifact_count": len(stale_artifacts),
+        "bytes": audit.get("bytes") or {},
+        "prune_plan": {
+            "item_count": ((audit.get("prune_plan") or {}).get("item_count") or len(stale_artifacts)),
+            "bytes_to_delete": ((audit.get("prune_plan") or {}).get("bytes_to_delete") or 0),
+            "requires_apply": bool((audit.get("prune_plan") or {}).get("requires_apply", True)),
+        },
+    }
+    warnings = list(audit.get("warnings") or [])
+    warnings.extend(_stale_artifact_progress_warnings(stale_artifacts))
+    return summary, stale_artifacts, warnings
+
+
+def _stale_artifact_progress_warnings(stale_artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    for row in stale_artifacts:
+        path = row.get("path")
+        warnings.append(
+            {
+                "category": "StaleArtifactWarning",
+                "severity": "warning",
+                "message": f"Generated artifact exists on disk but is absent from the active manifest set: {path}",
+                "path": path,
+                "scope": row.get("scope"),
+            }
+        )
     return warnings
 
 

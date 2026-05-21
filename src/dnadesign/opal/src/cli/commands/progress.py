@@ -18,7 +18,7 @@ import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..registry import cli_command
-from ._common import internal_error, json_out, opal_error
+from ._common import internal_error, json_error, json_out, opal_error
 
 
 @cli_command("progress", help="Summarize campaign round progress from state and round logs.")
@@ -43,7 +43,7 @@ def cmd_progress(
             print_stdout(render_campaign_progress_text(payload))
     except OpalError as e:
         if json:
-            json_out({"ok": False, "error": {"context": "progress", "message": str(e), "exit_code": e.exit_code}})
+            json_error("progress", e)
         else:
             opal_error("progress", e)
         raise typer.Exit(code=e.exit_code)
