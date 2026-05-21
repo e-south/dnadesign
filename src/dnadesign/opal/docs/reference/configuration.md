@@ -1,7 +1,7 @@
 ## OPAL Configuration (v2)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-21
 
 
 This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
@@ -12,6 +12,7 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 `configs/campaign.yaml` is organized into these top-level blocks:
 
 - `campaign`: `name`, `slug`, `workdir`
+- `ownership`: optional owner metadata for non-portable study fixtures
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
 - `labels`: optional training-label source contract; defaults to
   campaign-scoped label history
@@ -61,6 +62,17 @@ If an optional block is omitted, OPAL supplies conservative defaults:
 - `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
   conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true,
   accept_x_mismatch=false, max_x_matrix_gib=8.0
+
+`ownership` is metadata only; it does not change runtime behavior. Use it to
+make non-portable checked-in configs explicit, for example:
+
+```yaml
+ownership:
+  owner_scope: study_fixture
+  study_id: stress_ethanol_cipro_growth
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  portable: false
+```
 
 `safety.max_x_matrix_gib` is a fail-fast memory budget for model-ready X batches
 during `opal run`. For `writeback.prediction_records: ledger_only`, OPAL loads

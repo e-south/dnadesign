@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 import os
 import traceback
 from dataclasses import dataclass
@@ -46,6 +47,7 @@ class PlotRequest:
     round_suffix: str
     name_filter: Optional[str]
     tag_filters: List[str]
+    emit_status: bool = True
 
 
 def resolve_run_round(runs_df: pl.DataFrame, run_id: str) -> int:
@@ -222,23 +224,7 @@ def run_plots(req: PlotRequest) -> bool:
             **entry_params,
         }
 
-        import logging
-
-        logger = logging.getLogger(f"opal.plot.{pname}")
-        logger.setLevel(logging.INFO)
-
-        if not logger.handlers:
-            try:
-                from rich.logging import RichHandler
-
-                h = RichHandler(rich_tracebacks=False, markup=True, show_path=False, show_time=False)
-            except Exception:
-                h = logging.StreamHandler()
-            h.setLevel(logging.INFO)
-            if not isinstance(h, logging.StreamHandler):
-                h.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
-            logger.addHandler(h)
-            logger.propagate = False
+        logger = _plot_logger(pname, emit_status=req.emit_status)
 
         ctx = PlotContext(
             campaign_dir=req.campaign_dir,
@@ -263,7 +249,7 @@ def run_plots(req: PlotRequest) -> bool:
                 "yes",
                 "on",
             )
-            if debug:
+            if debug and req.emit_status:
                 if isinstance(entry.get("params"), dict):
                     params_preview = {k: entry["params"].get(k) for k in (entry.get("params") or {}).keys()}
                 else:
@@ -288,9 +274,10 @@ def run_plots(req: PlotRequest) -> bool:
             manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
             if manifest.get("status") != "written":
                 any_fail = True
-                typer.secho(f"[fail] {pname} ({pkind}) did not write expected media", fg=typer.colors.RED)
+                _plot_status(req, f"[fail] {pname} ({pkind}) did not write expected media", fg=typer.colors.RED)
                 continue
-            typer.secho(
+            _plot_status(
+                req,
                 f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}",
                 fg=typer.colors.GREEN,
             )
@@ -307,10 +294,40 @@ def run_plots(req: PlotRequest) -> bool:
             )
             write_plot_manifest(manifest)
             manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
-            typer.secho(f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
-            traceback.print_exc()
+            _plot_status(req, f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
+            if req.emit_status:
+                traceback.print_exc()
 
     for output_dir, manifests in manifests_by_dir.items():
         write_plot_manifest_index(output_dir, manifests)
 
     return any_fail
+
+
+def _plot_logger(plot_name: str, *, emit_status: bool) -> logging.Logger:
+    if not emit_status:
+        logger = logging.Logger(f"opal.plot.{plot_name}.quiet")
+        logger.addHandler(logging.NullHandler())
+        logger.propagate = False
+        return logger
+
+    logger = logging.getLogger(f"opal.plot.{plot_name}")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        try:
+            from rich.logging import RichHandler
+
+            handler = RichHandler(rich_tracebacks=False, markup=True, show_path=False, show_time=False)
+        except Exception:
+            handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        if not isinstance(handler, logging.StreamHandler):
+            handler.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+        logger.addHandler(handler)
+        logger.propagate = False
+    return logger
+
+
+def _plot_status(req: PlotRequest, message: str, *, fg: str) -> None:
+    if req.emit_status:
+        typer.secho(message, fg=fg)

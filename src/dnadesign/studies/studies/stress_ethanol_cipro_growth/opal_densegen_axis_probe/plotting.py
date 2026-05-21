@@ -12,7 +12,9 @@ from dnadesign.opal import run_campaign_plots
 from .artifacts import ProbeArtifactLayout
 
 
-def generate_probe_campaign_plots(run_root: Path, *, round_selector: str = "all") -> dict[str, Any]:
+def generate_probe_campaign_plots(
+    run_root: Path, *, round_selector: str = "all", quiet: bool = False
+) -> dict[str, Any]:
     layout = ProbeArtifactLayout(Path(run_root).resolve())
     if not layout.run_root.exists():
         raise RuntimeError(f"run root not found: {layout.run_root}")
@@ -21,7 +23,7 @@ def generate_probe_campaign_plots(run_root: Path, *, round_selector: str = "all"
 
     results: list[dict[str, Any]] = []
     for config_path in _campaign_config_paths(layout):
-        result = run_campaign_plots(config_path, round_selector=round_selector)
+        result = run_campaign_plots(config_path, round_selector=round_selector, quiet=quiet)
         result["run_key"] = config_path.parents[1].name
         results.append(result)
     return {

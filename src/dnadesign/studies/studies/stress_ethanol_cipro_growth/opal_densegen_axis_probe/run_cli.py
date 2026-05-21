@@ -32,6 +32,7 @@ from .decision_inputs import (
 from .execution import materialize_probe_inputs, run_opal_rounds_for_probe
 from .paths import _default_run_root, _repo_root_from, _resolve_repo_path, validate_run_root_policy
 from .plan import build_plan
+from .plan_fingerprint import build_plan_record, prepare_probe_run_root
 from .scratch import _load_candidate_inputs, _write_json
 from .source_contract import validate_candidate_x_surface
 from .status import _format_status_text, audit_run_root
@@ -79,6 +80,8 @@ def _run_probe(args: argparse.Namespace) -> int:
         "planned_runs": len(plan.runs),
         "gate": plan.gate,
         "stop_after": plan.stop_after,
+        "seed": plan.seed,
+        "split_ids": list(plan.splits),
         "rounds": plan.rounds,
         "initial_label_count": plan.initial_label_count,
         "selection_k": plan.selection_k,
@@ -88,14 +91,31 @@ def _run_probe(args: argparse.Namespace) -> int:
         "splits": _compact_split_metadata(split_metadata),
         "commands": plan.commands,
     }
+    plan_record = build_plan_record(plan_payload)
     if args.json and not args.apply:
-        print(json.dumps(plan_payload, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    **plan_payload,
+                    "plan_fingerprint": plan_record["fingerprint"],
+                    "plan_path": str(ProbeArtifactLayout(run_root).probe_plan_path),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
     elif not args.json:
         print(_format_plan_text(plan=plan, safety=safety, split_metadata=split_metadata))
 
     if not args.apply:
         return 0
 
+    layout = ProbeArtifactLayout(run_root)
+    plan_record = prepare_probe_run_root(
+        layout,
+        plan_payload=plan_payload,
+        replace_run_root=bool(args.replace_run_root),
+    )
     null_labels = make_permuted_labels(labels, seed=int(args.seed))
     materialize_probe_inputs(
         repo_root=repo_root,
@@ -140,8 +160,9 @@ def _run_probe(args: argparse.Namespace) -> int:
     )
     return _write_run_outputs(
         args=args,
-        layout=ProbeArtifactLayout(run_root),
+        layout=layout,
         plan_payload=plan_payload,
+        plan_record=plan_record,
         safety=safety,
         metrics=metrics,
         round_metrics=round_metrics,
@@ -177,6 +198,7 @@ def _write_run_outputs(
     args: argparse.Namespace,
     layout: ProbeArtifactLayout,
     plan_payload: dict[str, Any],
+    plan_record: dict[str, Any],
     safety: dict[str, Any],
     metrics: list[dict[str, Any]],
     round_metrics: list[dict[str, Any]],
@@ -217,6 +239,8 @@ def _write_run_outputs(
                     "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.run.v1",
                     "mode": "apply",
                     "plan": plan_payload,
+                    "plan_fingerprint": plan_record["fingerprint"],
+                    "plan_path": str(layout.probe_plan_path),
                     "decision": decision,
                     "reports": str(layout.reports_dir),
                     "status": audit.to_dict(),

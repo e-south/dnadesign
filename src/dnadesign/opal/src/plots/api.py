@@ -28,6 +28,7 @@ def run_campaign_plots(
     run_id: str | None = None,
     name: str | None = None,
     tags: Sequence[str] | None = None,
+    quiet: bool = False,
 ) -> dict[str, Any]:
     """Generate configured plots for one campaign in the current Python process."""
     analysis = CampaignAnalysis.from_config_path(Path(config_path) if config_path is not None else None, allow_dir=True)
@@ -80,6 +81,7 @@ def run_campaign_plots(
         round_suffix=suffix,
         name_filter=name,
         tag_filters=[str(tag) for tag in (tags or [])],
+        emit_status=not quiet,
     )
     any_fail = run_plots(request)
     return {

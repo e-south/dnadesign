@@ -390,6 +390,12 @@ Campaign configuration ownership rule:
 - If existing stress campaign configs are moved, move them through a visible migration: update docs, tests, CLI examples, and campaign discovery. Do not leave hidden compatibility shims or duplicate canonical paths.
 - If they temporarily remain under `src/dnadesign/opal/campaigns/`, add ownership metadata such as `owner_scope: study_fixture`, `study_id`, `dataset_id`, and `portable: false` so future agents do not mistake them for OPAL-core semantics.
 
+Initial implementation status: the checked-in stress ethanol/ciprofloxacin OPAL
+configs now carry a strict `ownership:` block with `owner_scope: study_fixture`,
+`study_id: stress_ethanol_cipro_growth`,
+`dataset_id: usr_prom_eth_cip_opal_candidates`, and `portable: false`. The
+visible path migration remains future work.
+
 ### B. Public/Private API Boundary
 
 | Field | Specification |
@@ -641,12 +647,13 @@ Hierarchy should make distrust explicit. Limitations, stale artifacts, missing l
 
 | Surface | Proposed contract |
 | --- | --- |
-| `opal progress --json` | Add `schema_version`, top-level `event_contract.*`, per-round `rounds[].summary.run_scope.*`, `warnings`, `locks.campaign.*`, `stale_artifacts`, `aborted_runs`, legacy-event accounting, phase counts, and stable error categories. |
+| `opal progress --json` | Expose `schema_version`, top-level `event_contract.*`, per-round `rounds[].summary.run_scope.*`, `warnings`, `locks.campaign.*`, manifest-authoritative `artifact_garden` and `stale_artifacts`, legacy-event accounting, phase counts, and stable JSON error categories. |
 | `opal review --json` | Return `ReviewManifestContract` plus write paths. Refuse ambiguous run scope unless `--run-id` is explicit. Include stale-file warnings. |
 | `opal status` | Become the operator summary over state, latest run, lock state, manifest freshness, and next safe commands. |
 | `opal runs` | Add JSON schemas for `runs list` and `runs show`; expose run status, done/aborted state, artifact manifest refs, and duplicate/compaction warnings. |
 | `opal ingest-y --json` | Emit `IngestRuntimeContract`, including ingest mode, identity columns loaded, input rows, estimated memory, optional peak RSS, unknown policy, write scope, and fail-fast leakage/contract violations. |
 | `opal plot --list` | Text and JSON already exist; keep JSON schema `opal.plot_registry.v1` stable and fill metadata gaps for every built-in plot. |
+| `opal plot --list-config --json` | Return structured configured-plot objects (`name`, `kind`, `enabled`, `tags`, optional `preset`) instead of display strings. |
 | `opal plot --describe` | Include required data shape, tidy CSV schema, output manifest schema, and failure modes. |
 | `opal notebook generate` | Supports repeated `--campaign` options for campaign-set notebooks. Future work: accept an explicit campaign-set manifest/index, review manifest overrides, plot manifest overrides, smoke-check-by-default, and JSON summaries. |
 | `opal artifacts audit/prune` | Existing explicit gardening surface for stale files, ignored run roots, manifest authority, byte counts, retention policy, and dry-run/apply pruning. Inspection is read-only; pruning requires `--apply`. |

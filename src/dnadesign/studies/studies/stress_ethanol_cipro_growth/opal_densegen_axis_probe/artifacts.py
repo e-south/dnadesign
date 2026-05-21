@@ -117,6 +117,10 @@ class ProbeArtifactLayout:
     def split_metadata_path(self) -> Path:
         return self.splits_dir / "split_metadata.json"
 
+    @property
+    def probe_plan_path(self) -> Path:
+        return self.run_root / "probe_plan.json"
+
     def train_ids_path(self, split_id: str) -> Path:
         return self.splits_dir / f"{split_id}_train_ids.parquet"
 

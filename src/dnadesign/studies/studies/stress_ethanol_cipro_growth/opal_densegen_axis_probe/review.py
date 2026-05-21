@@ -23,6 +23,7 @@ from .decision import (
     metric_definitions,
     metric_quality_from_metrics,
 )
+from .plan_fingerprint import load_probe_plan_record
 from .status import audit_run_root
 
 
@@ -110,6 +111,7 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         encoding="utf-8",
     )
     return {
+        "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.review.v1",
         "run_root": str(layout.run_root),
         "review": str(layout.review_path),
         "index": str(layout.review_index_path),
@@ -879,10 +881,13 @@ def _build_run_manifest(
     metric_quality: Mapping[str, Any],
 ) -> dict[str, Any]:
     inventory = _artifact_inventory(layout.run_root)
+    plan_record = load_probe_plan_record(layout.run_root)
     return {
         "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.run_manifest.v1",
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "run_root": str(layout.run_root),
+        "plan_fingerprint": plan_record.get("fingerprint") if plan_record else None,
+        "plan_path": str(layout.probe_plan_path) if plan_record else None,
         "decision": review_decision,
         "persisted_decision": audit.decision,
         "status": review_status,

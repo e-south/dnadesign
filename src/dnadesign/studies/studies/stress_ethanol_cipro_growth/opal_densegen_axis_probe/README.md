@@ -5,6 +5,7 @@ This package owns the study-local scratch probe that checks whether the current 
 - `axis_oracle.py`: DenseGen metadata parsing and vec8 oracle construction.
 - `artifacts.py`: run specs, run-root audit DTOs, and artifact-path layout semantics.
 - `plan.py`: run-matrix planning, OPAL stage command construction, and scratch-path policy.
+- `plan_fingerprint.py`: `probe_plan.json` hashing and run-root reuse guards.
 - `scratch.py`: candidate-table reads, scratch USR cloning, campaign config materialization, and subprocess execution.
 - `decision.py`: split metadata, prediction evaluation, decision policy, and decision-report rendering.
 - `status.py`: materialized run-root audits.
@@ -20,3 +21,9 @@ Use `--rounds N` to run a synthetic multi-round OPAL loop in scratch space.
 Round 0 ingests the planned train IDs. Later rounds ingest labels for the
 previous round's OPAL-selected candidates, using the study-owned DenseGen oracle
 or permuted null for that scratch run only.
+
+Applied runs write `probe_plan.json` at the run root and refuse to reuse a
+nonempty root with a missing or mismatched plan. Use a new `--run-id` for normal
+reruns; `--replace-run-root` intentionally deletes and rebuilds the scratch root.
+`progress --json` is compact by default; add `--full` to include the nested OPAL
+campaign progress payloads.

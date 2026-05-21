@@ -33,6 +33,7 @@ from .types import (
     LocationLocal,
     LocationUSR,
     ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
@@ -185,6 +186,14 @@ class PSafety(BaseModel):
         return out
 
 
+class POwnership(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    owner_scope: Literal["opal_example", "study_fixture"]
+    study_id: Optional[str] = None
+    dataset_id: Optional[str] = None
+    portable: bool = True
+
+
 class PRoot(BaseModel):
     model_config = ConfigDict(extra="forbid")
     campaign: PCampaign
@@ -205,6 +214,7 @@ class PRoot(BaseModel):
     plot_presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     # Non-core, optional block used by the `opal plot` CLI.
     plots: List[Dict[str, Any]] = Field(default_factory=list)
+    ownership: Optional[POwnership] = None
 
 
 def _require_registered_plugin(*, category: str, name: str, available: set[str]) -> None:
@@ -375,6 +385,16 @@ def load_config(path: Path | str) -> RootConfig:
         accept_x_mismatch=pyd.safety.accept_x_mismatch,
         max_x_matrix_gib=float(pyd.safety.max_x_matrix_gib),
     )
+    ownership_dc = (
+        OwnershipBlock(
+            owner_scope=pyd.ownership.owner_scope,
+            study_id=pyd.ownership.study_id,
+            dataset_id=pyd.ownership.dataset_id,
+            portable=bool(pyd.ownership.portable),
+        )
+        if pyd.ownership is not None
+        else None
+    )
 
     root = RootConfig(
         campaign=CampaignBlock(
@@ -393,5 +413,6 @@ def load_config(path: Path | str) -> RootConfig:
         labels=labels_dc,
         writeback=writeback_dc,
         plot_config=(_abs(pyd.plot_config) if pyd.plot_config else None),
+        ownership=ownership_dc,
     )
     return root

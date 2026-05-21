@@ -921,6 +921,11 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
         assert cfg.labels.round_column == "observed_round"
         assert cfg.labels.dedup_policy == "latest_by_round"
         assert cfg.writeback.prediction_records == "ledger_only"
+        assert cfg.ownership is not None
+        assert cfg.ownership.owner_scope == "study_fixture"
+        assert cfg.ownership.study_id == "stress_ethanol_cipro_growth"
+        assert cfg.ownership.dataset_id == "usr_prom_eth_cip_opal_candidates"
+        assert cfg.ownership.portable is False
         assert cfg.model.name == "random_forest"
         assert cfg.selection.selection.name == "top_n"
         assert cfg.selection.selection.params["top_k"] == 6

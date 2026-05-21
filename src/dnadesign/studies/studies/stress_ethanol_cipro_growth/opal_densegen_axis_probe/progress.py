@@ -11,15 +11,18 @@ from dnadesign.opal import build_campaign_progress, render_campaign_progress_tex
 from .artifacts import ProbeArtifactLayout
 
 
-def summarize_probe_progress(run_root: Path) -> dict[str, Any]:
+def summarize_probe_progress(run_root: Path, *, include_opal_progress: bool = False) -> dict[str, Any]:
     layout = ProbeArtifactLayout(Path(run_root).resolve())
     if not layout.run_root.exists():
         raise RuntimeError(f"run root not found: {layout.run_root}")
-    campaigns = [_campaign_progress(path) for path in _campaign_config_paths(layout)]
+    campaigns = [
+        _campaign_progress(path, include_opal_progress=include_opal_progress) for path in _campaign_config_paths(layout)
+    ]
     return {
         "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.progress.v1",
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "run_root": str(layout.run_root),
+        "detail": "full" if include_opal_progress else "compact",
         "campaign_count": len(campaigns),
         "status": "no_campaigns" if not campaigns else _aggregate_status(campaigns),
         "campaigns": campaigns,
@@ -58,11 +61,11 @@ def _campaign_config_paths(layout: ProbeArtifactLayout) -> list[Path]:
     return sorted(layout.scratch_campaigns_dir.glob("*/configs/campaign.yaml"))
 
 
-def _campaign_progress(config_path: Path) -> dict[str, Any]:
+def _campaign_progress(config_path: Path, *, include_opal_progress: bool) -> dict[str, Any]:
     opal_progress = build_campaign_progress(config_path, round_selector="all")
     rounds = list(opal_progress.get("rounds") or [])
     latest = rounds[-1] if rounds else {}
-    return {
+    payload = {
         "run_key": config_path.parents[1].name,
         "config_path": str(config_path),
         "status": opal_progress.get("status"),
@@ -74,8 +77,10 @@ def _campaign_progress(config_path: Path) -> dict[str, Any]:
         "predict": latest.get("predict") or {"batch": None, "of": None, "rows": None},
         "summary": latest.get("summary") or {"events": 0},
         "path": latest.get("path"),
-        "opal_progress": opal_progress,
     }
+    if include_opal_progress:
+        payload["opal_progress"] = opal_progress
+    return payload
 
 
 def _aggregate_status(campaigns: list[dict[str, Any]]) -> str:

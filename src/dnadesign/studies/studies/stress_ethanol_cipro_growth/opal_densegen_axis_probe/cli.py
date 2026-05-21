@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import sys
 from pathlib import Path
 from typing import Sequence
 
@@ -28,7 +30,11 @@ def _report_probe(args: argparse.Namespace) -> int:
 
     repo_root = _repo_root_from(Path.cwd())
     run_root = _resolve_repo_path(repo_root, Path(args.run_root))
-    payload = build_probe_review(run_root, include_plots=bool(args.plots))
+    if args.json:
+        with contextlib.redirect_stdout(sys.stderr):
+            payload = build_probe_review(run_root, include_plots=bool(args.plots))
+    else:
+        payload = build_probe_review(run_root, include_plots=bool(args.plots))
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -47,7 +53,7 @@ def _progress_probe(args: argparse.Namespace) -> int:
 
     repo_root = _repo_root_from(Path.cwd())
     run_root = _resolve_repo_path(repo_root, Path(args.run_root))
-    payload = summarize_probe_progress(run_root)
+    payload = summarize_probe_progress(run_root, include_opal_progress=bool(args.full))
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -60,7 +66,11 @@ def _plot_probe(args: argparse.Namespace) -> int:
 
     repo_root = _repo_root_from(Path.cwd())
     run_root = _resolve_repo_path(repo_root, Path(args.run_root))
-    payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round))
+    if args.json:
+        with contextlib.redirect_stdout(sys.stderr):
+            payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round), quiet=True)
+    else:
+        payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round))
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -117,6 +127,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Allow --apply writes to an external scratch root; repo-local writes stay under .var/studies.",
     )
     run.add_argument(
+        "--replace-run-root",
+        action="store_true",
+        help="Delete an existing probe run root before writing a new plan and scratch artifacts.",
+    )
+    run.add_argument(
         "--stop-after",
         choices=RUN_STAGES,
         default="status",
@@ -134,6 +149,7 @@ def _build_parser() -> argparse.ArgumentParser:
     progress = subparsers.add_parser("progress", help="Summarize OPAL round-log progress for a probe run root.")
     progress.add_argument("--run-root", required=True)
     progress.add_argument("--json", action="store_true", help="Emit machine-readable JSON progress.")
+    progress.add_argument("--full", action="store_true", help="Include full nested OPAL campaign progress payloads.")
     plot = subparsers.add_parser(
         "plot",
         help="Generate configured OPAL plots for all scratch campaigns in one Python process.",

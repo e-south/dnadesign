@@ -5,6 +5,12 @@ campaign:
   slug: "stress_eth_cip_ethanol_rf_sfxi_topn"
   workdir: "."
 
+ownership:
+  owner_scope: study_fixture
+  study_id: stress_ethanol_cipro_growth
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  portable: false
+
 data:
   location:
     kind: usr

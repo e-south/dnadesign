@@ -118,6 +118,14 @@ class SafetyBlock:
 
 
 @dataclass
+class OwnershipBlock:
+    owner_scope: str
+    study_id: Optional[str] = None
+    dataset_id: Optional[str] = None
+    portable: bool = True
+
+
+@dataclass
 class CampaignBlock:
     name: str
     slug: str
@@ -138,3 +146,4 @@ class RootConfig:
     labels: LabelsBlock = field(default_factory=LabelsBlock)
     writeback: WritebackBlock = field(default_factory=WritebackBlock)
     plot_config: Optional[str] = None
+    ownership: Optional[OwnershipBlock] = None
