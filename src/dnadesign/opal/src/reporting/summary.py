@@ -167,10 +167,14 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
     predict_batches = sum(1 for e in events if e.get("stage") == "predict_batch")
     predict_rows = int(sum(int(e.get("rows", 0)) for e in events if e.get("stage") == "predict_batch"))
     legacy_events = sum(1 for e in events if not e.get("schema_version") or not e.get("phase"))
+    command_events = sum(1 for e in events if e.get("phase") == "command")
     preflight_events = sum(1 for e in events if e.get("phase") == "preflight")
     run_events = sum(1 for e in events if e.get("phase") == "run")
+    abort_events = sum(1 for e in events if e.get("phase") == "abort" or e.get("stage") in {"abort", "aborted"})
+    finalize_events = sum(1 for e in events if e.get("phase") == "finalize")
     aborted = any(e.get("phase") == "abort" or e.get("stage") in {"abort", "aborted"} for e in events)
     scoped_run_ids = sorted({str(e.get("run_id")) for e in events if e.get("run_id") not in (None, "")})
+    attempt_ids = sorted({str(e.get("attempt_id")) for e in events if e.get("attempt_id") not in (None, "")})
 
     total_sec = (done_ts - start_ts).total_seconds() if start_ts and done_ts else None
     fit_sec = (fit_done - fit_start).total_seconds() if fit_start and fit_done else None
@@ -185,13 +189,17 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
             "requested_run_id": run_id,
             "resolved_run_id": run_id if run_id_filter_applied else None,
             "run_ids": scoped_run_ids or all_run_ids,
+            "attempt_ids": attempt_ids,
             "ambiguous_run_scope": run_id is None and len(all_run_ids) > 1,
         },
         "stage_counts": stages,
         "phase_counts": phases,
         "legacy_events": legacy_events,
+        "command_events": command_events,
         "preflight_events": preflight_events,
         "run_events": run_events,
+        "abort_events": abort_events,
+        "finalize_events": finalize_events,
         "aborted": aborted,
         "predict_batches": predict_batches,
         "predict_rows": predict_rows,

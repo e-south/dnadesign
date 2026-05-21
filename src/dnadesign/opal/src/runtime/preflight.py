@@ -43,6 +43,7 @@ def preflight_run(
     fail_on_mixed_biotype_or_alphabet: bool,
     auto_backfill: bool = True,
     check_manual_attach: bool = True,
+    x_dim_override: int | None = None,
 ) -> PreflightReport:
     rep = PreflightReport(
         manual_attach_ids=[],
@@ -55,12 +56,14 @@ def preflight_run(
     if missing:
         raise OpalError(f"records.parquet missing essentials: {missing}")
 
-    if store.x_col not in df.columns:
+    if store.x_col in df.columns:
+        # X dimension probe (via first non-null row)
+        probe = df[store.x_col].dropna().head(1)
+        rep.x_dim = _vector_len(probe.iloc[0]) if not probe.empty else None
+    elif x_dim_override is not None:
+        rep.x_dim = int(x_dim_override)
+    else:
         raise OpalError(f"Missing X column '{store.x_col}' in records.parquet")
-
-    # X dimension probe (via first non-null row)
-    probe = df[store.x_col].dropna().head(1)
-    rep.x_dim = _vector_len(probe.iloc[0]) if not probe.empty else None
 
     # Manual attach detection:
     # Current y_col non-null AND not present in label_hist at ANY round → record as manual_attach at current as_of_round

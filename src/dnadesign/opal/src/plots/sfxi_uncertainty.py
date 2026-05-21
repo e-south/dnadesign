@@ -65,6 +65,13 @@ def _coerce_y_ops(value: object) -> list[dict]:
         },
         requires=["model artifact", "predictions", "records"],
         notes=["Loads artifact model from outputs/rounds/round_<r>/model/model.joblib."],
+        data_shape="uncertainty support scatter",
+        failure_modes=[
+            "missing model artifact",
+            "model does not support uncertainty",
+            "missing records X column",
+            "invalid X or prediction vectors",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

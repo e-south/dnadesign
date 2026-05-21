@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Tuple
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from ..core.round_context import PluginCtx
 from ..core.utils import OpalError
@@ -52,6 +54,19 @@ class RecordsStore:
 
     def load_columns(self, columns: Iterable[str]) -> pd.DataFrame:
         return self._io.load_columns(list(columns))
+
+    def load_runtime_frame(self, *, include_x: bool) -> pd.DataFrame:
+        columns = [*ESSENTIAL_COLS, self.y_col, self.label_hist_col()]
+        if include_x:
+            columns.append(self.x_col)
+        return self.load_columns(columns)
+
+    def load_ingest_identity_frame(self) -> pd.DataFrame:
+        frame = self.load_columns(["id", "sequence"])
+        missing = [column for column in ("id", "sequence") if column not in frame.columns]
+        if missing:
+            raise OpalError(f"records.parquet missing required ingest identity column(s): {missing}.")
+        return frame
 
     def load_label_status_frame(self) -> pd.DataFrame:
         return self.load_columns(["id", self.label_hist_col()])
@@ -210,9 +225,12 @@ class RecordsStore:
         Return a DataFrame with at least 'id' and 'sequence' for all rows with X present.
         We do not exclude labeled rows from scoring; selection policy can decide.
         """
-        if self.x_col not in df.columns:
-            raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
-        keep = df[self.x_col].notna()
+        if self.x_col in df.columns:
+            keep = df[self.x_col].notna()
+        else:
+            if self.x_col not in self.schema_columns():
+                raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
+            keep = pd.Series([True] * len(df), index=df.index)
         cols = ["id", "sequence", self.x_col]
         cols = [c for c in cols if c in df.columns]
         return df.loc[keep, cols].copy()
@@ -253,6 +271,89 @@ class RecordsStore:
         if X.shape[0] != len(id_list):
             raise OpalError(f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(id_list)} ids.")
         return np.asarray(X), id_list
+
+    def transform_matrix_from_records(
+        self,
+        ids: Iterable[str],
+        *,
+        ctx: PluginCtx,
+        batch_size: int = 2048,
+    ) -> Tuple[np.ndarray, List[str]]:
+        id_list = [str(i) for i in ids]
+        if len(id_list) != len(set(id_list)):
+            raise OpalError("transform_matrix_from_records received duplicate ids.")
+        rows: dict[str, np.ndarray] = {}
+        for X_batch, batch_ids in self.iter_transform_matrix_batches(id_list, ctx=ctx, batch_size=batch_size):
+            for row_index, row_id in enumerate(batch_ids):
+                rows[str(row_id)] = np.asarray(X_batch[row_index], dtype=float)
+        missing = [row_id for row_id in id_list if row_id not in rows]
+        if missing:
+            raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={missing[:10]}).")
+        X = np.vstack([rows[row_id] for row_id in id_list])
+        return np.asarray(X, dtype=float), id_list
+
+    def iter_transform_matrix_batches(
+        self,
+        ids: Iterable[str],
+        *,
+        ctx: PluginCtx,
+        batch_size: int,
+    ) -> Iterator[Tuple[np.ndarray, List[str]]]:
+        if ctx is None:
+            raise OpalError("iter_transform_matrix_batches requires a PluginCtx for transform_x.")
+        if int(batch_size) <= 0:
+            raise OpalError("iter_transform_matrix_batches batch_size must be positive.")
+        id_list = [str(i) for i in ids]
+        if len(id_list) != len(set(id_list)):
+            raise OpalError("iter_transform_matrix_batches received duplicate ids.")
+        if not id_list:
+            return
+        wanted = set(id_list)
+        found: set[str] = set()
+        try:
+            parquet = pq.ParquetFile(self.records_path)
+        except Exception as exc:
+            raise OpalError(f"Failed to read records.parquet for X batches: {self.records_path}: {exc}") from exc
+        schema_names = set(parquet.schema_arrow.names)
+        missing_cols = [column for column in ("id", self.x_col) if column not in schema_names]
+        if missing_cols:
+            raise OpalError(f"records.parquet missing required column(s) for X batches: {missing_cols}")
+
+        tx = get_transform_x(self.x_transform_name, self.x_transform_params)
+        try:
+            batches = parquet.iter_batches(columns=["id", self.x_col], batch_size=int(batch_size))
+            for batch in batches:
+                id_values = [str(value) for value in batch.column("id").to_pylist()]
+                mask = [value in wanted for value in id_values]
+                if not any(mask):
+                    continue
+                indices = [index for index, keep in enumerate(mask) if keep]
+                filtered = batch.take(pa.array(indices, type=pa.int64()))
+                frame = filtered.to_pandas()
+                frame["id"] = frame["id"].astype(str)
+                batch_ids = frame["id"].tolist()
+                if len(batch_ids) != len(set(batch_ids)):
+                    raise OpalError("records.parquet contains duplicate ids inside an X batch.")
+                found.update(batch_ids)
+                series = frame[self.x_col]
+                null_mask = series.isna()
+                if null_mask.any():
+                    bad_ids = frame.loc[null_mask, "id"].tolist()[:10]
+                    raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
+                X = tx(series, ctx=ctx)
+                if X.shape[0] != len(batch_ids):
+                    raise OpalError(
+                        f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(batch_ids)} ids."
+                    )
+                yield np.asarray(X, dtype=float), batch_ids
+        except OpalError:
+            raise
+        except Exception as exc:
+            raise OpalError(f"Failed to stream X batches from records.parquet: {exc}") from exc
+
+        missing = sorted(wanted - found)
+        if missing:
+            raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={missing[:10]}).")
 
     # --------------- ensure rows exist for ingest ---------------
     def ensure_rows_exist(

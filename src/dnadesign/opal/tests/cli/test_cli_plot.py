@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.plots._context import PlotContext
-from dnadesign.opal.src.registries.plots import register_plot
+from dnadesign.opal.src.registries.plots import PlotMeta, describe_plot_kind, list_plots, register_plot
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
@@ -28,6 +28,24 @@ def _plot_minimal(ctx: PlotContext, params: dict) -> None:
 @register_plot("test_plot_cli_no_output")
 def _plot_no_output(ctx: PlotContext, params: dict) -> None:
     return None
+
+
+@register_plot(
+    "test_plot_cli_bad_tidy_schema",
+    meta=PlotMeta(
+        summary="Test plot with intentionally invalid tidy output.",
+        data_shape="test table",
+        tidy_schema=["a", "b"],
+        failure_modes=["missing declared tidy CSV columns"],
+    ),
+)
+def _plot_bad_tidy_schema(ctx: PlotContext, params: dict) -> None:
+    import pandas as pd
+
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    (ctx.output_dir / ctx.filename).write_text("ok")
+    if ctx.save_data:
+        ctx.save_df(pd.DataFrame({"a": [1]}))
 
 
 def test_plot_cli_writes_output(tmp_path):
@@ -95,6 +113,18 @@ def test_plot_cli_list_registry_includes_sfxi_diagnostics(tmp_path):
     ]:
         assert name in res.stdout
     assert "sfxi_setpoint_decomposition" not in res.stdout
+
+
+def test_builtin_plot_metadata_declares_shape_and_failure_modes() -> None:
+    missing = []
+    for kind in list_plots():
+        if kind.startswith("test_plot_cli_"):
+            continue
+        meta = describe_plot_kind(kind)
+        if not meta.get("data_shape") or not meta.get("failure_modes"):
+            missing.append(kind)
+
+    assert missing == []
 
 
 def test_plot_cli_list_registry_ignores_config(tmp_path):
@@ -238,6 +268,37 @@ def test_plot_cli_writes_failed_manifest_when_plugin_does_not_write_output(tmp_p
     assert res.exit_code == 1, res.stdout
     manifest = json.loads((workdir / "outputs" / "plots" / "nope.manifest.json").read_text())
     assert manifest["status"] == "failed"
+    assert manifest["error"]["category"] == "PlotDataContractError"
+
+
+def test_plot_cli_fails_when_tidy_csv_missing_declared_columns(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "bad_tidy",
+                "kind": "test_plot_cli_bad_tidy_schema",
+                "output": {"save_data": True},
+            }
+        ],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign)])
+
+    assert res.exit_code == 1, res.stdout
+    manifest = json.loads((workdir / "outputs" / "plots" / "bad_tidy.manifest.json").read_text())
+    assert manifest["status"] == "failed"
+    assert manifest["quality"]["tidy_schema_valid"] is False
+    assert manifest["quality"]["missing_tidy_columns"] == ["b"]
     assert manifest["error"]["category"] == "PlotDataContractError"
 
 

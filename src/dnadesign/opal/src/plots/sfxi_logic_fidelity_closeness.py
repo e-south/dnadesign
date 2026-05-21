@@ -45,6 +45,14 @@ def _import_pyarrow():
         },
         requires=["observed_round", "y_obs", "objective__params"],
         notes=["Reads outputs/ledger/labels.parquet + outputs/ledger/runs.parquet for setpoint."],
+        data_shape="observed label agreement matrix",
+        tidy_schema=["observed_round", "mse"],
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 observed label vectors",
+            "missing setpoint metadata",
+            "insufficient points for violin mode",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

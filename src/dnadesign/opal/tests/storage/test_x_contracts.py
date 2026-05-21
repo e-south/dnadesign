@@ -92,6 +92,22 @@ def test_validate_x_parquet_column_rejects_scalar_physical_schema(tmp_path: Path
         validate_x_parquet_column(records, x_column="X")
 
 
+def test_validate_x_parquet_column_rejects_integer_child_type(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b"], type=pa.string()),
+                "X": pa.array([[1, 2], [3, 4]], type=pa.list_(pa.int32(), list_size=2)),
+            }
+        ),
+        records,
+    )
+
+    with pytest.raises(OpalError, match="float32 or float64"):
+        validate_x_parquet_column(records, x_column="X")
+
+
 def test_records_save_atomic_preserves_fixed_size_x_schema(tmp_path: Path) -> None:
     records = tmp_path / "records.parquet"
     _write_fixed_size_x(records, [[0.1, 0.2], [0.3, 0.4]])

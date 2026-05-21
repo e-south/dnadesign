@@ -111,7 +111,8 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
   using the most common values found in `records.parquet`.
 * `--if-exists`: Behavior if `(id, round)` already exists in the configured label source (`fail`/`skip`/`replace`).
 * `--apply`: Apply ingest without interactive confirmation.
-* `--json`: Output as machine-readable JSON (default output is plain text).
+* `--json`: Output as machine-readable JSON (default output is plain text). With `--apply`, the command emits
+  one final JSON object containing commit counts, preview data, and `ingest_runtime` telemetry.
 
 **Behavior & checks**
 
@@ -136,7 +137,9 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
   `opal__<slug>__label_hist` and writes the current Y column.
 * For `labels.source.kind: usr_sidecar`, appends observed labels to the shared
   sidecar such as `_opal/observed_labels.parquet`; it does not duplicate assay
-  truth into campaign label-history columns.
+  truth into campaign label-history columns. Fixed-universe sidecar ingest loads
+  only the records identity frame (`id`, `sequence`) and does not materialize
+  the configured X column.
 * Emits `label` events into `outputs/ledger/labels.parquet`.
 
 ---
@@ -151,7 +154,8 @@ top-k, and write campaign artifacts/ledgers.
 
 ```bash
 opal run --config <yaml> --labels-as-of <r> \
-  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet] [--json]
+  [--k <n>] [--resume] [--score-batch-size <n>] [--max-x-matrix-gib <gib>] \
+  [--verbose|--quiet] [--json]
 ```
 
 **Flags**
@@ -160,6 +164,7 @@ opal run --config <yaml> --labels-as-of <r> \
 * `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
 * `--k, -k`: Override `selection.params.top_k`.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
+* `--max-x-matrix-gib`: Override `safety.max_x_matrix_gib` for this run. Prefer lowering `--score-batch-size` before raising this on memory-constrained hosts.
 * `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already contains artifacts). When set, the round directory is wiped before writing new artifacts.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 * `--json`: Output as machine-readable JSON (default output is plain text).
@@ -167,6 +172,10 @@ opal run --config <yaml> --labels-as-of <r> \
 **Pipeline**
 
 * Pulls effective labels per `training.policy` (cumulative vs current round, dedup policy).
+* Validates the Parquet X contract in bounded batches before round execution.
+* For `writeback.prediction_records: ledger_only`, loads record metadata without X and streams model-ready candidate X in bounded score batches.
+* For `writeback.prediction_records: label_history`, requires a full records frame because predictions are written back into `records.parquet`.
+* Aborts if the train plus score batch X footprint exceeds `safety.max_x_matrix_gib`.
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
 * Evaluates configured objective plugins and emits named score/uncertainty channels.
 * Resolves `selection.params.score_ref` (and optional `uncertainty_ref`) to choose channels for selection.
@@ -670,13 +679,14 @@ Built-ins injected for plots:
 
 ### `notebook`
 
-Generate or run the campaign-specific marimo artifact viewer.
+Generate or run OPAL marimo artifact viewers.
 
 **Usage**
 
 ```bash
 uv run opal notebook
 uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
+uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>]
 uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 ```
 
@@ -685,6 +695,10 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 * `generate` writes the campaign-specific artifact viewer for records, round/run
   state, ledger readiness, selected records, labels, predictions, and
   manifest-backed `outputs/plots` deliverables.
+* Repeating `--campaign` writes an explicit campaign-set notebook with a
+  campaign dropdown, at-a-glance campaign table, selected-campaign status, plot
+  dropdown, and warnings/stale-artifact panel. This is a review surface over
+  OPAL campaign contracts, not a study/probe dashboard.
 * `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
 * `generate` works before the first OPAL run. Missing ledger, label,
   prediction, and plot artifacts appear as explicit notebook states.
@@ -727,6 +741,31 @@ opal review --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out-d
 * The manifest is authoritative. Review reports stale files that exist under
   the review output directory but are absent from the active manifest, and it
   validates the configured X column before publishing review evidence.
+
+---
+
+### `artifacts`
+
+Audit and prune generated OPAL artifacts using active manifests as the
+authority.
+
+**Usage**
+
+```bash
+opal artifacts audit --config <yaml-or-dir> [--json]
+opal artifacts prune --config <yaml-or-dir> [--apply] [--json]
+```
+
+**Notes**
+
+* `audit` is read-only. It inventories `outputs/`, `notebooks/`, active review
+  and plot manifests, stale manifest-absent plot/review siblings, byte counts,
+  and whether the campaign root is local-only because it lives under `.var`.
+* `prune` is a dry-run by default. It deletes only stale artifacts from the
+  active prune plan when `--apply` is passed.
+* The command does not read `records.parquet` or the configured X column; it is
+  an artifact-gardening surface, not a campaign execution or scientific-review
+  step.
 
 ---
 

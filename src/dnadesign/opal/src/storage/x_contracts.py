@@ -29,6 +29,8 @@ from ..core.utils import OpalError
 class XSeriesValidation:
     row_count: int
     x_dim: int
+    value_type: str = "float64"
+    item_size_bytes: int = 8
 
 
 def validate_x_series(
@@ -64,7 +66,7 @@ def validate_x_series(
 
     if row_count == 0 or expected_dim is None:
         raise OpalError(f"X column '{x_column}' has no rows to validate.")
-    return XSeriesValidation(row_count=row_count, x_dim=expected_dim)
+    return XSeriesValidation(row_count=row_count, x_dim=expected_dim, value_type="float64", item_size_bytes=8)
 
 
 def validate_x_parquet_column(
@@ -94,6 +96,10 @@ def validate_x_parquet_column(
     field = schema.field(x_column)
     if not pa.types.is_fixed_size_list(field.type):
         raise OpalError(f"X column '{x_column}' must be stored as a Parquet fixed_size_list; found {field.type}.")
+    child_type = field.type.value_type
+    if not (pa.types.is_float32(child_type) or pa.types.is_float64(child_type)):
+        raise OpalError(f"X column '{x_column}' fixed_size_list values must be float32 or float64; found {child_type}.")
+    item_size_bytes = 4 if pa.types.is_float32(child_type) else 8
     fixed_dim = int(field.type.list_size)
     expected_dim: int | None = fixed_dim
     if expected_dim == 0:
@@ -125,7 +131,12 @@ def validate_x_parquet_column(
 
     if row_count == 0 or expected_dim is None:
         raise OpalError(f"X column '{x_column}' has no rows to validate.")
-    return XSeriesValidation(row_count=int(row_count), x_dim=int(expected_dim))
+    return XSeriesValidation(
+        row_count=int(row_count),
+        x_dim=int(expected_dim),
+        value_type=str(child_type),
+        item_size_bytes=item_size_bytes,
+    )
 
 
 def _validate_fixed_size_x_batch(
@@ -145,22 +156,14 @@ def _validate_fixed_size_x_batch(
         local_index = _first_true(child.is_null().to_pylist()) // int(expected_dim)
         sample_id = _sample_id(ids[local_index], row_index=row_offset + local_index)
         raise OpalError(f"X column '{x_column}' contains null vector values for id {sample_id}.")
-    if pa.types.is_floating(child.type):
-        array = child.to_numpy(zero_copy_only=False)
-        bad = np.flatnonzero(~np.isfinite(array))
-        if len(bad):
-            local_index = int(bad[0]) // int(expected_dim)
-            sample_id = _sample_id(ids[local_index], row_index=row_offset + local_index)
-            raise OpalError(f"X column '{x_column}' contains non-finite values for id {sample_id}.")
-    elif not pa.types.is_integer(child.type):
-        for local_index, value in enumerate(values.to_pylist()):
-            sample_id = _sample_id(ids[local_index], row_index=row_offset + local_index)
-            vector = _coerce_x_vector(value, x_column=x_column, sample_id=sample_id)
-            if len(vector) != int(expected_dim):
-                raise OpalError(
-                    f"X column '{x_column}' must be fixed-length; first non-null vector has length "
-                    f"{expected_dim}, but id {sample_id} has length {len(vector)}."
-                )
+    if not (pa.types.is_float32(child.type) or pa.types.is_float64(child.type)):
+        raise OpalError(f"X column '{x_column}' fixed_size_list values must be float32 or float64; found {child.type}.")
+    array = child.to_numpy(zero_copy_only=False)
+    bad = np.flatnonzero(~np.isfinite(array))
+    if len(bad):
+        local_index = int(bad[0]) // int(expected_dim)
+        sample_id = _sample_id(ids[local_index], row_index=row_offset + local_index)
+        raise OpalError(f"X column '{x_column}' contains non-finite values for id {sample_id}.")
 
 
 def _first_true(values: Sequence[bool]) -> int:

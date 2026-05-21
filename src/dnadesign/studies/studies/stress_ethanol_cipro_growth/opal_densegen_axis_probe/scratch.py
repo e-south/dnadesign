@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -87,32 +86,6 @@ def _write_parquet(path: Path, frame: pd.DataFrame) -> None:
     frame.to_parquet(path, index=False)
 
 
-def _clone_records_file(src: Path, dst: Path, *, copy_mode: str) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if dst.exists():
-        problems = records_manifest_problems(dst, src)
-        if problems:
-            raise RuntimeError(
-                "scratch records.parquet already exists without a matching source manifest. "
-                f"Use a fresh --run-root or remove the stale scratch dataset: {', '.join(problems)}"
-            )
-        return
-    if copy_mode == "clone":
-        result = subprocess.run(["cp", "-c", str(src), str(dst)], check=False, capture_output=True, text=True)
-        if result.returncode != 0:
-            message = (result.stderr or result.stdout or "").strip()
-            raise RuntimeError(
-                "failed to create APFS clone for scratch records.parquet. "
-                "Re-run with --copy-mode full if a full 5 GB scratch copy is acceptable. "
-                f"cp -c error: {message}"
-            )
-    elif copy_mode == "full":
-        shutil.copy2(src, dst)
-    else:
-        raise ValueError("--copy-mode must be clone or full")
-    _write_json(records_manifest_path(dst), records_manifest_payload(src, dst, copy_mode=copy_mode))
-
-
 def _stable_id_hash(ids: Sequence[str]) -> str:
     payload = "\n".join(sorted(map(str, ids))).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
@@ -140,25 +113,52 @@ def _write_records_subset(src: Path, dst: Path, *, ids: Sequence[str]) -> None:
             )
         return
 
-    import pyarrow.dataset as ds
+    import pyarrow as pa
     import pyarrow.parquet as pq
 
-    dataset = ds.dataset(str(src), format="parquet")
-    table = dataset.to_table(filter=ds.field("id").isin(requested_ids))
-    found_ids = set(table.column("id").to_pylist()) if table.num_rows else set()
-    missing = sorted(set(requested_ids) - set(map(str, found_ids)))
+    source = pq.ParquetFile(src)
+    wanted = set(requested_ids)
+    found_ids: set[str] = set()
+    row_count = 0
+    tmp = dst.with_suffix(".tmp.parquet")
+    writer: pq.ParquetWriter | None = None
+    failed = False
+    try:
+        writer = pq.ParquetWriter(tmp, source.schema_arrow)
+        for batch in source.iter_batches(batch_size=512):
+            ids = [str(value) for value in batch.column("id").to_pylist()]
+            mask = [value in wanted for value in ids]
+            if not any(mask):
+                continue
+            table = pa.Table.from_batches([batch]).filter(pa.array(mask))
+            kept_ids = [str(value) for value in table.column("id").to_pylist()]
+            found_ids.update(kept_ids)
+            row_count += int(table.num_rows)
+            writer.write_table(table)
+    except Exception:
+        failed = True
+        raise
+    finally:
+        if writer is not None:
+            writer.close()
+        if failed and tmp.exists():
+            tmp.unlink()
+
+    missing = sorted(wanted - found_ids)
     if missing:
+        if tmp.exists():
+            tmp.unlink()
         preview = ", ".join(missing[:5])
         suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
         raise RuntimeError(f"records subset is missing requested id(s): {preview}{suffix}")
-    pq.write_table(table, dst)
+    tmp.replace(dst)
     _write_json(
         records_manifest_path(dst),
         records_manifest_payload(
             src,
             dst,
             copy_mode="subset",
-            row_count=int(table.num_rows),
+            row_count=int(row_count),
             subset_id_count=len(requested_ids),
             subset_ids_sha256=expected_hash,
         ),
@@ -216,6 +216,10 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
     selection_params = selection.setdefault("params", {})
     selection_params["top_k"] = int(run.selection_k)
     selection_params["tie_handling"] = "ordinal"
+    if run.max_x_matrix_gib is not None:
+        cfg.setdefault("safety", {})["max_x_matrix_gib"] = float(run.max_x_matrix_gib)
+    if run.score_batch_size is not None:
+        cfg.setdefault("scoring", {})["score_batch_size"] = int(run.score_batch_size)
     cfg["writeback"] = {"prediction_records": "ledger_only"}
     cfg["plot_config"] = "plots.yaml"
     run.config_path.parent.mkdir(parents=True, exist_ok=True)

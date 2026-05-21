@@ -171,6 +171,14 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
         },
         requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
         notes=["Reads per-round outputs, not ledger."],
+        data_shape="attribution matrix",
+        tidy_schema=["as_of_round", "feature_index", "importance"],
+        failure_modes=[
+            "missing feature_importance.csv",
+            "duplicate or inconsistent feature IDs",
+            "non-finite importances",
+            "requested round has no feature-importance artifact",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

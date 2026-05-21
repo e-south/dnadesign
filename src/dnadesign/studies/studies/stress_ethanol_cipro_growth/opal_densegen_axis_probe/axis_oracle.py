@@ -378,24 +378,6 @@ def _balanced_class_budgets(*, budget: int, seed: int, require_each_class: bool 
     return counts
 
 
-def build_balanced_eval_ids(
-    labels: pd.DataFrame,
-    *,
-    eval_ids: Sequence[str],
-    budget: int,
-    seed: int,
-) -> list[str]:
-    class_budgets = _balanced_class_budgets(budget=int(budget), seed=int(seed))
-    eval_id_set = set(map(str, eval_ids))
-    pool = _ok_labels(labels).loc[lambda frame: frame["id"].astype(str).isin(eval_id_set)].copy()
-    rng = np.random.default_rng(int(seed) + 104729)
-    sampled_ids: list[str] = []
-    for axis_class in AXIS_CLASS_TO_LOGIC4:
-        class_ids = pool.loc[pool["axis_class"].astype(str) == axis_class, "id"].astype(str).tolist()
-        sampled_ids.extend(_deterministic_sample(class_ids, n=class_budgets[axis_class], rng=rng))
-    return sorted(sampled_ids)
-
-
 def build_train_ids(
     labels: pd.DataFrame,
     *,

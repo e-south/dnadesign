@@ -88,12 +88,13 @@ class CampaignLock:
     Not distributed; good enough for single-host workflows.
     """
 
-    def __init__(self, workdir: Path):
+    def __init__(self, workdir: Path, *, payload_extra: dict | None = None):
         self.workdir = Path(workdir)
         self.lockfile = self.workdir / ".opal.lock"
+        self.payload_extra = dict(payload_extra or {})
 
     def __enter__(self):
-        _acquire_lock_file(self.lockfile, subject="Campaign")
+        _acquire_lock_file(self.lockfile, subject="Campaign", payload_extra=self.payload_extra)
         return self
 
     def __exit__(self, exc_type, exc, tb):

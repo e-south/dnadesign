@@ -23,6 +23,8 @@ import pandas as pd
 from ..core.utils import ensure_dir, file_sha256
 from .parquet_io import write_parquet_df
 
+PROGRESS_EVENT_SCHEMA_VERSION = "opal.progress_event.v1"
+
 
 @dataclass
 class ArtifactPaths:
@@ -57,7 +59,7 @@ def append_round_log_event(path: Path, event: dict) -> None:
     ensure_dir(path.parent)
     event = dict(event)
     stage = str(event.get("stage", "unknown"))
-    event.setdefault("schema_version", "opal.progress_event.v1")
+    event.setdefault("schema_version", PROGRESS_EVENT_SCHEMA_VERSION)
     event.setdefault("event_id", uuid.uuid4().hex)
     event.setdefault("phase", _infer_progress_phase(stage))
     event.setdefault("severity", "info")
@@ -68,7 +70,12 @@ def append_round_log_event(path: Path, event: dict) -> None:
 def _infer_progress_phase(stage: str) -> str:
     if stage.startswith("command_"):
         return "command"
-    if stage.startswith("records_load") or stage in {"preflight", "preflight_start", "preflight_done"}:
+    if (
+        stage.startswith("records_load")
+        or stage.startswith("x_validate")
+        or stage.startswith("lock_")
+        or stage in {"preflight", "preflight_start", "preflight_done"}
+    ):
         return "preflight"
     if stage in {"abort", "aborted"} or stage.endswith("_abort"):
         return "abort"

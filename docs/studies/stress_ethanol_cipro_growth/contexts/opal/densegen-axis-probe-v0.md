@@ -61,13 +61,17 @@ campaign distinguishes dual-condition specificity from single-axis OR behavior.
 
 ### Run Matrix
 
-The v0 matrix is intentionally small:
+The v0 matrix is intentionally scoped, but it should use real OPAL scoring
+semantics inside each split: OPAL trains from observed labels, scores the full
+unlabeled split pool, selects the greedy top K, ingests those labels, and repeats
+round over round. There is no candidate cap in the durable probe contract.
 
 - Oracles: `densegen_part_axis_vec8_v0`,
   `permuted_densegen_part_axis_vec8_v0`
 - Campaigns: cipro, ethanol, AND
 - Splits: `random_id`, `leave_sigma35_variant`
-- Budget: 96 labels, stratified 24 per axis class
+- Initial labels: 6, stratified across axis classes
+- Selection K: 6 labels per OPAL round
 - Seed: 7
 
 The full matrix is 12 runs. Gates allow narrower execution:
@@ -85,7 +89,8 @@ Dry-run is the default:
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --budget 96 \
+  --initial-labels 6 \
+  --selection-k 6 \
   --seed 7 \
   --splits random_id,leave_sigma35_variant
 ```
@@ -94,13 +99,30 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_dens
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --budget 96 --seed 7 --rounds 3 --splits random_id,leave_sigma35_variant --apply
+  --initial-labels 6 --selection-k 6 --seed 7 --rounds 12 \
+  --splits random_id,leave_sigma35_variant --score-batch-size 512 --apply
 ```
 
 `--rounds` controls a scratch active-learning loop: round 0 uses the planned
 training split, and later rounds label the previous OPAL selections from the
 study-owned DenseGen oracle or permuted null before rerunning OPAL. Synthetic
 labels still never enter the shared observed-label sidecar.
+
+Metrics are written both for the final scored round and for every available
+round in `reports/round_metrics.csv` and `reports/round_metrics.jsonl`. The
+review also includes a metric guide so `precision@K`, target prevalence, lift,
+binomial tail p-values, and null lift can be interpreted without reading the
+Python implementation.
+
+The probe inherits OPAL's `safety.max_x_matrix_gib` guard and uses scratch
+campaigns with `writeback.prediction_records: ledger_only`. OPAL therefore
+validates the full 8192-D X contract, loads record metadata without X, streams
+candidate X in score batches, and fails only when a single train plus score
+batch would exceed the configured memory budget. On memory-constrained hosts,
+lower `--score-batch-size` before raising `--max-x-matrix-gib`.
+Scratch split `records.parquet` files are also written in filtered Parquet
+batches so a full random-id split does not require one giant in-memory Arrow
+table during materialization.
 
 By default, apply-mode run roots must live under:
 

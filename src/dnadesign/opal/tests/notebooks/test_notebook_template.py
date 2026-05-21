@@ -1,6 +1,8 @@
 import ast
 from pathlib import Path
 
+from dnadesign.opal.src.analysis.notebook_components import render_plot_gallery_cells
+from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
 
 
@@ -28,6 +30,17 @@ def test_notebook_template_has_plot_gallery() -> None:
     assert "outputs/plots" in text
     assert "build_notebook_view_model" in text
     assert "All configured plots with written manifests." in text
+
+
+def test_notebook_template_uses_plot_gallery_component() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    gallery_text = render_plot_gallery_cells()
+
+    assert render_plot_gallery_cells.__module__.endswith(".notebook_components")
+    assert "def render_plot_gallery_cells" not in text
+    assert gallery_text in text
+    assert "plot_gallery_note" in gallery_text
+    assert "manifest-backed plot outputs" in gallery_text
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -93,4 +106,21 @@ def test_notebook_template_omits_altair_import() -> None:
 
 def test_notebook_template_is_valid_python() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    ast.parse(text)
+
+
+def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="latest",
+    )
+
+    assert "# OPAL Campaign Set Notebook" in text
+    assert "from dnadesign.opal import build_campaign_set_notebook_view_model" in text
+    assert "dnadesign.opal.src" not in text
+    assert 'label="Campaign"' in text
+    assert 'label="Plot"' in text
+    assert "campaign_set_view_model" in text
+    assert "LatentDNA" not in text
+    assert "UMAP" not in text
     ast.parse(text)

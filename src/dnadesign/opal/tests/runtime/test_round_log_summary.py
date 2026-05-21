@@ -7,10 +7,13 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import json
+
 import pytest
 
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.reporting.summary import summarize_round_log
+from dnadesign.opal.src.storage.artifacts import append_round_log_event
 
 
 def test_round_log_summary_counts():
@@ -65,3 +68,27 @@ def test_round_log_summary_rejects_missing_run_id_when_logs_are_run_scoped():
 
     with pytest.raises(OpalError, match="no events for run_id"):
         summarize_round_log(events, run_id="run-b")
+
+
+def test_round_log_event_contract_marks_x_validation_as_preflight(tmp_path):
+    log_path = tmp_path / "round.log.jsonl"
+
+    append_round_log_event(
+        log_path,
+        {
+            "ts": "2025-01-01T00:00:00+00:00",
+            "round": 0,
+            "stage": "x_validate_start",
+            "attempt_id": "attempt-1",
+        },
+    )
+
+    event = json.loads(log_path.read_text(encoding="utf-8").strip())
+    assert event["schema_version"] == "opal.progress_event.v1"
+    assert event["phase"] == "preflight"
+    assert event["attempt_id"] == "attempt-1"
+
+    summary = summarize_round_log([event])
+    assert summary["preflight_events"] == 1
+    assert summary["run_events"] == 0
+    assert summary["run_scope"]["attempt_ids"] == ["attempt-1"]

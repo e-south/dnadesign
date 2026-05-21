@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import csv
 import re
 import traceback
 from pathlib import Path
@@ -78,6 +79,11 @@ def build_plot_manifest(
             outputs.append(_file_entry(data_file, role="tidy_csv"))
     tidy_csv = next((entry["path"] for entry in outputs if entry.get("role") == "tidy_csv"), None)
     warnings: list[dict[str, Any]] = []
+    quality = _quality_entry(tidy_csv=tidy_csv, tidy_schema=meta.get("tidy_schema") or [])
+    freshness = _freshness_entry(
+        inputs=[_file_entry(path, role=role) for role, path in sorted(getattr(context, "data_paths", {}).items())],
+        outputs=outputs,
+    )
     if status == "written" and not output_path.exists():
         warnings.append(
             {
@@ -89,6 +95,19 @@ def build_plot_manifest(
         )
         status = "failed"
         error = error or RuntimeError("plot media output was not written")
+    if status == "written" and quality.get("tidy_schema_valid") is False:
+        missing = ", ".join(quality.get("missing_tidy_columns") or [])
+        message = f"Plot tidy CSV is missing declared columns: {missing}"
+        warnings.append(
+            {
+                "category": "PlotDataContractError",
+                "severity": "warning",
+                "message": message,
+                "path": tidy_csv,
+            }
+        )
+        status = "failed"
+        error = error or RuntimeError(message)
     return {
         "schema_version": PLOT_ARTIFACT_SCHEMA_VERSION,
         "plot_id": plot_artifact_id(Path(str(context.filename)).stem),
@@ -100,11 +119,15 @@ def build_plot_manifest(
         "run_id": getattr(context, "run_id", None),
         "rounds": _jsonable(getattr(context, "rounds", "unspecified")),
         "params": _jsonable(dict(params)),
-        "inputs": [_file_entry(path, role=role) for role, path in sorted(getattr(context, "data_paths", {}).items())],
+        "inputs": freshness["inputs"],
         "outputs": outputs,
         "tidy_csv": tidy_csv,
         "manifest_path": str(manifest_path),
         "metadata": meta,
+        "caption": meta.get("summary"),
+        "review_purpose": meta.get("summary"),
+        "quality": quality,
+        "freshness": freshness,
         "warnings": warnings,
         "error": _error_entry(error) if error is not None else None,
     }
@@ -154,6 +177,56 @@ def _error_entry(error: BaseException) -> dict[str, Any]:
         "type": type(error).__name__,
         "message": str(error),
         "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+    }
+
+
+def _quality_entry(*, tidy_csv: str | None, tidy_schema: Iterable[str]) -> dict[str, Any]:
+    expected = [str(column) for column in tidy_schema if str(column)]
+    quality: dict[str, Any] = {
+        "tidy_schema_declared": bool(expected),
+        "tidy_schema": expected,
+        "tidy_schema_valid": None,
+        "missing_tidy_columns": [],
+    }
+    if tidy_csv is None:
+        return quality
+    if not expected:
+        quality["tidy_schema_valid"] = None
+        return quality
+    path = Path(tidy_csv)
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            header = next(csv.reader(handle), [])
+    except StopIteration:
+        header = []
+    missing = [column for column in expected if column not in header]
+    quality["tidy_schema_valid"] = not missing
+    quality["missing_tidy_columns"] = missing
+    quality["tidy_columns"] = header
+    return quality
+
+
+def _freshness_entry(*, inputs: list[dict[str, Any]], outputs: list[dict[str, Any]]) -> dict[str, Any]:
+    input_mtimes = [
+        int(entry["mtime_ns"]) for entry in inputs if entry.get("exists") and isinstance(entry.get("mtime_ns"), int)
+    ]
+    output_mtimes = [
+        int(entry["mtime_ns"]) for entry in outputs if entry.get("exists") and isinstance(entry.get("mtime_ns"), int)
+    ]
+    latest_input = max(input_mtimes) if input_mtimes else None
+    oldest_output = min(output_mtimes) if output_mtimes else None
+    if not output_mtimes:
+        status = "missing_outputs"
+    elif latest_input is not None and oldest_output is not None and oldest_output < latest_input:
+        status = "stale"
+    else:
+        status = "fresh"
+    return {
+        "schema_version": "opal.plot_freshness.v1",
+        "status": status,
+        "latest_input_mtime_ns": latest_input,
+        "oldest_output_mtime_ns": oldest_output,
+        "inputs": inputs,
     }
 
 

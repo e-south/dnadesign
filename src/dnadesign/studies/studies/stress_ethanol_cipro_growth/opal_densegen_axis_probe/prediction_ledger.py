@@ -9,7 +9,7 @@ import pandas as pd
 from dnadesign.opal import read_campaign_predictions
 
 
-def read_probe_predictions(config_path: Path) -> pd.DataFrame:
+def read_probe_predictions(config_path: Path, *, round_selector: str | None = "latest") -> pd.DataFrame:
     return read_campaign_predictions(
         config_path,
         columns=[
@@ -21,7 +21,7 @@ def read_probe_predictions(config_path: Path) -> pd.DataFrame:
             "sel__rank_competition",
             "sel__is_selected",
         ],
-        round_selector="latest",
+        round_selector=round_selector,
         require_run_id=True,
     )
 

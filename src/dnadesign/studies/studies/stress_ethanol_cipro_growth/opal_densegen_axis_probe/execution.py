@@ -18,7 +18,6 @@ def materialize_probe_inputs(
     labels: Any,
     null_labels: Any,
     split_metadata: Mapping[str, Mapping[str, Any]],
-    copy_mode: str,
 ) -> None:
     import pandas as pd
 

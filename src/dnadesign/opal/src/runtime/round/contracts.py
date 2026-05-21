@@ -32,6 +32,9 @@ class RunRoundRequest:
     config_path: Optional[Path] = None
     k_override: Optional[int] = None
     score_batch_size_override: Optional[int] = None
+    max_x_matrix_gib_override: Optional[float] = None
+    x_dim_override: Optional[int] = None
+    x_item_size_bytes: Optional[int] = None
     verbose: bool = True
     allow_resume: bool = False
     progress_factory: Optional[ProgressFactory] = None
@@ -74,7 +77,6 @@ class TrainingBundle:
 class XBundle:
     X_train: np.ndarray
     id_order_train: List[str]
-    X_pool: np.ndarray
     id_order_pool: List[str]
     cand_df: pd.DataFrame
 

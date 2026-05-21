@@ -43,6 +43,13 @@ from .sfxi_diag_data import (
         },
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for denom/logic metrics (objective-consistent)."],
+        data_shape="objective setpoint matrix",
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 label vectors",
+            "insufficient labels for denominator percentile",
+            "missing objective setpoint metadata",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

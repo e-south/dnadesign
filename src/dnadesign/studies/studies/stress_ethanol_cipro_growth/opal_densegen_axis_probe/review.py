@@ -7,7 +7,7 @@ import os
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
@@ -15,15 +15,37 @@ from dnadesign.opal import build_campaign_review, load_plot_artifact_manifest, l
 
 from .artifacts import ProbeArtifactLayout
 from .constants import NULL_ORACLE_ID, ORACLE_ID
-from .decision import _decision_from_metrics
+from .decision import (
+    _decision_from_metrics,
+    decision_reasons_from_metrics,
+    enrich_metric_rows,
+    gate_results_from_metrics,
+    metric_definitions,
+    metric_quality_from_metrics,
+)
 from .status import audit_run_root
 
 
 def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[str, Any]:
     layout = ProbeArtifactLayout(Path(run_root).resolve())
     metrics_payload = _load_metrics(layout.metrics_path)
+    metrics_payload = _enriched_metrics_payload(metrics_payload)
     audit = audit_run_root(layout.run_root)
     review_decision = _review_decision(metrics_payload)
+    safety = metrics_payload.get("safety") if isinstance(metrics_payload.get("safety"), Mapping) else {}
+    runs = metrics_payload.get("runs") if isinstance(metrics_payload.get("runs"), list) else []
+    gate_results = gate_results_from_metrics([row for row in runs if isinstance(row, Mapping)], safety)
+    decision_reasons = decision_reasons_from_metrics(
+        [row for row in runs if isinstance(row, Mapping)],
+        safety,
+        decision=review_decision,
+    )
+    metric_quality = metric_quality_from_metrics([row for row in runs if isinstance(row, Mapping)])
+    metrics_payload["decision"] = review_decision
+    metrics_payload["decision_reasons"] = decision_reasons
+    metrics_payload["gate_results"] = gate_results
+    metrics_payload["metric_quality"] = metric_quality
+    metrics_payload["metric_definitions"] = metric_definitions()
     review_problems = _review_problems(audit=audit, review_decision=review_decision)
     review_status = "attention" if review_problems else audit.status
     run_manifest = _build_run_manifest(
@@ -33,6 +55,9 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         review_decision=review_decision,
         review_status=review_status,
         review_problems=review_problems,
+        decision_reasons=decision_reasons,
+        gate_results=gate_results,
+        metric_quality=metric_quality,
     )
     campaign_reviews = _build_campaign_reviews(layout, metrics_payload=metrics_payload, include_plots=include_plots)
     configured_plots = _build_configured_plot_reviews(layout, metrics_payload=metrics_payload)
@@ -50,6 +75,10 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         "persisted_decision": audit.decision,
         "status": review_status,
         "problems": review_problems,
+        "decision_reasons": decision_reasons,
+        "gate_results": gate_results,
+        "metric_quality": metric_quality,
+        "metric_definitions": metric_definitions(),
         "gate_coverage": _gate_coverage(metrics_payload.get("runs") or []),
         "opal_campaign_reviews": campaign_reviews,
         "opal_configured_plots": configured_plots,
@@ -63,8 +92,18 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         },
         "run_manifest": str(layout.run_manifest_path),
     }
+    _write_json(layout.metrics_path, metrics_payload)
+    if metrics_payload.get("runs"):
+        _write_jsonl(layout.reports_dir / "selection_summary.jsonl", metrics_payload["runs"])
+    if metrics_payload.get("rounds"):
+        _write_jsonl(layout.reports_dir / "round_metrics.jsonl", metrics_payload["rounds"])
     _write_json(layout.run_manifest_path, run_manifest)
     _write_json(layout.review_manifest_path, review_manifest)
+    status_payload = audit.to_dict()
+    status_payload["decision_reasons"] = decision_reasons
+    status_payload["gate_results"] = gate_results
+    status_payload["metric_quality"] = metric_quality
+    _write_json(layout.status_path, status_payload)
     layout.review_path.write_text(render_probe_review_markdown(review_manifest, metrics_payload), encoding="utf-8")
     layout.review_index_path.write_text(
         render_probe_review_html(review_manifest, metrics_payload, base_dir=layout.reports_dir),
@@ -89,12 +128,17 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
 
 def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_payload: Mapping[str, Any]) -> str:
     runs = metrics_payload.get("runs") or []
+    round_rows = metrics_payload.get("rounds") or []
     coverage = review_manifest.get("gate_coverage") or {}
     campaign_reviews = review_manifest.get("opal_campaign_reviews") or []
     configured_plots = review_manifest.get("opal_configured_plots") or []
     plot_quality = review_manifest.get("plot_quality") or {}
     plots = review_manifest.get("probe_plots") or []
     problems = review_manifest.get("problems") or []
+    decision_reasons = review_manifest.get("decision_reasons") or []
+    gate_results = review_manifest.get("gate_results") or []
+    metric_quality = review_manifest.get("metric_quality") or {}
+    definitions = review_manifest.get("metric_definitions") or metrics_payload.get("metric_definitions") or {}
     lines = [
         "# DenseGen axis OPAL probe review",
         "",
@@ -106,8 +150,10 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
         f"- decision: `{review_manifest.get('decision')}`",
         f"- persisted decision: `{review_manifest.get('persisted_decision')}`",
         f"- status: `{review_manifest.get('status')}`",
-        f"- problems: `{', '.join(problems) if problems else 'none'}`",
+        f"- contract problems: `{', '.join(problems) if problems else 'none'}`",
+        f"- decision reasons: `{len(decision_reasons)}`",
         f"- run_root: `{review_manifest.get('run_root')}`",
+        f"- weak count-aware runs: `{metric_quality.get('weak_count_approx_binomial_p_gt_0_05', 0)}`",
         "",
         "## Coverage",
         "",
@@ -116,31 +162,110 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
         f"- positive/null pairs complete: `{coverage.get('positive_null_pairs_complete')}`",
         f"- omitted scored gates: `{', '.join(coverage.get('omitted_scored_gates') or []) or 'none'}`",
         "",
-        "## Metrics",
+        "## Decision Reasons",
         "",
     ]
+    if decision_reasons:
+        for reason in decision_reasons:
+            lines.append(
+                "- `{gate}` `{status}`: {reason}".format(
+                    gate=reason.get("gate", "unknown"),
+                    status=reason.get("status", "unknown"),
+                    reason=reason.get("reason", "no reason recorded"),
+                )
+            )
+    else:
+        lines.append("No blocking decision reasons were recorded.")
+    lines.extend(["", "## Gate Results", ""])
+    if gate_results:
+        lines.extend(
+            [
+                "| gate | status | campaign | split | observed | threshold | reason |",
+                "|---|---|---|---|---:|---:|---|",
+            ]
+        )
+        for row in gate_results:
+            lines.append(
+                "| `{gate}` | `{status}` | `{campaign}` | `{split}` | {observed} | {threshold} | {reason} |".format(
+                    gate=row.get("gate", ""),
+                    status=row.get("status", ""),
+                    campaign=row.get("campaign", ""),
+                    split=row.get("split_id", ""),
+                    observed=_fmt(_gate_observed(row)),
+                    threshold=_fmt(_gate_threshold(row)),
+                    reason=row.get("reason", ""),
+                )
+            )
+    else:
+        lines.append("No gate results were recorded.")
+    lines.extend(
+        [
+            "",
+            "## Metric Guide",
+            "",
+            f"- selected target count: {definitions.get('selected_target_count', '')}",
+            f"- precision@K: {definitions.get('precision_at_k', '')}",
+            f"- prevalence: {definitions.get('target_prevalence', '')}",
+            f"- lift: {definitions.get('lift', '')}",
+            f"- binomial p>=k: {definitions.get('binomial_tail_p', '')}",
+            f"- null lift: {definitions.get('null_lift', '')}",
+            f"- round metrics: {definitions.get('round', '')}",
+            "",
+            "## Metrics",
+            "",
+        ]
+    )
     if runs:
         lines.extend(
             [
-                "| run_key | oracle | split | precision@K true | lift true | selected classes |",
-                "|---|---|---|---:|---:|---|",
+                "| run_key | oracle | split | selected target | prevalence | precision@K | "
+                "lift | binom p>=k | selected classes |",
+                "|---|---|---|---:|---:|---:|---:|---:|---|",
             ]
         )
         for row in runs:
             classes = row.get("off_target_class_distribution_true") or {}
             class_text = ", ".join(f"{key}:{value}" for key, value in classes.items())
             lines.append(
-                "| `{run_key}` | `{oracle}` | `{split}` | {precision} | {lift} | {classes} |".format(
+                (
+                    "| `{run_key}` | `{oracle}` | `{split}` | {selected_count} | {prevalence} | "
+                    "{precision} | {lift} | {p_value} | {classes} |"
+                ).format(
                     run_key=row.get("run_key"),
                     oracle=row.get("oracle_id"),
                     split=row.get("split_id"),
-                    precision=row.get("selected_target_precision_at_k_true"),
-                    lift=row.get("target_lift_at_k_true"),
+                    selected_count=row.get("selected_target_count_label_true", ""),
+                    prevalence=_fmt(row.get("target_class_prevalence_true")),
+                    precision=_fmt(row.get("selected_target_precision_at_k_true")),
+                    lift=_fmt(row.get("target_lift_at_k_true")),
+                    p_value=_fmt(row.get("selected_target_binomial_tail_p_true")),
                     classes=class_text,
                 )
             )
     else:
         lines.append("No scored OPAL run metrics are present yet.")
+    lines.extend(["", "## Round Metrics", ""])
+    if round_rows:
+        lines.extend(
+            [
+                "| run_key | round | selected target | prevalence | precision@K | lift | binom p>=k |",
+                "|---|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for row in round_rows:
+            lines.append(
+                "| `{run_key}` | {round} | {selected_count} | {prevalence} | {precision} | {lift} | {p_value} |".format(
+                    run_key=row.get("run_key"),
+                    round=row.get("as_of_round"),
+                    selected_count=row.get("selected_target_count_label_true", ""),
+                    prevalence=_fmt(row.get("target_class_prevalence_true")),
+                    precision=_fmt(row.get("selected_target_precision_at_k_true")),
+                    lift=_fmt(row.get("target_lift_at_k_true")),
+                    p_value=_fmt(row.get("selected_target_binomial_tail_p_true")),
+                )
+            )
+    else:
+        lines.append("No round-level OPAL metrics were recorded.")
     lines.extend(["", "## OPAL Campaign Reviews", ""])
     if campaign_reviews:
         for review in campaign_reviews:
@@ -191,19 +316,25 @@ def render_probe_review_html(
     base_dir: Path,
 ) -> str:
     runs = metrics_payload.get("runs") or []
+    round_rows_payload = metrics_payload.get("rounds") or []
     coverage = review_manifest.get("gate_coverage") or {}
     campaign_reviews = review_manifest.get("opal_campaign_reviews") or []
     configured_plots = review_manifest.get("opal_configured_plots") or []
     plot_quality = review_manifest.get("plot_quality") or {}
     plots = review_manifest.get("probe_plots") or []
     problems = review_manifest.get("problems") or []
+    decision_reasons = review_manifest.get("decision_reasons") or []
+    gate_results = review_manifest.get("gate_results") or []
+    metric_quality = review_manifest.get("metric_quality") or {}
+    definitions = review_manifest.get("metric_definitions") or metrics_payload.get("metric_definitions") or {}
     plot_cards = []
     for path in plots:
         src = _rel(path, base_dir=base_dir)
+        title = Path(str(path)).stem.replace("_", " ")
         plot_cards.append(
             "<article>"
-            f"<h3>{_e(Path(str(path)).stem.replace('_', ' '))}</h3>"
-            f'<a href="{_e(src)}"><img src="{_e(src)}" alt="{_e(Path(str(path)).stem)}"></a>'
+            f"<h3>{_e(title)}</h3>"
+            f'<a href="{_e(src)}"><img src="{_e(src)}" alt="Probe plot: {_e(title)}"></a>'
             "</article>"
         )
     campaign_links = []
@@ -228,14 +359,52 @@ def render_probe_review_html(
             f"<td><code>{_e(row.get('run_key'))}</code></td>"
             f"<td>{_e(row.get('oracle_id'))}</td>"
             f"<td>{_e(row.get('split_id'))}</td>"
-            f"<td>{_e(row.get('selected_target_precision_at_k_true'))}</td>"
-            f"<td>{_e(row.get('target_lift_at_k_true'))}</td>"
+            f"<td>{_e(row.get('selected_target_count_label_true'))}</td>"
+            f"<td>{_e(_fmt(row.get('target_class_prevalence_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('selected_target_precision_at_k_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('target_lift_at_k_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('selected_target_binomial_tail_p_true')))}</td>"
             f"<td>{_e(class_text)}</td>"
+            "</tr>"
+        )
+    round_rows = []
+    for row in round_rows_payload:
+        round_rows.append(
+            "<tr>"
+            f"<td><code>{_e(row.get('run_key'))}</code></td>"
+            f"<td>{_e(row.get('as_of_round'))}</td>"
+            f"<td>{_e(row.get('selected_target_count_label_true'))}</td>"
+            f"<td>{_e(_fmt(row.get('target_class_prevalence_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('selected_target_precision_at_k_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('target_lift_at_k_true')))}</td>"
+            f"<td>{_e(_fmt(row.get('selected_target_binomial_tail_p_true')))}</td>"
+            "</tr>"
+        )
+    reason_items = []
+    for reason in decision_reasons:
+        reason_items.append(
+            "<li>"
+            f"<strong>{_e(reason.get('gate'))}</strong> "
+            f"<code>{_e(reason.get('status'))}</code>: {_e(reason.get('reason'))}"
+            "</li>"
+        )
+    gate_rows = []
+    for row in gate_results:
+        gate_rows.append(
+            "<tr>"
+            f"<td><code>{_e(row.get('gate'))}</code></td>"
+            f"<td><code>{_e(row.get('status'))}</code></td>"
+            f"<td>{_e(row.get('campaign', ''))}</td>"
+            f"<td>{_e(row.get('split_id', ''))}</td>"
+            f"<td>{_e(_fmt(_gate_observed(row)))}</td>"
+            f"<td>{_e(_fmt(_gate_threshold(row)))}</td>"
+            f"<td>{_e(row.get('reason'))}</td>"
             "</tr>"
         )
     configured_plot_cards = []
     for entry in configured_plots:
         plot_links = []
+        plot_thumbs = []
         for plot in entry.get("plots") or []:
             media_path = next(iter(plot.get("media_paths") or []), None)
             tidy_path = next(iter(plot.get("tidy_csv_paths") or []), None)
@@ -253,6 +422,16 @@ def render_probe_review_html(
                 f"{media_link}{tidy_link}{manifest_link}"
                 "</li>"
             )
+            if media_path:
+                media_src = _rel(media_path, base_dir=base_dir)
+                caption = f"{plot.get('name')} ({plot.get('kind')})"
+                plot_thumbs.append(
+                    "<figure>"
+                    f'<a href="{_e(media_src)}"><img src="{_e(media_src)}" '
+                    f'alt="{_e(entry.get("run_key"))}: {_e(caption)}"></a>'
+                    f"<figcaption>{_e(caption)}</figcaption>"
+                    "</figure>"
+                )
         quality = entry.get("quality") or {}
         configured_plot_cards.append(
             "<article>"
@@ -261,6 +440,7 @@ def render_probe_review_html(
             f"quality: <code>{_e(quality.get('status'))}</code>; "
             f"plots: <code>{_e(entry.get('plot_count'))}</code></p>"
             f"<ul>{''.join(plot_links) if plot_links else '<li>No manifest-backed configured plots.</li>'}</ul>"
+            f'<div class="plot-thumb-grid">{"".join(plot_thumbs)}</div>'
             "</article>"
         )
     plot_index_text = (
@@ -268,6 +448,9 @@ def render_probe_review_html(
     )
     configured_plot_cards_html = (
         "".join(configured_plot_cards) if configured_plot_cards else "<p>No configured OPAL plot indexes found.</p>"
+    )
+    round_rows_html = (
+        "".join(round_rows) if round_rows else '<tr><td colspan="7">No round-level metrics recorded.</td></tr>'
     )
     body = f"""
     <header>
@@ -278,7 +461,9 @@ def render_probe_review_html(
     <main>
       <section class="summary-grid">
         {_metric_card("Status", review_manifest.get("status"))}
-        {_metric_card("Problems", ", ".join(problems) if problems else "none")}
+        {_metric_card("Contract problems", ", ".join(problems) if problems else "none")}
+        {_metric_card("Decision reasons", len(decision_reasons))}
+        {_metric_card("Weak K tests", metric_quality.get("weak_count_approx_binomial_p_gt_0_05", 0))}
         {_metric_card("Persisted decision", review_manifest.get("persisted_decision"))}
         {_metric_card("Runs", len(runs))}
         {_metric_card("Campaigns", ", ".join(coverage.get("campaigns") or []) or "none")}
@@ -292,6 +477,36 @@ def render_probe_review_html(
           <dt>Positive/null complete</dt><dd>{_e(coverage.get("positive_null_pairs_complete"))}</dd>
           <dt>Scope</dt><dd>pre-assay synthetic-oracle benchmark; not a global OPAL readiness claim</dd>
         </dl>
+      </section>
+      <section>
+        <h2>Decision Reasons</h2>
+        <ul>{"".join(reason_items) if reason_items else "<li>No blocking decision reasons recorded.</li>"}</ul>
+      </section>
+      <section>
+        <h2>Gate Results</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th><th>Status</th><th>Campaign</th><th>Split</th><th>Observed</th><th>Threshold</th><th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>{"".join(gate_rows)}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Metric Guide</h2>
+        <details open>
+          <summary>Metric Guide</summary>
+          <dl>
+            <dt>Selected target count</dt><dd>{_e(definitions.get("selected_target_count", ""))}</dd>
+            <dt>Precision@K</dt><dd>{_e(definitions.get("precision_at_k", ""))}</dd>
+            <dt>Prevalence</dt><dd>{_e(definitions.get("target_prevalence", ""))}</dd>
+            <dt>Lift</dt><dd>{_e(definitions.get("lift", ""))}</dd>
+            <dt>Binomial p&gt;=k</dt><dd>{_e(definitions.get("binomial_tail_p", ""))}</dd>
+            <dt>Null lift</dt><dd>{_e(definitions.get("null_lift", ""))}</dd>
+            <dt>Round metrics</dt><dd>{_e(definitions.get("round", ""))}</dd>
+          </dl>
+        </details>
       </section>
       <section>
         <h2>Probe Plots</h2>
@@ -312,10 +527,25 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Run</th><th>Oracle</th><th>Split</th><th>Precision@K</th><th>Lift@K</th><th>Selected Classes</th>
+              <th>Run</th><th>Oracle</th><th>Split</th><th>Selected Target</th>
+              <th>Prevalence</th><th>Precision@K</th><th>Lift@K</th>
+              <th>Binom p&gt;=k</th><th>Selected Classes</th>
             </tr>
           </thead>
           <tbody>{"".join(metric_rows)}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Round Metrics</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th><th>Round</th><th>Selected Target</th>
+              <th>Prevalence</th><th>Precision@K</th><th>Lift@K</th>
+              <th>Binom p&gt;=k</th>
+            </tr>
+          </thead>
+          <tbody>{round_rows_html}</tbody>
         </table>
       </section>
       <section>
@@ -341,6 +571,27 @@ def _load_metrics(path: Path) -> dict[str, Any]:
     if not isinstance(payload.get("runs"), list):
         raise RuntimeError("metrics.json missing list field: runs")
     return payload
+
+
+def _enriched_metrics_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(payload)
+    runs = payload.get("runs") or []
+    out["runs"] = enrich_metric_rows([row for row in runs if isinstance(row, Mapping)])
+    rounds = payload.get("rounds") or []
+    out["rounds"] = enrich_metric_rows([row for row in rounds if isinstance(row, Mapping)])
+    safety = payload.get("safety") if isinstance(payload.get("safety"), Mapping) else {}
+    decision = payload.get("decision")
+    if isinstance(decision, str) and decision:
+        out["decision"] = decision
+    out["gate_results"] = gate_results_from_metrics(out["runs"], safety)
+    out["decision_reasons"] = decision_reasons_from_metrics(
+        out["runs"],
+        safety,
+        decision=str(decision) if decision else None,
+    )
+    out["metric_quality"] = metric_quality_from_metrics(out["runs"])
+    out["metric_definitions"] = metric_definitions()
+    return out
 
 
 def _review_decision(metrics_payload: Mapping[str, Any]) -> str:
@@ -623,6 +874,9 @@ def _build_run_manifest(
     review_decision: str | None,
     review_status: str,
     review_problems: list[str],
+    decision_reasons: list[dict[str, Any]],
+    gate_results: list[dict[str, Any]],
+    metric_quality: Mapping[str, Any],
 ) -> dict[str, Any]:
     inventory = _artifact_inventory(layout.run_root)
     return {
@@ -637,6 +891,9 @@ def _build_run_manifest(
         "shared_sidecar_present": audit.shared_sidecar_present,
         "artifact_inventory": inventory,
         "problems": review_problems,
+        "decision_reasons": decision_reasons,
+        "gate_results": gate_results,
+        "metric_quality": dict(metric_quality),
     }
 
 
@@ -676,6 +933,11 @@ def _write_probe_plots(
     _plot_positive_null_lift_delta(frame, paths[2])
     _plot_evaluable_selected_count(frame, paths[3])
     _plot_stop_decision_matrix(frame, paths[4])
+    round_rows = [row for row in metrics_payload.get("rounds") or [] if isinstance(row, Mapping)]
+    if round_rows:
+        round_path = layout.review_plots_dir / "round_target_lift_and_precision.png"
+        _plot_round_lift_and_precision(pd.DataFrame(round_rows), round_path)
+        paths.append(round_path)
     optional_paths = [
         (layout.review_plots_dir / "vec8_distance_to_setpoint_over_rounds.png", _vec8_distance_rows(configured_plots)),
         (layout.review_plots_dir / "feature_stability_over_rounds.png", _feature_stability_rows(configured_plots)),
@@ -708,6 +970,39 @@ def _plot_lift_and_precision(frame: pd.DataFrame, path: Path) -> None:
     for ax in axes:
         ax.set_xticks(list(x))
         ax.set_xticklabels(df["label"].tolist(), rotation=35, ha="right")
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_round_lift_and_precision(frame: pd.DataFrame, path: Path) -> None:
+    import matplotlib.pyplot as plt
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df = frame.copy()
+    required = {"run_key", "as_of_round", "target_lift_at_k_true", "selected_target_precision_at_k_true"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise RuntimeError(f"round metric plot requires column(s): {missing}")
+    df["round"] = pd.to_numeric(df["as_of_round"], errors="coerce")
+    df["lift"] = pd.to_numeric(df["target_lift_at_k_true"], errors="coerce")
+    df["precision"] = pd.to_numeric(df["selected_target_precision_at_k_true"], errors="coerce")
+    df = df.dropna(subset=["round"])
+    if df.empty:
+        raise RuntimeError("round metric plot requires at least one finite round")
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True, constrained_layout=True)
+    for run_key, sub in df.sort_values(["run_key", "round"]).groupby("run_key"):
+        label = str(run_key)
+        axes[0].plot(sub["round"], sub["lift"], marker="o", linewidth=1.15, label=label)
+        axes[1].plot(sub["round"], sub["precision"], marker="o", linewidth=1.15, label=label)
+    axes[0].axhline(1.0, color="#222222", linewidth=0.8, linestyle="--")
+    axes[0].set_ylabel("target lift@K")
+    axes[0].set_title("Round-over-round target lift")
+    axes[1].set_xlabel("round")
+    axes[1].set_ylabel("precision@K")
+    axes[1].set_title("Round-over-round selected target precision")
+    axes[1].set_ylim(bottom=0.0)
+    axes[0].legend(frameon=False, fontsize=7, ncols=2)
     fig.savefig(path, dpi=160)
     plt.close(fig)
 
@@ -929,6 +1224,49 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _write_jsonl(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(dict(row), sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+
+def _fmt(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if not pd.notna(number):
+        return ""
+    if abs(number) >= 100:
+        return f"{number:.1f}"
+    if abs(number) >= 10:
+        return f"{number:.2f}"
+    if abs(number) >= 0.01:
+        return f"{number:.3f}"
+    return f"{number:.3g}"
+
+
+def _gate_observed(row: Mapping[str, Any]) -> Any:
+    gate = row.get("gate")
+    if gate == "H-NULL-CONTROL":
+        return row.get("null_lift")
+    if gate == "H-POSITIVE-SEPARATION":
+        return row.get("positive_minus_null_lift")
+    return row.get("observed", "")
+
+
+def _gate_threshold(row: Mapping[str, Any]) -> Any:
+    gate = row.get("gate")
+    if gate == "H-NULL-CONTROL":
+        return row.get("null_lift_threshold")
+    if gate == "H-POSITIVE-SEPARATION":
+        return 0.0
+    return row.get("threshold", "")
+
+
 def _e(value: Any) -> str:
     return escape("" if value is None else str(value), quote=True)
 
@@ -1000,6 +1338,9 @@ def _html_document(*, title: str, body: str) -> str:
     .plot-grid {{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }}
     .plot-grid article {{ padding: 12px; }}
     .plot-grid h3 {{ font-size: 0.95rem; margin: 0 0 10px; text-transform: capitalize; }}
+    .plot-thumb-grid {{ display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }}
+    figure {{ margin: 10px 0 0; }}
+    figcaption {{ color: var(--muted); font-size: 0.78rem; margin-top: 5px; overflow-wrap: anywhere; }}
     img {{ display: block; height: auto; max-width: 100%; }}
     table {{ border-collapse: collapse; width: 100%; }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }}

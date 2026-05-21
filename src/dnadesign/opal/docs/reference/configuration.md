@@ -59,7 +59,18 @@ If an optional block is omitted, OPAL supplies conservative defaults:
   campaigns; shared `usr_sidecar` campaigns must declare this explicitly
 - `training.policy`: `{}` and `training.y_ops`: `[]`
 - `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
-  conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true, accept_x_mismatch=false
+  conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true,
+  accept_x_mismatch=false, max_x_matrix_gib=8.0
+
+`safety.max_x_matrix_gib` is a fail-fast memory budget for model-ready X batches
+during `opal run`. For `writeback.prediction_records: ledger_only`, OPAL loads
+record metadata without the configured X column, streams candidate X from
+Parquet in `scoring.score_batch_size` batches, and aborts if a single train plus
+score batch would exceed this budget. For
+`writeback.prediction_records: label_history`, OPAL still needs a full records
+frame to rewrite prediction history into `records.parquet`; large candidate
+universes should use `ledger_only` unless record-level prediction writeback is
+explicitly required.
 
 Plugin `params` default to `{}`, but plugin names are required.
 Unknown plugin names fail at `opal validate` (registry resolution is strict).

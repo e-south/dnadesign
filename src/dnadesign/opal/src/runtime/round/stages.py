@@ -32,6 +32,7 @@ from ...registries.selection import get_selection, normalize_selection_result, v
 from ...registries.transforms_y import get_y_op, run_y_ops_pipeline
 from ...storage.artifacts import append_round_log_event, write_objective_meta
 from ...storage.label_sources import CampaignHistoryLabelSource, label_source_from_config
+from ..memory_guard import enforce_x_matrix_memory_budget, infer_x_dim_from_series
 from ..preflight import preflight_run
 from ..round_plan import plan_round
 from .contracts import RoundInputs, ScoreBundle, TrainingBundle, XBundle
@@ -156,6 +157,7 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
         cfg.safety.fail_on_mixed_biotype_or_alphabet,
         auto_backfill=False,
         check_manual_attach=uses_campaign_history,
+        x_dim_override=req.x_dim_override,
     )
     if uses_campaign_history and getattr(rep, "manual_attach_count", 0):
         raise OpalError(
@@ -228,12 +230,12 @@ def stage_x_matrices(
             if _id not in seen:
                 unique_ids.append(_id)
                 seen.add(_id)
-        X_unique, id_order_unique = store.transform_matrix(df, unique_ids, ctx=tctx)
+        X_unique, id_order_unique = store.transform_matrix_from_records(unique_ids, ctx=tctx)
         x_map = {i: X_unique[j] for j, i in enumerate(id_order_unique)}
         X_train = np.vstack([x_map[i] for i in train_ids])
         id_order_train = train_ids
     else:
-        X_train, id_order_train = store.transform_matrix(df, train_ids, ctx=tctx)
+        X_train, id_order_train = store.transform_matrix_from_records(train_ids, ctx=tctx)
 
     cand_df = plan.candidate_df
     if plan.selection_excludes_labeled and plan.candidate_filtered_out:
@@ -246,29 +248,58 @@ def stage_x_matrices(
     if cand_df.shape[0] == 0:
         raise OpalError("Candidate pool is empty after filtering; nothing to score.")
 
-    X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"], ctx=tctx)
-    if X_pool.shape[0] == 0:
-        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
+    if req.x_dim_override is not None:
+        x_dim = int(req.x_dim_override)
+    elif store.x_col in df.columns:
+        x_dim = infer_x_dim_from_series(df[store.x_col], x_column=store.x_col)
+    else:
+        raise OpalError(
+            f"Missing X dimension for streaming scoring. Validate records.parquet X column '{store.x_col}' first."
+        )
+    sbatch = int(req.score_batch_size_override or cfg.scoring.score_batch_size)
+    if sbatch <= 0:
+        raise OpalError("score_batch_size must be a positive integer.")
+    candidate_batch_rows = min(int(len(cand_df)), int(sbatch))
+    memory_estimate = enforce_x_matrix_memory_budget(
+        row_count=int(len(train_ids) + candidate_batch_rows),
+        x_dim=int(x_dim),
+        item_size_bytes=max(8, int(req.x_item_size_bytes or 8)),
+        max_gib=req.max_x_matrix_gib_override
+        if req.max_x_matrix_gib_override is not None
+        else cfg.safety.max_x_matrix_gib,
+        context="OPAL round streaming X batch",
+    )
+    append_round_log_event(
+        inputs.rdir / "logs" / "round.log.jsonl",
+        {
+            "ts": now_iso(),
+            "round": int(req.as_of_round),
+            "stage": "x_memory_guard_done",
+            "scope": "streaming_score_batch",
+            "candidate_rows": int(len(cand_df)),
+            "score_batch_size": int(sbatch),
+            "rows": int(memory_estimate.row_count),
+            "x_dim": int(memory_estimate.x_dim),
+            "raw_gib": float(memory_estimate.raw_gib),
+            "estimated_gib": float(memory_estimate.estimated_gib),
+            "max_gib": float(memory_estimate.max_gib),
+        },
+    )
+    id_order_pool = cand_df["id"].astype(str).tolist()
     rctx.set_core("core/data/x_dim", int(X_train.shape[1]))
     rctx.set_core("core/data/n_scored", int(len(id_order_pool)))
     rctx.set_core("core/data/candidate_pool_total", int(plan.candidate_total_before_filter))
     rctx.set_core("core/data/candidate_pool_filtered_out", int(plan.candidate_filtered_out))
     if X_train.shape[0] != Y_train.shape[0]:
         raise OpalError(f"Training X/Y row mismatch: X_train={X_train.shape[0]} Y_train={Y_train.shape[0]}.")
-    if not cfg.safety.accept_x_mismatch and X_train.shape[1] != X_pool.shape[1]:
-        raise OpalError(
-            f"X dimension mismatch between training and pool (train={X_train.shape[1]}, pool={X_pool.shape[1]}). "
-            "Set safety.accept_x_mismatch=true to override."
-        )
     _log(
         req.verbose,
         f"[transform] X_train: {X_train.shape} for {len(id_order_train)} ids | "
-        f"X_pool: {X_pool.shape} for {len(id_order_pool)} ids",
+        f"X_pool: streaming batches up to {sbatch} rows for {len(id_order_pool)} ids",
     )
     return XBundle(
         X_train=X_train,
         id_order_train=id_order_train,
-        X_pool=X_pool,
         id_order_pool=id_order_pool,
         cand_df=cand_df,
     )
@@ -281,7 +312,7 @@ def stage_scoring(
     X_train: np.ndarray,
     Y_train: np.ndarray,
     R_train: np.ndarray,
-    X_pool: np.ndarray,
+    tctx: Any,
     id_order_train: List[str],
     id_order_pool: List[str],
     y_dim: int,
@@ -335,16 +366,24 @@ def stage_scoring(
     if sbatch <= 0:
         raise OpalError("score_batch_size must be a positive integer.")
     yhat_chunks: List[np.ndarray] = []
-    total = X_pool.shape[0]
+    predicted_ids: List[str] = []
+    total = len(id_order_pool)
     num_batches = max(1, (total + max(1, sbatch) - 1) // max(1, sbatch))
 
     progress_factory = req.progress_factory if (req.verbose and req.progress_factory) else None
     factory = progress_factory or (lambda desc, total_rows: NullProgress())
     with factory("predict", int(total)) as prog:
-        for bi, i in enumerate(range(0, total, max(1, sbatch))):
-            sl = slice(i, i + sbatch)
-            batch_X = X_pool[sl]
+        for bi, (batch_X, batch_ids) in enumerate(
+            inputs.store.iter_transform_matrix_batches(id_order_pool, ctx=tctx, batch_size=max(1, sbatch))
+        ):
+            if not cfg.safety.accept_x_mismatch and X_train.shape[1] != batch_X.shape[1]:
+                raise OpalError(
+                    "X dimension mismatch between training and pool "
+                    f"(train={X_train.shape[1]}, pool={batch_X.shape[1]}). "
+                    "Set safety.accept_x_mismatch=true to override."
+                )
             yhat_chunks.append(model.predict(batch_X, ctx=mctx))
+            predicted_ids.extend(batch_ids)
             prog.advance(int(batch_X.shape[0]))
             append_round_log_event(
                 rdir / "logs" / "round.log.jsonl",
@@ -358,6 +397,8 @@ def stage_scoring(
                     "rows": int(batch_X.shape[0]),
                 },
             )
+    if predicted_ids != list(map(str, id_order_pool)):
+        raise OpalError("Streaming prediction order mismatch; aborting before writing selection artifacts.")
     Y_hat_fit = np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
 
     contract = getattr(model, "__opal_contract__", None)

@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-20
 
 
 This document covers **plot plugins** and the `PlotContext` helper. Plots are bespoke by design: each plugin owns its data loading, joins, and styling.
@@ -119,13 +119,16 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | field | purpose |
 | --- | --- |
 | `name`, `kind` | configured plot instance and registered plot primitive |
-| `status` | `success` or `failed` |
+| `status` | `written` or `failed` for current plot attempts; future schemas may add explicit `skipped` or `stale` states |
 | `run_id`, `rounds` | explicit run/round scope used for input resolution |
 | `params` | merged plot parameters after defaults and presets |
 | `inputs` | resolved built-in and custom data paths with file size and mtime |
 | `outputs.media` | rendered image/SVG/PDF files |
 | `outputs.tidy_csv` | tidy CSV files saved by the plugin |
 | `metadata` | `PlotMeta` summary, data shape, tidy schema, and failure modes |
+| `quality` | tidy CSV schema validation status when a plot declares `metadata.tidy_schema` |
+| `freshness` | mtime-based freshness summary for resolved inputs and outputs |
+| `caption`, `review_purpose` | manifest-backed human purpose text derived from plot metadata |
 | `warnings`, `error` | structured nonfatal and fatal plot outcomes |
 
 Review and generated notebook surfaces should read manifests first. Extra files

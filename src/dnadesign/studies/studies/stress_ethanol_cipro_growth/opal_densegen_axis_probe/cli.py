@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .artifacts import ProbeArtifactLayout
-from .constants import DEFAULT_BUDGET, DEFAULT_SEED, NULL_ORACLE_ID, ORACLE_ID, RUN_STAGES, SPLITS
+from .constants import (
+    DEFAULT_INITIAL_LABELS,
+    DEFAULT_SEED,
+    DEFAULT_TOP_K,
+    NULL_ORACLE_ID,
+    ORACLE_ID,
+    RUN_STAGES,
+    SPLITS,
+)
 from .execution import materialize_probe_inputs, run_opal_rounds_for_probe
 from .paths import _default_run_root, _repo_root_from, _resolve_repo_path, validate_run_root_policy
 from .status import _format_status_text, audit_run_root
@@ -23,10 +31,16 @@ def _run_probe(args: argparse.Namespace) -> int:
         _compact_split_metadata,
         _decision_from_metrics,
         _evaluate_run,
+        _evaluate_run_rounds,
         _format_plan_text,
         _source_summary,
         _split_metadata_for_all,
         _write_decision,
+        decision_reasons_from_metrics,
+        enrich_metric_rows,
+        gate_results_from_metrics,
+        metric_definitions,
+        metric_quality_from_metrics,
     )
     from .plan import build_plan
     from .scratch import _load_candidate_inputs, _write_json
@@ -34,7 +48,9 @@ def _run_probe(args: argparse.Namespace) -> int:
 
     repo_root = _repo_root_from(Path.cwd())
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    run_id = args.run_id or f"{timestamp}_seed{int(args.seed)}_budget{int(args.budget)}"
+    run_id = args.run_id or (
+        f"{timestamp}_seed{int(args.seed)}_initial{int(args.initial_labels)}_k{int(args.selection_k)}"
+    )
     run_root = Path(args.run_root) if args.run_root else _default_run_root(repo_root, run_id)
     run_root = _resolve_repo_path(repo_root, run_root)
     if args.apply:
@@ -46,10 +62,12 @@ def _run_probe(args: argparse.Namespace) -> int:
     splits = tuple(str(args.splits).split(",")) if args.splits else SPLITS
     plan = build_plan(
         run_root=run_root,
-        budget=int(args.budget),
+        initial_label_count=int(args.initial_labels),
+        selection_k=int(args.selection_k),
+        max_x_matrix_gib=args.max_x_matrix_gib,
+        score_batch_size=args.score_batch_size,
         seed=int(args.seed),
         rounds=int(args.rounds),
-        candidate_cap_per_split=args.candidate_cap,
         gate=args.gate,
         splits=splits,
         apply=bool(args.apply),
@@ -61,6 +79,7 @@ def _run_probe(args: argparse.Namespace) -> int:
     x_surface = validate_candidate_x_surface(repo_root, expected_rows=len(labels))
     safety = _source_summary(labels, run_root=run_root, x_surface=x_surface)
     split_metadata = _split_metadata_for_all(labels, plan=plan)
+    x_memory_budget = _x_memory_budget_reports(plan=plan, split_metadata=split_metadata, x_surface=x_surface)
 
     plan_payload = {
         "source_summary": safety,
@@ -69,7 +88,11 @@ def _run_probe(args: argparse.Namespace) -> int:
         "gate": plan.gate,
         "stop_after": plan.stop_after,
         "rounds": plan.rounds,
-        "candidate_cap_per_split": plan.candidate_cap_per_split,
+        "initial_label_count": plan.initial_label_count,
+        "selection_k": plan.selection_k,
+        "max_x_matrix_gib": plan.max_x_matrix_gib,
+        "score_batch_size": plan.score_batch_size,
+        "x_memory_budget": x_memory_budget,
         "splits": _compact_split_metadata(split_metadata),
         "commands": plan.commands,
     }
@@ -89,7 +112,6 @@ def _run_probe(args: argparse.Namespace) -> int:
         labels=labels,
         null_labels=null_labels,
         split_metadata=split_metadata,
-        copy_mode=str(args.copy_mode),
     )
 
     metrics: list[dict[str, Any]] = []
@@ -119,21 +141,62 @@ def _run_probe(args: argparse.Namespace) -> int:
                         split_metadata=run_metadata,
                     )
                 )
+    round_metrics: list[dict[str, Any]] = []
+    if scored:
+        for run in plan.runs:
+            run_labels = labels if run.oracle_id == ORACLE_ID else null_labels
+            round_metrics.extend(
+                _evaluate_run_rounds(
+                    run=run,
+                    positive_labels=labels,
+                    run_labels=run_labels,
+                    split_metadata=dict(split_metadata[run.split_id]),
+                )
+            )
 
-    layout = ProbeArtifactLayout(run_root)
-    _write_json(layout.metrics_path, {"safety": safety, "runs": metrics})
-    if metrics:
-        pd.DataFrame(metrics).to_csv(layout.reports_dir / "selection_summary.csv", index=False)
     decision = _decision_from_metrics(metrics, safety)
+    enriched_metrics = enrich_metric_rows(metrics)
+    gate_results = gate_results_from_metrics(enriched_metrics, safety)
+    decision_reasons = decision_reasons_from_metrics(enriched_metrics, safety, decision=decision)
+    metric_quality = metric_quality_from_metrics(enriched_metrics)
+    metrics_payload = {
+        "safety": safety,
+        "runs": enriched_metrics,
+        "rounds": enrich_metric_rows(round_metrics),
+        "decision": decision,
+        "metric_definitions": metric_definitions(),
+        "decision_reasons": decision_reasons,
+        "gate_results": gate_results,
+        "metric_quality": metric_quality,
+    }
+    layout = ProbeArtifactLayout(run_root)
+    _write_json(layout.metrics_path, metrics_payload)
+    if enriched_metrics:
+        pd.DataFrame(enriched_metrics).to_csv(layout.reports_dir / "selection_summary.csv", index=False)
+        (layout.reports_dir / "selection_summary.jsonl").write_text(
+            "\n".join(json.dumps(row, sort_keys=True) for row in enriched_metrics) + "\n",
+            encoding="utf-8",
+        )
+    if round_metrics:
+        round_metric_rows = enrich_metric_rows(round_metrics)
+        pd.DataFrame(round_metric_rows).to_csv(layout.reports_dir / "round_metrics.csv", index=False)
+        (layout.reports_dir / "round_metrics.jsonl").write_text(
+            "\n".join(json.dumps(row, sort_keys=True) for row in round_metric_rows) + "\n",
+            encoding="utf-8",
+        )
     _write_decision(
         path=layout.decision_path,
         decision=decision,
         safety=safety,
-        metrics=metrics,
+        metrics=enriched_metrics,
         quality_counts=safety["quality_counts"],
     )
     audit = audit_run_root(run_root)
-    _write_json(layout.status_path, audit.to_dict())
+    status_payload = audit.to_dict()
+    status_payload["decision_reasons"] = decision_reasons
+    status_payload["gate_results"] = gate_results
+    status_payload["metric_quality"] = metric_quality
+    _write_json(layout.status_path, status_payload)
     if args.json:
         schema = "stress_ethanol_cipro_growth.opal_densegen_axis_probe.run.v1"
         payload = dict(
@@ -150,6 +213,45 @@ def _run_probe(args: argparse.Namespace) -> int:
         print(f"reports={layout.reports_dir}")
         print(_format_status_text(audit))
     return 0
+
+
+def _x_memory_budget_reports(
+    *,
+    plan,
+    split_metadata: dict[str, dict[str, Any]],
+    x_surface: dict[str, Any],
+) -> list[dict[str, Any]]:
+    from dnadesign.opal import enforce_x_matrix_memory_budget
+
+    reports: list[dict[str, Any]] = []
+    if RUN_STAGES.index(plan.stop_after) < RUN_STAGES.index("run"):
+        return reports
+    for split_id, metadata in split_metadata.items():
+        train_count = int(len(metadata.get("train_ids") or []))
+        eval_count = int(len(metadata.get("eval_ids") or []))
+        score_batch_size = int(plan.score_batch_size or 10_000)
+        row_count = train_count + min(eval_count, score_batch_size)
+        estimate = enforce_x_matrix_memory_budget(
+            row_count=row_count,
+            x_dim=int(x_surface["x_dim"]),
+            item_size_bytes=8,
+            max_gib=plan.max_x_matrix_gib,
+            context=f"DenseGen probe split {split_id} OPAL streaming X batch",
+        )
+        reports.append(
+            {
+                "split_id": split_id,
+                "scope": "streaming_score_batch",
+                "split_rows": int(train_count + eval_count),
+                "score_batch_size": int(score_batch_size),
+                "rows": int(estimate.row_count),
+                "x_dim": int(estimate.x_dim),
+                "raw_gib": float(estimate.raw_gib),
+                "estimated_gib": float(estimate.estimated_gib),
+                "max_gib": float(estimate.max_gib),
+            }
+        )
+    return reports
 
 
 def _status_probe(args: argparse.Namespace) -> int:
@@ -217,21 +319,30 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     run = subparsers.add_parser("run", help="Plan or execute the scratch OPAL probe.")
     run.add_argument(
-        "--budget",
+        "--initial-labels",
         type=int,
-        default=DEFAULT_BUDGET,
+        default=DEFAULT_INITIAL_LABELS,
         help="Initial labeled seed count before OPAL selections are added round over round.",
     )
-    run.add_argument("--seed", type=int, default=DEFAULT_SEED)
     run.add_argument(
-        "--candidate-cap",
+        "--selection-k",
+        type=int,
+        default=DEFAULT_TOP_K,
+        help="Number of greedy selections made by each OPAL round.",
+    )
+    run.add_argument(
+        "--max-x-matrix-gib",
+        type=float,
+        default=None,
+        help=("Explicit OPAL X matrix memory budget for scratch campaigns. Default uses OPAL safety.max_x_matrix_gib."),
+    )
+    run.add_argument(
+        "--score-batch-size",
         type=int,
         default=None,
-        help=(
-            "Optional maximum scratch candidate rows per split for fast dogfood. "
-            "The cap includes initial labels and balanced eval rows; omit for the full candidate table."
-        ),
+        help="OPAL scoring batch size for scratch campaigns. Lower this on memory-constrained hosts.",
     )
+    run.add_argument("--seed", type=int, default=DEFAULT_SEED)
     run.add_argument(
         "--rounds",
         type=int,
@@ -247,7 +358,6 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow --apply writes to an external scratch root; repo-local writes stay under .var/studies.",
     )
-    run.add_argument("--copy-mode", choices=["clone", "full"], default="clone")
     run.add_argument(
         "--stop-after",
         choices=RUN_STAGES,

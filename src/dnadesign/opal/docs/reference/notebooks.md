@@ -13,6 +13,15 @@ Generate one with:
 uv run opal notebook generate --config /path/to/campaign --round latest --force
 ```
 
+Generate a campaign-set review notebook with repeated `--campaign` options:
+
+```bash
+uv run opal notebook generate \
+  --campaign /path/to/campaign-a \
+  --campaign /path/to/campaign-b \
+  --out /path/to/opal_campaign_set_analysis.py
+```
+
 ### Notebook View Model
 
 Generated notebooks import public helpers from `dnadesign.opal` and build a
@@ -28,6 +37,12 @@ manifest-backed and uses schema `opal.notebook_view_model.v1`.
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
+Campaign-set notebooks import `build_campaign_set_notebook_view_model(...)` and
+build schema `opal.notebook_campaign_set_view_model.v1`. The payload contains
+one `NotebookViewModel` per campaign plus aggregate warnings. Campaign-set
+notebooks require at least two distinct campaign configs and fail fast on
+duplicates.
+
 The generated notebook renders the view model with progressive disclosure:
 
 - campaign state at a glance;
@@ -36,7 +51,15 @@ The generated notebook renders the view model with progressive disclosure:
 - manifest-backed plot cards;
 - limitations and handoff commands.
 
-Heavy sections should use marimo accordions with lazy loading.
+Heavy sections should use marimo accordions with lazy loading. Reusable
+generated-cell builders live in `src/analysis/notebook_components.py`; keep
+`notebook_template.py` as thin wiring and move independently testable panels out
+of the template before adding new notebook UX.
+
+Campaign-set notebooks are intentionally overview-first: they provide campaign
+and plot dropdowns, status and provenance summary, manifest-backed plot cards,
+warnings, and stale-artifact evidence. Single-campaign notebooks remain the
+record/table drill-down surface.
 
 ### Boundaries
 

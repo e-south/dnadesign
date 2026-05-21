@@ -1,7 +1,7 @@
 ## OPAL Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-05-20
 
 
 This documentation covers end-to-end workflows, plugin contracts and math, runtime concepts, and exact configuration and CLI references. Use the workflow guides for operational command order, then use plugin/concept/reference pages for deeper details.
@@ -53,6 +53,7 @@ These pages are contract-oriented lookups for schema, data surfaces, CLI behavio
 
 These pages are maintainer-focused notes and validation runbooks.
 - [Development journal](./maintainers/journal.md): maintainer investigations and decision records.
+- [Modernization development specification](./maintainers/dev-spec-modernization.md): contract-first OPAL hardening plan for runtime, review, plots, CLI JSON, and generated marimo notebooks.
 - [History](./maintainers/history.md): chronology of major design and behavior changes.
 - [Workflow pressure-test matrix](./maintainers/testing-matrix.md): repeatable validation matrix for workflow hardening.
 - [Shared label source plan](./maintainers/shared-label-source-plan.md): implementation plan for shared observed labels across multiple OPAL campaigns.

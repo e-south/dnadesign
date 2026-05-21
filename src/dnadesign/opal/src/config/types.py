@@ -114,6 +114,7 @@ class SafetyBlock:
     conflict_policy_on_duplicate_ids: str = "error"
     write_back_requires_columns_present: bool = True
     accept_x_mismatch: bool = False
+    max_x_matrix_gib: float = 8.0
 
 
 @dataclass

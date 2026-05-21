@@ -1,7 +1,7 @@
 ## OPAL Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-20
 
 
 This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, shared label sidecars, label history, and append-only ledger sinks.
@@ -40,9 +40,9 @@ Required columns in `records.parquet`:
 
 X and Y representation:
 
-- X: canonical Arrow `fixed_size_list<float32|float64>[x_dim]` or an equivalent
-  Parquet fixed-size list vector column. Values must be non-null, finite, and
-  fixed length across every used row.
+- X: canonical Arrow `fixed_size_list<float32>[x_dim]` or
+  `fixed_size_list<float64>[x_dim]` in Parquet. Values must be non-null,
+  finite, and fixed length across every used row.
 - Noncanonical vector encodings such as ragged Arrow lists, scalar cells, or JSON
   array strings are import/normalization inputs only. They are not accepted as
   the runtime campaign contract.

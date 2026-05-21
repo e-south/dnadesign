@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .artifacts import ProbeArtifactLayout, ProbePlan, RunSpec
-from .constants import CAMPAIGNS, ORACLE_ID, ORACLES, RUN_STAGES, SHARED_OBSERVED_LABEL_SIDECAR, SPLITS
+from .constants import CAMPAIGNS, DEFAULT_TOP_K, ORACLE_ID, ORACLES, RUN_STAGES, SHARED_OBSERVED_LABEL_SIDECAR, SPLITS
 
 
 def _validate_rounds(rounds: int) -> int:
@@ -113,20 +113,31 @@ def _opal_commands(config_path: Path, *, stop_after: str = "status", rounds: int
 def build_plan(
     *,
     run_root: Path,
-    budget: int,
+    initial_label_count: int,
     seed: int,
     gate: str | None,
     splits: Iterable[str],
-    candidate_cap_per_split: int | None = None,
+    selection_k: int = DEFAULT_TOP_K,
+    max_x_matrix_gib: float | None = None,
+    score_batch_size: int | None = None,
     rounds: int = 1,
     apply: bool = False,
     stop_after: str = "status",
 ) -> ProbePlan:
     stop = _validate_stop_after(stop_after)
     round_count = _validate_rounds(rounds)
-    cap = None if candidate_cap_per_split is None else int(candidate_cap_per_split)
-    if cap is not None and cap <= int(budget):
-        raise ValueError("--candidate-cap must be greater than --budget")
+    initial_count = int(initial_label_count)
+    if initial_count < 1:
+        raise ValueError("--initial-labels must be >= 1")
+    batch_size = int(selection_k)
+    if batch_size < 1:
+        raise ValueError("--selection-k must be >= 1")
+    memory_budget = None if max_x_matrix_gib is None else float(max_x_matrix_gib)
+    if memory_budget is not None and memory_budget <= 0.0:
+        raise ValueError("--max-x-matrix-gib must be > 0")
+    score_batch = None if score_batch_size is None else int(score_batch_size)
+    if score_batch is not None and score_batch < 1:
+        raise ValueError("--score-batch-size must be >= 1")
     split_tuple = tuple(dict.fromkeys(str(split).strip() for split in splits if str(split).strip()))
     if not split_tuple:
         split_tuple = ("random_id", "leave_sigma35_variant")
@@ -154,16 +165,20 @@ def build_plan(
                 config_path=config_path,
                 label_input_path=label_input_path,
                 sidecar_path=sidecar_path,
-                selection_k=int(budget),
+                selection_k=batch_size,
+                max_x_matrix_gib=memory_budget,
+                score_batch_size=score_batch,
             )
         )
         commands.extend(_opal_commands(config_path, stop_after=stop, rounds=round_count))
     return ProbePlan(
         run_root=run_root,
-        budget=int(budget),
+        initial_label_count=initial_count,
+        selection_k=batch_size,
+        max_x_matrix_gib=memory_budget,
+        score_batch_size=score_batch,
         seed=int(seed),
         rounds=round_count,
-        candidate_cap_per_split=cap,
         gate=gate,
         splits=split_tuple,
         apply=bool(apply),

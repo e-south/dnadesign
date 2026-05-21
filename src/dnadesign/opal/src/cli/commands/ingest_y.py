@@ -95,7 +95,31 @@ def cmd_ingest_y(
         cfg = load_cli_config(cfg_path)
         store: RecordsStore = store_from_cfg(cfg)
         label_source = label_source_from_config(cfg, store)
-        df = store.load()
+        unknown_sequences = (unknown_sequences or "create").strip().lower()
+        if unknown_sequences not in {"create", "drop", "error"}:
+            raise OpalError("--unknown-sequences must be one of: create, drop, error.")
+
+        shared_label_source = isinstance(label_source, SharedObservedLabelSource)
+        if shared_label_source:
+            df = store.load_ingest_identity_frame()
+            records_load_mode = "identity_frame"
+        else:
+            df = store.load()
+            records_load_mode = "full_records"
+
+        ingest_runtime = {
+            "schema_version": 1,
+            "label_source_kind": getattr(label_source, "kind", "campaign_history"),
+            "records_load_mode": records_load_mode,
+            "full_records_loaded": records_load_mode == "full_records",
+            "fixed_candidate_universe": shared_label_source,
+            "candidate_x_column_loaded": cfg.data.x_column_name in df.columns,
+            "records_path": store.records_path,
+            "records_row_count": store.row_count(),
+            "records_columns_loaded": list(map(str, df.columns)),
+            "records_frame_bytes": int(df.memory_usage(deep=True).sum()),
+            "unknown_sequences_policy": unknown_sequences,
+        }
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
@@ -151,10 +175,6 @@ def cmd_ingest_y(
         )
         tctx = rctx.for_plugin(category="transform_y", name=t_name, plugin=get_transform_y(t_name))
 
-        unknown_sequences = (unknown_sequences or "create").strip().lower()
-        if unknown_sequences not in {"create", "drop", "error"}:
-            raise OpalError("--unknown-sequences must be one of: create, drop, error.")
-
         labels_df, preview = run_ingest(
             df,
             csv_df,
@@ -197,14 +217,17 @@ def cmd_ingest_y(
                 )
             preview.warnings = preview_warnings
         sample = labels_df.head(5).to_dict(orient="records")
-        if json:
-            json_out({"preview": asdict(preview), "sample": sample})
-        else:
+        preview_payload = {
+            "preview": asdict(preview),
+            "sample": sample,
+            "ingest_runtime": ingest_runtime,
+        }
+        if not json:
             print_stdout(render_ingest_preview_text(preview, sample, transform_name=t_name))
 
         # Required columns for new rows (used for nudges + strict checks below)
         required_cols = ["bio_type", "alphabet"]
-        if cfg.safety.write_back_requires_columns_present:
+        if cfg.safety.write_back_requires_columns_present and not shared_label_source:
             if cfg.data.x_column_name not in df.columns:
                 raise OpalError(f"records.parquet missing required X column '{cfg.data.x_column_name}'.")
             required_cols.append(cfg.data.x_column_name)
@@ -436,6 +459,10 @@ def cmd_ingest_y(
                 labels_df = labels_df.loc[~unknown_mask].copy()
                 unknown_count = 0
 
+        ingest_runtime["unknown_count_initial"] = int(preview.unknown_sequences or 0)
+        ingest_runtime["unknown_count_after_policy"] = int(unknown_count)
+        ingest_runtime["labels_after_unknown_policy"] = int(len(labels_df))
+
         # Human-friendly nudges (non-fatal)
         if not json:
             nudges = list(preview.warnings or [])
@@ -464,6 +491,10 @@ def cmd_ingest_y(
             if nudges:
                 print_stdout(bullet_list("Nudges", nudges))
 
+        if json and not apply:
+            json_out({"ok": True, "applied": False, **preview_payload})
+            return
+
         if not apply:
             if not prompt_confirm(
                 f"Proceed to append {len(labels_df)} labels at observed_round={round}? (y/N): ",
@@ -474,14 +505,14 @@ def cmd_ingest_y(
 
         # Ensure rows exist for campaign-history ingest; shared sidecars keep a fixed candidate universe.
         with CampaignLock(Path(cfg.campaign.workdir)):
-            row_count_before = int(len(df))
-            df = store.ensure_rows_exist(
-                df,
-                labels_df,
-                csv_df,
-                required_cols=required_cols,
-                conflict_policy=cfg.safety.conflict_policy_on_duplicate_ids,
-            )
+            if not shared_label_source:
+                df = store.ensure_rows_exist(
+                    df,
+                    labels_df,
+                    csv_df,
+                    required_cols=required_cols,
+                    conflict_policy=cfg.safety.conflict_policy_on_duplicate_ids,
+                )
 
             # Resolve ids for any rows that were missing id at transform time (new sequences)
             if labels_df["id"].isna().any():
@@ -498,25 +529,26 @@ def cmd_ingest_y(
 
             # Optional: preview duplicates at this round for better UX
             existing_ids: set[str] = set()
-            try:
-                lh = store.label_hist_col()
-                ids_in = set(labels_df["id"].dropna().astype(str))
-                if ids_in:
-                    maybe = df.loc[df["id"].astype(str).isin(ids_in), ["id", lh]]
-                    dup = 0
-                    for _id, cell in maybe.itertuples(index=False, name=None):
-                        for e in store._normalize_hist_cell(cell):
-                            if e.get("kind") == "label" and int(e.get("observed_round", -1)) == int(round):
-                                dup += 1
-                                existing_ids.add(str(_id))
-                                break
-                    if dup > 0:
-                        print_stdout(
-                            f"[notice] {dup}/{len(ids_in)} incoming labels already have r={int(round)};"
-                            f"applying --if-exists={if_exists}."
-                        )  # noqa
-            except Exception:
-                pass
+            if not shared_label_source:
+                try:
+                    lh = store.label_hist_col()
+                    ids_in = set(labels_df["id"].dropna().astype(str))
+                    if ids_in:
+                        maybe = df.loc[df["id"].astype(str).isin(ids_in), ["id", lh]]
+                        dup = 0
+                        for _id, cell in maybe.itertuples(index=False, name=None):
+                            for e in store._normalize_hist_cell(cell):
+                                if e.get("kind") == "label" and int(e.get("observed_round", -1)) == int(round):
+                                    dup += 1
+                                    existing_ids.add(str(_id))
+                                    break
+                        if dup > 0:
+                            print_stdout(
+                                f"[notice] {dup}/{len(ids_in)} incoming labels already have r={int(round)};"
+                                f"applying --if-exists={if_exists}."
+                            )  # noqa
+                except Exception:
+                    pass
 
             # Apply skip policy by filtering labels before writes/events.
             if str(if_exists).lower().strip() == "skip" and existing_ids:
@@ -525,9 +557,7 @@ def cmd_ingest_y(
                 labels_effective = labels_df
 
             y_column_updated = cfg.data.y_column_name
-            if isinstance(label_source, SharedObservedLabelSource):
-                if int(len(df)) != row_count_before:
-                    store.save_atomic(df)
+            if shared_label_source:
                 labels_effective = label_source.store.append_labels(
                     labels_effective[["id", "y"]],
                     observed_round=int(round),
@@ -568,11 +598,14 @@ def cmd_ingest_y(
 
         out = {
             "ok": True,
+            "applied": True,
             "round": int(round),
             "labels_appended": int(len(labels_effective)),
             "labels_skipped": int(len(labels_df) - len(labels_effective)),
             "y_column_updated": y_column_updated,
         }
+        if json:
+            out.update(preview_payload)
 
         if json:
             json_out(out)

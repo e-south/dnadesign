@@ -83,9 +83,6 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
     if split_records_paths:
         for path in split_records_paths:
             problems.extend(records_manifest_problems(path, source_records))
-    elif layout.scratch_records_path.exists():
-        problems.extend(records_manifest_problems(layout.scratch_records_path, source_records))
-        scratch_records_present = True
     if planned_campaign_count > 0 and not scratch_records_present:
         problems.append("scratch_records_missing_for_planned_campaigns")
     if not root.exists():

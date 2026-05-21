@@ -104,6 +104,111 @@ def test_validate_does_not_materialize_candidate_x_in_pandas(tmp_path: Path, mon
     assert calls == [("id", "bio_type", "sequence", "alphabet", "Y", "opal__demo__label_hist")]
 
 
+def test_run_rejects_x_matrix_memory_budget_before_records_load(tmp_path: Path, monkeypatch) -> None:
+    workdir, campaign, records = _setup_workspace(
+        tmp_path,
+        include_opal_cols=True,
+    )
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        safety={"max_x_matrix_gib": 1.0e-9},
+    )
+
+    from dnadesign.opal.src.storage.data_access import RecordsStore
+
+    def fail_load(self):
+        raise AssertionError("records load should not happen after X memory guard failure")
+
+    monkeypatch.setattr(RecordsStore, "load", fail_load)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0", "--json"])
+
+    assert res.exit_code == 2
+    assert "exceeds safety.max_x_matrix_gib" in res.output
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    log_text = round_log.read_text(encoding="utf-8")
+    assert '"stage":"x_validate_done"' in log_text
+    assert '"stage":"records_load_start"' not in log_text
+
+
+def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path: Path, monkeypatch) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    raw = yaml.safe_load(campaign.read_text())
+    raw["writeback"] = {"prediction_records": "ledger_only"}
+    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    app = _build()
+    runner = CliRunner()
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    csv_path = workdir / "labels.csv"
+    pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    ).to_csv(csv_path, index=False)
+    ingest_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
+        ],
+    )
+    assert ingest_res.exit_code == 0, ingest_res.stdout
+
+    from dnadesign.opal.src.storage.data_access import RecordsStore
+
+    def fail_full_load(self):
+        raise AssertionError("ledger_only run should not materialize the full records frame")
+
+    monkeypatch.setattr(RecordsStore, "load", fail_full_load)
+
+    run_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "run",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--score-batch-size",
+            "1",
+            "--json",
+        ],
+    )
+    assert run_res.exit_code == 0, run_res.stdout
+    out = json.loads(run_res.stdout)
+    assert out["scored"] == 1
+    assert (workdir / "outputs" / "ledger" / "predictions").exists()
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    log_text = round_log.read_text(encoding="utf-8")
+    assert '"pool_mode":"streaming"' in log_text
+    assert '"stage":"predict_batch"' in log_text
+
+
 def test_validate_rejects_inconsistent_x_lengths(tmp_path: Path) -> None:
     _, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
     pd.DataFrame(

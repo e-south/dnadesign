@@ -9,7 +9,7 @@ STUDY_ID = "stress_ethanol_cipro_growth"
 ORACLE_ID = "densegen_part_axis_vec8_v0"
 NULL_ORACLE_ID = "permuted_densegen_part_axis_vec8_v0"
 DEFAULT_SEED = 7
-DEFAULT_BUDGET = 96
+DEFAULT_INITIAL_LABELS = 6
 DEFAULT_TOP_K = 6
 RUN_STAGES = ("materialize", "validate", "init", "ingest", "run", "status")
 

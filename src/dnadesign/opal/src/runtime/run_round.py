@@ -71,8 +71,12 @@ def _round_dir_has_blocking_entries(rdir: Path) -> bool:
         "command_start",
         "x_validate_start",
         "x_validate_done",
+        "x_memory_guard_done",
         "records_load_start",
         "records_load_done",
+        "lock_acquire_start",
+        "lock_acquired",
+        "lock_released",
         "abort",
     }
     try:
@@ -208,6 +212,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "n_train": len(xbundle.id_order_train),
             "n_pool": len(xbundle.id_order_pool),
             "x_dim": int(xbundle.X_train.shape[1]),
+            "pool_mode": "streaming",
         },
     )
 
@@ -227,7 +232,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         X_train=xbundle.X_train,
         Y_train=training.Y_train,
         R_train=training.R_train,
-        X_pool=xbundle.X_pool,
+        tctx=tctx,
         id_order_train=xbundle.id_order_train,
         id_order_pool=xbundle.id_order_pool,
         y_dim=training.y_dim,
@@ -316,6 +321,11 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         objective_meta["params"] = score.obj_params
     records_label_hist_updated = False
     if cfg.writeback.prediction_records == "label_history":
+        if store.x_col not in df.columns:
+            raise OpalError(
+                "prediction_records=label_history requires a full records frame including the X column. "
+                "Use writeback.prediction_records=ledger_only for streaming large candidate universes."
+            )
         _ = write_prediction_label_hist(
             store=store,
             df=df,

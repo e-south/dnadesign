@@ -45,6 +45,14 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "obj__diag__setpoint",
         ],
         notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
+        data_shape="objective component scatter",
+        tidy_schema=["obj__logic_fidelity"],
+        failure_modes=[
+            "missing prediction or setpoint columns",
+            "y-axis/hue/size fields are nonnumeric",
+            "records metadata hue column missing",
+            "no rows match the requested round/run scope",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

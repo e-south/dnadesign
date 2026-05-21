@@ -23,6 +23,7 @@ import typer
 from ...analysis.facade import (
     CampaignAnalysis,
 )
+from ...analysis.notebook_set_template import render_campaign_set_notebook
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.pretty import console_out
 from ...core.rounds import resolve_round_index_from_runs
@@ -209,7 +210,7 @@ def notebook_root(
         raise typer.Exit(code=e.exit_code)
 
 
-@notebook_app.command("generate", help="Generate a campaign-tied marimo notebook.")
+@notebook_app.command("generate", help="Generate a campaign or campaign-set marimo notebook.")
 def cmd_notebook_generate(
     config: Optional[Path] = typer.Option(
         None,
@@ -217,6 +218,11 @@ def cmd_notebook_generate(
         "-c",
         help="campaign.yaml or campaign directory",
         envvar="OPAL_CONFIG",
+    ),
+    campaign: Optional[list[Path]] = typer.Option(
+        None,
+        "--campaign",
+        help="Campaign config or directory for campaign-set notebooks. Repeat for each campaign.",
     ),
     round: Optional[str] = typer.Option(
         "latest",
@@ -227,7 +233,10 @@ def cmd_notebook_generate(
     out: Optional[Path] = typer.Option(
         None,
         "--out",
-        help="Output notebook path (default: <workdir>/notebooks/opal_<slug>_analysis.py).",
+        help=(
+            "Output notebook path "
+            "(default: <workdir>/notebooks/opal_<slug>_analysis.py or opal_campaign_set_analysis.py)."
+        ),
     ),
     name: Optional[str] = typer.Option(
         None,
@@ -242,6 +251,19 @@ def cmd_notebook_generate(
     ),
 ) -> None:
     try:
+        campaign_set_paths = list(campaign or [])
+        if campaign_set_paths:
+            _generate_campaign_set_notebook(
+                config=config,
+                campaign_paths=campaign_set_paths,
+                round=round,
+                out=out,
+                name=name,
+                force=force,
+                validate=validate,
+            )
+            return
+
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
         cfg = analysis.config
         ws = analysis.workspace
@@ -317,6 +339,79 @@ def cmd_notebook_generate(
     except Exception as e:
         internal_error("notebook.generate", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
+
+
+def _generate_campaign_set_notebook(
+    *,
+    config: Optional[Path],
+    campaign_paths: list[Path],
+    round: Optional[str],
+    out: Optional[Path],
+    name: Optional[str],
+    force: bool,
+    validate: bool,
+) -> None:
+    config_paths = ([config] if config is not None else []) + campaign_paths
+    if len(config_paths) < 2:
+        raise OpalError("Campaign-set notebook generation requires at least two campaign configs.", ExitCodes.BAD_ARGS)
+    resolved = [str(Path(path).resolve()) for path in config_paths]
+    duplicates = sorted({path for path in resolved if resolved.count(path) > 1})
+    if duplicates:
+        raise OpalError(
+            "Campaign-set notebook generation requires distinct campaign configs; duplicates: " + ", ".join(duplicates),
+            ExitCodes.BAD_ARGS,
+        )
+    if out is not None and name is not None:
+        raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
+
+    analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
+    round_sel_raw = (round or "latest").strip().lower()
+    if round_sel_raw in ("", "latest"):
+        round_sel = "latest"
+    else:
+        try:
+            round_val = int(round_sel_raw)
+        except Exception as e:
+            raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
+        round_sel = str(round_val)
+
+    for analysis in analyses:
+        store = analysis.records_store()
+        if not store.records_path.exists():
+            raise OpalError(f"records.parquet not found: {store.records_path}", ExitCodes.BAD_ARGS)
+        if validate and analysis.workspace.ledger_runs_path.exists():
+            resolve_round_index_from_runs(analysis.read_runs(), round_sel)
+
+    default_name = "opal_campaign_set_analysis.py"
+    notebook_name = _resolve_notebook_name(name, default_name)
+    default_out = analyses[0].workspace.workdir / "notebooks" / notebook_name
+    out_path = Path(out) if out is not None else default_out
+    if out_path.exists() and not force:
+        msg = f"Notebook already exists: {out_path}. Use --force to overwrite or --name to choose a different filename."
+        try:
+            confirmed = prompt_confirm(f"{msg}\nOverwrite? (y/N): ", non_interactive_hint=msg)
+        except OpalError:
+            raise
+        if not confirmed:
+            print_stdout("Aborted.")
+            return
+
+    content = render_campaign_set_notebook([analysis.config_path for analysis in analyses], round_selector=round_sel)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content)
+
+    if tui_enabled():
+        table = _rich_kv_table(
+            "Campaign Set Notebook Generated",
+            {
+                "Campaigns": len(analyses),
+                "Notebook": out_path,
+                "Round": round_sel,
+            },
+        )
+        if _print_rich(table):
+            return
+    print_stdout(f"Campaign-set notebook written: {out_path}")
 
 
 @notebook_app.command("run", help="Launch a marimo notebook (if installed).")

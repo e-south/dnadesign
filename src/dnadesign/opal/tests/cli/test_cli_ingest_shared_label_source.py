@@ -152,6 +152,96 @@ selection:
     assert status_json["writeback"]["prediction_records"] == "ledger_only"
 
 
+def test_ingest_y_usr_sidecar_uses_identity_frame_without_full_records_load(tmp_path: Path, monkeypatch) -> None:
+    usr_root = tmp_path / "usr" / "datasets"
+    dataset_root = usr_root / "demo_candidates"
+    dataset_root.mkdir(parents=True)
+    records = dataset_root / "records.parquet"
+    _write_records(records, ids=["a", "b"], sequences=["AAA", "BBB"], x_values=[[0.1], [0.2]])
+
+    workdir = tmp_path / "campaign"
+    workdir.mkdir()
+    campaign = workdir / "campaign.yaml"
+    campaign.write_text(
+        f"""
+campaign:
+  name: Demo
+  slug: demo
+  workdir: "{workdir}"
+data:
+  location: {{ kind: usr, path: "{usr_root}", dataset: demo_candidates }}
+  x_column_name: X
+  y_column_name: opal__demo__y
+  y_expected_length: 1
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: demo_candidates
+    path: _opal/observed_labels.parquet
+  y_space: scalar_test
+writeback:
+  prediction_records: ledger_only
+transforms_x: {{ name: identity, params: {{}} }}
+transforms_y: {{ name: test_shared_scalar_labels, params: {{}} }}
+model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
+objectives:
+  - {{ name: scalar_identity_v1, params: {{}} }}
+selection:
+  name: top_n
+  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+""".strip()
+    )
+    labels = workdir / "labels.parquet"
+    pd.DataFrame({"id": ["a"], "y_val": [0.1]}).to_parquet(labels, index=False)
+
+    from dnadesign.opal.src.storage import records_io
+    from dnadesign.opal.src.storage.data_access import RecordsStore
+
+    calls: list[tuple[str, ...] | None] = []
+    original_read_parquet_df = records_io.read_parquet_df
+
+    def spy_read_parquet_df(path, *, columns=None, dtype_backend=None):
+        if Path(path) == records:
+            calls.append(tuple(columns) if columns is not None else None)
+            assert columns is not None
+            assert "X" not in columns
+        return original_read_parquet_df(path, columns=columns, dtype_backend=dtype_backend)
+
+    def fail_full_records_load(self):
+        raise AssertionError("shared usr_sidecar ingest must not materialize the full records table")
+
+    monkeypatch.setattr(records_io, "read_parquet_df", spy_read_parquet_df)
+    monkeypatch.setattr(RecordsStore, "load", fail_full_records_load)
+
+    res = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels),
+            "--unknown-sequences",
+            "error",
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["applied"] is True
+    assert payload["ingest_runtime"]["records_load_mode"] == "identity_frame"
+    assert payload["ingest_runtime"]["full_records_loaded"] is False
+    assert payload["ingest_runtime"]["candidate_x_column_loaded"] is False
+    assert calls == [("id", "sequence")]
+    sidecar = pd.read_parquet(dataset_root / "_opal" / "observed_labels.parquet")
+    assert sidecar["id"].tolist() == ["a"]
+
+
 def test_ingest_y_rejects_unknown_ids_for_shared_label_source(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr" / "datasets"
     dataset_root = usr_root / "demo_candidates"

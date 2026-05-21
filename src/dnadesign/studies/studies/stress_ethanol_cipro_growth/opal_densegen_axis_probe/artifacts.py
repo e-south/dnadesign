@@ -40,18 +40,22 @@ class RunSpec:
     label_input_path: Path
     sidecar_path: Path
     selection_k: int = DEFAULT_TOP_K
+    max_x_matrix_gib: float | None = None
+    score_batch_size: int | None = None
 
 
 @dataclass(frozen=True)
 class ProbePlan:
     run_root: Path
-    budget: int
+    initial_label_count: int
+    selection_k: int
     seed: int
     rounds: int
-    candidate_cap_per_split: int | None
     gate: str | None
     splits: tuple[str, ...]
     apply: bool
+    max_x_matrix_gib: float | None = None
+    score_batch_size: int | None = None
     stop_after: str = "status"
     runs: list[RunSpec] = field(default_factory=list)
     commands: list[list[str]] = field(default_factory=list)
@@ -167,10 +171,6 @@ class ProbeArtifactLayout:
     def scratch_dataset_dir(self) -> Path:
         return self.scratch_usr_dir / SCRATCH_DATASET
 
-    @property
-    def scratch_records_path(self) -> Path:
-        return self.scratch_dataset_dir / "records.parquet"
-
     def split_dataset(self, split_id: str) -> str:
         return f"{SCRATCH_DATASET}_{str(split_id)}"
 
@@ -189,6 +189,5 @@ class ProbeArtifactLayout:
     def campaign_label_input_path(self, run_key: str, round_index: int = 0) -> Path:
         return self.campaign_workdir(run_key) / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
 
-    def campaign_sidecar_path(self, run_key: str, split_id: str | None = None) -> Path:
-        dataset_dir = self.split_dataset_dir(split_id) if split_id is not None else self.scratch_dataset_dir
-        return dataset_dir / "_opal" / run_key / "observed_labels.parquet"
+    def campaign_sidecar_path(self, run_key: str, split_id: str) -> Path:
+        return self.split_dataset_dir(split_id) / "_opal" / run_key / "observed_labels.parquet"

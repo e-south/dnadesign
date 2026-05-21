@@ -169,6 +169,50 @@ def test_notebook_generate_with_name(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
+def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -> None:
+    campaigns = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records = workdir / "records.parquet"
+        write_records(records, slug=slug)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(
+            campaign,
+            workdir=workdir,
+            records_path=records,
+            slug=slug,
+        )
+        campaigns.append(campaign)
+
+    out_path = tmp_path / "campaign_set.py"
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--out",
+            str(out_path),
+            "--no-validate",
+        ],
+    )
+
+    assert res.exit_code == 0, res.output
+    assert out_path.exists()
+    text = out_path.read_text()
+    assert "OPAL Campaign Set Notebook" in text
+    assert "build_campaign_set_notebook_view_model" in text
+    assert 'label="Campaign"' in text
+    assert 'label="Plot"' in text
+
+
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

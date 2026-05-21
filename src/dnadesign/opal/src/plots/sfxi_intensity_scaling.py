@@ -46,6 +46,13 @@ from .sfxi_diag_data import (
         },
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for scaling; pool optional."],
+        data_shape="objective scaling diagnostics",
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 label vectors",
+            "insufficient labels for denominator percentile",
+            "invalid pool prediction vectors when include_pool is true",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

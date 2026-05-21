@@ -174,6 +174,15 @@ class PSafety(BaseModel):
     conflict_policy_on_duplicate_ids: str = "error"
     write_back_requires_columns_present: bool = True
     accept_x_mismatch: bool = False
+    max_x_matrix_gib: float = 8.0
+
+    @field_validator("max_x_matrix_gib")
+    @classmethod
+    def _max_x_matrix_gib_positive(cls, value: float) -> float:
+        out = float(value)
+        if out <= 0.0:
+            raise ValueError("safety.max_x_matrix_gib must be > 0")
+        return out
 
 
 class PRoot(BaseModel):
@@ -364,6 +373,7 @@ def load_config(path: Path | str) -> RootConfig:
         conflict_policy_on_duplicate_ids=pyd.safety.conflict_policy_on_duplicate_ids,
         write_back_requires_columns_present=pyd.safety.write_back_requires_columns_present,
         accept_x_mismatch=pyd.safety.accept_x_mismatch,
+        max_x_matrix_gib=float(pyd.safety.max_x_matrix_gib),
     )
 
     root = RootConfig(

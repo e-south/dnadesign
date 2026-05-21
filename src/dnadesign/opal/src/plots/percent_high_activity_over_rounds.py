@@ -35,6 +35,14 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
         },
         requires=["as_of_round", "pred__score_selected"],
         notes=["Reads outputs/ledger/predictions."],
+        data_shape="thresholded scalar over rounds",
+        tidy_schema=["as_of_round", "total", "high", "percent_high"],
+        failure_modes=[
+            "missing pred__score_selected",
+            "no rows match the requested round/run scope",
+            "non-finite objective scores",
+            "insufficient finite points for violin mode",
+        ],
     ),
 )
 def render(context, params: dict) -> None:

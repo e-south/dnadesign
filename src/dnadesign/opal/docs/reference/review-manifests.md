@@ -43,6 +43,11 @@ OPAL reports these as warnings instead of deleting them automatically. Deletion
 should be an explicit operator action because review directories may contain
 manual notes or externally copied artifacts.
 
+For bundle-wide gardening, use `opal artifacts audit` to inventory active
+manifests, stale plot/review siblings, byte counts, and local-only `.var`
+campaign roots. `opal artifacts prune` is dry-run by default and requires
+`--apply` before deleting stale manifest-absent files.
+
 ### Validation Behavior
 
 `opal review` validates the configured X column before writing review evidence.

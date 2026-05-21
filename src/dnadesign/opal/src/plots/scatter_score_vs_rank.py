@@ -49,6 +49,14 @@ from ._param_utils import (
             "sel__is_selected",
         ],
         notes=["Reads outputs/ledger/predictions."],
+        data_shape="selection behavior scatter",
+        tidy_schema=["as_of_round", "id", "sel__is_selected"],
+        failure_modes=[
+            "missing score or rank columns",
+            "score/hue/size fields are nonnumeric",
+            "no rows match the requested round/run scope",
+            "ambiguous run_id for selected rounds",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
