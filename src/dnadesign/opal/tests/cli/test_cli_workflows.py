@@ -20,6 +20,10 @@ from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records, write_records_with_x_values
 
 
+def _plain_output(text: str) -> str:
+    return " ".join(str(text).split())
+
+
 def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tuple[Path, Path, Path]:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +132,7 @@ def test_run_rejects_x_matrix_memory_budget_before_records_load(tmp_path: Path, 
     res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0", "--json"])
 
     assert res.exit_code == 2
-    assert "exceeds safety.max_x_matrix_gib" in res.output
+    assert "exceeds safety.max_x_matrix_gib" in _plain_output(res.output)
     round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
     log_text = round_log.read_text(encoding="utf-8")
     assert '"stage":"x_validate_done"' in log_text
@@ -395,7 +399,7 @@ def test_validate_rejects_ei_with_model_without_predictive_std(tmp_path: Path) -
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
     assert res.exit_code != 0
-    out = res.output.lower()
+    out = _plain_output(res.output).lower()
     assert "expected_improvement" in out
     assert "predictive std" in out
 

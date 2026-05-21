@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from ..analysis.facade import CampaignAnalysis
+from ..core.leakage import assert_no_leakage_violations, build_prediction_identity_report
 from ..core.rounds import resolve_round_index_from_runs
 from ..core.utils import ExitCodes, OpalError, read_json, write_json
 from ..plots._mpl_utils import apply_plot_style, ensure_mpl_config_dir, scatter_smart
@@ -525,6 +526,12 @@ def _read_review_predictions(
     )
     if df.empty:
         raise OpalError("No prediction rows found for campaign review scope.", ExitCodes.BAD_ARGS)
+    assert_no_leakage_violations(
+        build_prediction_identity_report(
+            prediction_ids=df["id"],
+            scope="campaign_review.predictions",
+        )
+    )
     return df
 
 

@@ -54,7 +54,7 @@ def test_compare_selection_to_ledger_rejects_missing_v2_score_column() -> None:
 def test_compare_selection_to_ledger_rejects_unknown_selection_ids() -> None:
     selection_df = pd.DataFrame({"id": ["a", "missing"], "pred__score_selected": [1.0, 2.0]})
     ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
-    with pytest.raises(OpalError, match="absent from ledger predictions"):
+    with pytest.raises(OpalError, match="selected_ids_outside_eval"):
         _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
 
 
@@ -62,6 +62,14 @@ def test_compare_selection_to_ledger_rejects_duplicate_selection_ids() -> None:
     selection_df = pd.DataFrame({"id": ["a", "a"], "pred__score_selected": [1.0, 1.0]})
     ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
     with pytest.raises(OpalError, match="duplicate IDs"):
+        _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
+
+
+def test_compare_selection_to_ledger_rejects_duplicate_ledger_prediction_ids() -> None:
+    selection_df = pd.DataFrame({"id": ["a"], "pred__score_selected": [1.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "a"], "pred__score_selected": [1.0, 2.0]})
+
+    with pytest.raises(OpalError, match="duplicate_prediction_ids"):
         _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
 
 

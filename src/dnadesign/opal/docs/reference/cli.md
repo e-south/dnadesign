@@ -359,6 +359,9 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 
 * Resolves the selection artifact path from `outputs/ledger/runs.parquet` when possible.
 * Uses the ledger’s `pred__score_selected` as the primary score source.
+* Fails fast with leakage-guard contract errors when ledger prediction IDs are
+  duplicated for the selected run/round or when selected IDs are outside the
+  run-scoped prediction/eval evidence.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
 * If the selected round has multiple runs, pass `--run-id` to disambiguate.
@@ -435,6 +438,11 @@ vector dimension, and any preflight warnings.
 Dashboard from config, `records.parquet`, label source, and `state.json`.
 Before initialization it still reports the records path, whether it exists, and
 the configured label-source path.
+
+For shared `usr_sidecar` campaigns, JSON output includes
+`label_source.leakage` with schema `opal.leakage_guard.v1`. Status reads only
+narrow label-status columns (`id`, configured Y when present, and
+`opal__<slug>__label_hist` when present), never the configured X column.
 
 **Usage**
 
@@ -736,6 +744,7 @@ opal review --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out-d
   `outputs/review/plots/`.
 * Reads campaign ledgers and per-round artifacts; it does not rerun OPAL and
   does not mutate records or labels.
+* Fails fast if run-scoped prediction evidence contains duplicate candidate IDs.
 * If a round has multiple run IDs, pass `--run-id` so the review does not mix
   reruns.
 * The manifest is authoritative. Review reports stale files that exist under

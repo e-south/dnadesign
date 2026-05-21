@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from ..core.leakage import assert_no_leakage_violations, build_train_eval_leakage_report
 from ..storage.data_access import RecordsStore
 from ..storage.label_sources import CampaignHistoryLabelSource, TrainingLabelSource
 
@@ -69,6 +70,14 @@ def plan_round(
             cand_df = cand_df.loc[~cand_df["id"].astype(str).isin(labeled_ids)].copy()
 
     filtered_out = total_before - int(len(cand_df))
+    assert_no_leakage_violations(
+        build_train_eval_leakage_report(
+            train_df=train_df,
+            candidate_df=cand_df,
+            as_of_round=int(as_of_round),
+            selection_excludes_labeled=exclude_already_labeled,
+        )
+    )
 
     return RoundPlan(
         as_of_round=int(as_of_round),

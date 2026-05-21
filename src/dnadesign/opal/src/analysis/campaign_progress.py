@@ -30,6 +30,7 @@ class RecordsContractReport:
     missing_required_columns: tuple[str, ...]
     x_column: str | None
     label_hist_column: str | None
+    x_values_loaded: bool = True
 
     @property
     def ready(self) -> bool:
@@ -65,13 +66,15 @@ def required_record_columns(info: CampaignInfo | None) -> tuple[str, ...]:
 def assess_records_contract(df: pl.DataFrame, info: CampaignInfo | None) -> RecordsContractReport:
     required = required_record_columns(info)
     columns = set(df.columns)
+    x_column = info.x_column if info is not None else None
     return RecordsContractReport(
         row_count=int(df.height),
         column_count=len(df.columns),
         required_columns=required,
         missing_required_columns=tuple(col for col in required if col not in columns),
-        x_column=info.x_column if info is not None else None,
+        x_column=x_column,
         label_hist_column=campaign_label_hist_column(info),
+        x_values_loaded=bool(x_column and x_column in columns),
     )
 
 
@@ -93,6 +96,32 @@ def assess_records_contract_for_values(
         missing_required_columns=tuple(col for col in dict.fromkeys(required) if col not in columns),
         x_column=str(x_column) if x_column else None,
         label_hist_column=label_hist_column,
+        x_values_loaded=bool(x_column and str(x_column) in columns),
+    )
+
+
+def assess_records_contract_for_schema(
+    *,
+    row_count: int,
+    schema_columns: tuple[str, ...] | list[str],
+    campaign_slug: str | None,
+    x_column: str | None,
+    loaded_columns: tuple[str, ...] | list[str] | None = None,
+) -> RecordsContractReport:
+    required = list(OPAL_RECORD_IDENTITY_COLUMNS)
+    if x_column:
+        required.append(str(x_column))
+    schema_column_set = {str(column) for column in schema_columns}
+    loaded_column_set = {str(column) for column in loaded_columns or ()}
+    label_hist_column = f"opal__{campaign_slug}__label_hist" if campaign_slug else None
+    return RecordsContractReport(
+        row_count=int(row_count),
+        column_count=len(schema_column_set),
+        required_columns=tuple(dict.fromkeys(required)),
+        missing_required_columns=tuple(col for col in dict.fromkeys(required) if col not in schema_column_set),
+        x_column=str(x_column) if x_column else None,
+        label_hist_column=label_hist_column,
+        x_values_loaded=bool(x_column and str(x_column) in loaded_column_set),
     )
 
 
@@ -109,12 +138,20 @@ def records_status_lines(report: RecordsContractReport) -> list[str]:
         lines.append(f"- Records contract: **missing required columns**: {missing}")
     if report.label_hist_column:
         lines.append(f"- Campaign label history column: `{report.label_hist_column}`")
+    if report.x_column:
+        loaded = "yes" if report.x_values_loaded else "no"
+        lines.append(f"- X values loaded in this view: `{loaded}`")
     return lines
 
 
 def x_provenance_status_lines(report: RecordsContractReport) -> list[str]:
     if report.x_column:
-        x_state = "**present**" if report.x_column not in report.missing_required_columns else "**missing**"
+        if report.x_column in report.missing_required_columns:
+            x_state = "**missing**"
+        elif report.x_values_loaded:
+            x_state = "**present**"
+        else:
+            x_state = "**present in records schema; values not loaded in notebook preview**"
         return [
             f"- X column: `{report.x_column}` ({x_state})",
             "- OPAL treats X as an explicit candidate-table contract and does not inspect producer geometry.",

@@ -13,6 +13,10 @@ import numpy as np
 import pandas as pd
 
 from ..config.types import LabelSourceCampaignHistory, LabelSourceUSRSidecar, LocationUSR, RootConfig
+from ..core.leakage import (
+    assert_no_leakage_violations,
+    build_shared_label_source_contamination_report,
+)
 from ..core.utils import OpalError
 from .data_access import RecordsStore
 from .locks import PathLock
@@ -444,6 +448,7 @@ def label_source_status(
 
     if isinstance(source, SharedObservedLabelSource):
         obs = source.store
+        leakage_report = build_shared_label_source_contamination_report(cfg=cfg, store=store, df=df)
         out = {
             "kind": "usr_sidecar",
             "path": str(obs.path),
@@ -457,7 +462,16 @@ def label_source_status(
             "label_count": 0,
             "available_rounds": [],
             "counts_by_round": {},
+            "leakage": leakage_report.to_dict(),
         }
+        if leakage_report.violations:
+            try:
+                assert_no_leakage_violations(leakage_report)
+            except OpalError as exc:
+                if strict:
+                    raise
+                out.update({"valid": False, "error": str(exc)})
+                return out
         if not obs.path.exists():
             if strict:
                 raise OpalError(f"Observed label source not found: {obs.path}")

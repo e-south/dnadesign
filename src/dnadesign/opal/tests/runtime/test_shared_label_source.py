@@ -27,7 +27,7 @@ from dnadesign.opal.src.config.types import (
 from dnadesign.opal.src.runtime.round_plan import plan_round
 from dnadesign.opal.src.runtime.run_round import RunRoundRequest, run_round
 from dnadesign.opal.src.storage.data_access import RecordsStore
-from dnadesign.opal.src.storage.label_sources import label_source_from_config
+from dnadesign.opal.src.storage.label_sources import label_source_from_config, label_source_status
 from dnadesign.opal.src.storage.state import CampaignState
 
 
@@ -168,6 +168,37 @@ def test_plan_round_uses_shared_labels_and_selector_specific_top_k(tmp_path: Pat
     assert cipro_plan.candidate_df["id"].tolist() == ["c"]
 
 
+def test_plan_round_rejects_train_eval_overlap_when_exclusion_is_configured(tmp_path: Path) -> None:
+    df, usr_root, records_path = _records(tmp_path)
+    store = _store(_cfg(usr_root, "eth", top_k=1), records_path)
+    cfg = _cfg(usr_root, "eth", top_k=1)
+
+    class _BadLabelSource:
+        kind = "test_bad_source"
+
+        def training_labels(self, df, as_of_round, *, cumulative_training, dedup_policy):
+            _unused = (df, as_of_round, cumulative_training, dedup_policy)
+            return pd.DataFrame({"id": ["a"], "y": [[1.0]], "r": [0]})
+
+        def labeled_id_set_leq_round(self, df, as_of_round):
+            _unused = (df, as_of_round)
+            return set()
+
+        def labeled_id_set_any_round(self, df):
+            _unused = df
+            return set()
+
+    try:
+        plan_round(store, df, cfg, 0, label_source=_BadLabelSource())
+    except Exception as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected train/eval overlap to fail fast")
+
+    assert "LeakageContractError" in message
+    assert "train_eval_overlap" in message
+
+
 def test_run_round_shared_labels_keep_selection_ledgers_campaign_local(tmp_path: Path) -> None:
     df, usr_root, records_path = _records(tmp_path)
     _labels(usr_root)
@@ -197,3 +228,65 @@ def test_run_round_shared_labels_keep_selection_ledgers_campaign_local(tmp_path:
     records_after = pd.read_parquet(records_path)
     assert "opal__eth__label_hist" not in records_after.columns
     assert "opal__cipro__label_hist" not in records_after.columns
+
+
+def test_run_round_shared_sidecar_rejects_current_y_contamination(tmp_path: Path) -> None:
+    df, usr_root, records_path = _records(tmp_path)
+    _labels(usr_root)
+    cfg = _cfg(usr_root, "eth", top_k=1)
+    _write_state(cfg, records_path)
+    contaminated = df.copy()
+    contaminated[cfg.data.y_column_name] = [[1.0], None, None]
+
+    try:
+        run_round(
+            _store(cfg, records_path),
+            contaminated,
+            RunRoundRequest(cfg=cfg, as_of_round=1, verbose=False),
+        )
+    except Exception as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected shared-sidecar current-Y contamination to fail fast")
+
+    assert "LeakageContractError" in message
+    assert "records_y_column_contamination" in message
+
+    status = label_source_status(cfg, _store(cfg, records_path), contaminated, strict=False)
+    assert status["valid"] is False
+    assert status["leakage"]["status"] == "fail"
+    assert status["leakage"]["violations"][0]["code"] == "records_y_column_contamination"
+
+
+def test_run_round_shared_sidecar_rejects_ledger_only_label_history_contamination(tmp_path: Path) -> None:
+    df, usr_root, records_path = _records(tmp_path)
+    _labels(usr_root)
+    cfg = _cfg(usr_root, "eth", top_k=1)
+    _write_state(cfg, records_path)
+    contaminated = df.copy()
+    contaminated[f"opal__{cfg.campaign.slug}__label_hist"] = [
+        [
+            {
+                "kind": "label",
+                "observed_round": 0,
+                "y_obs": {"value": [1.0], "dtype": "vector", "schema": {"length": 1}},
+                "src": "stale_campaign_history",
+            }
+        ],
+        [],
+        [],
+    ]
+
+    try:
+        run_round(
+            _store(cfg, records_path),
+            contaminated,
+            RunRoundRequest(cfg=cfg, as_of_round=1, verbose=False),
+        )
+    except Exception as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected shared-sidecar label-history contamination to fail fast")
+
+    assert "LeakageContractError" in message
+    assert "records_label_history_contamination" in message

@@ -17,6 +17,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
+from ...core.leakage import assert_no_leakage_violations, build_shared_label_source_contamination_report
 from ...core.objective_result import validate_objective_result_v2
 from ...core.progress import NullProgress
 from ...core.round_context import Contract, RoundCtx
@@ -165,6 +166,7 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
             "Run `opal ingest-y` (preferred) or explicitly reconcile the current Y column with "
             "`opal label-hist attach-from-y`."
         )
+    assert_no_leakage_violations(build_shared_label_source_contamination_report(cfg=cfg, store=store, df=df))
     label_source.validate(df)
 
     plan = plan_round(

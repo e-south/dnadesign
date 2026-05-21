@@ -25,7 +25,9 @@ OPAL is assertive by default and fails fast on inconsistent inputs.
   the current Y column to label history.
 - Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 - Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
-- `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
+- `verify-outputs` is strict: selection IDs must be unique, selected IDs must
+  exist in the target run ledger predictions, and run-scoped ledger prediction
+  IDs must be unique before score comparisons are trusted.
 
 ### Records schema
 
@@ -79,6 +81,14 @@ fall back to campaign-local label history when the file is missing, malformed,
 or contains unknown candidate IDs. Appends lock the sidecar path while OPAL
 loads existing labels, applies the duplicate policy, and replaces the Parquet
 file.
+
+For `usr_sidecar` campaigns, the candidate table must not carry active observed
+labels through campaign-local surfaces. OPAL rejects non-empty configured
+current-Y values and campaign-local observed-label entries because they can make
+the sidecar and records table disagree about the training set. In
+`writeback.prediction_records: ledger_only`, any campaign-local
+`opal__<slug>__label_hist` entries are rejected; prediction and selection truth
+must live in the ledgers.
 
 ### Records label history (OPAL-managed)
 

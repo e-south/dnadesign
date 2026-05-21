@@ -55,6 +55,11 @@ class RunError(OpalError):
     pass
 
 
+class LeakageContractError(OpalError):
+    def __init__(self, message: str):
+        super().__init__(message, ExitCodes.CONTRACT_VIOLATION)
+
+
 # -----------------------
 # IO helpers
 # -----------------------

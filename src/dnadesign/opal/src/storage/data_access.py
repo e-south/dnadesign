@@ -69,7 +69,7 @@ class RecordsStore:
         return frame
 
     def load_label_status_frame(self) -> pd.DataFrame:
-        return self.load_columns(["id", self.label_hist_col()])
+        return self.load_columns(["id", self.y_col, self.label_hist_col()])
 
     def row_count(self) -> int:
         return self._io.row_count()

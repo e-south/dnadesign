@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from typer.models import OptionInfo
 
 from ...core.selection_contracts import (
     resolve_selection_objective_mode,
@@ -47,6 +48,10 @@ def _resolve_summary_selection_mode(sel_params: dict[str, object]) -> tuple[str,
     tie_handling = resolve_selection_tie_handling(sel_params, error_cls=OpalError)
     objective_mode = resolve_selection_objective_mode(sel_params, error_cls=OpalError)
     return tie_handling, objective_mode
+
+
+def _direct_call_default(value, default):
+    return default if isinstance(value, OptionInfo) else value
 
 
 def _append_cli_round_event(
@@ -116,6 +121,15 @@ def cmd_run(
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
     json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ) -> None:
+    config = _direct_call_default(config, None)
+    k = _direct_call_default(k, None)
+    resume = bool(_direct_call_default(resume, False))
+    score_batch_size = _direct_call_default(score_batch_size, None)
+    max_x_matrix_gib = _direct_call_default(max_x_matrix_gib, None)
+    verbose = bool(_direct_call_default(verbose, True))
+    no_hints = bool(_direct_call_default(no_hints, False))
+    json = bool(_direct_call_default(json, False))
+
     cfg_path: Path | None = None
     cfg = None
     attempt_id: str | None = None

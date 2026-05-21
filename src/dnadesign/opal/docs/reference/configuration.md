@@ -116,6 +116,13 @@ campaign-local label history when a configured shared sidecar is missing or
 malformed during `run`/`explain`; `opal validate` reports missing pre-ingest
 sidecars and validates schema when the file exists.
 
+Shared sidecar campaigns also fail closed on generic contamination. Non-empty
+values in the configured current-Y column, campaign-local observed-label entries
+in `opal__<slug>__label_hist`, or any campaign-local label-history entries while
+`writeback.prediction_records: ledger_only` are treated as leakage contract
+errors. `opal status --json` exposes this as `label_source.leakage` without
+loading the configured X column.
+
 ### Minimal baseline example (RF + top_n)
 
 Use this example when your objective is already scalar and selection is deterministic.

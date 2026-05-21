@@ -17,6 +17,11 @@ from typing import Any
 
 import pandas as pd
 
+from ..core.leakage import (
+    assert_no_leakage_violations,
+    build_prediction_identity_report,
+    build_selected_ids_scope_report,
+)
 from ..core.utils import OpalError
 
 
@@ -97,12 +102,19 @@ def compare_selection_to_ledger(
         suffix = "..." if len(dup_ids) > len(preview) else ""
         raise OpalError(f"Selection data contains duplicate IDs: {preview}{suffix}")
 
-    missing_sel_mask = ~sel[id_col].isin(set(led[id_col]))
-    if bool(missing_sel_mask.any()):
-        missing_ids = sorted(sel.loc[missing_sel_mask, id_col].astype(str).unique().tolist())
-        preview = missing_ids[:10]
-        suffix = "..." if len(missing_ids) > len(preview) else ""
-        raise OpalError(f"Selection IDs absent from ledger predictions: {preview}{suffix}")
+    assert_no_leakage_violations(
+        build_prediction_identity_report(
+            prediction_ids=led[id_col],
+            scope="verify_outputs.ledger_predictions",
+        )
+    )
+    assert_no_leakage_violations(
+        build_selected_ids_scope_report(
+            selected_ids=sel[id_col],
+            prediction_ids=led[id_col],
+            scope="verify_outputs.selection",
+        )
+    )
 
     sel[selection_score_col] = pd.to_numeric(sel[selection_score_col], errors="coerce")
     led[ledger_score_col] = pd.to_numeric(led[ledger_score_col], errors="coerce")

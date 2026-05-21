@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from typer.testing import CliRunner
 
@@ -132,3 +134,14 @@ def test_build_campaign_review_reports_stale_plot_files_when_plots_disabled(tmp_
     assert result.manifest["stale_artifacts"]
     assert result.manifest["warnings"][0]["category"] == "StaleArtifactWarning"
     assert result.manifest["stale_artifacts"][0]["path"] == str(stale_file)
+
+
+def test_build_campaign_review_rejects_duplicate_prediction_ids(tmp_path: Path) -> None:
+    workdir, campaign, run_id = _setup_review_campaign(tmp_path)
+    predictions_dir = workdir / "outputs" / "ledger" / "predictions"
+    predictions = pd.read_parquet(predictions_dir)
+    duplicate = predictions.loc[predictions["id"].astype(str) == "a"].head(1).copy()
+    pq.write_table(pa.Table.from_pandas(duplicate, preserve_index=False), predictions_dir / "part-duplicate.parquet")
+
+    with pytest.raises(OpalError, match="duplicate_prediction_ids"):
+        build_campaign_review(campaign, run_id=run_id)

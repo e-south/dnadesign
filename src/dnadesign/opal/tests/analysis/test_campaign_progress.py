@@ -15,6 +15,7 @@ import polars as pl
 
 from dnadesign.opal.src.analysis.campaign_progress import (
     assess_records_contract,
+    assess_records_contract_for_schema,
     build_ledger_status_table,
     build_records_preview,
     cli_handoff_lines,
@@ -77,6 +78,22 @@ def test_records_contract_requires_configured_x_column() -> None:
 
     assert not report.ready
     assert report.missing_required_columns == ("opal__view__x",)
+
+
+def test_records_contract_schema_mode_does_not_load_x_values() -> None:
+    report = assess_records_contract_for_schema(
+        row_count=157_160,
+        schema_columns=("id", "bio_type", "sequence", "alphabet", "opal__view__x"),
+        campaign_slug="demo",
+        x_column="opal__view__x",
+        loaded_columns=("id", "bio_type", "sequence", "alphabet"),
+    )
+
+    assert report.ready
+    assert not report.x_values_loaded
+    status = "\n".join(x_provenance_status_lines(report)).lower()
+    assert "present in records schema" in status
+    assert "not loaded" in status
 
 
 def test_records_preview_hides_vector_but_marks_presence() -> None:

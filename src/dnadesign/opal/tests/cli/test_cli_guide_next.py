@@ -203,7 +203,7 @@ def test_status_reads_label_status_columns_without_loading_x(tmp_path: Path, mon
     res = runner.invoke(app, ["--no-color", "status", "-c", str(campaign), "--json"])
 
     assert res.exit_code == 0, res.stdout
-    assert calls == [("id", "opal__demo__label_hist")]
+    assert calls == [("id", "Y", "opal__demo__label_hist")]
 
 
 def test_guide_next_before_init_does_not_load_candidate_x(tmp_path: Path, monkeypatch) -> None:
