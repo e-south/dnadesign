@@ -140,6 +140,11 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
   truth into campaign label-history columns. Fixed-universe sidecar ingest loads
   only the records identity frame (`id`, `sequence`) and does not materialize
   the configured X column.
+* The text preview includes a `[Runtime] ingest-y` block. JSON output includes
+  `ingest_runtime.schema_version: opal.ingest_runtime.v1`, `mode`, loaded
+  columns, candidate index rows, estimated frame memory, unknown-sequence policy,
+  and write scope. Shared `usr_sidecar` appends report `mode=identity_index`,
+  `write_scope=label_sidecar`, and `full_records_loaded=false`.
 * Emits `label` events into `outputs/ledger/labels.parquet`.
 
 ---

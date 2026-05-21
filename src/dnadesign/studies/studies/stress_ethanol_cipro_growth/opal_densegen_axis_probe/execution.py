@@ -21,7 +21,7 @@ def materialize_probe_inputs(
 ) -> None:
     import pandas as pd
 
-    from .decision import _persisted_split_metadata
+    from .decision_inputs import _persisted_split_metadata
     from .plan import validate_scratch_paths
     from .scratch import (
         _make_training_input,

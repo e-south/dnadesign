@@ -14,15 +14,11 @@ sources. A distribution-preserving permuted null must fail.
 
 ### Boundary
 
-Allowed oracle inputs:
-
 - `densegen__used_tfbs_detail`
 - `densegen__plan` for audit and sigma35 suffix parsing
 - `densegen__required_regulators` for audit
 - `densegen__sampling_library_hash` for collapse audit
 - pad and GC metadata for future audit only
-
-Forbidden oracle inputs:
 
 - `latentdna__*`
 - `infer__*`
@@ -108,21 +104,17 @@ training split, and later rounds label the previous OPAL selections from the
 study-owned DenseGen oracle or permuted null before rerunning OPAL. Synthetic
 labels still never enter the shared observed-label sidecar.
 
-Metrics are written both for the final scored round and for every available
-round in `reports/round_metrics.csv` and `reports/round_metrics.jsonl`. The
-review also includes a metric guide so `precision@K`, target prevalence, lift,
-binomial tail p-values, and null lift can be interpreted without reading the
-Python implementation.
+Metrics are written for the final scored round and for every available round in
+`reports/round_metrics.csv` and `reports/round_metrics.jsonl`. Reviews include a
+metric guide for `precision@K`, prevalence, lift, binomial tail p-values, and
+null lift.
 
-The probe inherits OPAL's `safety.max_x_matrix_gib` guard and uses scratch
-campaigns with `writeback.prediction_records: ledger_only`. OPAL therefore
-validates the full 8192-D X contract, loads record metadata without X, streams
-candidate X in score batches, and fails only when a single train plus score
-batch would exceed the configured memory budget. On memory-constrained hosts,
-lower `--score-batch-size` before raising `--max-x-matrix-gib`.
-Scratch split `records.parquet` files are also written in filtered Parquet
-batches so a full random-id split does not require one giant in-memory Arrow
-table during materialization.
+The probe inherits OPAL's `safety.max_x_matrix_gib` guard and uses
+`writeback.prediction_records: ledger_only`. OPAL validates the 8192-D X
+contract, loads records without X, streams score batches, and fails when one
+train plus score batch exceeds the budget. Lower `--score-batch-size` before
+raising `--max-x-matrix-gib`. Scratch split records are written in filtered
+Parquet batches.
 
 By default, apply-mode run roots must live under:
 
@@ -130,13 +122,12 @@ By default, apply-mode run roots must live under:
 .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/
 ```
 
-Use `--allow-custom-run-root` only for an explicit external scratch location.
-Repo-local apply writes stay under `.var/studies/...` so generated parquet does
-not enter source, docs, tests, or shared USR truth paths.
+Use `--allow-custom-run-root` only for an explicit external scratch location so
+generated parquet stays out of source, docs, tests, and shared USR truth paths.
 
-For cheap dogfooding without scoring the full candidate pool, stop after
-scratch config validation. This stage runs OPAL validation, including the full
-candidate-table X-column scan:
+For cheap dogfooding without scoring the full candidate pool, stop after scratch
+config validation. This still runs OPAL validation and the full candidate-table
+X-column scan:
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
@@ -150,21 +141,11 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_dens
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/<run_id>
 ```
 
-Scratch artifacts are written under:
-
-```text
-.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/<run_id>/
-```
-
 Split JSON is compact by contract. Full train/eval IDs are stored as split-level
 Parquet files so status and review artifacts do not balloon with 157k candidate
 IDs.
 
-The script prints every OPAL command before execution.
-
 ### Decision
-
-The output is one scoped `decision.md`, not a leaderboard.
 
 - `PASS_CIPRO_RANDOM_GATE`: the cipro/random positive-vs-null slice safely
   demonstrates non-null DenseGen grammar recovery for that scoped gate only.
@@ -182,21 +163,15 @@ The output is one scoped `decision.md`, not a leaderboard.
 Review artifacts are layered:
 
 - Each scratch OPAL campaign writes reusable OPAL campaign review artifacts under
-  `outputs/review/`, including `review.md`, `index.html`, a manifest, and
-  portable plots.
+  `outputs/review/`.
 - The probe writes only the study-specific aggregate benchmark layer under
-  `reports/`, including `review.md`, `index.html`, manifests, and aggregate
-  plots.
+  `reports/`.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`
-  summarizes scratch OPAL
-  round logs so operators can inspect live or post-run progress without digging
-  through campaign directories.
+  summarizes scratch OPAL round logs without digging through campaign
+  directories.
 
 Missing prediction ledgers after a scored OPAL stage are execution contract
-failures and should raise a CLI error rather than producing a research
-decision.
-
-The probe is valuable only if it changes a concrete OPAL readiness or
-assay-design decision.
+failures, not research decisions. The probe is valuable only if it changes a
+concrete OPAL readiness or assay-design decision.

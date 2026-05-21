@@ -23,6 +23,7 @@ from ...core.round_context import PluginRegistryView, RoundCtx
 from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...registries.transforms_y import get_transform_y
 from ...runtime.ingest import run_ingest
+from ...runtime.ingest_runtime import build_ingest_runtime_contract
 from ...storage.data_access import RecordsStore
 from ...storage.label_sources import SharedObservedLabelSource, label_source_from_config
 from ...storage.ledger import LedgerWriter
@@ -34,6 +35,7 @@ from ..formatting import (
     bullet_list,
     render_ingest_commit_text,
     render_ingest_preview_text,
+    render_ingest_runtime_text,
 )
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -102,24 +104,17 @@ def cmd_ingest_y(
         shared_label_source = isinstance(label_source, SharedObservedLabelSource)
         if shared_label_source:
             df = store.load_ingest_identity_frame()
-            records_load_mode = "identity_frame"
         else:
             df = store.load()
-            records_load_mode = "full_records"
-
-        ingest_runtime = {
-            "schema_version": 1,
-            "label_source_kind": getattr(label_source, "kind", "campaign_history"),
-            "records_load_mode": records_load_mode,
-            "full_records_loaded": records_load_mode == "full_records",
-            "fixed_candidate_universe": shared_label_source,
-            "candidate_x_column_loaded": cfg.data.x_column_name in df.columns,
-            "records_path": store.records_path,
-            "records_row_count": store.row_count(),
-            "records_columns_loaded": list(map(str, df.columns)),
-            "records_frame_bytes": int(df.memory_usage(deep=True).sum()),
-            "unknown_sequences_policy": unknown_sequences,
-        }
+        ingest_runtime = build_ingest_runtime_contract(
+            frame=df,
+            records_path=store.records_path,
+            records_row_count=store.row_count(),
+            candidate_x_column=cfg.data.x_column_name,
+            label_source_kind=getattr(label_source, "kind", "campaign_history"),
+            fixed_candidate_universe=shared_label_source,
+            unknown_sequences_policy=unknown_sequences,
+        )
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
@@ -185,6 +180,11 @@ def cmd_ingest_y(
             duplicate_policy=cfg.ingest.duplicate_policy,
             ctx=tctx,
         )
+        ingest_runtime = ingest_runtime.with_preview_counts(
+            input_rows=len(csv_df),
+            transformed_label_rows=len(labels_df),
+            unknown_count_initial=int(preview.unknown_sequences or 0),
+        )
 
         # Preview
         if preview.unknown_sequences:
@@ -220,10 +220,11 @@ def cmd_ingest_y(
         preview_payload = {
             "preview": asdict(preview),
             "sample": sample,
-            "ingest_runtime": ingest_runtime,
+            "ingest_runtime": ingest_runtime.to_dict(),
         }
         if not json:
             print_stdout(render_ingest_preview_text(preview, sample, transform_name=t_name))
+            print_stdout(render_ingest_runtime_text(ingest_runtime.to_dict()))
 
         # Required columns for new rows (used for nudges + strict checks below)
         required_cols = ["bio_type", "alphabet"]
@@ -459,9 +460,11 @@ def cmd_ingest_y(
                 labels_df = labels_df.loc[~unknown_mask].copy()
                 unknown_count = 0
 
-        ingest_runtime["unknown_count_initial"] = int(preview.unknown_sequences or 0)
-        ingest_runtime["unknown_count_after_policy"] = int(unknown_count)
-        ingest_runtime["labels_after_unknown_policy"] = int(len(labels_df))
+        ingest_runtime = ingest_runtime.with_policy_counts(
+            unknown_count_after_policy=unknown_count,
+            labels_after_unknown_policy=len(labels_df),
+        )
+        preview_payload["ingest_runtime"] = ingest_runtime.to_dict()
 
         # Human-friendly nudges (non-fatal)
         if not json:

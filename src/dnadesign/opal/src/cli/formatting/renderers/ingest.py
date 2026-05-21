@@ -129,3 +129,60 @@ def render_ingest_commit_text(
         if table is not None:
             return table
     return kv_block("[Committed] ingest-y", payload)
+
+
+def render_ingest_runtime_text(runtime: Any) -> str:
+    payload = _as_dict(runtime)
+    rows = payload.get("candidate_index_rows")
+    records_rows = payload.get("records_row_count")
+    memory = _format_bytes(payload.get("estimated_memory_bytes"))
+    peak = _format_bytes(payload.get("peak_rss_bytes"))
+    fields = {
+        "schema": payload.get("schema_version"),
+        "mode": payload.get("mode"),
+        "label source": payload.get("label_source_kind"),
+        "write scope": payload.get("write_scope"),
+        "fixed universe": _yes_no(payload.get("fixed_candidate_universe")),
+        "full records loaded": _yes_no(payload.get("full_records_loaded")),
+        "loaded columns": _format_columns(payload.get("records_columns_loaded") or []),
+        "X column loaded": _yes_no(payload.get("candidate_x_column_loaded")),
+        "candidate index rows": rows,
+        "records rows": records_rows,
+        "estimated frame memory": memory,
+        "process peak RSS": peak,
+        "unknown policy": payload.get("unknown_sequences_policy"),
+    }
+    if tui_enabled():
+        table = kv_table("[Runtime] ingest-y", fields)
+        if table is not None:
+            return table
+    return kv_block("[Runtime] ingest-y", fields)
+
+
+def _yes_no(value: Any) -> str:
+    return "yes" if bool(value) else "no"
+
+
+def _format_bytes(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    try:
+        size = float(value)
+    except Exception:
+        return str(value)
+    units = ("B", "KiB", "MiB", "GiB")
+    idx = 0
+    while size >= 1024 and idx < len(units) - 1:
+        size /= 1024
+        idx += 1
+    if idx == 0:
+        return f"{int(size)} {units[idx]}"
+    return f"{size:.2f} {units[idx]}"
+
+
+def _format_columns(columns: Any) -> str:
+    try:
+        values = [str(column) for column in columns]
+    except TypeError:
+        values = [str(columns)]
+    return ", ".join(values) if values else "(none)"

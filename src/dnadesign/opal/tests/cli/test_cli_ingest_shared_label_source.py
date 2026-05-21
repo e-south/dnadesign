@@ -113,6 +113,10 @@ selection:
     )
 
     assert res.exit_code == 0, res.stdout
+    assert "[Runtime] ingest-y" in res.stdout
+    assert "identity_index" in res.stdout
+    assert "full records loaded" in res.stdout
+    assert "no" in res.stdout
     sidecar = pd.read_parquet(dataset_root / "_opal" / "observed_labels.parquet")
     assert sidecar[["id", "observed_round", "batch_id", "y_space", "y_obs"]].to_dict(orient="records") == [
         {
@@ -234,9 +238,23 @@ selection:
     assert res.exit_code == 0, res.stdout
     payload = json.loads(res.stdout)
     assert payload["applied"] is True
+    assert payload["ingest_runtime"]["schema_version"] == "opal.ingest_runtime.v1"
+    assert payload["ingest_runtime"]["mode"] == "identity_index"
     assert payload["ingest_runtime"]["records_load_mode"] == "identity_frame"
     assert payload["ingest_runtime"]["full_records_loaded"] is False
     assert payload["ingest_runtime"]["candidate_x_column_loaded"] is False
+    assert payload["ingest_runtime"]["identity_columns"] == ["id", "sequence"]
+    assert payload["ingest_runtime"]["records_columns_loaded"] == ["id", "sequence"]
+    assert payload["ingest_runtime"]["candidate_index_rows"] == 2
+    assert payload["ingest_runtime"]["records_row_count"] == 2
+    assert payload["ingest_runtime"]["estimated_memory_bytes"] > 0
+    assert payload["ingest_runtime"]["unknown_sequences_policy"] == "error"
+    assert payload["ingest_runtime"]["write_scope"] == "label_sidecar"
+    assert payload["ingest_runtime"]["input_rows"] == 1
+    assert payload["ingest_runtime"]["transformed_label_rows"] == 1
+    assert payload["ingest_runtime"]["unknown_count_initial"] == 0
+    assert payload["ingest_runtime"]["unknown_count_after_policy"] == 0
+    assert payload["ingest_runtime"]["labels_after_unknown_policy"] == 1
     assert calls == [("id", "sequence")]
     sidecar = pd.read_parquet(dataset_root / "_opal" / "observed_labels.parquet")
     assert sidecar["id"].tolist() == ["a"]

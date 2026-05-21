@@ -16,7 +16,7 @@ This document is a specification only. It intentionally does not implement produ
 
 OPAL should become a small, contract-first active-learning campaign runtime with excellent machine-readable reporting and review artifacts. Its core identity is a campaign loop over one candidate table, one explicit X column, one label source, model/objective/selector plugins, append-only ledgers, run-scoped progress, configured plots, static review bundles, and generated marimo notebooks.
 
-The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: `opal ingest-y` still materializes the full candidate table for tiny label appends. The remaining gap is product and contract maturity: ingest must be memory-safe, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and the X contract still has a split between permissive in-memory identity parsing and strict Parquet validation.
+The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: label ingest, artifact review, and progress surfaces must make their memory and stale-evidence contracts operator-visible, not merely pass happy-path tests. The remaining gap is product and contract maturity: ingest must stay memory-safe and telemetry-rich, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and the X contract still has a split between permissive in-memory identity parsing and strict Parquet validation.
 
 Highest-priority changes:
 
@@ -91,9 +91,9 @@ Important current issue: `cmd_run()` writes `command_start`, `records_load_start
 
 ### Ingest Lifecycle And Runtime Cost
 
-The full-pool 12-round dogfood changed the runtime risk profile. OPAL scoring can be made memory-bounded with `score_batch_size=256`, but label ingestion is still too expensive for a normal active-learning loop. `opal ingest-y` currently builds `RecordsStore`, resolves the configured label source, and calls `store.load()` before reading the small incoming label file. For shared sidecar campaigns with a fixed candidate universe, the ingest path usually needs only candidate IDs, sequence mapping, and minimal metadata to validate a six-row label append. It does not need to materialize a 5 GB records table and its 8192-dimensional X column.
+The full-pool 12-round dogfood changed the runtime risk profile. OPAL scoring can be made memory-bounded with `score_batch_size=256`, and fixed-universe `usr_sidecar` label ingest now uses a narrow identity frame rather than materializing the full X-heavy records table. The remaining ingest work is to keep that behavior explicit and test-pinned: the CLI must expose `opal.ingest_runtime.v1`, loaded columns, candidate index size, estimated frame memory, optional peak RSS, unknown-label policy, and write scope in both JSON and operator text.
 
-The desired production invariant is memory proportionality: ingest memory should scale with the incoming label batch plus a narrow identity index, not with the full feature payload. Full candidate scoring may need batched X reads; label ingestion should not.
+The desired production invariant remains memory proportionality: ingest memory should scale with the incoming label batch plus a narrow identity index, not with the full feature payload. Full candidate scoring may need batched X reads; label ingestion should not.
 
 ### Public APIs
 
@@ -157,8 +157,8 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 
 | Issue | Risk |
 | --- | --- |
-| `opal ingest-y` currently loads the full records table before reading a small label batch | Full-pool campaigns can spike memory while appending six labels, even when scoring is safely batched |
-| `opal run` has scoring memory guards but `ingest-y` lacks matching memory estimates, phase telemetry, and fail-fast thresholds | Operators can complete scoring safely and still hit application-memory failure during the next label ingest |
+| `opal ingest-y` fixed-sidecar appends now avoid the full records table, but the contract must stay visible and regression-tested | Operators need to see `mode=identity_index`, loaded columns, memory estimates, and write scope during normal dogfood |
+| `opal run` has scoring memory guards; `ingest-y` now reports estimated frame memory and optional peak RSS but still needs configurable hard thresholds | Operators can complete scoring safely and should get explicit ingest memory posture before label writes |
 | Local dogfood roots under ignored `.var` can grow to multi-GB bundles and accumulate stale plot siblings | Local evidence, stale artifacts, and workspace storage pressure can drift unless artifact gardening is explicit |
 | Probe review currently enriches report metrics and status from a review pass | Raw execution evidence and derived review evidence can become hard to distinguish unless artifacts are split |
 | Leakage guards are partly study-owned and partly OPAL-owned | Invalid synthetic-oracle evidence, train/eval overlap, or prediction/label contamination must fail fast at the correct layer |
@@ -199,8 +199,8 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Plot config rejects unknown keys and conflicting inline/external plot config | `src/dnadesign/opal/src/plots/config.py:23-42`, `src/dnadesign/opal/src/plots/config.py:75-78`, `src/dnadesign/opal/src/plots/config.py:161-216` |
 | Plot runner injects built-in data paths, builds PlotContext, calls plugins, writes per-plot manifests, and writes aggregate plot manifest indexes | `src/dnadesign/opal/src/plots/runner.py:93-107`, `src/dnadesign/opal/src/plots/runner.py:243-315`, `src/dnadesign/opal/src/plots/manifests.py:22-130` |
 | Feature importance plot currently discovers per-round files and writes optional tidy CSV | `src/dnadesign/opal/src/plots/feature_importance_bars.py:34-53`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:163-176`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:213-317` |
-| `opal ingest-y` loads full records before reading the small incoming label file | `src/dnadesign/opal/src/cli/commands/ingest_y.py:94-99` |
-| `opal ingest-y` later needs only ID/sequence membership and required-column checks for fixed-universe sidecars | `src/dnadesign/opal/src/cli/commands/ingest_y.py:205-239` |
+| Fixed-sidecar `opal ingest-y` loads only the identity frame and emits `opal.ingest_runtime.v1` runtime telemetry | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/runtime/ingest_runtime.py` |
+| `opal ingest-y` needs ID/sequence membership and required-column checks for fixed-universe sidecars, not the configured X payload | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/runtime/ingest.py` |
 | Generated notebook imports public OPAL helpers rather than `dnadesign.opal.src.*` | `src/dnadesign/opal/src/analysis/notebook_template.py:41-88`, `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:59-70` |
 | Generated notebook builds a manifest-backed view model and uses manifest-backed plot choices | `src/dnadesign/opal/src/reporting/notebook.py:34-113`, `src/dnadesign/opal/src/analysis/notebook_template.py:99-102`, `src/dnadesign/opal/src/analysis/notebook_template.py:401-518` |
 | Generated notebook exposes round, run, record, data-source, and plot dropdowns plus lazy accordions | `src/dnadesign/opal/src/analysis/notebook_template.py:159-203`, `src/dnadesign/opal/src/analysis/notebook_template.py:306-340`, `src/dnadesign/opal/src/analysis/notebook_template.py:439-518`, `src/dnadesign/opal/src/analysis/notebook_template.py:700-746` |
@@ -218,7 +218,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | DenseGen probe consumes public OPAL progress and review APIs | `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/progress.py:9-27`, `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review.py:14-39` |
 | Local-only full-pool DenseGen-axis dogfood report is STOP/attention with 12 campaigns, 144 OPAL rounds, no candidate cap, 36 configured OPAL plots, 8 aggregate probe plots, 3 null-control decision reasons, and metric definitions for lift, null lift, p, and round semantics; this ignored `.var` path is not durable CI evidence | `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z/reports/review_manifest.json`, `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z/reports/metrics.json` |
 | Local-only full-pool dogfood artifact audit found an 8.1 GB run tree with 2,240 files, 13 HTML files, 256 local refs with 0 missing refs, and 104 readable/nonblank/non-undersized PNGs; future claims need a tracked summary or reproducible CI/nightly log | Read-only audit command recorded in this spec pass; root `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z` |
-| Local-only full-pool dogfood showed scoring stayed bounded with `score_batch_size=256`, but `ingest-y` had transient RSS spikes around 3.6 GB | Operator polling during full-pool run; supported by `ingest-y` full-record load evidence above |
+| Local-only full-pool dogfood showed scoring stayed bounded with `score_batch_size=256`; future ingest regressions should be caught by the identity-frame contract and memory telemetry | Operator polling during full-pool run; follow-up dogfood should record `opal.ingest_runtime.v1` evidence |
 
 ## 3. Goals
 
@@ -406,8 +406,8 @@ Campaign configuration ownership rule:
 
 | Field | Specification |
 | --- | --- |
-| Problem | `opal ingest-y` currently materializes the full candidate records table before reading the incoming label batch. In a full-pool campaign this can load multi-GB records with 8192-dimensional X payloads just to append a handful of labels to a fixed `usr_sidecar`. |
-| Proposed change | Add a memory-safe ingest plan. For fixed-universe sidecars and `--unknown-sequences error/drop`, load only an identity frame (`id`, `sequence`, and minimal required metadata). Reserve full-record materialization for explicit record-creation or record-update modes that truly need it. Add ingest memory estimates, phase telemetry, and peak RSS where the platform exposes it. |
+| Problem | `opal ingest-y` has the correct fixed-sidecar identity-frame path, but that memory-safety posture needs to remain a visible runtime contract rather than an implementation detail buried in tests. |
+| Proposed change | Keep the memory-safe ingest plan first-class. For fixed-universe sidecars and `--unknown-sequences error/drop`, load only an identity frame (`id`, `sequence`, and minimal required metadata). Reserve full-record materialization for explicit record-creation or record-update modes that truly need it. Emit ingest memory estimates, phase telemetry, and peak RSS where the platform exposes it. |
 | Contract shape | `IngestRuntimeContract = {schema_version, mode, input_rows, identity_columns, candidate_index_rows, estimated_memory_bytes, peak_rss_bytes, unknown_policy, write_scope, warnings}`. `mode=identity_index` is the default for shared sidecar label appends. |
 | Affected modules | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/storage/records_io.py`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/storage/label_sources.py`, `src/dnadesign/opal/src/runtime/memory_guard.py`, ingest CLI tests. |
 | Migration notes | Do not add a compatibility shim that silently falls back to `store.load()`. If the narrow identity frame cannot be built, fail with an `IngestContractError` explaining the missing columns or unsupported mode. If `unknown_sequences=create` is requested for a fixed `usr_sidecar`, fail before any full-record load. |
@@ -421,6 +421,14 @@ Implementation guidance:
 - Include `bio_type` and `alphabet` only when new-row creation or required-column validation needs them.
 - Include the X column only in explicit record-creation/update modes that must write records, never for fixed-universe sidecar appends.
 - Keep sidecar append rewrite optimization lower priority until sidecars are large enough to dominate runtime.
+
+Initial implementation status: fixed-sidecar ingest now uses
+`RecordsStore.load_ingest_identity_frame()`, emits `opal.ingest_runtime.v1` in
+JSON, and prints a `[Runtime] ingest-y` text block with mode, write scope,
+loaded columns, candidate index rows, estimated frame memory, optional peak RSS,
+unknown-label policy, and full-record/X-column load status. Remaining work in
+this section is configurable hard thresholds, broader memory regression fixtures,
+and any future explicit record-create/update ingest modes.
 
 ### D. Leakage And Contamination Fail-Fast
 
@@ -641,7 +649,7 @@ Hierarchy should make distrust explicit. Limitations, stale artifacts, missing l
 | `opal plot --list` | Text and JSON already exist; keep JSON schema `opal.plot_registry.v1` stable and fill metadata gaps for every built-in plot. |
 | `opal plot --describe` | Include required data shape, tidy CSV schema, output manifest schema, and failure modes. |
 | `opal notebook generate` | Supports repeated `--campaign` options for campaign-set notebooks. Future work: accept an explicit campaign-set manifest/index, review manifest overrides, plot manifest overrides, smoke-check-by-default, and JSON summaries. |
-| `opal artifacts audit/prune` | Future explicit gardening surface for stale files, ignored run roots, manifest authority, byte counts, retention policy, and dry-run/apply pruning. Inspection must be read-only; pruning must require `--apply`. |
+| `opal artifacts audit/prune` | Existing explicit gardening surface for stale files, ignored run roots, manifest authority, byte counts, retention policy, and dry-run/apply pruning. Inspection is read-only; pruning requires `--apply`. |
 
 All JSON errors should have:
 
@@ -790,7 +798,7 @@ Update these docs as implementation lands:
 
 - [ ] OPAL core imports no study/probe code and canonical OPAL surfaces contain no LatentDNA/UMAP/representation-browser content.
 - [ ] Study/probe code depends only on documented OPAL public APIs.
-- [ ] `opal ingest-y` has a column-pruned fixed-sidecar path, emits `IngestRuntimeContract`, and does not materialize full records for small label appends unless an explicit record-write mode requires it.
+- [x] `opal ingest-y` has a column-pruned fixed-sidecar path, emits `IngestRuntimeContract`, and does not materialize full records for small label appends unless an explicit record-write mode requires it.
 - [ ] Leakage and contamination guards fail fast on train/eval overlap, duplicate prediction IDs, selected IDs outside eval, malformed label sources, prediction/label contamination, and study-owned forbidden inputs.
 - [ ] `opal progress --json`, `opal review --json`, `opal status --json`, and `opal runs ... --json` expose schema versions, run scope, `event_contract.*`, warnings, ambiguity, aborted/incomplete state, and lock state where relevant.
 - [ ] `opal run` progress events distinguish command, preflight, actual run, abort, and finalize phases with attempt IDs before run IDs exist.
