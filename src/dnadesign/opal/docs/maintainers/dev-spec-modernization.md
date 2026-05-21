@@ -434,6 +434,15 @@ Implementation guidance:
 | Acceptance criteria | Any duplicate prediction IDs, selected IDs outside eval, train/eval overlap, malformed y-space, or forbidden study input produces an error before a PASS-like decision or review success. Read-only status surfaces show `leakage.status` and `violations` instead of burying these checks in prose. |
 | Tests | Generic OPAL fixtures for train/eval overlap and duplicate predictions; study probe fixtures for forbidden input columns and synthetic-label leakage; review/status JSON snapshots; no smoothing/truncation behavior in metrics. |
 
+Initial implementation status: OPAL now has a generic `opal.leakage_guard.v1`
+contract for shared-sidecar record contamination and train/eval overlap after
+configured labeled-candidate exclusion. `verify-outputs` and campaign review
+now reject duplicate run-scoped prediction IDs, and `verify-outputs` rejects
+selected IDs outside the run-scoped prediction/eval evidence through the same
+leakage-guard contract. Remaining checks in this section are broader review/status
+JSON snapshots, raw-vs-derived metrics separation, and study-owned forbidden-input
+policies.
+
 ### E. Run/Progress Semantics
 
 | Field | Specification |
@@ -600,6 +609,17 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 Notebook design rule: the user path is "Is it valid?", "What changed?", "What visual evidence supports that?", and "What should I distrust?" Plot cards must show source data, params, status, stale/fresh state, generated time, media links, and tidy CSV links. This is a product UX principle, not a static art direction: the visual language should be quiet evidence cartography, where status, scope, and distrust are visible before detailed tables.
 
 Campaign and plot dropdowns are both scoping controls. A campaign dropdown should select the active `NotebookViewModel`; a plot dropdown should select a manifest-backed plot card or gallery subset inside that active campaign. The same primitives should also support static review pages and JSON-backed dashboards where practical. Avoid duplicating notebook logic for "campaign-set" and "single-campaign" beyond the thin composition shell.
+
+Initial implementation status: generated single-campaign notebooks now use a
+schema-pruned records preview instead of loading the full X payload, and
+single-campaign plus campaign-set templates share public notebook primitives for
+campaign summary rows, at-a-glance panels, evidence rows, plot galleries, and
+plot card detail lines. The next slice added shared metric-definition tables and
+artifact-garden panels backed by manifest metadata and dry-run prune plans.
+This slice adds shared validity panels, progress-derived change tables, and a
+generated-template size guard so future notebook UX work cannot quietly rebuild
+a large all-in-one template. Remaining work in this section is manifest/index
+inputs for campaign sets and richer visual treatment of validity/change state.
 
 **Review Surface Philosophy: Evidence Cartography.** OPAL review surfaces should feel like maps of campaign evidence, not galleries of disconnected artifacts. Space should be allocated by decision value: state, scope, validity, warnings, and current selection evidence occupy the first viewport; raw ledgers, method details, and large tables sit behind lazy sections.
 

@@ -40,8 +40,37 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
             import marimo as mo
             import polars as pl
 
-            from dnadesign.opal import build_campaign_set_notebook_view_model
-            return Path, build_campaign_set_notebook_view_model, mo, pl
+            from dnadesign.opal import (
+                build_campaign_set_notebook_view_model,
+                build_notebook_artifact_garden_lines,
+                build_notebook_artifact_garden_rows,
+                build_notebook_at_a_glance_lines,
+                build_notebook_campaign_summary_row,
+                build_notebook_change_lines,
+                build_notebook_change_rows,
+                build_notebook_evidence_rows,
+                build_notebook_metric_definition_rows,
+                build_notebook_plot_card_lines,
+                build_notebook_plot_gallery_model,
+                build_notebook_validity_lines,
+            )
+            return (
+                Path,
+                build_campaign_set_notebook_view_model,
+                build_notebook_artifact_garden_lines,
+                build_notebook_artifact_garden_rows,
+                build_notebook_at_a_glance_lines,
+                build_notebook_campaign_summary_row,
+                build_notebook_change_lines,
+                build_notebook_change_rows,
+                build_notebook_evidence_rows,
+                build_notebook_metric_definition_rows,
+                build_notebook_plot_card_lines,
+                build_notebook_plot_gallery_model,
+                build_notebook_validity_lines,
+                mo,
+                pl,
+            )
 
 
         @app.cell
@@ -56,31 +85,9 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(campaign_set_view_model, campaigns, mo, pl):
-            _rows = []
-            _labels = []
-            for campaign_model in campaigns:
-                _campaign = campaign_model["campaign"]
-                _status = campaign_model.get("status") or {}
-                _plot_count = len(campaign_model.get("plot_manifests") or [])
-                _stale_count = len(campaign_model.get("stale_artifacts") or [])
-                _warning_count = len(campaign_model.get("warnings") or [])
-                _label = f"{_campaign['slug']} | {_status.get('progress_status') or 'unknown'}"
-                _labels.append(_label)
-                _rows.append(
-                    {
-                        "label": _label,
-                        "campaign": _campaign["slug"],
-                        "status": _status.get("progress_status"),
-                        "round_count": _status.get("round_count"),
-                        "latest_run_id": _status.get("latest_run_id"),
-                        "x_column": _campaign.get("x_column"),
-                        "label_source": _campaign.get("label_source"),
-                        "plots": _plot_count,
-                        "stale": _stale_count,
-                        "warnings": _warning_count,
-                    }
-                )
+        def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, mo, pl):
+            _rows = [build_notebook_campaign_summary_row(campaign_model) for campaign_model in campaigns]
+            _labels = [row["label"] for row in _rows]
             campaign_ui = mo.ui.dropdown(_labels, value=_labels[0], label="Campaign")
             campaign_summary_df = pl.DataFrame(_rows)
             header_md = mo.md(
@@ -106,51 +113,20 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(mo, selected_campaign_model):
-            _campaign = selected_campaign_model["campaign"]
-            _status = selected_campaign_model.get("status") or {}
-            _progress = selected_campaign_model.get("progress") or {}
-            _event_contract = _progress.get("event_contract") or {}
-            _overview_lines = [
-                "### Selected campaign",
-                "",
-                f"- Campaign: `{_campaign['slug']}`",
-                f"- Config: `{_campaign['config_path']}`",
-                f"- Workdir: `{_campaign['workdir']}`",
-                f"- Status: `{_status.get('progress_status')}`",
-                f"- Round count: `{_status.get('round_count')}`",
-                f"- Latest run ID: `{_status.get('latest_run_id')}`",
-                f"- X column: `{_campaign.get('x_column')}`",
-                f"- Label source: `{_campaign.get('label_source')}`",
-                f"- Event contract: `{_event_contract.get('schema_version')}`",
-            ]
-            selected_overview_md = mo.md("\\n".join(_overview_lines))
-            return selected_overview_md
+        def _(build_notebook_at_a_glance_lines, build_notebook_validity_lines, mo, selected_campaign_model):
+            selected_overview_md = mo.md(
+                "\\n".join(build_notebook_at_a_glance_lines(selected_campaign_model))
+            )
+            selected_validity_md = mo.md(
+                "\\n".join(build_notebook_validity_lines(selected_campaign_model))
+            )
+            return selected_overview_md, selected_validity_md
 
 
         @app.cell
-        def _(selected_campaign_model):
-            _plot_choices = []
-            for _manifest in selected_campaign_model.get("plot_manifests", []):
-                if _manifest.get("status") != "written":
-                    continue
-                _media_outputs = [
-                    output
-                    for output in _manifest.get("outputs", [])
-                    if output.get("role") == "media" and output.get("exists")
-                ]
-                if not _media_outputs:
-                    continue
-                _path = _media_outputs[0]["path"]
-                _label = f"{_manifest.get('name')} ({_manifest.get('kind')})"
-                _plot_choices.append(
-                    {
-                        "label": _label,
-                        "path": _path,
-                        "manifest": _manifest,
-                    }
-                )
-            plot_choices = _plot_choices
+        def _(build_notebook_plot_gallery_model, selected_campaign_model):
+            plot_gallery_model = build_notebook_plot_gallery_model(selected_campaign_model)
+            plot_choices = plot_gallery_model["choices"]
             return plot_choices
 
 
@@ -165,7 +141,7 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(Path, mo, plot_choices, plot_ui):
+        def _(Path, build_notebook_plot_card_lines, mo, plot_choices, plot_ui):
             if plot_ui is None:
                 plot_panel = mo.md(
                     "### Plot deliverables\\n\\n"
@@ -174,18 +150,7 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
             else:
                 _selected = str(plot_ui.value)
                 _choice = next(choice for choice in plot_choices if choice["label"] == _selected)
-                _manifest = _choice["manifest"]
-                _details = [
-                    "### Plot deliverables",
-                    "",
-                    f"- Plot: `{_manifest.get('name')}`",
-                    f"- Kind: `{_manifest.get('kind')}`",
-                    f"- Status: `{_manifest.get('status')}`",
-                    f"- Generated: `{_manifest.get('generated_at')}`",
-                    f"- Freshness: `{(_manifest.get('freshness') or {}).get('status')}`",
-                    f"- Tidy CSV: `{_manifest.get('tidy_csv') or 'none'}`",
-                    f"- Path: `{_choice['path']}`",
-                ]
+                _details = build_notebook_plot_card_lines(_choice)
                 plot_panel = mo.vstack(
                     [
                         mo.md("\\n".join(_details)),
@@ -197,30 +162,8 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(mo, pl, selected_campaign_model):
-            _warnings = selected_campaign_model.get("warnings") or []
-            _stale = selected_campaign_model.get("stale_artifacts") or []
-            _rows = []
-            for _warning in _warnings:
-                _rows.append(
-                    {
-                        "source": "warning",
-                        "category": _warning.get("category"),
-                        "severity": _warning.get("severity"),
-                        "message": _warning.get("message"),
-                        "path": _warning.get("path"),
-                    }
-                )
-            for _artifact in _stale:
-                _rows.append(
-                    {
-                        "source": "stale_artifact",
-                        "category": _artifact.get("category"),
-                        "severity": _artifact.get("severity"),
-                        "message": _artifact.get("message"),
-                        "path": _artifact.get("path"),
-                    }
-                )
+        def _(build_notebook_evidence_rows, mo, pl, selected_campaign_model):
+            _rows = build_notebook_evidence_rows(selected_campaign_model)
             if _rows:
                 evidence_panel = mo.ui.table(pl.DataFrame(_rows), page_size=10)
             else:
@@ -230,13 +173,62 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
         @app.cell
         def _(
+            build_notebook_artifact_garden_lines,
+            build_notebook_artifact_garden_rows,
+            build_notebook_change_lines,
+            build_notebook_change_rows,
+            build_notebook_metric_definition_rows,
+            mo,
+            pl,
+            selected_campaign_model,
+        ):
+            _metric_rows = build_notebook_metric_definition_rows(selected_campaign_model)
+            if _metric_rows:
+                metric_definitions_panel = mo.ui.table(pl.DataFrame(_metric_rows), page_size=10)
+            else:
+                metric_definitions_panel = mo.md("No manifest-backed plot metric definitions are available.")
+
+            _change_rows = build_notebook_change_rows(selected_campaign_model)
+            if _change_rows:
+                changes_table = mo.ui.table(pl.DataFrame(_change_rows), page_size=10)
+            else:
+                changes_table = mo.md("No round changes are available yet.")
+            changes_panel = mo.vstack(
+                [
+                    mo.md("\\n".join(build_notebook_change_lines(selected_campaign_model))),
+                    changes_table,
+                ]
+            )
+
+            _artifact_lines = build_notebook_artifact_garden_lines(selected_campaign_model)
+            _artifact_rows = build_notebook_artifact_garden_rows(selected_campaign_model)
+            artifact_rows_panel = (
+                mo.ui.table(pl.DataFrame(_artifact_rows), page_size=10)
+                if _artifact_rows
+                else mo.md("No artifact garden rows are available.")
+            )
+            artifact_garden_panel = mo.vstack(
+                [
+                    mo.md("\\n".join(_artifact_lines)),
+                    artifact_rows_panel,
+                ]
+            )
+            return artifact_garden_panel, changes_panel, metric_definitions_panel
+
+
+        @app.cell
+        def _(
+            artifact_garden_panel,
             campaign_summary_df,
             campaign_ui,
+            changes_panel,
             evidence_panel,
             header_md,
+            metric_definitions_panel,
             mo,
             plot_panel,
             selected_overview_md,
+            selected_validity_md,
         ):
             mo.vstack(
                 [
@@ -246,7 +238,11 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
                         {
                             "Campaigns at a glance": mo.ui.table(campaign_summary_df, page_size=12),
                             "Selected campaign": selected_overview_md,
+                            "Validity": selected_validity_md,
+                            "Changes": changes_panel,
                             "Plot deliverables": plot_panel,
+                            "Metric definitions": metric_definitions_panel,
+                            "Artifacts": artifact_garden_panel,
                             "Warnings and stale artifacts": evidence_panel,
                         },
                         multiple=True,

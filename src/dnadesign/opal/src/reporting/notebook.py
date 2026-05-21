@@ -25,6 +25,7 @@ from ..plots.manifests import (
     load_plot_artifact_manifest,
     load_plot_manifest_index,
 )
+from .artifact_garden import build_artifact_garden_audit
 from .progress import build_campaign_progress
 from .review import load_review_manifest
 
@@ -82,6 +83,12 @@ def build_notebook_view_model(
         stale_artifacts.extend(review_manifest.get("stale_artifacts") or [])
     stale_artifacts.extend(_detect_unmanifested_plot_outputs(ws.outputs_dir / "plots", plot_manifests))
 
+    artifact_garden = None
+    try:
+        artifact_garden = build_artifact_garden_audit(analysis.config_path)
+    except Exception as exc:
+        warnings.append(_warning("ArtifactGardenWarning", str(exc)))
+
     return {
         "schema_version": NOTEBOOK_VIEW_MODEL_SCHEMA_VERSION,
         "generated_at": now_iso(),
@@ -108,6 +115,7 @@ def build_notebook_view_model(
         "review_manifest_path": str(review_path),
         "review_manifest": review_manifest,
         "plot_manifests": plot_manifests,
+        "artifact_garden": artifact_garden,
         "stale_artifacts": stale_artifacts,
         "warnings": warnings,
     }

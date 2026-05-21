@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from .src.analysis.campaign_progress import (
     assess_records_contract,
+    assess_records_contract_for_schema,
     assess_records_contract_for_values,
     build_ledger_status_table,
     build_records_preview,
@@ -29,6 +30,20 @@ from .src.analysis.facade import (
     latest_round,
     latest_run_id,
     require_columns,
+)
+from .src.analysis.notebook_components import (
+    build_notebook_artifact_garden_lines,
+    build_notebook_artifact_garden_rows,
+    build_notebook_at_a_glance_lines,
+    build_notebook_campaign_summary_row,
+    build_notebook_change_lines,
+    build_notebook_change_rows,
+    build_notebook_distrust_lines,
+    build_notebook_evidence_rows,
+    build_notebook_metric_definition_rows,
+    build_notebook_plot_card_lines,
+    build_notebook_plot_gallery_model,
+    build_notebook_validity_lines,
 )
 from .src.analysis.notebook_set_template import render_campaign_set_notebook
 from .src.analysis.notebook_template import render_campaign_notebook
@@ -49,6 +64,7 @@ from .src.storage.x_contracts import validate_x_parquet_column
 __all__ = [
     "CampaignAnalysis",
     "assess_records_contract",
+    "assess_records_contract_for_schema",
     "assess_records_contract_for_values",
     "available_rounds",
     "build_ledger_status_table",
@@ -57,6 +73,18 @@ __all__ = [
     "build_campaign_review",
     "build_notebook_view_model",
     "build_campaign_set_notebook_view_model",
+    "build_notebook_artifact_garden_lines",
+    "build_notebook_artifact_garden_rows",
+    "build_notebook_at_a_glance_lines",
+    "build_notebook_campaign_summary_row",
+    "build_notebook_change_lines",
+    "build_notebook_change_rows",
+    "build_notebook_distrust_lines",
+    "build_notebook_evidence_rows",
+    "build_notebook_metric_definition_rows",
+    "build_notebook_plot_card_lines",
+    "build_notebook_plot_gallery_model",
+    "build_notebook_validity_lines",
     "build_records_preview",
     "cli_handoff_lines",
     "describe_plot_kind",

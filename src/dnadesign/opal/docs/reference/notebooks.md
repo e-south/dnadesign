@@ -1,7 +1,7 @@
 ## OPAL Notebooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-20
+**Last verified:** 2026-05-21
 
 
 OPAL notebooks are generated marimo campaign viewers. They are inspection
@@ -30,10 +30,11 @@ manifest-backed and uses schema `opal.notebook_view_model.v1`.
 
 | field | purpose |
 | --- | --- |
-| `campaign_state` | campaign progress JSON from `build_campaign_progress` |
+| `progress` | campaign progress JSON from `build_campaign_progress` |
 | `review_manifest` | latest or explicitly provided review manifest, when present |
 | `plot_manifest_index` | aggregate `outputs/plots/plot_manifest.json`, when present |
 | `plot_manifests` | per-plot manifests referenced by the index |
+| `artifact_garden` | local artifact-root inventory, stale sibling list, byte counts, and dry-run prune plan |
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
@@ -46,20 +47,40 @@ duplicates.
 The generated notebook renders the view model with progressive disclosure:
 
 - campaign state at a glance;
+- validity state for progress, review, plot, warning, and artifact-garden
+  contracts;
+- progress-derived change rows for visible rounds and run scope;
 - records and X provenance;
 - ledgers, labels, predictions, and selected records;
 - manifest-backed plot cards;
+- plot metric/data-shape definitions from plot-manifest metadata;
+- artifact garden rows with local-only status, stale siblings, byte counts, and
+  prune plans that require explicit apply outside the notebook;
 - limitations and handoff commands.
 
+The records preview is schema-pruned. It loads identity/metadata columns needed
+for inspection and record selection, but it does not materialize the configured
+X payload into the notebook preview. X is reported from the records schema and
+kept as provenance unless a runtime command explicitly needs the matrix.
+
 Heavy sections should use marimo accordions with lazy loading. Reusable
-generated-cell builders live in `src/analysis/notebook_components.py`; keep
+generated-cell builders and public component primitives live in
+`src/analysis/notebook_components.py`. Current reusable primitives cover
+campaign summary rows, at-a-glance lines, validity lines, change summary lines
+and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
+metric definition rows, artifact garden rows, manifest-backed plot-gallery
+models, and plot card detail lines. Keep
 `notebook_template.py` as thin wiring and move independently testable panels out
 of the template before adding new notebook UX.
 
 Campaign-set notebooks are intentionally overview-first: they provide campaign
 and plot dropdowns, status and provenance summary, manifest-backed plot cards,
-warnings, and stale-artifact evidence. Single-campaign notebooks remain the
-record/table drill-down surface.
+validity panels, change rows, metric definitions, artifact garden rows,
+warnings, and stale-artifact evidence.
+Single-campaign notebooks remain the record/table drill-down surface.
+Single-campaign and campaign-set notebooks use the same public plot-gallery,
+plot-card, validity, change-row, evidence-row, metric-definition, and
+artifact-garden primitives.
 
 ### Boundaries
 

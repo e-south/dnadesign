@@ -47,9 +47,20 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             from pathlib import Path
             from dnadesign.opal import (
                 CampaignAnalysis,
-                assess_records_contract_for_values,
+                assess_records_contract_for_schema,
                 available_rounds,
+                build_notebook_artifact_garden_lines,
+                build_notebook_artifact_garden_rows,
                 build_ledger_status_table,
+                build_notebook_at_a_glance_lines,
+                build_notebook_change_lines,
+                build_notebook_change_rows,
+                build_notebook_distrust_lines,
+                build_notebook_evidence_rows,
+                build_notebook_metric_definition_rows,
+                build_notebook_plot_card_lines,
+                build_notebook_plot_gallery_model,
+                build_notebook_validity_lines,
                 build_notebook_view_model,
                 build_records_preview,
                 cli_handoff_lines,
@@ -69,8 +80,19 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 mo,
                 pl,
                 Path,
-                assess_records_contract_for_values,
+                assess_records_contract_for_schema,
+                build_notebook_artifact_garden_lines,
+                build_notebook_artifact_garden_rows,
                 build_ledger_status_table,
+                build_notebook_at_a_glance_lines,
+                build_notebook_change_lines,
+                build_notebook_change_rows,
+                build_notebook_distrust_lines,
+                build_notebook_evidence_rows,
+                build_notebook_metric_definition_rows,
+                build_notebook_plot_card_lines,
+                build_notebook_plot_gallery_model,
+                build_notebook_validity_lines,
                 build_notebook_view_model,
                 build_records_preview,
                 cli_handoff_lines,
@@ -105,6 +127,79 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
+        def _(
+            build_notebook_at_a_glance_lines,
+            build_notebook_distrust_lines,
+            build_notebook_validity_lines,
+            mo,
+            notebook_view_model,
+        ):
+            at_a_glance_md = mo.md("\\n".join(build_notebook_at_a_glance_lines(notebook_view_model)))
+            distrust_md = mo.md("\\n".join(build_notebook_distrust_lines(notebook_view_model)))
+            validity_md = mo.md("\\n".join(build_notebook_validity_lines(notebook_view_model)))
+            return at_a_glance_md, distrust_md, validity_md
+
+
+        @app.cell
+        def _(
+            build_notebook_change_lines,
+            build_notebook_change_rows,
+            build_notebook_evidence_rows,
+            mo,
+            notebook_view_model,
+            pl,
+        ):
+            evidence_rows = build_notebook_evidence_rows(notebook_view_model)
+            if evidence_rows:
+                evidence_panel = mo.ui.table(pl.DataFrame(evidence_rows), page_size=10)
+            else:
+                evidence_panel = mo.md("No warnings or stale artifacts reported for this campaign.")
+            change_rows = build_notebook_change_rows(notebook_view_model)
+            if change_rows:
+                changes_table = mo.ui.table(pl.DataFrame(change_rows), page_size=10)
+            else:
+                changes_table = mo.md("No round changes are available yet.")
+            changes_panel = mo.vstack(
+                [
+                    mo.md("\\n".join(build_notebook_change_lines(notebook_view_model))),
+                    changes_table,
+                ]
+            )
+            return changes_panel, evidence_panel
+
+
+        @app.cell
+        def _(
+            build_notebook_artifact_garden_lines,
+            build_notebook_artifact_garden_rows,
+            build_notebook_metric_definition_rows,
+            mo,
+            notebook_view_model,
+            pl,
+        ):
+            metric_definition_rows = build_notebook_metric_definition_rows(notebook_view_model)
+            if metric_definition_rows:
+                metric_definitions_panel = mo.ui.table(pl.DataFrame(metric_definition_rows), page_size=10)
+            else:
+                metric_definitions_panel = mo.md("No manifest-backed plot metric definitions are available.")
+
+            artifact_garden_lines = build_notebook_artifact_garden_lines(notebook_view_model)
+            artifact_garden_rows = build_notebook_artifact_garden_rows(notebook_view_model)
+            artifact_rows_panel = (
+                mo.ui.table(pl.DataFrame(artifact_garden_rows), page_size=10)
+                if artifact_garden_rows
+                else mo.md("No artifact garden rows are available.")
+            )
+            artifact_garden_panel = mo.vstack(
+                [
+                    mo.md("\\n".join(artifact_garden_lines)),
+                    artifact_rows_panel,
+                ]
+            )
+            return artifact_garden_panel, metric_definitions_panel
+
+
+        @app.cell
         def _(campaign, config_path, mo):
             cfg = campaign.config
             ws = campaign.workspace
@@ -121,16 +216,38 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
         @app.cell
         def _(pl, store):
-            records_df = pl.from_pandas(store.load())
-            return records_df
+            records_schema_columns = store.schema_columns()
+            records_row_count = store.row_count()
+            records_loaded_columns = [
+                column
+                for column in (
+                    "id",
+                    "bio_type",
+                    "sequence",
+                    "alphabet",
+                    store.y_col,
+                    store.label_hist_col(),
+                )
+                if column in records_schema_columns
+            ]
+            records_df = pl.from_pandas(store.load_columns(records_loaded_columns))
+            return records_df, records_loaded_columns, records_row_count, records_schema_columns
 
 
         @app.cell
-        def _(assess_records_contract_for_values, cfg, records_df):
-            records_report = assess_records_contract_for_values(
-                records_df,
+        def _(
+            assess_records_contract_for_schema,
+            cfg,
+            records_loaded_columns,
+            records_row_count,
+            records_schema_columns,
+        ):
+            records_report = assess_records_contract_for_schema(
+                row_count=records_row_count,
+                schema_columns=records_schema_columns,
                 campaign_slug=cfg.campaign.slug,
                 x_column=cfg.data.x_column_name,
+                loaded_columns=records_loaded_columns,
             )
             return records_report
 
@@ -333,7 +450,10 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     f"- sequence length: `{len(sequence)}`",
                 ]
                 if records_report.x_column:
-                    _lines.append(f"- X present: `{row.get(records_report.x_column) is not None}`")
+                    if records_report.x_column in active_record_df.columns:
+                        _lines.append(f"- X present: `{row.get(records_report.x_column) is not None}`")
+                    else:
+                        _lines.append("- X preview: `not loaded`")
                 if records_report.label_hist_column and records_report.label_hist_column in active_record_df.columns:
                     _lines.append(f"- label history present: `{row.get(records_report.label_hist_column) is not None}`")
                 if sequence:
@@ -574,19 +694,26 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         def _(
             active_record_md,
             active_record_table_df,
+            artifact_garden_panel,
+            at_a_glance_md,
             campaign_contract_md,
+            changes_panel,
             cli_handoff_md,
             data_source_ui,
             data_status_md,
             data_table,
+            distrust_md,
+            evidence_panel,
             header_md,
             ledger_status_df,
+            metric_definitions_panel,
             mo,
             plot_panel,
             record_selector,
             records_preview_df,
             round_run_controls,
             run_summary_md,
+            validity_md,
             x_provenance_md,
         ):
             round_run_panel = mo.vstack([round_run_controls, run_summary_md])
@@ -613,18 +740,25 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     data_table,
                 ]
             )
+            distrust_panel = mo.vstack([distrust_md, evidence_panel])
             mo.vstack(
                 [
                     header_md,
+                    at_a_glance_md,
                     mo.accordion(
                         {
                             "Campaign contract": campaign_contract_md,
                             "Round and run": round_run_panel,
+                            "Validity": validity_md,
+                            "Changes": changes_panel,
                             "Ledger readiness": ledger_panel,
                             "Records and active record": records_panel,
                             "Labels and predictions": data_panel,
                             "Plot deliverables": plot_panel,
+                            "Metric definitions": metric_definitions_panel,
+                            "Artifacts": artifact_garden_panel,
                             "X provenance and limitations": x_provenance_md,
+                            "Distrust and limitations": distrust_panel,
                         },
                         multiple=True,
                         lazy=True,
