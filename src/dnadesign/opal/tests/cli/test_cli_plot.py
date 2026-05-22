@@ -194,6 +194,26 @@ def test_plot_cli_list_configured(tmp_path):
     ]
 
 
+def test_plot_cli_list_configured_json_error_when_no_plots(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--list-config", "-c", str(campaign), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "plot list-config"
+    assert "No plots found" in payload["error"]["message"]
+
+
 def test_plot_cli_accepts_directory(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

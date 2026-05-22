@@ -149,7 +149,11 @@ def cmd_plot(
     except ValueError as e:
         msg = str(e)
         if "No plots found" in msg:
-            raise ValueError("[plot] No plots found. Add plots.yaml or define plots in campaign.yaml.") from e
+            err = OpalError("[plot] No plots found. Add plots.yaml or define plots in campaign.yaml.")
+            if json_output:
+                json_error("plot list-config" if list_config else "plot", err)
+                raise typer.Exit(code=err.exit_code) from e
+            raise typer.BadParameter(str(err), param_hint="--plot-config") from e
         raise
 
     if list_registry or list_config:

@@ -117,6 +117,8 @@ selection:
     assert "identity_index" in res.stdout
     assert "full records loaded" in res.stdout
     assert "no" in res.stdout
+    assert "y column updated" not in res.stdout
+    assert "label source updated" in res.stdout
     sidecar = pd.read_parquet(dataset_root / "_opal" / "observed_labels.parquet")
     assert sidecar[["id", "observed_round", "batch_id", "y_space", "y_obs"]].to_dict(orient="records") == [
         {

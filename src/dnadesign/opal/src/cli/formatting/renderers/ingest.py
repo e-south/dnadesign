@@ -116,10 +116,15 @@ def render_ingest_commit_text(
     labels_skipped: int = 0,
     y_column_updated: str,
 ) -> str:
+    target_label = "y column updated"
+    target_value = y_column_updated
+    if str(y_column_updated).startswith("label_source:"):
+        target_label = "label source updated"
+        target_value = str(y_column_updated).removeprefix("label_source:")
     payload = {
         "round": round_index,
         "labels appended": labels_appended,
-        "y column updated": y_column_updated,
+        target_label: target_value,
         "ledger labels appended": "yes",
     }
     if labels_skipped:

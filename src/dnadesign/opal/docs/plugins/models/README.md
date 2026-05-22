@@ -22,7 +22,8 @@ Source module:
 Quick check:
 
 ```python
-from dnadesign.opal.src.registries.models import list_models
+# Inside OPAL source modules, inspect the internal model registry directly.
+from ...registries.models import list_models
 print(list_models())
 ```
 

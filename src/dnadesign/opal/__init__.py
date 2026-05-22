@@ -24,14 +24,6 @@ from .src.analysis.campaign_progress import (
     unavailable_table,
     x_provenance_status_lines,
 )
-from .src.analysis.dashboard.datasets import (
-    campaign_label_from_path,
-    find_repo_root,
-    list_campaign_paths,
-    load_campaign_selection,
-    load_parquet_cached,
-)
-from .src.analysis.dashboard.diagnostics import diagnostics_to_lines
 from .src.analysis.facade import (
     CampaignAnalysis,
     available_rounds,
@@ -49,9 +41,13 @@ from .src.analysis.notebook_components import (
     build_notebook_distrust_lines,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
+    build_notebook_no_run_lines,
     build_notebook_plot_card_lines,
     build_notebook_plot_gallery_model,
+    build_notebook_run_options,
+    build_notebook_run_summary_lines,
     build_notebook_validity_lines,
+    resolve_notebook_round_default,
 )
 from .src.analysis.notebook_set_template import render_campaign_set_notebook
 from .src.analysis.notebook_template import render_campaign_notebook
@@ -68,6 +64,15 @@ from .src.reporting.progress import build_campaign_progress, render_campaign_pro
 from .src.reporting.review import build_campaign_review, load_review_manifest
 from .src.runtime.memory_guard import enforce_x_matrix_memory_budget, estimate_x_matrix_memory
 from .src.storage.x_contracts import validate_x_parquet_column
+
+
+def main() -> None:
+    """Run the OPAL CLI entrypoint."""
+
+    from .src.cli import main as cli_main
+
+    cli_main()
+
 
 __all__ = [
     "CampaignAnalysis",
@@ -90,28 +95,26 @@ __all__ = [
     "build_notebook_distrust_lines",
     "build_notebook_evidence_rows",
     "build_notebook_metric_definition_rows",
+    "build_notebook_no_run_lines",
     "build_notebook_plot_card_lines",
     "build_notebook_plot_gallery_model",
+    "build_notebook_run_options",
+    "build_notebook_run_summary_lines",
     "build_notebook_validity_lines",
     "build_records_preview",
-    "campaign_label_from_path",
     "cli_handoff_lines",
     "describe_plot_kind",
-    "diagnostics_to_lines",
     "enforce_x_matrix_memory_budget",
     "estimate_x_matrix_memory",
-    "find_repo_root",
     "latest_round",
     "latest_run_id",
-    "list_campaign_paths",
     "list_plot_kinds",
-    "load_campaign_selection",
     "load_config",
-    "load_parquet_cached",
     "load_plot_artifact_manifest",
     "load_plot_config",
     "load_plot_manifest_index",
     "load_review_manifest",
+    "main",
     "parse_enabled",
     "parse_tags",
     "prune_stale_artifacts",
@@ -121,6 +124,7 @@ __all__ = [
     "render_campaign_notebook",
     "render_campaign_set_notebook",
     "render_campaign_progress_text",
+    "resolve_notebook_round_default",
     "require_columns",
     "run_campaign_plots",
     "smoke_check_notebook",

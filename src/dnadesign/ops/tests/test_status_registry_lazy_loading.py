@@ -77,7 +77,7 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     assert supported_specs["latentdna-workspace-snapshot"].owner_boundary == "latentdna"
     assert supported_specs["latentdna-workspace-snapshot"].observes_plane == "data"
     assert supported_specs["opal-campaign-state"].provider_ref == (
-        "dnadesign.opal.ops.status_providers:provide_opal_campaign_state_status"
+        "dnadesign.opal.src.ops.status_providers:provide_opal_campaign_state_status"
     )
     assert supported_specs["opal-campaign-state"].owner_boundary == "opal"
     assert supported_specs["opal-campaign-state"].observes_plane == "control"
@@ -106,7 +106,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.builtin.status_provider',
         'dnadesign.usr.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
-        'dnadesign.opal.ops.status_providers',
+        'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider',
@@ -309,7 +309,7 @@ def test_status_registry_fragments_are_included_as_package_data() -> None:
     expected_patterns = {
         "dnadesign.cluster": "ops/status.registry.yaml",
         "dnadesign.latentdna": "ops/status.registry.yaml",
-        "dnadesign.opal": "ops/status.registry.yaml",
+        "dnadesign.opal": "src/ops/status.registry.yaml",
         "dnadesign.ops": "providers/*/status.registry.yaml",
         "dnadesign.studies": "studies/retron_hairpin_design/status/ops/status.registry.yaml",
         "dnadesign.usr": "ops/status.registry.yaml",
@@ -501,7 +501,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.builtin.status_provider',
         'dnadesign.usr.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
-        'dnadesign.opal.ops.status_providers',
+        'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider',
@@ -531,7 +531,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.builtin.status_provider',
         'dnadesign.usr.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
-        'dnadesign.opal.ops.status_providers',
+        'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider',
@@ -685,7 +685,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.builtin.status_provider',
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.opal.ops.status_providers',
+        'dnadesign.opal.src.ops.status_providers',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider',
         'dnadesign.studies.studies.retron_hairpin_design.status.service',
@@ -717,7 +717,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.providers.builtin.status_provider',
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.opal.ops.status_providers',
+        'dnadesign.opal.src.ops.status_providers',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service',
         'dnadesign.studies.studies.stress_ethanol_cipro_growth.status.ops.provider',
         'dnadesign.studies.studies.retron_hairpin_design.status.service',

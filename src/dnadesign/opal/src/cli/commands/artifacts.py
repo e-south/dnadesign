@@ -19,7 +19,7 @@ import typer
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..formatting import kv_block
 from ..registry import cli_group
-from ._common import internal_error, json_out, opal_error
+from ._common import internal_error, json_error, json_out, opal_error
 
 artifacts_app = typer.Typer(no_args_is_help=True, help="Audit and prune generated OPAL artifacts.")
 cli_group("artifacts", help="Audit and prune generated OPAL artifacts.")(artifacts_app)
@@ -46,7 +46,7 @@ def cmd_artifacts_audit(
         print_stdout(_render_audit_text(audit))
     except OpalError as e:
         if json:
-            json_out({"ok": False, "error": {"context": "artifacts audit", "message": str(e)}})
+            json_error("artifacts audit", e)
         else:
             opal_error("artifacts audit", e)
         raise typer.Exit(code=e.exit_code)
@@ -77,7 +77,7 @@ def cmd_artifacts_prune(
         print_stdout(_render_prune_text(result))
     except OpalError as e:
         if json:
-            json_out({"ok": False, "error": {"context": "artifacts prune", "message": str(e)}})
+            json_error("artifacts prune", e)
         else:
             opal_error("artifacts prune", e)
         raise typer.Exit(code=e.exit_code)

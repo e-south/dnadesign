@@ -484,6 +484,11 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json]
 **Notes**
 
 * `runs show --round <k>` requires `--run-id` if round `<k>` has multiple runs.
+* JSON output is schema-bearing. `runs list --json` emits
+  `schema_version: opal.runs_list.v1` with campaign metadata, requested and
+  resolved round scope, and a `runs` array. `runs show --json` emits
+  `schema_version: opal.run_meta.v1` with campaign metadata and a single `run`
+  object.
 
 ---
 
@@ -715,7 +720,9 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
   campaign dropdown, at-a-glance campaign table, selected-campaign status, plot
   dropdown, and warnings/stale-artifact panel. This is a review surface over
   OPAL campaign contracts, not a study/probe dashboard.
-* `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
+* `generate` requires the campaign `records.parquet` to exist so the notebook
+  can inspect schema and identity columns. The generated preview is
+  schema-pruned and does not load the configured X payload on startup.
 * `generate` works before the first OPAL run. Missing ledger, label,
   prediction, and plot artifacts appear as explicit notebook states.
 * Generated notebooks import public helpers from `dnadesign.opal`, build a
@@ -783,6 +790,8 @@ opal artifacts prune --config <yaml-or-dir> [--apply] [--json]
 * The command does not read `records.parquet` or the configured X column; it is
   an artifact-gardening surface, not a campaign execution or scientific-review
   step.
+* JSON errors use the shared `opal.cli_error.v1` envelope with context,
+  category, message, and exit code.
 
 ---
 

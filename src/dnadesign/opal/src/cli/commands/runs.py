@@ -51,7 +51,15 @@ def runs_list(
         if round_sel is not None:
             runs_df = runs_df[runs_df["as_of_round"] == int(round_sel)]
         if json:
-            json_out(runs_df.to_dict(orient="records"))
+            json_out(
+                {
+                    "schema_version": "opal.runs_list.v1",
+                    "campaign": _campaign_json(cfg_path, cfg, ws),
+                    "round_selector": round,
+                    "resolved_round": round_sel,
+                    "runs": runs_df.to_dict(orient="records"),
+                }
+            )
         else:
             print_config_context(cfg_path, cfg=cfg)
             summary_rows = [summarize_run_meta(r) for _, r in runs_df.iterrows()]
@@ -85,7 +93,16 @@ def runs_show(
         round_sel = resolve_round_index_from_runs(runs_df, round) if run_id is None else None
         row = select_run_meta(runs_df, round_sel=round_sel, run_id=run_id)
         if json:
-            json_out(row.to_dict())
+            json_out(
+                {
+                    "schema_version": "opal.run_meta.v1",
+                    "campaign": _campaign_json(cfg_path, cfg, ws),
+                    "round_selector": round,
+                    "resolved_round": round_sel,
+                    "run_id": run_id or row.to_dict().get("run_id"),
+                    "run": row.to_dict(),
+                }
+            )
         else:
             print_config_context(cfg_path, cfg=cfg)
             print_stdout(render_run_meta_text(row.to_dict()))
@@ -98,3 +115,11 @@ def runs_show(
     except Exception as e:
         internal_error("runs show", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
+
+
+def _campaign_json(cfg_path: Path, cfg, ws: CampaignWorkspace) -> dict[str, str]:
+    return {
+        "slug": str(cfg.campaign.slug),
+        "config_path": str(cfg_path),
+        "workdir": str(ws.workdir),
+    }

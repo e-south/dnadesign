@@ -12,7 +12,7 @@ from typing import Sequence
 
 import numpy as np
 
-from dnadesign.opal.src.objectives import sfxi_math
+from ..src.objectives import sfxi_math
 
 SFXI_API_VERSION = "1"
 SFXI_OBJECTIVE_NAME = "sfxi_v1"

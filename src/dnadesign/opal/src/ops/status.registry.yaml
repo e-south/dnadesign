@@ -4,7 +4,7 @@ entries:
   - status_kind: opal-campaign-state
     owner_boundary: opal
     observes_plane: control
-    provider_ref: dnadesign.opal.ops.status_providers:provide_opal_campaign_state_status
+    provider_ref: dnadesign.opal.src.ops.status_providers:provide_opal_campaign_state_status
     description: Read one OPAL campaign workdir and summarize state.json plus round ledgers.
     surface_type: campaign_snapshot
     cost_class: cheap

@@ -44,11 +44,24 @@ def test_notebook_template_has_plot_gallery() -> None:
     assert "All configured plots with written manifests." in text
 
 
+def test_notebook_template_has_opal_schema_sentinel() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v1"' in text
+
+
+def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    for cell in text.split("@app.cell"):
+        if " = mo.ui.dropdown(" in cell:
+            assert ".value" not in cell
+
+
 def test_notebook_template_uses_plot_gallery_component() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     gallery_text = render_plot_gallery_cells()
 
-    assert render_plot_gallery_cells.__module__.endswith(".notebook_components")
+    assert render_plot_gallery_cells.__module__.endswith(".notebook_components.plots")
     assert "def render_plot_gallery_cells" not in text
     assert gallery_text in text
     assert "plot_gallery_note" in gallery_text
@@ -101,7 +114,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
 def test_notebook_template_degrades_without_runs() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "No runs available yet" in text
+    assert "build_notebook_no_run_lines" in text
     assert "mo.stop(len(rounds) == 0" not in text
     assert 'default_source = "records"' in text
 

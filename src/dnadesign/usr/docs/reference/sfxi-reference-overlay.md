@@ -9,7 +9,7 @@ The `sfxi_ref` namespace stores provenance-aware SFXI reference metrics for down
 
 - Source observations come from Reader vec8 artifacts.
 - Scoring is reached through Reader's public `reader.domains.logic.sfxi.setpoint_scatter.score_sfxi_setpoints` API.
-- Reader delegates SFXI scoring to the public `dnadesign.opal.api.sfxi` API.
+- Reader delegates SFXI scoring to the source-owned `dnadesign.opal.api.sfxi` API.
 - LatentDNA consumes materialized USR/view columns such as `sfxi_ref__metric_value`; it must not import Reader internals or OPAL internals.
 
 ## Required Semantics

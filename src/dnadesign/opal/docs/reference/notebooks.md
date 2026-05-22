@@ -6,6 +6,9 @@
 
 OPAL notebooks are generated marimo campaign viewers. They are inspection
 artifacts, not runtime control planes and not study-specific visual browsers.
+Checked-in operator notebooks may use the public `dnadesign.opal.notebooks.api`
+adapter for notebook discovery helpers; generated notebooks should continue to
+import only `dnadesign.opal` public helpers plus general third-party packages.
 
 Generate one with:
 
@@ -27,6 +30,9 @@ uv run opal notebook generate \
 Generated notebooks import public helpers from `dnadesign.opal` and build a
 `NotebookViewModel` through `build_notebook_view_model(...)`. The view model is
 manifest-backed and uses schema `opal.notebook_view_model.v1`.
+Generated single-campaign notebooks also embed
+`__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v1"` so
+old local notebooks can be distinguished from current templates during review.
 
 | field | purpose |
 | --- | --- |
@@ -65,13 +71,17 @@ kept as provenance unless a runtime command explicitly needs the matrix.
 
 Heavy sections should use marimo accordions with lazy loading. Reusable
 generated-cell builders and public component primitives live in
-`src/analysis/notebook_components.py`. Current reusable primitives cover
+`src/analysis/notebook_components/`. Current reusable primitives cover
 campaign summary rows, at-a-glance lines, validity lines, change summary lines
 and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
 metric definition rows, artifact garden rows, manifest-backed plot-gallery
-models, and plot card detail lines. Keep
-`notebook_template.py` as thin wiring and move independently testable panels out
-of the template before adding new notebook UX.
+models, and plot card detail lines. Keep the generated source renderer in
+`src/analysis/notebook_template/` as thin composition over small semantic cell
+fragment modules. The reusable component surface lives in the
+`src/analysis/notebook_components/` package; add new notebook UX as small
+semantic modules there instead of growing a single component file.
+Define marimo UI controls in one cell and read their `.value` in a downstream
+cell; generated notebooks include a regression guard for this rule.
 
 Campaign-set notebooks are intentionally overview-first: they provide campaign
 and plot dropdowns, status and provenance summary, manifest-backed plot cards,

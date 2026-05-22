@@ -18,10 +18,13 @@ def test_campaign_progress_has_no_load_button() -> None:
     assert "Click **Load**" not in text
 
 
-def test_campaign_progress_uses_public_opal_imports() -> None:
+def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
     text = NOTEBOOK_PATH.read_text()
     assert "from dnadesign.opal import" in text
+    assert "from dnadesign.opal.notebooks.api import" in text
     assert "dnadesign.opal.src" not in text
+    assert "dnadesign.opal.src.analysis.dashboard.api" not in text
+    assert "dnadesign.opal.dashboard" not in text
 
 
 def test_campaign_progress_is_not_atlas() -> None:

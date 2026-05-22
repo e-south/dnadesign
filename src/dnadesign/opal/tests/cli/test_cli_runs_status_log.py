@@ -35,7 +35,11 @@ def test_runs_list_and_show_json(tmp_path):
 
     res = runner.invoke(app, ["--no-color", "runs", "list", "-c", str(campaign), "--json"])
     assert res.exit_code == 0, res.stdout
-    runs = json.loads(res.stdout)
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.runs_list.v1"
+    assert payload["campaign"]["config_path"] == str(campaign)
+    assert payload["round_selector"] is None
+    runs = payload["runs"]
     assert any(r.get("run_id") == run_id for r in runs)
 
     res = runner.invoke(
@@ -52,7 +56,10 @@ def test_runs_list_and_show_json(tmp_path):
         ],
     )
     assert res.exit_code == 0, res.stdout
-    row = json.loads(res.stdout)
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.run_meta.v1"
+    assert payload["campaign"]["config_path"] == str(campaign)
+    row = payload["run"]
     assert row["run_id"] == run_id
 
 
@@ -156,3 +163,18 @@ def test_runs_list_json_error_for_missing_config(tmp_path):
     assert payload["ok"] is False
     assert payload["error"]["schema_version"] == "opal.cli_error.v1"
     assert payload["error"]["context"] == "runs list"
+
+
+def test_artifacts_audit_json_error_uses_shared_cli_error_contract(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "artifacts", "audit", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "artifacts audit"
+    assert payload["error"]["category"] == "OpalError"
+    assert isinstance(payload["error"]["exit_code"], int)

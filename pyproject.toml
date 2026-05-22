@@ -55,7 +55,7 @@ dependencies = [
 [project.scripts]
 usr        = "dnadesign.usr:main"
 usr-sync-audit-drill = "dnadesign.usr.ops.sync_audit_drill:main"
-opal       = "dnadesign.opal.cli:main"
+opal       = "dnadesign.opal:main"
 dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
@@ -137,7 +137,7 @@ where = ["src"]
   "workspaces/templates/*/*.md",
 ]
 "dnadesign.opal" = [
-  "ops/status.registry.yaml",
+  "src/ops/status.registry.yaml",
 ]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",

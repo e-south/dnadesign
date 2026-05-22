@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/opal/ops/status_providers.py
+<dnadesign project>
+src/dnadesign/opal/src/ops/status_providers.py
 
 Provider-owned OPAL status builders.
 

@@ -53,7 +53,7 @@ The current runtime already has good seams:
 - Config loading forbids unknown Pydantic fields and unknown plugins; shared `usr_sidecar` labels require matching USR dataset, explicit writeback, `y_space`, and relative sidecar path.
 - Objectives emit explicit channels, and selection consumes configured refs such as `sfxi_v1/sfxi`.
 - Ledgers use allow-listed schemas for `run_pred`, `run_meta`, and `label`, and reject unknown columns unless an explicit environment escape hatch is enabled.
-- Public package exports now include `load_config`, `read_campaign_predictions`, `build_campaign_progress`, `render_campaign_progress_text`, `build_campaign_review`, and `validate_x_parquet_column`.
+- Public package exports now include config, prediction, progress, review, plot-manifest, artifact-garden, notebook view-model, memory-guard, and X-validation helpers; dashboard/UMAP helper exports are intentionally excluded from the package root.
 - `opal progress --json` and `opal review --json` exist, and the study-owned DenseGen probe uses the public OPAL progress/review helpers rather than importing OPAL internals.
 
 Current CLI behavior observed during this pass:
@@ -164,7 +164,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Leakage guards are partly study-owned and partly OPAL-owned | Invalid synthetic-oracle evidence, train/eval overlap, or prediction/label contamination must fail fast at the correct layer |
 | Stress-specific campaign configs currently live under the OPAL package tree | OPAL information architecture can imply ownership of study-specific biology unless configs are moved or explicitly marked as study-owned fixtures |
 | Active OPAL dashboard helpers still mention UMAP/projection/cluster views outside the canonical generated notebook | Boundary drift: noncanonical dashboard code can be mistaken for the OPAL campaign-review surface |
-| Generated notebook implementation now has the first plot-gallery component split into `notebook_components.py`, but the template module remains a 648-line generated string and a representative generated notebook is about 720 lines | Notebook UX and maintenance can regress until the remaining panels are independently testable marimo primitives |
+| Generated notebook implementation now has semantic `notebook_components/` and `notebook_template/` packages, a template schema sentinel, same-cell widget-value regression guard, and source-fragment size caps | Notebook UX can still regress if future panels bypass reusable primitives or live marimo validation |
 | Campaign-set notebook UX now exists, but it is overview-first: campaign/plot dropdowns, status, provenance, warnings, stale artifacts, and plot cards | A 12-campaign probe can be triaged in one OPAL notebook, but record-level drill-down still belongs to single-campaign notebooks |
 | Plot manifests exist, but not every plot kind declares data shape, tidy schema, and failure modes | Plot cards can be mechanically valid while still under-explaining what the visual decides |
 | Plot manifest schema is evolving from mechanical artifact presence to semantic quality/freshness metadata | Docs and tests must pin status enums, tidy schema validation, captions, and freshness fields so agents can trust manifests literally |
@@ -199,12 +199,12 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Plot config rejects unknown keys and conflicting inline/external plot config | `src/dnadesign/opal/src/plots/config.py:23-42`, `src/dnadesign/opal/src/plots/config.py:75-78`, `src/dnadesign/opal/src/plots/config.py:161-216` |
 | Plot runner injects built-in data paths, builds PlotContext, calls plugins, writes per-plot manifests, and writes aggregate plot manifest indexes | `src/dnadesign/opal/src/plots/runner.py:93-107`, `src/dnadesign/opal/src/plots/runner.py:243-315`, `src/dnadesign/opal/src/plots/manifests.py:22-130` |
 | Feature importance plot currently discovers per-round files and writes optional tidy CSV | `src/dnadesign/opal/src/plots/feature_importance_bars.py:34-53`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:163-176`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:213-317` |
-| Fixed-sidecar `opal ingest-y` loads only the identity frame and emits `opal.ingest_runtime.v1` runtime telemetry | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/runtime/ingest_runtime.py` |
-| `opal ingest-y` needs ID/sequence membership and required-column checks for fixed-universe sidecars, not the configured X payload | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/runtime/ingest.py` |
-| Generated notebook imports public OPAL helpers rather than `dnadesign.opal.src.*` | `src/dnadesign/opal/src/analysis/notebook_template.py:41-88`, `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:59-70` |
-| Generated notebook builds a manifest-backed view model and uses manifest-backed plot choices | `src/dnadesign/opal/src/reporting/notebook.py:34-113`, `src/dnadesign/opal/src/analysis/notebook_template.py:99-102`, `src/dnadesign/opal/src/analysis/notebook_template.py:401-518` |
-| Generated notebook exposes round, run, record, data-source, and plot dropdowns plus lazy accordions | `src/dnadesign/opal/src/analysis/notebook_template.py:159-203`, `src/dnadesign/opal/src/analysis/notebook_template.py:306-340`, `src/dnadesign/opal/src/analysis/notebook_template.py:439-518`, `src/dnadesign/opal/src/analysis/notebook_template.py:700-746` |
-| Notebook template is still mostly a large generated string and generated artifact, despite the extracted plot-gallery cell helper | `src/dnadesign/opal/src/analysis/notebook_template.py`, `src/dnadesign/opal/src/analysis/notebook_components.py`; `wc -l` measured 648 lines in the template, 141 lines in the first component module, and about 720 lines in a representative generated notebook |
+| Fixed-sidecar `opal ingest-y` loads only the identity frame and emits `opal.ingest_runtime.v1` runtime telemetry | `src/dnadesign/opal/src/cli/commands/ingest_y/`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/runtime/ingest_runtime.py` |
+| `opal ingest-y` needs ID/sequence membership and required-column checks for fixed-universe sidecars, not the configured X payload | `src/dnadesign/opal/src/cli/commands/ingest_y/`, `src/dnadesign/opal/src/runtime/ingest.py` |
+| Generated notebook imports public OPAL helpers rather than `dnadesign.opal.src.*` | `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:59-70` |
+| Generated notebook builds a manifest-backed view model and uses manifest-backed plot choices | `src/dnadesign/opal/src/reporting/notebook.py:34-113`, `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/plot_cells.py` |
+| Generated notebook exposes round, run, record, data-source, and plot dropdowns plus lazy accordions | `src/dnadesign/opal/src/analysis/notebook_template/run_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/record_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/data_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/layout_cells.py` |
+| Notebook generated-source wiring is split into semantic source-fragment modules with IA regression caps | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/analysis/notebook_components/`, `src/dnadesign/opal/tests/test_source_tree_contracts.py` |
 | Active dashboard analysis includes UMAP chart/view code | `src/dnadesign/opal/src/analysis/dashboard/views/plots.py:6-7`, `src/dnadesign/opal/src/analysis/dashboard/views/plots.py:101-139` |
 | Notebook tests already assert lateral tools and default UMAP column strings stay out of generated template | `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:70-86` |
 | Locks are local-host file locks | `src/dnadesign/opal/src/storage/locks.py:86-108` |
@@ -378,7 +378,7 @@ class NotebookCampaignSetViewModel:
 | Problem | Canonical generated notebooks have removed lateral UMAP defaults, but active OPAL dashboard helpers still include UMAP/projection/cluster code. That noncanonical code can be mistaken for OPAL campaign review. |
 | Proposed change | Quarantine active UMAP/projection dashboard helpers outside the canonical OPAL review and generated notebook path. Preserve only generic X-column provenance: `x_column`, `x_dim`, `records_path`, and optional `x_contract`. |
 | Contract shape | `campaign.x_provenance = {"x_column": str, "x_dim": int | None, "source_note": str | None}`. No UMAP, cluster, LatentDNA atlas, or producer-specific readiness gates. |
-| Affected modules | `src/dnadesign/opal/src/analysis/dashboard/*`, `src/dnadesign/opal/src/analysis/notebook_template.py`, notebook tests, reference notebook docs. |
+| Affected modules | `src/dnadesign/opal/src/analysis/dashboard/*`, `src/dnadesign/opal/src/analysis/notebook_template/`, notebook tests, reference notebook docs. |
 | Migration notes | If UMAP dashboard code is still needed, move it to an archived/noncanonical namespace or a producer/study-owned package. Add tests that canonical OPAL notebook/review surfaces contain no `LatentDNA`, `UMAP`, `projection`, `cluster__ldn`, or `DenseGen visual` strings except in boundary docs. |
 | Acceptance criteria | Generated notebooks and `opal review` mention only campaign contracts, X column provenance, ledgers, progress, selection, labels, predictions, plots, and limitations. Study/probe code remains free to link OPAL review artifacts from study-owned reports. |
 | Tests | Snapshot tests for generated notebook, review Markdown, review HTML, and public JSON. Static grep/lint guard over canonical OPAL surfaces. |
@@ -402,10 +402,10 @@ visible path migration remains future work.
 | --- | --- |
 | Problem | The first public API cleanup is in place, but the generated notebook still pulls many low-level helper functions directly. Durable notebooks should depend on a smaller public view-model/component API, not a broad helper grab-bag. |
 | Proposed change | Keep `dnadesign.opal` public APIs narrow and add explicit notebook/reporting adapter functions for view-model construction and rendering. Generated notebooks should import only public APIs and general third-party packages. |
-| Contract shape | Public exports: `build_campaign_progress`, `build_campaign_review`, `read_campaign_predictions`, `load_review_manifest`, `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `load_plot_manifest_index`, `build_notebook_view_model`, `render_campaign_notebook`, `smoke_check_notebook`, `render_campaign_progress_text`. |
-| Affected modules | `src/dnadesign/opal/__init__.py`, `src/dnadesign/opal/src/analysis/notebook_template.py`, `src/dnadesign/opal/src/reporting/*`, `src/dnadesign/opal/src/plots/*`. |
+| Contract shape | Public exports: `build_campaign_progress`, `build_campaign_review`, `read_campaign_predictions`, `load_review_manifest`, `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `load_plot_manifest_index`, `build_notebook_view_model`, `build_campaign_set_notebook_view_model`, `render_campaign_notebook`, `render_campaign_set_notebook`, `smoke_check_notebook`, `render_campaign_progress_text`, `build_artifact_garden_audit`, `prune_stale_artifacts`, memory guards, and X validation. Cross-package SFXI scoring lives at `dnadesign.opal.api.sfxi`. Checked-in operator notebooks can use `dnadesign.opal.notebooks.api`. Dashboard/UMAP discovery helpers are not package-root exports. |
+| Affected modules | `src/dnadesign/opal/__init__.py`, `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/*`, `src/dnadesign/opal/src/plots/*`. |
 | Migration notes | Keep internal modules intact. Add thin public adapters rather than relocating large internals. Generated notebooks should pin the public schema versions they expect. |
-| Acceptance criteria | No generated notebook imports from `dnadesign.opal.src.*`; notebook render helpers are documented public contracts; study packages use only `dnadesign.opal` public helpers. |
+| Acceptance criteria | No generated notebook imports from `dnadesign.opal.src.*`; package-root public API excludes dashboard/projection helpers; notebook render helpers are documented public contracts; study packages use only `dnadesign.opal` public helpers. |
 | Tests | Public import tests, generated notebook text tests, architecture boundary check, study probe import tests, and contract tests for the notebook view-model schema. |
 
 ### C. Ingest Runtime Memory Safety
@@ -415,7 +415,7 @@ visible path migration remains future work.
 | Problem | `opal ingest-y` has the correct fixed-sidecar identity-frame path, but that memory-safety posture needs to remain a visible runtime contract rather than an implementation detail buried in tests. |
 | Proposed change | Keep the memory-safe ingest plan first-class. For fixed-universe sidecars and `--unknown-sequences error/drop`, load only an identity frame (`id`, `sequence`, and minimal required metadata). Reserve full-record materialization for explicit record-creation or record-update modes that truly need it. Emit ingest memory estimates, phase telemetry, and peak RSS where the platform exposes it. |
 | Contract shape | `IngestRuntimeContract = {schema_version, mode, input_rows, identity_columns, candidate_index_rows, estimated_memory_bytes, peak_rss_bytes, unknown_policy, write_scope, warnings}`. `mode=identity_index` is the default for shared sidecar label appends. |
-| Affected modules | `src/dnadesign/opal/src/cli/commands/ingest_y.py`, `src/dnadesign/opal/src/storage/records_io.py`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/storage/label_sources.py`, `src/dnadesign/opal/src/runtime/memory_guard.py`, ingest CLI tests. |
+| Affected modules | `src/dnadesign/opal/src/cli/commands/ingest_y/`, `src/dnadesign/opal/src/storage/records_io.py`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/storage/label_sources.py`, `src/dnadesign/opal/src/runtime/memory_guard.py`, ingest CLI tests. |
 | Migration notes | Do not add a compatibility shim that silently falls back to `store.load()`. If the narrow identity frame cannot be built, fail with an `IngestContractError` explaining the missing columns or unsupported mode. If `unknown_sequences=create` is requested for a fixed `usr_sidecar`, fail before any full-record load. |
 | Acceptance criteria | A full-pool six-row label append for a fixed sidecar succeeds without calling `RecordsStore.load()`, reports `mode=identity_index`, emits estimated memory and optional peak RSS, and writes the same label-sidecar result as the old path. Repeated 12-round dogfood can complete rounds without application-memory pressure from ingest. |
 | Tests | Monkeypatch `RecordsStore.load()` to fail and assert `opal ingest-y` succeeds for `usr_sidecar + unknown_sequences=error/drop`; assert `unknown_sequences=create` fails before full load for shared sidecars; fixture benchmark verifies peak RSS or estimated memory stays bounded; JSON snapshot covers `IngestRuntimeContract`. |
@@ -427,6 +427,13 @@ Implementation guidance:
 - Include `bio_type` and `alphabet` only when new-row creation or required-column validation needs them.
 - Include the X column only in explicit record-creation/update modes that must write records, never for fixed-universe sidecar appends.
 - Keep sidecar append rewrite optimization lower priority until sidecars are large enough to dominate runtime.
+
+Continuation status: the command monolith is now a semantic package under
+`src/dnadesign/opal/src/cli/commands/ingest_y/`. The Typer entrypoint remains
+`cmd_ingest_y`; input loading, command context, transform context, preview
+warnings, unknown-sequence policy, metadata/X checks, and writeback are separate
+modules with source-tree size guards. This is a behavior-preserving split; it
+does not add compatibility shims for the former private module file.
 
 Initial implementation status: fixed-sidecar ingest now uses
 `RecordsStore.load_ingest_identity_frame()`, emits `opal.ingest_runtime.v1` in
@@ -612,10 +619,10 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 
 | Field | Specification |
 | --- | --- |
-| Problem | The generated single-campaign notebook is useful and manifest-backed, but it is still mostly a large campaign-local artifact. The first plot-gallery helper now lives in `notebook_components.py`; campaign-set generation now exists as a separate overview notebook. Remaining monolith risk is in the single-campaign template and missing reusable panel primitives. |
+| Problem | The generated single-campaign notebook is useful and manifest-backed. Reusable helper panels now live in the semantic `notebook_components/` package, generated source wiring is split under `notebook_template/`, and campaign-set generation exists as a separate overview notebook. Remaining UX risk is future drift away from reusable panel primitives and weak live marimo interaction evidence. |
 | Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same plot gallery, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
 | Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `plot_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_card`, `plot_gallery`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `At a glance`, `Validity`, `Changes`, `Evidence`, `Metric definitions`, `Distrust and limitations`, `Artifacts`, `Raw tables`. |
-| Affected modules | `src/dnadesign/opal/src/analysis/notebook_template.py`, `src/dnadesign/opal/src/reporting/notebook.py`, public notebook API, tests, CLI notebook command. |
+| Affected modules | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/notebook.py`, public notebook API, tests, CLI notebook command. |
 | Migration notes | Preserve current ability to generate before first run. In that state, the view model reports `not_started` and missing manifest states explicitly. Keep the single-campaign path as the default; add campaign-set mode only when the user supplies a campaign index, run-root manifest, or explicit repeated `--campaign` values. |
 | Acceptance criteria | First viewport shows campaign selector when multiple campaigns exist, campaign status, run scope, X column, label source, latest run_id, selected count, stale warnings, and missing artifacts. Heavy tables and plots are inside `mo.accordion(..., multiple=True, lazy=True)`. The generated notebook should be mostly wiring; reusable component/view-model code should be importable and unit-tested outside marimo. |
 | Tests | `marimo check` smoke, generated Python parse, no private imports, no UMAP/LatentDNA strings, manifest-only plot rendering, missing/stale plot states, component-level unit tests, campaign-set fixture with two campaigns, and a text guard against re-growing a large all-in-one template. |
@@ -632,8 +639,11 @@ plot card detail lines. The next slice added shared metric-definition tables and
 artifact-garden panels backed by manifest metadata and dry-run prune plans.
 This slice adds shared validity panels, progress-derived change tables, and a
 generated-template size guard so future notebook UX work cannot quietly rebuild
-a large all-in-one template. Remaining work in this section is manifest/index
-inputs for campaign sets and richer visual treatment of validity/change state.
+a large all-in-one template. The follow-on IA cleanup splits generated
+single-campaign source wiring into `notebook_template/` cell-fragment modules
+and gates those modules in `test_source_tree_contracts.py`. Remaining work in
+this section is manifest/index inputs for campaign sets, live marimo interaction
+validation, and richer visual treatment of validity/change state.
 
 **Review Surface Philosophy: Evidence Cartography.** OPAL review surfaces should feel like maps of campaign evidence, not galleries of disconnected artifacts. Space should be allocated by decision value: state, scope, validity, warnings, and current selection evidence occupy the first viewport; raw ledgers, method details, and large tables sit behind lazy sections.
 
@@ -650,7 +660,7 @@ Hierarchy should make distrust explicit. Limitations, stale artifacts, missing l
 | `opal progress --json` | Expose `schema_version`, top-level `event_contract.*`, per-round `rounds[].summary.run_scope.*`, `warnings`, `locks.campaign.*`, manifest-authoritative `artifact_garden` and `stale_artifacts`, legacy-event accounting, phase counts, and stable JSON error categories. |
 | `opal review --json` | Return `ReviewManifestContract` plus write paths. Refuse ambiguous run scope unless `--run-id` is explicit. Include stale-file warnings. |
 | `opal status` | Become the operator summary over state, latest run, lock state, manifest freshness, and next safe commands. |
-| `opal runs` | Add JSON schemas for `runs list` and `runs show`; expose run status, done/aborted state, artifact manifest refs, and duplicate/compaction warnings. |
+| `opal runs` | JSON schemas `opal.runs_list.v1` and `opal.run_meta.v1` now wrap list/show payloads; remaining work is richer run status, done/aborted state, artifact manifest refs, and duplicate/compaction warnings. |
 | `opal ingest-y --json` | Emit `IngestRuntimeContract`, including ingest mode, identity columns loaded, input rows, estimated memory, optional peak RSS, unknown policy, write scope, and fail-fast leakage/contract violations. |
 | `opal plot --list` | Text and JSON already exist; keep JSON schema `opal.plot_registry.v1` stable and fill metadata gaps for every built-in plot. |
 | `opal plot --list-config --json` | Return structured configured-plot objects (`name`, `kind`, `enabled`, `tags`, optional `preset`) instead of display strings. |
@@ -770,7 +780,7 @@ Update these docs as implementation lands:
 | P4: Generic plot primitives | Extend beyond existing `metric_over_rounds`, `feature_importance_heatmap`, and `vector_summary_heatmap` into overlap/composition/uncertainty/support/calibration primitives | P3 | Medium; temptation to over-abstract | New primitives pass data-shape contracts and avoid study names | Keep SFXI-specific plots during transition as configured diagnostics |
 | P5: Marimo review notebook modernization | Public component primitives shared by single-campaign and campaign-set notebooks, manifest-backed plot cards, campaign/plot dropdowns, lazy accordions, smoke checks | P3 | Medium; generated artifacts are durable | Notebook uses public imports and manifest authority; related campaigns are navigable from one generated notebook without duplicating implementation | Keep behavior stable through explicit view-model versioning; avoid legacy template shims |
 | P6: Campaign information architecture | Decide and execute ownership model for study-specific campaign configs: move to studies or mark as study fixtures with metadata | P1-P5 not required but helpful | Medium; path churn affects docs/tests | OPAL package contains generic configs/templates; study configs are study-owned or explicitly marked | Use explicit docs/tests migration, not hidden compatibility paths |
-| P7: Module decomposition | Split `ingest_y.py`, probe `review.py`, probe `decision.py`, and notebook templates by contract | Can proceed slice-by-slice | Medium; review churn | Smaller modules have focused tests and no behavior drift | Extract helpers under tests before deleting old paths |
+| P7: Module decomposition | Split `ingest_y/`, probe `review.py`, probe `decision.py`, and notebook templates by contract | Can proceed slice-by-slice | Medium; review churn | Smaller modules have focused tests and no behavior drift | Extract helpers under tests before deleting old paths |
 | P8: Dogfood expansion and CI gates | Add broader synthetic and real-data smoke coverage with explicit evidence labels, including multi-round synthetic probe loops owned by study code | P0-P7 depending gate | High; runtime cost and study availability | Reports distinguish cipro/random, random-all, leave-sigma35, multi-round synthetic pressure tests, and real assay evidence | Keep expensive gates optional/nightly; never block core OPAL unit tests on study-specific benchmarks |
 
 ## P. Risks And Tradeoffs

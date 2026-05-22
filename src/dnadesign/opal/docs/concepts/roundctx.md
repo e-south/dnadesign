@@ -16,7 +16,8 @@ The runner persists:
 The runner injects a plugin-scoped `ctx` that expands `"<self>"` to the plugin name and enforces contracts.
 
 ```python
-from dnadesign.opal.src.core.round_context import roundctx_contract
+# Inside OPAL plugin modules, use the internal runtime contract decorator.
+from ...core.round_context import roundctx_contract
 
 @roundctx_contract(
   category="objective",

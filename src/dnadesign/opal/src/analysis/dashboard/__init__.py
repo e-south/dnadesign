@@ -8,6 +8,7 @@ Module Author(s): Eric J. South
 """
 
 from . import (
+    api,
     artifacts,
     charts,
     datasets,
@@ -26,6 +27,7 @@ from . import (
 )
 
 __all__ = [
+    "api",
     "artifacts",
     "charts",
     "datasets",
