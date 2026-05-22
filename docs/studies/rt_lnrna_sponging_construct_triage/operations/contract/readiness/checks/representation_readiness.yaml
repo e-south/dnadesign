@@ -1,0 +1,15 @@
+id: representation_readiness
+status: blocked
+owner: construct_usr_infer
+phase: phase_2_construct_projection
+blocked_by:
+  - construct_runtime_not_executed
+  - construct_context_view_materialization
+  - fixed_size_representation_table_contract
+rules:
+  - Use the GenBank offset audit as the source for cassette boundaries.
+  - Use Construct named slots for lnRNA and RT CDS; do not precompose them into one hidden anchor.
+  - Validate product_kind remains realized_context for emitted construct contexts.
+  - Validate forward and reverse-complement views are explicitly declared before concat.
+  - Validate lnRNA anchor_mean pooling bounds before Infer.
+  - Fail on truncation, arbitrary filler padding, invalid alphabet, or missing constants.

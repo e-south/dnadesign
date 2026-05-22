@@ -1,0 +1,15 @@
+workspaces:
+  study_runtime_root:
+    status: planned
+    path: workspaces/studies/rt_lnrna_sponging_construct_triage
+    checked_in: false
+  latentdna_workspace:
+    status: planned
+    path: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
+    checked_in_config_allowed: true
+    generated_outputs_checked_in_by_default: false
+  construct_workspace:
+    status: planned
+    blocked_by: construct_context_view_materialization
+    checked_in_config_allowed: true
+    generated_outputs_checked_in_by_default: false

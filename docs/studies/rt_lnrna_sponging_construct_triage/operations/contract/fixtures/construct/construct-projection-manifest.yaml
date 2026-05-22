@@ -1,0 +1,108 @@
+manifest_id: rt_lnrna_sponging_construct_triage_construct_projection_manifest_v1
+study_id: rt_lnrna_sponging_construct_triage
+construct_contract: dual_cassette_rt_lnrna_expression_v1
+representation_contract: dual_cassette_construct_context_embedding_v1
+strategy:
+  strategy_id: construct_multi_slot_assembly_v1
+  rationale: Use Construct's public named-slot assembler; do not precompose lnRNA and RT into one anchor.
+  construct_runtime_contract:
+    mode: realize_template
+    input_primary_field:
+    required_slots:
+      - lnrna
+      - rt_cds
+    parts_are_named_slots: true
+construct_template:
+  construct_template_id: dual_cassette_rt_lnrna_expression_template_v1
+  plasmid_context_source_id: genbank:pes-retron-26.gb#record
+  source_authority_id: pes_retron_26_vector
+  source_sequence_length_nt: 4956
+  topology: circular
+  target_context:
+    context_id: dual_cassette_1600bp_context_v1
+    length_nt: 1600
+    coordinate_basis: zero_based_half_open
+    window_start_0: 0
+    window_end_0: 1600
+    padding_policy: real_plasmid_sequence_only
+    truncation_policy: fail
+slots:
+  - slot_id: lnrna
+    construct_part_name: lnrna
+    role: lnrna_cassette
+    sequence_field: candidate__lnrna_sequence
+    required: true
+    template_span_0: [186, 359]
+    placement_kind: replace
+    orientation: forward
+    guard:
+      source_feature: genbank:pes-retron-26.gb#a1-a2
+      replaced_span_bp: 173
+  - slot_id: rt_cds
+    construct_part_name: rt_cds
+    role: rt_cds
+    sequence_field: candidate__rt_cds_sequence
+    required: true
+    template_span_0: [524, 1487]
+    placement_kind: replace
+    orientation: forward
+    guard:
+      source_feature: genbank:pes-retron-26.gb#ECD_00831
+      replaced_span_bp: 963
+representation_views:
+  - view_name: dual_cassette_1600bp_seq_mean
+    product_kind: realized_context
+    orientation: forward
+    pooling_operation: seq_mean
+    required_slots: [lnrna, rt_cds]
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    product_kind: realized_context
+    required_orientations: [forward, reverse_complement]
+    pooling_operation: seq_mean
+    downstream_transform: block_normalized_concatenate
+    required_slots: [lnrna, rt_cds]
+  - view_name: lnrna_span_in_construct_anchor_mean
+    product_kind: realized_context
+    orientation: forward
+    pooling_operation: anchor_mean
+    pooling_slot: lnrna
+    required_slots: [lnrna, rt_cds]
+candidates:
+  - candidate_id: rt_lnrna_anchor__eco1_wt_rt__retron26_lnrna__tetO
+    fixture_ref: operations/contract/fixtures/candidates/retron26-working-anchor.yaml
+    construct_projection_status: representable
+    slot_bindings:
+      lnrna:
+        sequence_id: genbank:pes-retron-26-a1-a2.gb#a1-a2
+        sequence_length_nt: 173
+        source_sequence_span_0: [0, 173]
+      rt_cds:
+        sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+        sequence_length_nt: 963
+        source_sequence_span_0: [0, 963]
+    emitted_slot_spans_0:
+      lnrna: [186, 359]
+      rt_cds: [524, 1487]
+    construct_context_view_declarations:
+      - dual_cassette_1600bp_seq_mean
+      - dual_cassette_1600bp_fwd_rc_concat
+      - lnrna_span_in_construct_anchor_mean
+  - candidate_id: rt_lnrna_anchor__eco1_wt_rt__retron43_lnrna__tetO
+    fixture_ref: operations/contract/fixtures/candidates/retron43-failed-anchor.yaml
+    construct_projection_status: representable
+    slot_bindings:
+      lnrna:
+        sequence_id: genbank:pes-retron-43.gb#a1-a2
+        sequence_length_nt: 187
+        source_sequence_span_0: [186, 373]
+      rt_cds:
+        sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+        sequence_length_nt: 963
+        source_sequence_span_0: [0, 963]
+    emitted_slot_spans_0:
+      lnrna: [186, 373]
+      rt_cds: [538, 1501]
+    construct_context_view_declarations:
+      - dual_cassette_1600bp_seq_mean
+      - dual_cassette_1600bp_fwd_rc_concat
+      - lnrna_span_in_construct_anchor_mean

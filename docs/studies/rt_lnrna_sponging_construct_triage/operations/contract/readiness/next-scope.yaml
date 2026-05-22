@@ -1,0 +1,15 @@
+next_scope:
+  target_phase_groups:
+    phase_0_contracts:
+      - genbank_source_authority
+      - candidate_contract
+      - overlay_linkage
+    phase_1_candidate_table:
+      - genbank_source_authority
+      - candidate_contract
+    phase_2_construct_projection:
+      - representation_readiness
+    phase_7_opal_readiness:
+      - opal_precondition
+  runtime_phase_groups: []
+  runtime_shared_groups: []

@@ -47,6 +47,16 @@ _CONSTRUCT_COLUMNS = [
     {"name": "construct__input_fields", "type": "list<string>"},
     {"name": "construct__input_id", "type": "string"},
     {"name": "construct__input_length", "type": "int64"},
+    {"name": "construct__assembly_mode", "type": "string"},
+    {"name": "construct__slot_count", "type": "int64"},
+    {
+        "name": "construct__slots",
+        "type": (
+            "list<struct<slot_id:string,role:string,sequence_source:string,sequence_field:string,"
+            "placement_kind:string,orientation:string,template_start:int64,template_end:int64,"
+            "forward_start:int64,forward_end:int64,start:int64,end:int64,length:int64>>"
+        ),
+    },
     {"name": "construct__anchor_id", "type": "string"},
     {"name": "construct__anchor_orientation", "type": "string"},
     {"name": "construct__anchor_start", "type": "int64"},

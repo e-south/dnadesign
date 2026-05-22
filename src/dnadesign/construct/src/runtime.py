@@ -430,7 +430,9 @@ def _scan_usr_rows(ds: Dataset, *, columns: List[str], ids: List[str] | None) ->
 
 
 def _input_fields(cfg: JobConfig) -> List[str]:
-    fields = {"id", cfg.job.input.field}
+    fields = {"id"}
+    if cfg.job.input.field is not None:
+        fields.add(cfg.job.input.field)
     for part in cfg.job.parts:
         if part.sequence.source == "input_field":
             fields.add(str(part.sequence.field))
@@ -468,6 +470,8 @@ def _input_usr_labels(row: dict[str, object]) -> tuple[str | None, List[str]]:
 
 
 def _normalize_input_scan_fields(ds: Dataset, cfg: JobConfig) -> List[str]:
+    if cfg.job.input.field is None:
+        raise ValidationError("job.input.field is required when job.mode='normalize_anchor'.")
     fields = {"id", cfg.job.input.field}
     available = set(ds.schema().names)
     for field_name in (
@@ -1487,6 +1491,137 @@ def _relative_anchor_bounds(
     return anchor_start, anchor_end
 
 
+def _relative_part_bounds(
+    *,
+    part: _ResolvedPart,
+    output_length: int,
+    full_construct_length: int,
+    window_start: int,
+    mode: str,
+) -> tuple[int | None, int | None]:
+    return _relative_anchor_bounds(
+        anchor_part=part,
+        output_length=output_length,
+        full_construct_length=full_construct_length,
+        window_start=window_start,
+        mode=mode,
+    )
+
+
+def _realized_input_slot_parts(ordered_realized_parts: List[_ResolvedPart]) -> list[_ResolvedPart]:
+    return [part for part in ordered_realized_parts if part.sequence_source == "input_field"]
+
+
+def _assembly_mode(ordered_realized_parts: List[_ResolvedPart]) -> str:
+    return "multi_slot" if len(_realized_input_slot_parts(ordered_realized_parts)) > 1 else "single_slot"
+
+
+def _input_length_for_row(
+    *,
+    row: dict[str, object],
+    cfg: JobConfig,
+    ordered_realized_parts: List[_ResolvedPart],
+) -> int:
+    if cfg.job.input.field is not None:
+        raw = row.get(cfg.job.input.field)
+        if raw is None:
+            raise ValidationError(f"Input row '{row.get('id')}' is missing field '{cfg.job.input.field}'.")
+        return len(str(raw).strip())
+    return sum(len(part.sequence) for part in _realized_input_slot_parts(ordered_realized_parts))
+
+
+def _slot_span_records(
+    *,
+    ordered_realized_parts: List[_ResolvedPart],
+    output_length: int,
+    full_construct_length: int,
+    window_start: int,
+    mode: str,
+) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for part in ordered_realized_parts:
+        start, end = _relative_part_bounds(
+            part=part,
+            output_length=output_length,
+            full_construct_length=full_construct_length,
+            window_start=window_start,
+            mode=mode,
+        )
+        records.append(
+            {
+                "slot_id": part.name,
+                "role": part.role,
+                "sequence_source": part.sequence_source,
+                "sequence_field": part.sequence_field or "",
+                "placement_kind": part.kind,
+                "orientation": part.orientation,
+                "template_start": part.start,
+                "template_end": part.end,
+                "forward_start": start,
+                "forward_end": end,
+                "start": start,
+                "end": end,
+                "length": len(part.sequence),
+            }
+        )
+    return records
+
+
+def _require_required_slot_bounds(
+    *,
+    row_id: object,
+    required_slots: list[str],
+    slot_spans: list[dict[str, object]],
+    cfg: JobConfig,
+) -> None:
+    if not required_slots:
+        return
+    by_id = {str(slot["slot_id"]): slot for slot in slot_spans}
+    for slot_id in required_slots:
+        slot = by_id.get(slot_id)
+        if slot is None:
+            raise ValidationError(f"Construct required slot '{slot_id}' is not defined for row_id={row_id}.")
+        if slot.get("start") is not None and slot.get("end") is not None:
+            continue
+        window = cfg.job.realize.window
+        if window is None:
+            window_desc = cfg.job.realize.mode
+        elif window.semantics == "fixed_total":
+            window_desc = (
+                f"fixed_total(reference={window.reference}, direction={window.direction}, size_bp={window.size_bp})"
+            )
+        else:
+            window_desc = f"anchor_plus_context(upstream_bp={window.upstream_bp}, downstream_bp={window.downstream_bp})"
+        raise ValidationError(
+            f"Construct window does not preserve required slot '{slot_id}' as one contiguous span in the emitted "
+            f"sequence. row_id={row_id} mode={cfg.job.realize.mode} window={window_desc}. "
+            "Choose full_construct, a larger window, or remove the slot from realize.required_slots explicitly."
+        )
+
+
+def _oriented_slot_span_records(
+    *,
+    forward_slots: list[dict[str, object]],
+    output_length: int,
+    orientation: str,
+) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for slot in forward_slots:
+        record = dict(slot)
+        forward_start = slot.get("forward_start")
+        forward_end = slot.get("forward_end")
+        if orientation == "reverse_complement" and forward_start is not None and forward_end is not None:
+            start, end = reverse_complement_anchor_bounds(
+                sequence_length=output_length,
+                anchor_start_0=int(forward_start),
+                anchor_end_0=int(forward_end),
+            )
+            record["start"] = start
+            record["end"] = end
+        records.append(record)
+    return records
+
+
 def _require_window_anchor_handoff_bounds(
     *,
     row_id: object,
@@ -1573,6 +1708,7 @@ def _spec_id(
         "realize": {
             "mode": cfg.job.realize.mode,
             "focal_part": cfg.job.realize.focal_part,
+            "required_slots": list(cfg.job.realize.required_slots),
             "window": (
                 {
                     "semantics": window.semantics,
@@ -1651,6 +1787,19 @@ def _build_record(
         anchor_end=anchor_end,
         cfg=cfg,
     )
+    slot_spans = _slot_span_records(
+        ordered_realized_parts=ordered_realized_parts,
+        output_length=len(output_sequence),
+        full_construct_length=len(full_construct),
+        window_start=window_start,
+        mode=cfg.job.realize.mode,
+    )
+    _require_required_slot_bounds(
+        row_id=row.get("id"),
+        required_slots=list(cfg.job.realize.required_slots),
+        slot_spans=slot_spans,
+        cfg=cfg,
+    )
     metadata = {
         "id": output_id,
         "construct__job": cfg.job.id,
@@ -1669,7 +1818,14 @@ def _build_record(
         "construct__input_dataset": cfg.job.input.source.dataset,
         "construct__input_fields": input_fields,
         "construct__input_id": str(row["id"]),
-        "construct__input_length": len(str(row[cfg.job.input.field]).strip()),
+        "construct__input_length": _input_length_for_row(
+            row=row,
+            cfg=cfg,
+            ordered_realized_parts=ordered_realized_parts,
+        ),
+        "construct__assembly_mode": _assembly_mode(ordered_realized_parts),
+        "construct__slot_count": len(ordered_realized_parts),
+        "construct__slots": slot_spans,
         "construct__anchor_id": str(row["id"]),
         "construct__anchor_orientation": anchor_part.orientation if anchor_part is not None else "",
         "construct__anchor_start": anchor_start,
@@ -1755,6 +1911,11 @@ def _build_variant_record(
             "construct__anchor_end": anchor_end,
             "construct__orientation": variant.orientation,
             "construct__parent_forward_construct_id": parent_forward_construct_id,
+            "construct__slots": _oriented_slot_span_records(
+                forward_slots=list(forward_record.metadata.get("construct__slots") or []),
+                output_length=len(forward_record.sequence),
+                orientation=variant.orientation,
+            ),
         }
     )
     label_suffix = (
@@ -1905,6 +2066,9 @@ def _build_normalize_record(
         "construct__input_fields": [cfg.job.input.field],
         "construct__input_id": str(row["id"]),
         "construct__input_length": len(sequence),
+        "construct__assembly_mode": "analysis_window",
+        "construct__slot_count": 0,
+        "construct__slots": [],
         "construct__anchor_id": str(row["id"]),
         "construct__anchor_orientation": "forward",
         "construct__anchor_start": 0,

@@ -16,5 +16,6 @@ Use semantic lanes instead of a flat chronology.
 ### Current Proposals
 
 - [Generic linear ssDNA composition](cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
+- [RT-lnRNA sponging construct triage](cross-tool/rt-lnrna-sponging-construct-triage/2026-05-22-rt-lnrna-sponging-construct-triage.md)
 - [Sequence-view ontology and Infer completion](cross-tool/sequence-view/2026-04-28-ontology-and-infer-completion-hardening.md)
 - [OPAL campaign notebook consolidation](tools/opal/2026-05-15-campaign-notebook-consolidation.md)

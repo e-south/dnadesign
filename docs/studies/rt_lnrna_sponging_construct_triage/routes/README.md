@@ -1,0 +1,53 @@
+---
+doc_id: study-rt-lnrna-sponging-construct-triage-routes
+surface: study-route-map
+study_id: rt_lnrna_sponging_construct_triage
+owner: dnadesign-maintainers
+last_verified: 2026-05-22
+entrypoint: self
+status_surface: record-only
+preflight_surface: planned-contract-checks
+---
+
+## rt_lnrna_sponging_construct_triage Routes
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-05-22
+
+Use this page as the one-hop route record for the planned RT-lnRNA sponging
+construct workbench. No study-owned OPS status or preflight provider is
+registered yet.
+
+### Navigation Header
+
+| Need | Surface |
+| --- | --- |
+| Current state | `../record/status.md` |
+| Source inventories | `../record/datasets.yaml` |
+| GenBank source authority | `../workbench/provenance/genbank-source-authority.yaml` |
+| Parsed feature-offset audit | `../workbench/provenance/genbank-feature-offset-audit.md` |
+| Construct projection manifest | `../operations/contract/fixtures/construct/construct-projection-manifest.yaml` |
+| Machine-readable contract index | `../operations/ops.study.yaml` |
+| Candidate/table schemas | `../operations/contract/schemas/` |
+| Minimal anchor fixtures | `../operations/contract/fixtures/candidates/` |
+
+### Owner Routes
+
+| Need | First owner surface | State |
+| --- | --- | --- |
+| Biological scope | this page and `../workbench/ontology/vocabulary.md` | Phase 0 planned |
+| Candidate universe | `../workbench/design_sets/v1-candidate-scope.md` | Phase 0 planned |
+| Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
+| Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; runtime materialization blocked |
+| Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
+| OPAL readiness | `../contexts/opal-handoff.md` | labels absent; OPAL run blocked |
+
+### Boundary Rules
+
+- Candidate rows are paired RT plus lnRNA constructs, not RT-only catalog rows.
+- Literature abundance priors are not TF-sponging labels.
+- Construct owns named-slot assembly and realized sequence projection.
+- Infer owns feature aliases and vector sidecars.
+- LatentDNA may review geometry after Infer sidecars exist.
+- OPAL starts only after one candidate table has one fixed-size vector `X` and
+  real `SpongingAssayObservation` labels exist.

@@ -101,6 +101,10 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "ensure_sequence_contract_namespaces": (".src.api", "ensure_sequence_contract_namespaces"),
     "parse_columns_spec": (".src.api", "parse_columns_spec"),
     "register_namespace": (".src.api", "register_namespace"),
+    "BiopythonGenBankParser": (".src.genbank", "BiopythonGenBankParser"),
+    "GenBankParser": (".src.genbank", "GenBankParser"),
+    "ParsedGenBankFeature": (".src.genbank", "ParsedGenBankFeature"),
+    "ParsedGenBankRecord": (".src.genbank", "ParsedGenBankRecord"),
 }
 
 __all__ = list(_ATTR_SOURCES)

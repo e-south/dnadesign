@@ -1,0 +1,16 @@
+groups:
+  genbank_source_authority:
+    owner: study
+    phase: phase_0_contracts
+  candidate_contract:
+    owner: study
+    phase: phase_1_candidate_table
+  representation_readiness:
+    owner: construct_usr_infer
+    phase: phase_2_construct_projection
+  overlay_linkage:
+    owner: study
+    phase: phase_4_overlay_linkage
+  opal_precondition:
+    owner: opal
+    phase: phase_7_opal_readiness

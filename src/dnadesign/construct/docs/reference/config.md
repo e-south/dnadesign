@@ -5,8 +5,10 @@
 
 ### Job shape
 
-One construct job either realizes one template against one input dataset selection or runs one
-annotation-aware `normalize_anchor` pass, and writes into one output dataset.
+One construct job either realizes one template against one input dataset
+selection or runs one annotation-aware `normalize_anchor` pass, and writes into
+one output dataset. Template-realization jobs may bind one or more named
+`input_field` parts from each selected input row into that template.
 
 ```yaml
 job:
@@ -45,6 +47,7 @@ job:
   realize:
     mode: window
     focal_part: anchor
+    required_slots: [anchor]
     window:
       semantics: fixed_total
       reference: center
@@ -65,7 +68,9 @@ job:
 - `input.source.kind`: current backend selector; today this must be `usr`
 - `input.source.dataset`: required USR dataset id
 - `input.source.root`: required explicit USR root for construct jobs that read USR datasets
-- `input.field`: sequence-bearing field for `input_field` parts
+- `input.field`: primary sequence-bearing field for one-slot jobs; set this to
+  `null` only when every variable `input_field` part declares its own
+  `part.sequence.field`
 - `input.ids`: optional subset of record ids for selective realization
 - construct decides whether a sequence is used as a focal part or as a template; do not encode that role in the USR dataset id itself
 - flat `input.dataset`, `input.root`, and scalar `input.source: usr` are rejected; `input.source` must be a mapping
@@ -90,6 +95,10 @@ Fail-fast template rules:
 ### Parts and placement
 
 - each job must include at least one `input_field` part
+- each part is a named assembly slot with its own role, sequence source,
+  placement, orientation, and guards
+- multi-slot jobs bind several `input_field` parts from the same input row, for
+  example `candidate__lnrna_sequence` and `candidate__rt_cds_sequence`
 - every placement now has two explicit sub-blocks:
   - `locator`: how construct finds the site
   - `guards`: optional assertions that prove the resolved site is the intended one
@@ -130,6 +139,9 @@ Common patterns:
 
 - `mode: full_construct`: write the entire realized construct
 - `mode: window`: extract a focal window around `focal_part`
+- `realize.required_slots`: optional list of part names that must remain
+  present as one contiguous span in the emitted output; windowed jobs fail
+  before write-back if a required slot would be clipped or split
 - `realize.window.semantics=fixed_total`: emitted output length is fixed by `size_bp`
 - `realize.window.reference=start|center|end`: choose the focal point inside the realized part
 - `realize.window.direction=symmetric|five_prime|three_prime`: symmetric is the default; `five_prime` and `three_prime` are resolved relative to part orientation
@@ -206,6 +218,9 @@ whole-output reverse-complement products from one realized forward construct.
   `construct__forward_anchor_start` / `construct__forward_anchor_end` for downstream audits
 - reverse-complement variants are the reverse complement of the full emitted context sequence, not
   the reverse complement of a truncated anchor-only sequence
+- reverse-complement variants transform `construct__slots[].start` /
+  `construct__slots[].end` into emitted reverse-complement coordinates while
+  preserving `forward_start` / `forward_end` for audits
 - Infer `anchor_mean` consumers should use the emitted-orientation `construct__anchor_start` /
   `construct__anchor_end` or matching sequence-view bounds directly; reverse-complement bounds are
   already transformed by Construct using `L-b, L-a`
@@ -233,15 +248,22 @@ whole-output reverse-complement products from one realized forward construct.
 - `output.allow_same_as_input`: defaults to `false`; set to `true` only for intentional recursive accumulation
 - flat `output.dataset`, `output.root`, and `output.source` are rejected; use `output.target.*` plus `output.record_source`
 
-### Multi-template and matrix studies
+### Multi-slot and multi-template studies
 
-The current construct schema is intentionally one-template-per-job. Represent larger studies by:
+The current construct schema is intentionally one-template-per-job, but a
+single template job may assemble multiple named slots from one input row. Use
+multiple construct projects when a study needs multiple templates, context
+lengths, or backbone choices.
+
+Represent larger template matrices by:
 
 1. creating multiple config files
 2. inventorying them in `construct.workspace.yaml` under `project.artifacts.config`
 3. using `construct workspace show` plus `validate`/`run` per project
 
-This keeps each construct spec auditable and avoids hiding a job matrix inside one oversized config.
+This keeps each construct spec auditable and avoids hiding a template matrix
+inside one oversized config. Multi-slot placement remains part of the public
+job schema, not a study-local precomposition workaround.
 
 Use `construct workspace doctor` to keep the registry and those config files aligned, then use
 `construct workspace validate-project` or `construct workspace run-project` to execute by project id.

@@ -41,7 +41,7 @@ class USRDatasetLocatorConfig(StrictConfigModel):
 
 class InputConfig(StrictConfigModel):
     source: USRDatasetLocatorConfig
-    field: str = "sequence"
+    field: Optional[str] = "sequence"
     ids: Optional[List[str]] = None
 
     @model_validator(mode="before")
@@ -62,7 +62,9 @@ class InputConfig(StrictConfigModel):
 
     @field_validator("field")
     @classmethod
-    def _field_not_blank(cls, value: str) -> str:
+    def _field_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         text = str(value or "").strip()
         if not text:
             raise ValueError("input.field cannot be empty.")
@@ -358,7 +360,23 @@ class WindowConfig(StrictConfigModel):
 class RealizeConfig(StrictConfigModel):
     mode: Literal["window", "full_construct"] = "window"
     focal_part: Optional[str] = None
+    required_slots: List[str] = Field(default_factory=list)
     window: Optional[WindowConfig] = None
+
+    @field_validator("required_slots")
+    @classmethod
+    def _required_slots_not_blank(cls, value: List[str]) -> List[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = str(item or "").strip()
+            if not text:
+                raise ValueError("realize.required_slots cannot contain empty strings.")
+            if text in seen:
+                raise ValueError(f"realize.required_slots contains duplicate slot '{text}'.")
+            seen.add(text)
+            normalized.append(text)
+        return normalized
 
     @model_validator(mode="before")
     @classmethod
@@ -619,6 +637,8 @@ class InnerJobConfig(StrictConfigModel):
         if not str(self.input.source.root or "").strip():
             raise ValueError("job.input.source.root is required for construct jobs that read USR datasets.")
         if self.mode == "normalize_anchor":
+            if self.input.field is None:
+                raise ValueError("job.input.field is required when job.mode='normalize_anchor'.")
             if self.normalize_anchor is None:
                 raise ValueError("job.normalize_anchor is required when job.mode='normalize_anchor'.")
             if self.template is not None:
@@ -650,6 +670,10 @@ class InnerJobConfig(StrictConfigModel):
             raise ValueError("job.parts must include at least one source='input_field' part.")
         if self.realize.mode == "window" and self.realize.focal_part not in seen:
             raise ValueError(f"realize.focal_part '{self.realize.focal_part}' is not defined in job.parts.")
+        missing_required_slots = [slot for slot in self.realize.required_slots if slot not in seen]
+        if missing_required_slots:
+            joined = ", ".join(missing_required_slots)
+            raise ValueError(f"realize.required_slots contains unknown part name(s): {joined}.")
         return self
 
 

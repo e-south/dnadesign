@@ -1,0 +1,7 @@
+snapshot:
+  kind: record_only
+  study_id: rt_lnrna_sponging_construct_triage
+  status_ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md
+  datasets_ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml
+  routes_ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
+  provider_registered: false

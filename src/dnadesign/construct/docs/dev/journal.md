@@ -249,7 +249,9 @@ Pressure testing against real demo flows and a bounded review swarm surfaced thr
   - `output.on_conflict=error` remains the fail-fast default
   - `output.on_conflict=ignore` supports idempotent reruns or selective append flows
 - Writing output to the same dataset/root as input is blocked unless `output.allow_same_as_input=true`.
-- Every workspace now carries `construct.workspace.yaml` as a project registry so multi-template or multi-slot studies stay auditable as multiple explicit config entries.
+- Every workspace now carries `construct.workspace.yaml` as a project registry so
+  multi-template studies stay auditable as multiple explicit config entries;
+  multiple slots inside one template are declared inside each job config.
 - Workspace projects now track config artifacts explicitly, including expected `job.id`, so registry drift is caught before a run instead of after outputs are written.
 
 ### Workspace stance refinement

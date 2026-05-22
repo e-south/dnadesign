@@ -22,10 +22,15 @@ For template-backed inference or other downstream analysis, the resolved constru
 - `construct__anchor_orientation`
 - `construct__anchor_start`
 - `construct__anchor_end`
+- `construct__assembly_mode`
+- `construct__slot_count`
+- `construct__slots`
 - `construct__resolved_length`
 - `construct__spec_id`
 
 These values are emitted relative to the realized sequence that construct writes.
+For multi-slot jobs, `construct__anchor_*` remains the focal part span for
+existing consumers, while `construct__slots` carries every named slot span.
 
 ### What infer expects
 
@@ -46,10 +51,13 @@ Templated infer jobs fail fast when the required `construct__*` fields are missi
 
 Construct now also fails fast during preflight when a windowed output would clip or wrap the focal anchor so that
 `construct__anchor_start` / `construct__anchor_end` cannot be emitted as one contiguous span.
+Windowed jobs also fail when `realize.required_slots` names a part that would be
+clipped or split in the emitted view.
 
 ### Template strategy
 
-The current construct schema remains one-template-per-job.
+The current construct schema remains one-template-per-job. Within that one
+template, jobs may assemble multiple named slots from one candidate row.
 
 Use multiple construct projects when you need:
 

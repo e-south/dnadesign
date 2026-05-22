@@ -1,0 +1,67 @@
+schema_id: construct_projection_manifest_v1
+study_id: rt_lnrna_sponging_construct_triage
+purpose: Bind source-authority RT/lnRNA candidate rows to Construct named slots before runtime materialization.
+required_top_level_fields:
+  manifest_id: string
+  study_id: rt_lnrna_sponging_construct_triage
+  construct_contract: dual_cassette_rt_lnrna_expression_v1
+  representation_contract: dual_cassette_construct_context_embedding_v1
+  strategy.strategy_id: construct_multi_slot_assembly_v1
+  construct_template.construct_template_id: string
+  construct_template.plasmid_context_source_id: string
+  construct_template.target_context.length_nt: integer
+  construct_template.target_context.coordinate_basis: zero_based_half_open
+  slots: list
+  representation_views: list
+  candidates: list
+slot_contract:
+  required_slot_ids:
+    - lnrna
+    - rt_cds
+  required_fields:
+    slot_id: string
+    role: string
+    sequence_field: string
+    required: boolean
+    template_span_0: zero_based_half_open_span
+    placement_kind: controlled_string
+    orientation: controlled_string
+    guard.source_feature: string
+    guard.replaced_span_bp: integer
+candidate_slot_binding_contract:
+  required_fields:
+    candidate_id: string
+    construct_projection_status: controlled_string
+    slot_bindings.lnrna.sequence_id: string
+    slot_bindings.lnrna.sequence_length_nt: integer
+    slot_bindings.rt_cds.sequence_id: string
+    slot_bindings.rt_cds.sequence_length_nt: integer
+    emitted_slot_spans_0.lnrna: zero_based_half_open_span
+    emitted_slot_spans_0.rt_cds: zero_based_half_open_span
+    construct_context_view_declarations: list_string
+controlled_values:
+  strategy_id:
+    - construct_multi_slot_assembly_v1
+  construct_projection_status:
+    - representable
+    - not_representable_too_long
+    - not_representable_missing_constant
+    - not_representable_invalid_sequence
+    - not_representable_unresolved_anchor
+  placement_kind:
+    - replace
+    - insert
+  orientation:
+    - forward
+    - reverse_complement
+future_input_normalization:
+  rule: Every future GenBank, compiler, Crawford, or Khan-derived candidate source must normalize into the same slot_binding shape before Construct placement.
+  genbank_inputs: Parse through GenBank source authority and require unambiguous feature spans.
+  msd_compiler_outputs: Require materialized sequence plus feature map; labels alone are not projectable.
+  crawford_design_rows: May provide Eco1 lnRNA/MSD provenance only after projection-compatible feature mapping.
+  khan_rows: Remain abundance/provenance overlays unless both RT and lnRNA sequence authority are named.
+validation_notes:
+  - Reject precomposed single-anchor strategy ids.
+  - Reject arbitrary filler padding and any context that needs truncation.
+  - Reject missing forward or reverse-complement view declarations before Infer handoff.
+  - Reject missing lnRNA slot span for anchor_mean pooling.

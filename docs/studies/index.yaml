@@ -15,3 +15,6 @@ studies:
   - study_id: retron_hairpin_design
     title: Retron hairpin design effort
     record_root: docs/studies/retron_hairpin_design
+  - study_id: rt_lnrna_sponging_construct_triage
+    title: RT-lnRNA sponging construct triage
+    record_root: docs/studies/rt_lnrna_sponging_construct_triage

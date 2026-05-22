@@ -1,0 +1,30 @@
+schema_id: msd_design_spec_v1
+study_id: rt_lnrna_sponging_construct_triage
+required_fields:
+  msd_design_spec_id: string
+  schema_version: msd_design_spec_v1
+  payload_program_id: string
+  payload_id: string
+  payload_sequence: dna_string
+  compiler_source: string
+  compiler_contract: string
+  cap_id: string
+  snapback_source_id: string_or_null
+  scar_nick_source_id: string_or_null
+  left_base: string_or_null
+  right_base: string_or_null
+  profile_s3s2s1s0: string_or_null
+  nick_orientation: string_or_null
+  nickase: string_or_null
+  feasibility_status: controlled_string
+  feasibility_reason: string_or_null
+  source_refs: list
+controlled_values:
+  feasibility_status:
+    - cloning_feasible
+    - non_ligatable_control
+    - needs_review
+    - not_feasible
+validation_notes:
+  - This schema owns cloning and design feasibility details.
+  - Do not create a separate construct-level cloning_constraint_set object.

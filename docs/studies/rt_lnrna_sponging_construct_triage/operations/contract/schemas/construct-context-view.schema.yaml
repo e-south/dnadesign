@@ -1,0 +1,37 @@
+schema_id: construct_context_view_v1
+study_id: rt_lnrna_sponging_construct_triage
+required_fields:
+  construct_context_view_id: string
+  candidate_id: string
+  construct_contract: dual_cassette_rt_lnrna_expression_v1
+  representation_contract: dual_cassette_construct_context_embedding_v1
+  view_name: string
+  product_kind: realized_context
+  orientation: controlled_string
+  sequence_window_length_nt: integer
+  coordinate_basis: zero_based_half_open
+  pooling_operation: controlled_string
+  pooling_start_0: integer_or_null
+  pooling_end_0: integer_or_null
+  required_slots: list_string
+  emitted_slot_spans_0: mapping_string_span_or_null
+  transform_version: dual_cassette_construct_context_embedding_v1
+  representability_status: controlled_string
+  failure_reason: string_or_null
+controlled_values:
+  orientation:
+    - forward
+    - reverse_complement
+  pooling_operation:
+    - seq_mean
+    - anchor_mean
+  representability_status:
+    - representable
+    - not_representable_too_long
+    - not_representable_missing_constant
+    - not_representable_invalid_sequence
+    - not_representable_unresolved_anchor
+validation_notes:
+  - Study view names are not new USR product_kind values.
+  - Concat is a downstream derived vector view, not an Infer pooling operation.
+  - Required lnRNA and RT CDS slots must be present in the emitted context before Infer runs.

@@ -1,0 +1,25 @@
+version: 1
+study_id: rt_lnrna_sponging_construct_triage
+command_groups:
+  - id: phase_0_contract_validation
+    status: active
+    purpose: Validate checked-in docs and contract fixtures.
+    commands:
+      - uv run python -m dnadesign.devtools.docs.checks --repo-root .
+  - id: construct_projection
+    status: blocked
+    purpose: Materialize dual-cassette construct contexts from the multi-slot projection manifest.
+    blockers:
+      - construct_runtime_not_executed
+      - construct_context_view_materialization
+  - id: infer_handoff
+    status: blocked
+    purpose: Extract feature aliases from declared construct-context views.
+    blockers:
+      - materialized_sequence_views
+  - id: opal_readiness
+    status: blocked
+    purpose: Validate candidate records with one fixed-size vector X and real labels.
+    blockers:
+      - fixed_size_vector_x_absent
+      - real_sponging_assay_observations_absent

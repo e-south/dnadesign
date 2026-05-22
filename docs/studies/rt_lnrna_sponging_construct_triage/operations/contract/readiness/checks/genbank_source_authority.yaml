@@ -1,0 +1,18 @@
+id: genbank_source_authority
+status: pass
+owner: study
+phase: phase_0_contracts
+inputs:
+  registry: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
+  audit: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
+  tests:
+    - repo:src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py
+rules:
+  - Parse registered GenBank files through dnadesign.usr.BiopythonGenBankParser.
+  - Fail when required labels are missing or ambiguous.
+  - Require two tet operator placements for anchor vectors and retron26 a1-a2.
+  - Require RT CDS sequence and translation identity across retron26 vector, retron43 vector, and standalone Eco1 RT.
+  - Require retron26 a1-a2 sequence containment in the full retron26 vector.
+  - Require explicit left base, right base, foldback, cap, payload, and payload-complement labels in the retron179 orientation reference.
+validation:
+  command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py

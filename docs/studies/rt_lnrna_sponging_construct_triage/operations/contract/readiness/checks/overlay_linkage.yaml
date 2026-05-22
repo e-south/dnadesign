@@ -1,0 +1,11 @@
+id: overlay_linkage
+status: planned
+owner: study
+phase: phase_4_overlay_linkage
+inputs:
+  datasets: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml
+rules:
+  - Preserve raw_value and normalized_value for Khan and Crawford abundance priors.
+  - Keep Khan and Crawford regimes separate.
+  - Treat ordinal_bin as derived metadata, not a replacement for raw numeric values.
+  - Do not export any abundance prior as normalized_TF_sponging_label.

@@ -1,0 +1,19 @@
+schema_id: sponging_assay_observation_v1
+study_id: rt_lnrna_sponging_construct_triage
+status: future_label_schema
+required_fields:
+  observation_id: string
+  candidate_id: string
+  payload_program_id: string
+  assay_id: string
+  batch_id: string
+  readout_kind: string
+  raw_value: numeric
+  normalized_value: numeric_or_null
+  normalization_basis: string_or_null
+  replicate_count: integer_or_null
+  uncertainty: numeric_or_struct_or_null
+  assay_metadata: mapping
+validation_notes:
+  - This is the only planned source for OPAL TF-sponging Y values.
+  - Literature abundance priors must not be converted into this schema.
