@@ -104,10 +104,9 @@ training split, and later rounds label the previous OPAL selections from the
 study-owned DenseGen oracle or permuted null before rerunning OPAL. Synthetic
 labels still never enter the shared observed-label sidecar.
 
-Metrics are written for the final scored round and for every available round in
-`reports/round_metrics.csv` and `reports/round_metrics.jsonl`. Reviews include a
-metric guide for `precision@K`, prevalence, lift, binomial tail p-values, and
-null lift.
+Metrics are written for the final scored round and every available round in
+`reports/round_metrics.csv` and `reports/round_metrics.jsonl`. Reviews cover
+`precision@K`, prevalence, lift, binomial tail p-values, and null lift.
 
 The probe inherits OPAL's `safety.max_x_matrix_gib` guard and uses
 `writeback.prediction_records: ledger_only`. OPAL validates the 8192-D X
@@ -166,6 +165,10 @@ Review artifacts are layered:
   `outputs/review/`.
 - The probe writes only the study-specific aggregate benchmark layer under
   `reports/`.
+- Configured OPAL campaign plots are refreshed separately from the aggregate
+  report. For final plot review, run
+  `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
+  then rerun the report with `--plots --json`.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`

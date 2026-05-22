@@ -96,9 +96,14 @@ def _run_probe(args: argparse.Namespace) -> int:
         print(
             json.dumps(
                 {
+                    "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.plan_preview.v1",
+                    "mode": "dry_run",
+                    "writes_artifacts": False,
                     **plan_payload,
                     "plan_fingerprint": plan_record["fingerprint"],
-                    "plan_path": str(ProbeArtifactLayout(run_root).probe_plan_path),
+                    "planned_plan_path": str(ProbeArtifactLayout(run_root).probe_plan_path),
+                    "plan_exists": False,
+                    "run_root_exists": run_root.exists(),
                 },
                 indent=2,
                 sort_keys=True,

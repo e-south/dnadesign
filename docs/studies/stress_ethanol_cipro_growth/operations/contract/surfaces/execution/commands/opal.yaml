@@ -59,3 +59,18 @@ densegen_axis_probe_report_json:
   - --run-root
   - <run-root>
   - --json
+densegen_axis_probe_plot_refresh_json:
+  surface_type: command
+  writes_artifacts: true
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe
+  - plot
+  - --run-root
+  - <run-root>
+  - --round
+  - all
+  - --json

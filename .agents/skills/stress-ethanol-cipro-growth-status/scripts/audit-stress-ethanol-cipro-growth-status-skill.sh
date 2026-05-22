@@ -16,6 +16,11 @@ require_file() {
   [[ -f "$path" ]] && pass "found ${path#$REPO_ROOT/}" || fail "missing file $path"
 }
 
+require_dir() {
+  local path="$1"
+  [[ -d "$path" ]] && pass "found ${path#$REPO_ROOT/}" || fail "missing directory $path"
+}
+
 require_section() {
   local section="$1"
   grep -Fxq "$section" "$SKILL_FILE" && pass "section present: $section" || fail "section missing: $section"
@@ -164,7 +169,9 @@ require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_grow
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/decision.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/prediction_ledger.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/progress.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review.py"
+require_dir "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/__init__.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/builder.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/status.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
@@ -222,6 +229,12 @@ else
   pass "stress Infer readiness checks are split by owner/action lane"
 fi
 
+if [[ -e "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review.py" ]]; then
+  fail "DenseGen probe review is a semantic package"
+else
+  pass "DenseGen probe review is a semantic package"
+fi
+
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py" 320 "status service stays orchestration-sized"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/runtime_dependencies.py" 140 "runtime probe module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/semantic_completeness.py" 200 "semantic-completeness probe module stays bounded"
@@ -231,6 +244,11 @@ require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/prediction_ledger.py" 120 "DenseGen probe prediction-ledger module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/cli.py" 280 "DenseGen probe CLI module stays bounded"
 require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/status.py" 220 "DenseGen probe status module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/builder.py" 180 "DenseGen probe review builder stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/configured_plots.py" 260 "DenseGen probe review configured-plot module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/probe_plots.py" 360 "DenseGen probe review plot module stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/rendering/html.py" 320 "DenseGen probe review HTML renderer stays bounded"
+require_max_lines "$REPO_ROOT/src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review/rendering/markdown.py" 240 "DenseGen probe review Markdown renderer stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md" 140 "stress study route map stays one-hop"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/source/densegen.md" 80 "DenseGen route detail stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/compute/infer.md" 80 "Infer route detail stays bounded"

@@ -25,5 +25,10 @@ or permuted null for that scratch run only.
 Applied runs write `probe_plan.json` at the run root and refuse to reuse a
 nonempty root with a missing or mismatched plan. Use a new `--run-id` for normal
 reruns; `--replace-run-root` intentionally deletes and rebuilds the scratch root.
+Dry-run JSON reports `planned_plan_path` and `writes_artifacts: false`; it does
+not claim that `probe_plan.json` already exists.
 `progress --json` is compact by default; add `--full` to include the nested OPAL
 campaign progress payloads.
+Refresh configured OPAL plot indexes with `plot --run-root <run> --round all
+--json`, then rerun `report --run-root <run> --plots --json` for the final
+artifact review.
