@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from importlib import import_module
-from io import BytesIO
 from typing import Any, Mapping, Sequence
 
 BASERENDER_CONTRACT_SCHEMA_VERSION = "opal.notebook_baserender_contract.v1"
+NO_RENDERABLE_RECORDS_LABEL = "(no renderable records)"
 
 
 def build_notebook_baserender_contract(
@@ -73,76 +72,30 @@ def build_notebook_baserender_contract_rows(contract: Mapping[str, Any]) -> list
     ]
 
 
-def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
-    """Render a single record through the public BaseRender API."""
-
-    if not bool(contract.get("available")):
-        raise ValueError(str(contract.get("reason") or "BaseRender contract is unavailable."))
-    record_id = str(record_row.get("id") or "unknown")
-    adapter_kind = str(contract.get("adapter_kind") or "")
-    if not adapter_kind:
-        raise ValueError("BaseRender contract is missing adapter_kind.")
-
-    baserender = import_module("dnadesign.baserender")
-    adapt_records = baserender.adapt_records
-    render_record_figure = baserender.render_record_figure
-
-    records = adapt_records(
-        [dict(record_row)],
-        adapter_kind=adapter_kind,
-        adapter_columns=dict(contract.get("adapter_columns") or {}),
-        adapter_policies=dict(contract.get("adapter_policies") or {}),
-        alphabet="DNA",
-    )
-    if not records:
-        raise ValueError(f"BaseRender produced no record for `{record_id}`.")
-    figure = render_record_figure(
-        records[0],
-        renderer_name=str(contract.get("renderer_name") or "sequence_rows"),
-        style_preset=contract.get("style_preset") or "presentation_default",
-        style_overrides=dict(contract.get("style_overrides") or {}),
-    )
-    try:
-        buffer = BytesIO()
-        figure.savefig(buffer, format="png", bbox_inches="tight", facecolor="white")
-        image_bytes = buffer.getvalue()
-    finally:
-        try:
-            import matplotlib.pyplot as plt
-
-            plt.close(figure)
-        except Exception:
-            pass
-    if not image_bytes:
-        raise ValueError(f"BaseRender image bytes were empty for `{record_id}`.")
-    caption = str(contract.get("caption") or "BaseRender record view.")
-    return {
-        "record_id": record_id,
-        "image_bytes": image_bytes,
-        "caption": f"{caption} Record `{record_id}`.",
-        "alt_text": str(contract.get("alt_text_template") or caption).format(record_id=record_id),
-    }
-
-
 def _contract_candidates(columns: set[str]) -> list[dict[str, Any]]:
-    candidates = [
-        {
-            "label": "Record render",
-            "adapter_kind": "densegen_tfbs",
-            "adapter_columns": {
-                "id": "id",
-                "sequence": "sequence",
-                "annotations": "densegen__used_tfbs_detail",
-            },
-            "adapter_policies": {"on_invalid_row": "error"},
-            "required_columns": ("id", "sequence", "densegen__used_tfbs_detail"),
-            "caption": "BaseRender view of the selected record with annotated sequence features.",
-            "alt_text_template": (
-                "BaseRender sequence diagram for record {record_id}; annotated sequence features "
-                "are drawn over the selected OPAL record."
-            ),
-        }
-    ]
+    candidates = []
+    if "seq_annot__features" in columns:
+        candidates.append(
+            {
+                "label": "Record render",
+                "adapter_kind": "usr_genbank_annotations_v1",
+                "adapter_columns": {
+                    "id": "id",
+                    "sequence": "sequence",
+                    "annotations": "seq_annot__features",
+                    **({"overlay_text": "usr_label__primary"} if "usr_label__primary" in columns else {}),
+                    **({"source_file": "seq_annot__source_file"} if "seq_annot__source_file" in columns else {}),
+                    **({"product_kind": "derived__product_kind"} if "derived__product_kind" in columns else {}),
+                },
+                "adapter_policies": {"on_invalid_row": "error"},
+                "required_columns": ("id", "sequence", "seq_annot__features"),
+                "caption": "BaseRender view of the selected record with sequence annotations.",
+                "alt_text_template": (
+                    "BaseRender sequence diagram for record {record_id}; sequence annotations "
+                    "are drawn over the selected OPAL record."
+                ),
+            }
+        )
     for feature_column in ("opal__baserender_features", "baserender__features"):
         if feature_column in columns:
             candidates.append(
@@ -163,6 +116,24 @@ def _contract_candidates(columns: set[str]) -> list[dict[str, Any]]:
                     ),
                 }
             )
+    candidates.append(
+        {
+            "label": "Record render",
+            "adapter_kind": "densegen_tfbs",
+            "adapter_columns": {
+                "id": "id",
+                "sequence": "sequence",
+                "annotations": "densegen__used_tfbs_detail",
+            },
+            "adapter_policies": {"on_invalid_row": "error"},
+            "required_columns": ("id", "sequence", "densegen__used_tfbs_detail"),
+            "caption": "BaseRender view of the selected record with annotated sequence features.",
+            "alt_text_template": (
+                "BaseRender sequence diagram for record {record_id}; annotated sequence features "
+                "are drawn over the selected OPAL record."
+            ),
+        }
+    )
     return candidates
 
 

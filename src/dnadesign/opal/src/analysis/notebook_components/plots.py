@@ -94,6 +94,10 @@ def build_notebook_visual_surface_model(
                     title=title,
                     kind=entry.get("kind") or manifest.get("kind"),
                     summary=summary,
+                    rounds=manifest.get("rounds"),
+                    run_id=manifest.get("run_id"),
+                    freshness=freshness.get("status") or manifest.get("stale_state"),
+                    warning_count=len(warnings),
                 ),
                 "entry": dict(entry),
                 "manifest": dict(manifest),
@@ -159,12 +163,59 @@ def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str,
     ]
 
 
-def _plot_alt_text(*, title: str, kind: Any, summary: str) -> str:
+def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, str]:
+    """Build readable accordion sections for the selected plot's method."""
+
+    rows = {str(row["section"]): str(row["detail"]) for row in build_notebook_plot_method_rows(choice)}
+    title = str(choice.get("title") or display_name(choice.get("name"))).strip()
+    kind = str(choice.get("kind") or "unknown").replace("_", " ")
+    rounds = _rounds_text(choice.get("rounds"))
+    freshness = str(choice.get("freshness") or "unknown")
+    warnings = int(choice.get("warning_count") or 0)
+    return {
+        "Read": (f"{title} shows a {kind} view for {rounds}. {rows.get('reading', 'No plot description recorded.')}"),
+        "Math": rows.get("math", "No math description recorded."),
+        "Data contract": (
+            f"Data shape: {rows.get('data shape', 'not recorded')}.\n\n"
+            f"Parameters: {rows.get('parameters', 'not recorded')}.\n\n"
+            f"Tidy schema: {rows.get('tidy schema', 'not recorded')}.\n\n"
+            f"Failure modes: {rows.get('failure modes', 'not recorded')}.\n\n"
+            f"Freshness: `{freshness}`. Warnings: `{warnings}`."
+        ),
+    }
+
+
+def _plot_alt_text(
+    *,
+    title: str,
+    kind: Any,
+    summary: str,
+    rounds: Any,
+    run_id: Any,
+    freshness: Any,
+    warning_count: int,
+) -> str:
     kind_text = str(kind or "plot").replace("_", " ")
     summary_text = str(summary or "").strip()
+    scope = _rounds_text(rounds)
+    run_text = "all runs" if run_id in (None, "") else f"run {run_id}"
+    quality = f"freshness {freshness or 'unknown'}"
+    if int(warning_count) > 0:
+        quality += f", {int(warning_count)} warnings"
     if summary_text:
-        return f"{title}. {summary_text}"
-    return f"{title}. OPAL {kind_text} visual for the selected campaign."
+        return f"{title}. {summary_text} Scope: {scope}, {run_text}; {quality}."
+    return f"{title}. OPAL {kind_text} visual. Scope: {scope}, {run_text}; {quality}."
+
+
+def _rounds_text(value: Any) -> str:
+    if value in (None, ""):
+        return "the selected round"
+    if value == "all":
+        return "all rounds"
+    items = sequence(value)
+    if len(items) == 1:
+        return f"round {items[0]}"
+    return "rounds " + ", ".join(str(item) for item in items)
 
 
 def _plot_math_description(kind: str) -> str:

@@ -106,6 +106,7 @@ def build_notebook_view_model(
         "campaign": {
             "name": cfg.campaign.name,
             "slug": cfg.campaign.slug,
+            "description": cfg.campaign.description,
             "workdir": str(ws.workdir),
             "config_path": str(analysis.config_path),
             "records_path": str(analysis.records_store().records_path),

@@ -27,6 +27,7 @@ LAYOUT_CELLS = dedent(
         records_preview_df,
         round_run_controls,
         run_summary_md,
+        status_line_md,
         validity_md,
         x_provenance_md,
     ):
@@ -56,6 +57,7 @@ LAYOUT_CELLS = dedent(
         mo.vstack(
             [
                 header_md,
+                status_line_md,
                 at_a_glance_md,
                 plot_panel,
                 mo.accordion(

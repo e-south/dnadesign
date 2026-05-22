@@ -8,22 +8,28 @@ SUMMARY_CELLS = dedent(
     def _(
         build_notebook_at_a_glance_rows,
         build_notebook_distrust_lines,
+        build_notebook_status_line,
+        build_notebook_trust_rows,
         build_notebook_validity_lines,
         mo,
         notebook_view_model,
         pl,
     ):
         at_a_glance_rows = build_notebook_at_a_glance_rows(notebook_view_model)
-        at_a_glance_md = mo.vstack(
-            [
-                mo.md("## Campaign status"),
-                mo.ui.table(pl.DataFrame(at_a_glance_rows), page_size=14),
-            ],
-            gap=0.25,
+        status_line_md = mo.md(build_notebook_status_line(notebook_view_model))
+        at_a_glance_md = mo.accordion(
+            {
+                "Status": mo.ui.table(pl.DataFrame(at_a_glance_rows), page_size=14),
+                "Trust checks": mo.ui.table(
+                    pl.DataFrame(build_notebook_trust_rows(notebook_view_model)),
+                    page_size=8,
+                ),
+            },
+            lazy=True,
         )
         distrust_md = mo.md("\\n".join(build_notebook_distrust_lines(notebook_view_model)))
         validity_md = mo.md("\\n".join(build_notebook_validity_lines(notebook_view_model)))
-        return at_a_glance_md, distrust_md, validity_md
+        return at_a_glance_md, distrust_md, status_line_md, validity_md
 
 
     @app.cell
@@ -86,17 +92,11 @@ SUMMARY_CELLS = dedent(
 
 
     @app.cell
-    def _(campaign, config_path, mo):
+    def _(build_notebook_campaign_header_lines, campaign, mo, notebook_view_model):
         cfg = campaign.config
         ws = campaign.workspace
         store = campaign.records_store()
-        summary_lines = [
-            "# OPAL Campaign Notebook",
-            "",
-            "Campaign analysis command surface for manifest-backed status, records, and visuals.",
-        ]
-        summary = "\\n".join(summary_lines)
-        header_md = mo.md(summary)
+        header_md = mo.md("\\n".join(build_notebook_campaign_header_lines(notebook_view_model)))
         return cfg, header_md, store, ws
 
 

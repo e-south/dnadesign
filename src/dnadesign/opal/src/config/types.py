@@ -130,6 +130,7 @@ class CampaignBlock:
     name: str
     slug: str
     workdir: str
+    description: Optional[str] = None
 
 
 @dataclass

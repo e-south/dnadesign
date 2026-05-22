@@ -19,7 +19,7 @@ import numpy as np
 from ..registries.plots import PlotMeta, register_plot
 from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import ensure_mpl_config_dir
+from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
 
 
 @register_plot(
@@ -55,6 +55,7 @@ def render(context, params: dict) -> None:
     import matplotlib.pyplot as plt
     import pandas as pd
 
+    apply_plot_style()
     vector_field = str(params.get("vector_field", "pred__y_hat_model"))
     cohort = str(params.get("cohort", "selected")).strip().lower()
     if cohort not in {"selected", "top_k", "all_pool"}:
@@ -152,9 +153,10 @@ def render(context, params: dict) -> None:
             )
 
     matrix = np.asarray(matrix_rows, dtype=float)
-    figsize = tuple(params.get("figsize_in", (8.0, 4.8)))
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
+    fig, ax = plt.subplots(figsize=figsize)
     im = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap=str(params.get("cmap", "viridis")))
+    apply_notebook_axes_style(ax)
     ax.set_xticks(range(dim))
     ax.set_xticklabels(channel_labels, rotation=45, ha="right")
     ax.set_yticks(range(len(y_labels)))
@@ -162,8 +164,9 @@ def render(context, params: dict) -> None:
     ax.set_xlabel("Vector channel")
     ax.set_title(str(params.get("title", "Vector summary heatmap")))
     fig.colorbar(im, ax=ax, label=aggregation)
+    fig.tight_layout()
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    save_notebook_square_figure(fig, out, dpi=context.dpi)
     plt.close(fig)
 
     if context.save_data:

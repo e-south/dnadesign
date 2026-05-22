@@ -18,7 +18,7 @@ import pandas as pd
 from ..registries.plots import PlotMeta, register_plot
 from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import ensure_mpl_config_dir
+from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
 from ._param_utils import get_str, normalize_metric_field
 
 
@@ -49,6 +49,9 @@ def render(context, params: dict) -> None:
     ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
     import numpy as np
+
+    apply_plot_style()
+    from matplotlib.ticker import MaxNLocator
 
     metric = normalize_metric_field(get_str(params, ["metric", "metric_field", "field"], "pred__score_selected"))
     if not metric:
@@ -96,24 +99,32 @@ def render(context, params: dict) -> None:
                 )
     tidy = pd.DataFrame(rows).sort_values(["cohort", "summary", "round"]).reset_index(drop=True)
 
-    figsize = tuple(params.get("figsize_in", (8.0, 4.8)))
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
+    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
+    fig, ax = plt.subplots(figsize=figsize)
+    apply_notebook_axes_style(ax)
+    plotted_series = 0
     for (cohort, summary), sub in tidy.groupby(["cohort", "summary"]):
         if summary == "count" and len(set(summaries)) > 1:
             continue
         label = f"{cohort}:{summary}"
         ax.plot(sub["round"], sub["value"], marker="o", linewidth=1.8, label=label)
+        plotted_series += 1
     threshold = params.get("threshold", params.get("reference_line"))
     if threshold is not None:
         ax.axhline(float(threshold), color="#444444", linestyle="--", linewidth=1.0, alpha=0.8)
     ax.set_xlabel("Round")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_ylabel(metric)
     ax.set_title(str(params.get("title", "Metric over rounds")))
-    ax.legend(frameon=False, fontsize=9)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ncol = min(3, max(1, int(np.ceil(plotted_series / 4))))
+        fig.legend(handles, labels, loc="lower center", ncol=ncol, frameon=False, fontsize=8)
+        fig.tight_layout(rect=(0, 0.18, 1, 1))
+    else:
+        fig.tight_layout()
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    save_notebook_square_figure(fig, out, dpi=context.dpi)
     plt.close(fig)
 
     if context.save_data:

@@ -87,6 +87,20 @@ def apply_plot_style(*, variant: str = "diagnostic") -> None:
     )
 
 
+def apply_notebook_axes_style(ax) -> None:
+    """Apply the notebook-review axes contract for static OPAL plot artifacts."""
+
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    ax.tick_params(axis="both", direction="out", length=4, width=0.8)
+
+
+def save_notebook_square_figure(fig, out: Path, *, dpi: int) -> None:
+    """Save a square notebook artifact without legend/crop-driven shape drift."""
+
+    fig.savefig(out, dpi=dpi, facecolor="white")
+
+
 def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="none", **kw):
     """
     Always deterministic; switches to rasterized draw above 'rasterize_at' points

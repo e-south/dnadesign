@@ -136,6 +136,7 @@ class PCampaign(BaseModel):
     name: str
     slug: str
     workdir: str
+    description: Optional[str] = None
 
     @field_validator("slug")
     @classmethod
@@ -401,6 +402,7 @@ def load_config(path: Path | str) -> RootConfig:
             name=pyd.campaign.name,
             slug=pyd.campaign.slug,
             workdir=str(resolve_path_like(cfg_path, pyd.campaign.workdir, base_dir=campaign_root)),
+            description=(str(pyd.campaign.description).strip() if pyd.campaign.description else None),
         ),
         data=data_dc,
         model=PluginRef(mdl.name, mdl_params),

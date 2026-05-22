@@ -92,11 +92,12 @@ DATA_CELLS = dedent(
 
 
     @app.cell
-    def _(labels_read, mo, pred_read, selected_round):
+    def _(cfg, labels_df, labels_read, mo, pred_read, selected_round):
+        label_round_column = str(cfg.labels.round_column or "observed_round")
         data_source_options = ["records"]
         default_source = "records"
         if labels_read.available:
-            if selected_round is not None:
+            if selected_round is not None and label_round_column in labels_df.columns:
                 data_source_options.append("labels (selected round)")
             data_source_options.append("labels (all rounds)")
         if pred_read.available:
@@ -111,7 +112,7 @@ DATA_CELLS = dedent(
             value=default_source,
             label="Data source",
         )
-        return data_source_ui, default_source
+        return data_source_ui, default_source, label_round_column
 
 
     @app.cell
@@ -120,6 +121,7 @@ DATA_CELLS = dedent(
         data_source_ui,
         labels_df,
         labels_read,
+        label_round_column,
         mo,
         pl,
         pred_columns,
@@ -138,9 +140,9 @@ DATA_CELLS = dedent(
         elif source == "labels (all rounds)":
             data_df = labels_df
         elif source == "labels (selected round)":
-            if "as_of_round" not in labels_df.columns:
-                raise ValueError("Labels do not include as_of_round for round filtering.")
-            data_df = labels_df.filter(pl.col("as_of_round") == selected_round)
+            if label_round_column not in labels_df.columns:
+                raise ValueError(f"Labels do not include {label_round_column} for round filtering.")
+            data_df = labels_df.filter(pl.col(label_round_column) == selected_round)
         elif source == "predictions (selected run)":
             data_df = pred_df
         elif source == "predictions (all rounds)":

@@ -18,6 +18,13 @@ from dnadesign.opal.src.registries.plots import PlotMeta, describe_plot_kind, li
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
+def _png_dimensions(path: Path) -> tuple[int, int]:
+    header = path.read_bytes()[:24]
+    if not header.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise AssertionError(f"not a PNG file: {path}")
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+
+
 @register_plot("test_plot_cli_minimal")
 def _plot_minimal(ctx: PlotContext, params: dict) -> None:
     ctx.output_dir.mkdir(parents=True, exist_ok=True)
@@ -386,6 +393,8 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
         manifest = json.loads((workdir / "outputs" / "plots" / f"{name}_r0.manifest.json").read_text())
         assert manifest["status"] == "written"
         assert manifest["tidy_csv"].endswith(".csv")
+        width, height = _png_dimensions(workdir / "outputs" / "plots" / f"{name}_r0.png")
+        assert width == height
 
 
 def test_plot_cli_rejects_top_level_plot_keys(tmp_path):

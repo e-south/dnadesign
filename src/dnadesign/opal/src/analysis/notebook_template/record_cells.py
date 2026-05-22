@@ -68,7 +68,7 @@ RECORD_CELLS = dedent(
         record_selector = mo.ui.dropdown(
             options=record_options,
             value=record_options[0],
-            label="Record id",
+            label="Record",
             searchable=True,
             full_width=True,
         )
@@ -117,25 +117,37 @@ RECORD_CELLS = dedent(
 
 
     @app.cell
-    def _(notebook_baserender_contract, pl, record_selector, store):
-        baserender_record_row = None
-        if (
-            notebook_baserender_contract.get("available")
-            and record_selector.value != "(no records)"
-        ):
-            required_columns = [
-                str(column)
-                for column in notebook_baserender_contract.get("required_columns", [])
-            ]
-            row_df = (
-                pl.scan_parquet(str(store.records_path))
-                .filter(pl.col("id").cast(pl.Utf8) == str(record_selector.value))
-                .select(required_columns)
-                .limit(1)
-                .collect()
-            )
-            if not row_df.is_empty():
-                baserender_record_row = row_df.to_dicts()[0]
+    def _(
+        build_notebook_baserender_record_options,
+        labels_df,
+        mo,
+        notebook_baserender_contract,
+        selected_round,
+        store,
+    ):
+        baserender_record_options = build_notebook_baserender_record_options(
+            store.records_path,
+            notebook_baserender_contract,
+            labels_df=labels_df,
+            round_value=selected_round,
+        )
+        baserender_record_selector = mo.ui.dropdown(
+            options=baserender_record_options,
+            value=baserender_record_options[0],
+            label="Record",
+            searchable=True,
+            full_width=True,
+        )
+        return baserender_record_selector
+
+
+    @app.cell
+    def _(baserender_record_selector, load_notebook_baserender_record_row, notebook_baserender_contract, store):
+        baserender_record_row = load_notebook_baserender_record_row(
+            store.records_path,
+            str(baserender_record_selector.value),
+            notebook_baserender_contract,
+        )
         return baserender_record_row
     """
 ).strip("\n")

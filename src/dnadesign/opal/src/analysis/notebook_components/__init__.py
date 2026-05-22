@@ -9,19 +9,30 @@ from .artifacts import build_notebook_artifact_garden_lines, build_notebook_arti
 from .baserender import (
     build_notebook_baserender_contract,
     build_notebook_baserender_contract_rows,
+)
+from .baserender_records import (
+    build_notebook_baserender_label_rows,
+    build_notebook_baserender_record_options,
+    load_notebook_baserender_record_row,
+)
+from .baserender_render import (
     render_notebook_baserender_record,
 )
 from .overview import (
     build_notebook_at_a_glance_rows,
+    build_notebook_campaign_header_lines,
     build_notebook_campaign_summary_row,
     build_notebook_distrust_lines,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
+    build_notebook_status_line,
+    build_notebook_trust_rows,
     build_notebook_validity_lines,
 )
 from .plots import (
     build_notebook_plot_card_rows,
     build_notebook_plot_method_rows,
+    build_notebook_plot_method_sections,
     build_notebook_visual_surface_model,
 )
 from .runs import (
@@ -38,8 +49,11 @@ __all__ = [
     "build_notebook_artifact_garden_lines",
     "build_notebook_artifact_garden_rows",
     "build_notebook_at_a_glance_rows",
+    "build_notebook_baserender_label_rows",
     "build_notebook_baserender_contract",
     "build_notebook_baserender_contract_rows",
+    "build_notebook_baserender_record_options",
+    "build_notebook_campaign_header_lines",
     "build_notebook_campaign_summary_row",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
@@ -48,12 +62,16 @@ __all__ = [
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
     "build_notebook_plot_card_rows",
+    "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
     "build_notebook_visual_surface_model",
     "build_notebook_run_options",
     "build_notebook_run_summary_lines",
+    "build_notebook_status_line",
+    "build_notebook_trust_rows",
     "build_notebook_validity_lines",
     "compact_notebook_path",
+    "load_notebook_baserender_record_row",
     "render_notebook_baserender_record",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",

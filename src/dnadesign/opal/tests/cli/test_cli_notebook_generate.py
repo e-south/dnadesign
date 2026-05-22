@@ -62,7 +62,7 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
     assert "Data source" in txt
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
-    assert 'marimo.App(width="medium")' in txt
+    assert 'marimo.App(width="full")' in txt
 
     # Optional import check if marimo is installed
     if importlib.util.find_spec("marimo") is not None:
@@ -207,7 +207,7 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -
     assert res.exit_code == 0, res.output
     assert out_path.exists()
     text = out_path.read_text()
-    assert "OPAL Campaign Set Notebook" in text
+    assert "# Campaigns" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
     assert 'label="Visual"' in text

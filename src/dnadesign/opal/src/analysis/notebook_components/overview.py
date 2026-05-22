@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._support import compact_path, join_list, mapping, selection_count, sequence
+from ._support import compact_path, display_name, join_list, mapping, selection_count, sequence
 from .plots import build_notebook_visual_surface_model
 
 
@@ -26,6 +26,29 @@ def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[s
         "stale": stale_count,
         "warnings": warning_count,
     }
+
+
+def build_notebook_campaign_header_lines(view_model: Mapping[str, Any]) -> list[str]:
+    """Build a compact, human-readable notebook heading."""
+
+    campaign = mapping(view_model.get("campaign"))
+    slug = str(campaign.get("slug") or "unknown").strip()
+    name = str(campaign.get("name") or "").strip()
+    title = name if name and name != slug else display_name(slug)
+    for suffix in {slug, slug.removeprefix("opal_axis_probe_v0_")}:
+        if suffix and title.endswith(f" [{suffix}]"):
+            title = title[: -len(f" [{suffix}]")].strip()
+    title = title.replace("top_n", "top N")
+    if title.lower().startswith("opal "):
+        title = "OPAL " + title[5:]
+    description = str(campaign.get("description") or "").strip()
+    if not description:
+        objective = sequence(campaign.get("objectives"))[0] if sequence(campaign.get("objectives")) else "objective"
+        description = (
+            f"{title} evaluates the configured records table with `{campaign.get('model')}` "
+            f"and selects candidates by `{campaign.get('selection')}` against `{objective}`."
+        )
+    return [f"# {title}", "", description]
 
 
 def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -57,6 +80,45 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         )
     )
     return rows
+
+
+def build_notebook_trust_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build compact trust-state rows for first-viewport notebook disclosure."""
+
+    status = mapping(view_model.get("status"))
+    progress = mapping(view_model.get("progress"))
+    state = mapping(progress.get("state"))
+    visual_surface = build_notebook_visual_surface_model(view_model)
+    warnings = [
+        item
+        for item in (*sequence(view_model.get("warnings")), *sequence(progress.get("warnings")))
+        if isinstance(item, Mapping)
+    ]
+    blocking_count = sum(1 for item in warnings if item.get("severity") == "error")
+    return [
+        {"field": "status", "value": status.get("progress_status") or "unknown"},
+        {"field": "rounds", "value": status.get("round_count") or 0},
+        {"field": "state file", "value": "present" if state.get("exists") else "missing"},
+        {
+            "field": "review manifest",
+            "value": "present" if isinstance(view_model.get("review_manifest"), Mapping) else "missing",
+        },
+        {"field": "plot media choices", "value": len(visual_surface["choices"])},
+        {"field": "missing plot outputs", "value": len(visual_surface["missing_outputs"])},
+        {"field": "stale artifacts", "value": len(sequence(view_model.get("stale_artifacts")))},
+        {"field": "blocking issues", "value": blocking_count},
+    ]
+
+
+def build_notebook_status_line(view_model: Mapping[str, Any]) -> str:
+    """Return a compact human status line for the notebook header."""
+
+    row = {str(item["field"]): item["value"] for item in build_notebook_trust_rows(view_model)}
+    return (
+        f"Status `{row['status']}` across `{row['rounds']}` rounds. "
+        f"`{row['plot media choices']}` plot media choices, `{row['missing plot outputs']}` missing plot outputs, "
+        f"`{row['stale artifacts']}` stale artifacts, `{row['blocking issues']}` blocking issues."
+    )
 
 
 def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:

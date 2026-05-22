@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import ensure_mpl_config_dir
+from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
 from .feature_importance_bars import _discover_round_fi_files, _read_fi_csv, _resolve_order, _select_rounds
 
 
@@ -46,6 +46,7 @@ def render(context, params: dict) -> None:
     import numpy as np
     import pandas as pd
 
+    apply_plot_style()
     if bool(params.get("cluster", False)):
         raise ValueError("feature_importance_heatmap does not cluster by default; set cluster: false.")
     order_policy = str(params.get("order_policy", params.get("sort", "preserve"))).strip().lower()
@@ -95,9 +96,10 @@ def render(context, params: dict) -> None:
     if not np.isfinite(arr).all():
         raise ValueError("feature_importance_heatmap contains non-finite importances.")
 
-    figsize = tuple(params.get("figsize_in", (8.5, 7.0)))
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
+    fig, ax = plt.subplots(figsize=figsize)
     im = ax.imshow(arr, aspect="auto", interpolation="nearest", cmap=str(params.get("cmap", "viridis")))
+    apply_notebook_axes_style(ax)
     ax.set_xticks(range(len(target_rounds)))
     ax.set_xticklabels([str(round_index) for round_index in target_rounds])
     max_yticks = int(params.get("max_yticks", 40))
@@ -109,8 +111,9 @@ def render(context, params: dict) -> None:
     ax.set_ylabel("Feature ID")
     ax.set_title(str(params.get("title", "Feature importance heatmap")))
     fig.colorbar(im, ax=ax, label="Importance")
+    fig.tight_layout()
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    save_notebook_square_figure(fig, out, dpi=context.dpi)
     plt.close(fig)
 
     if context.save_data:

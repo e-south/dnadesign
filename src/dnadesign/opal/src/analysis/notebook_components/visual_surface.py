@@ -33,21 +33,9 @@ def render_visual_surface_cells() -> str:
         ):
             visual_surface_ui = None
             visual_surface_choices = []
-            surface_scope = "Select one operative visual surface for the active campaign."
             if plot_cfg_error:
-                visual_surface_note = (
-                    "## Visual surface\\n\\n"
-                    f"Plot config unavailable: `{plot_cfg_error}`"
-                )
+                visual_surface_note = f"Plot config unavailable: `{plot_cfg_error}`"
             else:
-                visual_surface_choices.extend(
-                    {
-                        "label": f"Plot: {plot_choice['title']}",
-                        "kind": "plot",
-                        "plot_label": plot_choice["label"],
-                    }
-                    for plot_choice in plot_choices
-                )
                 if notebook_baserender_contract.get("available"):
                     visual_surface_choices.append(
                         {
@@ -56,11 +44,15 @@ def render_visual_surface_cells() -> str:
                             "plot_label": None,
                         }
                     )
-                _lines = [
-                    "## Visual surface",
-                    "",
-                    surface_scope,
-                ]
+                visual_surface_choices.extend(
+                    {
+                        "label": plot_choice["title"],
+                        "kind": "plot",
+                        "plot_label": plot_choice["label"],
+                    }
+                    for plot_choice in plot_choices
+                )
+                _lines = []
                 if not plot_choices:
                     _lines.append(f"No manifest-backed plot outputs found in `{plots_dir}`.")
                     _lines.append("Run `uv run opal plot -c <campaign.yaml>` to generate plots.")
@@ -79,14 +71,18 @@ def render_visual_surface_cells() -> str:
         def _(
             Path,
             baserender_record_row,
+            baserender_record_selector,
+            build_notebook_baserender_label_rows,
+            build_notebook_plot_method_sections,
             build_notebook_baserender_contract_rows,
             build_notebook_plot_card_rows,
-            build_notebook_plot_method_rows,
+            labels_df,
             mo,
             notebook_baserender_contract,
             pl,
             plot_choices,
             render_notebook_baserender_record,
+            round_ui,
             visual_surface_choices,
             visual_surface_note,
             visual_surface_ui,
@@ -100,7 +96,7 @@ def render_visual_surface_cells() -> str:
                     None,
                 )
                 if surface is None:
-                    raise ValueError(f"Visual surface selection not found: {selected}")
+                    raise ValueError(f"Visual selection not found: {selected}")
 
                 def _plot_image(plot_choice):
                     media_path = Path(plot_choice["path"])
@@ -113,19 +109,33 @@ def render_visual_surface_cells() -> str:
                         rounded=True,
                         style={
                             "width": "100%",
-                            "max-width": "980px",
-                            "max-height": "640px",
+                            "max-width": "100%",
                             "height": "auto",
                             "object-fit": "contain",
                             "margin": "0 auto",
                             "display": "block",
+                            "background": "white",
                         },
                     )
 
                 controls = mo.hstack([visual_surface_ui], justify="start", align="end", wrap=True, gap=0.35)
                 if surface["kind"] == "baserender":
+                    _controls = [visual_surface_ui, baserender_record_selector]
+                    if round_ui is not None:
+                        _controls.insert(1, round_ui)
+                    controls = mo.hstack(_controls, justify="start", align="end", wrap=True, gap=0.35)
+                    label_rows = build_notebook_baserender_label_rows(
+                        labels_df,
+                        record_id=str(baserender_record_selector.value),
+                        round_value=int(round_ui.value) if round_ui is not None else None,
+                    )
+                    label_view = (
+                        mo.ui.table(pl.DataFrame(label_rows), page_size=5)
+                        if label_rows
+                        else mo.md("No observed label is available for this record and round.")
+                    )
                     if baserender_record_row is None:
-                        visual = mo.md("Record render unavailable for the selected record.")
+                        visual = mo.md("No contract-valid record is available for this selection.")
                     else:
                         try:
                             payload = render_notebook_baserender_record(
@@ -139,8 +149,7 @@ def render_visual_surface_cells() -> str:
                                 rounded=True,
                                 style={
                                     "width": "100%",
-                                    "max-width": "980px",
-                                    "max-height": "640px",
+                                    "max-width": "100%",
                                     "height": "auto",
                                     "object-fit": "contain",
                                     "background": "white",
@@ -152,6 +161,7 @@ def render_visual_surface_cells() -> str:
                             visual = mo.md(f"Record render failed: `{exc}`")
                     details = mo.accordion(
                         {
+                            "Label": label_view,
                             "Render contract": mo.ui.table(
                                 pl.DataFrame(build_notebook_baserender_contract_rows(notebook_baserender_contract)),
                                 page_size=8,
@@ -164,13 +174,11 @@ def render_visual_surface_cells() -> str:
                         plot_choice for plot_choice in plot_choices if plot_choice["label"] == surface["plot_label"]
                     )
                     visual = _plot_image(choice)
+                    method_sections = build_notebook_plot_method_sections(choice)
                     details = mo.accordion(
                         {
-                            "How to read this plot": mo.ui.table(
-                                pl.DataFrame(build_notebook_plot_method_rows(choice)),
-                                page_size=8,
-                            ),
-                            "Plot evidence": mo.ui.table(
+                            **{label: mo.md(text) for label, text in method_sections.items()},
+                            "Evidence": mo.ui.table(
                                 pl.DataFrame(build_notebook_plot_card_rows(choice)),
                                 page_size=12,
                             ),
