@@ -31,12 +31,13 @@ def cmd_progress(
         envvar="OPAL_CONFIG",
     ),
     round: Optional[str] = typer.Option("latest", "--round", "-r", help="Round selector: int, latest, or all."),
+    run_id: Optional[str] = typer.Option(None, "--run-id", help="Filter round-log summaries to a specific run_id."),
     json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     try:
         from ...reporting.progress import build_campaign_progress, render_campaign_progress_text
 
-        payload = build_campaign_progress(config, round_selector=round)
+        payload = build_campaign_progress(config, round_selector=round, run_id=run_id)
         if json:
             json_out(payload)
         else:

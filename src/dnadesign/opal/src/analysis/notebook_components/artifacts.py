@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._support import mapping, sequence
+from ._support import compact_path, mapping, sequence
 
 
 def build_notebook_artifact_garden_lines(view_model: Mapping[str, Any]) -> list[str]:
@@ -11,8 +11,6 @@ def build_notebook_artifact_garden_lines(view_model: Mapping[str, Any]) -> list[
     audit = mapping(view_model.get("artifact_garden"))
     if not audit:
         return [
-            "### Artifacts",
-            "",
             "- Artifact garden audit: `unavailable`",
             "- Run `uv run opal artifacts audit -c <campaign.yaml>` for a manifest-authoritative artifact inventory.",
         ]
@@ -22,11 +20,10 @@ def build_notebook_artifact_garden_lines(view_model: Mapping[str, Any]) -> list[
     active_manifests = sequence(audit.get("active_manifests"))
     stale = sequence(audit.get("stale_artifacts"))
     local_only = "yes (local-only)" if audit.get("local_only") else "no"
+    root = audit.get("root")
     return [
-        "### Artifacts",
-        "",
         f"- Artifact garden schema: `{audit.get('schema_version')}`",
-        f"- Root: `{audit.get('root')}`",
+        f"- Root: `{compact_path(root, max_parts=1)}`",
         f"- Local-only root: `{local_only}`",
         f"- Artifact roots: `{len(roots)}`",
         f"- Active manifests: `{len(active_manifests)}`",
@@ -44,6 +41,7 @@ def build_notebook_artifact_garden_rows(view_model: Mapping[str, Any]) -> list[d
     audit = mapping(view_model.get("artifact_garden"))
     if not audit:
         return []
+    root_path = audit.get("root")
     rows: list[dict[str, Any]] = []
     for root in sequence(audit.get("artifact_roots")):
         if not isinstance(root, Mapping):
@@ -52,7 +50,7 @@ def build_notebook_artifact_garden_rows(view_model: Mapping[str, Any]) -> list[d
             {
                 "source": "artifact_root",
                 "name": root.get("name"),
-                "path": root.get("path"),
+                "path": compact_path(root.get("path"), base=root_path),
                 "exists": root.get("exists"),
                 "file_count": root.get("file_count"),
                 "size_bytes": root.get("size_bytes"),
@@ -67,7 +65,7 @@ def build_notebook_artifact_garden_rows(view_model: Mapping[str, Any]) -> list[d
             {
                 "source": "stale_artifact",
                 "name": None,
-                "path": artifact.get("path"),
+                "path": compact_path(artifact.get("path"), base=root_path),
                 "exists": True,
                 "file_count": None,
                 "size_bytes": artifact.get("size_bytes"),

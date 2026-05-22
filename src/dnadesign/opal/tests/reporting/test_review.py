@@ -101,6 +101,9 @@ def test_review_cli_writes_json_error_for_not_started_campaign(tmp_path: Path) -
     assert res.exit_code != 0
     payload = json.loads(res.stdout)
     assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["category"] == "LedgerError"
+    assert payload["error"]["context"] == "review"
     assert "outputs/ledger/runs.parquet" in payload["error"]["message"]
 
 

@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 from pathlib import Path
-from textwrap import dedent
 from typing import Any, Iterable, Mapping
 
-from ._support import first_media_output, mapping, plot_entries_from_manifests, sequence
+from ._support import (
+    compact_path,
+    display_name,
+    first_media_output,
+    join_list,
+    mapping,
+    plot_entries_from_manifests,
+    sequence,
+)
 
 
-def build_notebook_plot_gallery_model(
+def build_notebook_visual_surface_model(
     view_model: Mapping[str, Any],
     *,
     plot_entries: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Build a manifest-authoritative plot gallery model for marimo templates."""
+    """Build manifest-authoritative visual choices for OPAL marimo templates."""
 
     campaign = mapping(view_model.get("campaign"))
     workdir = campaign.get("workdir") or ""
@@ -27,6 +34,7 @@ def build_notebook_plot_gallery_model(
 
     choices: list[dict[str, Any]] = []
     missing_outputs: list[str] = []
+    labels_seen: dict[str, int] = {}
     for entry in configured_entries:
         if not isinstance(entry, Mapping):
             continue
@@ -42,10 +50,51 @@ def build_notebook_plot_gallery_model(
             missing_outputs.append(name)
             continue
         path = str(media_output.get("path"))
+        title = str(entry.get("title") or manifest.get("title") or display_name(name))
+        label = title
+        labels_seen[label] = labels_seen.get(label, 0) + 1
+        if labels_seen[label] > 1:
+            label = f"{label} ({Path(path).name})"
+        freshness = mapping(manifest.get("freshness"))
+        warnings = sequence(manifest.get("warnings"))
+        tidy_csv = manifest.get("tidy_csv")
+        inputs = [
+            item
+            for item in sequence(manifest.get("inputs"))
+            if isinstance(item, Mapping) and (item.get("path") or item.get("role"))
+        ]
+        summary = str(
+            manifest.get("caption")
+            or manifest.get("review_purpose")
+            or mapping(manifest.get("metadata")).get("summary")
+            or ""
+        )
         choices.append(
             {
-                "label": f"{name} ({Path(path).name})",
+                "label": label,
+                "title": title,
+                "name": name,
+                "kind": entry.get("kind") or manifest.get("kind") or "unknown",
                 "path": path,
+                "workdir": workdir,
+                "path_label": compact_path(path, base=workdir),
+                "filename": Path(path).name,
+                "tidy_label": compact_path(tidy_csv, base=workdir) if tidy_csv else "none",
+                "source_labels": [
+                    f"{item.get('role') or 'input'}={compact_path(item.get('path'), base=workdir)}"
+                    for item in inputs[:5]
+                ],
+                "freshness": freshness.get("status") or manifest.get("stale_state") or "unknown",
+                "status": manifest.get("status"),
+                "run_id": manifest.get("run_id"),
+                "rounds": manifest.get("rounds"),
+                "warning_count": len(warnings),
+                "caption": summary,
+                "alt_text": _plot_alt_text(
+                    title=title,
+                    kind=entry.get("kind") or manifest.get("kind"),
+                    summary=summary,
+                ),
                 "entry": dict(entry),
                 "manifest": dict(manifest),
             }
@@ -58,114 +107,94 @@ def build_notebook_plot_gallery_model(
     }
 
 
-def build_notebook_plot_card_lines(choice: Mapping[str, Any]) -> list[str]:
-    """Build manifest-backed plot-card detail lines for generated notebooks."""
+def build_notebook_plot_card_rows(choice: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build compact evidence rows for the selected plot."""
 
     entry = mapping(choice.get("entry"))
     manifest = mapping(choice.get("manifest"))
-    freshness = mapping(manifest.get("freshness"))
     inputs = [
         item
         for item in sequence(manifest.get("inputs"))
         if isinstance(item, Mapping) and (item.get("path") or item.get("role"))
     ]
-    source_data = "; ".join(f"{item.get('role') or 'input'}={item.get('path') or 'unrecorded'}" for item in inputs[:5])
-    warnings = sequence(manifest.get("warnings"))
-    tags = ", ".join(str(tag) for tag in sequence(entry.get("tags"))) or "none"
+    base = choice.get("workdir") or manifest.get("campaign_workdir") or manifest.get("workdir")
     return [
-        "### Plot deliverables",
-        "",
-        f"**Plot**: `{entry.get('name') or manifest.get('name')}`",
-        f"Kind: `{entry.get('kind') or manifest.get('kind')}`",
-        f"Tags: `{tags}`",
-        f"Status: `{manifest.get('status')}`",
-        f"Freshness: `{freshness.get('status') or manifest.get('stale_state') or 'unknown'}`",
-        f"Generated: `{manifest.get('generated_at')}`",
-        f"Run ID: `{manifest.get('run_id')}`",
-        f"Rounds: `{manifest.get('rounds')}`",
-        f"Media: `{choice.get('path')}`",
-        f"Tidy CSV: `{manifest.get('tidy_csv') or 'none'}`",
-        f"Source data: `{source_data or 'not recorded'}`",
-        f"Params: `{manifest.get('params') or {}}`",
-        f"Warnings: `{len(warnings)}`",
+        {"field": "plot", "value": entry.get("name") or manifest.get("name")},
+        {"field": "display", "value": choice.get("title") or display_name(entry.get("name") or manifest.get("name"))},
+        {"field": "kind", "value": entry.get("kind") or manifest.get("kind")},
+        {"field": "status", "value": manifest.get("status")},
+        {"field": "freshness", "value": choice.get("freshness") or "unknown"},
+        {"field": "generated", "value": manifest.get("generated_at")},
+        {"field": "run", "value": manifest.get("run_id") or "all runs"},
+        {"field": "rounds", "value": manifest.get("rounds")},
+        {"field": "media", "value": choice.get("path_label") or compact_path(choice.get("path"), base=base)},
+        {"field": "tidy data", "value": choice.get("tidy_label") or compact_path(manifest.get("tidy_csv"), base=base)},
+        {
+            "field": "source data",
+            "value": "; ".join(
+                f"{item.get('role') or 'input'}={compact_path(item.get('path'), base=base)}" for item in inputs[:5]
+            )
+            or "not recorded",
+        },
+        {"field": "warnings", "value": len(sequence(manifest.get("warnings")))},
     ]
 
 
-def render_plot_gallery_cells() -> str:
-    """Render generated cells for manifest-backed plot selection."""
+def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build plot interpretation and math/data-contract rows."""
 
-    return dedent(
-        """
-        @app.cell
-        def _(Path, build_notebook_plot_gallery_model, notebook_view_model, plot_entries):
-            plot_gallery_model = build_notebook_plot_gallery_model(
-                notebook_view_model,
-                plot_entries=plot_entries,
-            )
-            plots_dir = Path(plot_gallery_model["plots_dir"])
-            plot_choices = plot_gallery_model["choices"]
-            missing_outputs = plot_gallery_model["missing_outputs"]
-            stale_plot_artifacts = plot_gallery_model["stale_artifacts"]
-            return plots_dir, plot_choices, missing_outputs, stale_plot_artifacts
-
-
-        @app.cell
-        def _(mo, plot_cfg_error, plot_choices, plots_dir, missing_outputs, stale_plot_artifacts):
-            plot_ui = None
-            gallery_scope = "All configured plots with written manifests."
-            if plot_cfg_error:
-                plot_gallery_note = (
-                    "### Plot artifacts (`outputs/plots`)\\n\\n"
-                    f"Plot config unavailable: `{plot_cfg_error}`"
-                )
-            elif not plot_choices:
-                _lines = [
-                    "### Plot artifacts (`outputs/plots`)",
-                    "",
-                    f"No manifest-backed plot outputs found in `{plots_dir}`.",
-                    "Run `uv run opal plot -c <campaign.yaml>` to generate plots.",
-                    gallery_scope,
-                ]
-                if missing_outputs:
-                    _lines.append(
-                        f"Configured plots without outputs: {', '.join(missing_outputs)}"
-                    )
-                if stale_plot_artifacts:
-                    _lines.append(f"Stale artifact warnings: `{len(stale_plot_artifacts)}`")
-                plot_gallery_note = "\\n".join(_lines)
-            else:
-                labels = [plot_choice["label"] for plot_choice in plot_choices]
-                plot_ui = mo.ui.dropdown(labels, value=labels[0], label="Plot")
-                plot_gallery_note = "### Plot artifacts (`outputs/plots`)\\n\\n" + gallery_scope
-                if stale_plot_artifacts:
-                    plot_gallery_note += f"\\n\\nStale artifact warnings: `{len(stale_plot_artifacts)}`"
-            return plot_ui, plot_gallery_note
+    manifest = mapping(choice.get("manifest"))
+    metadata = mapping(manifest.get("metadata"))
+    kind = str(choice.get("kind") or manifest.get("kind") or "unknown")
+    return [
+        {
+            "section": "reading",
+            "detail": str(choice.get("caption") or metadata.get("summary") or "No plot description recorded."),
+        },
+        {"section": "data shape", "detail": str(metadata.get("data_shape") or "not recorded")},
+        {"section": "math", "detail": _plot_math_description(kind)},
+        {"section": "parameters", "detail": _compact_params(manifest.get("params"))},
+        {"section": "tidy schema", "detail": join_list(metadata.get("tidy_schema"), sep=", ")},
+        {"section": "failure modes", "detail": join_list(metadata.get("failure_modes"), sep="; ")},
+    ]
 
 
-        @app.cell
-        def _(Path, build_notebook_plot_card_lines, mo, plot_choices, plot_gallery_note, plot_ui):
-            if plot_ui is None:
-                plot_panel = mo.md(plot_gallery_note)
-            else:
-                selected = str(plot_ui.value)
-                choice = next(
-                    (
-                        plot_choice
-                        for plot_choice in plot_choices
-                        if plot_choice["label"] == selected
-                    ),
-                    None,
-                )
-                if choice is None:
-                    raise ValueError(f"Plot selection not found: {selected}")
-                details = [plot_gallery_note, "", *build_notebook_plot_card_lines(choice)]
-                plot_panel = mo.vstack(
-                    [
-                        mo.md("\\n".join(details)),
-                        plot_ui,
-                        mo.image(Path(choice["path"]).read_bytes()),
-                    ]
-                )
-            return plot_panel
-        """
-    ).strip("\n")
+def _plot_alt_text(*, title: str, kind: Any, summary: str) -> str:
+    kind_text = str(kind or "plot").replace("_", " ")
+    summary_text = str(summary or "").strip()
+    if summary_text:
+        return f"{title}. {summary_text}"
+    return f"{title}. OPAL {kind_text} visual for the selected campaign."
+
+
+def _plot_math_description(kind: str) -> str:
+    descriptions = {
+        "metric_over_rounds": (
+            "For each round and cohort, OPAL filters prediction rows, extracts the configured numeric metric, "
+            "then computes requested summaries. mean = sum(x) / n; quantile summaries use the requested order "
+            "statistic; count = n."
+        ),
+        "feature_importance_heatmap": (
+            "OPAL builds a feature-by-round matrix from model feature_importance.csv artifacts. Each cell is the "
+            "model-reported importance for one feature in one round; top_n keeps features with the largest maximum "
+            "importance across rounds."
+        ),
+        "vector_summary_heatmap": (
+            "For each round, cohort, and vector channel, OPAL aggregates the configured vector prediction field. "
+            "The current primitive computes the mean channel value across matching prediction rows."
+        ),
+        "scatter_score_vs_rank": (
+            "OPAL plots selected prediction rows by rank and score. Rank is selection order; score is the configured "
+            "selection score or objective channel."
+        ),
+    }
+    return descriptions.get(
+        kind,
+        "See the plot kind metadata for the exact data shape, required fields, parameters, and failure modes.",
+    )
+
+
+def _compact_params(value: Any) -> str:
+    if not isinstance(value, Mapping) or not value:
+        return "not recorded"
+    return "; ".join(f"{key}={item}" for key, item in value.items())

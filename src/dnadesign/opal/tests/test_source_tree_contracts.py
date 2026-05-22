@@ -109,3 +109,26 @@ def test_ingest_y_command_package_imports_real_command() -> None:
     module = importlib.import_module("dnadesign.opal.src.cli.commands.ingest_y")
 
     assert module.cmd_ingest_y.__name__ == "cmd_ingest_y"
+
+
+def test_round_stages_are_semantic_package_modules() -> None:
+    stages_file = OPAL_SOURCE_ROOT / "runtime" / "round" / "stages.py"
+    stages_package = OPAL_SOURCE_ROOT / "runtime" / "round" / "stages"
+
+    assert not stages_file.exists()
+    assert stages_package.is_dir()
+    module_lengths = {
+        path.name: len(path.read_text().splitlines())
+        for path in stages_package.glob("*.py")
+        if path.name != "__init__.py"
+    }
+    assert module_lengths
+    assert max(module_lengths.values()) <= 260
+
+
+def test_round_stages_package_imports_real_stage_entrypoints() -> None:
+    module = importlib.import_module("dnadesign.opal.src.runtime.round.stages")
+
+    assert module.stage_training.__name__ == "stage_training"
+    assert module.stage_x_matrices.__name__ == "stage_x_matrices"
+    assert module.stage_scoring.__name__ == "stage_scoring"

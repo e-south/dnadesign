@@ -5,24 +5,26 @@ from textwrap import dedent
 RECORD_CELLS = dedent(
     """
     @app.cell
-    def _(config_path, mo, cfg, records_status_lines, records_report, store, ws):
-        contract_lines = [
-            "### Campaign contract",
-            f"- Campaign: `{cfg.campaign.name}`",
-            f"- Slug: `{cfg.campaign.slug}`",
-            f"- Config: `{config_path}`",
-            f"- Workdir: `{ws.workdir}`",
-            f"- Records: `{store.records_path}`",
-            f"- X column: `{cfg.data.x_column_name}`",
-            f"- Y column: `{cfg.data.y_column_name}`",
-            f"- Y expected length: `{cfg.data.y_expected_length}`",
-            f"- Model: `{cfg.model.name}`",
-            f"- Selection: `{cfg.selection.selection.name}`",
+    def _(compact_notebook_path, config_path, mo, cfg, pl, records_report, store, ws):
+        contract_rows = [
+            {"field": "campaign", "value": cfg.campaign.name},
+            {"field": "slug", "value": cfg.campaign.slug},
+            {"field": "config", "value": compact_notebook_path(config_path, base=ws.workdir)},
+            {"field": "workspace", "value": compact_notebook_path(ws.workdir, max_parts=1)},
+            {"field": "records", "value": compact_notebook_path(store.records_path, base=ws.workdir)},
+            {"field": "X column", "value": cfg.data.x_column_name},
+            {"field": "Y column", "value": cfg.data.y_column_name},
+            {"field": "Y expected length", "value": cfg.data.y_expected_length},
+            {"field": "model", "value": cfg.model.name},
+            {"field": "selection", "value": cfg.selection.selection.name},
+            {"field": "rows", "value": records_report.row_count},
+            {"field": "columns", "value": records_report.column_count},
+            {"field": "records contract", "value": "ready" if records_report.ready else "missing required columns"},
+            {"field": "X values loaded", "value": "yes" if records_report.x_values_loaded else "no"},
         ]
         if cfg.objectives.objectives:
-            contract_lines.append(f"- Objective: `{cfg.objectives.objectives[0].name}`")
-        contract_lines.extend(records_status_lines(records_report))
-        campaign_contract_md = mo.md("\\n".join(contract_lines))
+            contract_rows.append({"field": "objective", "value": cfg.objectives.objectives[0].name})
+        campaign_contract_md = mo.ui.table(pl.DataFrame(contract_rows), page_size=16)
         return campaign_contract_md
 
 
@@ -37,8 +39,6 @@ RECORD_CELLS = dedent(
         x_provenance_md = mo.md(
             "\\n".join(
                 [
-                    "### X provenance and limitations",
-                    "",
                     *x_provenance_status_lines(records_report),
                     "",
                     "- OPAL review surfaces show campaign contracts, ledgers, selections, "
@@ -88,20 +88,54 @@ RECORD_CELLS = dedent(
         else:
             row = active_record_df.to_dicts()[0]
             sequence = str(row.get("sequence") or "")
-            _lines = [
-                f"- id: `{row.get('id')}`",
-                f"- sequence length: `{len(sequence)}`",
+            _rows = [
+                {"field": "id", "value": row.get("id")},
+                {"field": "sequence length", "value": len(sequence)},
             ]
             if records_report.x_column:
                 if records_report.x_column in active_record_df.columns:
-                    _lines.append(f"- X present: `{row.get(records_report.x_column) is not None}`")
+                    _rows.append({"field": "X present", "value": row.get(records_report.x_column) is not None})
                 else:
-                    _lines.append("- X preview: `not loaded`")
+                    _rows.append({"field": "X preview", "value": "not loaded"})
             if records_report.label_hist_column and records_report.label_hist_column in active_record_df.columns:
-                _lines.append(f"- label history present: `{row.get(records_report.label_hist_column) is not None}`")
+                _rows.append(
+                    {"field": "label history present", "value": row.get(records_report.label_hist_column) is not None}
+                )
             if sequence:
-                _lines.append(f"- sequence preview: `{sequence[:120]}`")
-            active_record_md = mo.md("\\n".join(_lines))
+                _rows.append({"field": "sequence preview", "value": sequence[:120]})
+            active_record_md = mo.ui.table(pl.DataFrame(_rows), page_size=8)
         return active_record_md, active_record_table_df
+
+
+    @app.cell
+    def _(build_notebook_baserender_contract, records_schema_columns, store):
+        notebook_baserender_contract = build_notebook_baserender_contract(
+            records_schema_columns,
+            records_path=str(store.records_path),
+        )
+        return notebook_baserender_contract
+
+
+    @app.cell
+    def _(notebook_baserender_contract, pl, record_selector, store):
+        baserender_record_row = None
+        if (
+            notebook_baserender_contract.get("available")
+            and record_selector.value != "(no records)"
+        ):
+            required_columns = [
+                str(column)
+                for column in notebook_baserender_contract.get("required_columns", [])
+            ]
+            row_df = (
+                pl.scan_parquet(str(store.records_path))
+                .filter(pl.col("id").cast(pl.Utf8) == str(record_selector.value))
+                .select(required_columns)
+                .limit(1)
+                .collect()
+            )
+            if not row_df.is_empty():
+                baserender_record_row = row_df.to_dicts()[0]
+        return baserender_record_row
     """
 ).strip("\n")

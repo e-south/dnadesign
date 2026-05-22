@@ -4,7 +4,7 @@
 **Last verified:** 2026-05-20
 
 
-This document covers **plot plugins** and the `PlotContext` helper. Plots are bespoke by design: each plugin owns its data loading, joins, and styling.
+This document covers **plot plugins** and the `PlotContext` helper. Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
 
 ### How it works
 
@@ -139,7 +139,7 @@ not current evidence unless referenced by the active manifest.
 
 ### SFXI diagnostics plots
 
-These plots reuse shared SFXI math and are safe to run without retraining.
+These objective-specific plots reuse shared SFXI math and are safe to run without retraining.
 Diagnostic plots always render the full dataset; sampling parameters are not supported.
 
 ### Plot kinds + params

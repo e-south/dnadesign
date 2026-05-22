@@ -1,9 +1,19 @@
-"""
-Public helper surface for checked-in OPAL operator notebooks.
-"""
+"""Public helper surface for OPAL operator and generated campaign notebooks."""
 
 from __future__ import annotations
 
+from ...src.analysis.campaign_progress import (
+    assess_records_contract,
+    assess_records_contract_for_schema,
+    build_ledger_status_table,
+    build_records_preview,
+    cli_handoff_lines,
+    read_optional_table,
+    records_status_lines,
+    table_status_lines,
+    unavailable_table,
+    x_provenance_status_lines,
+)
 from ...src.analysis.dashboard.api import (
     campaign_label_from_path,
     diagnostics_to_lines,
@@ -12,12 +22,86 @@ from ...src.analysis.dashboard.api import (
     load_campaign_selection,
     load_parquet_cached,
 )
+from ...src.analysis.facade import (
+    CampaignAnalysis,
+    available_rounds,
+    latest_round,
+    latest_run_id,
+    require_columns,
+)
+from ...src.analysis.notebook_components import (
+    build_notebook_artifact_garden_lines,
+    build_notebook_artifact_garden_rows,
+    build_notebook_at_a_glance_rows,
+    build_notebook_baserender_contract,
+    build_notebook_baserender_contract_rows,
+    build_notebook_campaign_summary_row,
+    build_notebook_change_lines,
+    build_notebook_change_rows,
+    build_notebook_distrust_lines,
+    build_notebook_evidence_rows,
+    build_notebook_metric_definition_rows,
+    build_notebook_no_run_lines,
+    build_notebook_plot_card_rows,
+    build_notebook_plot_method_rows,
+    build_notebook_run_options,
+    build_notebook_run_summary_lines,
+    build_notebook_validity_lines,
+    build_notebook_visual_surface_model,
+    compact_notebook_path,
+    render_notebook_baserender_record,
+    resolve_notebook_round_default,
+)
+from ...src.plots.config import load_plot_config, parse_enabled, parse_tags
+from ...src.reporting.notebook import build_notebook_view_model
+from ...src.reporting.notebook_set import build_campaign_set_notebook_view_model
 
 __all__ = [
+    "CampaignAnalysis",
+    "assess_records_contract",
+    "assess_records_contract_for_schema",
+    "available_rounds",
+    "build_campaign_set_notebook_view_model",
+    "build_ledger_status_table",
+    "build_notebook_artifact_garden_lines",
+    "build_notebook_artifact_garden_rows",
+    "build_notebook_at_a_glance_rows",
+    "build_notebook_baserender_contract",
+    "build_notebook_baserender_contract_rows",
+    "build_notebook_campaign_summary_row",
+    "build_notebook_change_lines",
+    "build_notebook_change_rows",
+    "build_notebook_distrust_lines",
+    "build_notebook_evidence_rows",
+    "build_notebook_metric_definition_rows",
+    "build_notebook_no_run_lines",
+    "build_notebook_plot_card_rows",
+    "build_notebook_plot_method_rows",
+    "build_notebook_run_options",
+    "build_notebook_run_summary_lines",
+    "build_notebook_validity_lines",
+    "build_notebook_view_model",
+    "build_notebook_visual_surface_model",
+    "build_records_preview",
     "campaign_label_from_path",
+    "cli_handoff_lines",
+    "compact_notebook_path",
     "diagnostics_to_lines",
     "find_repo_root",
+    "latest_round",
+    "latest_run_id",
     "list_campaign_paths",
+    "load_plot_config",
     "load_campaign_selection",
     "load_parquet_cached",
+    "parse_enabled",
+    "parse_tags",
+    "read_optional_table",
+    "records_status_lines",
+    "render_notebook_baserender_record",
+    "resolve_notebook_round_default",
+    "require_columns",
+    "table_status_lines",
+    "unavailable_table",
+    "x_provenance_status_lines",
 ]

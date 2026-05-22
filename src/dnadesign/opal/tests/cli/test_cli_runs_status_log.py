@@ -124,6 +124,15 @@ def test_progress_json_summary(tmp_path):
     assert out["stale_artifacts"][0]["path"] == str(stale_plot)
     assert any(row["category"] == "StaleArtifactWarning" for row in out["warnings"])
 
+    res = runner.invoke(
+        app,
+        ["--no-color", "progress", "-c", str(campaign), "--round", "all", "--run-id", "run-0", "--json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    scoped = json.loads(res.stdout)
+    assert scoped["run_id"] == "run-0"
+    assert scoped["rounds"][0]["summary"]["run_scope"]["requested_run_id"] == "run-0"
+
 
 def test_progress_rejects_missing_explicit_round(tmp_path):
     _, campaign, _ = _setup_workspace(tmp_path)

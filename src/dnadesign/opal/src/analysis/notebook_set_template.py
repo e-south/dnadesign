@@ -35,23 +35,25 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
         @app.cell
         def _():
+            generated_with = "__GENERATED_WITH__"
             from pathlib import Path
 
             import marimo as mo
             import polars as pl
 
-            from dnadesign.opal import (
+            from dnadesign.opal.notebooks.api import (
                 build_campaign_set_notebook_view_model,
                 build_notebook_artifact_garden_lines,
                 build_notebook_artifact_garden_rows,
-                build_notebook_at_a_glance_lines,
+                build_notebook_at_a_glance_rows,
                 build_notebook_campaign_summary_row,
                 build_notebook_change_lines,
                 build_notebook_change_rows,
                 build_notebook_evidence_rows,
                 build_notebook_metric_definition_rows,
-                build_notebook_plot_card_lines,
-                build_notebook_plot_gallery_model,
+                build_notebook_plot_card_rows,
+                build_notebook_plot_method_rows,
+                build_notebook_visual_surface_model,
                 build_notebook_validity_lines,
             )
             return (
@@ -59,15 +61,17 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
                 build_campaign_set_notebook_view_model,
                 build_notebook_artifact_garden_lines,
                 build_notebook_artifact_garden_rows,
-                build_notebook_at_a_glance_lines,
+                build_notebook_at_a_glance_rows,
                 build_notebook_campaign_summary_row,
                 build_notebook_change_lines,
                 build_notebook_change_rows,
                 build_notebook_evidence_rows,
                 build_notebook_metric_definition_rows,
-                build_notebook_plot_card_lines,
-                build_notebook_plot_gallery_model,
+                build_notebook_plot_card_rows,
+                build_notebook_plot_method_rows,
+                build_notebook_visual_surface_model,
                 build_notebook_validity_lines,
+                generated_with,
                 mo,
                 pl,
             )
@@ -85,7 +89,7 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, mo, pl):
+        def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, generated_with, mo, pl):
             _rows = [build_notebook_campaign_summary_row(campaign_model) for campaign_model in campaigns]
             _labels = [row["label"] for row in _rows]
             campaign_ui = mo.ui.dropdown(_labels, value=_labels[0], label="Campaign")
@@ -94,7 +98,7 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
                 "# OPAL Campaign Set Notebook\\n\\n"
                 f"Campaigns: `{campaign_set_view_model['campaign_count']}`  "
                 f"Round selector: `{campaign_set_view_model['round_selector']}`  "
-                f"Generated with marimo: `{__generated_with}`"
+                f"Generated with marimo: `{generated_with}`"
             )
             return campaign_summary_df, campaign_ui, header_md
 
@@ -113,50 +117,83 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
 
 
         @app.cell
-        def _(build_notebook_at_a_glance_lines, build_notebook_validity_lines, mo, selected_campaign_model):
-            selected_overview_md = mo.md(
-                "\\n".join(build_notebook_at_a_glance_lines(selected_campaign_model))
+        def _(build_notebook_at_a_glance_rows, build_notebook_validity_lines, mo, pl, selected_campaign_model):
+            selected_overview_panel = mo.ui.table(
+                pl.DataFrame(build_notebook_at_a_glance_rows(selected_campaign_model)),
+                page_size=14,
             )
             selected_validity_md = mo.md(
                 "\\n".join(build_notebook_validity_lines(selected_campaign_model))
             )
-            return selected_overview_md, selected_validity_md
+            return selected_overview_panel, selected_validity_md
 
 
         @app.cell
-        def _(build_notebook_plot_gallery_model, selected_campaign_model):
-            plot_gallery_model = build_notebook_plot_gallery_model(selected_campaign_model)
-            plot_choices = plot_gallery_model["choices"]
+        def _(build_notebook_visual_surface_model, selected_campaign_model):
+            visual_surface_model = build_notebook_visual_surface_model(selected_campaign_model)
+            plot_choices = visual_surface_model["choices"]
             return plot_choices
 
 
         @app.cell
         def _(mo, plot_choices):
             if plot_choices:
-                _labels = [choice["label"] for choice in plot_choices]
-                plot_ui = mo.ui.dropdown(_labels, value=_labels[0], label="Plot")
+                _labels = [f"Plot: {choice['title']}" for choice in plot_choices]
+                plot_ui = mo.ui.dropdown(_labels, value=_labels[0], label="Visual")
             else:
                 plot_ui = None
             return plot_ui
 
 
         @app.cell
-        def _(Path, build_notebook_plot_card_lines, mo, plot_choices, plot_ui):
+        def _(Path, build_notebook_plot_card_rows, build_notebook_plot_method_rows, mo, pl, plot_choices, plot_ui):
             if plot_ui is None:
                 plot_panel = mo.md(
-                    "### Plot deliverables\\n\\n"
-                    "No written manifest-backed plot media are available for this campaign."
+                    "## Visual surface\\n\\nNo written manifest-backed plot media are available for this campaign."
                 )
             else:
                 _selected = str(plot_ui.value)
-                _choice = next(choice for choice in plot_choices if choice["label"] == _selected)
-                _details = build_notebook_plot_card_lines(_choice)
+                _choice = next(choice for choice in plot_choices if f"Plot: {choice['title']}" == _selected)
+                def _plot_image(plot_choice):
+                    _path = Path(plot_choice["path"])
+                    if not _path.exists():
+                        return mo.md(f"Plot media missing: `{plot_choice['path_label']}`")
+                    return mo.image(
+                        _path.read_bytes(),
+                        alt=str(plot_choice.get("alt_text") or plot_choice["title"]),
+                        caption=str(plot_choice.get("caption") or "") or None,
+                        rounded=True,
+                        style={
+                            "width": "100%",
+                            "max-width": "980px",
+                            "max-height": "640px",
+                            "height": "auto",
+                            "object-fit": "contain",
+                            "margin": "0 auto",
+                            "display": "block",
+                        },
+                    )
+                _controls = mo.hstack([plot_ui], justify="start", align="end", wrap=True, gap=0.35)
                 plot_panel = mo.vstack(
                     [
-                        mo.md("\\n".join(_details)),
-                        plot_ui,
-                        mo.image(Path(_choice["path"]).read_bytes()),
-                    ]
+                        mo.md("## Visual surface\\n\\nSelect one operative visual surface for the active campaign."),
+                        _controls,
+                        _plot_image(_choice),
+                        mo.accordion(
+                            {
+                                "How to read this plot": mo.ui.table(
+                                    pl.DataFrame(build_notebook_plot_method_rows(_choice)),
+                                    page_size=8,
+                                ),
+                                "Plot evidence": mo.ui.table(
+                                    pl.DataFrame(build_notebook_plot_card_rows(_choice)),
+                                    page_size=12,
+                                ),
+                            },
+                            multiple=True,
+                        ),
+                    ],
+                    gap=0.45,
                 )
             return plot_panel
 
@@ -227,20 +264,20 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
             metric_definitions_panel,
             mo,
             plot_panel,
-            selected_overview_md,
+            selected_overview_panel,
             selected_validity_md,
         ):
             mo.vstack(
                 [
                     header_md,
                     campaign_ui,
+                    plot_panel,
                     mo.accordion(
                         {
                             "Campaigns at a glance": mo.ui.table(campaign_summary_df, page_size=12),
-                            "Selected campaign": selected_overview_md,
+                            "Selected campaign": selected_overview_panel,
                             "Validity": selected_validity_md,
                             "Changes": changes_panel,
-                            "Plot deliverables": plot_panel,
                             "Metric definitions": metric_definitions_panel,
                             "Artifacts": artifact_garden_panel,
                             "Warnings and stale artifacts": evidence_panel,

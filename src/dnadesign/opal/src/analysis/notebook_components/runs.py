@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from ._support import mapping, predict_progress_text, resolved_run_id, sequence
+from ._support import compact_path, mapping, predict_progress_text, resolved_run_id, sequence
 
 
 def build_notebook_change_lines(view_model: Mapping[str, Any]) -> list[str]:
@@ -13,8 +13,6 @@ def build_notebook_change_lines(view_model: Mapping[str, Any]) -> list[str]:
     event_contract = mapping(progress.get("event_contract"))
     rounds = sequence(progress.get("rounds"))
     lines = [
-        "### Changes",
-        "",
         f"- Round selector: `{status.get('round_selector') or progress.get('round_selector') or 'latest'}`",
         f"- Rounds visible: `{len(rounds)}`",
         f"- Latest run ID: `{status.get('latest_run_id')}`",
@@ -37,6 +35,8 @@ def build_notebook_change_rows(view_model: Mapping[str, Any]) -> list[dict[str, 
     """Return progress-derived round/run rows for notebook change tables."""
 
     progress = mapping(view_model.get("progress"))
+    campaign = mapping(view_model.get("campaign"))
+    workdir = campaign.get("workdir")
     rows: list[dict[str, Any]] = []
     for round_row in sequence(progress.get("rounds")):
         if not isinstance(round_row, Mapping):
@@ -56,7 +56,7 @@ def build_notebook_change_rows(view_model: Mapping[str, Any]) -> list[dict[str, 
                 "predict": predict_progress_text(predict),
                 "aborted": bool(summary.get("aborted")),
                 "ambiguous_run_scope": bool(run_scope.get("ambiguous_run_scope")),
-                "log_path": round_row.get("path"),
+                "log": compact_path(round_row.get("path"), base=workdir),
             }
         )
     return rows
@@ -80,18 +80,43 @@ def build_notebook_run_options(runs_for_round: Any) -> list[str]:
     return runs_for_round.select("run_id").unique().sort("run_id")["run_id"].to_list()
 
 
-def build_notebook_run_summary_lines(run_id: str, run_meta: Mapping[str, Any], objective_name: str) -> list[str]:
+def build_notebook_run_summary_lines(
+    run_id: str,
+    run_meta: Mapping[str, Any],
+    objective_name: str,
+    *,
+    selected_round: Any | None = None,
+    default_round: Any | None = None,
+    run_options: Iterable[str] | None = None,
+) -> list[str]:
     """Build the selected-run summary lines used by generated notebooks."""
 
-    return [
-        "## Run Summary",
-        "",
+    run_ids = [str(option) for option in sequence(run_options)]
+    selected = selected_round if selected_round is not None else run_meta.get("as_of_round", -1)
+    default = "latest" if str(default_round or "").strip().lower() in ("", "latest") else str(default_round)
+    lines = [
         (
             f"Run `{run_id}` (round {run_meta.get('as_of_round', -1)}) uses "
             f"objective `{objective_name}` and selection `{run_meta.get('selection__name')}`."
         ),
-        f"Model: `{run_meta.get('model__name')}`",
-        f"Train size: {run_meta.get('stats__n_train')} | Scored: {run_meta.get('stats__n_scored')}",
+        f"Run scope: selected round `{selected}`, selected run `{run_id}`.",
+        f"Generated default round selector: `{default}`.",
+    ]
+    if len(run_ids) > 1:
+        lines.append(
+            f"Available runs for this round: `{len(run_ids)}`. "
+            "The notebook scopes labels, predictions, and selections to the selected Run ID dropdown value."
+        )
+    elif len(run_ids) == 1:
+        lines.append("Available runs for this round: `1`.")
+    lines.extend(
+        [
+            f"Model: `{run_meta.get('model__name')}`",
+            f"Train size: {run_meta.get('stats__n_train')} | Scored: {run_meta.get('stats__n_scored')}",
+        ]
+    )
+    return [
+        *lines,
     ]
 
 
@@ -104,8 +129,6 @@ def build_notebook_no_run_lines(
     """Build no-run guidance for generated notebooks."""
 
     return [
-        "### Round and run",
-        "",
         no_run_message,
         "The campaign contract and records remain inspectable before the first OPAL run.",
         f"Expected runs ledger: `{expected_runs_ledger}`.",

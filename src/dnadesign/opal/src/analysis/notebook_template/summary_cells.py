@@ -6,13 +6,21 @@ SUMMARY_CELLS = dedent(
     """
     @app.cell
     def _(
-        build_notebook_at_a_glance_lines,
+        build_notebook_at_a_glance_rows,
         build_notebook_distrust_lines,
         build_notebook_validity_lines,
         mo,
         notebook_view_model,
+        pl,
     ):
-        at_a_glance_md = mo.md("\\n".join(build_notebook_at_a_glance_lines(notebook_view_model)))
+        at_a_glance_rows = build_notebook_at_a_glance_rows(notebook_view_model)
+        at_a_glance_md = mo.vstack(
+            [
+                mo.md("## Campaign status"),
+                mo.ui.table(pl.DataFrame(at_a_glance_rows), page_size=14),
+            ],
+            gap=0.25,
+        )
         distrust_md = mo.md("\\n".join(build_notebook_distrust_lines(notebook_view_model)))
         validity_md = mo.md("\\n".join(build_notebook_validity_lines(notebook_view_model)))
         return at_a_glance_md, distrust_md, validity_md
@@ -85,7 +93,7 @@ SUMMARY_CELLS = dedent(
         summary_lines = [
             "# OPAL Campaign Notebook",
             "",
-            "Campaign-specific artifact viewer for records, ledgers, selected records, and plot deliverables.",
+            "Campaign analysis command surface for manifest-backed status, records, and visuals.",
         ]
         summary = "\\n".join(summary_lines)
         header_md = mo.md(summary)

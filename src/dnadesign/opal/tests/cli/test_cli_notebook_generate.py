@@ -210,7 +210,7 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -
     assert "OPAL Campaign Set Notebook" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
-    assert 'label="Plot"' in text
+    assert 'label="Visual"' in text
 
 
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:

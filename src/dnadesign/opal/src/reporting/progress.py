@@ -32,12 +32,13 @@ def build_campaign_progress(
     config_path: Path | None,
     *,
     round_selector: str | None = "latest",
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     analysis = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
     cfg = analysis.config
     ws = analysis.workspace
     round_indices = _resolve_progress_rounds(ws, round_selector)
-    rounds = [_round_progress(ws, round_index) for round_index in round_indices]
+    rounds = [_round_progress(ws, round_index, run_id=run_id) for round_index in round_indices]
     event_contract = _event_contract_summary(rounds)
     lock_state = inspect_campaign_lock(ws.workdir)
     warnings = []
@@ -78,6 +79,7 @@ def build_campaign_progress(
             "path": str(ws.state_path),
         },
         "round_selector": round_selector or "latest",
+        "run_id": run_id,
         "status": _campaign_status(rounds),
         "round_count": len(rounds),
         "warnings": warnings,
@@ -147,7 +149,7 @@ def _available_round_indices(ws: CampaignWorkspace) -> list[int]:
     return sorted(rounds)
 
 
-def _round_progress(ws: CampaignWorkspace, round_index: int) -> dict[str, Any]:
+def _round_progress(ws: CampaignWorkspace, round_index: int, *, run_id: str | None = None) -> dict[str, Any]:
     log_path = ws.round_logs_dir(round_index) / "round.log.jsonl"
     if not log_path.exists():
         return {
@@ -161,7 +163,7 @@ def _round_progress(ws: CampaignWorkspace, round_index: int) -> dict[str, Any]:
             "path": str(log_path),
         }
     events = load_round_log(log_path)
-    summary = summarize_round_log(events)
+    summary = summarize_round_log(events, run_id=run_id)
     last_event = events[-1] if events else {}
     last_predict = next((event for event in reversed(events) if event.get("stage") == "predict_batch"), {})
     status = "done" if summary.get("done_ts") else "running_or_incomplete"

@@ -17,7 +17,12 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records, write_records_with_x_values
+from dnadesign.opal.tests._cli_helpers import (
+    write_campaign_yaml,
+    write_ledger,
+    write_records,
+    write_records_with_x_values,
+)
 
 
 def _plain_output(text: str) -> str:
@@ -56,6 +61,88 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["round_index"] == 0
+
+
+def test_notebook_generate_json_writes_machine_readable_summary(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "notebook", "generate", "-c", str(campaign), "--force", "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.notebook_generate.v1"
+    assert payload["ok"] is True
+    assert payload["kind"] == "campaign"
+    assert payload["campaign_count"] == 1
+    assert payload["round_selector"] == "latest"
+    assert payload["run_id"] is None
+    assert payload["config_paths"] == [str(campaign)]
+    assert Path(payload["notebook_path"]).exists()
+    assert str(workdir) in payload["workdirs"]
+    assert "Notebook written" not in res.stdout
+
+
+def test_notebook_generate_json_pins_run_id_and_round(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    workdir = campaign.parent
+    write_ledger(workdir, run_id="run-0", round_index=0)
+    write_ledger(workdir, run_id="run-1", round_index=0)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "-c",
+            str(campaign),
+            "--run-id",
+            "run-1",
+            "--force",
+            "--json",
+        ],
+    )
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["round_selector"] == "0"
+    assert payload["run_id"] == "run-1"
+    text = Path(payload["notebook_path"]).read_text(encoding="utf-8")
+    assert "default_round = '0'" in text
+    assert "default_run_id = 'run-1'" in text
+
+
+def test_notebook_generate_rejects_run_id_round_mismatch_json(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    write_ledger(campaign.parent, run_id="run-0", round_index=0)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "-c",
+            str(campaign),
+            "--round",
+            "1",
+            "--run-id",
+            "run-0",
+            "--json",
+        ],
+    )
+
+    assert res.exit_code == 2
+    payload = json.loads(res.stdout)
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "notebook.generate"
+    assert "belongs to round 0" in payload["error"]["message"]
 
 
 def test_init_does_not_materialize_candidate_x_when_label_history_exists(tmp_path: Path, monkeypatch) -> None:

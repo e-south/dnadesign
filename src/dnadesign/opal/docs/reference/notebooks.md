@@ -1,19 +1,27 @@
 ## OPAL Notebooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-21
+**Last verified:** 2026-05-22
 
 
-OPAL notebooks are generated marimo campaign viewers. They are inspection
-artifacts, not runtime control planes and not study-specific visual browsers.
-Checked-in operator notebooks may use the public `dnadesign.opal.notebooks.api`
-adapter for notebook discovery helpers; generated notebooks should continue to
-import only `dnadesign.opal` public helpers plus general third-party packages.
+OPAL notebooks are generated marimo campaign analysis surfaces. They summarize
+campaign state, records, ledgers, and visual artifacts for inspection; mutation
+and long-running execution remain in the CLI.
+Checked-in operator notebooks and generated campaign notebooks use the public
+`dnadesign.opal.notebooks.api` adapter for notebook-specific helpers; generated
+notebooks should import only that notebook API plus general third-party packages.
 
 Generate one with:
 
 ```bash
-uv run opal notebook generate --config /path/to/campaign --round latest --force
+uv run opal notebook generate --config /path/to/campaign --round latest --force --json
+```
+
+Pin a single-campaign notebook to a specific rerun when a round has multiple
+`run_id` values:
+
+```bash
+uv run opal notebook generate --config /path/to/campaign --round latest --run-id <run-id> --force --json
 ```
 
 Generate a campaign-set review notebook with repeated `--campaign` options:
@@ -27,12 +35,15 @@ uv run opal notebook generate \
 
 ### Notebook View Model
 
-Generated notebooks import public helpers from `dnadesign.opal` and build a
-`NotebookViewModel` through `build_notebook_view_model(...)`. The view model is
-manifest-backed and uses schema `opal.notebook_view_model.v1`.
+Generated notebooks import public helpers from `dnadesign.opal.notebooks.api` and
+build a `NotebookViewModel` through `build_notebook_view_model(...)`. The view
+model is manifest-backed and uses schema `opal.notebook_view_model.v1`.
 Generated single-campaign notebooks also embed
 `__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v1"` so
 old local notebooks can be distinguished from current templates during review.
+`opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
+written notebook path, config paths, resolved round selector, optional pinned
+run ID, and follow-up `opal notebook run` / `marimo check` commands.
 
 | field | purpose |
 | --- | --- |
@@ -52,14 +63,19 @@ duplicates.
 
 The generated notebook renders the view model with progressive disclosure:
 
-- campaign state at a glance;
+- campaign state as a compact table;
 - validity state for progress, review, plot, warning, and artifact-garden
   contracts;
 - progress-derived change rows for visible rounds and run scope;
+- selected round/run scope, with the run dropdown initialized to the pinned
+  `--run-id` when one was provided;
 - records and X provenance;
 - ledgers, labels, predictions, and selected records;
-- manifest-backed plot cards;
+- a single visual-surface selector for manifest-backed plots and optional
+  record renders;
 - plot metric/data-shape definitions from plot-manifest metadata;
+- plot-local method, math, failure-mode, and evidence tables inside
+  progressively disclosed accordions;
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
 - limitations and handoff commands.
@@ -72,24 +88,25 @@ kept as provenance unless a runtime command explicitly needs the matrix.
 Heavy sections should use marimo accordions with lazy loading. Reusable
 generated-cell builders and public component primitives live in
 `src/analysis/notebook_components/`. Current reusable primitives cover
-campaign summary rows, at-a-glance lines, validity lines, change summary lines
+campaign summary rows, at-a-glance rows, validity lines, change summary lines
 and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
-metric definition rows, artifact garden rows, manifest-backed plot-gallery
-models, and plot card detail lines. Keep the generated source renderer in
-`src/analysis/notebook_template/` as thin composition over small semantic cell
-fragment modules. The reusable component surface lives in the
+metric definition rows, artifact garden rows, manifest-backed visual-surface
+models, compact path labels, plot detail rows, plot method rows, and optional
+BaseRender record-render contracts. Keep the generated
+source renderer in `src/analysis/notebook_template/` as thin composition over
+small semantic cell fragment modules. The reusable component surface lives in the
 `src/analysis/notebook_components/` package; add new notebook UX as small
 semantic modules there instead of growing a single component file.
 Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
 
 Campaign-set notebooks are intentionally overview-first: they provide campaign
-and plot dropdowns, status and provenance summary, manifest-backed plot cards,
-validity panels, change rows, metric definitions, artifact garden rows,
+and visual controls, status and provenance summary, visible manifest-backed plot
+surfaces, validity panels, change rows, metric definitions, artifact garden rows,
 warnings, and stale-artifact evidence.
 Single-campaign notebooks remain the record/table drill-down surface.
-Single-campaign and campaign-set notebooks use the same public plot-gallery,
-plot-card, validity, change-row, evidence-row, metric-definition, and
+Single-campaign and campaign-set notebooks use the same public visual-surface,
+plot-card, plot-method, validity, change-row, evidence-row, metric-definition, and
 artifact-garden primitives.
 
 ### Boundaries
@@ -98,10 +115,12 @@ Canonical OPAL notebooks show OPAL campaign evidence only: records contract,
 configured X column provenance, ledgers, progress, review manifests, selection
 behavior, labels, predictions, plot artifacts, and limitations.
 
-They must not render LatentDNA geometry, UMAP atlases, DenseGen-specific
-visuals, or representation-browser content. Study/probe notebooks may link to
-OPAL review artifacts, but OPAL-generated notebooks should remain
-campaign-agnostic.
+They must not render LatentDNA geometry, UMAP atlases, or representation-browser
+content. They may expose a BaseRender record view only when the records schema
+satisfies a public adapter contract such as generic feature annotations or
+sequence-feature annotations. That contract is detected from records columns and
+is optional; OPAL notebooks must not require producer-specific browser state to
+render.
 
 ### Smoke Checks
 

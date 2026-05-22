@@ -14,13 +14,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..notebook_components import render_plot_gallery_cells
+from ..notebook_components import render_visual_surface_cells
 from .source import render_notebook_source
 
 OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_notebook.v1"
 
 
-def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
+def render_campaign_notebook(config_path: Path, *, round_selector: str, run_id: str | None = None) -> str:
     """
     Render a marimo notebook template tied to a campaign.
     """
@@ -33,11 +33,12 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
     else:
         marimo_version = getattr(_marimo, "__version__", "unknown")
 
-    template = render_notebook_source(plot_gallery_cells=render_plot_gallery_cells())
+    template = render_notebook_source(visual_surface_cells=render_visual_surface_cells())
 
     return (
         template.replace("__CONFIG_PATH__", repr(str(config_path)))
         .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
+        .replace("__DEFAULT_RUN_ID__", repr(str(run_id)) if run_id else "None")
         .replace("__OPAL_NOTEBOOK_TEMPLATE_SCHEMA__", OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION)
         .replace("__GENERATED_WITH__", str(marimo_version))
         + "\n"

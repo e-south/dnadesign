@@ -30,7 +30,12 @@ from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..registry import cli_group
 from ..tui import tui_enabled
-from ._common import internal_error, opal_error, print_config_context, prompt_confirm
+from ._common import internal_error, json_error, json_out, opal_error, print_config_context, prompt_confirm
+from .notebook_generation import (
+    NOTEBOOK_GENERATE_SCHEMA_VERSION,
+    notebook_generate_payload,
+    resolve_generation_run_scope,
+)
 
 notebook_app = typer.Typer(no_args_is_help=False, help="Notebook workflows (marimo).")
 cli_group("notebook", help="Notebook workflows (marimo).")(notebook_app)
@@ -230,6 +235,11 @@ def cmd_notebook_generate(
         "-r",
         help="Default round selector (int or 'latest').",
     ),
+    run_id: Optional[str] = typer.Option(
+        None,
+        "--run-id",
+        help="Pin the generated single-campaign notebook to a run_id from outputs/ledger/runs.parquet.",
+    ),
     out: Optional[Path] = typer.Option(
         None,
         "--out",
@@ -249,10 +259,16 @@ def cmd_notebook_generate(
         "--validate/--no-validate",
         help="Validate requested round against existing runs before generating the notebook.",
     ),
+    json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON summary."),
 ) -> None:
     try:
         campaign_set_paths = list(campaign or [])
         if campaign_set_paths:
+            if run_id is not None:
+                raise OpalError(
+                    "--run-id is only supported for single-campaign notebook generation.",
+                    ExitCodes.BAD_ARGS,
+                )
             _generate_campaign_set_notebook(
                 config=config,
                 campaign_paths=campaign_set_paths,
@@ -261,6 +277,7 @@ def cmd_notebook_generate(
                 name=name,
                 force=force,
                 validate=validate,
+                json=json,
             )
             return
 
@@ -283,6 +300,15 @@ def cmd_notebook_generate(
                 raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
             round_sel = str(round_val)
 
+        if run_id is not None:
+            round_sel, resolved_run_id = resolve_generation_run_scope(
+                analysis,
+                round_selector=round_sel,
+                run_id=run_id,
+            )
+        else:
+            resolved_run_id = None
+
         if validate and ws.ledger_runs_path.exists():
             runs_df = analysis.read_runs()
             # Validate requested round exists (or at least that runs are available for "latest").
@@ -292,6 +318,7 @@ def cmd_notebook_generate(
         notebook_name = _resolve_notebook_name(name, default_name)
         default_out = ws.workdir / "notebooks" / notebook_name
         out_path = Path(out) if out is not None else default_out
+        overwritten = out_path.exists()
         if out_path.exists() and not force:
             msg = (
                 f"Notebook already exists: {out_path}. "
@@ -305,12 +332,36 @@ def cmd_notebook_generate(
             except OpalError:
                 raise
             if not confirmed:
-                print_stdout("Aborted.")
+                if json:
+                    json_out(
+                        {
+                            "schema_version": NOTEBOOK_GENERATE_SCHEMA_VERSION,
+                            "ok": False,
+                            "status": "aborted",
+                            "notebook_path": str(out_path),
+                        }
+                    )
+                else:
+                    print_stdout("Aborted.")
                 return
 
-        content = render_campaign_notebook(analysis.config_path, round_selector=round_sel)
+        content = render_campaign_notebook(analysis.config_path, round_selector=round_sel, run_id=resolved_run_id)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(content)
+        if json:
+            json_out(
+                notebook_generate_payload(
+                    kind="campaign",
+                    out_path=out_path,
+                    round_selector=round_sel,
+                    run_id=resolved_run_id,
+                    validate=validate,
+                    force=force,
+                    overwritten=overwritten,
+                    analyses=[analysis],
+                )
+            )
+            return
 
         if tui_enabled():
             table = _rich_kv_table(
@@ -319,6 +370,7 @@ def cmd_notebook_generate(
                     "Config": analysis.config_path,
                     "Workdir": ws.workdir,
                     "Notebook": out_path,
+                    "Run ID": resolved_run_id or "",
                 },
             )
             if _print_rich(table):
@@ -334,7 +386,10 @@ def cmd_notebook_generate(
             print_config_context(analysis.config_path, cfg=cfg)
             print_stdout(f"Notebook written: {out_path}")
     except OpalError as e:
-        opal_error("notebook.generate", e)
+        if json:
+            json_error("notebook.generate", e)
+        else:
+            opal_error("notebook.generate", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("notebook.generate", e)
@@ -350,6 +405,7 @@ def _generate_campaign_set_notebook(
     name: Optional[str],
     force: bool,
     validate: bool,
+    json: bool,
 ) -> None:
     config_paths = ([config] if config is not None else []) + campaign_paths
     if len(config_paths) < 2:
@@ -386,6 +442,7 @@ def _generate_campaign_set_notebook(
     notebook_name = _resolve_notebook_name(name, default_name)
     default_out = analyses[0].workspace.workdir / "notebooks" / notebook_name
     out_path = Path(out) if out is not None else default_out
+    overwritten = out_path.exists()
     if out_path.exists() and not force:
         msg = f"Notebook already exists: {out_path}. Use --force to overwrite or --name to choose a different filename."
         try:
@@ -393,12 +450,36 @@ def _generate_campaign_set_notebook(
         except OpalError:
             raise
         if not confirmed:
-            print_stdout("Aborted.")
+            if json:
+                json_out(
+                    {
+                        "schema_version": NOTEBOOK_GENERATE_SCHEMA_VERSION,
+                        "ok": False,
+                        "status": "aborted",
+                        "notebook_path": str(out_path),
+                    }
+                )
+            else:
+                print_stdout("Aborted.")
             return
 
     content = render_campaign_set_notebook([analysis.config_path for analysis in analyses], round_selector=round_sel)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
+    if json:
+        json_out(
+            notebook_generate_payload(
+                kind="campaign_set",
+                out_path=out_path,
+                round_selector=round_sel,
+                run_id=None,
+                validate=validate,
+                force=force,
+                overwritten=overwritten,
+                analyses=analyses,
+            )
+        )
+        return
 
     if tui_enabled():
         table = _rich_kv_table(

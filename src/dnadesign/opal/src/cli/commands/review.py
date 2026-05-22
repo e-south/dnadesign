@@ -18,7 +18,7 @@ import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..registry import cli_command
-from ._common import internal_error, json_out, opal_error
+from ._common import internal_error, json_error, json_out, opal_error
 
 
 @cli_command("review", help="Persist campaign review artifacts under outputs/review.")
@@ -62,7 +62,7 @@ def cmd_review(
             )
     except OpalError as e:
         if json:
-            json_out({"ok": False, "error": {"context": "review", "message": str(e), "exit_code": e.exit_code}})
+            json_error("review", e)
         else:
             opal_error("review", e)
         raise typer.Exit(code=e.exit_code)

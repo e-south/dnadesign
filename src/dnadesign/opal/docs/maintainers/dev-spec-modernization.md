@@ -289,10 +289,10 @@ The target architecture keeps abstractions small. Use dataclasses, protocols, JS
 | `PlotArtifactManifest` | Per-plot output authority | `schema_version`, `plot_id`, `kind`, `params`, `run_id`, `rounds`, `inputs`, `outputs`, `status`, `generated_at`, `stale_state` |
 | `NotebookViewModel` | Manifest-backed marimo input surface | `campaign_state`, `review_manifest`, `plot_manifests`, `warnings`, `links`, `tables` |
 | `NotebookCampaignSetViewModel` | Optional multi-campaign notebook input surface | `campaigns`, `active_campaign_id`, `campaign_states`, `plot_catalog`, `warnings`, `comparison_tables` |
-| `MarimoComponentPrimitives` | Public render helpers used by single-campaign and campaign-set notebooks | `render_campaign_selector`, `render_at_a_glance`, `render_validity_panel`, `render_plot_card`, `render_plot_gallery`, `render_distrust_panel` |
+| `MarimoComponentPrimitives` | Public render helpers used by single-campaign and campaign-set notebooks | `render_campaign_selector`, `render_at_a_glance`, `render_validity_panel`, `render_visual_surface`, `render_plot_evidence`, `render_distrust_panel` |
 | `Public Reporting API` | Stable functions for progress, review, predictions, status, manifests | `build_campaign_progress`, `build_campaign_review`, `read_campaign_predictions`, `load_review_manifest`, `inspect_campaign_status` |
-| `Public Plot API` | Stable functions for plot metadata and manifests | `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `run_configured_plots` |
-| `Public Notebook API` | Stable generated-notebook helper surface | `build_notebook_view_model`, `build_campaign_set_view_model`, `render_campaign_notebook`, `render_campaign_set_notebook`, `smoke_check_notebook` |
+| `Public Plot API` | Stable functions for plot metadata and manifests | `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `run_campaign_plots` |
+| `Public Notebook API` | Stable generated-notebook helper surface | `build_notebook_view_model`, `build_campaign_set_notebook_view_model`, `render_campaign_notebook`, `render_campaign_set_notebook`, `smoke_check_notebook` |
 
 ### Illustrative Dataclass Shapes
 
@@ -402,10 +402,10 @@ visible path migration remains future work.
 | --- | --- |
 | Problem | The first public API cleanup is in place, but the generated notebook still pulls many low-level helper functions directly. Durable notebooks should depend on a smaller public view-model/component API, not a broad helper grab-bag. |
 | Proposed change | Keep `dnadesign.opal` public APIs narrow and add explicit notebook/reporting adapter functions for view-model construction and rendering. Generated notebooks should import only public APIs and general third-party packages. |
-| Contract shape | Public exports: `build_campaign_progress`, `build_campaign_review`, `read_campaign_predictions`, `load_review_manifest`, `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `load_plot_manifest_index`, `build_notebook_view_model`, `build_campaign_set_notebook_view_model`, `render_campaign_notebook`, `render_campaign_set_notebook`, `smoke_check_notebook`, `render_campaign_progress_text`, `build_artifact_garden_audit`, `prune_stale_artifacts`, memory guards, and X validation. Cross-package SFXI scoring lives at `dnadesign.opal.api.sfxi`. Checked-in operator notebooks can use `dnadesign.opal.notebooks.api`. Dashboard/UMAP discovery helpers are not package-root exports. |
+| Contract shape | Package-root public exports: `build_campaign_progress`, `build_campaign_review`, `read_campaign_predictions`, `load_review_manifest`, `list_plot_kinds`, `describe_plot_kind`, `load_plot_artifact_manifest`, `load_plot_manifest_index`, `build_notebook_view_model`, `build_campaign_set_notebook_view_model`, `render_campaign_notebook`, `render_campaign_set_notebook`, `smoke_check_notebook`, `render_campaign_progress_text`, `build_artifact_garden_audit`, `prune_stale_artifacts`, memory guards, and X validation. Cross-package SFXI scoring lives at `dnadesign.opal.api.sfxi`. Generated and checked-in operator notebooks can use `dnadesign.opal.notebooks.api` for notebook-specific helpers. Dashboard/UMAP discovery helpers and generated-notebook component helpers are not package-root exports. |
 | Affected modules | `src/dnadesign/opal/__init__.py`, `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/*`, `src/dnadesign/opal/src/plots/*`. |
 | Migration notes | Keep internal modules intact. Add thin public adapters rather than relocating large internals. Generated notebooks should pin the public schema versions they expect. |
-| Acceptance criteria | No generated notebook imports from `dnadesign.opal.src.*`; package-root public API excludes dashboard/projection helpers; notebook render helpers are documented public contracts; study packages use only `dnadesign.opal` public helpers. |
+| Acceptance criteria | No generated notebook imports from `dnadesign.opal.src.*`; package-root public API excludes dashboard/projection helpers and generated-notebook component helpers; notebook render helpers are documented public contracts under `dnadesign.opal.notebooks.api`; study packages use only `dnadesign.opal` public helpers. |
 | Tests | Public import tests, generated notebook text tests, architecture boundary check, study probe import tests, and contract tests for the notebook view-model schema. |
 
 ### C. Ingest Runtime Memory Safety
@@ -483,7 +483,7 @@ policies.
 | Problem | Runtime `identity` accepts scalar/list/JSON string vectors, docs describe Arrow list or JSON string, and public validation requires Parquet `fixed_size_list`. This split weakens fail-fast behavior. |
 | Proposed change | Define canonical physical schema as Parquet Arrow `fixed_size_list<float32 or float64>` with finite, non-null values and stable row count. Noncanonical forms are allowed only through explicit import/normalization commands, never inside campaign execution. |
 | Contract shape | `XMatrixContract` with `physical_type`, `x_dim`, `canonical=true`, `validation_level=parquet_schema_and_values`, and `normalization_source` if converted. |
-| Affected modules | `src/dnadesign/opal/src/storage/x_contracts.py`, `src/dnadesign/opal/src/transforms_x/identity.py`, `src/dnadesign/opal/src/runtime/round/stages.py`, `src/dnadesign/opal/docs/reference/data-contracts.md`, validate/init/run/explain paths. |
+| Affected modules | `src/dnadesign/opal/src/storage/x_contracts.py`, `src/dnadesign/opal/src/transforms_x/identity.py`, `src/dnadesign/opal/src/runtime/round/stages/`, `src/dnadesign/opal/docs/reference/data-contracts.md`, validate/init/run/explain paths. |
 | Migration notes | Keep `identity` as a model-matrix transform, but require candidate records to validate before run/explain/review. Add `opal x normalize` or `opal import-records` if scalar/list/JSON compatibility is needed for legacy inputs. |
 | Acceptance criteria | `opal run`, `opal explain`, `opal review`, and notebook view model all fail or warn on invalid/noncanonical X according to severity. Docs no longer describe JSON-string X as runtime-canonical. |
 | Tests | Fixed-size list accept; variable list/scalar/JSON reject at campaign execution; normalization command accepts legacy forms and writes canonical records; review exposes x contract. |
@@ -620,8 +620,8 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 | Field | Specification |
 | --- | --- |
 | Problem | The generated single-campaign notebook is useful and manifest-backed. Reusable helper panels now live in the semantic `notebook_components/` package, generated source wiring is split under `notebook_template/`, and campaign-set generation exists as a separate overview notebook. Remaining UX risk is future drift away from reusable panel primitives and weak live marimo interaction evidence. |
-| Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same plot gallery, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
-| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `plot_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_card`, `plot_gallery`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `At a glance`, `Validity`, `Changes`, `Evidence`, `Metric definitions`, `Distrust and limitations`, `Artifacts`, `Raw tables`. |
+| Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same visual surface, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
+| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `visual_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_evidence`, `visual_surface`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `At a glance`, `Visual surface`, `Validity`, `Changes`, `Evidence`, `Metric definitions`, `Distrust and limitations`, `Artifacts`, `Raw tables`. |
 | Affected modules | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/notebook.py`, public notebook API, tests, CLI notebook command. |
 | Migration notes | Preserve current ability to generate before first run. In that state, the view model reports `not_started` and missing manifest states explicitly. Keep the single-campaign path as the default; add campaign-set mode only when the user supplies a campaign index, run-root manifest, or explicit repeated `--campaign` values. |
 | Acceptance criteria | First viewport shows campaign selector when multiple campaigns exist, campaign status, run scope, X column, label source, latest run_id, selected count, stale warnings, and missing artifacts. Heavy tables and plots are inside `mo.accordion(..., multiple=True, lazy=True)`. The generated notebook should be mostly wiring; reusable component/view-model code should be importable and unit-tested outside marimo. |
@@ -629,13 +629,13 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 
 Notebook design rule: the user path is "Is it valid?", "What changed?", "What visual evidence supports that?", and "What should I distrust?" Plot cards must show source data, params, status, stale/fresh state, generated time, media links, and tidy CSV links. This is a product UX principle, not a static art direction: the visual language should be quiet evidence cartography, where status, scope, and distrust are visible before detailed tables.
 
-Campaign and plot dropdowns are both scoping controls. A campaign dropdown should select the active `NotebookViewModel`; a plot dropdown should select a manifest-backed plot card or gallery subset inside that active campaign. The same primitives should also support static review pages and JSON-backed dashboards where practical. Avoid duplicating notebook logic for "campaign-set" and "single-campaign" beyond the thin composition shell.
+Campaign and visual dropdowns are both scoping controls. A campaign dropdown should select the active `NotebookViewModel`; a visual dropdown should select one manifest-backed plot or one optional record-render endpoint inside that active campaign. The same primitives should also support static review pages and JSON-backed dashboards where practical. Avoid duplicating notebook logic for "campaign-set" and "single-campaign" beyond the thin composition shell.
 
 Initial implementation status: generated single-campaign notebooks now use a
 schema-pruned records preview instead of loading the full X payload, and
 single-campaign plus campaign-set templates share public notebook primitives for
-campaign summary rows, at-a-glance panels, evidence rows, plot galleries, and
-plot card detail lines. The next slice added shared metric-definition tables and
+campaign summary rows, at-a-glance panels, evidence rows, visual-surface models,
+and plot evidence tables. The next slice added shared metric-definition tables and
 artifact-garden panels backed by manifest metadata and dry-run prune plans.
 This slice adds shared validity panels, progress-derived change tables, and a
 generated-template size guard so future notebook UX work cannot quietly rebuild
@@ -644,6 +644,14 @@ single-campaign source wiring into `notebook_template/` cell-fragment modules
 and gates those modules in `test_source_tree_contracts.py`. Remaining work in
 this section is manifest/index inputs for campaign sets, live marimo interaction
 validation, and richer visual treatment of validity/change state.
+
+Current visual-surface status: the canonical generated notebook now uses one
+`Visual` selector for endpoint visuals rather than gallery/contact-sheet controls.
+Manifest-backed plots render as full operative visuals with alt text, plot-method
+rows, and plot-evidence rows in progressive-disclosure tables. Promoter-like
+record rendering is capability-gated by a public OPAL notebook BaseRender
+contract and imported lazily through `dnadesign.baserender` public APIs only when
+the active records schema satisfies a supported adapter contract.
 
 **Review Surface Philosophy: Evidence Cartography.** OPAL review surfaces should feel like maps of campaign evidence, not galleries of disconnected artifacts. Space should be allocated by decision value: state, scope, validity, warnings, and current selection evidence occupy the first viewport; raw ledgers, method details, and large tables sit behind lazy sections.
 
@@ -665,7 +673,7 @@ Hierarchy should make distrust explicit. Limitations, stale artifacts, missing l
 | `opal plot --list` | Text and JSON already exist; keep JSON schema `opal.plot_registry.v1` stable and fill metadata gaps for every built-in plot. |
 | `opal plot --list-config --json` | Return structured configured-plot objects (`name`, `kind`, `enabled`, `tags`, optional `preset`) instead of display strings. |
 | `opal plot --describe` | Include required data shape, tidy CSV schema, output manifest schema, and failure modes. |
-| `opal notebook generate` | Supports repeated `--campaign` options for campaign-set notebooks. Future work: accept an explicit campaign-set manifest/index, review manifest overrides, plot manifest overrides, smoke-check-by-default, and JSON summaries. |
+| `opal notebook generate` | Supports repeated `--campaign` options for campaign-set notebooks, `--json` summaries, and single-campaign `--run-id` pinning. Future work: accept an explicit campaign-set manifest/index, review manifest overrides, plot manifest overrides, and smoke-check-by-default. |
 | `opal artifacts audit/prune` | Existing explicit gardening surface for stale files, ignored run roots, manifest authority, byte counts, retention policy, and dry-run/apply pruning. Inspection is read-only; pruning requires `--apply`. |
 
 All JSON errors should have:
@@ -674,7 +682,9 @@ All JSON errors should have:
 {
   "ok": false,
   "error": {
+    "schema_version": "opal.cli_error.v1",
     "category": "RunScopeAmbiguityError",
+    "context": "review",
     "message": "...",
     "exit_code": 2,
     "hints": ["pass --run-id ..."]

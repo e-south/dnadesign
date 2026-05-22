@@ -521,13 +521,14 @@ Summarize campaign progress from `state.json` and round logs.
 **Usage**
 
 ```bash
-opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--json]
+opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--run-id <id>] [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` or a campaign directory (required unless `$OPAL_CONFIG` is set).
 * `--round, -r`: Round selector (`latest`, `all`, or an integer).
+* `--run-id`: Filter round-log summaries to one run when a round has reruns.
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
@@ -706,8 +707,8 @@ Generate or run OPAL marimo artifact viewers.
 
 ```bash
 uv run opal notebook
-uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
-uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>]
+uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate] [--json]
+uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>] [--json]
 uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 ```
 
@@ -725,6 +726,12 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
   schema-pruned and does not load the configured X payload on startup.
 * `generate` works before the first OPAL run. Missing ledger, label,
   prediction, and plot artifacts appear as explicit notebook states.
+* `generate --json` emits schema `opal.notebook_generate.v1` with the written
+  notebook path, config paths, round selector, optional pinned run ID, and
+  follow-up commands. JSON output has no human preamble.
+* `generate --run-id <id>` is single-campaign only. It resolves the run ID
+  through `outputs/ledger/runs.parquet`, pins the generated default round to
+  that run's `as_of_round`, and rejects mismatched `--round` values.
 * Generated notebooks import public helpers from `dnadesign.opal`, build a
   `NotebookViewModel`, and render plot cards from review and plot manifests
   rather than treating directory contents as authoritative.

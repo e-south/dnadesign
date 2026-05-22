@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._support import join_list, mapping, selection_count, sequence
-from .plots import build_notebook_plot_gallery_model
+from ._support import compact_path, join_list, mapping, selection_count, sequence
+from .plots import build_notebook_visual_surface_model
 
 
 def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[str, Any]:
@@ -28,36 +28,35 @@ def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[s
     }
 
 
-def build_notebook_at_a_glance_lines(view_model: Mapping[str, Any]) -> list[str]:
-    """Build first-viewport campaign status lines from a notebook view model."""
+def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build first-viewport campaign status rows from a notebook view model."""
 
     row = build_notebook_campaign_summary_row(view_model)
     campaign = mapping(view_model.get("campaign"))
     status = mapping(view_model.get("status"))
+    workdir = campaign.get("workdir")
     selected_count = selection_count(view_model)
-    lines = [
-        "### At a glance",
-        "",
-        f"- Campaign: `{row['campaign']}`",
-        f"- Status: `{row['status']}`",
-        f"- Round selector: `{status.get('round_selector')}`",
-        f"- Round count: `{row['round_count']}`",
-        f"- Latest run ID: `{row['latest_run_id']}`",
-        f"- X column: `{row['x_column']}`",
-        f"- Label source: `{row['label_source']}`",
-        f"- Config: `{campaign.get('config_path')}`",
-        f"- Workdir: `{campaign.get('workdir')}`",
+    rows = [
+        {"field": "campaign", "value": row["campaign"]},
+        {"field": "status", "value": row["status"]},
+        {"field": "round selector", "value": status.get("round_selector")},
+        {"field": "round count", "value": row["round_count"]},
+        {"field": "latest run", "value": row["latest_run_id"]},
+        {"field": "X column", "value": row["x_column"]},
+        {"field": "label source", "value": row["label_source"]},
+        {"field": "config", "value": compact_path(campaign.get("config_path"), base=workdir)},
+        {"field": "workspace", "value": compact_path(workdir, max_parts=1)},
     ]
     if selected_count is not None:
-        lines.append(f"- Selected count: `{selected_count}`")
-    lines.extend(
-        [
-            f"- Manifest-backed plots: `{row['plots']}`",
-            f"- Warnings: `{row['warnings']}`",
-            f"- Stale artifacts: `{row['stale']}`",
-        ]
+        rows.append({"field": "selected count", "value": selected_count})
+    rows.extend(
+        (
+            {"field": "manifest-backed plots", "value": row["plots"]},
+            {"field": "warnings", "value": row["warnings"]},
+            {"field": "stale artifacts", "value": row["stale"]},
+        )
     )
-    return lines
+    return rows
 
 
 def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:
@@ -66,7 +65,7 @@ def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:
     status = mapping(view_model.get("status"))
     progress = mapping(view_model.get("progress"))
     state = mapping(progress.get("state"))
-    gallery = build_notebook_plot_gallery_model(view_model)
+    visual_surface = build_notebook_visual_surface_model(view_model)
     plot_manifests = sequence(view_model.get("plot_manifests"))
     stale = sequence(view_model.get("stale_artifacts"))
     warnings = [
@@ -81,15 +80,13 @@ def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:
     state_text = "present" if state.get("exists") else "missing"
     artifact_schema = artifact_garden.get("schema_version") or "unavailable"
     return [
-        "### Validity",
-        "",
         f"- Campaign status: `{status.get('progress_status') or 'unknown'}`",
         f"- Progress schema: `{progress.get('schema_version') or 'missing'}`",
         f"- State file: `{state_text}`",
         f"- Review manifest: `{review_state}`",
         f"- Plot manifests: `{len(plot_manifests)}`",
-        f"- Written plot media choices: `{len(gallery['choices'])}`",
-        f"- Missing plot outputs: `{len(gallery['missing_outputs'])}`",
+        f"- Written plot media choices: `{len(visual_surface['choices'])}`",
+        f"- Missing plot outputs: `{len(visual_surface['missing_outputs'])}`",
         f"- Warnings: `{len(warnings)}`",
         f"- Stale artifacts: `{len(stale)}`",
         f"- Artifact garden: `{artifact_schema}`",
@@ -102,17 +99,15 @@ def build_notebook_distrust_lines(view_model: Mapping[str, Any]) -> list[str]:
     """Build a compact distrust/limitations panel for generated notebooks."""
 
     review_manifest = view_model.get("review_manifest")
-    gallery = build_notebook_plot_gallery_model(view_model)
+    visual_surface = build_notebook_visual_surface_model(view_model)
     warnings = sequence(view_model.get("warnings"))
     stale = sequence(view_model.get("stale_artifacts"))
     lines = [
-        "### Distrust and limitations",
-        "",
         "- OPAL notebooks are inspection surfaces; execution and mutation stay in the CLI.",
         "- Producer-specific representation browsers and study benchmark reports are outside this notebook.",
     ]
     lines.append("- Review manifest: `missing`" if review_manifest is None else "- Review manifest: `present`")
-    if not gallery["choices"]:
+    if not visual_surface["choices"]:
         lines.append("- Plot evidence: no written manifest-backed plot media.")
     if warnings:
         lines.append(f"- Warnings: `{len(warnings)}`")
@@ -124,7 +119,25 @@ def build_notebook_distrust_lines(view_model: Mapping[str, Any]) -> list[str]:
 def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Return warning and stale-artifact rows for notebook evidence tables."""
 
+    campaign = mapping(view_model.get("campaign"))
+    workdir = campaign.get("workdir")
     rows: list[dict[str, Any]] = []
+    for label, path in (
+        ("config", campaign.get("config_path")),
+        ("workdir", workdir),
+        ("records", campaign.get("records_path")),
+        ("review_manifest", view_model.get("review_manifest_path")),
+    ):
+        if path:
+            rows.append(
+                {
+                    "source": "path",
+                    "category": label,
+                    "severity": None,
+                    "message": compact_path(path, base=workdir),
+                    "path": compact_path(path, base=workdir),
+                }
+            )
     for warning in sequence(view_model.get("warnings")):
         if isinstance(warning, Mapping):
             rows.append(
@@ -133,7 +146,7 @@ def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str
                     "category": warning.get("category"),
                     "severity": warning.get("severity"),
                     "message": warning.get("message"),
-                    "path": warning.get("path"),
+                    "path": compact_path(warning.get("path"), base=workdir),
                 }
             )
     for artifact in sequence(view_model.get("stale_artifacts")):
@@ -144,7 +157,7 @@ def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str
                     "category": artifact.get("category"),
                     "severity": artifact.get("severity"),
                     "message": artifact.get("message"),
-                    "path": artifact.get("path"),
+                    "path": compact_path(artifact.get("path"), base=workdir),
                 }
             )
     return rows

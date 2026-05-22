@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
@@ -20,6 +21,43 @@ def sequence(value: Any) -> list[Any]:
 def join_list(value: Any, *, sep: str) -> str:
     items = [str(item) for item in sequence(value) if str(item)]
     return sep.join(items) if items else "not recorded"
+
+
+def display_name(value: Any) -> str:
+    """Return a compact human label for stable identifiers."""
+
+    text = str(value or "").strip()
+    if not text:
+        return "Untitled"
+    words = text.replace("__", " ").replace("_", " ").replace("-", " ").split()
+    return " ".join(word[:1].upper() + word[1:] for word in words) if words else text
+
+
+def compact_path(value: Any, *, base: Any | None = None, max_parts: int = 3) -> str:
+    """Return a notebook-friendly path label without discarding evidence fields."""
+
+    text = str(value or "").strip()
+    if not text:
+        return "not recorded"
+    path = Path(text)
+    if base not in (None, ""):
+        try:
+            relative = path.expanduser().resolve().relative_to(Path(str(base)).expanduser().resolve())
+            return relative.as_posix() or "."
+        except Exception:
+            pass
+    if not path.is_absolute():
+        return path.as_posix()
+    parts = [part for part in path.parts if part not in {path.anchor, ""}]
+    if not parts:
+        return path.as_posix()
+    return Path(*parts[-max(1, max_parts) :]).as_posix()
+
+
+def compact_notebook_path(value: Any, *, base: Any | None = None, max_parts: int = 3) -> str:
+    """Public notebook helper for compact path display labels."""
+
+    return compact_path(value, base=base, max_parts=max_parts)
 
 
 def selection_count(view_model: Mapping[str, Any]) -> int | None:

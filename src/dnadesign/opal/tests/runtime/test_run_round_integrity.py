@@ -37,7 +37,7 @@ from dnadesign.opal.src.registries.objectives import list_objectives, register_o
 from dnadesign.opal.src.registries.selection import list_selections, register_selection
 from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op
 from dnadesign.opal.src.runtime.round import writebacks as round_writebacks
-from dnadesign.opal.src.runtime.round.stages import _format_summary_stats_for_log
+from dnadesign.opal.src.runtime.round.stages.telemetry import format_summary_stats_for_log
 from dnadesign.opal.src.runtime.run_round import RunRoundRequest, run_round
 from dnadesign.opal.src.storage.data_access import RecordsStore
 from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
@@ -217,7 +217,7 @@ def test_format_summary_stats_for_log_handles_mixed_types() -> None:
         "train_effect_pool_size": 4,
         "non_finite_value": np.nan,
     }
-    kvs = _format_summary_stats_for_log(summary_stats)
+    kvs = format_summary_stats_for_log(summary_stats)
     assert kvs == [
         "non_finite_value=nan",
         "score_max=1.23457",

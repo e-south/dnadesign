@@ -14,13 +14,13 @@ NOTEBOOK_TEMPLATE_FRAGMENTS = (
     RUN_CELLS,
     RECORD_CELLS,
     PLOT_CONFIG_CELLS,
-    "__PLOT_GALLERY_CELLS__",
+    "__VISUAL_SURFACE_CELLS__",
     DATA_CELLS,
     LAYOUT_CELLS,
 )
 
 
-def render_notebook_source(*, plot_gallery_cells: str) -> str:
+def render_notebook_source(*, visual_surface_cells: str) -> str:
     template = "\n\n".join(NOTEBOOK_TEMPLATE_FRAGMENTS).strip("\n")
     template = template.replace("\n\n\n@app.cell", "\n\n@app.cell")
-    return template.replace("__PLOT_GALLERY_CELLS__", plot_gallery_cells)
+    return template.replace("__VISUAL_SURFACE_CELLS__", visual_surface_cells)

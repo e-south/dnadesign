@@ -85,7 +85,9 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     ]
     source: list[str] = [
         f"{src_root}/runtime/run_round.py",
-        f"{src_root}/runtime/round/stages.py",
+        f"{src_root}/runtime/round/stages/training.py",
+        f"{src_root}/runtime/round/stages/x_matrices.py",
+        f"{src_root}/runtime/round/stages/scoring.py",
         f"{src_root}/registries/models.py",
         f"{src_root}/registries/objectives.py",
         f"{src_root}/registries/selection.py",

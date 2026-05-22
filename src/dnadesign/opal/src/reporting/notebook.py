@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from ..analysis.facade import CampaignAnalysis
+from ..analysis.notebook_scope import resolve_notebook_run_scope
 from ..core.utils import ExitCodes, OpalError, now_iso
 from ..plots.manifests import (
     PLOT_MANIFEST_INDEX_SCHEMA_VERSION,
@@ -36,6 +37,7 @@ def build_notebook_view_model(
     config_path: str | Path | None,
     *,
     round_selector: str | None = "latest",
+    run_id: str | None = None,
     review_manifest_path: str | Path | None = None,
     plot_manifest_path: str | Path | None = None,
 ) -> dict[str, Any]:
@@ -43,9 +45,18 @@ def build_notebook_view_model(
     cfg = analysis.config
     ws = analysis.workspace
     warnings: list[dict[str, Any]] = []
+    resolved_round_selector, resolved_run_id = resolve_notebook_run_scope(
+        analysis,
+        round_selector=round_selector,
+        run_id=run_id,
+    )
 
     try:
-        progress = build_campaign_progress(analysis.config_path, round_selector=round_selector)
+        progress = build_campaign_progress(
+            analysis.config_path,
+            round_selector=resolved_round_selector,
+            run_id=resolved_run_id,
+        )
     except Exception as exc:
         progress = {
             "schema_version": "opal.campaign_progress.unavailable",
@@ -107,7 +118,8 @@ def build_notebook_view_model(
         },
         "status": {
             "progress_status": progress.get("status"),
-            "round_selector": round_selector or "latest",
+            "round_selector": resolved_round_selector or "latest",
+            "run_id_selector": resolved_run_id,
             "round_count": progress.get("round_count", 0),
             "latest_run_id": _latest_run_id(progress),
         },

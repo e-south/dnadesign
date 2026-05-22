@@ -4,15 +4,20 @@ from pathlib import Path
 from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_artifact_garden_lines,
     build_notebook_artifact_garden_rows,
-    build_notebook_at_a_glance_lines,
+    build_notebook_at_a_glance_rows,
+    build_notebook_baserender_contract,
+    build_notebook_baserender_contract_rows,
     build_notebook_change_lines,
     build_notebook_change_rows,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
-    build_notebook_plot_card_lines,
-    build_notebook_plot_gallery_model,
+    build_notebook_plot_card_rows,
+    build_notebook_plot_method_rows,
+    build_notebook_run_summary_lines,
     build_notebook_validity_lines,
-    render_plot_gallery_cells,
+    build_notebook_visual_surface_model,
+    render_notebook_baserender_record,
+    render_visual_surface_cells,
 )
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
@@ -36,12 +41,13 @@ def test_notebook_template_removes_extra_tables() -> None:
     assert "mo.ui.data_explorer(filtered_df)" not in text
 
 
-def test_notebook_template_has_plot_gallery() -> None:
+def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert "Plot artifacts" in text
-    assert "outputs/plots" in text
+    assert "Visual surface" in text
+    assert "plots_dir" in text
     assert "build_notebook_view_model" in text
-    assert "All configured plots with written manifests." in text
+    assert "Select one operative visual surface" in text
+    assert '"Plot deliverables": plot_panel' not in text
 
 
 def test_notebook_template_has_opal_schema_sentinel() -> None:
@@ -57,15 +63,18 @@ def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> 
             assert ".value" not in cell
 
 
-def test_notebook_template_uses_plot_gallery_component() -> None:
+def test_notebook_template_uses_visual_surface_component() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    gallery_text = render_plot_gallery_cells()
+    surface_text = render_visual_surface_cells()
 
-    assert render_plot_gallery_cells.__module__.endswith(".notebook_components.plots")
-    assert "def render_plot_gallery_cells" not in text
-    assert gallery_text in text
-    assert "plot_gallery_note" in gallery_text
-    assert "manifest-backed plot outputs" in gallery_text
+    assert render_visual_surface_cells.__module__.endswith(".notebook_components.visual_surface")
+    assert "def render_visual_surface_cells" not in text
+    assert surface_text in text
+    assert "visual_surface_note" in surface_text
+    assert "manifest-backed plot outputs" in surface_text
+    assert 'label="Visual"' in surface_text
+    assert "Record render" in surface_text
+    assert "thumbnail_gallery" not in surface_text
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -80,7 +89,7 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
     assert "# OPAL Campaign Notebook" in text
-    assert "Campaign-specific artifact viewer" in text
+    assert "Campaign analysis command surface" in text
     assert "mo.accordion(" in text
     for section in [
         "Campaign contract",
@@ -88,7 +97,6 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
         "Ledger readiness",
         "Records and active record",
         "Labels and predictions",
-        "Plot deliverables",
         "Validity",
         "Changes",
         "X provenance and limitations",
@@ -101,12 +109,13 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
 def test_notebook_template_uses_public_opal_helpers() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "from dnadesign.opal import" in text
+    assert "from dnadesign.opal.notebooks.api import" in text
     assert "dnadesign.opal.src" not in text
     assert "assess_records_contract_for_schema" in text
     assert "build_ledger_status_table" in text
     assert "build_records_preview" in text
     assert "cli_handoff_lines" in text
+    assert "compact_notebook_path" in text
     assert "read_optional_table" in text
     assert "records_status_lines" in text
 
@@ -119,6 +128,25 @@ def test_notebook_template_degrades_without_runs() -> None:
     assert 'default_source = "records"' in text
 
 
+def test_notebook_template_can_pin_initial_run_scope() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="0", run_id="run-1")
+
+    assert "default_round = '0'" in text
+    assert "default_run_id = 'run-1'" in text
+    assert "run_default = default_run_id if default_run_id in run_options" in text
+    summary = "\n".join(
+        build_notebook_run_summary_lines(
+            "run-1",
+            {"as_of_round": 0, "selection__name": "top_n", "model__name": "rf"},
+            "sfxi",
+            selected_round=0,
+            default_round=0,
+            run_options=["run-0", "run-1"],
+        )
+    )
+    assert "Run scope: selected round `0`, selected run `run-1`." in summary
+
+
 def test_notebook_template_keeps_lateral_tools_out() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
@@ -126,6 +154,9 @@ def test_notebook_template_keeps_lateral_tools_out() -> None:
     assert "densegen__visual" not in text
     assert "cluster__ldn_v1__umap_x" not in text
     assert "cluster__ldn_v1__umap_y" not in text
+    assert "obj__logic_fidelity" not in text
+    assert "obj__effect_raw" not in text
+    assert "obj__effect_scaled" not in text
 
 
 def test_notebook_template_omits_altair_import() -> None:
@@ -248,33 +279,36 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
         },
     }
 
-    glance = "\n".join(build_notebook_at_a_glance_lines(view_model))
-    assert "campaign_a" in glance
-    assert "x_vec" in glance
-    assert "Stale artifacts" in glance
+    glance_rows = build_notebook_at_a_glance_rows(view_model)
+    assert {"field": "campaign", "value": "campaign_a"} in glance_rows
+    assert {"field": "X column", "value": "x_vec"} in glance_rows
+    assert {"field": "stale artifacts", "value": 1} in glance_rows
 
-    gallery = build_notebook_plot_gallery_model(view_model)
-    assert gallery["missing_outputs"] == []
-    assert gallery["stale_artifacts"] == view_model["stale_artifacts"]
-    assert gallery["choices"][0]["label"] == "score (score.png)"
+    visual_surface = build_notebook_visual_surface_model(view_model)
+    assert visual_surface["missing_outputs"] == []
+    assert visual_surface["stale_artifacts"] == view_model["stale_artifacts"]
+    assert visual_surface["choices"][0]["label"] == "Score"
+    assert visual_surface["choices"][0]["path_label"] == "plots/score.png"
 
-    card = "\n".join(build_notebook_plot_card_lines(gallery["choices"][0]))
-    assert "Source data" in card
-    assert "Freshness: `fresh`" in card
-    assert "Tidy CSV: `plots/score.csv`" in card
+    card_rows = build_notebook_plot_card_rows(visual_surface["choices"][0])
+    assert {"field": "media", "value": "plots/score.png"} in card_rows
+    assert {"field": "freshness", "value": "fresh"} in card_rows
+    assert {"field": "tidy data", "value": "plots/score.csv"} in card_rows
+    assert any(row["field"] == "source data" for row in card_rows)
+    method_rows = build_notebook_plot_method_rows(visual_surface["choices"][0])
+    assert any(row["section"] == "math" and "mean = sum(x) / n" in row["detail"] for row in method_rows)
 
     evidence = build_notebook_evidence_rows(view_model)
-    assert [row["source"] for row in evidence] == ["warning", "stale_artifact"]
+    assert [row["source"] for row in evidence] == ["path", "path", "warning", "stale_artifact"]
+    assert evidence[0]["path"] == "campaign.yaml"
 
     validity_lines = "\n".join(build_notebook_validity_lines(view_model))
-    assert "### Validity" in validity_lines
     assert "Review manifest: `present`" in validity_lines
     assert "Plot manifests: `1`" in validity_lines
     assert "Missing plot outputs: `0`" in validity_lines
     assert "Artifact garden: `opal.artifact_garden.v1`" in validity_lines
 
     change_lines = "\n".join(build_notebook_change_lines(view_model))
-    assert "### Changes" in change_lines
     assert "Latest run ID: `run-3`" in change_lines
     assert "Event phases: command=`1`, preflight=`2`, run=`6`, finalize=`1`" in change_lines
     change_rows = build_notebook_change_rows(view_model)
@@ -290,7 +324,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
             "predict": "4/4 batches, 157 rows",
             "aborted": False,
             "ambiguous_run_scope": False,
-            "log_path": "workdir/outputs/rounds/round_3/logs/round.log.jsonl",
+            "log": "outputs/rounds/round_3/logs/round.log.jsonl",
         }
     ]
 
@@ -326,18 +360,23 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     )
 
     assert "# OPAL Campaign Set Notebook" in text
-    assert "from dnadesign.opal import (" in text
+    assert "from dnadesign.opal.notebooks.api import (" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "dnadesign.opal.src" not in text
+    assert "__generated_with" in text
+    assert 'generated_with = "' in text
+    assert "Generated with marimo: `{__generated_with}`" not in text
     assert 'label="Campaign"' in text
-    assert 'label="Plot"' in text
+    assert 'label="Visual"' in text
+    assert "## Visual surface" in text
     assert "Validity" in text
     assert "Changes" in text
     assert "build_notebook_artifact_garden_rows" in text
     assert "build_notebook_change_rows" in text
     assert "build_notebook_metric_definition_rows" in text
-    assert "build_notebook_plot_gallery_model" in text
-    assert "build_notebook_plot_card_lines" in text
+    assert "build_notebook_visual_surface_model" in text
+    assert "build_notebook_plot_card_rows" in text
+    assert "build_notebook_plot_method_rows" in text
     assert "build_notebook_validity_lines" in text
     assert "campaign_set_view_model" in text
     assert "LatentDNA" not in text
@@ -352,5 +391,24 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
         round_selector="latest",
     )
 
-    assert len(single.splitlines()) <= 810
-    assert len(campaign_set.splitlines()) <= 290
+    assert len(single.splitlines()) <= 1000
+    assert len(campaign_set.splitlines()) <= 340
+
+
+def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    assert "render_notebook_baserender_record" in text
+    assert "from dnadesign.baserender import" not in text
+
+    unavailable = build_notebook_baserender_contract(["id", "sequence"], records_path="records.parquet")
+    assert unavailable["available"] is False
+    assert build_notebook_baserender_contract_rows(unavailable)[0] == {"field": "available", "value": "false"}
+
+    contract = build_notebook_baserender_contract(
+        ["id", "sequence", "densegen__used_tfbs_detail"],
+        records_path="records.parquet",
+    )
+    assert contract["available"] is True
+    assert contract["adapter_kind"] == "densegen_tfbs"
+    assert contract["adapter_columns"]["annotations"] == "densegen__used_tfbs_detail"
+    assert callable(render_notebook_baserender_record)

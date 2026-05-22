@@ -101,7 +101,7 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
     assert "opal init -c" in out["steps"][1]["command"]
     assert "docs/plugins/objectives/sfxi.md" in out["learn_more"]["docs"]
     assert "src/dnadesign/opal/src/models/random_forest.py" in out["learn_more"]["source"]
-    assert "src/dnadesign/opal/src/runtime/round/stages.py" in out["learn_more"]["source"]
+    assert "src/dnadesign/opal/src/runtime/round/stages/scoring.py" in out["learn_more"]["source"]
 
 
 def test_guide_json_uses_usr_records_and_shared_label_source_sidecar(tmp_path: Path) -> None:

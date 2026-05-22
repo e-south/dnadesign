@@ -33,14 +33,12 @@ LAYOUT_CELLS = dedent(
         round_run_panel = mo.vstack([round_run_controls, run_summary_md])
         ledger_panel = mo.vstack(
             [
-                mo.md("### Ledger readiness"),
                 mo.ui.table(ledger_status_df, page_size=8),
                 cli_handoff_md,
             ]
         )
         records_panel = mo.vstack(
             [
-                mo.md("### Records preview"),
                 mo.ui.table(records_preview_df, page_size=10),
                 record_selector,
                 active_record_md,
@@ -59,6 +57,7 @@ LAYOUT_CELLS = dedent(
             [
                 header_md,
                 at_a_glance_md,
+                plot_panel,
                 mo.accordion(
                     {
                         "Campaign contract": campaign_contract_md,
@@ -68,7 +67,6 @@ LAYOUT_CELLS = dedent(
                         "Ledger readiness": ledger_panel,
                         "Records and active record": records_panel,
                         "Labels and predictions": data_panel,
-                        "Plot deliverables": plot_panel,
                         "Metric definitions": metric_definitions_panel,
                         "Artifacts": artifact_garden_panel,
                         "X provenance and limitations": x_provenance_md,

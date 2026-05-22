@@ -26,7 +26,7 @@ RUN_CELLS = dedent(
         if rounds:
             round_default = resolve_notebook_round_default(default_round, rounds, latest_round(runs_df))
             round_ui = mo.ui.dropdown(rounds, value=round_default, label="Round")
-            round_run_intro_md = mo.md("### Round and run")
+            round_run_intro_md = mo.md("")
         else:
             round_ui = None
             round_run_intro_md = mo.md(
@@ -54,23 +54,26 @@ RUN_CELLS = dedent(
 
 
     @app.cell
-    def _(build_notebook_run_options, latest_run_id, mo, runs_for_round, selected_round):
+    def _(build_notebook_run_options, default_run_id, latest_run_id, mo, runs_for_round, selected_round):
         run_ui = None
+        run_options = []
         if selected_round is not None:
-            run_default = latest_run_id(runs_for_round)
             run_options = build_notebook_run_options(runs_for_round)
+            run_default = default_run_id if default_run_id in run_options else latest_run_id(runs_for_round)
             run_ui = mo.ui.dropdown(run_options, value=run_default, label="Run ID")
-        return run_ui
+        return run_options, run_ui
 
 
     @app.cell
     def _(
         build_notebook_run_summary_lines,
+        default_round,
         mo,
         objective_name_default,
         pl,
         round_run_intro_md,
         round_ui,
+        run_options,
         run_ui,
         runs_for_round,
         selected_round,
@@ -87,7 +90,14 @@ RUN_CELLS = dedent(
                 raise ValueError(f"Run id not found: {run_id}")
             run_meta = run_row.to_dicts()[0]
             objective_name = str(run_meta.get("objective__name") or objective_name)
-            run_summary_lines = build_notebook_run_summary_lines(run_id, run_meta, objective_name)
+            run_summary_lines = build_notebook_run_summary_lines(
+                run_id,
+                run_meta,
+                objective_name,
+                selected_round=selected_round,
+                default_round=default_round,
+                run_options=run_options,
+            )
             round_run_controls = mo.vstack([round_ui, run_ui])
             run_summary_md = mo.md("\\n".join(run_summary_lines))
         return (

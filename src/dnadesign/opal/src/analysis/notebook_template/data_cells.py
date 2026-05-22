@@ -5,8 +5,8 @@ from textwrap import dedent
 DATA_CELLS = dedent(
     """
     @app.cell
-    def _():
-        pred_columns = [
+    def _(campaign):
+        pred_core_columns = [
             "id",
             "sequence",
             "as_of_round",
@@ -14,10 +14,17 @@ DATA_CELLS = dedent(
             "pred__score_selected",
             "sel__rank_competition",
             "sel__is_selected",
-            "obj__logic_fidelity",
-            "obj__effect_raw",
-            "obj__effect_scaled",
         ]
+        try:
+            prediction_schema_columns = list(campaign.scan_predictions().collect_schema().keys())
+        except Exception:
+            prediction_schema_columns = []
+        pred_extra_columns = [
+            column
+            for column in prediction_schema_columns
+            if column.startswith(("obj__", "pred__", "sel__")) and column not in pred_core_columns
+        ][:12]
+        pred_columns = [*pred_core_columns, *pred_extra_columns]
         return pred_columns
 
 
@@ -112,6 +119,7 @@ DATA_CELLS = dedent(
         campaign,
         data_source_ui,
         labels_df,
+        labels_read,
         mo,
         pl,
         pred_columns,
@@ -154,8 +162,6 @@ DATA_CELLS = dedent(
         else:
             raise ValueError(f"Unknown data source: {source}")
         data_status_lines = [
-            "### Labels and predictions",
-            "",
             f"- Selected data source: `{source}`",
             "",
             *table_status_lines(labels_read),
