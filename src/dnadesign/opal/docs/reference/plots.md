@@ -199,6 +199,16 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
+- **`fold_change_vs_logic_fidelity`**: SFXI tradeoff scatter for logic fidelity
+  against fold-change/effect/score.
+  - params: `y_axis`, `hue_field`, `size_by`, `alpha`
+  - optional reference overlay params: `reference_overlay: true`,
+    `reference_collection_id`, `reference_campaign_id`,
+    `reference_batch_id`, `reference_metric_id`, and `reference_y_axis`
+  - reference overlays are loaded from materialized `sfxi_ref__...` columns in
+    the campaign records table and are validated against OPAL's public SFXI API
+    version, objective name, state order, active setpoint vector, finite metric
+    values, and non-empty metric provenance before plotting.
 - **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
   - rendered as a heatmap with setpoints as columns (vector labels) and diagnostic metrics as rows.
   - rows report median `logic_fidelity`, median `effect_scaled`, and median `score` over observed labels.
@@ -233,11 +243,18 @@ round on the full history without changing data selection. Use this for the
 
 SFXI overlay records that need to cross package boundaries should use the public
 `dnadesign.opal.api.sfxi.to_sfxi_reference_overlay_records` helper. It emits
-`sfxi_ref__...` columns with `metric_id`, `metric_value`,
-`metric_provenance`, optional `batch_id`/`campaign_id`/`design_id`/`source_id`,
-and the OPAL SFXI channels `logic_fidelity`, `effect_raw`, `effect_scaled`, and
+registry-compatible `sfxi_ref__...` columns with
+`reference_instance_id`, `collection_id`, `batch_id`, `campaign_id`,
+`metric_id`, `metric_value`, `metric_provenance`, `source_ref`, `score_ref`, and
+the OPAL SFXI channels `logic_fidelity`, `effect_raw`, `effect_scaled`, and
 `sfxi`. Plot code should consume that namespaced surface when it needs
 reference overlays instead of recomputing or inventing plot-local field names.
+
+Consumers that already have materialized overlay rows should validate them with
+`dnadesign.opal.api.sfxi.validate_sfxi_reference_overlay_records(...)` before
+plotting. OPAL's built-in `fold_change_vs_logic_fidelity` reference overlay
+path does this automatically and fails fast when a reference row was scored with
+a different SFXI API version, objective, state order, or setpoint vector.
 
 ### Example YAML
 

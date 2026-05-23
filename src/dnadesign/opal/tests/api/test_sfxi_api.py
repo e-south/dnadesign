@@ -10,6 +10,7 @@ from dnadesign.opal.api.sfxi import (
     SFXIScoringConfig,
     score_vec8,
     to_sfxi_reference_overlay_records,
+    validate_sfxi_reference_overlay_records,
 )
 
 
@@ -64,23 +65,37 @@ def test_sfxi_reference_overlay_records_are_namespaced() -> None:
 
     rows = to_sfxi_reference_overlay_records(
         result,
+        setpoint_name="and",
+        collection_id="reader_sfxi_pdual10_latest",
         batch_id="batch-0",
         campaign_id="stress_ethanol",
-        design_id=["design-a", "design-b"],
-        source_id=["usr-a", "usr-b"],
+        reference_instance_id=["design-a", "design-b"],
+        sequence_source_id=["usr-a", "usr-b"],
     )
 
     assert len(rows) == 2
-    assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}schema_version"] == SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION
-    assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}metric_id"] == "sfxi_v1/sfxi"
+    assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}metric_id"] == "sfxi_v1/and/sfxi"
     assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}metric_value"] == rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}sfxi"]
     assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}logic_fidelity"] == 1.0
     assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}effect_scaled"] == 1.0
+    assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}collection_id"] == "reader_sfxi_pdual10_latest"
     assert rows[0][f"{SFXI_REFERENCE_OVERLAY_PREFIX}batch_id"] == "batch-0"
     assert rows[1][f"{SFXI_REFERENCE_OVERLAY_PREFIX}campaign_id"] == "stress_ethanol"
-    assert rows[1][f"{SFXI_REFERENCE_OVERLAY_PREFIX}design_id"] == "design-b"
-    assert rows[1][f"{SFXI_REFERENCE_OVERLAY_PREFIX}source_id"] == "usr-b"
+    assert rows[1][f"{SFXI_REFERENCE_OVERLAY_PREFIX}reference_instance_id"] == "design-b"
+    assert rows[1][f"{SFXI_REFERENCE_OVERLAY_PREFIX}sequence_source_id"] == "usr-b"
+    assert f"{SFXI_REFERENCE_OVERLAY_PREFIX}schema_version" not in rows[0]
     assert "sfxi" not in rows[0]
+    summary = validate_sfxi_reference_overlay_records(
+        rows,
+        expected_setpoint_vector=(0.0, 0.0, 0.0, 1.0),
+        metric_id="sfxi_v1/and/sfxi",
+    )
+    assert summary == {
+        "schema_version": SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION,
+        "namespace": "sfxi_ref",
+        "row_count": 2,
+        "metric_ids": ["sfxi_v1/and/sfxi"],
+    }
 
 
 def test_sfxi_reference_overlay_rejects_misaligned_ids() -> None:
@@ -89,5 +104,16 @@ def test_sfxi_reference_overlay_rejects_misaligned_ids() -> None:
         SFXIScoringConfig(setpoint_vector=(0.0, 0.0, 0.0, 1.0), scaling_min_n=1),
     )
 
-    with pytest.raises(ValueError, match="design_id length"):
+    with pytest.raises(ValueError, match="reference_instance_id length"):
         to_sfxi_reference_overlay_records(result, design_id=["a", "b"])
+
+
+def test_sfxi_reference_overlay_validation_rejects_setpoint_drift() -> None:
+    result = score_vec8(
+        np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]], dtype=float),
+        SFXIScoringConfig(setpoint_vector=(0.0, 0.0, 0.0, 1.0), scaling_min_n=1),
+    )
+    rows = to_sfxi_reference_overlay_records(result, setpoint_name="and")
+
+    with pytest.raises(ValueError, match="setpoint_vector"):
+        validate_sfxi_reference_overlay_records(rows, expected_setpoint_vector=(0.0, 1.0, 0.0, 1.0))

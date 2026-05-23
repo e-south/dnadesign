@@ -25,6 +25,12 @@ from ._mpl_utils import (
     scatter_smart,
 )
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
+from .sfxi_reference_overlay import (
+    load_sfxi_reference_overlay,
+    reference_label_values,
+    reference_y_values,
+    sfxi_reference_overlay_enabled,
+)
 
 
 @register_plot(
@@ -36,6 +42,10 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "hue_field": "Optional obj__/pred__/sel__ or records.<col> for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
             "alpha": "Point alpha (default 0.40).",
+            "reference_overlay": "Overlay validated records-table sfxi_ref points (default false).",
+            "reference_collection_id": "Optional sfxi_ref collection filter.",
+            "reference_metric_id": "Optional sfxi_ref metric filter.",
+            "reference_y_axis": "Optional reference y metric when y_axis is not directly supported.",
         },
         requires=[
             "as_of_round",
@@ -54,6 +64,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "missing prediction or setpoint columns",
             "y-axis/hue/size fields are nonnumeric",
             "records metadata hue column missing",
+            "reference overlay columns are absent or fail OPAL SFXI API validation",
             "no rows match the requested round/run scope",
         ],
     ),
@@ -409,6 +420,50 @@ def render(context, params: dict) -> None:
         if xticks_n and xticks_n >= 2:
             ax.set_xticks(np.linspace(0.0, 1.0, xticks_n))
 
+    reference_count = 0
+    if sfxi_reference_overlay_enabled(params):
+        records_path = context.data_paths.get("records")
+        reference_df = load_sfxi_reference_overlay(
+            records_path=records_path,
+            params=params,
+            expected_setpoint_vector=setpoint,
+        )
+        reference_y, reference_y_col = reference_y_values(reference_df, y_axis=y_axis, params=params)
+        reference_x = reference_df["sfxi_ref__logic_fidelity"].astype(float).to_numpy()
+        reference_count = int(reference_df.shape[0])
+        reference_marker = get_str(params, ["reference_marker"], "D") or "D"
+        reference_color = get_str(params, ["reference_color"], "#111827") or "#111827"
+        reference_edgecolor = get_str(params, ["reference_edgecolor"], "white") or "white"
+        reference_size = get_float(params, ["reference_size"], 72.0)
+        ax.scatter(
+            reference_x,
+            reference_y,
+            s=float(reference_size),
+            marker=reference_marker,
+            c=reference_color,
+            edgecolors=reference_edgecolor,
+            linewidths=0.8,
+            alpha=1.0,
+            label="SFXI reference",
+            zorder=5,
+        )
+        for label, x_val, y_val in zip(reference_label_values(reference_df), reference_x, reference_y):
+            if label:
+                ax.annotate(
+                    label,
+                    (x_val, y_val),
+                    textcoords="offset points",
+                    xytext=(4, 4),
+                    fontsize=7,
+                    alpha=0.85,
+                )
+        ax.legend(frameon=False, loc="best")
+        context.logger.info(
+            "[fold_change_vs_logic] reference_overlay rows=%d y=%s",
+            reference_count,
+            reference_y_col,
+        )
+
     # Log + annotate
     from ._mpl_utils import log_kv
 
@@ -421,6 +476,7 @@ def render(context, params: dict) -> None:
         alpha=float(alpha),
         rasterize_at=(rasterize_at if rasterize_at is not None else "off"),
         points=int(lf.size),
+        reference_points=int(reference_count),
     )
     annotate_plot_meta(
         ax,
@@ -432,6 +488,7 @@ def render(context, params: dict) -> None:
             "delta": f"{delta:.3g}",
             "selected_marker": selected_marker,
             "selected_n": int(sel_mask.sum()),
+            "reference_n": int(reference_count),
             "xlim": "[0,1]" if force_xlim_01 else "auto",
         },
     )
@@ -442,5 +499,14 @@ def render(context, params: dict) -> None:
 
     if context.save_data:
         # Save logic_fidelity and the actually-plotted Y series under a meaningful column name
-        tidy = pd.DataFrame({"obj__logic_fidelity": lf, tidy_col: y_plot})
+        tidy = pd.DataFrame({"source": "predictions", "obj__logic_fidelity": lf, tidy_col: y_plot})
+        if sfxi_reference_overlay_enabled(params):
+            reference_rows = pd.DataFrame(
+                {
+                    "source": "sfxi_ref",
+                    "obj__logic_fidelity": reference_x,
+                    tidy_col: reference_y,
+                }
+            )
+            tidy = pd.concat([tidy, reference_rows], ignore_index=True)
         context.save_df(tidy)

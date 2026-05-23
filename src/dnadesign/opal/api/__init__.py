@@ -14,6 +14,7 @@ from .sfxi import (
     SFXIScoringResult,
     score_vec8,
     to_sfxi_reference_overlay_records,
+    validate_sfxi_reference_overlay_records,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "SFXIScoringResult",
     "score_vec8",
     "to_sfxi_reference_overlay_records",
+    "validate_sfxi_reference_overlay_records",
 ]
