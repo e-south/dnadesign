@@ -5,11 +5,11 @@
 LatentDNA/Evo2 X surface lets the three existing RF + SFXI + top-n stress
 campaigns recover DenseGen part-derived stress-axis grammar.
 
-The positive oracle is a binary SFXI-compatible vec8 generated from
-`densegen__used_tfbs_detail` regulator composition: LexA defines the cipro
-axis, CpxR/BaeR define the ethanol axis, and both axes define the dual/AND
-class. `densegen__plan`, `densegen__required_regulators`, `sigma35_variant`,
-and `densegen__sampling_library_hash` are audit/split fields, not primary label
+The positive oracle is a binary SFXI-compatible vec8 from
+`densegen__used_tfbs_detail`: LexA defines cipro, CpxR/BaeR define ethanol, and
+both axes define dual/AND. `densegen__plan`,
+`densegen__required_regulators`, `sigma35_variant`, and
+`densegen__sampling_library_hash` are audit/split fields, not primary label
 sources. A distribution-preserving permuted null must fail.
 
 ### Boundary
@@ -57,27 +57,20 @@ campaign distinguishes dual-condition specificity from single-axis OR behavior.
 
 ### Run Matrix
 
-The v0 matrix is intentionally scoped, but it should use real OPAL scoring
-semantics inside each split: OPAL trains from observed labels, scores the full
-unlabeled split pool, selects the greedy top K, ingests those labels, and repeats
-round over round. There is no candidate cap in the durable probe contract.
+The v0 matrix is scoped but uses real OPAL scoring inside each split: train from
+observed labels, score the full unlabeled split pool, select greedy top K, ingest
+those labels, and repeat. There is no durable-probe candidate cap.
 
-- Oracles: `densegen_part_axis_vec8_v0`,
-  `permuted_densegen_part_axis_vec8_v0`
+- Oracles: `densegen_part_axis_vec8_v0`, `permuted_densegen_part_axis_vec8_v0`
 - Campaigns: cipro, ethanol, AND
 - Splits: `random_id`, `leave_sigma35_variant`
 - Initial labels: 6, stratified across axis classes
 - Selection K: 6 labels per OPAL round
 - Seed: 7
 
-The full matrix is 12 runs. Gates allow narrower execution:
-
-- `source`: DenseGen oracle source validation, candidate-table X schema/dimension
-  validation, and label generation only
-- `cipro-random`: positive/null cipro random split
-- `random-all`: all three campaigns under random split
-- `leave-sigma35`: all three campaigns under held-out sigma35
-- `all`: full matrix
+The full matrix is 12 runs. Gates allow narrower execution: `source`,
+`cipro-random`, `random-all`, `leave-sigma35`, and `all`. `source` validates
+DenseGen source, candidate-table X schema/dimension, and label generation only.
 
 ### CLI
 
@@ -159,25 +152,20 @@ IDs.
 - `PENDING`: source/materialization/validation gates passed, but no OPAL run
   metrics exist yet; this is not a research decision.
 
-Review artifacts are layered:
-
-- Each scratch OPAL campaign writes reusable OPAL campaign review artifacts under
-  `outputs/review/`.
-- The probe writes only the study-specific aggregate benchmark layer under
-  `reports/`.
-- Configured OPAL campaign plots are refreshed separately from the aggregate
-  report and are first-class OPAL plot artifacts. The scratch campaign
-  `plots.yaml` includes the same suitable registered OPAL primitives as the
-  stress campaign bundles, including full-ordinal feature-importance heatmaps,
-  feature-importance bars, scalar/vector round-history plots, and SFXI
-  diagnostics. Per-round browsing is driven by OPAL `round_variants` manifests,
-  not by report-layer file scraping. For final plot review, run
+Review artifacts are layered: scratch OPAL campaigns write reusable campaign
+review artifacts under `outputs/review/`; the probe writes only the
+study-specific aggregate benchmark layer under `reports/`; configured OPAL
+campaign plots are refreshed separately from the aggregate report and are
+first-class `opal.plot_artifact.v1` artifacts. The scratch campaign `plots.yaml`
+uses the same suitable registered OPAL primitives as the stress bundles,
+including feature-importance, scalar/vector round history, and SFXI diagnostics.
+Per-round browsing is driven by OPAL `round_variants` manifests, not
+report-layer file scraping. For final plot review, run
   `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
   then rerun the report with `--plots --json`.
-- Study-specific aggregate plots remain in `reports/` unless they are promoted
-  to OPAL through the registered plot API (`PlotMeta`, `PlotContext`, media/tidy
-  output, and `opal.plot_artifact.v1` manifests). This prevents drift between
-  probe-only reports and the OPAL notebook surface.
+Study-specific aggregate plots remain in `reports/` unless promoted to OPAL
+through the registered plot API (`PlotMeta`, `PlotContext`, media/tidy output,
+and manifests). This prevents drift between probe-only reports and notebooks.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`
