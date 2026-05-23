@@ -35,6 +35,7 @@ from .overview import (
     build_notebook_validity_lines,
     build_notebook_validity_rows,
 )
+from .plot_scopes import build_notebook_plot_scope_options, select_notebook_plot_scope
 from .plots import (
     build_notebook_plot_card_rows,
     build_notebook_plot_inventory_rows,
@@ -76,6 +77,7 @@ __all__ = [
     "build_notebook_plot_inventory_rows",
     "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
+    "build_notebook_plot_scope_options",
     "build_notebook_visual_surface_model",
     "build_notebook_run_options",
     "build_notebook_run_summary_lines",
@@ -88,4 +90,5 @@ __all__ = [
     "render_notebook_baserender_record",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
+    "select_notebook_plot_scope",
 ]

@@ -13,7 +13,12 @@ from ._support import (
     plot_entries_from_manifests,
     sequence,
 )
-from .plot_text import capability_text, compact_params, plot_alt_text, plot_math_description, rounds_text
+from .plot_scopes import (
+    dedupe_scope_labels,
+    plot_choice_from_manifest,
+    sort_plot_scope_manifests,
+)
+from .plot_text import capability_text, compact_params, plot_math_description, rounds_text
 
 
 def build_notebook_visual_surface_model(
@@ -31,7 +36,9 @@ def build_notebook_visual_surface_model(
         for manifest in sequence(view_model.get("plot_manifests"))
         if isinstance(manifest, Mapping) and manifest.get("status") == "written"
     ]
-    active_by_name = {str(row.get("name")): row for row in manifest_rows}
+    active_by_name: dict[str, list[Mapping[str, Any]]] = {}
+    for row in manifest_rows:
+        active_by_name.setdefault(str(row.get("name")), []).append(row)
     if plot_entries is None:
         configured_entries = list(sequence(view_model.get("configured_plots"))) or plot_entries_from_manifests(
             manifest_rows
@@ -49,7 +56,8 @@ def build_notebook_visual_surface_model(
         name = str(entry.get("name") or "")
         if not name:
             continue
-        manifest = active_by_name.get(name)
+        manifests = sort_plot_scope_manifests(active_by_name.get(name) or [])
+        manifest = manifests[0] if manifests else None
         kind = str(entry.get("kind") or mapping(manifest).get("kind") or "unknown")
         metadata = _plot_kind_metadata(kind)
         capability = mapping(metadata.get("capability"))
@@ -66,9 +74,24 @@ def build_notebook_visual_surface_model(
             )
             continue
         media_output = first_media_output(manifest)
+        scope_choices = [
+            scope_choice
+            for scope_choice in (
+                plot_choice_from_manifest(
+                    entry=entry,
+                    manifest=scope_manifest,
+                    workdir=workdir,
+                    label=display_name(name),
+                    capability=capability,
+                )
+                for scope_manifest in manifests
+            )
+            if scope_choice is not None
+        ]
+        path = str(scope_choices[0].get("path") or "") if scope_choices else ""
         freshness = mapping(manifest.get("freshness"))
         freshness_status = str(freshness.get("status") or manifest.get("stale_state") or "unknown")
-        if media_output is None:
+        if media_output is None or not scope_choices:
             missing_outputs.append(name)
             inventory.append(
                 _plot_inventory_entry(
@@ -80,62 +103,18 @@ def build_notebook_visual_surface_model(
                 )
             )
             continue
-        path = str(media_output.get("path"))
         title = str(entry.get("title") or manifest.get("title") or display_name(name))
         label = title
         labels_seen[label] = labels_seen.get(label, 0) + 1
         if labels_seen[label] > 1:
             label = f"{label} ({Path(path).name})"
-        warnings = sequence(manifest.get("warnings"))
-        tidy_csv = manifest.get("tidy_csv")
-        inputs = [
-            item
-            for item in sequence(manifest.get("inputs"))
-            if isinstance(item, Mapping) and (item.get("path") or item.get("role"))
-        ]
-        summary = str(
-            manifest.get("caption")
-            or manifest.get("review_purpose")
-            or mapping(manifest.get("metadata")).get("summary")
-            or ""
-        )
-        choices.append(
-            {
-                "label": label,
-                "title": title,
-                "name": name,
-                "kind": entry.get("kind") or manifest.get("kind") or "unknown",
-                "path": path,
-                "workdir": workdir,
-                "path_label": compact_path(path, base=workdir),
-                "filename": Path(path).name,
-                "tidy_label": compact_path(tidy_csv, base=workdir) if tidy_csv else "none",
-                "source_labels": [
-                    f"{item.get('role') or 'input'}={compact_path(item.get('path'), base=workdir)}"
-                    for item in inputs[:5]
-                ],
-                "freshness": freshness_status,
-                "status": manifest.get("status"),
-                "run_id": manifest.get("run_id"),
-                "rounds": manifest.get("rounds"),
-                "capability": capability,
-                "warning_count": len(warnings),
-                "caption": summary,
-                "alt_text": plot_alt_text(
-                    title=title,
-                    kind=entry.get("kind") or manifest.get("kind"),
-                    summary=summary,
-                    params=manifest.get("params"),
-                    metadata=manifest.get("metadata"),
-                    rounds=manifest.get("rounds"),
-                    run_id=manifest.get("run_id"),
-                    freshness=freshness.get("status") or manifest.get("stale_state"),
-                    warning_count=len(warnings),
-                ),
-                "entry": dict(entry),
-                "manifest": dict(manifest),
-            }
-        )
+        for scope_choice in scope_choices:
+            scope_choice["label"] = label
+            scope_choice["title"] = title
+        choice = dict(scope_choices[0])
+        choice["scope_options"] = dedupe_scope_labels(scope_choices)
+        choice["scope_count"] = len(scope_choices)
+        choices.append(choice)
         inventory.append(
             _plot_inventory_entry(
                 entry=entry,

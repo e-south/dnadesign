@@ -73,6 +73,9 @@ The generated notebook renders the view model with progressive disclosure:
 - ledgers, labels, predictions, and selected records;
 - a single visual-surface selector for manifest-backed plots and optional
   record renders;
+- a plot-scope selector when the active plot has multiple manifest-backed
+  scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
+  `round_variants`;
 - plot metric/data-shape definitions from plot-manifest metadata;
 - plot-local method, math, failure-mode, and evidence tables inside
   progressively disclosed accordions;
@@ -101,9 +104,9 @@ Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
 
 Campaign-set notebooks are intentionally overview-first: they provide campaign
-and visual controls, status and provenance summary, visible manifest-backed plot
-surfaces, validity panels, change rows, metric definitions, artifact garden rows,
-warnings, and stale-artifact evidence.
+and visual controls, manifest-backed plot-scope controls, status and provenance
+summary, visible manifest-backed plot surfaces, validity panels, change rows,
+metric definitions, artifact garden rows, warnings, and stale-artifact evidence.
 Single-campaign notebooks remain the record/table drill-down surface.
 Single-campaign and campaign-set notebooks use the same public visual-surface,
 plot-card, plot-method, validity, change-row, evidence-row, metric-definition, and
@@ -121,6 +124,13 @@ satisfies a public adapter contract such as generic feature annotations or
 sequence-feature annotations. That contract is detected from records columns and
 is optional; OPAL notebooks must not require producer-specific browser state to
 render.
+
+Study-specific visuals may appear in OPAL notebooks only through the OPAL plot
+registry and artifact-manifest contract. A study can provide a plugin plot kind,
+but generated notebooks consume it the same way as built-ins: `PlotMeta`
+metadata, configured plot entries, written media/tidy outputs, and
+`opal.plot_artifact.v1` manifests. Arbitrary study report images remain a
+separate report layer unless they are produced through that API.
 
 ### Smoke Checks
 

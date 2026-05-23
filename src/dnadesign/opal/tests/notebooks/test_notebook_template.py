@@ -21,12 +21,14 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
+    build_notebook_plot_scope_options,
     build_notebook_run_summary_lines,
     build_notebook_validity_lines,
     build_notebook_visual_surface_model,
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     render_visual_surface_cells,
+    select_notebook_plot_scope,
 )
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
@@ -350,6 +352,31 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert "Scope: round 3" in visual_surface["choices"][0]["alt_text"]
     assert "freshness fresh" in visual_surface["choices"][0]["alt_text"]
 
+    scope_view_model = {
+        **view_model,
+        "plot_manifests": [
+            {
+                **view_model["plot_manifests"][0],
+                "run_id": None,
+                "rounds": "all",
+                "tidy_csv": "plots/score_rall.csv",
+                "outputs": [{"role": "media", "path": "plots/score_rall.png", "exists": True}],
+            },
+            {
+                **view_model["plot_manifests"][0],
+                "rounds": [3],
+                "tidy_csv": "plots/score_r3.csv",
+                "outputs": [{"role": "media", "path": "plots/score_r3.png", "exists": True}],
+            },
+        ],
+    }
+    scope_surface = build_notebook_visual_surface_model(scope_view_model)
+    scope_choice = scope_surface["choices"][0]
+    assert scope_choice["scope_count"] == 2
+    scope_options = build_notebook_plot_scope_options(scope_choice)
+    assert [option["label"] for option in scope_options] == ["all rounds", "round 3; run run-3"]
+    assert select_notebook_plot_scope(scope_choice, "round 3; run run-3")["path_label"] == "plots/score_r3.png"
+
     inventory_rows = build_notebook_plot_inventory_rows(visual_surface)
     assert {
         "plot": "score",
@@ -518,8 +545,10 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
         round_selector="latest",
     )
 
-    assert len(single.splitlines()) <= 1000
-    assert len(campaign_set.splitlines()) <= 325
+    assert 'label="Plot scope"' in single
+    assert 'label="Plot scope"' in campaign_set
+    assert len(single.splitlines()) <= 1050
+    assert len(campaign_set.splitlines()) <= 360
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:

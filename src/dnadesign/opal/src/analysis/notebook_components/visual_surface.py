@@ -91,6 +91,27 @@ def render_visual_surface_cells() -> str:
 
         @app.cell
         def _(
+            build_notebook_plot_scope_options,
+            mo,
+            plot_choices,
+        ):
+            plot_scope_controls = {}
+            plot_scope_options_by_plot = {}
+            for plot_choice in plot_choices:
+                _scope_options = build_notebook_plot_scope_options(plot_choice)
+                plot_scope_options_by_plot[plot_choice["label"]] = _scope_options
+                if len(_scope_options) > 1:
+                    _scope_labels = [option["label"] for option in _scope_options]
+                    plot_scope_controls[plot_choice["label"]] = mo.ui.dropdown(
+                        _scope_labels,
+                        value=_scope_labels[0],
+                        label="Plot scope",
+                    )
+            return plot_scope_controls, plot_scope_options_by_plot
+
+
+        @app.cell
+        def _(
             Path,
             baserender_record_row,
             baserender_record_selector,
@@ -104,8 +125,10 @@ def render_visual_surface_cells() -> str:
             pl,
             plot_choices,
             plot_inventory_rows,
+            plot_scope_controls,
             render_notebook_baserender_record,
             round_ui,
+            select_notebook_plot_scope,
             visual_surface_choices,
             visual_surface_note,
             visual_surface_ui,
@@ -210,9 +233,18 @@ def render_visual_surface_cells() -> str:
                         multiple=True,
                     )
                 else:
-                    choice = next(
+                    selected_plot_choice = next(
                         plot_choice for plot_choice in plot_choices if plot_choice["label"] == surface["plot_label"]
                     )
+                    plot_scope_ui = plot_scope_controls.get(surface["plot_label"])
+                    choice = select_notebook_plot_scope(
+                        selected_plot_choice,
+                        str(plot_scope_ui.value) if plot_scope_ui is not None else None,
+                    )
+                    _controls = [visual_surface_ui]
+                    if plot_scope_ui is not None:
+                        _controls.append(plot_scope_ui)
+                    controls = mo.hstack(_controls, justify="start", align="end", wrap=True, gap=0.35)
                     visual = _plot_image(choice)
                     method_sections = build_notebook_plot_method_sections(choice)
                     details = mo.accordion(

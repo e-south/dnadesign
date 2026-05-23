@@ -6,7 +6,7 @@ from ._support import block
 def render_visual_cells() -> str:
     """Render campaign-set visual selector and manifest-backed plot panel cells."""
 
-    return "\n\n".join((_visual_model_cell(), _visual_selector_cell(), _visual_panel_cell()))
+    return "\n\n".join((_visual_model_cell(), _visual_selector_cell(), _visual_scope_cell(), _visual_panel_cell()))
 
 
 def _visual_model_cell() -> str:
@@ -38,6 +38,28 @@ def _visual_selector_cell() -> str:
     )
 
 
+def _visual_scope_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(build_notebook_plot_scope_options, mo, plot_choices):
+            plot_scope_controls = {}
+            plot_scope_options_by_plot = {}
+            for plot_choice in plot_choices:
+                plot_scope_options = build_notebook_plot_scope_options(plot_choice)
+                plot_scope_options_by_plot[plot_choice["label"]] = plot_scope_options
+                if len(plot_scope_options) > 1:
+                    _scope_labels = [option["label"] for option in plot_scope_options]
+                    plot_scope_controls[plot_choice["label"]] = mo.ui.dropdown(
+                        _scope_labels,
+                        value=_scope_labels[0],
+                        label="Plot scope",
+                    )
+            return plot_scope_controls, plot_scope_options_by_plot
+        """
+    )
+
+
 def _visual_panel_cell() -> str:
     return block(
         """
@@ -51,7 +73,9 @@ def _visual_panel_cell() -> str:
             plot_choices,
             plot_inventory_counts,
             plot_inventory_rows,
+            plot_scope_controls,
             plot_ui,
+            select_notebook_plot_scope,
         ):
             if plot_ui is None:
                 _lines = ["No written manifest-backed plot media are available for this campaign."]
@@ -67,7 +91,12 @@ def _visual_panel_cell() -> str:
                 plot_panel = mo.vstack(_items, gap=0.45)
             else:
                 _selected = str(plot_ui.value)
-                _choice = next(choice for choice in plot_choices if choice["label"] == _selected)
+                selected_plot_choice = next(choice for choice in plot_choices if choice["label"] == _selected)
+                plot_scope_ui = plot_scope_controls.get(_selected)
+                _choice = select_notebook_plot_scope(
+                    selected_plot_choice,
+                    str(plot_scope_ui.value) if plot_scope_ui is not None else None,
+                )
                 def _plot_image(plot_choice):
                     _path = Path(plot_choice["path"])
                     if not _path.exists():
@@ -89,7 +118,10 @@ def _visual_panel_cell() -> str:
                             "background": "white",
                         },
                     )
-                _controls = mo.hstack([plot_ui], justify="start", align="end", wrap=True, gap=0.35)
+                _control_items = [plot_ui]
+                if plot_scope_ui is not None:
+                    _control_items.append(plot_scope_ui)
+                _controls = mo.hstack(_control_items, justify="start", align="end", wrap=True, gap=0.35)
                 _method_sections = build_notebook_plot_method_sections(_choice)
                 plot_panel = mo.vstack(
                     [

@@ -38,6 +38,7 @@ from ...src.analysis.notebook_components import (
     build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
+    build_notebook_plot_scope_options,
     build_notebook_run_options,
     build_notebook_run_summary_lines,
     build_notebook_status_line,
@@ -49,6 +50,7 @@ from ...src.analysis.notebook_components import (
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     resolve_notebook_round_default,
+    select_notebook_plot_scope,
 )
 from ...src.plots.config import list_configured_plot_specs, load_plot_config, parse_enabled, parse_tags
 from ...src.reporting.notebook import build_notebook_view_model
@@ -83,6 +85,7 @@ __all__ = [
     "build_notebook_plot_inventory_rows",
     "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
+    "build_notebook_plot_scope_options",
     "build_notebook_run_options",
     "build_notebook_run_summary_lines",
     "build_notebook_status_line",
@@ -105,6 +108,7 @@ __all__ = [
     "records_status_lines",
     "render_notebook_baserender_record",
     "resolve_notebook_round_default",
+    "select_notebook_plot_scope",
     "require_columns",
     "table_status_lines",
     "unavailable_table",

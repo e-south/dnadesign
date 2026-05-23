@@ -47,8 +47,10 @@ def _import_cell() -> str:
                 build_notebook_plot_card_rows,
                 build_notebook_plot_inventory_rows,
                 build_notebook_plot_method_sections,
+                build_notebook_plot_scope_options,
                 build_notebook_visual_surface_model,
                 build_notebook_validity_rows,
+                select_notebook_plot_scope,
             )
             return (
                 Path,
@@ -66,11 +68,13 @@ def _import_cell() -> str:
                 build_notebook_plot_card_rows,
                 build_notebook_plot_inventory_rows,
                 build_notebook_plot_method_sections,
+                build_notebook_plot_scope_options,
                 build_notebook_visual_surface_model,
                 build_notebook_validity_rows,
                 generated_with,
                 mo,
                 pl,
+                select_notebook_plot_scope,
             )
         """
     )
