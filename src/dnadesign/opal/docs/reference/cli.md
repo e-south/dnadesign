@@ -552,12 +552,13 @@ End-to-end table checks (essentials present; X non-null, finite, and fixed-lengt
 **Usage**
 
 ```bash
-opal validate --config <yaml>
+opal validate --config <yaml> [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
+* `--json`: Output schema `opal.validate.v1` as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -565,6 +566,8 @@ opal validate --config <yaml>
 * Verifies **USR essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.
+* JSON errors use the shared `opal.cli_error.v1` payload, so scripts can rely
+  on parseable stdout for both pass and fail paths.
 
 ---
 

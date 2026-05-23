@@ -63,6 +63,49 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert out["round_index"] == 0
 
 
+def test_validate_json_writes_machine_readable_contract(tmp_path: Path) -> None:
+    workdir, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.validate.v1"
+    assert payload["ok"] is True
+    assert payload["config_path"] == str(campaign.resolve())
+    assert payload["campaign"]["workdir"] == str(workdir.resolve())
+    assert payload["records"]["path"] == str(records.resolve())
+    assert payload["records"]["row_count"] == 2
+    assert payload["records"]["column_count"] >= 5
+    assert payload["data"]["x_column"] == "X"
+    assert payload["data"]["y_column"] == "Y"
+    assert payload["x_contract"] == {"row_count": 2, "x_dim": 2}
+    assert payload["label_source"]["kind"] == "campaign_history"
+    assert payload["label_source"]["prediction_records"] == "label_history"
+    assert "validation passed" not in res.stdout.lower()
+
+
+def test_validate_json_error_is_machine_readable(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    cfg = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+    cfg["data"]["x_column_name"] = "missing_x"
+    campaign.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "validate"
+    assert "Missing X column" in payload["error"]["message"]
+    assert "Missing X column" not in res.stderr
+
+
 def test_notebook_generate_json_writes_machine_readable_summary(tmp_path: Path) -> None:
     workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
     app = _build()
