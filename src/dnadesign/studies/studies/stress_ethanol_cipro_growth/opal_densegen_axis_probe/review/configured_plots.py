@@ -206,8 +206,9 @@ def _tidy_csv_quality_problems(
         if missing:
             problems.append(f"{label}:tidy_csv_missing_rounds:{','.join(map(str, missing))}")
     if kind == "vector_summary_heatmap" and "row_type" in frame.columns:
-        if "setpoint" not in set(frame["row_type"].astype(str)):
-            problems.append(f"{label}:tidy_csv_missing_setpoint")
+        row_types = set(frame["row_type"].astype(str))
+        if not ({"reference_vector", "setpoint"} & row_types):
+            problems.append(f"{label}:tidy_csv_missing_reference_vector")
     if kind == "feature_importance_heatmap" and "feature_id" in frame.columns:
         if frame["feature_id"].nunique(dropna=True) <= 0:
             problems.append(f"{label}:tidy_csv_no_features")

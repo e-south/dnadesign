@@ -38,6 +38,10 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
         requires=["pred__y_hat_model", "pred__score_selected"],
         notes=["Uses labels-as-of round for support distances."],
         data_shape="support distance scatter",
+        objective_family="sfxi",
+        data_layer="predictions_plus_labels",
+        round_scope="single_round",
+        label_requirement="required",
         failure_modes=[
             "missing predictions or labels ledger",
             "invalid length-8 prediction or label vectors",

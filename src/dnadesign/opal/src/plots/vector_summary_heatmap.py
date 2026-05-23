@@ -25,15 +25,14 @@ from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_
 @register_plot(
     "vector_summary_heatmap",
     meta=PlotMeta(
-        summary="Mean vector-channel summary by setpoint/cohort/round.",
+        summary="Mean vector-channel summary by reference/cohort/round.",
         params={
             "vector_field": "List-valued prediction field (default pred__y_hat_model).",
             "cohort": "selected|top_k|all_pool (default selected).",
             "top_k": "Rank cutoff for top_k cohort (default 10).",
-            "include_setpoint": "Include objective setpoint row when objective metadata has one (default false).",
-            "setpoint": (
-                "Optional explicit setpoint vector; overrides objective metadata when include_setpoint is true."
-            ),
+            "include_reference_vector": "Include a reference-vector row (default false).",
+            "reference_vector": ("Optional explicit vector baseline; if omitted, objective setpoint metadata is used."),
+            "reference_label": "Optional y-axis label for the reference row.",
             "channel_labels": "Optional channel labels, same length as the vector.",
             "aggregation": "Currently mean.",
         },
@@ -41,10 +40,13 @@ from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_
         notes=["SFXI can configure semantic channel labels, but the primitive is vector-shaped."],
         data_shape="vector over rounds",
         tidy_schema=["row_type", "round", "cohort", "channel", "value"],
+        objective_family="generic",
+        data_layer="predictions_vector",
+        round_scope="round_history",
         failure_modes=[
             "missing vector field",
             "vector length mismatch",
-            "missing setpoint when include_setpoint is true",
+            "missing reference vector when include_reference_vector is true",
             "selected/top_k cohort columns missing",
             "non-finite vector values",
         ],
@@ -66,7 +68,13 @@ def render(context, params: dict) -> None:
     aggregation = str(params.get("aggregation", "mean")).strip().lower()
     if aggregation != "mean":
         raise ValueError("vector_summary_heatmap currently supports aggregation: mean.")
-    include_setpoint = bool(params.get("include_setpoint", False))
+    explicit_reference = _explicit_reference_vector_param(params)
+    include_reference = bool(
+        params.get(
+            "include_reference_vector",
+            params.get("include_target_vector", params.get("include_setpoint", False)),
+        )
+    )
 
     need = {"as_of_round", "run_id", vector_field}
     if cohort == "selected":
@@ -74,7 +82,7 @@ def render(context, params: dict) -> None:
     elif cohort == "top_k":
         need.add("sel__rank_competition")
     outputs_dir = resolve_outputs_dir(context)
-    if include_setpoint:
+    if include_reference and explicit_reference is None:
         df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     else:
         df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
@@ -104,29 +112,29 @@ def render(context, params: dict) -> None:
     rows = []
     matrix_rows = []
     y_labels = []
-    if include_setpoint:
-        explicit_setpoint = params.get("setpoint", params.get("setpoint_vector"))
-        if explicit_setpoint is not None:
-            setpoint = _coerce_vector(explicit_setpoint, field="params.setpoint")
+    if include_reference:
+        if explicit_reference is not None:
+            reference = _coerce_vector(explicit_reference, field="params.reference_vector")
         elif "obj__diag__setpoint" not in df.columns:
-            raise ValueError("include_setpoint requires objective metadata setpoint.")
+            raise ValueError("include_reference_vector requires reference_vector or objective metadata setpoint.")
         else:
             setpoints = [
                 _coerce_vector(value, field="obj__diag__setpoint") for value in df["obj__diag__setpoint"].dropna()
             ]
             if not setpoints:
-                raise ValueError("include_setpoint requested, but no setpoint vector was found.")
-            setpoint = setpoints[0]
-        if len(setpoint) != dim:
-            raise ValueError(f"setpoint length {len(setpoint)} does not match vector length {dim}.")
-        matrix_rows.append(setpoint)
-        y_labels.append("setpoint")
-        for channel, value in zip(channel_labels, setpoint):
+                raise ValueError("include_reference_vector requested, but no objective setpoint vector was found.")
+            reference = setpoints[0]
+        if len(reference) != dim:
+            raise ValueError(f"reference_vector length {len(reference)} does not match vector length {dim}.")
+        reference_label = str(params.get("reference_label", "reference")).strip() or "reference"
+        matrix_rows.append(reference)
+        y_labels.append(reference_label)
+        for channel, value in zip(channel_labels, reference):
             rows.append(
                 {
-                    "row_type": "setpoint",
+                    "row_type": "reference_vector",
                     "round": None,
-                    "cohort": "setpoint",
+                    "cohort": reference_label,
                     "channel": channel,
                     "value": value,
                 }
@@ -201,3 +209,10 @@ def _coerce_vector(value: object, *, field: str) -> list[float]:
     if not all(math.isfinite(item) for item in out):
         raise ValueError(f"{field} contains non-finite values.")
     return out
+
+
+def _explicit_reference_vector_param(params: dict) -> object | None:
+    for key in ("reference_vector", "target_vector", "setpoint", "setpoint_vector"):
+        if key in params:
+            return params[key]
+    return None

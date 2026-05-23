@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from .helpers import (
     AXIS_CLASS_TO_LOGIC4,
-    ORACLE_ID,
     Namespace,
     Path,
     ProbeArtifactLayout,
-    RunSpec,
     _compact_split_metadata,
     _persisted_split_metadata,
     _run_command,
     _split_metadata_for_all,
-    _write_campaign_plot_config,
     build_plan,
     json,
     pd,
@@ -20,36 +17,7 @@ from .helpers import (
     sys,
     validate_run_root_policy,
     validate_scratch_paths,
-    yaml,
 )
-
-
-def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path: Path) -> None:
-    config_path = tmp_path / "campaign" / "configs" / "campaign.yaml"
-    config_path.parent.mkdir(parents=True)
-    run = RunSpec(
-        campaign_key="cipro",
-        oracle_id=ORACLE_ID,
-        split_id="random_id",
-        run_key="cipro_positive_random_id",
-        target_class="cipro_only",
-        workdir=tmp_path / "campaign",
-        config_path=config_path,
-        label_input_path=tmp_path / "labels.parquet",
-        sidecar_path=tmp_path / "observed_labels.parquet",
-    )
-
-    _write_campaign_plot_config(run)
-
-    payload = yaml.safe_load((config_path.parent / "plots.yaml").read_text(encoding="utf-8"))
-    plot_names = {plot["name"] for plot in payload["plots"]}
-    assert payload["plot_defaults"]["output"]["save_data"] is True
-    assert plot_names == {"score_selected_over_rounds", "feature_importance_heatmap", "selected_vec8_summary"}
-    assert {plot["kind"] for plot in payload["plots"]} == {
-        "metric_over_rounds",
-        "feature_importance_heatmap",
-        "vector_summary_heatmap",
-    }
 
 
 def test_persisted_split_metadata_keeps_large_id_lists_out_of_json() -> None:

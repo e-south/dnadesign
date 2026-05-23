@@ -18,6 +18,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
     build_notebook_plot_card_rows,
+    build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
     build_notebook_run_summary_lines,
@@ -339,14 +340,52 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     visual_surface = build_notebook_visual_surface_model(view_model)
     assert visual_surface["missing_outputs"] == []
     assert visual_surface["stale_artifacts"] == view_model["stale_artifacts"]
+    assert visual_surface["inventory_status_counts"] == {
+        "generated_current": 1,
+        "stale_unmanifested": 1,
+    }
     assert visual_surface["choices"][0]["label"] == "Score"
     assert visual_surface["choices"][0]["path_label"] == "plots/score.png"
+    assert visual_surface["choices"][0]["capability"]["objective_family"] == "generic"
     assert "Scope: round 3" in visual_surface["choices"][0]["alt_text"]
     assert "freshness fresh" in visual_surface["choices"][0]["alt_text"]
+
+    inventory_rows = build_notebook_plot_inventory_rows(visual_surface)
+    assert {
+        "plot": "score",
+        "kind": "metric_over_rounds",
+        "status": "generated_current",
+        "rounds": [3],
+        "objective": "generic",
+        "data": "predictions",
+        "round behavior": "round_history",
+        "labels": "none",
+        "model artifact": False,
+        "tidy": True,
+        "path": "plots/score.png",
+    } in inventory_rows
+    assert any(row["plot"] == "old" and row["status"] == "stale_unmanifested" for row in inventory_rows)
+
+    configured_surface = build_notebook_visual_surface_model(
+        view_model,
+        plot_entries=[
+            {"name": "score", "kind": "metric_over_rounds"},
+            {"name": "missing_plot", "kind": "scatter_score_vs_rank", "round_selector": "latest"},
+        ],
+    )
+    assert configured_surface["missing_outputs"] == ["missing_plot"]
+    configured_inventory = build_notebook_plot_inventory_rows(configured_surface)
+    assert any(
+        row["plot"] == "missing_plot"
+        and row["status"] == "configured_missing_output"
+        and row["round behavior"] == "single_or_round_history"
+        for row in configured_inventory
+    )
 
     card_rows = build_notebook_plot_card_rows(visual_surface["choices"][0])
     assert {"field": "media", "value": "plots/score.png"} in card_rows
     assert {"field": "freshness", "value": "fresh"} in card_rows
+    assert any(row["field"] == "capability" and "objective_family=generic" in row["value"] for row in card_rows)
     assert {"field": "tidy data", "value": "plots/score.csv"} in card_rows
     assert any(row["field"] == "source data" for row in card_rows)
     method_rows = build_notebook_plot_method_rows(visual_surface["choices"][0])
@@ -441,11 +480,14 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "from dnadesign.opal.notebooks.api.generated import (" in text
     assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
+    assert "build_campaign_set_round_options" in text
     assert "build_notebook_campaign_header_lines" in text
     assert "dnadesign.opal.src" not in text
     assert "__generated_with" in text
     assert 'generated_with = "' in text
     assert "Generated with marimo: `{__generated_with}`" not in text
+    assert 'label="Round"' in text
+    assert "selected_round_selector = str(round_ui.value)" in text
     assert 'label="Campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
@@ -477,7 +519,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     )
 
     assert len(single.splitlines()) <= 1000
-    assert len(campaign_set.splitlines()) <= 300
+    assert len(campaign_set.splitlines()) <= 325
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:

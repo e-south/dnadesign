@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from ...registries.plots import describe_plot_kind
 from ._support import (
     compact_path,
     display_name,
@@ -12,6 +13,7 @@ from ._support import (
     plot_entries_from_manifests,
     sequence,
 )
+from .plot_text import capability_text, compact_params, plot_alt_text, plot_math_description, rounds_text
 
 
 def build_notebook_visual_surface_model(
@@ -30,9 +32,15 @@ def build_notebook_visual_surface_model(
         if isinstance(manifest, Mapping) and manifest.get("status") == "written"
     ]
     active_by_name = {str(row.get("name")): row for row in manifest_rows}
-    configured_entries = plot_entries_from_manifests(manifest_rows) if plot_entries is None else list(plot_entries)
+    if plot_entries is None:
+        configured_entries = list(sequence(view_model.get("configured_plots"))) or plot_entries_from_manifests(
+            manifest_rows
+        )
+    else:
+        configured_entries = list(plot_entries)
 
     choices: list[dict[str, Any]] = []
+    inventory: list[dict[str, Any]] = []
     missing_outputs: list[str] = []
     labels_seen: dict[str, int] = {}
     for entry in configured_entries:
@@ -42,12 +50,35 @@ def build_notebook_visual_surface_model(
         if not name:
             continue
         manifest = active_by_name.get(name)
+        kind = str(entry.get("kind") or mapping(manifest).get("kind") or "unknown")
+        metadata = _plot_kind_metadata(kind)
+        capability = mapping(metadata.get("capability"))
         if manifest is None:
             missing_outputs.append(name)
+            inventory.append(
+                _plot_inventory_entry(
+                    entry=entry,
+                    manifest=None,
+                    status="configured_missing_output",
+                    workdir=workdir,
+                    capability=capability,
+                )
+            )
             continue
         media_output = first_media_output(manifest)
+        freshness = mapping(manifest.get("freshness"))
+        freshness_status = str(freshness.get("status") or manifest.get("stale_state") or "unknown")
         if media_output is None:
             missing_outputs.append(name)
+            inventory.append(
+                _plot_inventory_entry(
+                    entry=entry,
+                    manifest=manifest,
+                    status="generated_missing_media",
+                    workdir=workdir,
+                    capability=capability,
+                )
+            )
             continue
         path = str(media_output.get("path"))
         title = str(entry.get("title") or manifest.get("title") or display_name(name))
@@ -55,7 +86,6 @@ def build_notebook_visual_surface_model(
         labels_seen[label] = labels_seen.get(label, 0) + 1
         if labels_seen[label] > 1:
             label = f"{label} ({Path(path).name})"
-        freshness = mapping(manifest.get("freshness"))
         warnings = sequence(manifest.get("warnings"))
         tidy_csv = manifest.get("tidy_csv")
         inputs = [
@@ -84,13 +114,14 @@ def build_notebook_visual_surface_model(
                     f"{item.get('role') or 'input'}={compact_path(item.get('path'), base=workdir)}"
                     for item in inputs[:5]
                 ],
-                "freshness": freshness.get("status") or manifest.get("stale_state") or "unknown",
+                "freshness": freshness_status,
                 "status": manifest.get("status"),
                 "run_id": manifest.get("run_id"),
                 "rounds": manifest.get("rounds"),
+                "capability": capability,
                 "warning_count": len(warnings),
                 "caption": summary,
-                "alt_text": _plot_alt_text(
+                "alt_text": plot_alt_text(
                     title=title,
                     kind=entry.get("kind") or manifest.get("kind"),
                     summary=summary,
@@ -105,12 +136,73 @@ def build_notebook_visual_surface_model(
                 "manifest": dict(manifest),
             }
         )
+        inventory.append(
+            _plot_inventory_entry(
+                entry=entry,
+                manifest=manifest,
+                status=_generated_inventory_status(freshness_status),
+                workdir=workdir,
+                capability=capability,
+                media_path=path,
+            )
+        )
+    stale_artifacts = list(sequence(view_model.get("stale_artifacts")))
+    for artifact in stale_artifacts:
+        if not isinstance(artifact, Mapping):
+            continue
+        artifact_path = str(artifact.get("path") or "")
+        if not artifact_path:
+            continue
+        inventory.append(
+            {
+                "name": Path(artifact_path).stem,
+                "kind": "unmanifested",
+                "status": "stale_unmanifested",
+                "rounds": "not recorded",
+                "freshness": "stale",
+                "path": artifact_path,
+                "path_label": compact_path(artifact_path, base=workdir),
+                "objective_family": "unknown",
+                "data_layer": "generated_artifact",
+                "round_scope": "not recorded",
+                "label_requirement": "not recorded",
+                "requires_model_artifact": False,
+                "tidy_available": artifact_path.endswith(".csv"),
+            }
+        )
     return {
         "plots_dir": plots_dir,
         "choices": choices,
         "missing_outputs": missing_outputs,
-        "stale_artifacts": list(sequence(view_model.get("stale_artifacts"))),
+        "stale_artifacts": stale_artifacts,
+        "inventory": inventory,
+        "inventory_status_counts": _inventory_status_counts(inventory),
     }
+
+
+def build_notebook_plot_inventory_rows(visual_surface_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build rows that distinguish configured, generated, and stale plot surfaces."""
+
+    rows: list[dict[str, Any]] = []
+    for item in sequence(mapping(visual_surface_model).get("inventory")):
+        if not isinstance(item, Mapping):
+            continue
+        rows.append(
+            {
+                "plot": item.get("name") or "not recorded",
+                "kind": item.get("kind") or "not recorded",
+                "status": item.get("status") or "unknown",
+                "rounds": item.get("rounds") or "not recorded",
+                "objective": item.get("objective_family") or "unknown",
+                "data": item.get("data_layer") or "unspecified",
+                "round behavior": item.get("round_scope") or "unspecified",
+                "labels": item.get("label_requirement") or "none",
+                "model artifact": bool(item.get("requires_model_artifact")),
+                "tidy": bool(item.get("tidy_available")),
+                "path": item.get("path_label") or "not generated",
+            }
+        )
+    return rows
 
 
 def build_notebook_plot_card_rows(choice: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -130,6 +222,7 @@ def build_notebook_plot_card_rows(choice: Mapping[str, Any]) -> list[dict[str, A
         {"field": "kind", "value": entry.get("kind") or manifest.get("kind")},
         {"field": "status", "value": manifest.get("status")},
         {"field": "freshness", "value": choice.get("freshness") or "unknown"},
+        {"field": "capability", "value": capability_text(choice.get("capability"))},
         {"field": "generated", "value": manifest.get("generated_at")},
         {"field": "run", "value": manifest.get("run_id") or "all runs"},
         {"field": "rounds", "value": manifest.get("rounds")},
@@ -151,15 +244,17 @@ def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str,
 
     manifest = mapping(choice.get("manifest"))
     metadata = mapping(manifest.get("metadata"))
+    capability = mapping(metadata.get("capability")) or mapping(choice.get("capability"))
     kind = str(choice.get("kind") or manifest.get("kind") or "unknown")
     return [
         {
             "section": "reading",
             "detail": str(choice.get("caption") or metadata.get("summary") or "No plot description recorded."),
         },
+        {"section": "capability", "detail": capability_text(capability)},
         {"section": "data shape", "detail": str(metadata.get("data_shape") or "not recorded")},
-        {"section": "math", "detail": _plot_math_description(kind)},
-        {"section": "parameters", "detail": _compact_params(manifest.get("params"))},
+        {"section": "math", "detail": plot_math_description(kind)},
+        {"section": "parameters", "detail": compact_params(manifest.get("params"))},
         {"section": "tidy schema", "detail": join_list(metadata.get("tidy_schema"), sep=", ")},
         {"section": "failure modes", "detail": join_list(metadata.get("failure_modes"), sep="; ")},
     ]
@@ -171,7 +266,7 @@ def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, 
     rows = {str(row["section"]): str(row["detail"]) for row in build_notebook_plot_method_rows(choice)}
     title = str(choice.get("title") or display_name(choice.get("name"))).strip()
     kind = str(choice.get("kind") or "unknown").replace("_", " ")
-    rounds = _rounds_text(choice.get("rounds"))
+    rounds = rounds_text(choice.get("rounds"))
     freshness = str(choice.get("freshness") or "unknown")
     warnings = int(choice.get("warning_count") or 0)
     return {
@@ -179,6 +274,7 @@ def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, 
         "Math": rows.get("math", "No math description recorded."),
         "Data contract": (
             f"Data shape: {rows.get('data shape', 'not recorded')}.\n\n"
+            f"Capability: {rows.get('capability', 'not recorded')}.\n\n"
             f"Parameters: {rows.get('parameters', 'not recorded')}.\n\n"
             f"Tidy schema: {rows.get('tidy schema', 'not recorded')}.\n\n"
             f"Failure modes: {rows.get('failure modes', 'not recorded')}.\n\n"
@@ -187,134 +283,67 @@ def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, 
     }
 
 
-def _plot_alt_text(
+def _plot_kind_metadata(kind: str) -> Mapping[str, Any]:
+    try:
+        return describe_plot_kind(kind)
+    except Exception as exc:
+        return {
+            "kind": kind,
+            "summary": None,
+            "capability_error": str(exc),
+            "capability": {
+                "objective_family": "unknown",
+                "data_layer": "unspecified",
+                "round_scope": "single_or_round_history",
+                "label_requirement": "none",
+                "requires_labels": False,
+                "requires_model_artifact": False,
+                "tidy_available": False,
+            },
+        }
+
+
+def _plot_inventory_entry(
     *,
-    title: str,
-    kind: Any,
-    summary: str,
-    params: Any,
-    metadata: Any,
-    rounds: Any,
-    run_id: Any,
-    freshness: Any,
-    warning_count: int,
-) -> str:
-    kind_text = str(kind or "plot").replace("_", " ")
-    summary_text = str(summary or "").strip()
-    scope = _rounds_text(rounds)
-    run_text = "all runs" if run_id in (None, "") else f"run {run_id}"
-    field_text = _plot_field_text(kind=str(kind or ""), params=mapping(params), metadata=mapping(metadata))
-    quality = f"freshness {freshness or 'unknown'}"
-    if int(warning_count) > 0:
-        quality += f", {int(warning_count)} warnings"
-    if summary_text:
-        return f"{title}. {summary_text} {field_text} Scope: {scope}, {run_text}; {quality}."
-    return f"{title}. OPAL {kind_text} visual. {field_text} Scope: {scope}, {run_text}; {quality}."
-
-
-def _rounds_text(value: Any) -> str:
-    if value in (None, ""):
-        return "the selected round"
-    if value == "all":
-        return "all rounds"
-    items = sequence(value)
-    if len(items) == 1:
-        return f"round {items[0]}"
-    return "rounds " + ", ".join(str(item) for item in items)
-
-
-def _plot_math_description(kind: str) -> str:
-    descriptions = {
-        "metric_over_rounds": (
-            "For each round and cohort, OPAL filters prediction rows, extracts the configured numeric metric, "
-            "then computes requested summaries. mean = sum(x) / n; quantile summaries use the requested order "
-            "statistic; count = n."
-        ),
-        "feature_importance_heatmap": (
-            "OPAL builds a feature-by-round matrix from model feature_importance.csv artifacts. Each cell is the "
-            "model-reported importance for one feature in one round; top_n keeps features with the largest maximum "
-            "importance across rounds."
-        ),
-        "vector_summary_heatmap": (
-            "For each round, cohort, and vector channel, OPAL aggregates the configured vector prediction field. "
-            "The current primitive computes the mean channel value across matching prediction rows."
-        ),
-        "scatter_score_vs_rank": (
-            "OPAL plots selected prediction rows by rank and score. Rank is selection order; score is the configured "
-            "selection score or objective channel."
-        ),
-        "percent_high_activity_over_rounds": (
-            "For each round, OPAL counts rows where score >= threshold. percent_high = 100 * high / total; "
-            "violin and swarm layers show the underlying score distribution when enabled."
-        ),
-        "feature_importance_bars": (
-            "OPAL reads per-round model feature_importance.csv artifacts. Bars encode model-reported importance, "
-            "with ordering controlled by the configured order policy."
-        ),
-        "fold_change_vs_logic_fidelity": (
-            "For SFXI, logic fidelity is clipped 1 - ||v - p||2 / D, where v is the predicted logic vector, "
-            "p is the setpoint, and D is the worst-corner distance. The y-axis is the configured effect or score field."
-        ),
-        "sfxi_logic_fidelity_closeness": (
-            "For each observed label, OPAL uses the first four SFXI components as logic values and computes "
-            "mean squared error against the setpoint: MSE = mean((v - p)^2). Lower MSE means closer logic behavior."
-        ),
-        "sfxi_factorial_effects": (
-            "With state order 00,10,01,11, A effect = ((v10 + v11) - (v00 + v01)) / 2, "
-            "B effect = ((v01 + v11) - (v00 + v10)) / 2, and interaction = ((v11 + v00) - (v10 + v01)) / 2."
-        ),
-        "sfxi_setpoint_sweep": (
-            "OPAL evaluates label vectors against a setpoint library. Logic fidelity is 1 - ||v - p||2 / D, "
-            "effect is scaled by a percentile denominator, and score = logic_fidelity^beta * effect_scaled^gamma."
-        ),
-        "sfxi_support_diagnostics": (
-            "For each candidate, OPAL computes Euclidean distance in four-channel logic space to the nearest "
-            "labeled point. Larger distances flag extrapolation risk."
-        ),
-        "sfxi_uncertainty": (
-            "For models with ensemble predictions, OPAL computes the standard deviation of objective scores "
-            "across estimators after inverse y-ops and SFXI scoring."
-        ),
-        "sfxi_intensity_scaling": (
-            "OPAL recovers linear intensity as max(0, 2^y_star - delta), computes weighted raw effect, "
-            "uses a configured percentile denominator, then clips effect_scaled = effect_raw / denom to [0, 1]."
-        ),
+    entry: Mapping[str, Any],
+    manifest: Mapping[str, Any] | None,
+    status: str,
+    workdir: str,
+    capability: Mapping[str, Any],
+    media_path: str | None = None,
+) -> dict[str, Any]:
+    manifest_map = mapping(manifest)
+    path = media_path or ""
+    return {
+        "name": str(entry.get("name") or manifest_map.get("name") or "unknown"),
+        "kind": str(entry.get("kind") or manifest_map.get("kind") or "unknown"),
+        "status": status,
+        "rounds": manifest_map.get("rounds") or entry.get("round_selector") or "not generated",
+        "freshness": mapping(manifest_map.get("freshness")).get("status") or "not generated",
+        "path": path,
+        "path_label": compact_path(path, base=workdir) if path else "not generated",
+        "objective_family": capability.get("objective_family") or "unknown",
+        "data_layer": capability.get("data_layer") or "unspecified",
+        "round_scope": capability.get("round_scope") or "unspecified",
+        "label_requirement": capability.get("label_requirement") or "none",
+        "requires_model_artifact": bool(capability.get("requires_model_artifact")),
+        "tidy_available": bool(capability.get("tidy_available")),
     }
-    return descriptions.get(
-        kind,
-        "See the plot kind metadata for the exact data shape, required fields, parameters, and failure modes.",
-    )
 
 
-def _compact_params(value: Any) -> str:
-    if not isinstance(value, Mapping) or not value:
-        return "not recorded"
-    return "; ".join(f"{key}={item}" for key, item in value.items())
+def _generated_inventory_status(freshness_status: str) -> str:
+    if freshness_status == "fresh":
+        return "generated_current"
+    if freshness_status == "stale":
+        return "generated_stale"
+    if freshness_status == "missing_outputs":
+        return "generated_missing_media"
+    return "generated_unknown"
 
 
-def _plot_field_text(*, kind: str, params: Mapping[str, Any], metadata: Mapping[str, Any]) -> str:
-    fields: list[str] = []
-    for key in (
-        "metric",
-        "summary",
-        "summaries",
-        "cohort",
-        "score_field",
-        "rank_mode",
-        "threshold",
-        "y_axis",
-        "hue",
-        "hue_field",
-        "size_by",
-        "vector_field",
-        "aggregation",
-    ):
-        value = params.get(key)
-        if value not in (None, "", []):
-            fields.append(f"{key}={value}")
-    shape = metadata.get("data_shape")
-    if shape not in (None, ""):
-        fields.append(f"data_shape={shape}")
-    if not fields:
-        return f"Plot kind: {str(kind or 'unknown').replace('_', ' ')}."
-    return "Encoded fields: " + "; ".join(str(item) for item in fields[:8]) + "."
+def _inventory_status_counts(inventory: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in inventory:
+        status = str(mapping(item).get("status") or "unknown")
+        counts[status] = counts.get(status, 0) + 1
+    return counts

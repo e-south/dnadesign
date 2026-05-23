@@ -47,6 +47,10 @@ def _import_pyarrow():
         notes=["Reads outputs/ledger/labels.parquet + outputs/ledger/runs.parquet for setpoint."],
         data_shape="observed label agreement matrix",
         tidy_schema=["observed_round", "mse"],
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_round",
+        label_requirement="required",
         failure_modes=[
             "missing labels or runs ledger",
             "invalid length-8 observed label vectors",

@@ -66,6 +66,10 @@ def _coerce_y_ops(value: object) -> list[dict]:
         requires=["model artifact", "predictions", "records"],
         notes=["Loads artifact model from outputs/rounds/round_<r>/model/model.joblib."],
         data_shape="uncertainty support scatter",
+        objective_family="sfxi",
+        data_layer="model_artifact_records_predictions",
+        round_scope="single_round",
+        requires_model_artifact=True,
         failure_modes=[
             "missing model artifact",
             "model does not support uncertainty",

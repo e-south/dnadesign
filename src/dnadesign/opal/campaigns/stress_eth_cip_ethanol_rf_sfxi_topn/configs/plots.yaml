@@ -1,0 +1,120 @@
+plot_defaults:
+  output:
+    format: "png"
+    dpi: 240
+    save_data: true
+
+plots:
+  - name: score_selected_over_rounds
+    kind: metric_over_rounds
+    tags: [rounds, selection]
+    params:
+      metric: "pred__score_selected"
+      cohort: [selected, top_k, all_pool]
+      top_k: 6
+      summaries: [mean, median, q25, q75]
+      highlight_round: latest
+
+  - name: score_vs_rank_by_round
+    kind: scatter_score_vs_rank
+    tags: [rounds, selection]
+    params:
+      rank_mode: competition
+      alpha: 0.45
+      rasterize_at: 20000
+      figsize_in: [9, 5]
+
+  - name: score_threshold_over_rounds
+    kind: percent_high_activity_over_rounds
+    tags: [rounds, selection, threshold]
+    params:
+      metric: "pred__score_selected"
+      threshold: 0.8
+      mode: both
+      hue: logic_fidelity
+      highlight_round: latest
+      rasterize_at: 20000
+
+  - name: feature_importance_heatmap
+    kind: feature_importance_heatmap
+    tags: [rounds, model]
+    params:
+      top_n: 128
+      sort: max_importance
+      cluster: false
+      cmap: "viridis"
+      title: "ethanol factor: feature importance over rounds"
+
+  - name: selected_vec8_summary
+    kind: vector_summary_heatmap
+    tags: [rounds, sfxi, vector]
+    params:
+      vector_field: "pred__y_hat_model"
+      cohort: selected
+      include_reference_vector: true
+      reference_vector: [0, 1, 0, 1, 0, 1, 0, 1]
+      reference_label: "target vec8"
+      channel_labels: [v00, v10, v01, v11, y00_star, y10_star, y01_star, y11_star]
+      cmap: "viridis"
+      title: "ethanol factor: selected vec8 summary"
+
+  - name: fold_change_vs_logic_fidelity_latest
+    kind: fold_change_vs_logic_fidelity
+    round_selector: latest
+    tags: [sfxi, selection, overlay, single-round]
+    params:
+      y_axis: score
+      hue: effect_scaled
+      size_by: logic_fidelity
+      alpha: 0.35
+      rasterize_at: 20000
+
+  - name: sfxi_logic_fidelity_closeness_latest
+    kind: sfxi_logic_fidelity_closeness
+    round_selector: latest
+    tags: [sfxi, labels, overlay, single-round]
+    params:
+      on_violin_invalid: line
+      violin_min_points: 3
+
+  - name: sfxi_factorial_effects_latest
+    kind: sfxi_factorial_effects
+    round_selector: latest
+    tags: [sfxi, labels, overlay, single-round]
+    params:
+      size_by: obj__effect_scaled
+      include_labels: true
+      rasterize_at: 20000
+
+  - name: sfxi_setpoint_sweep_latest
+    kind: sfxi_setpoint_sweep
+    round_selector: latest
+    tags: [sfxi, labels, single-round]
+    params:
+      min_n: 5
+
+  - name: sfxi_support_diagnostics_latest
+    kind: sfxi_support_diagnostics
+    round_selector: latest
+    tags: [sfxi, labels, overlay, single-round]
+    params:
+      y_axis: score
+      hue: effect_scaled
+      batch_size: 2048
+
+  - name: sfxi_uncertainty_latest
+    kind: sfxi_uncertainty
+    round_selector: latest
+    tags: [sfxi, model, single-round]
+    params:
+      kind: score
+      y_axis: score
+      hue: logic_fidelity
+
+  - name: sfxi_intensity_scaling_latest
+    kind: sfxi_intensity_scaling
+    round_selector: latest
+    tags: [sfxi, labels, single-round]
+    params:
+      min_n: 5
+      include_pool: true

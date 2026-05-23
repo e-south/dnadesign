@@ -8,7 +8,7 @@ OPAL-compatible SFXI scores without importing OPAL internals.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -17,6 +17,32 @@ from ..src.objectives import sfxi_math
 SFXI_API_VERSION = "1"
 SFXI_OBJECTIVE_NAME = "sfxi_v1"
 SFXI_STATE_ORDER = sfxi_math.STATE_ORDER
+SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION = "opal.sfxi_reference_overlay.v1"
+SFXI_REFERENCE_OVERLAY_NAMESPACE = "sfxi_ref"
+SFXI_REFERENCE_OVERLAY_PREFIX = f"{SFXI_REFERENCE_OVERLAY_NAMESPACE}__"
+SFXI_REFERENCE_OVERLAY_FIELDS = (
+    "schema_version",
+    "api_version",
+    "objective_name",
+    "metric_id",
+    "metric_value",
+    "metric_provenance",
+    "batch_id",
+    "campaign_id",
+    "design_id",
+    "source_id",
+    "state_order",
+    "setpoint_vector",
+    "denom_percentile",
+    "denom_used",
+    "logic_fidelity",
+    "effect_raw",
+    "effect_scaled",
+    "sfxi",
+    "clip_lo_mask",
+    "clip_hi_mask",
+    "intensity_disabled",
+)
 
 
 @dataclass(frozen=True)
@@ -158,11 +184,83 @@ def score_vec8(
     )
 
 
+def to_sfxi_reference_overlay_records(
+    result: SFXIScoringResult,
+    *,
+    metric_id: str = "sfxi_v1/sfxi",
+    metric_provenance: str = "dnadesign.opal.api.sfxi.score_vec8",
+    batch_id: str | Sequence[str] | None = None,
+    campaign_id: str | Sequence[str] | None = None,
+    design_id: Sequence[str] | None = None,
+    source_id: Sequence[str] | None = None,
+    namespace: str = SFXI_REFERENCE_OVERLAY_NAMESPACE,
+) -> list[dict[str, object]]:
+    """Return namespaced SFXI reference-overlay records for plots/notebooks."""
+
+    if not isinstance(result, SFXIScoringResult):
+        raise TypeError("result must be an SFXIScoringResult.")
+    ns = str(namespace).strip()
+    if not ns or "__" in ns:
+        raise ValueError("namespace must be a non-empty column namespace without '__'.")
+    prefix = f"{ns}__"
+    base_records = result.to_records()
+    n_rows = len(base_records)
+    batch_ids = _overlay_values(batch_id, n_rows=n_rows, field="batch_id")
+    campaign_ids = _overlay_values(campaign_id, n_rows=n_rows, field="campaign_id")
+    design_ids = _overlay_values(design_id, n_rows=n_rows, field="design_id")
+    source_ids = _overlay_values(source_id, n_rows=n_rows, field="source_id")
+
+    rows: list[dict[str, object]] = []
+    for idx, record in enumerate(base_records):
+        rows.append(
+            {
+                f"{prefix}schema_version": SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION,
+                f"{prefix}api_version": record["api_version"],
+                f"{prefix}objective_name": record["objective_name"],
+                f"{prefix}metric_id": str(metric_id),
+                f"{prefix}metric_value": record["sfxi"],
+                f"{prefix}metric_provenance": str(metric_provenance),
+                f"{prefix}batch_id": batch_ids[idx],
+                f"{prefix}campaign_id": campaign_ids[idx],
+                f"{prefix}design_id": design_ids[idx],
+                f"{prefix}source_id": source_ids[idx],
+                f"{prefix}state_order": record["state_order"],
+                f"{prefix}setpoint_vector": record["setpoint_vector"],
+                f"{prefix}denom_percentile": record["denom_percentile"],
+                f"{prefix}denom_used": record["denom_used"],
+                f"{prefix}logic_fidelity": record["logic_fidelity"],
+                f"{prefix}effect_raw": record["effect_raw"],
+                f"{prefix}effect_scaled": record["effect_scaled"],
+                f"{prefix}sfxi": record["sfxi"],
+                f"{prefix}clip_lo_mask": record["clip_lo_mask"],
+                f"{prefix}clip_hi_mask": record["clip_hi_mask"],
+                f"{prefix}intensity_disabled": record["intensity_disabled"],
+            }
+        )
+    return rows
+
+
+def _overlay_values(value: Any, *, n_rows: int, field: str) -> list[object | None]:
+    if value is None:
+        return [None] * n_rows
+    if isinstance(value, str):
+        return [value] * n_rows
+    values = list(value)
+    if len(values) != n_rows:
+        raise ValueError(f"{field} length {len(values)} does not match SFXI row count {n_rows}.")
+    return [None if item is None else str(item) for item in values]
+
+
 __all__ = [
     "SFXI_API_VERSION",
+    "SFXI_REFERENCE_OVERLAY_FIELDS",
+    "SFXI_REFERENCE_OVERLAY_NAMESPACE",
+    "SFXI_REFERENCE_OVERLAY_PREFIX",
+    "SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION",
     "SFXI_OBJECTIVE_NAME",
     "SFXI_STATE_ORDER",
     "SFXIScoringConfig",
     "SFXIScoringResult",
     "score_vec8",
+    "to_sfxi_reference_overlay_records",
 ]

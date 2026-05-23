@@ -33,6 +33,11 @@ class PlotMeta:
     data_shape: str | None = None
     tidy_schema: List[str] = field(default_factory=list)
     failure_modes: List[str] = field(default_factory=list)
+    objective_family: str = "generic"
+    data_layer: str = "unspecified"
+    round_scope: str = "single_or_round_history"
+    label_requirement: str = "none"
+    requires_model_artifact: bool = False
 
 
 def _dbg(msg: str) -> None:
@@ -138,6 +143,14 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
             "data_shape": None,
             "tidy_schema": [],
             "failure_modes": [],
+            "capability": _capability_entry(
+                objective_family="unknown",
+                data_layer="unspecified",
+                round_scope="single_or_round_history",
+                label_requirement="none",
+                requires_model_artifact=False,
+                tidy_available=False,
+            ),
         }
     return {
         "kind": name,
@@ -148,4 +161,32 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
         "data_shape": meta.data_shape,
         "tidy_schema": list(meta.tidy_schema),
         "failure_modes": list(meta.failure_modes),
+        "capability": _capability_entry(
+            objective_family=meta.objective_family,
+            data_layer=meta.data_layer,
+            round_scope=meta.round_scope,
+            label_requirement=meta.label_requirement,
+            requires_model_artifact=meta.requires_model_artifact,
+            tidy_available=bool(meta.tidy_schema),
+        ),
+    }
+
+
+def _capability_entry(
+    *,
+    objective_family: str,
+    data_layer: str,
+    round_scope: str,
+    label_requirement: str,
+    requires_model_artifact: bool,
+    tidy_available: bool,
+) -> Dict[str, object]:
+    return {
+        "objective_family": str(objective_family),
+        "data_layer": str(data_layer),
+        "round_scope": str(round_scope),
+        "label_requirement": str(label_requirement),
+        "requires_labels": str(label_requirement) == "required",
+        "requires_model_artifact": bool(requires_model_artifact),
+        "tidy_available": bool(tidy_available),
     }

@@ -13,7 +13,7 @@ def _campaign_selector_cell() -> str:
     return block(
         """
         @app.cell
-        def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, mo, pl):
+        def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, mo, pl, selected_round_selector):
             _rows = [build_notebook_campaign_summary_row(campaign_model) for campaign_model in campaigns]
             campaign_labels = [f"{index + 1}. {row['label']}" for index, row in enumerate(_rows)]
             campaign_ui = mo.ui.dropdown(campaign_labels, value=campaign_labels[0], label="Campaign")
@@ -21,7 +21,7 @@ def _campaign_selector_cell() -> str:
             header_md = mo.md(
                 "# Campaigns\\n\\n"
                 f"`{campaign_set_view_model['campaign_count']}` campaigns. "
-                f"Round selector: `{campaign_set_view_model['round_selector']}`."
+                f"Round selector: `{selected_round_selector}`."
             )
             return campaign_labels, campaign_summary_df, campaign_ui, header_md
         """

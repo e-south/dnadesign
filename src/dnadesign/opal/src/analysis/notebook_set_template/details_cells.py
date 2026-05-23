@@ -91,6 +91,7 @@ def _layout_cell() -> str:
             metric_definitions_panel,
             mo,
             plot_panel,
+            round_ui,
             selected_campaign_header_md,
             selected_overview_panel,
             selected_validity_md,
@@ -98,7 +99,7 @@ def _layout_cell() -> str:
             mo.vstack(
                 [
                     header_md,
-                    campaign_ui,
+                    mo.hstack([round_ui, campaign_ui], justify="start", align="end", wrap=True, gap=0.35),
                     selected_campaign_header_md,
                     plot_panel,
                     mo.accordion(

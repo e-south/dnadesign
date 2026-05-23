@@ -47,6 +47,10 @@ from .sfxi_diag_data import (
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for scaling; pool optional."],
         data_shape="objective scaling diagnostics",
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_round",
+        label_requirement="required",
         failure_modes=[
             "missing labels or runs ledger",
             "invalid length-8 label vectors",

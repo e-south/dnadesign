@@ -5,6 +5,7 @@ from typing import Any, Mapping, Sequence
 
 BASERENDER_CONTRACT_SCHEMA_VERSION = "dnadesign.baserender.record_render_contract.v1"
 NO_RENDERABLE_RECORDS_LABEL = "(no renderable records)"
+GENERIC_BASERENDER_FEATURES_COLUMN = "opal__baserender_features"
 
 
 def build_notebook_baserender_contract(
@@ -15,12 +16,92 @@ def build_notebook_baserender_contract(
     """Detect whether records expose a public BaseRender-compatible surface."""
 
     baserender = import_module("dnadesign.baserender")
-    return dict(
-        baserender.record_render_contract_for_schema(
-            tuple(str(column) for column in schema_columns),
+    columns = {str(column) for column in schema_columns}
+    if {"id", "sequence", GENERIC_BASERENDER_FEATURES_COLUMN}.issubset(columns):
+        return _available_contract(
+            adapter_kind="generic_features",
+            adapter_columns={
+                "id": "id",
+                "sequence": "sequence",
+                "features": GENERIC_BASERENDER_FEATURES_COLUMN,
+            },
+            adapter_policies={},
+            required_columns=["id", "sequence", GENERIC_BASERENDER_FEATURES_COLUMN],
+            render_route="figure",
+            renderer_name="sequence_rows",
             records_path=records_path,
+            caption="BaseRender generic feature view.",
         )
-    )
+
+    densegen_config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
+    densegen_columns = dict(densegen_config.adapter_columns)
+    required = [str(densegen_columns[key]) for key in ("id", "sequence", "annotations") if key in densegen_columns]
+    if set(required).issubset(columns):
+        return _available_contract(
+            adapter_kind=str(densegen_config.adapter_kind),
+            adapter_columns=densegen_columns,
+            adapter_policies=dict(densegen_config.adapter_policies),
+            required_columns=required,
+            render_route="sequence_panel",
+            renderer_name=str(densegen_config.renderer_name),
+            records_path=records_path,
+            caption="BaseRender DenseGen TFBS view.",
+            style_overrides=dict(densegen_config.style_overrides or {}),
+            target_width_px=int(densegen_config.target_width_px),
+            target_height_px=int(densegen_config.target_height_px),
+            vertical_anchor=str(densegen_config.vertical_anchor),
+            canvas_top_pad_px=int(densegen_config.canvas_top_pad_px),
+        )
+
+    return {
+        "schema_version": BASERENDER_CONTRACT_SCHEMA_VERSION,
+        "available": False,
+        "render_route": None,
+        "adapter_kind": None,
+        "renderer_name": "sequence_rows",
+        "required_columns": [],
+        "adapter_columns": {},
+        "adapter_policies": {},
+        "records_path": records_path,
+        "reason": "No public BaseRender-compatible record surface was detected.",
+    }
+
+
+def _available_contract(
+    *,
+    adapter_kind: str,
+    adapter_columns: Mapping[str, Any],
+    adapter_policies: Mapping[str, Any],
+    required_columns: Sequence[str],
+    render_route: str,
+    renderer_name: str,
+    records_path: str | None,
+    caption: str,
+    style_overrides: Mapping[str, Any] | None = None,
+    target_width_px: int | None = None,
+    target_height_px: int | None = None,
+    vertical_anchor: str | None = None,
+    canvas_top_pad_px: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": BASERENDER_CONTRACT_SCHEMA_VERSION,
+        "available": True,
+        "render_route": render_route,
+        "adapter_kind": adapter_kind,
+        "renderer_name": renderer_name,
+        "required_columns": list(required_columns),
+        "adapter_columns": dict(adapter_columns),
+        "adapter_policies": dict(adapter_policies),
+        "records_path": records_path,
+        "reason": "detected",
+        "caption": caption,
+        "alt_text_template": "BaseRender sequence diagram for record {record_id}; {feature_count} annotations.",
+        "style_overrides": dict(style_overrides or {}),
+        "target_width_px": target_width_px,
+        "target_height_px": target_height_px,
+        "vertical_anchor": vertical_anchor,
+        "canvas_top_pad_px": canvas_top_pad_px,
+    }
 
 
 def build_notebook_baserender_contract_rows(contract: Mapping[str, Any]) -> list[dict[str, Any]]:

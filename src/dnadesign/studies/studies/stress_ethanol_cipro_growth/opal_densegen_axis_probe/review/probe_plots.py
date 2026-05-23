@@ -242,21 +242,22 @@ def _vec8_distance_rows(configured_plots: list[dict[str, Any]]) -> list[dict[str
             required = {"row_type", "round", "channel", "value"}
             if not required.issubset(tidy.columns):
                 continue
-            setpoint = (
-                tidy.loc[tidy["row_type"].astype(str) == "setpoint", ["channel", "value"]]
+            row_type = tidy["row_type"].astype(str)
+            reference = (
+                tidy.loc[row_type.isin(["reference_vector", "setpoint"]), ["channel", "value"]]
                 .dropna()
                 .set_index("channel")["value"]
                 .astype(float)
             )
-            if setpoint.empty:
+            if reference.empty:
                 continue
             round_rows = tidy.loc[tidy["row_type"].astype(str) == "round"].copy()
             for round_index, sub in round_rows.groupby("round"):
                 vector = sub.set_index("channel")["value"].astype(float)
-                aligned = pd.concat([setpoint.rename("setpoint"), vector.rename("value")], axis=1).dropna()
+                aligned = pd.concat([reference.rename("reference"), vector.rename("value")], axis=1).dropna()
                 if aligned.empty:
                     continue
-                distance = float(((aligned["value"] - aligned["setpoint"]) ** 2).sum() ** 0.5)
+                distance = float(((aligned["value"] - aligned["reference"]) ** 2).sum() ** 0.5)
                 rows.append({"run_key": run_key, "round": int(round_index), "distance": distance})
     return rows
 
@@ -298,8 +299,8 @@ def _plot_vec8_distance(frame: pd.DataFrame, path: Path) -> None:
     for run_key, sub in frame.groupby("run_key"):
         ax.plot(sub["round"], sub["distance"], marker="o", linewidth=1.2, label=str(run_key))
     ax.set_xlabel("round")
-    ax.set_ylabel("Euclidean distance to setpoint")
-    ax.set_title("Selected vec8 distance to configured setpoint")
+    ax.set_ylabel("Euclidean distance to reference")
+    ax.set_title("Selected vec8 distance to configured reference")
     ax.legend(frameon=False, fontsize=7, ncols=2)
     fig.savefig(path, dpi=160)
     plt.close(fig)

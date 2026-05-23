@@ -55,6 +55,7 @@ plot_presets:
 plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
+    round_selector: latest            # optional plot-local override for --round
 
     # Optional extra sources (built-ins auto-injected: records, outputs)
     data:
@@ -84,6 +85,9 @@ plots:
 
 **Notes:**
 - Plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
+- Use plot-level `round_selector:` only for plot scope, not rendering knobs. It accepts
+  the same selectors as `--round` and lets all-round bundles include primitives that
+  are inherently single-round. `--run-id` remains single-round and takes precedence.
 - `scatter_score_vs_rank` should use `pred__score_selected` unless you intentionally target another ledger metric.
 - Use `enabled: false` to keep a plot entry without running it.
 - Presets merge into each plot entry; entry values override preset values.
@@ -125,7 +129,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | `inputs` | resolved built-in and custom data paths with file size and mtime |
 | `outputs.media` | rendered image/SVG/PDF files |
 | `outputs.tidy_csv` | tidy CSV files saved by the plugin |
-| `metadata` | `PlotMeta` summary, data shape, tidy schema, and failure modes |
+| `metadata` | `PlotMeta` summary, capability, data shape, tidy schema, and failure modes |
 | `quality` | tidy CSV schema validation status when a plot declares `metadata.tidy_schema` |
 | `freshness` | mtime-based freshness summary for resolved inputs and outputs |
 | `caption`, `review_purpose` | manifest-backed human purpose text derived from plot metadata |
@@ -134,6 +138,11 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 Review and generated notebook surfaces should read manifests first. Extra files
 on disk are advisory only; they can trigger stale-file warnings, but they are
 not current evidence unless referenced by the active manifest.
+
+Plot capability metadata is the dropdown contract. It records objective family,
+data layer, round behavior, label requirement, model-artifact requirement, and
+tidy-data availability so notebooks can distinguish configured-but-missing,
+generated-current, generated-stale, and stale-unmanifested surfaces.
 
 ---
 
@@ -150,21 +159,29 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - requires feature importance artifacts (for example RF with `emit_feature_importance: true`)
 - **`feature_importance_heatmap`**: matrix heatmap of feature importance over rounds.
   - rows are stable feature IDs, columns are rounds, values are importances
-  - params: `order_policy` (`preserve|sort_index|top_mean`), `top_n`,
-    `figsize_in`, `cmap`
+  - params: `order_policy` (`preserve|sort_index`), `sort`
+    (`preserve|sort_index|max_importance`), `top_n`, `figsize_in`, `cmap`
   - writes tidy CSV columns `round`, `feature_id`, `importance`, `rank`,
     and `source_path`
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
   - params: `metric`, `cohorts`, `summaries`, `top_k`, `threshold`,
-    `reference_lines`, `figsize_in`
+    `reference_lines`, `highlight_round`, `figsize_in`
   - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, and
     `value`
+- **`percent_high_activity_over_rounds`**: thresholded scalar distribution plus
+  optional percent-above-threshold line over rounds.
+  - params: `metric`, `threshold`, `mode`, `hue`, `size_by`,
+    `highlight_round`, `figsize_in`
 - **`vector_summary_heatmap`**: vector-channel summary over rounds.
-  - rows are an optional setpoint reference followed by chronological rounds
-  - params: `vector_field`, `cohorts`, `channel_labels`, `include_setpoint`,
-    `setpoint`, `aggregation`, `top_k`, `figsize_in`, `cmap`
+  - rows are an optional reference vector followed by chronological rounds
+  - params: `vector_field`, `cohorts`, `channel_labels`,
+    `include_reference_vector`, `reference_vector`, `reference_label`,
+    `aggregation`, `top_k`, `figsize_in`, `cmap`
   - writes tidy CSV columns `row_type`, `round`, `cohort`, `channel`, and
     `value`
+  - use `reference_vector` for vec8 baselines. Objective `setpoint_vector`
+    remains the length-4 SFXI logic setpoint and should not be used as a
+    length-8 plot baseline.
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
@@ -181,32 +198,59 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
 - **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution (current-round labels).
   - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
 
+SFXI plots that use current-round labels, model artifacts, or labels-as-of-round
+should normally declare `round_selector: latest` when they live in a campaign
+bundle that is run with `--round all`. This keeps scalar/vector round-history
+plots all-round while label/model diagnostics resolve to a single, explicit
+round in the manifest.
+
+For round-history plots, `params.highlight_round: latest` overlays the current
+round on the full history without changing data selection. Use this for the
+"whole population, highlight current round" case. Use plot-level
+`round_selector: latest` only when the primitive itself requires a single round.
+
+### SFXI reference-overlay contract
+
+SFXI overlay records that need to cross package boundaries should use the public
+`dnadesign.opal.api.sfxi.to_sfxi_reference_overlay_records` helper. It emits
+`sfxi_ref__...` columns with `metric_id`, `metric_value`,
+`metric_provenance`, optional `batch_id`/`campaign_id`/`design_id`/`source_id`,
+and the OPAL SFXI channels `logic_fidelity`, `effect_raw`, `effect_scaled`, and
+`sfxi`. Plot code should consume that namespaced surface when it needs
+reference overlays instead of recomputing or inventing plot-local field names.
+
 ### Example YAML
 
 ```yaml
 plots:
   - name: sfxi_factorial_map
     kind: sfxi_factorial_effects
+    round_selector: latest
     params:
       size_by: obj__effect_scaled
+      include_labels: true
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
+    round_selector: latest
     params: {}
 
   - name: sfxi_support_diag
     kind: sfxi_support_diagnostics
+    round_selector: latest
     params:
       y_axis: score
       hue: effect_scaled
 
   - name: sfxi_uncertainty
     kind: sfxi_uncertainty
+    round_selector: latest
     params:
       kind: score
 
   - name: sfxi_intensity_scaling
     kind: sfxi_intensity_scaling
+    round_selector: latest
     params:
       include_pool: true
 ```

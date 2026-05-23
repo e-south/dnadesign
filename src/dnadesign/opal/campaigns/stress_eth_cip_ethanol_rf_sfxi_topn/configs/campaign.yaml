@@ -6,6 +6,8 @@ campaign:
   description: "Stress ethanol/ciprofloxacin promoter campaign focused on the ethanol response factor under the SFXI active-learning objective."
   workdir: "."
 
+plot_config: "plots.yaml"
+
 ownership:
   owner_scope: study_fixture
   study_id: stress_ethanol_cipro_growth

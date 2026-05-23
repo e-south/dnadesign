@@ -47,6 +47,9 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
         notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
         data_shape="objective component scatter",
         tidy_schema=["obj__logic_fidelity"],
+        objective_family="sfxi",
+        data_layer="predictions_objective",
+        round_scope="single_or_round_history",
         failure_modes=[
             "missing prediction or setpoint columns",
             "y-axis/hue/size fields are nonnumeric",

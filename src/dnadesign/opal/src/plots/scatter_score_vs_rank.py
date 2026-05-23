@@ -51,6 +51,9 @@ from ._param_utils import (
         notes=["Reads outputs/ledger/predictions."],
         data_shape="selection behavior scatter",
         tidy_schema=["as_of_round", "id", "sel__is_selected"],
+        objective_family="generic",
+        data_layer="predictions_selection",
+        round_scope="single_or_round_history",
         failure_modes=[
             "missing score or rank columns",
             "score/hue/size fields are nonnumeric",

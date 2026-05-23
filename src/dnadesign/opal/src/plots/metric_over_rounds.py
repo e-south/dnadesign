@@ -20,6 +20,7 @@ from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, resolve_outputs_dir
 from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
 from ._param_utils import get_str, normalize_metric_field
+from ._round_overlay import add_round_vline, resolve_highlight_round
 
 
 @register_plot(
@@ -32,11 +33,15 @@ from ._param_utils import get_str, normalize_metric_field
             "top_k": "Rank cutoff for top_k cohort (default 10).",
             "summaries": "Summary or list: mean, median, count, q10, q25, q75, q90.",
             "threshold": "Optional horizontal threshold/reference line.",
+            "highlight_round": "Optional round overlay marker: latest, true, false, or an integer.",
         },
         requires=["as_of_round", "run_id", "pred__score_selected"],
         notes=["Reads outputs/ledger/predictions and writes tidy scalar summaries when save_data is enabled."],
         data_shape="scalar over rounds",
         tidy_schema=["round", "cohort", "metric", "summary", "value"],
+        objective_family="generic",
+        data_layer="predictions",
+        round_scope="round_history",
         failure_modes=[
             "missing metric column",
             "metric is not numeric",
@@ -103,15 +108,34 @@ def render(context, params: dict) -> None:
     fig, ax = plt.subplots(figsize=figsize)
     apply_notebook_axes_style(ax)
     plotted_series = 0
+    highlight_round = resolve_highlight_round(
+        params.get("highlight_round", params.get("overlay_round")),
+        tidy["round"].unique().tolist(),
+    )
     for (cohort, summary), sub in tidy.groupby(["cohort", "summary"]):
         if summary == "count" and len(set(summaries)) > 1:
             continue
         label = f"{cohort}:{summary}"
-        ax.plot(sub["round"], sub["value"], marker="o", linewidth=1.8, label=label)
+        line = ax.plot(sub["round"], sub["value"], marker="o", linewidth=1.8, label=label)[0]
+        if highlight_round is not None:
+            hi = sub[sub["round"] == int(highlight_round)]
+            if not hi.empty:
+                ax.scatter(
+                    hi["round"],
+                    hi["value"],
+                    s=84,
+                    marker="o",
+                    facecolors="none",
+                    edgecolors=line.get_color(),
+                    linewidths=1.6,
+                    zorder=5,
+                )
         plotted_series += 1
     threshold = params.get("threshold", params.get("reference_line"))
     if threshold is not None:
         ax.axhline(float(threshold), color="#444444", linestyle="--", linewidth=1.0, alpha=0.8)
+    if highlight_round is not None:
+        add_round_vline(ax, int(highlight_round))
     ax.set_xlabel("Round")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_ylabel(metric)

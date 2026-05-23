@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 import typer
 
-from ..analysis.ledger import RoundSelector
+from ..analysis.ledger import RoundSelector, parse_round_selector, round_suffix
 from ..core.utils import now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir
@@ -90,6 +90,28 @@ def _resolve_output_dir(
     else:
         out_dir = (campaign_dir / "outputs" / "plots").resolve()
     return out_dir
+
+
+def _entry_round_scope(
+    *,
+    req: PlotRequest,
+    entry: Dict[str, Any],
+    preset: Dict[str, Any],
+    plot_name: str,
+) -> tuple[RoundSelector, str]:
+    if req.run_id:
+        return req.rounds_sel, req.round_suffix
+
+    raw = entry.get("round_selector", preset.get("round_selector"))
+    if raw is None:
+        return req.rounds_sel, req.round_suffix
+    if isinstance(raw, list):
+        raise ValueError(
+            f"[plot] plot '{plot_name}' round_selector must be a scalar selector "
+            "('latest', 'all', '3', '1,3', or '2-5'), not a YAML list."
+        )
+    rounds_sel = parse_round_selector(str(raw))
+    return rounds_sel, round_suffix(rounds_sel)
 
 
 def run_plots(req: PlotRequest) -> bool:
@@ -185,19 +207,25 @@ def run_plots(req: PlotRequest) -> bool:
             **preset_out,
             **entry_out,
         }
+        entry_rounds_sel, entry_round_suffix = _entry_round_scope(
+            req=req,
+            entry=entry,
+            preset=preset,
+            plot_name=pname,
+        )
         out_dir = _resolve_output_dir(
             out_cfg,
             campaign_dir=req.campaign_dir,
             workspace=req.workspace,
             plot_name=pname,
             plot_kind=pkind,
-            round_suffix=req.round_suffix,
+            round_suffix=entry_round_suffix,
         )
         fmt = (out_cfg.get("format") or "png").lower()
         dpi = int(out_cfg.get("dpi", 600))
         fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(
             name=pname,
-            round_suffix=req.round_suffix,
+            round_suffix=entry_round_suffix,
         )
         if not fname.lower().endswith(f".{fmt}"):
             base = fname.rsplit(".", 1)[0] if "." in fname else fname
@@ -229,7 +257,7 @@ def run_plots(req: PlotRequest) -> bool:
         ctx = PlotContext(
             campaign_dir=req.campaign_dir,
             workspace=req.workspace,
-            rounds=req.rounds_sel,
+            rounds=entry_rounds_sel,
             run_id=req.run_id,
             data_paths=data_paths,
             output_dir=Path(out_dir),

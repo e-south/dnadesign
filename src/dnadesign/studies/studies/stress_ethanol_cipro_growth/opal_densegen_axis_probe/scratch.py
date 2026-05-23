@@ -228,7 +228,7 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
 
 
 def _write_campaign_plot_config(run: RunSpec) -> None:
-    setpoint = list(CAMPAIGNS[run.campaign_key]["target_vec8"])
+    target_vec8 = list(CAMPAIGNS[run.campaign_key]["target_vec8"])
     plot_config = {
         "plot_defaults": {
             "output": {
@@ -245,9 +245,34 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "params": {
                     "metric": "pred__score_selected",
                     "cohort": ["selected", "top_k", "all_pool"],
-                    "top_k": 6,
+                    "top_k": int(run.selection_k),
                     "summaries": ["mean", "median", "q25", "q75"],
+                    "highlight_round": "latest",
                     "title": f"{run.run_key}: score over rounds",
+                },
+            },
+            {
+                "name": "score_vs_rank_by_round",
+                "kind": "scatter_score_vs_rank",
+                "tags": ["rounds", "dogfood", "selection"],
+                "params": {
+                    "rank_mode": "competition",
+                    "alpha": 0.45,
+                    "rasterize_at": 20000,
+                    "figsize_in": [9, 5],
+                },
+            },
+            {
+                "name": "score_threshold_over_rounds",
+                "kind": "percent_high_activity_over_rounds",
+                "tags": ["rounds", "dogfood", "selection", "threshold"],
+                "params": {
+                    "metric": "pred__score_selected",
+                    "threshold": 0.8,
+                    "mode": "both",
+                    "hue": "logic_fidelity",
+                    "highlight_round": "latest",
+                    "rasterize_at": 20000,
                 },
             },
             {
@@ -268,10 +293,84 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "params": {
                     "vector_field": "pred__y_hat_model",
                     "cohort": "selected",
-                    "include_setpoint": True,
-                    "setpoint": setpoint,
+                    "include_reference_vector": True,
+                    "reference_vector": target_vec8,
+                    "reference_label": "target vec8",
                     "channel_labels": [*SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS],
                     "title": f"{run.run_key}: selected vec8 summary",
+                },
+            },
+            {
+                "name": "fold_change_vs_logic_fidelity_latest",
+                "kind": "fold_change_vs_logic_fidelity",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "selection", "overlay", "single-round"],
+                "params": {
+                    "y_axis": "score",
+                    "hue": "effect_scaled",
+                    "size_by": "logic_fidelity",
+                    "alpha": 0.35,
+                    "rasterize_at": 20000,
+                },
+            },
+            {
+                "name": "sfxi_logic_fidelity_closeness_latest",
+                "kind": "sfxi_logic_fidelity_closeness",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
+                "params": {
+                    "on_violin_invalid": "line",
+                    "violin_min_points": 3,
+                },
+            },
+            {
+                "name": "sfxi_factorial_effects_latest",
+                "kind": "sfxi_factorial_effects",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
+                "params": {
+                    "size_by": "obj__effect_scaled",
+                    "include_labels": True,
+                    "rasterize_at": 20000,
+                },
+            },
+            {
+                "name": "sfxi_setpoint_sweep_latest",
+                "kind": "sfxi_setpoint_sweep",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "labels", "single-round"],
+                "params": {"min_n": 5},
+            },
+            {
+                "name": "sfxi_support_diagnostics_latest",
+                "kind": "sfxi_support_diagnostics",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
+                "params": {
+                    "y_axis": "score",
+                    "hue": "effect_scaled",
+                    "batch_size": 2048,
+                },
+            },
+            {
+                "name": "sfxi_uncertainty_latest",
+                "kind": "sfxi_uncertainty",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "model", "single-round"],
+                "params": {
+                    "kind": "score",
+                    "y_axis": "score",
+                    "hue": "logic_fidelity",
+                },
+            },
+            {
+                "name": "sfxi_intensity_scaling_latest",
+                "kind": "sfxi_intensity_scaling",
+                "round_selector": "latest",
+                "tags": ["sfxi", "dogfood", "labels", "single-round"],
+                "params": {
+                    "min_n": 5,
+                    "include_pool": True,
                 },
             },
         ],

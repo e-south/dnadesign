@@ -173,6 +173,10 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
         notes=["Reads per-round outputs, not ledger."],
         data_shape="attribution matrix",
         tidy_schema=["as_of_round", "feature_index", "importance"],
+        objective_family="generic",
+        data_layer="model_artifact",
+        round_scope="round_history",
+        requires_model_artifact=True,
         failure_modes=[
             "missing feature_importance.csv",
             "duplicate or inconsistent feature IDs",

@@ -21,6 +21,7 @@ from typing import Any
 from ..analysis.campaign import CampaignAnalysis
 from ..analysis.notebook_scope import resolve_notebook_run_scope
 from ..core.utils import ExitCodes, OpalError, now_iso
+from ..plots.config import list_configured_plot_specs, load_plot_config
 from ..plots.manifests import (
     PLOT_MANIFEST_INDEX_SCHEMA_VERSION,
     load_plot_artifact_manifest,
@@ -89,6 +90,12 @@ def build_notebook_view_model(
         plot_manifest_path=plot_manifest_path,
         warnings=warnings,
     )
+    configured_plots = _load_configured_plot_specs(
+        campaign_cfg=analysis.read_config_dict(),
+        config_path=analysis.config_path,
+        campaign_dir=ws.workdir,
+        warnings=warnings,
+    )
     stale_artifacts = []
     if review_manifest is not None:
         stale_artifacts.extend(review_manifest.get("stale_artifacts") or [])
@@ -128,6 +135,7 @@ def build_notebook_view_model(
         "progress": progress,
         "review_manifest_path": str(review_path),
         "review_manifest": review_manifest,
+        "configured_plots": configured_plots,
         "plot_manifests": plot_manifests,
         "artifact_garden": artifact_garden,
         "stale_artifacts": stale_artifacts,
@@ -203,6 +211,35 @@ def _load_plot_manifests(
             )
         )
     return manifests
+
+
+def _load_configured_plot_specs(
+    *,
+    campaign_cfg: dict[str, Any],
+    config_path: Path,
+    campaign_dir: Path,
+    warnings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    try:
+        plot_cfg = load_plot_config(
+            campaign_cfg=campaign_cfg,
+            campaign_yaml=config_path,
+            campaign_dir=campaign_dir,
+            plot_config_opt=None,
+        )
+        return [
+            spec
+            for spec in list_configured_plot_specs(
+                plots_cfg=plot_cfg.plots,
+                plot_presets=plot_cfg.plot_presets,
+            )
+            if spec.get("enabled")
+        ]
+    except Exception as exc:
+        if "[plot] No plots found" in str(exc):
+            return []
+        warnings.append(_warning("PlotConfigWarning", str(exc), path=config_path))
+        return []
 
 
 def _detect_unmanifested_plot_outputs(plots_dir: Path, manifests: list[dict[str, Any]]) -> list[dict[str, Any]]:

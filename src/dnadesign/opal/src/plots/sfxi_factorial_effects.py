@@ -34,6 +34,10 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
         requires=["pred__y_hat_model"],
         notes=["Reads outputs/ledger/predictions and labels.parquet (optional) for overlays."],
         data_shape="objective geometry scatter",
+        objective_family="sfxi",
+        data_layer="predictions_plus_optional_labels",
+        round_scope="single_round",
+        label_requirement="optional",
         failure_modes=[
             "missing prediction vector field",
             "invalid length-8 prediction vectors",

@@ -29,6 +29,7 @@ ALLOWED_PLOT_KEYS = {
     "enabled",
     "tags",
     "preset",
+    "round_selector",
 }
 ALLOWED_PRESET_KEYS = {
     "kind",
@@ -37,6 +38,7 @@ ALLOWED_PRESET_KEYS = {
     "data",
     "enabled",
     "tags",
+    "round_selector",
 }
 ALLOWED_PLOT_DEFAULT_KEYS = {"output", "data", "params"}
 ALLOWED_PLOT_CONFIG_KEYS = {"plots", "plot_defaults", "plot_presets"}
@@ -261,7 +263,8 @@ def list_configured_plots(
         status = "disabled" if not spec["enabled"] else "enabled"
         tags = spec.get("tags") or []
         tag_str = f" tags={tags}" if tags else ""
-        rows.append(f"{spec['name']}: {spec['kind']} ({status}){tag_str}")
+        round_str = f" round_selector={spec['round_selector']}" if spec.get("round_selector") else ""
+        rows.append(f"{spec['name']}: {spec['kind']} ({status}){tag_str}{round_str}")
     return rows
 
 
@@ -307,6 +310,9 @@ def list_configured_plot_specs(
         }
         if preset_name is not None:
             spec["preset"] = preset_name
+        entry_round_selector = entry.get("round_selector", preset.get("round_selector"))
+        if entry_round_selector is not None:
+            spec["round_selector"] = str(entry_round_selector)
         specs.append(spec)
     return specs
 

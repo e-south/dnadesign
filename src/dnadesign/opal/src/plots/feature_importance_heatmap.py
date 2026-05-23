@@ -32,6 +32,10 @@ from .feature_importance_bars import _discover_round_fi_files, _read_fi_csv, _re
         notes=["Preserves feature identity by default; clustering is intentionally off by default."],
         data_shape="attribution matrix",
         tidy_schema=["round", "feature_id", "importance", "rank", "source_path"],
+        objective_family="generic",
+        data_layer="model_artifact",
+        round_scope="round_history",
+        requires_model_artifact=True,
         failure_modes=[
             "missing feature_importance.csv",
             "duplicate or inconsistent feature IDs",

@@ -37,6 +37,7 @@ from .overview import (
 )
 from .plots import (
     build_notebook_plot_card_rows,
+    build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
     build_notebook_visual_surface_model,
@@ -72,6 +73,7 @@ __all__ = [
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
     "build_notebook_plot_card_rows",
+    "build_notebook_plot_inventory_rows",
     "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
     "build_notebook_visual_surface_model",

@@ -21,6 +21,7 @@ from ._mpl_utils import (
     swarm_smart,
 )
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
+from ._round_overlay import add_round_vline, resolve_highlight_round
 
 
 @register_plot(
@@ -28,15 +29,20 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
     meta=PlotMeta(
         summary="Percent of candidates above a score threshold across rounds.",
         params={
+            "metric": "Numeric ledger field to threshold (default pred__score_selected).",
             "threshold": "Scalar cutoff for 'high' (default 0.8).",
             "mode": "line|violin|both (default both).",
             "hue_field": "Optional obj__/pred__/sel__ field for swarm color.",
             "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
+            "highlight_round": "Optional round overlay marker: latest, true, false, or an integer.",
         },
         requires=["as_of_round", "pred__score_selected"],
         notes=["Reads outputs/ledger/predictions."],
         data_shape="thresholded scalar over rounds",
         tidy_schema=["as_of_round", "total", "high", "percent_high"],
+        objective_family="generic",
+        data_layer="predictions_selection",
+        round_scope="round_history",
         failure_modes=[
             "missing pred__score_selected",
             "no rows match the requested round/run scope",
@@ -64,6 +70,11 @@ def render(context, params: dict) -> None:
     rasterize_at = params.get("rasterize_at", None)
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
+    metric_field = normalize_metric_field(
+        get_str(params, ["metric", "score_field", "metric_field", "field"], "pred__score_selected")
+    )
+    if not metric_field:
+        raise ValueError("percent_high_activity_over_rounds requires a metric field.")
     # Optional hue/size (applied to swarm points only)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
     cmap = get_str(params, ["cmap"], "viridis")
@@ -82,11 +93,13 @@ def render(context, params: dict) -> None:
     size_max = float(params.get("size_max", 60.0))
     outputs_dir = resolve_outputs_dir(context)
     # Always read from typed sinks (predictions + runs).
-    need = {"as_of_round", "pred__score_selected"}
+    need = {"as_of_round", metric_field}
     need |= event_columns_for(hue_field, size_by)
     df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
         raise ValueError("Ledger predictions contained zero rows after projection.")
+    if metric_field not in df.columns:
+        raise ValueError(f"metric field '{metric_field}' not present in predictions.")
 
     rsel = context.rounds
     if rsel in ("unspecified", "latest"):
@@ -98,8 +111,8 @@ def render(context, params: dict) -> None:
         raise ValueError("No rows matched the requested round selector.")
 
     grp = df.groupby("as_of_round").agg(
-        total=("pred__score_selected", "size"),
-        high=("pred__score_selected", lambda s: (s >= threshold).sum()),
+        total=(metric_field, "size"),
+        high=(metric_field, lambda s: (s >= threshold).sum()),
     )
     grp["percent_high"] = (grp["high"] / grp["total"]) * 100.0
     grp = grp.reset_index().sort_values("as_of_round")
@@ -117,6 +130,10 @@ def render(context, params: dict) -> None:
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     rounds = grp["as_of_round"].tolist()
+    highlight_round = resolve_highlight_round(
+        params.get("highlight_round", params.get("overlay_round")),
+        rounds,
+    )
     if violin_width is None:
         violin_width = 0.45 if len(rounds) <= 1 else 0.9
     violin_width = float(violin_width)
@@ -126,7 +143,7 @@ def render(context, params: dict) -> None:
     sizes = [] if size_by else None
     for r in rounds:
         sub = df.loc[df["as_of_round"] == r]
-        y_all = sub["pred__score_selected"].astype(float).to_numpy()
+        y_all = sub[metric_field].astype(float).to_numpy()
         mask = np.isfinite(y_all)
         y = y_all[mask]
         series.append(y)
@@ -150,7 +167,7 @@ def render(context, params: dict) -> None:
                 raise ValueError(f"Cannot draw violin: round {rr} has <3 finite points.")
             if float(np.nanmax(yy)) <= float(np.nanmin(yy)):
                 raise ValueError(
-                    f"Cannot draw violin: round {rr} has zero variance in 'pred__score_selected' after filtering."
+                    f"Cannot draw violin: round {rr} has zero variance in '{metric_field}' after filtering."
                 )
         parts = ax.violinplot(
             series,
@@ -176,10 +193,12 @@ def render(context, params: dict) -> None:
                 alpha=swarm_alpha,
                 rasterize_at=rasterize_at,
             )
-        ax.set_ylabel("Objective scalar")
+        ax.set_ylabel(metric_field)
     ax.set_xlabel("Round")
-    ax.set_title("Objective Scalar Over Rounds")
+    ax.set_title(str(params.get("title", f"{metric_field} Over Rounds")))
     ax.set_xticks(rounds)
+    if highlight_round is not None:
+        add_round_vline(ax, int(highlight_round))
 
     # Percent-high line on a twin axis when asked
     if mode in {"line", "both"}:
@@ -193,6 +212,18 @@ def render(context, params: dict) -> None:
         )
         ax2.set_ylabel("% high (≥ threshold)")
         ax2.set_ylim(0, 100)
+        if highlight_round is not None:
+            hi = grp.loc[grp["as_of_round"] == int(highlight_round)]
+            if not hi.empty:
+                ax2.scatter(
+                    hi["as_of_round"],
+                    hi["percent_high"],
+                    s=84,
+                    facecolors="none",
+                    edgecolors="#202020",
+                    linewidths=1.6,
+                    zorder=5,
+                )
         if mode == "both":
             ax2.legend(frameon=False, loc="upper right")
 
@@ -214,7 +245,7 @@ def render(context, params: dict) -> None:
         size_by=size_by,
         alpha=violin_alpha if mode in {"violin", "both"} else None,
         rasterized=raster,
-        extras={"mode": mode, "threshold": f"{threshold:.2f}"},
+        extras={"metric": metric_field, "mode": mode, "threshold": f"{threshold:.2f}"},
     )
 
     out = context.output_dir / context.filename

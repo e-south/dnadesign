@@ -9,7 +9,13 @@ def render_visual_surface_cells() -> str:
     return dedent(
         """
         @app.cell
-        def _(Path, build_notebook_visual_surface_model, notebook_view_model, plot_entries):
+        def _(
+            Path,
+            build_notebook_plot_inventory_rows,
+            build_notebook_visual_surface_model,
+            notebook_view_model,
+            plot_entries,
+        ):
             visual_surface_model = build_notebook_visual_surface_model(
                 notebook_view_model,
                 plot_entries=plot_entries,
@@ -18,7 +24,16 @@ def render_visual_surface_cells() -> str:
             plot_choices = visual_surface_model["choices"]
             missing_outputs = visual_surface_model["missing_outputs"]
             stale_plot_artifacts = visual_surface_model["stale_artifacts"]
-            return plots_dir, plot_choices, missing_outputs, stale_plot_artifacts
+            plot_inventory_rows = build_notebook_plot_inventory_rows(visual_surface_model)
+            plot_inventory_counts = visual_surface_model["inventory_status_counts"]
+            return (
+                plots_dir,
+                plot_choices,
+                missing_outputs,
+                stale_plot_artifacts,
+                plot_inventory_rows,
+                plot_inventory_counts,
+            )
 
 
         @app.cell
@@ -27,6 +42,7 @@ def render_visual_surface_cells() -> str:
             notebook_baserender_contract,
             plot_cfg_error,
             plot_choices,
+            plot_inventory_counts,
             plots_dir,
             missing_outputs,
             stale_plot_artifacts,
@@ -60,6 +76,12 @@ def render_visual_surface_cells() -> str:
                     _lines.append(f"Configured plots without outputs: {', '.join(missing_outputs)}")
                 if stale_plot_artifacts:
                     _lines.append(f"Stale artifact warnings: `{len(stale_plot_artifacts)}`.")
+                if plot_inventory_counts:
+                    _parts = [
+                        f"{key}={value}"
+                        for key, value in sorted(plot_inventory_counts.items())
+                    ]
+                    _lines.append("Plot inventory: " + ", ".join(_parts))
                 visual_surface_note = "\\n".join(_lines)
             if visual_surface_choices:
                 labels = [choice["label"] for choice in visual_surface_choices]
@@ -81,6 +103,7 @@ def render_visual_surface_cells() -> str:
             notebook_baserender_contract,
             pl,
             plot_choices,
+            plot_inventory_rows,
             render_notebook_baserender_record,
             round_ui,
             visual_surface_choices,
@@ -88,7 +111,10 @@ def render_visual_surface_cells() -> str:
             visual_surface_ui,
         ):
             if visual_surface_ui is None:
-                plot_panel = mo.md(visual_surface_note)
+                _items = [mo.md(visual_surface_note)]
+                if plot_inventory_rows:
+                    _items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
+                plot_panel = mo.vstack(_items, gap=0.45)
             else:
                 selected = str(visual_surface_ui.value)
                 surface = next(
@@ -175,7 +201,11 @@ def render_visual_surface_cells() -> str:
                             "Render contract": mo.ui.table(
                                 pl.DataFrame(build_notebook_baserender_contract_rows(notebook_baserender_contract)),
                                 page_size=8,
-                            )
+                            ),
+                            "Plot inventory": mo.ui.table(
+                                pl.DataFrame(plot_inventory_rows),
+                                page_size=12,
+                            ),
                         },
                         multiple=True,
                     )
@@ -190,6 +220,10 @@ def render_visual_surface_cells() -> str:
                             **{label: mo.md(text) for label, text in method_sections.items()},
                             "Evidence": mo.ui.table(
                                 pl.DataFrame(build_notebook_plot_card_rows(choice)),
+                                page_size=12,
+                            ),
+                            "Plot inventory": mo.ui.table(
+                                pl.DataFrame(plot_inventory_rows),
                                 page_size=12,
                             ),
                         },

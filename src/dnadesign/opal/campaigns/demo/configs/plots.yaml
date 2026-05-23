@@ -31,9 +31,11 @@ plots:
       swarm_alpha: 0.3
       rasterize_at: 20000
       figsize_in: [10, 5]
+      highlight_round: latest
 
   - name: sfxi_logic_closeness
     kind: sfxi_logic_fidelity_closeness
+    round_selector: latest
     tags: [diagnostic]
     params:
       figsize_in: [15, 10]     # overall figure size; both panels remain 1:1
@@ -45,6 +47,7 @@ plots:
 
   - name: effect_scaled_vs_logic_fidelity
     kind: fold_change_vs_logic_fidelity
+    round_selector: latest
     tags: [analysis]
     params:
       intensity_log2_offset_delta: 0.0
@@ -58,17 +61,20 @@ plots:
 
   - name: sfxi_factorial_effects
     kind: sfxi_factorial_effects
+    round_selector: latest
     tags: [diagnostic]
     params:
       size_by: obj__effect_scaled
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
+    round_selector: latest
     tags: [diagnostic]
     params: {}
 
   - name: sfxi_support_diagnostics
     kind: sfxi_support_diagnostics
+    round_selector: latest
     tags: [diagnostic]
     params:
       y_axis: score
@@ -76,6 +82,7 @@ plots:
 
   - name: sfxi_uncertainty
     kind: sfxi_uncertainty
+    round_selector: latest
     tags: [diagnostic]
     params:
       kind: score
@@ -84,6 +91,7 @@ plots:
 
   - name: sfxi_intensity_scaling
     kind: sfxi_intensity_scaling
+    round_selector: latest
     tags: [diagnostic]
     params:
       include_pool: true

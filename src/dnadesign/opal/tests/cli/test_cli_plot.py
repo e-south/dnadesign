@@ -10,10 +10,13 @@ Module Author(s): Eric J. South
 import json
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.plots._context import PlotContext
+from dnadesign.opal.src.plots._round_overlay import resolve_highlight_round
+from dnadesign.opal.src.plots.config import list_configured_plot_specs, load_plot_config
 from dnadesign.opal.src.registries.plots import PlotMeta, describe_plot_kind, list_plots, register_plot
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
@@ -87,6 +90,44 @@ def test_plot_cli_writes_output(tmp_path):
     index = json.loads(index_path.read_text())
     assert index["schema_version"] == "opal.plot_manifest_index.v1"
     assert index["plot_count"] == 1
+
+
+def test_plot_cli_plot_local_round_selector_overrides_global_round(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "mini",
+                "kind": "test_plot_cli_minimal",
+                "round_selector": "latest",
+            }
+        ],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "all"])
+    assert res.exit_code == 0, res.stdout
+
+    out_path = Path(workdir) / "outputs" / "plots" / "mini_rlatest.png"
+    manifest_path = Path(workdir) / "outputs" / "plots" / "mini_rlatest.manifest.json"
+    assert out_path.exists()
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["name"] == "mini"
+    assert manifest["rounds"] == "latest"
+
+
+def test_round_highlight_overlay_resolves_round_zero() -> None:
+    assert resolve_highlight_round(0, [0, 1]) == 0
+    assert resolve_highlight_round("latest", [0, 1]) == 1
+    assert resolve_highlight_round(False, [0, 1]) is None
 
 
 def test_plot_cli_list_registry(tmp_path):
@@ -219,6 +260,49 @@ def test_plot_cli_list_configured_json_error_when_no_plots(tmp_path):
     assert payload["error"]["schema_version"] == "opal.cli_error.v1"
     assert payload["error"]["context"] == "plot list-config"
     assert "No plots found" in payload["error"]["message"]
+
+
+def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
+    config_paths = [
+        Path("src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml"),
+    ]
+    expected = {
+        "score_selected_over_rounds": "metric_over_rounds",
+        "score_vs_rank_by_round": "scatter_score_vs_rank",
+        "score_threshold_over_rounds": "percent_high_activity_over_rounds",
+        "feature_importance_heatmap": "feature_importance_heatmap",
+        "selected_vec8_summary": "vector_summary_heatmap",
+        "fold_change_vs_logic_fidelity_latest": "fold_change_vs_logic_fidelity",
+        "sfxi_logic_fidelity_closeness_latest": "sfxi_logic_fidelity_closeness",
+        "sfxi_factorial_effects_latest": "sfxi_factorial_effects",
+        "sfxi_setpoint_sweep_latest": "sfxi_setpoint_sweep",
+        "sfxi_support_diagnostics_latest": "sfxi_support_diagnostics",
+        "sfxi_uncertainty_latest": "sfxi_uncertainty",
+        "sfxi_intensity_scaling_latest": "sfxi_intensity_scaling",
+    }
+
+    for path in config_paths:
+        campaign_cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
+        plot_cfg = load_plot_config(
+            campaign_cfg=campaign_cfg,
+            campaign_yaml=path,
+            campaign_dir=path.parent.parent,
+            plot_config_opt=None,
+        )
+        specs = list_configured_plot_specs(
+            plots_cfg=plot_cfg.plots,
+            plot_presets=plot_cfg.plot_presets,
+        )
+        assert {spec["name"]: spec["kind"] for spec in specs} == expected
+        for spec in specs:
+            if spec["name"].endswith("_latest"):
+                assert spec["round_selector"] == "latest"
+                assert "single-round" in spec["tags"]
+        joined = path.read_text(encoding="utf-8") + "\n" + plot_cfg.source_path.read_text(encoding="utf-8")
+        assert "UMAP" not in joined
+        assert "cluster__ldn_v1__umap" not in joined
 
 
 def test_plot_cli_accepts_directory(tmp_path):
@@ -357,7 +441,11 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
             {
                 "name": "metric",
                 "kind": "metric_over_rounds",
-                "params": {"metric": "pred__score_selected", "cohort": ["selected", "all_pool"]},
+                "params": {
+                    "metric": "pred__score_selected",
+                    "cohort": ["selected", "all_pool"],
+                    "highlight_round": "latest",
+                },
                 "output": {"save_data": True},
             },
             {
@@ -369,7 +457,12 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
             {
                 "name": "vector_heat",
                 "kind": "vector_summary_heatmap",
-                "params": {"cohort": "all_pool", "channel_labels": ["y0"], "include_setpoint": True, "setpoint": [0.0]},
+                "params": {
+                    "cohort": "all_pool",
+                    "channel_labels": ["y0"],
+                    "include_reference_vector": True,
+                    "reference_vector": [0.0],
+                },
                 "output": {"save_data": True},
             },
         ],

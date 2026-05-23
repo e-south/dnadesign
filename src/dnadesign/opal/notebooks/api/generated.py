@@ -35,6 +35,7 @@ from ...src.analysis.notebook_components import (
     build_notebook_metric_definition_rows,
     build_notebook_no_run_lines,
     build_notebook_plot_card_rows,
+    build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
     build_notebook_run_options,
@@ -49,15 +50,16 @@ from ...src.analysis.notebook_components import (
     render_notebook_baserender_record,
     resolve_notebook_round_default,
 )
-from ...src.plots.config import load_plot_config, parse_enabled, parse_tags
+from ...src.plots.config import list_configured_plot_specs, load_plot_config, parse_enabled, parse_tags
 from ...src.reporting.notebook import build_notebook_view_model
-from ...src.reporting.notebook_set import build_campaign_set_notebook_view_model
+from ...src.reporting.notebook_set import build_campaign_set_notebook_view_model, build_campaign_set_round_options
 
 __all__ = [
     "CampaignAnalysis",
     "assess_records_contract_for_schema",
     "available_rounds",
     "build_campaign_set_notebook_view_model",
+    "build_campaign_set_round_options",
     "build_ledger_status_table",
     "build_notebook_artifact_garden_lines",
     "build_notebook_artifact_garden_rows",
@@ -78,6 +80,7 @@ __all__ = [
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
     "build_notebook_plot_card_rows",
+    "build_notebook_plot_inventory_rows",
     "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
     "build_notebook_run_options",
@@ -95,6 +98,7 @@ __all__ = [
     "latest_run_id",
     "load_notebook_baserender_record_row",
     "load_plot_config",
+    "list_configured_plot_specs",
     "parse_enabled",
     "parse_tags",
     "read_optional_table",

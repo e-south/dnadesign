@@ -44,6 +44,10 @@ from .sfxi_diag_data import (
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for denom/logic metrics (objective-consistent)."],
         data_shape="objective setpoint matrix",
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_round",
+        label_requirement="required",
         failure_modes=[
             "missing labels or runs ledger",
             "invalid length-8 label vectors",

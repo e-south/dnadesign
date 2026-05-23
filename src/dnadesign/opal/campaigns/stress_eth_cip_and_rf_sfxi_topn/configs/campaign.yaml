@@ -6,6 +6,8 @@ campaign:
   description: "Stress ethanol/ciprofloxacin promoter campaign that prioritizes records predicted to satisfy the joint ethanol-and-ciprofloxacin SFXI response."
   workdir: "."
 
+plot_config: "plots.yaml"
+
 ownership:
   owner_scope: study_fixture
   study_id: stress_ethanol_cipro_growth
