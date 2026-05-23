@@ -69,6 +69,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   namespace cleanup can delete other campaign columns.
 - The OPAL notebook is the campaign-specific artifact viewer for records,
   rounds, ledgers, labels, predictions, selected records, and plots.
+- Plot visibility is manifest-backed. Stress bundles and DenseGen scratch
+  probes should use configured OPAL plot primitives plus `round_variants` for
+  per-round notebook scopes; study-specific visuals only enter OPAL notebooks
+  through the registered plot API and `opal.plot_artifact.v1` manifests.
 - LatentDNA can narrow the choice of `X`, but OPAL owns label-source
   validation, training, scoring, active selection, and ledgers after labels
   exist.

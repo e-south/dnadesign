@@ -233,7 +233,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
         "plot_defaults": {
             "output": {
                 "format": "png",
-                "dpi": 180,
+                "dpi": 300,
                 "save_data": True,
             }
         },
@@ -241,6 +241,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             {
                 "name": "score_selected_over_rounds",
                 "kind": "metric_over_rounds",
+                "round_variants": ["all", "each"],
                 "tags": ["rounds", "dogfood"],
                 "params": {
                     "metric": "pred__score_selected",
@@ -254,6 +255,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             {
                 "name": "score_vs_rank_by_round",
                 "kind": "scatter_score_vs_rank",
+                "round_variants": ["all", "each"],
                 "tags": ["rounds", "dogfood", "selection"],
                 "params": {
                     "rank_mode": "competition",
@@ -265,6 +267,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             {
                 "name": "score_threshold_over_rounds",
                 "kind": "percent_high_activity_over_rounds",
+                "round_variants": ["all", "each"],
                 "tags": ["rounds", "dogfood", "selection", "threshold"],
                 "params": {
                     "metric": "pred__score_selected",
@@ -278,17 +281,33 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             {
                 "name": "feature_importance_heatmap",
                 "kind": "feature_importance_heatmap",
+                "round_variants": ["all", "each"],
                 "tags": ["rounds", "dogfood", "model"],
                 "params": {
-                    "top_n": 128,
-                    "sort": "max_importance",
+                    "order_policy": "sort_index",
                     "cluster": False,
+                    "rasterized": True,
+                    "figsize_in": [8.5, 12],
+                    "max_yticks": 24,
                     "title": f"{run.run_key}: feature importance over rounds",
+                },
+            },
+            {
+                "name": "feature_importance_bars",
+                "kind": "feature_importance_bars",
+                "round_variants": ["all", "each"],
+                "tags": ["rounds", "dogfood", "model"],
+                "params": {
+                    "order_policy": "sort_index",
+                    "alpha": 0.32,
+                    "figsize_in": [12, 5],
+                    "title": f"{run.run_key}: feature importance bars",
                 },
             },
             {
                 "name": "selected_vec8_summary",
                 "kind": "vector_summary_heatmap",
+                "round_variants": ["all", "each"],
                 "tags": ["rounds", "dogfood", "vector"],
                 "params": {
                     "vector_field": "pred__y_hat_model",
@@ -304,6 +323,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "fold_change_vs_logic_fidelity_latest",
                 "kind": "fold_change_vs_logic_fidelity",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "selection", "overlay", "single-round"],
                 "params": {
                     "y_axis": "score",
@@ -317,6 +337,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_logic_fidelity_closeness_latest",
                 "kind": "sfxi_logic_fidelity_closeness",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
                 "params": {
                     "on_violin_invalid": "line",
@@ -327,6 +348,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_factorial_effects_latest",
                 "kind": "sfxi_factorial_effects",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
                 "params": {
                     "size_by": "obj__effect_scaled",
@@ -338,6 +360,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_setpoint_sweep_latest",
                 "kind": "sfxi_setpoint_sweep",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "labels", "single-round"],
                 "params": {"min_n": 5},
             },
@@ -345,6 +368,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_support_diagnostics_latest",
                 "kind": "sfxi_support_diagnostics",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
                 "params": {
                     "y_axis": "score",
@@ -356,6 +380,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_uncertainty_latest",
                 "kind": "sfxi_uncertainty",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "model", "single-round"],
                 "params": {
                     "kind": "score",
@@ -367,6 +392,7 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "name": "sfxi_intensity_scaling_latest",
                 "kind": "sfxi_intensity_scaling",
                 "round_selector": "latest",
+                "round_variants": ["latest", "each"],
                 "tags": ["sfxi", "dogfood", "labels", "single-round"],
                 "params": {
                     "min_n": 5,

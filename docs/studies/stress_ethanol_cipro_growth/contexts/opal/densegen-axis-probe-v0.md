@@ -166,9 +166,18 @@ Review artifacts are layered:
 - The probe writes only the study-specific aggregate benchmark layer under
   `reports/`.
 - Configured OPAL campaign plots are refreshed separately from the aggregate
-  report. For final plot review, run
+  report and are first-class OPAL plot artifacts. The scratch campaign
+  `plots.yaml` includes the same suitable registered OPAL primitives as the
+  stress campaign bundles, including full-ordinal feature-importance heatmaps,
+  feature-importance bars, scalar/vector round-history plots, and SFXI
+  diagnostics. Per-round browsing is driven by OPAL `round_variants` manifests,
+  not by report-layer file scraping. For final plot review, run
   `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
   then rerun the report with `--plots --json`.
+- Study-specific aggregate plots remain in `reports/` unless they are promoted
+  to OPAL through the registered plot API (`PlotMeta`, `PlotContext`, media/tidy
+  output, and `opal.plot_artifact.v1` manifests). This prevents drift between
+  probe-only reports and the OPAL notebook surface.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
 - `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`

@@ -31,6 +31,7 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
         "score_vs_rank_by_round",
         "score_threshold_over_rounds",
         "feature_importance_heatmap",
+        "feature_importance_bars",
         "selected_vec8_summary",
         "fold_change_vs_logic_fidelity_latest",
         "sfxi_logic_fidelity_closeness_latest",
@@ -45,6 +46,7 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
         "scatter_score_vs_rank",
         "percent_high_activity_over_rounds",
         "feature_importance_heatmap",
+        "feature_importance_bars",
         "vector_summary_heatmap",
         "fold_change_vs_logic_fidelity",
         "sfxi_logic_fidelity_closeness",
@@ -60,6 +62,12 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
     assert plots_by_name["score_threshold_over_rounds"]["params"]["metric"] == "pred__score_selected"
     assert plots_by_name["score_threshold_over_rounds"]["params"]["hue"] == "logic_fidelity"
     assert plots_by_name["score_threshold_over_rounds"]["params"]["highlight_round"] == "latest"
+    heatmap_params = plots_by_name["feature_importance_heatmap"]["params"]
+    assert heatmap_params["order_policy"] == "sort_index"
+    assert heatmap_params["rasterized"] is True
+    assert "top_n" not in heatmap_params
+    assert "sort" not in heatmap_params
+    assert plots_by_name["feature_importance_bars"]["params"]["order_policy"] == "sort_index"
     assert plots_by_name["selected_vec8_summary"]["params"]["reference_vector"] == [0, 0, 1, 1, 0, 0, 1, 1]
     assert plots_by_name["selected_vec8_summary"]["params"]["reference_label"] == "target vec8"
     assert plots_by_name["selected_vec8_summary"]["params"]["channel_labels"] == [
@@ -75,3 +83,6 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
     for name in plot_names:
         if name.endswith("_latest"):
             assert plots_by_name[name]["round_selector"] == "latest"
+            assert plots_by_name[name]["round_variants"] == ["latest", "each"]
+        else:
+            assert plots_by_name[name]["round_variants"] == ["all", "each"]
