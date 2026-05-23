@@ -20,8 +20,9 @@ def test_campaign_progress_has_no_load_button() -> None:
 
 def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "from dnadesign.opal import" in text
-    assert "from dnadesign.opal.notebooks.api import" in text
+    assert "from dnadesign.opal.notebooks.api.progress import" in text
+    assert "from dnadesign.opal import" not in text
+    assert "from dnadesign.opal.notebooks.api import" not in text
     assert "dnadesign.opal.src" not in text
     assert "dnadesign.opal.src.analysis.dashboard.api" not in text
     assert "dnadesign.opal.dashboard" not in text
@@ -31,10 +32,23 @@ def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
     assert "# OPAL Campaign Progress" in text
     assert "mo.accordion(" in text
+    assert "mo.ui.table" in text
     assert "Campaign contract" in text
     assert "Records and active record" in text
     assert "Ledger and CLI handoff" in text
     assert "X provenance and limitations" in text
+
+
+def test_campaign_progress_uses_tables_for_contract_and_record_status() -> None:
+    text = NOTEBOOK_PATH.read_text()
+    assert "campaign_contract_rows(" in text
+    assert "active_record_rows(" in text
+    assert "x_provenance_status_rows(" in text
+    assert "records_status_lines" not in text
+    assert "x_provenance_status_lines" not in text
+    assert 'f"- Campaign:' not in text
+    assert 'f"- id:' not in text
+    assert 'f"- X column:' not in text
 
 
 def test_campaign_progress_uses_canonical_cli_handoff() -> None:

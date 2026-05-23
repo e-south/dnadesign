@@ -17,7 +17,8 @@ from typing import List, Optional
 
 import typer
 
-from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suffix
+from ...analysis.campaign import CampaignAnalysis
+from ...analysis.ledger import parse_round_selector, round_suffix
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...plots.config import list_configured_plot_specs, list_configured_plots, load_plot_config
 from ...plots.runner import PlotRequest, resolve_run_round, run_plots

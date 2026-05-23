@@ -28,10 +28,18 @@ def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[s
     }
 
 
-def build_notebook_campaign_header_lines(view_model: Mapping[str, Any]) -> list[str]:
+def build_notebook_campaign_header_lines(view_model: Mapping[str, Any], *, heading_level: int = 1) -> list[str]:
     """Build a compact, human-readable notebook heading."""
 
     campaign = mapping(view_model.get("campaign"))
+    title = _campaign_title(campaign)
+    level = max(1, min(6, int(heading_level)))
+    marker = "#" * level
+    description = _campaign_description(campaign)
+    return [f"{marker} {title}", "", description]
+
+
+def _campaign_title(campaign: Mapping[str, Any]) -> str:
     slug = str(campaign.get("slug") or "unknown").strip()
     name = str(campaign.get("name") or "").strip()
     title = name if name and name != slug else display_name(slug)
@@ -41,14 +49,23 @@ def build_notebook_campaign_header_lines(view_model: Mapping[str, Any]) -> list[
     title = title.replace("top_n", "top N")
     if title.lower().startswith("opal "):
         title = "OPAL " + title[5:]
+    return title
+
+
+def _campaign_description(campaign: Mapping[str, Any]) -> str:
     description = str(campaign.get("description") or "").strip()
-    if not description:
-        objective = sequence(campaign.get("objectives"))[0] if sequence(campaign.get("objectives")) else "objective"
-        description = (
-            f"{title} evaluates the configured records table with `{campaign.get('model')}` "
-            f"and selects candidates by `{campaign.get('selection')}` against `{objective}`."
-        )
-    return [f"# {title}", "", description]
+    if description:
+        return description
+
+    title = _campaign_title(campaign)
+    slug = str(campaign.get("slug") or "unknown").strip()
+    objective = sequence(campaign.get("objectives"))[0] if sequence(campaign.get("objectives")) else "objective"
+    x_column = str(campaign.get("x_column") or "").strip()
+    x_clause = f" The active X contract is `{x_column}`." if x_column else ""
+    return (
+        f"Campaign ID `{slug}`. {title} scores the configured OPAL records table with `{campaign.get('model')}` "
+        f"and selects candidates by `{campaign.get('selection')}` against `{objective}`.{x_clause}"
+    )
 
 
 def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -61,6 +78,8 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
     selected_count = selection_count(view_model)
     rows = [
         {"field": "campaign", "value": row["campaign"]},
+        {"field": "description", "value": _campaign_description(campaign)},
+        {"field": "description source", "value": campaign.get("description_source") or "derived"},
         {"field": "status", "value": row["status"]},
         {"field": "round selector", "value": status.get("round_selector")},
         {"field": "round count", "value": row["round_count"]},
@@ -124,6 +143,12 @@ def build_notebook_status_line(view_model: Mapping[str, Any]) -> str:
 def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:
     """Build explicit trust-state lines for generated notebooks."""
 
+    return [f"{row['field']}: `{row['value']}`" for row in build_notebook_validity_rows(view_model)]
+
+
+def build_notebook_validity_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build explicit trust-state rows for generated notebooks."""
+
     status = mapping(view_model.get("status"))
     progress = mapping(view_model.get("progress"))
     state = mapping(progress.get("state"))
@@ -142,40 +167,55 @@ def build_notebook_validity_lines(view_model: Mapping[str, Any]) -> list[str]:
     state_text = "present" if state.get("exists") else "missing"
     artifact_schema = artifact_garden.get("schema_version") or "unavailable"
     return [
-        f"- Campaign status: `{status.get('progress_status') or 'unknown'}`",
-        f"- Progress schema: `{progress.get('schema_version') or 'missing'}`",
-        f"- State file: `{state_text}`",
-        f"- Review manifest: `{review_state}`",
-        f"- Plot manifests: `{len(plot_manifests)}`",
-        f"- Written plot media choices: `{len(visual_surface['choices'])}`",
-        f"- Missing plot outputs: `{len(visual_surface['missing_outputs'])}`",
-        f"- Warnings: `{len(warnings)}`",
-        f"- Stale artifacts: `{len(stale)}`",
-        f"- Artifact garden: `{artifact_schema}`",
-        f"- Prune requires apply: `{prune_plan.get('requires_apply', True)}`",
-        f"- Blocking issues: `{blocking_count}`",
+        {"field": "Campaign status", "value": status.get("progress_status") or "unknown"},
+        {"field": "Progress schema", "value": progress.get("schema_version") or "missing"},
+        {"field": "State file", "value": state_text},
+        {"field": "Review manifest", "value": review_state},
+        {"field": "Plot manifests", "value": len(plot_manifests)},
+        {"field": "Written plot media choices", "value": len(visual_surface["choices"])},
+        {"field": "Missing plot outputs", "value": len(visual_surface["missing_outputs"])},
+        {"field": "Warnings", "value": len(warnings)},
+        {"field": "Stale artifacts", "value": len(stale)},
+        {"field": "Artifact garden", "value": artifact_schema},
+        {"field": "Prune requires apply", "value": prune_plan.get("requires_apply", True)},
+        {"field": "Blocking issues", "value": blocking_count},
     ]
 
 
 def build_notebook_distrust_lines(view_model: Mapping[str, Any]) -> list[str]:
     """Build a compact distrust/limitations panel for generated notebooks."""
 
+    return [f"{row['field']}: {row['value']}" for row in build_notebook_distrust_rows(view_model)]
+
+
+def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build compact limitation rows for generated notebooks."""
+
     review_manifest = view_model.get("review_manifest")
     visual_surface = build_notebook_visual_surface_model(view_model)
     warnings = sequence(view_model.get("warnings"))
     stale = sequence(view_model.get("stale_artifacts"))
-    lines = [
-        "- OPAL notebooks are inspection surfaces; execution and mutation stay in the CLI.",
-        "- Producer-specific representation browsers and study benchmark reports are outside this notebook.",
+    rows = [
+        {
+            "field": "surface boundary",
+            "value": "inspection only; execution and mutation stay in the CLI",
+        },
+        {
+            "field": "producer tools",
+            "value": "representation browsers and study benchmark reports stay outside canonical OPAL notebooks",
+        },
+        {
+            "field": "review manifest",
+            "value": "missing" if review_manifest is None else "present",
+        },
     ]
-    lines.append("- Review manifest: `missing`" if review_manifest is None else "- Review manifest: `present`")
     if not visual_surface["choices"]:
-        lines.append("- Plot evidence: no written manifest-backed plot media.")
+        rows.append({"field": "plot evidence", "value": "no written manifest-backed plot media"})
     if warnings:
-        lines.append(f"- Warnings: `{len(warnings)}`")
+        rows.append({"field": "warnings", "value": len(warnings)})
     if stale:
-        lines.append(f"- Stale artifacts ignored by active manifests: `{len(stale)}`")
-    return lines
+        rows.append({"field": "stale artifacts ignored by active manifests", "value": len(stale)})
+    return rows
 
 
 def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:

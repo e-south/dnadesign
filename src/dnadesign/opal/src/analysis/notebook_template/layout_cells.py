@@ -54,6 +54,29 @@ LAYOUT_CELLS = dedent(
             ]
         )
         distrust_panel = mo.vstack([distrust_md, evidence_panel])
+        evidence_scope_panel = mo.accordion(
+            {
+                "Validity": validity_md,
+                "Changes": changes_panel,
+                "Warnings and stale artifacts": distrust_panel,
+            },
+            multiple=True,
+            lazy=True,
+        )
+        operations_panel = mo.accordion(
+            {
+                "Campaign contract": campaign_contract_md,
+                "Round and run": round_run_panel,
+                "Ledger readiness": ledger_panel,
+                "Records and active record": records_panel,
+                "Labels and predictions": data_panel,
+                "Metric definitions": metric_definitions_panel,
+                "Artifacts": artifact_garden_panel,
+                "X provenance and limitations": x_provenance_md,
+            },
+            multiple=True,
+            lazy=True,
+        )
         mo.vstack(
             [
                 header_md,
@@ -62,17 +85,8 @@ LAYOUT_CELLS = dedent(
                 plot_panel,
                 mo.accordion(
                     {
-                        "Campaign contract": campaign_contract_md,
-                        "Round and run": round_run_panel,
-                        "Validity": validity_md,
-                        "Changes": changes_panel,
-                        "Ledger readiness": ledger_panel,
-                        "Records and active record": records_panel,
-                        "Labels and predictions": data_panel,
-                        "Metric definitions": metric_definitions_panel,
-                        "Artifacts": artifact_garden_panel,
-                        "X provenance and limitations": x_provenance_md,
-                        "Distrust and limitations": distrust_panel,
+                        "Attention and evidence": evidence_scope_panel,
+                        "Details": operations_panel,
                     },
                     multiple=True,
                     lazy=True,

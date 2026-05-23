@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/analysis/test_analysis_facade_setpoint.py
+src/dnadesign/opal/tests/analysis/test_analysis_ledger_setpoint.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ import pytest
 
 from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
 from dnadesign.opal.src import __version__ as OPAL_VERSION
-from dnadesign.opal.src.analysis.facade import load_predictions_with_setpoint
+from dnadesign.opal.src.analysis.ledger import load_predictions_with_setpoint
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.storage.ledger import LedgerWriter
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace

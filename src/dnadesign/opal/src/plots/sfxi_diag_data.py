@@ -16,7 +16,7 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from ..analysis.facade import latest_round
+from ..analysis.ledger import latest_round
 from ..core.utils import ExitCodes, OpalError
 from ..objectives import sfxi_math
 

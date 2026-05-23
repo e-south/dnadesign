@@ -24,7 +24,7 @@ from dnadesign.opal.tests._cli_helpers import (
 )
 
 
-def test_notebook_generate_smoke(tmp_path: Path) -> None:
+def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
@@ -37,6 +37,16 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
     )
 
     out_path = workdir / "notebooks" / "opal_demo_analysis.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    smoke_checked: list[Path] = []
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
+        or {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
     app = _build()
     runner = CliRunner()
     res = runner.invoke(
@@ -54,6 +64,7 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
     )
     assert res.exit_code == 0, res.stdout
     assert out_path.exists()
+    assert smoke_checked == [out_path]
 
     txt = out_path.read_text()
     assert "marimo.App" in txt
@@ -169,7 +180,7 @@ def test_notebook_generate_with_name(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
-def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -> None:
+def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, monkeypatch) -> None:
     campaigns = []
     for slug in ["campaign_a", "campaign_b"]:
         workdir = tmp_path / slug
@@ -186,6 +197,16 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -
         campaigns.append(campaign)
 
     out_path = tmp_path / "campaign_set.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    smoke_checked: list[Path] = []
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
+        or {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
     app = _build()
     runner = CliRunner()
     res = runner.invoke(
@@ -206,11 +227,12 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path) -
 
     assert res.exit_code == 0, res.output
     assert out_path.exists()
+    assert smoke_checked == [out_path]
     text = out_path.read_text()
     assert "# Campaigns" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
-    assert 'label="Visual"' in text
+    assert 'label="Visual surface"' in text
 
 
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:

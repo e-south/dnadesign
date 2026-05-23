@@ -15,7 +15,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from dnadesign.opal.src.analysis.facade import read_predictions
+from dnadesign.opal.src.analysis.ledger import read_predictions
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.storage.ledger import LedgerError, LedgerReader
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
@@ -33,7 +33,7 @@ def _write_pred_parts(pred_dir: Path) -> None:
     ).write_parquet(pred_dir / "part-0.parquet")
 
 
-def test_facade_read_predictions_run_id_resolves_round(tmp_path: Path) -> None:
+def test_ledger_read_predictions_run_id_resolves_round(tmp_path: Path) -> None:
     pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
     runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})
@@ -50,7 +50,7 @@ def test_facade_read_predictions_run_id_resolves_round(tmp_path: Path) -> None:
     assert int(df["as_of_round"][0]) == 1
 
 
-def test_facade_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) -> None:
+def test_ledger_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) -> None:
     pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
     runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})
@@ -65,7 +65,7 @@ def test_facade_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) ->
         )
 
 
-def test_facade_read_predictions_requires_runs_df(tmp_path: Path) -> None:
+def test_ledger_read_predictions_requires_runs_df(tmp_path: Path) -> None:
     pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
 
@@ -79,7 +79,7 @@ def test_facade_read_predictions_requires_runs_df(tmp_path: Path) -> None:
         )
 
 
-def test_facade_read_predictions_round_filter_without_as_of_round(tmp_path: Path) -> None:
+def test_ledger_read_predictions_round_filter_without_as_of_round(tmp_path: Path) -> None:
     pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
     runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})

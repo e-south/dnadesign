@@ -8,27 +8,38 @@ from ._support import compact_path, mapping, predict_progress_text, resolved_run
 def build_notebook_change_lines(view_model: Mapping[str, Any]) -> list[str]:
     """Build a compact round/run change summary for generated notebooks."""
 
+    return [f"{row['field']}: `{row['value']}`" for row in build_notebook_change_summary_rows(view_model)]
+
+
+def build_notebook_change_summary_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build compact round/run change rows for generated notebooks."""
+
     status = mapping(view_model.get("status"))
     progress = mapping(view_model.get("progress"))
     event_contract = mapping(progress.get("event_contract"))
     rounds = sequence(progress.get("rounds"))
-    lines = [
-        f"- Round selector: `{status.get('round_selector') or progress.get('round_selector') or 'latest'}`",
-        f"- Rounds visible: `{len(rounds)}`",
-        f"- Latest run ID: `{status.get('latest_run_id')}`",
-        (
-            "- Event phases: "
-            f"command=`{event_contract.get('command_events', 0)}`, "
-            f"preflight=`{event_contract.get('preflight_events', 0)}`, "
-            f"run=`{event_contract.get('run_events', 0)}`, "
-            f"finalize=`{event_contract.get('finalize_events', 0)}`"
-        ),
-        f"- Aborted rounds: `{len(sequence(event_contract.get('aborted_rounds')))}`",
-        f"- Ambiguous run-scope rounds: `{len(sequence(event_contract.get('ambiguous_rounds')))}`",
+    rows = [
+        {
+            "field": "Round selector",
+            "value": status.get("round_selector") or progress.get("round_selector") or "latest",
+        },
+        {"field": "Rounds visible", "value": len(rounds)},
+        {"field": "Latest run ID", "value": status.get("latest_run_id")},
+        {
+            "field": "Event phases",
+            "value": (
+                f"command={event_contract.get('command_events', 0)}, "
+                f"preflight={event_contract.get('preflight_events', 0)}, "
+                f"run={event_contract.get('run_events', 0)}, "
+                f"finalize={event_contract.get('finalize_events', 0)}"
+            ),
+        },
+        {"field": "Aborted rounds", "value": len(sequence(event_contract.get("aborted_rounds")))},
+        {"field": "Ambiguous run-scope rounds", "value": len(sequence(event_contract.get("ambiguous_rounds")))},
     ]
     if not rounds:
-        lines.append("- Round history: `not started`")
-    return lines
+        rows.append({"field": "Round history", "value": "not started"})
+    return rows
 
 
 def build_notebook_change_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:

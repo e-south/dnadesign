@@ -22,18 +22,22 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
     try:
         from PIL import Image
 
-        if adapter_kind in {"densegen_tfbs", "usr_genbank_annotations_v1"}:
+        render_route = str(contract.get("render_route") or "figure")
+        if render_route == "sequence_panel":
             panel = render_sequence_panel_image(
                 dict(record_row),
                 adapter_kind=adapter_kind,
                 adapter_columns=dict(contract.get("adapter_columns") or {}),
                 adapter_policies=dict(contract.get("adapter_policies") or {}),
                 style_overrides=style_overrides,
-                target_width_px=2600,
-                target_height_px=430,
-                canvas_top_pad_px=8,
+                target_width_px=int(contract.get("target_width_px") or 2600),
+                target_height_px=int(contract.get("target_height_px") or 430),
+                vertical_anchor=str(contract.get("vertical_anchor") or "top"),
+                canvas_top_pad_px=int(contract.get("canvas_top_pad_px") or 8),
             )
             image_bytes = _encode_opaque_white_png(Image.fromarray(panel.image))
+            sequence_length = int(panel.diagnostics.sequence_length_bp)
+            feature_count = int(panel.diagnostics.feature_count)
         else:
             record = baserender.adapt_record(
                 dict(record_row),
@@ -48,11 +52,14 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
                 style_overrides=style_overrides,
             )
             figure.patch.set_facecolor("white")
+            figure.patch.set_alpha(1.0)
             for axis in figure.axes:
                 axis.set_facecolor("white")
             buffer = BytesIO()
             figure.savefig(buffer, format="png", facecolor="white", transparent=False, bbox_inches="tight")
             image_bytes = buffer.getvalue()
+            sequence_length = len(str(record.sequence))
+            feature_count = len(record.features)
             try:
                 import matplotlib.pyplot as plt
 
@@ -68,8 +75,29 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
         "record_id": record_id,
         "image_bytes": image_bytes,
         "caption": f"{caption} Record `{record_id}`.",
-        "alt_text": str(contract.get("alt_text_template") or caption).format(record_id=record_id),
+        "alt_text": _format_alt_text(
+            contract.get("alt_text_template") or caption,
+            record_id=record_id,
+            sequence_length=sequence_length,
+            feature_count=feature_count,
+        ),
+        "sequence_length": sequence_length,
+        "feature_count": feature_count,
     }
+
+
+def _format_alt_text(template: object, *, record_id: str, sequence_length: int, feature_count: int) -> str:
+    try:
+        return str(template).format(
+            record_id=record_id,
+            sequence_length=sequence_length,
+            feature_count=feature_count,
+        )
+    except Exception:
+        return (
+            f"BaseRender sequence diagram for record {record_id}; sequence length "
+            f"{sequence_length} bp with {feature_count} annotations."
+        )
 
 
 def _encode_opaque_white_png(image: Any) -> bytes:

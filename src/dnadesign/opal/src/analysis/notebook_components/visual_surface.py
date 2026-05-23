@@ -33,20 +33,20 @@ def render_visual_surface_cells() -> str:
         ):
             visual_surface_ui = None
             visual_surface_choices = []
+            if notebook_baserender_contract.get("available"):
+                visual_surface_choices.append(
+                    {
+                        "label": "Record render",
+                        "kind": "baserender",
+                        "plot_label": None,
+                    }
+                )
             if plot_cfg_error:
                 visual_surface_note = f"Plot config unavailable: `{plot_cfg_error}`"
             else:
-                if notebook_baserender_contract.get("available"):
-                    visual_surface_choices.append(
-                        {
-                            "label": "Record render",
-                            "kind": "baserender",
-                            "plot_label": None,
-                        }
-                    )
                 visual_surface_choices.extend(
                     {
-                        "label": plot_choice["title"],
+                        "label": plot_choice["label"],
                         "kind": "plot",
                         "plot_label": plot_choice["label"],
                     }
@@ -61,9 +61,9 @@ def render_visual_surface_cells() -> str:
                 if stale_plot_artifacts:
                     _lines.append(f"Stale artifact warnings: `{len(stale_plot_artifacts)}`.")
                 visual_surface_note = "\\n".join(_lines)
-                if visual_surface_choices:
-                    labels = [choice["label"] for choice in visual_surface_choices]
-                    visual_surface_ui = mo.ui.dropdown(labels, value=labels[0], label="Visual")
+            if visual_surface_choices:
+                labels = [choice["label"] for choice in visual_surface_choices]
+                visual_surface_ui = mo.ui.dropdown(labels, value=labels[0], label="Visual surface")
             return visual_surface_ui, visual_surface_choices, visual_surface_note
 
 
@@ -108,10 +108,12 @@ def render_visual_surface_cells() -> str:
                         caption=str(plot_choice.get("caption") or "") or None,
                         rounded=True,
                         style={
-                            "width": "100%",
+                            "width": "auto",
+                            "max-height": "min(68vh, 760px)",
                             "max-width": "100%",
                             "height": "auto",
                             "object-fit": "contain",
+                            "overflow": "auto",
                             "margin": "0 auto",
                             "display": "block",
                             "background": "white",
@@ -142,16 +144,24 @@ def render_visual_surface_cells() -> str:
                                 baserender_record_row,
                                 notebook_baserender_contract,
                             )
+                            _round_text = (
+                                f"round {int(round_ui.value)}"
+                                if round_ui is not None
+                                else "the selected round"
+                            )
+                            _label_state = "observed label available" if label_rows else "no observed label available"
                             visual = mo.image(
                                 payload["image_bytes"],
-                                alt=str(payload["alt_text"]),
+                                alt=f"{payload['alt_text']} Selected scope: {_round_text}; {_label_state}.",
                                 caption=str(payload["caption"]),
                                 rounded=True,
                                 style={
-                                    "width": "100%",
+                                    "width": "auto",
+                                    "max-height": "min(58vh, 520px)",
                                     "max-width": "100%",
                                     "height": "auto",
                                     "object-fit": "contain",
+                                    "overflow": "auto",
                                     "background": "white",
                                     "display": "block",
                                     "margin": "0 auto",

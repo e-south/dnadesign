@@ -3,6 +3,7 @@
 campaign:
   name: "Demo (vec8)"
   slug: "demo"
+  description: "Small local OPAL demo for checking SFXI vector-label ingestion, random-forest scoring, and top-N selection on a fixed promoter-style records table."
   workdir: "."  # resolved relative to the campaign root
 
 data:

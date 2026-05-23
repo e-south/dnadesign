@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ..analysis.facade import CampaignAnalysis
+from ..analysis.campaign import CampaignAnalysis
 from ..core.utils import OpalError
 from ..storage.locks import inspect_campaign_lock
 from ..storage.state import CampaignState

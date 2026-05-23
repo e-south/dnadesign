@@ -21,7 +21,7 @@ from ..analysis.dashboard.artifacts import resolve_round_artifacts
 from ..analysis.dashboard.charts import sfxi_uncertainty
 from ..analysis.dashboard.models import load_model_artifact, load_round_ctx_from_dir, unwrap_artifact_model
 from ..analysis.dashboard.util import list_series_to_numpy
-from ..analysis.facade import load_predictions_with_setpoint, read_runs
+from ..analysis.ledger import load_predictions_with_setpoint, read_runs
 from ..analysis.sfxi.uncertainty import UncertaintyContext, compute_uncertainty, supports_uncertainty
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot

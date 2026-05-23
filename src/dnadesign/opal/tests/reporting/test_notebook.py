@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.opal.src.analysis.notebook_components import build_notebook_validity_rows
 from dnadesign.opal.src.reporting.notebook import build_notebook_view_model
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_ledger, write_records, write_round_log
 
@@ -64,3 +65,29 @@ def test_notebook_view_model_pins_requested_run_scope(tmp_path: Path) -> None:
     run_scope = payload["progress"]["rounds"][0]["summary"]["run_scope"]
     assert run_scope["requested_run_id"] == "run-1"
     assert run_scope["resolved_run_id"] == "run-1"
+
+
+def test_notebook_view_model_marks_progress_contract_errors_blocking(tmp_path: Path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path)
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
+
+    import dnadesign.opal.src.reporting.notebook as notebook_reporting
+
+    def fail_progress(*args, **kwargs):
+        raise RuntimeError("progress contract exploded")
+
+    monkeypatch.setattr(notebook_reporting, "build_campaign_progress", fail_progress)
+
+    payload = build_notebook_view_model(config_path, round_selector="latest")
+
+    assert {
+        "category": "ProgressContractError",
+        "severity": "error",
+        "message": "progress contract exploded",
+    } in payload["warnings"]
+    validity = {row["field"]: row["value"] for row in build_notebook_validity_rows(payload)}
+    assert validity["Blocking issues"] == 1

@@ -14,7 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Sequence
 
-from ..analysis.facade import CampaignAnalysis, parse_round_selector, round_suffix
+from ..analysis.campaign import CampaignAnalysis
+from ..analysis.ledger import parse_round_selector, round_suffix
 from ..core.utils import OpalError
 from .config import load_plot_config
 from .runner import PlotRequest, resolve_run_round, run_plots

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...analysis.facade import CampaignAnalysis
+from ...analysis.campaign import CampaignAnalysis
 from ...analysis.notebook_scope import resolve_notebook_run_scope
 
 NOTEBOOK_GENERATE_SCHEMA_VERSION = "opal.notebook_generate.v1"

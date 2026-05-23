@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..analysis.facade import CampaignAnalysis
+from ..analysis.campaign import CampaignAnalysis
 from ..analysis.notebook_scope import resolve_notebook_run_scope
 from ..core.utils import ExitCodes, OpalError, now_iso
 from ..plots.manifests import (
@@ -64,7 +64,7 @@ def build_notebook_view_model(
             "rounds": [],
             "error": str(exc),
         }
-        warnings.append(_warning("ProgressContractError", str(exc)))
+        warnings.append(_warning("ProgressContractError", str(exc), severity="error"))
 
     review_manifest = None
     review_path = (
@@ -74,7 +74,7 @@ def build_notebook_view_model(
         try:
             review_manifest = load_review_manifest(review_path)
         except Exception as exc:
-            warnings.append(_warning("ReviewManifestError", str(exc), path=review_path))
+            warnings.append(_warning("ReviewManifestError", str(exc), path=review_path, severity="error"))
     else:
         warnings.append(
             _warning(
@@ -107,6 +107,7 @@ def build_notebook_view_model(
             "name": cfg.campaign.name,
             "slug": cfg.campaign.slug,
             "description": cfg.campaign.description,
+            "description_source": "config" if str(cfg.campaign.description or "").strip() else "derived",
             "workdir": str(ws.workdir),
             "config_path": str(analysis.config_path),
             "records_path": str(analysis.records_store().records_path),
@@ -185,13 +186,14 @@ def _load_plot_manifests(
                     manifests.append(row)
                     warnings.append(
                         _warning(
-                            "ReviewManifestError",
+                            "PlotManifestError",
                             "Plot manifest index references a missing manifest.",
                             path=manifest_path,
+                            severity="error",
                         )
                     )
         except Exception as exc:
-            warnings.append(_warning("ReviewManifestError", str(exc), path=index_path))
+            warnings.append(_warning("PlotManifestError", str(exc), path=index_path, severity="error"))
     elif plots_dir.exists():
         warnings.append(
             _warning(
@@ -242,10 +244,16 @@ def _latest_run_id(progress: dict[str, Any]) -> str | None:
     return None
 
 
-def _warning(category: str, message: str, *, path: str | Path | None = None) -> dict[str, Any]:
+def _warning(
+    category: str,
+    message: str,
+    *,
+    path: str | Path | None = None,
+    severity: str = "warning",
+) -> dict[str, Any]:
     row: dict[str, Any] = {
         "category": category,
-        "severity": "warning",
+        "severity": severity,
         "message": message,
     }
     if path is not None:

@@ -16,7 +16,7 @@ from typing import Sequence
 
 import pandas as pd
 
-from ..analysis.facade import CampaignAnalysis
+from ..analysis.campaign import CampaignAnalysis
 from ..core.utils import ExitCodes, OpalError
 
 

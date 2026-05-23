@@ -103,7 +103,6 @@ DATA_CELLS = dedent(
         if pred_read.available:
             data_source_options = [
                 "predictions (selected run)",
-                "predictions (all rounds)",
                 *data_source_options,
             ]
             default_source = "predictions (selected run)"
@@ -132,7 +131,6 @@ DATA_CELLS = dedent(
         records_df,
         require_columns,
         selected_round,
-        table_status_lines,
     ):
         source = str(data_source_ui.value)
         if source == "records":
@@ -145,37 +143,24 @@ DATA_CELLS = dedent(
             data_df = labels_df.filter(pl.col(label_round_column) == selected_round)
         elif source == "predictions (selected run)":
             data_df = pred_df
-        elif source == "predictions (all rounds)":
-            all_pred_read = read_optional_table(
-                "predictions_all_rounds",
-                campaign.workspace.ledger_predictions_dir,
-                lambda: campaign.read_predictions(
-                    columns=pred_columns,
-                    round_selector="all",
-                    allow_missing=True,
-                    require_run_id=False,
-                ),
-            )
-            if all_pred_read.available:
-                data_df = all_pred_read.df
-                require_columns(data_df, pred_required, ctx="predictions")
-            else:
-                data_df = records_df
         else:
             raise ValueError(f"Unknown data source: {source}")
-        data_status_lines = [
-            f"- Selected data source: `{source}`",
-            "",
-            *table_status_lines(labels_read),
-            "",
-            *table_status_lines(pred_read),
+        data_status_rows = [
+            {"field": "selected data source", "value": source},
+            {"field": "selected rows", "value": data_df.height},
+            {"field": "labels status", "value": labels_read.status},
+            {"field": "labels rows", "value": labels_read.df.height},
+            {"field": "labels path", "value": str(labels_read.path or "")},
+            {"field": "predictions status", "value": pred_read.status},
+            {"field": "predictions rows", "value": pred_read.df.height},
+            {"field": "predictions path", "value": str(pred_read.path or "")},
         ]
         if data_df.is_empty():
-            data_status_lines.append(
-                f"- Selected data source `{source}` returned no rows."
+            data_status_rows.append(
+                {"field": "empty source", "value": f"{source} returned no rows"}
             )
         data_table = mo.ui.table(data_df, page_size=10)
-        data_status_md = mo.md("\\n".join(data_status_lines))
+        data_status_md = mo.ui.table(pl.DataFrame(data_status_rows), page_size=10)
         return data_df, data_status_md, data_table
     """
 ).strip("\n")

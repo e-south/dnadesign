@@ -18,32 +18,30 @@ def build_notebook_baserender_record_options(
 
     if not bool(contract.get("available")):
         return [NO_RENDERABLE_RECORDS_LABEL]
-    try:
-        import polars as pl
 
-        source_columns = _source_columns(contract)
-        if not source_columns:
-            return [NO_RENDERABLE_RECORDS_LABEL]
-        id_column = _id_column(contract)
-        if id_column not in source_columns:
-            source_columns.append(id_column)
-        scan = pl.scan_parquet(str(records_path)).select(source_columns)
-        schema = scan.collect_schema()
-        for expr in _contract_valid_filters(pl, contract, schema):
-            scan = scan.filter(expr)
-        label_ids = _label_ids_for_round(labels_df, round_value=round_value)
-        if label_ids:
-            scan = scan.filter(pl.col(id_column).cast(pl.Utf8).is_in(label_ids))
-        records = (
-            scan.select(pl.col(id_column).cast(pl.Utf8).alias("__record_id"))
-            .drop_nulls()
-            .unique(maintain_order=True)
-            .limit(max(1, int(limit)))
-            .collect()
-        )
-        options = records.get_column("__record_id").to_list() if "__record_id" in records.columns else []
-    except Exception:
+    import polars as pl
+
+    source_columns = _source_columns(contract)
+    if not source_columns:
         return [NO_RENDERABLE_RECORDS_LABEL]
+    id_column = _id_column(contract)
+    if id_column not in source_columns:
+        source_columns.append(id_column)
+    scan = pl.scan_parquet(str(records_path)).select(source_columns)
+    schema = scan.collect_schema()
+    for expr in _contract_valid_filters(pl, contract, schema):
+        scan = scan.filter(expr)
+    label_ids = _label_ids_for_round(labels_df, round_value=round_value)
+    if label_ids:
+        scan = scan.filter(pl.col(id_column).cast(pl.Utf8).is_in(label_ids))
+    records = (
+        scan.select(pl.col(id_column).cast(pl.Utf8).alias("__record_id"))
+        .drop_nulls()
+        .unique(maintain_order=True)
+        .limit(max(1, int(limit)))
+        .collect()
+    )
+    options = records.get_column("__record_id").to_list() if "__record_id" in records.columns else []
     return [str(item) for item in options if str(item).strip()] or [NO_RENDERABLE_RECORDS_LABEL]
 
 
@@ -56,20 +54,18 @@ def load_notebook_baserender_record_row(
 
     if not bool(contract.get("available")) or str(record_id) == NO_RENDERABLE_RECORDS_LABEL:
         return None
-    try:
-        import polars as pl
 
-        id_column = _id_column(contract)
-        source_columns = _source_columns(contract)
-        if id_column not in source_columns:
-            source_columns.append(id_column)
-        scan = pl.scan_parquet(str(records_path)).select(source_columns)
-        schema = scan.collect_schema()
-        for expr in _contract_valid_filters(pl, contract, schema):
-            scan = scan.filter(expr)
-        row_df = scan.filter(pl.col(id_column).cast(pl.Utf8) == str(record_id)).limit(1).collect()
-    except Exception:
-        return None
+    import polars as pl
+
+    id_column = _id_column(contract)
+    source_columns = _source_columns(contract)
+    if id_column not in source_columns:
+        source_columns.append(id_column)
+    scan = pl.scan_parquet(str(records_path)).select(source_columns)
+    schema = scan.collect_schema()
+    for expr in _contract_valid_filters(pl, contract, schema):
+        scan = scan.filter(expr)
+    row_df = scan.filter(pl.col(id_column).cast(pl.Utf8) == str(record_id)).limit(1).collect()
     if row_df.is_empty():
         return None
     return row_df.to_dicts()[0]

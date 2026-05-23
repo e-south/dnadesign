@@ -3,6 +3,7 @@
 campaign:
   name: "Demo GP + SFXI + top_n"
   slug: "demo_gp_topn"
+  description: "Local OPAL demo for Gaussian-process scoring with deterministic top-N selection against the SFXI objective."
   workdir: "."
 
 data:

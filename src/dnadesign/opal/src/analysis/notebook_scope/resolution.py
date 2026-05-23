@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ..core.utils import ExitCodes, OpalError
-from .facade import CampaignAnalysis
+from ...core.utils import ExitCodes, OpalError
+from ..campaign import CampaignAnalysis
 
 
 def resolve_notebook_run_scope(

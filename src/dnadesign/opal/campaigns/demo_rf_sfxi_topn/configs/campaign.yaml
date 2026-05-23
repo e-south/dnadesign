@@ -3,6 +3,7 @@
 campaign:
   name: "Demo RF + SFXI + top_n"
   slug: "demo_rf_sfxi_topn"
+  description: "Local OPAL demo for random-forest scoring of SFXI promoter candidates with deterministic top-N selection."
   workdir: "."
 
 data:

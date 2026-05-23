@@ -35,18 +35,42 @@ RECORD_CELLS = dedent(
 
 
     @app.cell
-    def _(x_provenance_status_lines, records_report, mo):
-        x_provenance_md = mo.md(
-            "\\n".join(
+    def _(records_report, mo, pl):
+        if records_report.x_column:
+            if records_report.x_column in records_report.missing_required_columns:
+                x_state = "missing"
+            elif records_report.x_values_loaded:
+                x_state = "present in preview"
+            else:
+                x_state = "present in records schema; values not loaded in notebook preview"
+        else:
+            x_state = "not configured"
+        x_provenance_md = mo.ui.table(
+            pl.DataFrame(
                 [
-                    *x_provenance_status_lines(records_report),
-                    "",
-                    "- OPAL review surfaces show campaign contracts, ledgers, selections, "
-                    "labels, predictions, and OPAL plot artifacts.",
-                    "- Producer-specific representation browsers and study benchmark reports "
-                    "stay outside canonical OPAL notebooks.",
+                    {"field": "X column", "value": records_report.x_column or "not configured"},
+                    {"field": "X state", "value": x_state},
+                    {
+                        "field": "candidate-table contract",
+                        "value": (
+                            "OPAL treats X as an explicit records-table contract and does not inspect "
+                            "producer geometry."
+                        ),
+                    },
+                    {
+                        "field": "notebook boundary",
+                        "value": (
+                            "campaign contracts, ledgers, selections, labels, predictions, and OPAL "
+                            "plot artifacts"
+                        ),
+                    },
+                    {
+                        "field": "outside this surface",
+                        "value": "producer-specific representation browsers and study benchmark reports",
+                    },
                 ]
-            )
+            ),
+            page_size=8,
         )
         return x_provenance_md
 
@@ -68,7 +92,7 @@ RECORD_CELLS = dedent(
         record_selector = mo.ui.dropdown(
             options=record_options,
             value=record_options[0],
-            label="Record",
+            label="Inspect record",
             searchable=True,
             full_width=True,
         )
@@ -134,7 +158,7 @@ RECORD_CELLS = dedent(
         baserender_record_selector = mo.ui.dropdown(
             options=baserender_record_options,
             value=baserender_record_options[0],
-            label="Record",
+            label="Render record",
             searchable=True,
             full_width=True,
         )

@@ -8,11 +8,20 @@ from ._support import compact_path, mapping, sequence
 def build_notebook_artifact_garden_lines(view_model: Mapping[str, Any]) -> list[str]:
     """Build artifact-garden status lines for generated notebooks."""
 
+    return [f"{row['field']}: `{row['value']}`" for row in build_notebook_artifact_garden_summary_rows(view_model)]
+
+
+def build_notebook_artifact_garden_summary_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build artifact-garden status rows for generated notebooks."""
+
     audit = mapping(view_model.get("artifact_garden"))
     if not audit:
         return [
-            "- Artifact garden audit: `unavailable`",
-            "- Run `uv run opal artifacts audit -c <campaign.yaml>` for a manifest-authoritative artifact inventory.",
+            {"field": "Artifact garden audit", "value": "unavailable"},
+            {
+                "field": "Next command",
+                "value": "uv run opal artifacts audit -c <campaign.yaml>",
+            },
         ]
     bytes_row = mapping(audit.get("bytes"))
     prune_plan = mapping(audit.get("prune_plan"))
@@ -22,16 +31,16 @@ def build_notebook_artifact_garden_lines(view_model: Mapping[str, Any]) -> list[
     local_only = "yes (local-only)" if audit.get("local_only") else "no"
     root = audit.get("root")
     return [
-        f"- Artifact garden schema: `{audit.get('schema_version')}`",
-        f"- Root: `{compact_path(root, max_parts=1)}`",
-        f"- Local-only root: `{local_only}`",
-        f"- Artifact roots: `{len(roots)}`",
-        f"- Active manifests: `{len(active_manifests)}`",
-        f"- Stale artifacts: `{len(stale)}`",
-        f"- Artifact bytes: `{bytes_row.get('artifact_roots', 0)}`",
-        f"- Stale bytes: `{bytes_row.get('stale_artifacts', 0)}`",
-        f"- Prune plan items: `{prune_plan.get('item_count', 0)}`",
-        f"- Prune requires apply: `{prune_plan.get('requires_apply', True)}`",
+        {"field": "Artifact garden schema", "value": audit.get("schema_version")},
+        {"field": "Root", "value": compact_path(root, max_parts=1)},
+        {"field": "Local-only root", "value": local_only},
+        {"field": "Artifact roots", "value": len(roots)},
+        {"field": "Active manifests", "value": len(active_manifests)},
+        {"field": "Stale artifacts", "value": len(stale)},
+        {"field": "Artifact bytes", "value": bytes_row.get("artifact_roots", 0)},
+        {"field": "Stale bytes", "value": bytes_row.get("stale_artifacts", 0)},
+        {"field": "Prune plan items", "value": prune_plan.get("item_count", 0)},
+        {"field": "Prune requires apply", "value": prune_plan.get("requires_apply", True)},
     ]
 
 

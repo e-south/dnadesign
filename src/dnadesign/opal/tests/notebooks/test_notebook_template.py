@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 
 from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_artifact_garden_lines,
@@ -28,11 +29,13 @@ from dnadesign.opal.src.analysis.notebook_components import (
 )
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
+from dnadesign.opal.src.registries.plots import get_plot, list_plot_kinds
 
 
 def test_notebook_template_data_source_options() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert "predictions (selected run)" in text
+    assert "predictions (all rounds)" not in text
     assert "labels (all rounds)" in text
     assert 'label_round_column = str(cfg.labels.round_column or "observed_round")' in text
     assert "pl.col(label_round_column)" in text
@@ -52,7 +55,7 @@ def test_notebook_template_removes_extra_tables() -> None:
 
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'label="Visual"' in text
+    assert 'label="Visual surface"' in text
     assert "plots_dir" in text
     assert "build_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
@@ -81,11 +84,17 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert surface_text in text
     assert "visual_surface_note" in surface_text
     assert "manifest-backed plot outputs" in surface_text
-    assert 'label="Visual"' in surface_text
+    assert 'label="Visual surface"' in surface_text
+    assert '"label": plot_choice["label"]' in surface_text
+    assert '"label": plot_choice["title"]' not in surface_text
+    assert "max-height" in surface_text
     assert "Record render" in surface_text
     assert "Plot:" not in surface_text
     assert "build_notebook_plot_method_sections" in surface_text
     assert "thumbnail_gallery" not in surface_text
+    assert surface_text.index('if notebook_baserender_contract.get("available")') < surface_text.index(
+        "if plot_cfg_error:"
+    )
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -121,7 +130,8 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
 def test_notebook_template_uses_public_opal_helpers() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "from dnadesign.opal.notebooks.api import" in text
+    assert "from dnadesign.opal.notebooks.api.generated import" in text
+    assert "from dnadesign.opal.notebooks.api import" not in text
     assert "dnadesign.opal.src" not in text
     assert "assess_records_contract_for_schema" in text
     assert "build_ledger_status_table" in text
@@ -296,11 +306,22 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
 
     glance_rows = build_notebook_at_a_glance_rows(view_model)
     assert {"field": "campaign", "value": "campaign_a"} in glance_rows
+    assert {
+        "field": "description",
+        "value": (
+            "Campaign ID `campaign_a`. Campaign A scores the configured OPAL records table with `random_forest` "
+            "and selects candidates by `top_n` against `sfxi_v1`. The active X contract is `x_vec`."
+        ),
+    } in glance_rows
+    assert {"field": "description source", "value": "derived"} in glance_rows
     assert {"field": "X column", "value": "x_vec"} in glance_rows
     assert {"field": "stale artifacts", "value": 1} in glance_rows
     header_lines = build_notebook_campaign_header_lines(view_model)
     assert header_lines[0] == "# Campaign A"
-    assert "records table with `random_forest`" in header_lines[2]
+    assert "Campaign ID `campaign_a`." in header_lines[2]
+    assert "scores the configured OPAL records table with `random_forest`" in header_lines[2]
+    assert "The active X contract is `x_vec`." in header_lines[2]
+    assert build_notebook_campaign_header_lines(view_model, heading_level=2)[0] == "## Campaign A"
     named_header = build_notebook_campaign_header_lines(
         {
             "campaign": {
@@ -347,7 +368,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
 
     change_lines = "\n".join(build_notebook_change_lines(view_model))
     assert "Latest run ID: `run-3`" in change_lines
-    assert "Event phases: command=`1`, preflight=`2`, run=`6`, finalize=`1`" in change_lines
+    assert "Event phases: `command=1, preflight=2, run=6, finalize=1`" in change_lines
     change_rows = build_notebook_change_rows(view_model)
     assert change_rows == [
         {
@@ -385,6 +406,26 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert [row["source"] for row in artifact_rows] == ["artifact_root", "stale_artifact", "prune_plan"]
 
 
+def test_registered_plot_kinds_have_explicit_math_disclosure() -> None:
+    fallback = "See the plot kind metadata"
+
+    builtin_kinds = [
+        kind for kind in list_plot_kinds() if get_plot(kind).__module__.startswith("dnadesign.opal.src.plots.")
+    ]
+    assert builtin_kinds
+
+    for kind in builtin_kinds:
+        choice = {"kind": kind, "name": kind, "manifest": {"kind": kind, "metadata": {}}}
+        method_rows = build_notebook_plot_method_rows(choice)
+        math_rows = [row for row in method_rows if row["section"] == "math"]
+        method_sections = build_notebook_plot_method_sections(choice)
+
+        assert math_rows, kind
+        assert math_rows[0]["detail"], kind
+        assert fallback not in math_rows[0]["detail"], kind
+        assert fallback not in method_sections["Math"], kind
+
+
 def test_notebook_template_is_valid_python() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     ast.parse(text)
@@ -397,14 +438,18 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     )
 
     assert "# Campaigns" in text
-    assert "from dnadesign.opal.notebooks.api import (" in text
+    assert "from dnadesign.opal.notebooks.api.generated import (" in text
+    assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
+    assert "build_notebook_campaign_header_lines" in text
     assert "dnadesign.opal.src" not in text
     assert "__generated_with" in text
     assert 'generated_with = "' in text
     assert "Generated with marimo: `{__generated_with}`" not in text
     assert 'label="Campaign"' in text
-    assert 'label="Visual"' in text
+    assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
+    assert "selected_index = campaign_labels.index(selected_label)" in text
+    assert 'label="Visual surface"' in text
     assert "Plot:" not in text
     assert "Validity" in text
     assert "Changes" in text
@@ -414,7 +459,10 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_plot_card_rows" in text
     assert "build_notebook_plot_method_sections" in text
-    assert "build_notebook_validity_lines" in text
+    assert "build_notebook_validity_rows" in text
+    assert "build_notebook_validity_lines" not in text
+    assert "build_notebook_artifact_garden_lines" not in text
+    assert "build_notebook_change_lines" not in text
     assert "campaign_set_view_model" in text
     assert "LatentDNA" not in text
     assert "UMAP" not in text
@@ -429,7 +477,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     )
 
     assert len(single.splitlines()) <= 1000
-    assert len(campaign_set.splitlines()) <= 340
+    assert len(campaign_set.splitlines()) <= 300
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:
@@ -439,7 +487,11 @@ def test_notebook_baserender_contract_detects_schema_without_generated_import() 
 
     unavailable = build_notebook_baserender_contract(["id", "sequence"], records_path="records.parquet")
     assert unavailable["available"] is False
-    assert build_notebook_baserender_contract_rows(unavailable)[0] == {"field": "available", "value": "false"}
+    unavailable_rows = {
+        str(row["field"]): str(row["value"]) for row in build_notebook_baserender_contract_rows(unavailable)
+    }
+    assert unavailable_rows["available"] == "false"
+    assert unavailable_rows["contract"] == "dnadesign.baserender.record_render_contract.v1"
 
     contract = build_notebook_baserender_contract(
         ["id", "sequence", "densegen__used_tfbs_detail"],
@@ -449,12 +501,26 @@ def test_notebook_baserender_contract_detects_schema_without_generated_import() 
     assert contract["adapter_kind"] == "densegen_tfbs"
     assert contract["adapter_columns"]["annotations"] == "densegen__used_tfbs_detail"
     assert callable(render_notebook_baserender_record)
+    assert (
+        "densegen__used_tfbs_detail"
+        not in Path("src/dnadesign/opal/src/analysis/notebook_components/baserender.py").read_text()
+    )
 
     generic = build_notebook_baserender_contract(
         ["id", "sequence", "opal__baserender_features", "densegen__used_tfbs_detail"],
         records_path="records.parquet",
     )
     assert generic["adapter_kind"] == "generic_features"
+
+
+def test_notebook_baserender_options_fail_fast_for_bad_available_contract(tmp_path: Path) -> None:
+    contract = build_notebook_baserender_contract(
+        ["id", "sequence", "opal__baserender_features"],
+        records_path=str(tmp_path / "missing.parquet"),
+    )
+
+    with pytest.raises(Exception, match="missing.parquet|No such file|not found"):
+        build_notebook_baserender_record_options(tmp_path / "missing.parquet", contract)
 
 
 def test_notebook_baserender_record_options_skip_empty_feature_rows(tmp_path: Path) -> None:

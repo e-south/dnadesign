@@ -94,6 +94,8 @@ def build_notebook_visual_surface_model(
                     title=title,
                     kind=entry.get("kind") or manifest.get("kind"),
                     summary=summary,
+                    params=manifest.get("params"),
+                    metadata=manifest.get("metadata"),
                     rounds=manifest.get("rounds"),
                     run_id=manifest.get("run_id"),
                     freshness=freshness.get("status") or manifest.get("stale_state"),
@@ -190,6 +192,8 @@ def _plot_alt_text(
     title: str,
     kind: Any,
     summary: str,
+    params: Any,
+    metadata: Any,
     rounds: Any,
     run_id: Any,
     freshness: Any,
@@ -199,12 +203,13 @@ def _plot_alt_text(
     summary_text = str(summary or "").strip()
     scope = _rounds_text(rounds)
     run_text = "all runs" if run_id in (None, "") else f"run {run_id}"
+    field_text = _plot_field_text(kind=str(kind or ""), params=mapping(params), metadata=mapping(metadata))
     quality = f"freshness {freshness or 'unknown'}"
     if int(warning_count) > 0:
         quality += f", {int(warning_count)} warnings"
     if summary_text:
-        return f"{title}. {summary_text} Scope: {scope}, {run_text}; {quality}."
-    return f"{title}. OPAL {kind_text} visual. Scope: {scope}, {run_text}; {quality}."
+        return f"{title}. {summary_text} {field_text} Scope: {scope}, {run_text}; {quality}."
+    return f"{title}. OPAL {kind_text} visual. {field_text} Scope: {scope}, {run_text}; {quality}."
 
 
 def _rounds_text(value: Any) -> str:
@@ -238,6 +243,42 @@ def _plot_math_description(kind: str) -> str:
             "OPAL plots selected prediction rows by rank and score. Rank is selection order; score is the configured "
             "selection score or objective channel."
         ),
+        "percent_high_activity_over_rounds": (
+            "For each round, OPAL counts rows where score >= threshold. percent_high = 100 * high / total; "
+            "violin and swarm layers show the underlying score distribution when enabled."
+        ),
+        "feature_importance_bars": (
+            "OPAL reads per-round model feature_importance.csv artifacts. Bars encode model-reported importance, "
+            "with ordering controlled by the configured order policy."
+        ),
+        "fold_change_vs_logic_fidelity": (
+            "For SFXI, logic fidelity is clipped 1 - ||v - p||2 / D, where v is the predicted logic vector, "
+            "p is the setpoint, and D is the worst-corner distance. The y-axis is the configured effect or score field."
+        ),
+        "sfxi_logic_fidelity_closeness": (
+            "For each observed label, OPAL uses the first four SFXI components as logic values and computes "
+            "mean squared error against the setpoint: MSE = mean((v - p)^2). Lower MSE means closer logic behavior."
+        ),
+        "sfxi_factorial_effects": (
+            "With state order 00,10,01,11, A effect = ((v10 + v11) - (v00 + v01)) / 2, "
+            "B effect = ((v01 + v11) - (v00 + v10)) / 2, and interaction = ((v11 + v00) - (v10 + v01)) / 2."
+        ),
+        "sfxi_setpoint_sweep": (
+            "OPAL evaluates label vectors against a setpoint library. Logic fidelity is 1 - ||v - p||2 / D, "
+            "effect is scaled by a percentile denominator, and score = logic_fidelity^beta * effect_scaled^gamma."
+        ),
+        "sfxi_support_diagnostics": (
+            "For each candidate, OPAL computes Euclidean distance in four-channel logic space to the nearest "
+            "labeled point. Larger distances flag extrapolation risk."
+        ),
+        "sfxi_uncertainty": (
+            "For models with ensemble predictions, OPAL computes the standard deviation of objective scores "
+            "across estimators after inverse y-ops and SFXI scoring."
+        ),
+        "sfxi_intensity_scaling": (
+            "OPAL recovers linear intensity as max(0, 2^y_star - delta), computes weighted raw effect, "
+            "uses a configured percentile denominator, then clips effect_scaled = effect_raw / denom to [0, 1]."
+        ),
     }
     return descriptions.get(
         kind,
@@ -249,3 +290,31 @@ def _compact_params(value: Any) -> str:
     if not isinstance(value, Mapping) or not value:
         return "not recorded"
     return "; ".join(f"{key}={item}" for key, item in value.items())
+
+
+def _plot_field_text(*, kind: str, params: Mapping[str, Any], metadata: Mapping[str, Any]) -> str:
+    fields: list[str] = []
+    for key in (
+        "metric",
+        "summary",
+        "summaries",
+        "cohort",
+        "score_field",
+        "rank_mode",
+        "threshold",
+        "y_axis",
+        "hue",
+        "hue_field",
+        "size_by",
+        "vector_field",
+        "aggregation",
+    ):
+        value = params.get(key)
+        if value not in (None, "", []):
+            fields.append(f"{key}={value}")
+    shape = metadata.get("data_shape")
+    if shape not in (None, ""):
+        fields.append(f"data_shape={shape}")
+    if not fields:
+        return f"Plot kind: {str(kind or 'unknown').replace('_', ' ')}."
+    return "Encoded fields: " + "; ".join(str(item) for item in fields[:8]) + "."

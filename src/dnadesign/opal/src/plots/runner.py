@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 import typer
 
-from ..analysis.facade import RoundSelector
+from ..analysis.ledger import RoundSelector
 from ..core.utils import now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir

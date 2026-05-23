@@ -12,28 +12,29 @@ def _():
     import marimo as mo
     import polars as pl
 
-    from dnadesign.opal import (
+    from dnadesign.opal.notebooks.api.progress import (
+        active_record_rows,
         assess_records_contract,
         build_ledger_status_table,
         build_records_preview,
-        cli_handoff_lines,
-        records_status_lines,
-        x_provenance_status_lines,
-    )
-    from dnadesign.opal.notebooks.api import (
+        campaign_contract_rows,
         campaign_label_from_path,
+        cli_handoff_lines,
         diagnostics_to_lines,
         find_repo_root,
         list_campaign_paths,
         load_campaign_selection,
         load_parquet_cached,
+        x_provenance_status_rows,
     )
 
     return (
         Path,
+        active_record_rows,
         assess_records_contract,
         build_ledger_status_table,
         build_records_preview,
+        campaign_contract_rows,
         campaign_label_from_path,
         cli_handoff_lines,
         diagnostics_to_lines,
@@ -43,8 +44,7 @@ def _():
         load_parquet_cached,
         mo,
         pl,
-        records_status_lines,
-        x_provenance_status_lines,
+        x_provenance_status_rows,
     )
 
 
@@ -132,27 +132,18 @@ def _(build_ledger_status_table, campaign_selection):
 
 
 @app.cell
-def _(campaign_selection, mo, records_path, records_report, records_status_lines):
-    info = campaign_selection.info
-    _lines = ["### Campaign contract"]
-    if info is not None:
-        _lines.extend(
-            [
-                f"- Campaign: `{info.slug}`",
-                f"- X column: `{info.x_column}`",
-                f"- Y column: `{info.y_column}`",
-                f"- Y expected length: `{info.y_expected_length}`",
-                f"- Model: `{info.model_name}`",
-                f"- Objective: `{info.objective_name}`",
-                f"- Selection: `{info.selection_name}`",
-            ]
-        )
-    if campaign_selection.path is not None:
-        _lines.append(f"- Config: `{campaign_selection.path}`")
-    if records_path is not None:
-        _lines.append(f"- Records: `{records_path}`")
-    _lines.extend(records_status_lines(records_report))
-    campaign_contract_md = mo.md("\n".join(_lines))
+def _(campaign_contract_rows, campaign_selection, mo, pl, records_path, records_report):
+    campaign_contract_md = mo.ui.table(
+        pl.DataFrame(
+            campaign_contract_rows(
+                campaign_selection.info,
+                config_path=campaign_selection.path,
+                records_path=records_path,
+                records_report=records_report,
+            )
+        ),
+        page_size=14,
+    )
     return (campaign_contract_md,)
 
 
@@ -174,7 +165,7 @@ def _(mo, pl, records_df):
 
 
 @app.cell
-def _(build_records_preview, mo, pl, record_selector, records_df, records_report):
+def _(active_record_rows, build_records_preview, mo, pl, record_selector, records_df, records_report):
     active_record_df = records_df.head(0)
     selected_id = record_selector.value
     if selected_id != "(no records)" and "id" in records_df.columns:
@@ -185,24 +176,13 @@ def _(build_records_preview, mo, pl, record_selector, records_df, records_report
         active_record_md = mo.md("No active record selected.")
     else:
         row = active_record_df.to_dicts()[0]
-        sequence = str(row.get("sequence") or "")
-        _lines = [
-            f"- id: `{row.get('id')}`",
-            f"- sequence length: `{len(sequence)}`",
-        ]
-        if records_report.x_column:
-            _lines.append(f"- X present: `{row.get(records_report.x_column) is not None}`")
-        if records_report.label_hist_column and records_report.label_hist_column in active_record_df.columns:
-            _lines.append(f"- label history present: `{row.get(records_report.label_hist_column) is not None}`")
-        if sequence:
-            _lines.append(f"- sequence preview: `{sequence[:120]}`")
-        active_record_md = mo.md("\n".join(_lines))
+        active_record_md = mo.ui.table(pl.DataFrame(active_record_rows(row, records_report)), page_size=8)
     return active_record_md, active_record_table_df
 
 
 @app.cell
-def _(mo, records_report, x_provenance_status_lines):
-    x_provenance_md = mo.md("\n".join(x_provenance_status_lines(records_report)))
+def _(mo, pl, records_report, x_provenance_status_rows):
+    x_provenance_md = mo.ui.table(pl.DataFrame(x_provenance_status_rows(records_report)), page_size=6)
     return (x_provenance_md,)
 
 

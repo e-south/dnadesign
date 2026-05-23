@@ -23,7 +23,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from ..analysis.facade import CampaignAnalysis
+from ..analysis.campaign import CampaignAnalysis
 from ..core.leakage import assert_no_leakage_violations, build_prediction_identity_report
 from ..core.rounds import resolve_round_index_from_runs
 from ..core.utils import ExitCodes, OpalError, read_json, write_json

@@ -15,7 +15,7 @@ import polars as pl
 
 from ..analysis.dashboard.charts import sfxi_intensity_scaling
 from ..analysis.dashboard.util import list_series_to_numpy
-from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
+from ..analysis.ledger import load_predictions_with_setpoint, read_labels, read_runs
 from ..analysis.sfxi.setpoint_sweep import sweep_setpoints
 from ..analysis.sfxi.state_order import STATE_ORDER
 from ..core.utils import ExitCodes, OpalError

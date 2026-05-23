@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from .src.analysis.campaign import CampaignAnalysis
 from .src.analysis.campaign_progress import (
     assess_records_contract,
     assess_records_contract_for_schema,
@@ -24,13 +25,7 @@ from .src.analysis.campaign_progress import (
     unavailable_table,
     x_provenance_status_lines,
 )
-from .src.analysis.facade import (
-    CampaignAnalysis,
-    available_rounds,
-    latest_round,
-    latest_run_id,
-    require_columns,
-)
+from .src.analysis.ledger import available_rounds, latest_round, latest_run_id, require_columns
 from .src.analysis.notebook_set_template import render_campaign_set_notebook
 from .src.analysis.notebook_template import render_campaign_notebook
 from .src.config.loader import load_config

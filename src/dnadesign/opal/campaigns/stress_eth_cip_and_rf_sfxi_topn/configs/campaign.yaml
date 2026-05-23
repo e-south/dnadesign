@@ -3,6 +3,7 @@
 campaign:
   name: "Stress ethanol/ciprofloxacin AND RF + SFXI + top_n"
   slug: "stress_eth_cip_and_rf_sfxi_topn"
+  description: "Stress ethanol/ciprofloxacin promoter campaign that prioritizes records predicted to satisfy the joint ethanol-and-ciprofloxacin SFXI response."
   workdir: "."
 
 ownership:

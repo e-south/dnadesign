@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Union
 
-from ..analysis.facade import (
+from ..analysis.ledger import (
     load_predictions_with_setpoint,
     read_predictions,
     read_runs,

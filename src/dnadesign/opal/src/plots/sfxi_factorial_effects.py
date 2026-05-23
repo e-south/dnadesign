@@ -14,7 +14,7 @@ from __future__ import annotations
 import polars as pl
 
 from ..analysis.dashboard.charts import sfxi_factorial_effects
-from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
+from ..analysis.ledger import load_predictions_with_setpoint, read_labels, read_runs
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir

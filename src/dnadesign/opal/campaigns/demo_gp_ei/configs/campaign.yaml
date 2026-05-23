@@ -3,6 +3,7 @@
 campaign:
   name: "Demo GP + SFXI + EI"
   slug: "demo_gp_ei"
+  description: "Local OPAL demo for comparing Gaussian-process expected-improvement selection against SFXI vector labels on the shared demo records table."
   workdir: "."
 
 data:

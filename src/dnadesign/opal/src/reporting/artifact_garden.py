@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ..analysis.facade import CampaignAnalysis
+from ..analysis.campaign import CampaignAnalysis
 from ..core.utils import ExitCodes, OpalError, now_iso
 from ..plots.manifests import load_plot_artifact_manifest, load_plot_manifest_index
 from .review import load_review_manifest

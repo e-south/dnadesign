@@ -7,10 +7,10 @@ SUMMARY_CELLS = dedent(
     @app.cell
     def _(
         build_notebook_at_a_glance_rows,
-        build_notebook_distrust_lines,
+        build_notebook_distrust_rows,
         build_notebook_status_line,
         build_notebook_trust_rows,
-        build_notebook_validity_lines,
+        build_notebook_validity_rows,
         mo,
         notebook_view_model,
         pl,
@@ -27,15 +27,21 @@ SUMMARY_CELLS = dedent(
             },
             lazy=True,
         )
-        distrust_md = mo.md("\\n".join(build_notebook_distrust_lines(notebook_view_model)))
-        validity_md = mo.md("\\n".join(build_notebook_validity_lines(notebook_view_model)))
+        distrust_md = mo.ui.table(
+            pl.DataFrame(build_notebook_distrust_rows(notebook_view_model)),
+            page_size=8,
+        )
+        validity_md = mo.ui.table(
+            pl.DataFrame(build_notebook_validity_rows(notebook_view_model)),
+            page_size=14,
+        )
         return at_a_glance_md, distrust_md, status_line_md, validity_md
 
 
     @app.cell
     def _(
-        build_notebook_change_lines,
         build_notebook_change_rows,
+        build_notebook_change_summary_rows,
         build_notebook_evidence_rows,
         mo,
         notebook_view_model,
@@ -53,7 +59,10 @@ SUMMARY_CELLS = dedent(
             changes_table = mo.md("No round changes are available yet.")
         changes_panel = mo.vstack(
             [
-                mo.md("\\n".join(build_notebook_change_lines(notebook_view_model))),
+                mo.ui.table(
+                    pl.DataFrame(build_notebook_change_summary_rows(notebook_view_model)),
+                    page_size=8,
+                ),
                 changes_table,
             ]
         )
@@ -62,8 +71,8 @@ SUMMARY_CELLS = dedent(
 
     @app.cell
     def _(
-        build_notebook_artifact_garden_lines,
         build_notebook_artifact_garden_rows,
+        build_notebook_artifact_garden_summary_rows,
         build_notebook_metric_definition_rows,
         mo,
         notebook_view_model,
@@ -75,8 +84,8 @@ SUMMARY_CELLS = dedent(
         else:
             metric_definitions_panel = mo.md("No manifest-backed plot metric definitions are available.")
 
-        artifact_garden_lines = build_notebook_artifact_garden_lines(notebook_view_model)
         artifact_garden_rows = build_notebook_artifact_garden_rows(notebook_view_model)
+        artifact_summary_rows = build_notebook_artifact_garden_summary_rows(notebook_view_model)
         artifact_rows_panel = (
             mo.ui.table(pl.DataFrame(artifact_garden_rows), page_size=10)
             if artifact_garden_rows
@@ -84,7 +93,7 @@ SUMMARY_CELLS = dedent(
         )
         artifact_garden_panel = mo.vstack(
             [
-                mo.md("\\n".join(artifact_garden_lines)),
+                mo.ui.table(pl.DataFrame(artifact_summary_rows), page_size=10),
                 artifact_rows_panel,
             ]
         )

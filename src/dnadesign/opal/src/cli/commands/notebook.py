@@ -20,14 +20,13 @@ from typing import Optional
 
 import typer
 
-from ...analysis.facade import (
-    CampaignAnalysis,
-)
+from ...analysis.campaign import CampaignAnalysis
 from ...analysis.notebook_set_template import render_campaign_set_notebook
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.pretty import console_out
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...reporting.notebook import smoke_check_notebook
 from ..registry import cli_group
 from ..tui import tui_enabled
 from ._common import internal_error, json_error, json_out, opal_error, print_config_context, prompt_confirm
@@ -348,6 +347,7 @@ def cmd_notebook_generate(
         content = render_campaign_notebook(analysis.config_path, round_selector=round_sel, run_id=resolved_run_id)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(content)
+        smoke_check_notebook(out_path, run_marimo_check=True)
         if json:
             json_out(
                 notebook_generate_payload(
@@ -466,6 +466,7 @@ def _generate_campaign_set_notebook(
     content = render_campaign_set_notebook([analysis.config_path for analysis in analyses], round_selector=round_sel)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
+    smoke_check_notebook(out_path, run_marimo_check=True)
     if json:
         json_out(
             notebook_generate_payload(

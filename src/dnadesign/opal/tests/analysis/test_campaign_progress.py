@@ -14,14 +14,17 @@ from pathlib import Path
 import polars as pl
 
 from dnadesign.opal.src.analysis.campaign_progress import (
+    active_record_rows,
     assess_records_contract,
     assess_records_contract_for_schema,
     build_ledger_status_table,
     build_records_preview,
+    campaign_contract_rows,
     cli_handoff_lines,
     read_optional_table,
     table_status_lines,
     x_provenance_status_lines,
+    x_provenance_status_rows,
 )
 from dnadesign.opal.src.analysis.dashboard.datasets import CampaignInfo
 
@@ -62,6 +65,9 @@ def test_records_contract_ready_with_configured_x_column() -> None:
     assert report.ready
     assert report.missing_required_columns == ()
     assert "does not inspect producer geometry" in "\n".join(x_provenance_status_lines(report))
+    rows = {row["field"]: row["value"] for row in x_provenance_status_rows(report)}
+    assert rows["X column"] == "opal__view__x"
+    assert rows["X state"] == "present"
 
 
 def test_records_contract_requires_configured_x_column() -> None:
@@ -115,6 +121,39 @@ def test_records_preview_hides_vector_but_marks_presence() -> None:
     assert preview.get_column("x_present").to_list() == [True]
     assert preview.get_column("label_hist_present").to_list() == [True]
     assert preview.get_column("sequence_length").to_list() == [160]
+    row = df.to_dicts()[0]
+    status_rows = {item["field"]: item["value"] for item in active_record_rows(row, report)}
+    assert status_rows["id"] == "rec-1"
+    assert status_rows["X present"] is True
+    assert status_rows["label history present"] is True
+
+
+def test_campaign_contract_rows_are_table_ready() -> None:
+    report = assess_records_contract(
+        pl.DataFrame(
+            {
+                "id": ["rec-1"],
+                "bio_type": ["promoter"],
+                "sequence": ["ACGT"],
+                "alphabet": ["DNA"],
+                "opal__view__x": [[0.1, 0.2, 0.3]],
+            }
+        ),
+        _campaign_info(),
+    )
+
+    rows = campaign_contract_rows(
+        _campaign_info(),
+        config_path=Path("campaign.yaml"),
+        records_path=Path("records.parquet"),
+        records_report=report,
+    )
+    keyed = {row["field"]: row["value"] for row in rows}
+
+    assert keyed["campaign"] == "demo"
+    assert keyed["config"] == "campaign.yaml"
+    assert keyed["records"] == "records.parquet"
+    assert keyed["records contract"] == "ready"
 
 
 def test_ledger_status_table_is_structured_when_workdir_missing() -> None:
