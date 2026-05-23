@@ -16,7 +16,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.construct.cli import app
+from dnadesign.construct.src.cli import app
 from dnadesign.usr import Dataset
 from dnadesign.usr import SchemaError as USRSchemaError
 
@@ -272,7 +272,7 @@ def test_run_command_shapes_usr_write_errors(tmp_path: Path, monkeypatch) -> Non
     config_path = _write_valid_config(tmp_path=tmp_path, usr_root=usr_root)
 
     monkeypatch.setattr(
-        "dnadesign.construct.src.api._persist_construct_run",
+        "dnadesign.construct.src.interfaces.api._persist_construct_run",
         lambda planned: (_ for _ in ()).throw(USRSchemaError("overlay attach rejected")),
     )
 

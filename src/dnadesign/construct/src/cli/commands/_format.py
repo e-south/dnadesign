@@ -17,7 +17,7 @@ from pathlib import Path
 
 import typer
 
-from ...errors import ConstructError
+from ...contracts.errors import ConstructError
 
 
 def normalize_json_value(value: object) -> object:

@@ -21,9 +21,14 @@ anchor handling, focal windows, and sequence-view product contracts.
 
 - Tool README: `src/dnadesign/construct/README.md`
 - Runtime source: `src/dnadesign/construct/src/`
+- Public API and cross-tool contract implementation:
+  `src/dnadesign/construct/src/interfaces/`
+- Configuration schemas and exception contracts:
+  `src/dnadesign/construct/src/contracts/`
+- Runtime orchestration: `src/dnadesign/construct/src/orchestration/`
 - CLI commands: `src/dnadesign/construct/src/cli/commands/`
-- Contracts and public wrappers: `src/dnadesign/construct/contracts.py`,
-  `src/dnadesign/construct/cli.py`
+- Public package surface: `src/dnadesign/construct/__init__.py`
+- Module execution surface: `src/dnadesign/construct/__main__.py`
 - Workspaces: `src/dnadesign/construct/workspaces/`
 - Tests: `src/dnadesign/construct/tests/`
 
@@ -45,7 +50,12 @@ uv run pytest -q src/dnadesign/construct/tests
 ## Layout
 
 - Keep runtime implementation under `src/`; root-level Python files should stay
-  limited to stable import and CLI wrappers.
+  limited to `__init__.py` and `__main__.py`.
 - Add new implementation domains as named packages rather than flat root modules.
+- Keep `src/dnadesign/construct/src/` itself free of implementation modules
+  other than `__init__.py`; place code in semantic domain packages.
+- Do not add root-level `cli.py`, `contracts.py`, or `main.py`; route CLI and
+  contract implementation through `src/` packages and export public APIs from
+  `dnadesign.construct`.
 - Keep tests grouped by behavior (`cli`, `runtime`, `package`, contracts) when
   adding broader coverage.

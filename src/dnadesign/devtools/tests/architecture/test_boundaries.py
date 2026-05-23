@@ -388,10 +388,8 @@ def test_find_undeclared_cross_tool_imports_allows_shared_contract_package(tmp_p
 @pytest.mark.parametrize(
     ("owner_tool", "imported_tool"),
     (
-        ("notify", "construct"),
         ("notify", "densegen"),
         ("notify", "infer"),
-        ("ops", "construct"),
         ("ops", "densegen"),
     ),
 )
@@ -412,6 +410,47 @@ def test_find_undeclared_cross_tool_imports_allows_contract_owner_edges(
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert violations == []
+
+
+@pytest.mark.parametrize("owner_tool", ("notify", "ops", "studies"))
+def test_find_undeclared_cross_tool_imports_allows_construct_public_package_surface(
+    tmp_path: Path,
+    owner_tool: str,
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / owner_tool / "api.py",
+        "from dnadesign.construct import resolve_construct_usr_output_contract\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "construct" / "__init__.py",
+        "def resolve_construct_usr_output_contract():\n    return 1\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+@pytest.mark.parametrize("owner_tool", ("notify", "ops", "studies"))
+def test_find_undeclared_cross_tool_imports_rejects_construct_contract_module_surface(
+    tmp_path: Path,
+    owner_tool: str,
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / owner_tool / "api.py",
+        "from dnadesign.construct.contracts import resolve_construct_usr_output_contract\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "construct" / "contracts.py",
+        "def resolve_construct_usr_output_contract():\n    return 1\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == owner_tool
+    assert violations[0].imported_tool == "construct"
+    assert violations[0].import_target == "dnadesign.construct.contracts"
 
 
 def test_find_undeclared_cross_tool_imports_allows_ops_to_notify_core_contracts(tmp_path: Path) -> None:

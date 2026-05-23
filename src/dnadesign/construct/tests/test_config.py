@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.construct.src.config import (
+from dnadesign.construct.src.contracts.config import (
     InputConfig,
     JobConfig,
     OutputConfig,
@@ -241,6 +241,83 @@ def test_job_config_normalize_anchor_rejects_template_realization_fields() -> No
                     },
                     "output": {
                         "target": {"kind": "usr", "dataset": "anchors_norm", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_unknown_full_construct_focal_part() -> None:
+    with pytest.raises(PydanticValidationError, match="realize.focal_part 'missing_anchor' is not defined"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_anchor_demo",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "template": {
+                        "id": "template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "anchor",
+                            "role": "anchor",
+                            "sequence": {"source": "input_field", "field": "sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "focal_part": "missing_anchor"},
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_implicit_focal_part_when_multiple_anchor_parts_exist() -> None:
+    with pytest.raises(PydanticValidationError, match="multiple anchor parts"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_anchor_demo",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "template": {
+                        "id": "template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "anchor_a",
+                            "role": "anchor",
+                            "sequence": {"source": "input_field", "field": "sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        },
+                        {
+                            "name": "anchor_b",
+                            "role": "anchor",
+                            "sequence": {"source": "literal", "literal": "GG"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 12, "end": 16},
+                            },
+                        },
+                    ],
+                    "realize": {"mode": "full_construct"},
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "constructs", "root": "/tmp/usr"},
                     },
                 }
             }

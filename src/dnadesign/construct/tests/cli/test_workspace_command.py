@@ -18,9 +18,9 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.construct.cli import app
-from dnadesign.construct.src.seed import bootstrap_anchor_template_demo
-from dnadesign.construct.src.workspace import project_root
+from dnadesign.construct.src.cli import app
+from dnadesign.construct.src.seeding.bootstrap import bootstrap_anchor_template_demo
+from dnadesign.construct.src.workspaces.registry import project_root
 from dnadesign.usr import Dataset
 
 _RUNNER = CliRunner()
@@ -190,7 +190,7 @@ def test_workspace_init_quotes_project_root_in_external_workspace_commands(tmp_p
 def test_workspace_init_uses_plain_uv_run_when_repo_checkout_is_unavailable(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "ws_root"
     monkeypatch.setattr("dnadesign.construct.src.cli.commands.workspace.project_root_or_none", lambda: None)
-    monkeypatch.setattr("dnadesign.construct.src.workspace.project_root_or_none", lambda: None)
+    monkeypatch.setattr("dnadesign.construct.src.workspaces.registry.project_root_or_none", lambda: None)
 
     result = _RUNNER.invoke(
         app,
@@ -243,7 +243,7 @@ def test_workspace_init_cleans_up_partial_workspace_on_copy_failure(tmp_path: Pa
     def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise OSError("simulated scaffold failure")
 
-    monkeypatch.setattr("dnadesign.construct.src.workspace._copy_blank_workspace", _boom)
+    monkeypatch.setattr("dnadesign.construct.src.workspaces.registry._copy_blank_workspace", _boom)
 
     result = _RUNNER.invoke(app, ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix()])
 
@@ -318,7 +318,7 @@ def test_workspace_list_json_reports_packaged_workspace_state(monkeypatch, tmp_p
         "ok\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+    monkeypatch.setattr("dnadesign.construct.src.workspaces.registry._construct_root", lambda: construct_root)
 
     result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
 
@@ -349,7 +349,7 @@ def test_workspace_list_json_reports_local_copied_workspace_state(monkeypatch, t
         encoding="utf-8",
     )
     (local_workspace / "outputs" / "logs" / "run.log").write_text("ok\n", encoding="utf-8")
-    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+    monkeypatch.setattr("dnadesign.construct.src.workspaces.registry._construct_root", lambda: construct_root)
     monkeypatch.chdir(tmp_path)
 
     result = _RUNNER.invoke(app, ["workspace", "list", "--format", "json"])
@@ -686,7 +686,7 @@ def test_workspace_show_resolves_packaged_workspace_id(monkeypatch, tmp_path: Pa
         "workspace:\n  id: demo_anchor_template_local\n  profile: anchor-template-demo\n  projects: []\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr("dnadesign.construct.src.workspace._construct_root", lambda: construct_root)
+    monkeypatch.setattr("dnadesign.construct.src.workspaces.registry._construct_root", lambda: construct_root)
 
     result = _RUNNER.invoke(app, ["workspace", "show", "--workspace", "demo_anchor_template_local"])
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.construct.cli import app
+from dnadesign.construct.src.cli import app
 
 _RUNNER = CliRunner()
 

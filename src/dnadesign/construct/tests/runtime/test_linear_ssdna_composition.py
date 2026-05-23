@@ -25,9 +25,9 @@ from Bio import SeqIO
 from Bio.GenBank import BiopythonParserWarning
 
 import dnadesign.baserender as baserender
-from dnadesign.construct.src.composition import run_linear_ssdna_composition
-from dnadesign.construct.src.composition_review import publish_composition_review_svg
-from dnadesign.construct.src.errors import ValidationError
+from dnadesign.construct.src.composition.review import publish_composition_review_svg
+from dnadesign.construct.src.composition.runtime import run_linear_ssdna_composition
+from dnadesign.construct.src.contracts.errors import ConfigError, ValidationError
 
 _DNA_COMPLEMENT = str.maketrans("ACGTacgt", "TGCAtgca")
 RETRON43_UNIT = "gtcagaaaaaaCAAGtccctatcagtgatagagatCCTCAGcccGCTGAGGatctctatcactgatagggaCTCGacagtaactcaga"
@@ -806,4 +806,20 @@ def test_run_linear_ssdna_composition_rejects_reverse_complement_mismatch(tmp_pa
     config_path = _write_retron43_config(tmp_path, bad_complement=True)
 
     with pytest.raises(ValidationError, match="payload_complement reverse_complement does not match payload_primary"):
+        run_linear_ssdna_composition(config_path)
+
+
+def test_run_linear_ssdna_composition_rejects_unknown_annotation_segment(tmp_path: Path) -> None:
+    config_path = _write_retron43_config(tmp_path)
+    config_text = config_path.read_text(encoding="utf-8")
+    config_path.write_text(
+        config_text.replace(
+            "segment_id: flank_5p\n          start: 11", "segment_id: missing_segment\n          start: 11", 1
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ConfigError, match="annotation 'stem_base_left' references unknown segment_id 'missing_segment'"
+    ):
         run_linear_ssdna_composition(config_path)

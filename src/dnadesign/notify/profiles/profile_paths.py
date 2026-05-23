@@ -29,7 +29,7 @@ def resolve_resolver_mode_profile_path(*, tool_name: str, config_path: Path) -> 
             raise NotifyConfigError(str(exc)) from exc
     if tool_name != "construct":
         return workspace_root / default_profile_path_for_tool(tool_name)
-    from dnadesign.construct.contracts import (
+    from dnadesign.construct import (
         resolve_construct_workspace_project_id_from_config,
         resolve_construct_workspace_root_from_config,
     )

@@ -202,7 +202,7 @@ def _construct_workspace_roots(repo_root: Path | None, search_root: Path) -> tup
 
 
 def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
-    from dnadesign.construct.contracts import resolve_construct_workspace_config_path_from_root
+    from dnadesign.construct import resolve_construct_workspace_config_path_from_root
 
     workspace_id, _, _ = workspace_name.partition(":")
     explicit_root = str(os.environ.get("CONSTRUCT_WORKSPACE_ROOT") or "").strip()
@@ -234,7 +234,7 @@ def _resolve_construct_config_from_known_roots(workspace_name: str, repo_root: P
 
 
 def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
-    from dnadesign.construct.contracts import (
+    from dnadesign.construct import (
         list_construct_workspace_selectors,
         list_construct_workspace_selectors_from_root,
     )

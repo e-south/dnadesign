@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.construct.src.config import SequenceOffsetSelectorConfig, load_job_config
+from dnadesign.construct.src.contracts.config import SequenceOffsetSelectorConfig, load_job_config
 
 WORKSPACE = Path("src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel")
 

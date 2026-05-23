@@ -97,6 +97,8 @@ Fail-fast template rules:
 - each job must include at least one `input_field` part
 - each part is a named assembly slot with its own role, sequence source,
   placement, orientation, and guards
+- part names must be unique; duplicate names are rejected before placement
+  planning so one slot cannot overwrite another slot's resolved site
 - multi-slot jobs bind several `input_field` parts from the same input row, for
   example `candidate__lnrna_sequence` and `candidate__rt_cds_sequence`
 - every placement now has two explicit sub-blocks:
@@ -201,6 +203,8 @@ analysis view, not a new native promoter.
 Fail-fast rules for `normalize_anchor`:
 
 - ambiguous annotation matches fail before sequence emission
+- malformed `seq_annot__features` payloads fail before selector fallback or
+  feature-retention reporting
 - `sequence_midpoint` is low-confidence and requires `fallback_policy.allow_low_confidence: true`
 - short inputs require `under_length_policy`
 - template expansion must still emit the exact target length

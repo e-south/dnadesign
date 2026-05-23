@@ -2269,7 +2269,7 @@ def test_retron_msd_study_uses_public_tool_apis_only() -> None:
                 imports.add(node.module)
 
     assert "dnadesign.construct" in imports
-    assert "dnadesign.construct.src.composition" not in imports
+    assert "dnadesign.construct.src.composition.runtime" not in imports
     assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.src") for name in imports)
     assert not any(name.startswith("dnadesign.cruncher.workspaces") for name in imports)
     assert not any(name.startswith("dnadesign.folding.src") for name in imports)

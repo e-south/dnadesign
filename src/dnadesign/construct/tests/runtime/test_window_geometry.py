@@ -15,9 +15,10 @@ from typing import Literal
 
 import pytest
 
-from dnadesign.construct.src.config import WindowConfig
-from dnadesign.construct.src.errors import ValidationError
-from dnadesign.construct.src.runtime import _normalize_window_geometry, _ResolvedPart
+from dnadesign.construct.src.contracts.config import WindowConfig
+from dnadesign.construct.src.contracts.errors import ValidationError
+from dnadesign.construct.src.realization.parts import RealizedPart
+from dnadesign.construct.src.realization.windows import normalize_window_geometry
 
 
 def _resolved_part(
@@ -25,8 +26,8 @@ def _resolved_part(
     sequence: str = "ACGT",
     orientation: Literal["forward", "reverse_complement"] = "forward",
     realized_start: int = 8,
-) -> _ResolvedPart:
-    return _ResolvedPart(
+) -> RealizedPart:
+    return RealizedPart(
         name="anchor",
         role="anchor",
         kind="replace",
@@ -42,7 +43,7 @@ def _resolved_part(
 
 
 def test_normalize_window_geometry_supports_fixed_total_symmetric_linear() -> None:
-    geometry = _normalize_window_geometry(
+    geometry = normalize_window_geometry(
         full_construct_length=16,
         template_circular=False,
         focal=_resolved_part(),
@@ -74,7 +75,7 @@ def test_normalize_window_geometry_supports_directional_fixed_total_windows(
     direction: Literal["five_prime", "three_prime"],
     expected: tuple[int, int],
 ) -> None:
-    geometry = _normalize_window_geometry(
+    geometry = normalize_window_geometry(
         full_construct_length=16,
         template_circular=False,
         focal=_resolved_part(orientation=orientation),
@@ -92,7 +93,7 @@ def test_normalize_window_geometry_supports_directional_fixed_total_windows(
 
 
 def test_normalize_window_geometry_supports_anchor_plus_context_reverse_orientation() -> None:
-    geometry = _normalize_window_geometry(
+    geometry = normalize_window_geometry(
         full_construct_length=20,
         template_circular=False,
         focal=_resolved_part(sequence="ACGT", orientation="reverse_complement"),
@@ -108,7 +109,7 @@ def test_normalize_window_geometry_supports_anchor_plus_context_reverse_orientat
 
 
 def test_normalize_window_geometry_wraps_coordinates_for_circular_templates() -> None:
-    geometry = _normalize_window_geometry(
+    geometry = normalize_window_geometry(
         full_construct_length=8,
         template_circular=True,
         focal=_resolved_part(sequence="GG", realized_start=6),
@@ -127,7 +128,7 @@ def test_normalize_window_geometry_wraps_coordinates_for_circular_templates() ->
 
 def test_normalize_window_geometry_rejects_linear_windows_outside_bounds() -> None:
     with pytest.raises(ValidationError, match="extends beyond the linear construct boundaries"):
-        _normalize_window_geometry(
+        normalize_window_geometry(
             full_construct_length=16,
             template_circular=False,
             focal=_resolved_part(realized_start=1),
@@ -143,7 +144,7 @@ def test_normalize_window_geometry_rejects_linear_windows_outside_bounds() -> No
 
 def test_normalize_window_geometry_rejects_linear_windows_past_right_boundary() -> None:
     with pytest.raises(ValidationError, match="extends beyond the linear construct boundaries"):
-        _normalize_window_geometry(
+        normalize_window_geometry(
             full_construct_length=16,
             template_circular=False,
             focal=_resolved_part(realized_start=12),
@@ -159,7 +160,7 @@ def test_normalize_window_geometry_rejects_linear_windows_past_right_boundary() 
 
 def test_normalize_window_geometry_rejects_fixed_total_window_shorter_than_focal_part() -> None:
     with pytest.raises(ValidationError, match="exceeds fixed_total window size_bp=5"):
-        _normalize_window_geometry(
+        normalize_window_geometry(
             full_construct_length=16,
             template_circular=False,
             focal=_resolved_part(sequence="ACGTAA"),
@@ -175,7 +176,7 @@ def test_normalize_window_geometry_rejects_fixed_total_window_shorter_than_focal
 
 def test_normalize_window_geometry_rejects_anchor_plus_context_windows_longer_than_construct() -> None:
     with pytest.raises(ValidationError, match="Requested anchor_plus_context window length 17 exceeds"):
-        _normalize_window_geometry(
+        normalize_window_geometry(
             full_construct_length=16,
             template_circular=False,
             focal=_resolved_part(sequence="ACGT"),

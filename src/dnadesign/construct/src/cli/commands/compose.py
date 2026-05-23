@@ -16,9 +16,9 @@ from pathlib import Path
 
 import typer
 
-from ...composition import run_linear_ssdna_composition, summarize_linear_ssdna_composition
-from ...composition_review import publish_composition_review_svg
-from ...errors import ConstructError
+from ...composition.review import publish_composition_review_svg
+from ...composition.runtime import run_linear_ssdna_composition, summarize_linear_ssdna_composition
+from ...contracts.errors import ConstructError
 from ._errors import exit_with_error
 from ._format import echo_json, validate_output_format
 

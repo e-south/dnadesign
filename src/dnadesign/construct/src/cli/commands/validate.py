@@ -15,8 +15,8 @@ from pathlib import Path
 
 import typer
 
-from ...api import load_job_config, preflight_from_config
-from ...errors import ConstructError
+from ...contracts.errors import ConstructError
+from ...interfaces.api import load_job_config, preflight_from_config
 from ._errors import exit_with_error
 from ._format import validate_output_format
 from ._render import echo_validate_result

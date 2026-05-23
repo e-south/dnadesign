@@ -17,9 +17,9 @@ from pathlib import Path
 
 import typer
 
-from ...errors import ConstructError
-from ...runtime import preflight_from_config, run_from_config
-from ...workspace import (
+from ...contracts.errors import ConstructError
+from ...orchestration.runtime import preflight_from_config, run_from_config
+from ...workspaces.registry import (
     doctor_workspace_registry,
     init_workspace,
     list_workspace_inventory,

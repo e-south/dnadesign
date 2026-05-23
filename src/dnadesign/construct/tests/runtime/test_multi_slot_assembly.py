@@ -18,9 +18,9 @@ import pytest
 import yaml
 from Bio.Seq import Seq
 
-from dnadesign.construct.src.api import run_from_config
-from dnadesign.construct.src.errors import ValidationError
-from dnadesign.construct.src.output_store import _ensure_construct_registry
+from dnadesign.construct.src.contracts.errors import ValidationError
+from dnadesign.construct.src.interfaces.api import run_from_config
+from dnadesign.construct.src.persistence.usr_registry import _ensure_construct_registry
 from dnadesign.usr import Dataset
 
 

@@ -1,0 +1,1 @@
+"""Construct output persistence contracts."""

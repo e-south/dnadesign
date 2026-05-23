@@ -1520,7 +1520,7 @@ def test_stress_ethanol_cipro_study_preflight_reports_command_and_dataset_blocke
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(
@@ -1983,7 +1983,7 @@ def test_stress_ethanol_cipro_study_preflight_blocks_stale_construct_inputs_in_n
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(
@@ -2220,7 +2220,7 @@ def test_stress_ethanol_cipro_study_preflight_scope_next_defers_later_lane_block
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(
@@ -2360,7 +2360,7 @@ def test_stress_ethanol_cipro_study_preflight_lane_scope_keeps_notify_env_and_se
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(
@@ -2500,7 +2500,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_completed_infer
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(
@@ -2627,7 +2627,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_parallel_option
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
-            "dnadesign.construct.contracts.resolve_construct_workspace_config_path_from_root",
+            "dnadesign.construct.resolve_construct_workspace_config_path_from_root",
             lambda **kwargs: repo_root / "workspace" / "construct" / "config.slot_a.yaml",
         )
         monkeypatch.setattr(

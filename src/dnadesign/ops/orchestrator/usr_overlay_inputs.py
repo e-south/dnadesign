@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+from dnadesign.construct import resolve_construct_usr_output_contract
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.ops.contracts import resolve_usr_producer_contract
 

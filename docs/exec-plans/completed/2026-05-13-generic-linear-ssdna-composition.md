@@ -323,7 +323,7 @@ Implemented artifacts:
   `src/dnadesign/contracts/sequence/linear_ssdna_composition_v1.py`
   and `src/dnadesign/contracts/folding/secondary_structure_prediction_v1.py`
 - Construct runtime:
-  `src/dnadesign/construct/src/composition.py`
+  `src/dnadesign/construct/src/composition/runtime.py`
 - CLI:
   `uv run construct compose validate --config <composition.yaml>`
   and `uv run construct compose run --config <composition.yaml>`
@@ -354,7 +354,7 @@ Implemented artifacts:
 Validation evidence:
 
 - RED: targeted tests first failed on missing
-  `dnadesign.contracts.folding` and `dnadesign.construct.src.composition`.
+  `dnadesign.contracts.folding` and `dnadesign.construct.src.composition.runtime`.
 - GREEN:
   `uv run pytest -q src/dnadesign/contracts/tests/test_sequence_contracts.py src/dnadesign/construct/tests/runtime/test_linear_ssdna_composition.py src/dnadesign/construct/tests/cli/test_compose_command.py`
   passed with 8 tests.

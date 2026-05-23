@@ -15,8 +15,8 @@ from pathlib import Path
 
 import typer
 
-from ...config import JobConfig
-from ...runtime import PreflightResult, RunResult
+from ...contracts.config import JobConfig
+from ...orchestration.runtime import PreflightResult, RunResult
 from ._format import echo_json
 
 

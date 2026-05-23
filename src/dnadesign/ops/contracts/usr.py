@@ -59,7 +59,7 @@ def _resolve_infer_usr_contract(config_path: Path) -> USRProducerContract:
 
 
 def _resolve_construct_usr_contract(config_path: Path) -> USRProducerContract:
-    from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+    from dnadesign.construct import resolve_construct_usr_output_contract
 
     destination = resolve_construct_usr_output_contract(config_path)
     return USRProducerContract(

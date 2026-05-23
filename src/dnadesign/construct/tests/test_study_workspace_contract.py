@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.construct.src.config import (
+from dnadesign.construct.src.contracts.config import (
     AnnotationPairMidpointSelectorConfig,
     load_job_config,
 )

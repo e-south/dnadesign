@@ -15,8 +15,8 @@ from pathlib import Path
 
 import typer
 
-from ...errors import ConstructError
-from ...seed import bootstrap_anchor_template_demo, import_seed_manifest
+from ...contracts.errors import ConstructError
+from ...seeding.bootstrap import bootstrap_anchor_template_demo, import_seed_manifest
 from ._errors import exit_with_error
 
 seed_app = typer.Typer(
