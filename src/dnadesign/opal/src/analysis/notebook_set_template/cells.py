@@ -5,6 +5,8 @@ from .details_cells import render_details_cells
 from .setup_cells import render_setup_cells
 from .visual_cells import render_visual_cells
 
+OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_notebook.v2"
+
 
 def render_campaign_set_template() -> str:
     """Render the full campaign-set marimo notebook source."""
@@ -19,4 +21,4 @@ def render_campaign_set_template() -> str:
     )
 
 
-__all__ = ["render_campaign_set_template"]
+__all__ = ["OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION", "render_campaign_set_template"]

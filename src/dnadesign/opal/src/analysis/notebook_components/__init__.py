@@ -43,6 +43,7 @@ from .plots import (
     build_notebook_plot_method_sections,
     build_notebook_visual_surface_model,
 )
+from .project import find_notebook_repo_root, list_notebook_campaign_paths
 from .runs import (
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -86,7 +87,9 @@ __all__ = [
     "build_notebook_validity_lines",
     "build_notebook_validity_rows",
     "compact_notebook_path",
+    "find_notebook_repo_root",
     "load_notebook_baserender_record_row",
+    "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",

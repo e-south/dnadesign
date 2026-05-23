@@ -37,11 +37,10 @@ from dnadesign.opal.src.registries.plots import get_plot, list_plot_kinds
 
 def test_notebook_template_data_source_options() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert "predictions (selected run)" in text
-    assert "predictions (all rounds)" not in text
-    assert "labels (all rounds)" in text
-    assert 'label_round_column = str(cfg.labels.round_column or "observed_round")' in text
-    assert "pl.col(label_round_column)" in text
+    assert 'label="Campaign"' in text
+    assert 'label="Round"' in text
+    assert "predictions (selected run)" not in text
+    assert "labels (all rounds)" not in text
 
 
 def test_notebook_template_uses_full_width() -> None:
@@ -59,8 +58,7 @@ def test_notebook_template_removes_extra_tables() -> None:
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert 'label="Visual surface"' in text
-    assert "plots_dir" in text
-    assert "build_notebook_view_model" in text
+    assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
 
@@ -68,7 +66,7 @@ def test_notebook_template_has_visual_surface() -> None:
 def test_notebook_template_has_opal_schema_sentinel() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v1"' in text
+    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v2"' in text
 
 
 def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> None:
@@ -84,20 +82,14 @@ def test_notebook_template_uses_visual_surface_component() -> None:
 
     assert render_visual_surface_cells.__module__.endswith(".notebook_components.visual_surface")
     assert "def render_visual_surface_cells" not in text
-    assert surface_text in text
-    assert "visual_surface_note" in surface_text
-    assert "manifest-backed plot outputs" in surface_text
-    assert 'label="Visual surface"' in surface_text
-    assert '"label": plot_choice["label"]' in surface_text
-    assert '"label": plot_choice["title"]' not in surface_text
-    assert "max-height" in surface_text
-    assert "Record render" in surface_text
-    assert "Plot:" not in surface_text
-    assert "build_notebook_plot_method_sections" in surface_text
-    assert "thumbnail_gallery" not in surface_text
-    assert surface_text.index('if notebook_baserender_contract.get("available")') < surface_text.index(
-        "if plot_cfg_error:"
-    )
+    assert surface_text not in text
+    assert "manifest-backed plot media are available" in text
+    assert 'label="Visual surface"' in text
+    assert '"label": plot_choice["title"]' not in text
+    assert "max-height" in text
+    assert "Plot:" not in text
+    assert "build_notebook_plot_method_sections" in text
+    assert "thumbnail_gallery" not in text
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -116,16 +108,13 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     assert "Campaign analysis command surface" not in text
     assert "mo.accordion(" in text
     for section in [
-        "Campaign contract",
-        "Round and run",
-        "Ledger readiness",
-        "Records and active record",
-        "Labels and predictions",
+        "Campaigns at a glance",
+        "Selected campaign",
         "Validity",
         "Changes",
-        "X provenance and limitations",
         "Metric definitions",
         "Artifacts",
+        "Warnings and stale artifacts",
     ]:
         assert section in text
 
@@ -136,29 +125,24 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "from dnadesign.opal.notebooks.api.generated import" in text
     assert "from dnadesign.opal.notebooks.api import" not in text
     assert "dnadesign.opal.src" not in text
-    assert "assess_records_contract_for_schema" in text
-    assert "build_ledger_status_table" in text
-    assert "build_records_preview" in text
-    assert "cli_handoff_lines" in text
-    assert "compact_notebook_path" in text
-    assert "read_optional_table" in text
-    assert "records_status_lines" in text
+    assert "build_campaign_set_notebook_view_model" in text
+    assert "build_campaign_set_round_options" in text
+    assert "build_notebook_campaign_summary_row" in text
+    assert "build_notebook_visual_surface_model" in text
 
 
 def test_notebook_template_degrades_without_runs() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "build_notebook_no_run_lines" in text
+    assert "No written manifest-backed plot media are available" in text
     assert "mo.stop(len(rounds) == 0" not in text
-    assert 'default_source = "records"' in text
 
 
 def test_notebook_template_can_pin_initial_run_scope() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="0", run_id="run-1")
 
-    assert "default_round = '0'" in text
-    assert "default_run_id = 'run-1'" in text
-    assert "run_default = default_run_id if default_run_id in run_options" in text
+    assert "round_default = '0'" in text
+    assert "run_id='run-1'" in text
     summary = "\n".join(
         build_notebook_run_summary_lines(
             "run-1",
@@ -193,9 +177,8 @@ def test_notebook_template_uses_schema_pruned_records_loading() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
     assert "store.load()" not in text
-    assert "store.schema_columns()" in text
-    assert "store.load_columns(records_loaded_columns)" in text
-    assert "records_df = pl.from_pandas" in text
+    assert "store.load_columns(records_loaded_columns)" not in text
+    assert "records_df = pl.from_pandas" not in text
 
 
 def test_notebook_component_primitives_build_shared_evidence_models() -> None:
@@ -553,7 +536,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert "render_notebook_baserender_record" in text
+    assert "render_notebook_baserender_record" not in text
     assert "from dnadesign.baserender import" not in text
 
     unavailable = build_notebook_baserender_contract(["id", "sequence"], records_path="records.parquet")

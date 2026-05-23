@@ -26,6 +26,7 @@ def _import_cell() -> str:
         """
         @app.cell
         def _():
+            __opal_notebook_template_schema__ = "__OPAL_NOTEBOOK_TEMPLATE_SCHEMA__"
             generated_with = "__GENERATED_WITH__"
             from pathlib import Path
 
@@ -105,6 +106,7 @@ def _view_model_cell() -> str:
             campaign_set_view_model = build_campaign_set_notebook_view_model(
                 config_paths,
                 round_selector=selected_round_selector,
+                run_id=__DEFAULT_RUN_ID__,
             )
             campaigns = campaign_set_view_model["campaigns"]
             return campaign_set_view_model, campaigns, selected_round_selector

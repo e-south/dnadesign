@@ -68,9 +68,9 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
 
     txt = out_path.read_text()
     assert "marimo.App" in txt
-    assert "CampaignAnalysis.from_config_path" in txt
+    assert "build_campaign_set_notebook_view_model" in txt
+    assert 'label="Campaign"' in txt
     assert "opal" in txt.lower()
-    assert "Data source" in txt
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
     assert 'marimo.App(width="full")' in txt
@@ -112,8 +112,8 @@ def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) ->
     out_path = workdir / "notebooks" / "opal_demo_analysis.py"
     assert out_path.exists()
     text = out_path.read_text()
-    assert "No runs available yet" in text
-    assert "outputs/ledger/runs.parquet" in text
+    assert "build_campaign_set_notebook_view_model" in text
+    assert "No written manifest-backed plot media are available" in text
 
 
 def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:

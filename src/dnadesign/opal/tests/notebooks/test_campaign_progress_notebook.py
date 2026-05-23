@@ -20,7 +20,8 @@ def test_campaign_progress_has_no_load_button() -> None:
 
 def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "from dnadesign.opal.notebooks.api.progress import" in text
+    assert "from dnadesign.opal.notebooks.api.generated import" in text
+    assert "build_campaign_set_notebook_view_model" in text
     assert "from dnadesign.opal import" not in text
     assert "from dnadesign.opal.notebooks.api import" not in text
     assert "dnadesign.opal.src" not in text
@@ -30,31 +31,33 @@ def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
 
 def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "# OPAL Campaign Progress" in text
+    assert "# Campaigns" in text
     assert "mo.accordion(" in text
     assert "mo.ui.table" in text
-    assert "Campaign contract" in text
-    assert "Records and active record" in text
-    assert "Ledger and CLI handoff" in text
-    assert "X provenance and limitations" in text
+    assert "Campaigns at a glance" in text
+    assert "Selected campaign" in text
+    assert "Validity" in text
+    assert "Visual surface" in text
 
 
 def test_campaign_progress_uses_tables_for_contract_and_record_status() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "campaign_contract_rows(" in text
-    assert "active_record_rows(" in text
-    assert "x_provenance_status_rows(" in text
-    assert "records_status_lines" not in text
-    assert "x_provenance_status_lines" not in text
+    assert "build_notebook_at_a_glance_rows" in text
+    assert "build_notebook_validity_rows" in text
+    assert "build_notebook_evidence_rows" in text
+    assert "campaign_contract_rows(" not in text
+    assert "active_record_rows(" not in text
     assert 'f"- Campaign:' not in text
     assert 'f"- id:' not in text
     assert 'f"- X column:' not in text
 
 
-def test_campaign_progress_uses_canonical_cli_handoff() -> None:
+def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "cli_handoff_lines" in text
-    assert "cli_handoff_lines(config_text)" in text
+    assert "build_campaign_set_round_options" in text
+    assert "selected_round_selector = str(round_ui.value)" in text
+    assert 'label="Campaign"' in text
+    assert 'label="Visual surface"' in text
 
 
 def test_campaign_progress_keeps_lateral_tools_out_of_opal_surface() -> None:

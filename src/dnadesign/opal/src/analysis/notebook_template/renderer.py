@@ -14,32 +14,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..notebook_components import render_visual_surface_cells
-from .source import render_notebook_source
-
-OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_notebook.v1"
+from ..notebook_set_template import render_campaign_set_notebook
+from ..notebook_set_template.cells import OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION
 
 
 def render_campaign_notebook(config_path: Path, *, round_selector: str, run_id: str | None = None) -> str:
     """
-    Render a marimo notebook template tied to a campaign.
+    Render the canonical OPAL campaign notebook for one campaign.
+
+    The single-campaign surface intentionally delegates to the same template as
+    campaign-set notebooks. A one-campaign notebook is just a campaign-set
+    notebook with one selectable campaign, which keeps progress, plot, and
+    evidence behavior from drifting across notebook entrypoints.
     """
-    try:
-        import marimo as _marimo
-    except Exception:
-        _marimo = None
-    if _marimo is None:
-        marimo_version = "unknown"
-    else:
-        marimo_version = getattr(_marimo, "__version__", "unknown")
+    return render_campaign_set_notebook([Path(config_path)], round_selector=round_selector, run_id=run_id)
 
-    template = render_notebook_source(visual_surface_cells=render_visual_surface_cells())
 
-    return (
-        template.replace("__CONFIG_PATH__", repr(str(config_path)))
-        .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
-        .replace("__DEFAULT_RUN_ID__", repr(str(run_id)) if run_id else "None")
-        .replace("__OPAL_NOTEBOOK_TEMPLATE_SCHEMA__", OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION)
-        .replace("__GENERATED_WITH__", str(marimo_version))
-        + "\n"
-    )
+__all__ = ["OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION", "render_campaign_notebook"]

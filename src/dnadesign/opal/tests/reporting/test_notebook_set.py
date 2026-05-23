@@ -46,6 +46,25 @@ def test_campaign_set_notebook_view_model_collects_campaigns(tmp_path: Path) -> 
     assert payload["campaigns"][0]["campaign"]["config_path"] == str(config_paths[0])
 
 
+def test_campaign_set_notebook_view_model_accepts_one_campaign(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign_a"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path, slug="campaign_a")
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        config_path,
+        workdir=workdir,
+        records_path=records_path,
+        slug="campaign_a",
+    )
+
+    payload = build_campaign_set_notebook_view_model([config_path], round_selector="latest")
+
+    assert payload["campaign_count"] == 1
+    assert payload["campaigns"][0]["campaign"]["slug"] == "campaign_a"
+
+
 def test_campaign_set_round_options_include_round_history(tmp_path: Path) -> None:
     config_paths = []
     for slug, rounds in {"campaign_a": [0, 2], "campaign_b": [1]}.items():

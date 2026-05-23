@@ -24,11 +24,24 @@ def build_campaign_set_notebook_view_model(
     config_paths: Iterable[str | Path],
     *,
     round_selector: str | None = "latest",
+    run_id: str | None = None,
 ) -> dict[str, Any]:
-    """Build a manifest-backed view model for a set of OPAL campaigns."""
+    """Build a manifest-backed view model for one or more OPAL campaigns."""
 
     paths = _validated_campaign_set_paths(config_paths)
-    campaigns = [build_notebook_view_model(path, round_selector=round_selector) for path in paths]
+    if run_id is not None and len(paths) != 1:
+        raise OpalError(
+            "Campaign-set notebooks only support run_id pinning for a single campaign.",
+            ExitCodes.BAD_ARGS,
+        )
+    campaigns = [
+        build_notebook_view_model(
+            path,
+            round_selector=round_selector,
+            run_id=run_id if len(paths) == 1 else None,
+        )
+        for path in paths
+    ]
     warnings = [
         {**warning, "campaign_slug": campaign["campaign"]["slug"]}
         for campaign in campaigns
@@ -78,8 +91,8 @@ def build_campaign_set_round_options(config_paths: Iterable[str | Path]) -> list
 
 def _validated_campaign_set_paths(config_paths: Iterable[str | Path]) -> list[Path]:
     paths = [Path(path) for path in config_paths]
-    if len(paths) < 2:
-        raise OpalError("Campaign-set notebooks require at least two campaign configs.", ExitCodes.BAD_ARGS)
+    if not paths:
+        raise OpalError("Campaign notebooks require at least one campaign config.", ExitCodes.BAD_ARGS)
 
     resolved = [str(path.resolve()) for path in paths]
     duplicates = sorted({path for path in resolved if resolved.count(path) > 1})

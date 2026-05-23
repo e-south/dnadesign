@@ -5,11 +5,12 @@
 
 
 OPAL notebooks are generated marimo campaign analysis surfaces. They summarize
-campaign state, records, ledgers, and visual artifacts for inspection; mutation
+campaign state, progress, ledgers, and visual artifacts for inspection; mutation
 and long-running execution remain in the CLI.
 Checked-in operator notebooks and generated campaign notebooks use the public
-`dnadesign.opal.notebooks.api` adapter for notebook-specific helpers; generated
-notebooks should import only that notebook API plus general third-party packages.
+`dnadesign.opal.notebooks.api.generated` adapter for notebook-specific helpers;
+generated notebooks should import only that notebook API plus general
+third-party packages.
 
 Generate one with:
 
@@ -35,15 +36,19 @@ uv run opal notebook generate \
 
 ### Notebook View Model
 
-Generated notebooks import public helpers from `dnadesign.opal.notebooks.api` and
-build a `NotebookViewModel` through `build_notebook_view_model(...)`. The view
-model is manifest-backed and uses schema `opal.notebook_view_model.v1`.
-Generated single-campaign notebooks also embed
-`__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v1"` so
+Generated notebooks import public helpers from
+`dnadesign.opal.notebooks.api.generated`. The canonical generated surface is the
+campaign-set template, and a single-campaign notebook is the same template with
+one campaign config. Generated notebooks embed
+`__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v2"` so
 old local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
 run ID, and follow-up `opal notebook run` / `marimo check` commands.
+
+Each campaign entry is a manifest-backed `NotebookViewModel` with schema
+`opal.notebook_view_model.v1`; the enclosing campaign surface uses
+`opal.notebook_campaign_set_view_model.v1`.
 
 | field | purpose |
 | --- | --- |
@@ -55,11 +60,11 @@ run ID, and follow-up `opal notebook run` / `marimo check` commands.
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
-Campaign-set notebooks import `build_campaign_set_notebook_view_model(...)` and
-build schema `opal.notebook_campaign_set_view_model.v1`. The payload contains
-one `NotebookViewModel` per campaign plus aggregate warnings. Campaign-set
-notebooks require at least two distinct campaign configs and fail fast on
-duplicates.
+Campaign surfaces import `build_campaign_set_notebook_view_model(...)`. The
+payload contains one `NotebookViewModel` per campaign plus aggregate warnings.
+The builder accepts one or more distinct campaign configs and fails fast on
+duplicates. `--run-id` pinning is supported only when the surface has exactly
+one campaign, because a single run ID is not portable across a campaign set.
 
 The generated notebook renders the view model with progressive disclosure:
 
@@ -67,12 +72,9 @@ The generated notebook renders the view model with progressive disclosure:
 - validity state for progress, review, plot, warning, and artifact-garden
   contracts;
 - progress-derived change rows for visible rounds and run scope;
-- selected round/run scope, with the run dropdown initialized to the pinned
-  `--run-id` when one was provided;
-- records and X provenance;
-- ledgers, labels, predictions, and selected records;
-- a single visual-surface selector for manifest-backed plots and optional
-  record renders;
+- campaign selector, even for one-campaign notebooks;
+- round selector for progress and manifest-backed plot scope;
+- a single visual-surface selector for manifest-backed plots;
 - a plot-scope selector when the active plot has multiple manifest-backed
   scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
   `round_variants`;
@@ -81,12 +83,13 @@ The generated notebook renders the view model with progressive disclosure:
   progressively disclosed accordions;
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
-- limitations and handoff commands.
+- limitations and evidence rows.
 
-The records preview is schema-pruned. It loads identity/metadata columns needed
-for inspection and record selection, but it does not materialize the configured
-X payload into the notebook preview. X is reported from the records schema and
-kept as provenance unless a runtime command explicitly needs the matrix.
+The canonical generated notebook no longer has a separate single-campaign
+record/table drilldown path. Records, labels, predictions, and selected-record
+inspection remain CLI/API concerns unless they are promoted through a
+manifest-backed OPAL plot or another public notebook component. This keeps the
+single-campaign and multi-campaign surfaces from drifting.
 
 Heavy sections should use marimo accordions with lazy loading. Reusable
 generated-cell builders and public component primitives live in
@@ -103,14 +106,13 @@ semantic modules there instead of growing a single component file.
 Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
 
-Campaign-set notebooks are intentionally overview-first: they provide campaign
-and visual controls, manifest-backed plot-scope controls, status and provenance
+Campaign surfaces are intentionally overview-first: they provide campaign and
+visual controls, manifest-backed plot-scope controls, status and provenance
 summary, visible manifest-backed plot surfaces, validity panels, change rows,
 metric definitions, artifact garden rows, warnings, and stale-artifact evidence.
-Single-campaign notebooks remain the record/table drill-down surface.
-Single-campaign and campaign-set notebooks use the same public visual-surface,
-plot-card, plot-method, validity, change-row, evidence-row, metric-definition, and
-artifact-garden primitives.
+The checked-in `src/dnadesign/opal/notebooks/campaign_progress.py` notebook is
+now a project-scoped campaign surface over discovered campaign configs, not a
+separate progress-only UI.
 
 ### Boundaries
 

@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .cells import render_campaign_set_template
+from .cells import OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION, render_campaign_set_template
 
 
-def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: str) -> str:
+def render_campaign_set_notebook(
+    config_paths: list[Path],
+    *,
+    round_selector: str,
+    run_id: str | None = None,
+) -> str:
     """Render a marimo notebook template for an OPAL campaign set."""
 
     try:
@@ -18,6 +23,8 @@ def render_campaign_set_notebook(config_paths: list[Path], *, round_selector: st
         render_campaign_set_template()
         .replace("__CONFIG_PATHS__", path_literals)
         .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
+        .replace("__DEFAULT_RUN_ID__", repr(str(run_id)) if run_id else "None")
+        .replace("__OPAL_NOTEBOOK_TEMPLATE_SCHEMA__", OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION)
         .replace("__GENERATED_WITH__", str(marimo_version))
         + "\n"
     )

@@ -408,8 +408,8 @@ def _generate_campaign_set_notebook(
     json: bool,
 ) -> None:
     config_paths = ([config] if config is not None else []) + campaign_paths
-    if len(config_paths) < 2:
-        raise OpalError("Campaign-set notebook generation requires at least two campaign configs.", ExitCodes.BAD_ARGS)
+    if not config_paths:
+        raise OpalError("Notebook generation requires at least one campaign config.", ExitCodes.BAD_ARGS)
     resolved = [str(Path(path).resolve()) for path in config_paths]
     duplicates = sorted({path for path in resolved if resolved.count(path) > 1})
     if duplicates:
