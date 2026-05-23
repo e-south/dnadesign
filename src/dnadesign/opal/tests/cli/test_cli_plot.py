@@ -124,6 +124,45 @@ def test_plot_cli_plot_local_round_selector_overrides_global_round(tmp_path):
     assert manifest["rounds"] == "latest"
 
 
+def test_plot_cli_round_variants_write_manifested_scope_artifacts(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "mini",
+                "kind": "test_plot_cli_minimal",
+                "round_variants": ["all", "each"],
+            }
+        ],
+    )
+    from dnadesign.opal.tests._cli_helpers import write_ledger
+
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r1", round_index=1)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "latest"])
+    assert res.exit_code == 0, res.stdout
+
+    index = json.loads((workdir / "outputs" / "plots" / "plot_manifest.json").read_text())
+    assert index["plot_count"] == 3
+    manifests = {
+        path.name: json.loads(path.read_text())
+        for path in sorted((workdir / "outputs" / "plots").glob("mini*.manifest.json"))
+    }
+    assert manifests["mini_rall.manifest.json"]["rounds"] == "all"
+    assert manifests["mini_r0.manifest.json"]["rounds"] == [0]
+    assert manifests["mini_r1.manifest.json"]["rounds"] == [1]
+
+
 def test_round_highlight_overlay_resolves_round_zero() -> None:
     assert resolve_highlight_round(0, [0, 1]) == 0
     assert resolve_highlight_round("latest", [0, 1]) == 1
@@ -273,6 +312,7 @@ def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
         "score_vs_rank_by_round": "scatter_score_vs_rank",
         "score_threshold_over_rounds": "percent_high_activity_over_rounds",
         "feature_importance_heatmap": "feature_importance_heatmap",
+        "feature_importance_bars": "feature_importance_bars",
         "selected_vec8_summary": "vector_summary_heatmap",
         "fold_change_vs_logic_fidelity_latest": "fold_change_vs_logic_fidelity",
         "sfxi_logic_fidelity_closeness_latest": "sfxi_logic_fidelity_closeness",
@@ -299,7 +339,16 @@ def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
         for spec in specs:
             if spec["name"].endswith("_latest"):
                 assert spec["round_selector"] == "latest"
+                assert spec["round_variants"] == ["latest", "each"]
                 assert "single-round" in spec["tags"]
+            else:
+                assert spec["round_variants"] == ["all", "each"]
+        entries = {entry["name"]: entry for entry in plot_cfg.plots}
+        heatmap_params = entries["feature_importance_heatmap"]["params"]
+        assert heatmap_params["order_policy"] == "sort_index"
+        assert heatmap_params["rasterized"] is True
+        assert "top_n" not in heatmap_params
+        assert "sort" not in heatmap_params
         joined = path.read_text(encoding="utf-8") + "\n" + plot_cfg.source_path.read_text(encoding="utf-8")
         assert "UMAP" not in joined
         assert "cluster__ldn_v1__umap" not in joined

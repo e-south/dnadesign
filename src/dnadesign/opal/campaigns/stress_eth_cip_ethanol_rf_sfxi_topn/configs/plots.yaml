@@ -1,12 +1,13 @@
 plot_defaults:
   output:
     format: "png"
-    dpi: 240
+    dpi: 300
     save_data: true
 
 plots:
   - name: score_selected_over_rounds
     kind: metric_over_rounds
+    round_variants: [all, each]
     tags: [rounds, selection]
     params:
       metric: "pred__score_selected"
@@ -17,6 +18,7 @@ plots:
 
   - name: score_vs_rank_by_round
     kind: scatter_score_vs_rank
+    round_variants: [all, each]
     tags: [rounds, selection]
     params:
       rank_mode: competition
@@ -26,6 +28,7 @@ plots:
 
   - name: score_threshold_over_rounds
     kind: percent_high_activity_over_rounds
+    round_variants: [all, each]
     tags: [rounds, selection, threshold]
     params:
       metric: "pred__score_selected"
@@ -37,16 +40,30 @@ plots:
 
   - name: feature_importance_heatmap
     kind: feature_importance_heatmap
+    round_variants: [all, each]
     tags: [rounds, model]
     params:
-      top_n: 128
-      sort: max_importance
+      order_policy: sort_index
       cluster: false
       cmap: "viridis"
+      rasterized: true
+      figsize_in: [8.5, 12]
+      max_yticks: 24
       title: "ethanol factor: feature importance over rounds"
+
+  - name: feature_importance_bars
+    kind: feature_importance_bars
+    round_variants: [all, each]
+    tags: [rounds, model]
+    params:
+      order_policy: sort_index
+      alpha: 0.32
+      figsize_in: [12, 5]
+      title: "ethanol factor: feature importance bars"
 
   - name: selected_vec8_summary
     kind: vector_summary_heatmap
+    round_variants: [all, each]
     tags: [rounds, sfxi, vector]
     params:
       vector_field: "pred__y_hat_model"
@@ -61,6 +78,7 @@ plots:
   - name: fold_change_vs_logic_fidelity_latest
     kind: fold_change_vs_logic_fidelity
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, selection, overlay, single-round]
     params:
       y_axis: score
@@ -72,6 +90,7 @@ plots:
   - name: sfxi_logic_fidelity_closeness_latest
     kind: sfxi_logic_fidelity_closeness
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, labels, overlay, single-round]
     params:
       on_violin_invalid: line
@@ -80,6 +99,7 @@ plots:
   - name: sfxi_factorial_effects_latest
     kind: sfxi_factorial_effects
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, labels, overlay, single-round]
     params:
       size_by: obj__effect_scaled
@@ -89,6 +109,7 @@ plots:
   - name: sfxi_setpoint_sweep_latest
     kind: sfxi_setpoint_sweep
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, labels, single-round]
     params:
       min_n: 5
@@ -96,6 +117,7 @@ plots:
   - name: sfxi_support_diagnostics_latest
     kind: sfxi_support_diagnostics
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, labels, overlay, single-round]
     params:
       y_axis: score
@@ -105,6 +127,7 @@ plots:
   - name: sfxi_uncertainty_latest
     kind: sfxi_uncertainty
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, model, single-round]
     params:
       kind: score
@@ -114,6 +137,7 @@ plots:
   - name: sfxi_intensity_scaling_latest
     kind: sfxi_intensity_scaling
     round_selector: latest
+    round_variants: [latest, each]
     tags: [sfxi, labels, single-round]
     params:
       min_n: 5

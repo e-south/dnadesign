@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 import typer
 
-from ..analysis.ledger import RoundSelector, parse_round_selector, round_suffix
+from ..analysis.ledger import RoundSelector, available_rounds, parse_round_selector, round_suffix
 from ..core.utils import now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir
@@ -112,6 +112,100 @@ def _entry_round_scope(
         )
     rounds_sel = parse_round_selector(str(raw))
     return rounds_sel, round_suffix(rounds_sel)
+
+
+def _entry_round_scopes(
+    *,
+    req: PlotRequest,
+    entry: Dict[str, Any],
+    preset: Dict[str, Any],
+    plot_name: str,
+) -> list[tuple[RoundSelector, str]]:
+    """Resolve one or more concrete plot output scopes for a configured entry."""
+
+    base_scope = _entry_round_scope(req=req, entry=entry, preset=preset, plot_name=plot_name)
+    raw_variants = entry.get("round_variants", preset.get("round_variants"))
+    if raw_variants is None:
+        return [base_scope]
+    if req.run_id:
+        raise ValueError(
+            f"[plot] plot '{plot_name}' uses round_variants, but --run-id is single-run. "
+            "Remove round_variants or omit --run-id."
+        )
+
+    variants = _parse_round_variants(raw_variants, plot_name=plot_name)
+    scopes: list[tuple[RoundSelector, str]] = []
+    for variant in variants:
+        variant_key = variant.strip().lower()
+        if variant_key in {"configured", "default", "base"}:
+            scopes.append(base_scope)
+            continue
+        if variant_key == "each":
+            for round_index in _available_variant_rounds(req=req, plot_name=plot_name):
+                round_scope: RoundSelector = [int(round_index)]
+                scopes.append((round_scope, round_suffix(round_scope)))
+            continue
+        parsed = parse_round_selector(variant_key)
+        if parsed == "unspecified":
+            raise ValueError(
+                f"[plot] plot '{plot_name}' round_variants must not contain an empty or unspecified selector."
+            )
+        scopes.append((parsed, round_suffix(parsed)))
+
+    seen_suffixes: set[str] = set()
+    unique: list[tuple[RoundSelector, str]] = []
+    for rounds_sel, suffix in scopes:
+        if suffix in seen_suffixes:
+            raise ValueError(
+                f"[plot] plot '{plot_name}' round_variants produced duplicate output suffix {suffix!r}. "
+                "Use distinct selectors."
+            )
+        seen_suffixes.add(suffix)
+        unique.append((rounds_sel, suffix))
+    return unique
+
+
+def _parse_round_variants(value: Any, *, plot_name: str) -> list[str]:
+    if isinstance(value, bool):
+        if value:
+            return ["configured", "each"]
+        raise ValueError(f"[plot] plot '{plot_name}' round_variants: false is invalid; remove the key instead.")
+    if isinstance(value, str):
+        variants = [value]
+    elif isinstance(value, list):
+        variants = value
+    else:
+        raise ValueError(
+            f"[plot] plot '{plot_name}' round_variants must be a string or list of strings "
+            f"(got {type(value).__name__})."
+        )
+    parsed: list[str] = []
+    for item in variants:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"[plot] plot '{plot_name}' round_variants entries must be non-empty strings.")
+        parsed.append(item.strip())
+    return parsed
+
+
+def _available_variant_rounds(*, req: PlotRequest, plot_name: str) -> list[int]:
+    runs_path = req.workspace.ledger_runs_path
+    if not runs_path.exists():
+        raise ValueError(
+            f"[plot] plot '{plot_name}' uses round_variants: each, but no run ledger exists at {runs_path}. "
+            "Run OPAL first or remove the per-round fan-out."
+        )
+    runs_df = pl.read_parquet(runs_path)
+    if "as_of_round" not in runs_df.columns:
+        raise ValueError(
+            f"[plot] plot '{plot_name}' cannot expand round_variants: each because {runs_path} "
+            "is missing column 'as_of_round'."
+        )
+    rounds = available_rounds(runs_df)
+    if not rounds:
+        raise ValueError(
+            f"[plot] plot '{plot_name}' cannot expand round_variants: each because {runs_path} has no rounds."
+        )
+    return rounds
 
 
 def run_plots(req: PlotRequest) -> bool:
@@ -207,29 +301,12 @@ def run_plots(req: PlotRequest) -> bool:
             **preset_out,
             **entry_out,
         }
-        entry_rounds_sel, entry_round_suffix = _entry_round_scope(
+        entry_round_scopes = _entry_round_scopes(
             req=req,
             entry=entry,
             preset=preset,
             plot_name=pname,
         )
-        out_dir = _resolve_output_dir(
-            out_cfg,
-            campaign_dir=req.campaign_dir,
-            workspace=req.workspace,
-            plot_name=pname,
-            plot_kind=pkind,
-            round_suffix=entry_round_suffix,
-        )
-        fmt = (out_cfg.get("format") or "png").lower()
-        dpi = int(out_cfg.get("dpi", 600))
-        fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(
-            name=pname,
-            round_suffix=entry_round_suffix,
-        )
-        if not fname.lower().endswith(f".{fmt}"):
-            base = fname.rsplit(".", 1)[0] if "." in fname else fname
-            fname = f"{base}.{fmt}"
         save_data = bool(out_cfg.get("save_data", False))
 
         raw_params = entry.get("params", None)
@@ -252,79 +329,98 @@ def run_plots(req: PlotRequest) -> bool:
             **entry_params,
         }
 
-        logger = _plot_logger(pname, emit_status=req.emit_status)
-
-        ctx = PlotContext(
-            campaign_dir=req.campaign_dir,
-            workspace=req.workspace,
-            rounds=entry_rounds_sel,
-            run_id=req.run_id,
-            data_paths=data_paths,
-            output_dir=Path(out_dir),
-            filename=fname,
-            dpi=dpi,
-            format=fmt,
-            logger=logger,
-            save_data=save_data,
-        )
-
-        started_at = now_iso()
-        try:
-            ctx.output_dir.mkdir(parents=True, exist_ok=True)
-            debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
+        for entry_rounds_sel, entry_round_suffix in entry_round_scopes:
+            out_dir = _resolve_output_dir(
+                out_cfg,
+                campaign_dir=req.campaign_dir,
+                workspace=req.workspace,
+                plot_name=pname,
+                plot_kind=pkind,
+                round_suffix=entry_round_suffix,
             )
-            if debug and req.emit_status:
-                if isinstance(entry.get("params"), dict):
-                    params_preview = {k: entry["params"].get(k) for k in (entry.get("params") or {}).keys()}
-                else:
-                    params_preview = "(not a dict)"
-                typer.secho(
-                    f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
-                    f"params_type={type(entry.get('params')).__name__} "
-                    f"params_preview={params_preview}",
-                    fg=typer.colors.BLUE,
+            fmt = (out_cfg.get("format") or "png").lower()
+            dpi = int(out_cfg.get("dpi", 600))
+            fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(
+                name=pname,
+                round_suffix=entry_round_suffix,
+            )
+            if not fname.lower().endswith(f".{fmt}"):
+                base = fname.rsplit(".", 1)[0] if "." in fname else fname
+                fname = f"{base}.{fmt}"
+
+            logger = _plot_logger(pname, emit_status=req.emit_status)
+
+            ctx = PlotContext(
+                campaign_dir=req.campaign_dir,
+                workspace=req.workspace,
+                rounds=entry_rounds_sel,
+                run_id=req.run_id,
+                data_paths=data_paths,
+                output_dir=Path(out_dir),
+                filename=fname,
+                dpi=dpi,
+                format=fmt,
+                logger=logger,
+                save_data=save_data,
+            )
+
+            started_at = now_iso()
+            try:
+                ctx.output_dir.mkdir(parents=True, exist_ok=True)
+                debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
                 )
+                if debug and req.emit_status:
+                    if isinstance(entry.get("params"), dict):
+                        params_preview = {k: entry["params"].get(k) for k in (entry.get("params") or {}).keys()}
+                    else:
+                        params_preview = "(not a dict)"
+                    typer.secho(
+                        f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
+                        f"params_type={type(entry.get('params')).__name__} "
+                        f"params_preview={params_preview}",
+                        fg=typer.colors.BLUE,
+                    )
 
-            get_plot(pkind)(ctx, params)
-            manifest = build_plot_manifest(
-                name=pname,
-                kind=pkind,
-                params=params,
-                context=ctx,
-                status="written",
-                started_at=started_at,
-            )
-            write_plot_manifest(manifest)
-            manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
-            if manifest.get("status") != "written":
+                get_plot(pkind)(ctx, params)
+                manifest = build_plot_manifest(
+                    name=pname,
+                    kind=pkind,
+                    params=params,
+                    context=ctx,
+                    status="written",
+                    started_at=started_at,
+                )
+                write_plot_manifest(manifest)
+                manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
+                if manifest.get("status") != "written":
+                    any_fail = True
+                    _plot_status(req, f"[fail] {pname} ({pkind}) did not write expected media", fg=typer.colors.RED)
+                    continue
+                _plot_status(
+                    req,
+                    f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}",
+                    fg=typer.colors.GREEN,
+                )
+            except Exception as exc:
                 any_fail = True
-                _plot_status(req, f"[fail] {pname} ({pkind}) did not write expected media", fg=typer.colors.RED)
-                continue
-            _plot_status(
-                req,
-                f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}",
-                fg=typer.colors.GREEN,
-            )
-        except Exception as exc:
-            any_fail = True
-            manifest = build_plot_manifest(
-                name=pname,
-                kind=pkind,
-                params=params,
-                context=ctx,
-                status="failed",
-                started_at=started_at,
-                error=exc,
-            )
-            write_plot_manifest(manifest)
-            manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
-            _plot_status(req, f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
-            if req.emit_status:
-                traceback.print_exc()
+                manifest = build_plot_manifest(
+                    name=pname,
+                    kind=pkind,
+                    params=params,
+                    context=ctx,
+                    status="failed",
+                    started_at=started_at,
+                    error=exc,
+                )
+                write_plot_manifest(manifest)
+                manifests_by_dir.setdefault(ctx.output_dir, []).append(manifest)
+                _plot_status(req, f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
+                if req.emit_status:
+                    traceback.print_exc()
 
     for output_dir, manifests in manifests_by_dir.items():
         write_plot_manifest_index(output_dir, manifests)

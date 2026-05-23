@@ -56,6 +56,7 @@ plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
     round_selector: latest            # optional plot-local override for --round
+    round_variants: [latest, each]    # optional manifest fan-out for dropdown scopes
 
     # Optional extra sources (built-ins auto-injected: records, outputs)
     data:
@@ -88,6 +89,11 @@ plots:
 - Use plot-level `round_selector:` only for plot scope, not rendering knobs. It accepts
   the same selectors as `--round` and lets all-round bundles include primitives that
   are inherently single-round. `--run-id` remains single-round and takes precedence.
+- Use `round_variants:` only when one configured plot should write multiple
+  manifest-backed scopes. Valid entries are normal round selectors plus
+  `configured` and `each`; `each` expands from `outputs/ledger/runs.parquet`
+  and fails visibly when no run ledger exists. Do not combine `round_variants`
+  with `--run-id`.
 - `scatter_score_vs_rank` should use `pred__score_selected` unless you intentionally target another ledger metric.
 - Use `enabled: false` to keep a plot entry without running it.
 - Presets merge into each plot entry; entry values override preset values.
@@ -139,6 +145,12 @@ Review and generated notebook surfaces should read manifests first. Extra files
 on disk are advisory only; they can trigger stale-file warnings, but they are
 not current evidence unless referenced by the active manifest.
 
+When `round_variants` expands one configured plot into multiple artifacts, the
+aggregate index contains multiple `opal.plot_artifact.v1` manifests with the
+same `name` and different `rounds` / filename suffixes. Notebook visual
+surfaces group those rows under one plot-level dropdown and expose a second
+manifest-backed plot-scope dropdown only when multiple scopes exist.
+
 Plot capability metadata is the dropdown contract. It records objective family,
 data layer, round behavior, label requirement, model-artifact requirement, and
 tidy-data availability so notebooks can distinguish configured-but-missing,
@@ -158,9 +170,11 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - params: `order_policy` (`preserve|sort_index`), `alpha`, `figsize_in`
   - requires feature importance artifacts (for example RF with `emit_feature_importance: true`)
 - **`feature_importance_heatmap`**: matrix heatmap of feature importance over rounds.
-  - rows are stable feature IDs, columns are rounds, values are importances
-  - params: `order_policy` (`preserve|sort_index`), `sort`
-    (`preserve|sort_index|max_importance`), `top_n`, `figsize_in`, `cmap`
+  - rows are stable feature IDs, columns are rounds, values are importances;
+    default `order_policy: sort_index` preserves the full ordinal feature axis
+    for dense X surfaces such as the 8192-D LatentDNA/Evo2 candidate table
+  - params: `order_policy` (`preserve|sort_index|max_importance`), legacy
+    `sort`, optional debugging `top_n`, `figsize_in`, `cmap`, `rasterized`
   - writes tidy CSV columns `round`, `feature_id`, `importance`, `rank`,
     and `source_path`
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
@@ -203,6 +217,12 @@ should normally declare `round_selector: latest` when they live in a campaign
 bundle that is run with `--round all`. This keeps scalar/vector round-history
 plots all-round while label/model diagnostics resolve to a single, explicit
 round in the manifest.
+
+For notebooks that need per-round plot browsing, configure round-history plots
+with `round_variants: [all, each]` and single-round SFXI diagnostics with
+`round_variants: [latest, each]`. The plot runner will write one artifact per
+declared scope; the notebook will only expose scopes present in
+`plot_manifest.json`.
 
 For round-history plots, `params.highlight_round: latest` overlays the current
 round on the full history without changing data selection. Use this for the
@@ -301,3 +321,13 @@ uncertainty/support distribution, objective decomposition, candidate audit table
 or calibration. Campaign semantics such as SFXI setpoints or study metadata
 should configure those primitives through `params:` and input data, not fork the
 plot ontology unless a genuinely new data shape is required.
+
+Study-owned plot plugins must use the same API. Register the plot with
+`@register_plot(...)`, declare `PlotMeta`, read only from `PlotContext`
+`data_paths` / workspace surfaces, write media to `context.output_dir /
+context.filename`, and let OPAL write the artifact manifest. A study report may
+keep separate aggregate EDA figures, but those figures are not OPAL notebook
+evidence unless they are produced through this plot API and appear in
+`plot_manifest.json`. OPAL intentionally fails fast on unknown plot kinds,
+unknown top-level plot keys, missing media, and malformed tidy CSVs rather than
+silently scraping arbitrary files.

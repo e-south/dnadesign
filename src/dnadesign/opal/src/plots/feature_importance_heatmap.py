@@ -22,14 +22,18 @@ from .feature_importance_bars import _discover_round_fi_files, _read_fi_csv, _re
     meta=PlotMeta(
         summary="Feature-importance heatmap with stable feature rows and round columns.",
         params={
-            "order_policy": "preserve|sort_index (default preserve).",
-            "top_n": "Optional top N features by max importance.",
-            "sort": "preserve|sort_index|max_importance (default preserve).",
+            "order_policy": "preserve|sort_index|max_importance (default sort_index).",
+            "top_n": "Optional positive debugging cap; omit for the full ordinal feature heatmap.",
+            "sort": "Legacy alias for order_policy.",
             "cluster": "Optional clustering flag; defaults false and is currently unsupported when true.",
             "cmap": "Matplotlib colormap (default viridis).",
+            "rasterized": "Rasterize the heatmap image artist while keeping axes/text vector-ready (default true).",
         },
         requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
-        notes=["Preserves feature identity by default; clustering is intentionally off by default."],
+        notes=[
+            "Sorts by ascending feature_index by default so dense ordinal X surfaces keep all feature rows.",
+            "Clustering is intentionally off by default.",
+        ],
         data_shape="attribution matrix",
         tidy_schema=["round", "feature_id", "importance", "rank", "source_path"],
         objective_family="generic",
@@ -53,7 +57,7 @@ def render(context, params: dict) -> None:
     apply_plot_style()
     if bool(params.get("cluster", False)):
         raise ValueError("feature_importance_heatmap does not cluster by default; set cluster: false.")
-    order_policy = str(params.get("order_policy", params.get("sort", "preserve"))).strip().lower()
+    order_policy = str(params.get("order_policy", params.get("sort", "sort_index"))).strip().lower()
     if order_policy == "max_importance":
         strict_order_policy = "sort_index"
     else:
@@ -103,6 +107,8 @@ def render(context, params: dict) -> None:
     figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
     fig, ax = plt.subplots(figsize=figsize)
     im = ax.imshow(arr, aspect="auto", interpolation="nearest", cmap=str(params.get("cmap", "viridis")))
+    if bool(params.get("rasterized", True)):
+        im.set_rasterized(True)
     apply_notebook_axes_style(ax)
     ax.set_xticks(range(len(target_rounds)))
     ax.set_xticklabels([str(round_index) for round_index in target_rounds])
@@ -112,7 +118,7 @@ def render(context, params: dict) -> None:
     ax.set_yticks(yticks)
     ax.set_yticklabels([str(order[index]) for index in yticks])
     ax.set_xlabel("Round")
-    ax.set_ylabel("Feature ID")
+    ax.set_ylabel(f"Feature ID ({len(order)} rows)")
     ax.set_title(str(params.get("title", "Feature importance heatmap")))
     fig.colorbar(im, ax=ax, label="Importance")
     fig.tight_layout()

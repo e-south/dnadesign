@@ -50,8 +50,8 @@ def plot_math_description(kind: str) -> str:
         ),
         "feature_importance_heatmap": (
             "OPAL builds a feature-by-round matrix from model feature_importance.csv artifacts. Each cell is the "
-            "model-reported importance for one feature in one round; top_n keeps features with the largest maximum "
-            "importance across rounds."
+            "model-reported importance for one feature in one round. The default ordering is ascending feature ID "
+            "so dense X surfaces can retain the full ordinal feature axis; top_n is an explicit debugging cap only."
         ),
         "vector_summary_heatmap": (
             "For each round, cohort, and vector channel, OPAL aggregates the configured vector prediction field. "
