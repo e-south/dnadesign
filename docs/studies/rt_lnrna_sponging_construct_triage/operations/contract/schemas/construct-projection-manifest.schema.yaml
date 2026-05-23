@@ -39,6 +39,14 @@ candidate_slot_binding_contract:
     emitted_slot_spans_0.lnrna: zero_based_half_open_span
     emitted_slot_spans_0.rt_cds: zero_based_half_open_span
     construct_context_view_declarations: list_string
+representation_view_contract:
+  required_fields:
+    view_name: string
+    product_kind: realized_context
+    pooling_operation: controlled_string
+    required_slots: list_string
+    construct_output_anchor_part: string_or_null
+  slot_pooling_rule: The lnRNA anchor-mean diagnostic view maps pooling_slot=lnrna to Construct output_variants[].anchor_part=lnrna.
 controlled_values:
   strategy_id:
     - construct_multi_slot_assembly_v1
@@ -47,7 +55,7 @@ controlled_values:
     - not_representable_too_long
     - not_representable_missing_constant
     - not_representable_invalid_sequence
-    - not_representable_unresolved_anchor
+    - not_representable_unresolved_slot
   placement_kind:
     - replace
     - insert
@@ -65,3 +73,7 @@ validation_notes:
   - Reject arbitrary filler padding and any context that needs truncation.
   - Reject missing forward or reverse-complement view declarations before Infer handoff.
   - Reject missing lnRNA slot span for anchor_mean pooling.
+  - Reject anchor-mean views that do not declare which named slot supplies the
+    sequence-view anchor bounds.
+  - Treat working/failed lab-anchor names as source-history labels; Construct
+    placement uses named slots.

@@ -3,7 +3,7 @@ status: blocked
 owner: opal
 phase: phase_7_opal_readiness
 blocked_by:
-  - opal_ready_records_parquet_absent
+  - rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent
   - fixed_size_vector_x_absent
   - sponging_assay_observations_absent
 rules:

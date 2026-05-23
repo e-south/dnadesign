@@ -1,7 +1,7 @@
 fixture_id: retron26-working-anchor
 fixture_status: source_resolved_construct_representable_not_materialized
 candidate:
-  candidate_id: rt_lnrna_anchor__eco1_wt_rt__retron26_lnrna__tetO
+  candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
   study_id: rt_lnrna_sponging_construct_triage
   construct_contract: dual_cassette_rt_lnrna_expression_v1
   representation_contract: dual_cassette_construct_context_embedding_v1
@@ -14,7 +14,7 @@ candidate:
   lnrna_source: Eco1-derived
   lnrna_design_id: retron26
   lnrna_provenance_id: genbank:pes-retron-26-a1-a2.gb#record
-  msd_design_spec_id: msd_design_spec__retron26_anchor__tetO_sponging_v1
+  msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
   variant_derivation:
   source_basis: lab_anchor
   construct_projection_status: representable
@@ -22,14 +22,13 @@ candidate:
   construct_context_view_ids: []
   abundance_prior_overlay_ids: []
   sponging_assay_observation_ids: []
-  anchor_role: working_anchor
+  candidate_role: working_control
   source_authority_status: resolved_by_genbank_source_authority
   blockers:
-    - construct_runtime_not_executed
-    - construct_context_view_not_materialized
-  candidate_note: Eco1 WT RT plus retron26-derived lnRNA working anchor backed by GenBank source authority and the multi-slot Construct projection manifest; context views are not materialized yet.
+    - persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
+  candidate_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; context views are proved in temporary tests but not persistently materialized yet.
 msd_design_spec:
-  msd_design_spec_id: msd_design_spec__retron26_anchor__tetO_sponging_v1
+  msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
   schema_version: msd_design_spec_v1
   payload_program_id: tetO_sponging_v1
   payload_id: tetO

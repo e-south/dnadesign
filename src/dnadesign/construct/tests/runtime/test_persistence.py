@@ -55,12 +55,15 @@ def _record(
 def _view(
     *,
     sequence_id: str = "seq_a",
+    view_name: str = "anchor_a",
     derivation_spec_id: str = "spec_a",
     recommended_pooling: str = "anchor_mean",
+    anchor_start_0: int = 1,
+    anchor_end_0: int = 3,
 ) -> SequenceViewRecord:
     return SequenceViewRecord(
         sequence_id=sequence_id,
-        view_name="anchor_a",
+        view_name=view_name,
         aliases=["alias_a"],
         product_kind="realized_context",
         context_kind="template_custom",
@@ -70,8 +73,8 @@ def _view(
         parent_dataset_id="inputs",
         derivation_id=f"{sequence_id}:{derivation_spec_id}",
         derivation_spec_id=derivation_spec_id,
-        anchor_start_0=1,
-        anchor_end_0=3,
+        anchor_start_0=anchor_start_0,
+        anchor_end_0=anchor_end_0,
         recommended_pooling=recommended_pooling,
         created_at=_CREATED_AT,
         created_by="construct",
@@ -147,3 +150,27 @@ def test_sequence_views_to_append_skips_legacy_view_id_for_existing_sequence() -
         )
         == []
     )
+
+
+def test_sequence_views_to_append_allows_distinct_slot_view_for_existing_sequence() -> None:
+    existing = _view(sequence_id="seq_a", anchor_start_0=1, anchor_end_0=3)
+    planned = _view(sequence_id="seq_a", derivation_spec_id="spec_b", anchor_start_0=7, anchor_end_0=11)
+
+    assert sequence_views_to_append(
+        [planned], existing_by_id={str(existing.view_id): _existing_view_payload(existing)}
+    ) == [planned]
+
+
+def test_sequence_views_to_append_allows_distinct_named_view_with_same_bounds() -> None:
+    existing = _view(sequence_id="seq_a", view_name="anchor_a", anchor_start_0=1, anchor_end_0=3)
+    planned = _view(
+        sequence_id="seq_a",
+        view_name="anchor_b",
+        derivation_spec_id="spec_b",
+        anchor_start_0=1,
+        anchor_end_0=3,
+    )
+
+    assert sequence_views_to_append(
+        [planned], existing_by_id={str(existing.view_id): _existing_view_payload(existing)}
+    ) == [planned]

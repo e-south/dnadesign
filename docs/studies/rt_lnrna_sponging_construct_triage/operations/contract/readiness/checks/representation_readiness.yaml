@@ -3,8 +3,7 @@ status: blocked
 owner: construct_usr_infer
 phase: phase_2_construct_projection
 blocked_by:
-  - construct_runtime_not_executed
-  - construct_context_view_materialization
+  - persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
   - fixed_size_representation_table_contract
 rules:
   - Use the GenBank offset audit as the source for cassette boundaries.

@@ -24,6 +24,16 @@ _EXPECTED_CONSTRUCT_CONTRACT = "dual_cassette_rt_lnrna_expression_v1"
 _EXPECTED_REPRESENTATION_CONTRACT = "dual_cassette_construct_context_embedding_v1"
 _EXPECTED_TARGET_LENGTH_NT = 1600
 _EXPECTED_REQUIRED_SLOTS = ("lnrna", "rt_cds")
+_EXPECTED_SLOT_CONTRACTS = {
+    "lnrna": {
+        "role": "lnrna_cassette",
+        "sequence_field": "candidate__lnrna_sequence",
+    },
+    "rt_cds": {
+        "role": "rt_cds",
+        "sequence_field": "candidate__rt_cds_sequence",
+    },
+}
 _REQUIRED_VIEW_NAMES = (
     "dual_cassette_1600bp_seq_mean",
     "dual_cassette_1600bp_fwd_rc_concat",
@@ -314,6 +324,11 @@ def _parse_slots(payload: object, *, errors: list[str]) -> tuple[_ProjectionSlot
         if not slot_id or not role or not sequence_field or span is None:
             errors.append(f"slots[{index}] must define slot_id, role, sequence_field, and template_span_0")
             continue
+        expected = _EXPECTED_SLOT_CONTRACTS.get(slot_id)
+        if expected is not None and (role != expected["role"] or sequence_field != expected["sequence_field"]):
+            errors.append(
+                f"slot {slot_id} must use role={expected['role']} and sequence_field={expected['sequence_field']}"
+            )
         if _string(item.get("placement_kind")) != "replace":
             errors.append(f"slots[{index}].placement_kind must be replace")
         if _string(item.get("orientation")) != "forward":
@@ -370,6 +385,8 @@ def _validate_view_shape(*, view_name: str, view: dict[str, object], errors: lis
             errors.append(f"{view_name}: orientation must be forward")
         if _string(view.get("pooling_operation")) != "seq_mean":
             errors.append(f"{view_name}: pooling_operation must be seq_mean")
+        if _string(view.get("construct_output_anchor_part")):
+            errors.append(f"{view_name}: construct_output_anchor_part must be empty")
     if view_name == "dual_cassette_1600bp_fwd_rc_concat":
         required_orientations = tuple(
             str(value)
@@ -383,6 +400,8 @@ def _validate_view_shape(*, view_name: str, view: dict[str, object], errors: lis
             errors.append(f"{view_name}: required_orientations must be forward, reverse_complement")
         if _string(view.get("downstream_transform")) != "block_normalized_concatenate":
             errors.append(f"{view_name}: downstream_transform must be block_normalized_concatenate")
+        if _string(view.get("construct_output_anchor_part")):
+            errors.append(f"{view_name}: construct_output_anchor_part must be empty")
     if view_name == "lnrna_span_in_construct_anchor_mean":
         if _string(view.get("orientation")) != "forward":
             errors.append(f"{view_name}: orientation must be forward")
@@ -390,6 +409,8 @@ def _validate_view_shape(*, view_name: str, view: dict[str, object], errors: lis
             errors.append(f"{view_name}: pooling_operation must be anchor_mean")
         if _string(view.get("pooling_slot")) != "lnrna":
             errors.append(f"{view_name}: pooling_slot must be lnrna")
+        if _string(view.get("construct_output_anchor_part")) != "lnrna":
+            errors.append(f"{view_name}: construct_output_anchor_part must be lnrna")
     required_slots = tuple(
         str(value)
         for value in _list(

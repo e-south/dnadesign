@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-construct-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-22
+last_verified: 2026-05-23
 ---
 
 ## Construct Contract
@@ -33,6 +33,17 @@ Construct owns placement, guard checks, emitted sequence, orientation-aware slot
 spans, and `realized_context` sequence views. The study owns candidate-row
 semantics, source authority, payload program, overlay linkage, and view names.
 Do not precompose lnRNA and RT into one hidden anchor.
+When the study needs slot-pooled Infer features, it maps a named Construct slot
+into the sequence-view anchor bounds through `output_variants[].anchor_part`;
+`lnrna` and `rt_cds` remain slots, not package-level Construct product kinds.
+
+Use Construct projection for the study-owned candidate-to-slot mapping,
+Construct realization for the runtime sequence-emission step, and construct
+context view materialization for the USR sequence-view rows written after
+realization.
+Candidate pairing ids remain study identity. USR base row ids remain canonical
+sequence ids; candidate ids are carried through study overlays and labels when
+temporary candidate rows are passed to Construct.
 
 ### Required Before Projection
 
@@ -44,9 +55,8 @@ Do not precompose lnRNA and RT into one hidden anchor.
   as the study-side projection manifest for named slots and expected spans.
 - Materialize construct context views from audited offsets and slot spans, not
   arbitrary padding.
-- Failure behavior for candidates exceeding the 1,600 bp view without
-  truncation.
+- Candidates that exceed the 1,600 bp view fail instead of being truncated.
 
 Construct must emit `realized_context` sequence views. Study role tags,
-source-family semantics, candidate anchor roles, and abundance-overlay regimes
-belong in view semantics or study fixtures, not in new Construct product kinds.
+source-family semantics, candidate roles, and abundance-overlay regimes belong
+in view semantics or study fixtures, not in new Construct product kinds.

@@ -84,7 +84,9 @@ candidate source in this study slice.
 
 ### Construct Projection Gate
 
-Source authority is resolved for the two anchors. The public strategy is
+Source authority is resolved for the two lab-anchor-derived candidate rows. The
+Construct placement ontology is still multi-slot: `lnrna` and `rt_cds` are
+separate required slots in one template realization. The public strategy is
 `construct_multi_slot_assembly_v1`, recorded in
 `operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
 The remaining gate is runtime materialization of Construct context views from

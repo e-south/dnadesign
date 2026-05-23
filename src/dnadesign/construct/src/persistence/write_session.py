@@ -119,12 +119,11 @@ def sequence_views_to_append(
     *,
     existing_by_id: Mapping[str, Mapping[str, object]],
 ) -> list[SequenceViewRecord]:
-    existing_sequence_ids = {str(row.get("sequence_id")) for row in existing_by_id.values() if row.get("sequence_id")}
     missing_sequence_views: list[SequenceViewRecord] = []
     for view in sequence_views:
         existing = existing_by_id.get(str(view.view_id))
         if existing is None:
-            if str(view.sequence_id) in existing_sequence_ids:
+            if _has_legacy_or_equivalent_sequence_view(view, existing_by_id=existing_by_id):
                 continue
             missing_sequence_views.append(view)
             continue
@@ -137,6 +136,41 @@ def sequence_views_to_append(
                 "refusing to treat the rerun as idempotent."
             )
     return missing_sequence_views
+
+
+def _has_legacy_or_equivalent_sequence_view(
+    view: SequenceViewRecord,
+    *,
+    existing_by_id: Mapping[str, Mapping[str, object]],
+) -> bool:
+    planned = view.model_dump(mode="python")
+    planned.pop("created_at", None)
+    planned.pop("created_by", None)
+    planned_without_view_id = dict(planned)
+    planned_without_view_id.pop("view_id", None)
+    for existing in existing_by_id.values():
+        if str(existing.get("sequence_id") or "") != str(view.sequence_id):
+            continue
+        if "product_kind" not in existing or "orientation" not in existing or "view_name" not in existing:
+            return True
+        existing_without_view_id = dict(existing)
+        existing_without_view_id.pop("view_id", None)
+        if existing_without_view_id == planned_without_view_id:
+            return True
+        equivalent_view_fields = (
+            "view_name",
+            "product_kind",
+            "context_kind",
+            "orientation",
+            "anchor_start_0",
+            "anchor_end_0",
+            "forward_anchor_start_0",
+            "forward_anchor_end_0",
+            "recommended_pooling",
+        )
+        if all(existing.get(field) == planned.get(field) for field in equivalent_view_fields):
+            return True
+    return False
 
 
 def write_planned_sequence_views(output_ds: Dataset, *, job_id: str, records: list[BuiltRecord]) -> None:

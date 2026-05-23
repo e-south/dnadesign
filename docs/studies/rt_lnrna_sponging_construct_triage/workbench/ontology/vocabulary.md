@@ -19,6 +19,21 @@
 | `AbundancePriorOverlay` | Literature/source abundance prior, not a sponging assay label. |
 | `SpongingAssayObservation` | Future lab TF-sponging label rows. |
 
+### Naming Rules
+
+- Use `ConstructSlot` for Construct placement semantics. The v1 slot ids are
+  `lnrna` and `rt_cds`.
+- Use `ConstructProjectionManifest` for the study-owned mapping from candidate
+  source authority into Construct slots and expected views.
+- Use Construct realization for the runtime act of emitting sequences, and
+  construct context view materialization for writing USR sequence-view rows.
+- Use `lab_anchor`, `working_anchor`, and `failed_anchor` only as source-history
+  or candidate-control labels. They are not Construct part roles.
+- Keep `anchor_mean`, `anchor_start_0`, `anchor_end_0`, and
+  `construct_output_anchor_part` only where the USR/Infer/Construct APIs require
+  a single pooled span. In study prose, describe the biological object as a
+  named slot or candidate role, not as a second Construct anchor.
+
 ### Excluded Core Fields
 
 The candidate core schema must not require these fields:

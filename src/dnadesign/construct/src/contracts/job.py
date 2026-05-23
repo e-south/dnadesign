@@ -17,7 +17,10 @@ from pydantic import Field, model_validator
 
 from .base import StrictConfigModel
 from .datasets import InputConfig
-from .job_invariants import require_realize_focal_contract
+from .job_invariants import (
+    require_output_variant_anchor_handoff_contract,
+    require_realize_focal_contract,
+)
 from .normalize_anchor import NormalizeAnchorConfig
 from .output import OutputConfig, OutputVariantConfig
 from .parts import PartConfig
@@ -76,6 +79,11 @@ class InnerJobConfig(StrictConfigModel):
             parts=self.parts,
             focal_part=self.realize.focal_part,
             realize_mode=self.realize.mode,
+        )
+        require_output_variant_anchor_handoff_contract(
+            parts=self.parts,
+            focal_part=self.realize.focal_part,
+            output_variants=self.output_variants,
         )
         missing_required_slots = [slot for slot in self.realize.required_slots if slot not in seen]
         if missing_required_slots:

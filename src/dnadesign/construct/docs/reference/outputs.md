@@ -45,6 +45,9 @@ For template-backed downstream handoffs, construct rejects window configs that c
 those runs cannot emit valid `construct__anchor_start` / `construct__anchor_end` coordinates.
 Jobs may also declare `realize.required_slots`; construct rejects any window
 that would clip or split one of those named slots.
+For multi-slot representation work, output variants can also declare
+`anchor_part`. That writes slot-specific sequence-view bounds while preserving a
+single base sequence row and the complete `construct__slots` audit trail.
 
 When the input dataset already carries `usr_label__primary` / `usr_label__aliases`, construct carries those labels onto the derived output rows as the analyst-facing source names. Those labels are convenience labels, not uniqueness guarantees for derived construct outputs; use `construct__*` lineage to disambiguate source/template/window context.
 

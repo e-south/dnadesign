@@ -23,6 +23,7 @@ required_columns:
   construct_context_view_ids: list_or_empty
   abundance_prior_overlay_ids: list_or_empty
   sponging_assay_observation_ids: list_or_empty
+  candidate_role: controlled_string_or_null
   candidate_note: string_or_null
 controlled_values:
   study_id:
@@ -45,10 +46,20 @@ controlled_values:
     - representable
     - not_representable
     - excluded
+  candidate_role:
+    - working_control
+    - failed_control
+    - weak_rescue_control
+    - negative_control
+    - reference_overlay
+    - candidate
+    - null
 forbidden_core_fields:
   - perturbation_class
   - cloning_constraint_set
   - representation_result
 validation_notes:
-  - Copy candidate_id to id only when exporting an OPAL-ready USR records.parquet.
+  - Copy candidate_id to id only when exporting rt_lnrna_sponging_construct_triage_opal_training_examples_v1.
   - Keep study metadata namespaced or in companion sidecars for OPAL export.
+  - "source_basis: lab_anchor is a source-history label, not a Construct part role."
+  - "Use candidate_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."

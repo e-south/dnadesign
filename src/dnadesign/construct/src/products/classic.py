@@ -199,19 +199,26 @@ def build_variant_record(
     variant: OutputVariantConfig,
     output_dataset_id: str,
 ) -> BuiltRecord:
+    forward_slots = list(forward_record.metadata.get("construct__slots") or [])
     if variant.orientation == "forward":
         sequence = forward_record.sequence
-        anchor_start = int(forward_record.metadata["construct__forward_anchor_start"])
-        anchor_end = int(forward_record.metadata["construct__forward_anchor_end"])
+        anchor_start = optional_int(forward_record.metadata.get("construct__forward_anchor_start"))
+        anchor_end = optional_int(forward_record.metadata.get("construct__forward_anchor_end"))
         parent_forward_construct_id = ""
+        oriented_slots = forward_slots
     else:
         sequence = reverse_complement(forward_record.sequence)
-        anchor_start, anchor_end = reverse_complement_anchor_bounds(
+        anchor_start, anchor_end = reverse_complement_optional_anchor_bounds(
             sequence_length=len(forward_record.sequence),
-            anchor_start_0=int(forward_record.metadata["construct__forward_anchor_start"]),
-            anchor_end_0=int(forward_record.metadata["construct__forward_anchor_end"]),
+            anchor_start_0=optional_int(forward_record.metadata.get("construct__forward_anchor_start")),
+            anchor_end_0=optional_int(forward_record.metadata.get("construct__forward_anchor_end")),
         )
         parent_forward_construct_id = forward_record.output_id
+        oriented_slots = oriented_slot_span_records(
+            forward_slots=forward_slots,
+            output_length=len(forward_record.sequence),
+            orientation=variant.orientation,
+        )
     alphabet = alphabet_for_sequence(sequence)
     output_id = compute_id("dna", normalize_sequence(sequence, "dna", alphabet))
     metadata = dict(forward_record.metadata)
@@ -222,11 +229,7 @@ def build_variant_record(
             "construct__anchor_end": anchor_end,
             "construct__orientation": variant.orientation,
             "construct__parent_forward_construct_id": parent_forward_construct_id,
-            "construct__slots": oriented_slot_span_records(
-                forward_slots=list(forward_record.metadata.get("construct__slots") or []),
-                output_length=len(forward_record.sequence),
-                orientation=variant.orientation,
-            ),
+            "construct__slots": oriented_slots,
         }
     )
     label_suffix = (
@@ -247,10 +250,33 @@ def build_variant_record(
         label_aliases=label_aliases,
         created_at=forward_record.created_at,
     )
+    view_anchor_start = anchor_start
+    view_anchor_end = anchor_end
+    view_forward_anchor_start = optional_int(forward_record.metadata.get("construct__forward_anchor_start"))
+    view_forward_anchor_end = optional_int(forward_record.metadata.get("construct__forward_anchor_end"))
+    if variant.anchor_part is not None:
+        view_anchor_start, view_anchor_end, view_forward_anchor_start, view_forward_anchor_end = slot_anchor_bounds(
+            slots=oriented_slots,
+            slot_id=variant.anchor_part,
+            output_id=output_id,
+        )
+    view_aliases = list(record.label_aliases)
+    if variant.view_name is not None:
+        view_aliases = [
+            alias
+            for alias in (append_variant_label_suffix(alias, variant.view_name) for alias in record.label_aliases)
+            if alias is not None
+        ]
     record.sequence_view = build_variant_sequence_view(
         record=record,
         output_dataset_id=output_dataset_id,
         recommended_pooling=variant.recommended_pooling,
+        anchor_start_0=view_anchor_start,
+        anchor_end_0=view_anchor_end,
+        forward_anchor_start_0=view_forward_anchor_start,
+        forward_anchor_end_0=view_forward_anchor_end,
+        view_name=variant.view_name,
+        aliases=view_aliases,
     )
     return record
 
@@ -267,6 +293,52 @@ def input_length_for_row(
             raise ValidationError(f"Input row '{row.get('id')}' is missing field '{cfg.job.input.field}'.")
         return len(str(raw).strip())
     return input_slot_sequence_length(ordered_realized_parts)
+
+
+def optional_int(value: object) -> int | None:
+    if value in {None, ""}:
+        return None
+    return int(value)
+
+
+def reverse_complement_optional_anchor_bounds(
+    *,
+    sequence_length: int,
+    anchor_start_0: int | None,
+    anchor_end_0: int | None,
+) -> tuple[int | None, int | None]:
+    if anchor_start_0 is None and anchor_end_0 is None:
+        return None, None
+    if anchor_start_0 is None or anchor_end_0 is None:
+        raise ValidationError("Construct anchor bounds must provide both start and end when present.")
+    return reverse_complement_anchor_bounds(
+        sequence_length=sequence_length,
+        anchor_start_0=anchor_start_0,
+        anchor_end_0=anchor_end_0,
+    )
+
+
+def slot_anchor_bounds(
+    *,
+    slots: list[dict[str, object]],
+    slot_id: str,
+    output_id: str,
+) -> tuple[int, int, int, int]:
+    for slot in slots:
+        if str(slot.get("slot_id") or "") != slot_id:
+            continue
+        start = optional_int(slot.get("start"))
+        end = optional_int(slot.get("end"))
+        forward_start = optional_int(slot.get("forward_start"))
+        forward_end = optional_int(slot.get("forward_end"))
+        if None in {start, end, forward_start, forward_end}:
+            raise ValidationError(
+                f"output_variants anchor_part '{slot_id}' does not have contiguous emitted bounds for {output_id}."
+            )
+        return int(start), int(end), int(forward_start), int(forward_end)
+    raise ValidationError(
+        f"output_variants anchor_part '{slot_id}' is not present in construct__slots for {output_id}."
+    )
 
 
 def require_window_anchor_handoff_bounds(

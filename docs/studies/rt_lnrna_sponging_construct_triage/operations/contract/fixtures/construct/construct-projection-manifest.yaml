@@ -54,21 +54,24 @@ representation_views:
     product_kind: realized_context
     orientation: forward
     pooling_operation: seq_mean
+    construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
   - view_name: dual_cassette_1600bp_fwd_rc_concat
     product_kind: realized_context
     required_orientations: [forward, reverse_complement]
     pooling_operation: seq_mean
     downstream_transform: block_normalized_concatenate
+    construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
   - view_name: lnrna_span_in_construct_anchor_mean
     product_kind: realized_context
     orientation: forward
     pooling_operation: anchor_mean
     pooling_slot: lnrna
+    construct_output_anchor_part: lnrna
     required_slots: [lnrna, rt_cds]
 candidates:
-  - candidate_id: rt_lnrna_anchor__eco1_wt_rt__retron26_lnrna__tetO
+  - candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
     fixture_ref: operations/contract/fixtures/candidates/retron26-working-anchor.yaml
     construct_projection_status: representable
     slot_bindings:
@@ -87,7 +90,7 @@ candidates:
       - dual_cassette_1600bp_seq_mean
       - dual_cassette_1600bp_fwd_rc_concat
       - lnrna_span_in_construct_anchor_mean
-  - candidate_id: rt_lnrna_anchor__eco1_wt_rt__retron43_lnrna__tetO
+  - candidate_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
     fixture_ref: operations/contract/fixtures/candidates/retron43-failed-anchor.yaml
     construct_projection_status: representable
     slot_bindings:

@@ -53,11 +53,11 @@ def test_construct_projection_manifest_uses_public_multi_slot_construct_strategy
         "lnrna_span_in_construct_anchor_mean",
     )
     assert audit.candidate_count == 2
-    assert audit.candidate_spans["rt_lnrna_anchor__eco1_wt_rt__retron26_lnrna__tetO"] == {
+    assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"] == {
         "lnrna": (186, 359),
         "rt_cds": (524, 1487),
     }
-    assert audit.candidate_spans["rt_lnrna_anchor__eco1_wt_rt__retron43_lnrna__tetO"] == {
+    assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO"] == {
         "lnrna": (186, 373),
         "rt_cds": (538, 1501),
     }
@@ -112,3 +112,25 @@ def test_construct_projection_manifest_rejects_missing_reverse_complement_view()
     assert (
         "dual_cassette_1600bp_fwd_rc_concat: required_orientations must be forward, reverse_complement"
     ) in audit.errors
+
+
+def test_construct_projection_manifest_rejects_missing_lnrna_anchor_part_mapping() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    payload["representation_views"][2]["construct_output_anchor_part"] = ""
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert "lnrna_span_in_construct_anchor_mean: construct_output_anchor_part must be lnrna" in audit.errors
+
+
+def test_construct_projection_manifest_rejects_swapped_slot_sequence_fields() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    payload["slots"][0]["sequence_field"] = "candidate__rt_cds_sequence"
+    payload["slots"][1]["sequence_field"] = "candidate__lnrna_sequence"
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert "slot lnrna must use role=lnrna_cassette and sequence_field=candidate__lnrna_sequence" in audit.errors
+    assert "slot rt_cds must use role=rt_cds and sequence_field=candidate__rt_cds_sequence" in audit.errors

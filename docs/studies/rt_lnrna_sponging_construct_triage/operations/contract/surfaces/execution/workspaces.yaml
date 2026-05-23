@@ -10,6 +10,6 @@ workspaces:
     generated_outputs_checked_in_by_default: false
   construct_workspace:
     status: planned
-    blocked_by: construct_context_view_materialization
+    blocked_by: persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
     checked_in_config_allowed: true
     generated_outputs_checked_in_by_default: false

@@ -52,6 +52,6 @@ Parsed offsets and SHA-256 values are pinned in
   checked multi-slot projection manifest.
 - OPAL-ready fixed-size feature table with real sponging labels.
 
-The two anchor rows are source-authority resolved and construct-representable
-under `construct_multi_slot_assembly_v1`, but materialized context views have
-not been written yet.
+The two lab-anchor-derived candidate rows are source-authority resolved and
+construct-representable under `construct_multi_slot_assembly_v1`, but
+materialized context views have not been written yet.

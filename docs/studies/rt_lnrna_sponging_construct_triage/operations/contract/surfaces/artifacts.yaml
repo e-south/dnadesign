@@ -8,8 +8,8 @@ artifacts:
     - repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
     - repo:src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/genbank_authority.py
   generated_not_checked_in_by_default:
-    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/candidates
-    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/construct
+    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/infer
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/analysis
-    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/handoff
+    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_opal_training_examples_v1

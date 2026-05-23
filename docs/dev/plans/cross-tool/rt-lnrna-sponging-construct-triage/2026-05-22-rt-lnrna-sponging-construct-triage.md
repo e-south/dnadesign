@@ -24,7 +24,7 @@ and not an RT-only model-catalog project.
 
 - The core unit is `SyntheticRtLnrnaSpongingConstruct`.
 - Eco1 WT RT with Eco1-derived retron26/retron43 lnRNA designs is the v1
-  anchor profile, not the reusable ontology.
+  lab-reference profile, not the reusable ontology.
 - `perturbation_class`, `cloning_constraint_set`, and
   `representation_result` are not core objects.
 - Khan and Crawford are `AbundancePriorOverlay` regimes; they are not
@@ -52,7 +52,7 @@ a fixed synthetic vector context so construct-context Evo2 embeddings can be
 tested for whether they contain enough multicopy ssDNA / RT-DNA abundance
 structure to support limited, interpretable wet-lab triage.
 
-The v1 anchor profile is Eco1 WT RT with Eco1-derived lnRNA designs:
+The v1 lab-reference profile is Eco1 WT RT with Eco1-derived lnRNA designs:
 
 ```yaml
 study_id: rt_lnrna_sponging_construct_triage
@@ -60,14 +60,14 @@ description: Synthetic RT-lnRNA expression construct triage for programmable mul
 construct_contract: dual_cassette_rt_lnrna_expression_v1
 representation_contract: dual_cassette_construct_context_embedding_v1
 payload_program_id: tetO_sponging_v1
-anchor_working: eco1_wt_rt__eco1_derived_lnrna_retron26
-anchor_failed: eco1_wt_rt__eco1_derived_lnrna_retron43
+lab_reference_working: eco1_wt_rt__eco1_derived_lnrna_retron26
+lab_reference_failed: eco1_wt_rt__eco1_derived_lnrna_retron43
 reference_overlays:
   - khan_cross_retron_rt_dna_abundance_v1
   - crawford_eco1_lnrna_msd_abundance_v1
 ```
 
-Eco1 is the first anchor/profile, not the ontology. The reusable category is
+Eco1 is the first source profile, not the ontology. The reusable category is
 the synthetic RT-lnRNA expression construct. Before lab TF-sponging labels
 exist, embeddings are exploratory evidence only. They may help choose a small
 batch if working/failed controls separate and obvious confounds do not explain
@@ -113,10 +113,10 @@ This plan should reuse current contracts rather than invent parallel names:
 
 | Surface | Current contract expectation | Requirement for this study |
 | --- | --- | --- |
-| Construct | One construct job realizes one template against one input selection and emits `construct__*` lineage plus optional forward/reverse-complement `realized_context` sequence views. Multiple named slots may be assembled from one candidate row inside that template; matrix studies across templates remain multiple project entries. | Use the public `construct_multi_slot_assembly_v1` path for lnRNA and RT placement. Do not precompose lnRNA and RT into one hidden runtime anchor. |
+| Construct | One construct job realizes one template against one input selection and emits `construct__*` lineage plus optional forward/reverse-complement `realized_context` sequence views. Multiple named slots may be assembled from one candidate row inside that template; matrix studies across templates remain multiple project entries. | Use the public `construct_multi_slot_assembly_v1` path for lnRNA and RT placement. Do not precompose lnRNA and RT into one hidden runtime part. |
 | USR | Base `records.parquet` uses `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, and `created_at`; richer semantics live in namespaced columns and `_views/sequence_views.parquet`. Product kinds are generic lineage terms such as `construct_insert` and `realized_context`. | Do not add RT/lnRNA-specific product kinds. Use base USR records for sequences, sequence views for emitted construct contexts, and `_views/view_semantics.parquet` for study membership, source family, and role tags. |
 | Infer | Evo2 feature bundles consume explicit sequence views and write aliases/payloads under `_derived/infer/`. `anchor_mean` sends the full emitted context through Evo2 and pools the declared emitted-orientation span. | Construct or USR must provide every forward/RC sequence view and pooling span before Infer runs. Infer must not reverse-complement, window, pad, or infer biological spans implicitly. |
-| LatentDNA | Workspaces materialize source-backed vector views, derived views, metrics, plots, notebooks, and review surfaces from explicit config. `infer_feature_sidecar` sources expose Infer aliases joined to vectors and sequence-view metadata. | LatentDNA may own representation review, block-normalized forward/RC concatenation, landmark/anchor metrics, projections, and notebooks. It is not the source of truth for construct projection, sequence identity, or OPAL campaign labels. |
+| LatentDNA | Workspaces materialize source-backed vector views, derived views, metrics, plots, notebooks, and review surfaces from explicit config. `infer_feature_sidecar` sources expose Infer aliases joined to vectors and sequence-view metadata. | LatentDNA may own representation review, block-normalized forward/RC concatenation, landmark/control-distance metrics, projections, and notebooks. It is not the source of truth for construct projection, sequence identity, or OPAL campaign labels. |
 | OPAL | OPAL starts from a candidate `records.parquet` with one explicit fixed-length `X` column. For shared labels, `labels.source.kind: usr_sidecar` plus `writeback.prediction_records: ledger_only` keeps assay truth out of campaign ledgers. | OPAL sees one selected `X` column after Infer/LatentDNA export. It does not select the representation view, learn from abundance priors as `Y`, or mutate upstream candidate definitions. |
 | Ops/studies | A checked-in study owns `README.md`, `record/`, `operations/ops.study.yaml`, optional route maps, contexts, and workbench artifacts. Ops status/preflight surfaces are added only when real providers exist. | Phase 0 can create study records and planned contracts. Do not register `studies.rt-lnrna-sponging-construct-triage.status` until a concrete provider exists. |
 
@@ -206,7 +206,8 @@ The lean core ontology is:
 | `LnrnaSequence` | The lnRNA cassette sequence used in the construct; in construct context this is represented as DNA encoding the transcript. | USR/source handoff |
 | `LnrnaProvenance` | Source, design id, derivation, source row, and literature/support metadata for the lnRNA. | Source overlay / study |
 | `MsdDesignSpec` | Study-owned design metadata for the MSD/hairpin/payload portion, including compiler source and feasibility status. | Study/compiler |
-| `DualExpressionConstruct` | The concrete synthetic plasmid-region construct instance produced by placing lnRNA and RT anchors into the contract template. | Construct |
+| `ConstructSlot` | Named Construct placement part, for example `lnrna` or `rt_cds`, with template span, source field, emitted span, and orientation-aware bounds. | Construct |
+| `DualExpressionConstruct` | The concrete synthetic plasmid-region construct instance produced by placing the lnRNA and RT CDS slot sequences into the contract template. | Construct |
 | `ConstructContextView` | A declared sequence product/view to embed, with coordinates, length policy, orientation, pooling intent, and failure behavior. | Construct / USR |
 | `SpongingAssayObservation` | Future lab TF-sponging label rows with assay metadata and normalization. | Study / OPAL label source |
 | `InferFeatureAlias` | Pointer to model-derived feature aliases, vector sidecars, scalar sidecars, and export-ready `X` columns. | Infer |
@@ -230,17 +231,17 @@ Replacement semantics:
 - Use `ConstructContextView` for what sequence is embedded, and
   `InferFeatureAlias` for where computed model outputs live.
 
-For the v1 Eco1 anchors, normalize the lab system as:
+For the v1 Eco1 lab-reference controls, normalize the lab system as:
 
 ```yaml
-working_anchor:
+working_control:
   rt_source: Eco1
   rt_variant: WT
   lnrna_source: Eco1-derived
   lnrna_design_id: retron26
   payload_program_id: tetO_sponging_v1
 
-failed_anchor:
+failed_control:
   rt_source: Eco1
   rt_variant: WT
   lnrna_source: Eco1-derived
@@ -270,28 +271,60 @@ It represents a fixed synthetic plasmid regional context:
 [plasmid suffix context]
 ```
 
-Constants stay fixed within a construct contract version. Variable anchors are
+Constants stay fixed within a construct contract version. Variable slots are
 primarily:
 
 - `lnRNA/msr-msd-payload`
 - `RT_CDS`
 
-Conceptually the construct has two biological anchors, but the current
-Construct runtime must expose that expressivity directly rather than using a
-hidden precomposed anchor. The v1 strategy is
-`construct_multi_slot_assembly_v1`: one candidate row binds separate named
-slots for the lnRNA cassette and RT CDS into one fixed expression-vector
-template. Construct owns generic slot assembly, placement guards, span emission,
-reverse-complement output variants, and runtime lineage. The study owns RT,
-lnRNA, payload, source-overlay, and representation semantics.
+The construct has two biological variable cassettes, but Construct should model
+them as named runtime slots rather than as multiple package-level anchors or one
+hidden precomposed anchor. The v1 strategy is `construct_multi_slot_assembly_v1`:
+one candidate row binds separate named slots for the lnRNA cassette and RT CDS
+into one fixed expression-vector template. Construct owns generic slot assembly,
+placement guards, span emission, reverse-complement output variants, and runtime
+lineage. The study owns RT, lnRNA, payload, source-overlay, and representation
+semantics.
 
 `SyntheticRtLnrnaSpongingConstruct` remains the study row. Construct slots are
 generic runtime parts, not RT/lnRNA ontology records; those meanings are
 preserved through candidate fields, source authority, and view semantics.
 
+Use three process names consistently:
+
+- Construct projection: the study-owned mapping from candidate source fields
+  into named Construct slots and expected context views.
+- Construct realization: the Construct runtime run that emits sequence records
+  from those slot bindings.
+- Construct context view materialization: the USR sequence-view rows and
+  sidecars written after realization.
+
+Implementation status as of 2026-05-23: the study now has a test-backed
+temporary materialization helper for the two control candidates. It converts the
+projection manifest plus GenBank authority into public Construct configs, runs
+multi-slot realization, and asserts the 1,600 bp context, emitted slot spans,
+real prefix/interstitial/suffix sequence, forward/reverse-complement rows, and
+the lnRNA anchor-mean diagnostic view. It is not yet a persistent study
+workspace/export materialization step.
+
+Use study-prefixed USR dataset ids because these datasets may live in mixed USR
+roots:
+
+- `rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1` for the
+  Construct input dataset.
+- `rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1` for the
+  realized construct-context output dataset and its sequence views.
+- `rt_lnrna_sponging_construct_triage_opal_training_examples_v1` for the future
+  OPAL-ready table with one selected fixed-size `X` vector and real sponging
+  labels.
+
+Avoid lifecycle-only names such as `pre_construct`, `post_construct`,
+`opal_handoff_v1`, or `sponging_handoff_v1`; lifecycle state belongs in
+metadata, not the dataset id.
+
 For v1, Eco1 WT RT is fixed for the main search. The primary variants are
-Eco1-derived lnRNA/MSD designs, especially retron26, retron43, weak/rescue
-anchors when available, and cloning-feasible variants from existing compiler
+Eco1-derived lnRNA/MSD designs, especially retron26, retron43, weak/rescue lab
+controls when available, and cloning-feasible variants from existing compiler
 primitives.
 
 The construct contract must define:
@@ -304,12 +337,12 @@ The construct contract must define:
 | `lnrna_promoter_id`, `lnrna_terminator_id` | Fixed lnRNA cassette constants. |
 | `rt_promoter_id`, `rt_rbs_id`, `rt_terminator_id` | Fixed RT cassette constants. |
 | `interstitial_region_id` | Fixed region between cassettes. |
-| `lnrna_anchor_id` | Candidate-specific lnRNA cassette sequence id. |
-| `rt_anchor_id` | Candidate-specific RT CDS sequence id. |
+| `lnrna_slot_sequence_id` | Candidate-specific lnRNA cassette sequence id bound to the `lnrna` slot. |
+| `rt_cds_slot_sequence_id` | Candidate-specific RT CDS sequence id bound to the `rt_cds` slot. |
 | `construct_slots` | Named Construct slots with sequence fields, placement guards, template spans, and required-slot status. |
-| `anchor_spans` | 0-based half-open spans in the emitted construct sequence. |
+| `emitted_slot_spans_0` | 0-based half-open slot spans in the emitted construct sequence. |
 | `resolved_length` | Full emitted sequence length. |
-| `representability_status` | `representable`, `not_representable_too_long`, `not_representable_missing_constant`, `not_representable_invalid_sequence`, or `not_representable_unresolved_anchor`. |
+| `representability_status` | `representable`, `not_representable_too_long`, `not_representable_missing_constant`, `not_representable_invalid_sequence`, or `not_representable_unresolved_slot`. |
 | `failure_reason` | Required when not representable. |
 
 The emitted USR rows should preserve Construct's existing lineage fields,
@@ -322,7 +355,7 @@ including `construct__context_id`, `construct__context_kind`,
 `construct__anchor_end` describe the focal slot for existing `anchor_mean`
 consumers. RT and lnRNA subspans remain separately auditable through
 `construct__slots` and study-owned view semantics, not through one collapsed
-dual-cassette anchor.
+dual-cassette span.
 
 Use a standardized regional context of 1,600 bp only if the full lnRNA and RT
 cassettes fit without truncation. Do not truncate biologically meaningful RT or
@@ -352,16 +385,17 @@ lnrna_span_in_construct_anchor_mean
 
 These are representation views, not necessarily one USR sequence-view row each.
 `dual_cassette_1600bp_seq_mean` maps to one forward `realized_context` sequence
-view. `dual_cassette_1600bp_fwd_rc_concat` maps to two `realized_context`
-sequence views plus one explicit derived vector view. The third is diagnostic
-and must still be computed from the lnRNA span inside the full construct
-context, not as an independent msd-only selector space.
+view. `dual_cassette_1600bp_fwd_rc_concat` uses that same forward member plus a
+reverse-complement `realized_context` sequence view and one explicit derived
+vector view. The third is diagnostic and must still be computed from the lnRNA
+span inside the full construct context, not as an independent msd-only selector
+space.
 
 All three views should be represented with existing USR sequence-view
 vocabulary. The full construct context rows are `product_kind:
 realized_context`, `context_kind: template_custom`, with `orientation:
 forward` or `reverse_complement`. Study-specific semantics such as
-`working_anchor`, `failed_anchor`, `khan_reference`, or
+`working_control`, `failed_control`, `khan_reference`, or
 `crawford_reference` belong in `_views/view_semantics.parquet` or candidate
 metadata, not in `product_kind`.
 
@@ -370,12 +404,14 @@ metadata, not in `product_kind`.
 They are not new USR `product_kind` values. When persisted against current USR
 contracts, use `SequenceViewRecord.view_name` or `aliases` for the source view
 label and use `_views/view_semantics.parquet` for study collection membership,
-anchor roles, source regimes, and other mutable interpretation. Spans that
-describe RT CDS, lnRNA, promoters, terminators, interstitial region, prefix,
-and suffix are part of the construct projection contract or a study-owned
-view-semantics/fixture table; do not add them as ad hoc columns to
-`_views/sequence_views.parquet` unless USR first exposes a public extension
-field.
+candidate roles, source regimes, and other mutable interpretation. Do not emit a
+duplicate forward sequence-view row solely to give the forward concat member a
+second view name; the concat layer should reference the
+`dual_cassette_1600bp_seq_mean` forward row plus the reverse-complement row.
+The spans that describe RT CDS, lnRNA, promoters, terminators, interstitial
+region, prefix, and suffix are part of the construct projection contract or a
+study-owned view-semantics/fixture table; do not add them as ad hoc columns to
+`_views/sequence_views.parquet` unless USR first exposes a public extension.
 
 Do not start with RT-only, msd-only, or broad atlas views as decision surfaces.
 They may be added later as diagnostics after v1 proves useful, but the
@@ -394,7 +430,7 @@ experimental candidate row is the paired complete construct.
 | Variable spans | `lnRNA/msr-msd-payload` and `RT_CDS` recorded as explicit spans in construct order. |
 | Constant spans | Plasmid prefix/suffix, promoters, RBS, terminators, interstitial region recorded as explicit spans. |
 | Transform version | `dual_cassette_construct_context_embedding_v1`. |
-| Failure behavior | Missing constants, invalid alphabet, length overflow, anchor clipping, or unresolved anchors produce non-representable rows before Infer. |
+| Failure behavior | Missing constants, invalid alphabet, length overflow, slot clipping, or unresolved slots produce non-representable rows before Infer. |
 
 #### View: `dual_cassette_1600bp_fwd_rc_concat`
 
@@ -439,7 +475,7 @@ row over the same emitted construct sequence by setting `anchor_start_0` /
 `anchor_end_0` to the lnRNA span and `recommended_pooling: anchor_mean`. That
 keeps Infer's existing single-span pooling contract intact. If later work needs
 RT-span diagnostics too, add a separate diagnostic view row with RT pooling
-bounds rather than overloading one view with multiple anchor spans.
+bounds rather than overloading one view with multiple pooled slot spans.
 
 Model outputs attach to declared `ConstructContextView` / `InferFeatureAlias`
 sidecars. They do not attach directly to source records, raw candidates, or
@@ -608,13 +644,14 @@ source so joins and rationale remain auditable:
 | `manual_control` | A deliberately included confound/control row with documented rationale. |
 
 `variant_derivation` can remain null when the candidate is a source-backed
-anchor whose structured fields already explain the row. It must be populated
+control whose structured fields already explain the row. It must be populated
 when a row is generated by a design transform, mutation, or control rule.
 
 Recommended metadata columns:
 
-- `anchor_role`: `working_anchor`, `failed_anchor`, `weak_rescue_anchor`,
-  `negative_control`, `reference_overlay`, `candidate`, or null.
+- `candidate_role`: `working_control`, `failed_control`,
+  `weak_rescue_control`, `negative_control`, `reference_overlay`,
+  `candidate`, or null.
 - `rt_catalytic_status`: `wild_type`, `catalytic_dead`, `engineered`, or
   `source_reference`.
 - `lnrna_region_focus`: `msd_p4`, `payload`, `cap`, `scar_nick`, `whole_lnrna`,
@@ -628,6 +665,10 @@ Recommended metadata columns:
 - `inverted_repeat_burden`
 - `stem_length_estimate`
 - `codon_policy`
+
+Use `candidate_role` for new study tables and exports. If legacy source files
+or lab notes use `working_anchor` / `failed_anchor`, preserve those as source
+history or provenance labels rather than as Construct roles.
 
 The inclusion rule is:
 
@@ -700,7 +741,7 @@ The handoff should produce:
 | `_derived/infer/feature_scalar_aliases.parquet` | Infer | Optional scalar aliases if diagnostics are enabled. |
 | `_derived/infer/feature_scalars.parquet` | Infer | Optional scalar payloads. |
 | LatentDNA workspace config | Study/LatentDNA | Declares source-backed Infer sidecar views, derived forward/RC concat, landmarks, metrics, plots, notebooks, and exports. |
-| LatentDNA materialized views/metrics | LatentDNA | Review surface for geometry, anchor distances, overlay enrichment, and confound reports. |
+| LatentDNA materialized views/metrics | LatentDNA | Review surface for geometry, working/failed control distances, overlay enrichment, and confound reports. |
 | OPAL-ready candidate table | Study/OPAL prep | One selected fixed-length vector-valued `X` column for future OPAL use. |
 
 Current Infer vector alias sidecars are the concrete persistence surface for
@@ -812,8 +853,9 @@ batch_id
 `design_constraints` in OPAL export is a flattened metadata summary from
 `MsdDesignSpec`; it is not a separate core ontology object.
 
-The OPAL handoff contract is:
+The OPAL training-example dataset contract is:
 
+- dataset id `rt_lnrna_sponging_construct_triage_opal_training_examples_v1`;
 - one candidate universe with stable ids in `records.parquet`;
 - one explicit fixed-length infer/LatentDNA-derived vector-valued `X` column
   selected by the study and stored as an Arrow fixed-size-list float vector;
@@ -870,7 +912,7 @@ working_failed_axis_coordinate
 off_axis_distance
 ```
 
-For an embedding vector `x`, working anchor `w`, and failed anchor `f`:
+For an embedding vector `x`, working control `w`, and failed control `f`:
 
 ```text
 d_to_retron26_working = cosine_distance(x, w)
@@ -920,7 +962,7 @@ Minimum confound checks:
 The representation contract is useful for triage only if:
 
 - retron26 and retron43 do not collapse in embedding space;
-- weak/rescue anchors land plausibly relative to the working/failed axis;
+- weak/rescue controls land plausibly relative to the working/failed axis;
 - Crawford abundance bins show non-random local structure;
 - Khan high producers are interpretable as external overlays beyond simple
   clade/source effects;
@@ -951,7 +993,7 @@ This spec explicitly excludes:
 - treating model outputs as assay observations;
 - over-annotating branch-G/msr/msd/stem/loop boundaries as mandatory v1 schema
   fields;
-- making Eco1 the ontology rather than the v1 anchor;
+- making Eco1 the ontology rather than the v1 reference profile;
 - broad payload search without a declared payload program;
 - broad RT protein engineering as the main v1 objective;
 - cross-pairing unrelated RTs and lnRNAs by default;
@@ -970,7 +1012,7 @@ Define schemas, ids, naming, and file paths. Confirm:
 - public multi-slot Construct contract for lnRNA and RT CDS placement;
 - retron26/retron43 sequence sources and naming normalization;
 - current Khan and Crawford handoff files and row counts;
-- whether any weak/rescue anchors are available;
+- whether any weak/rescue controls are available;
 - expected first study record location.
 
 Deliverables:
@@ -986,9 +1028,9 @@ Deliverables:
 
 Create `SyntheticRtLnrnaSpongingConstruct` rows for:
 
-- Eco1 WT RT + retron26 lnRNA working anchor;
-- Eco1 WT RT + retron43 lnRNA failed P4/stem-extension anchor;
-- available weak/rescue anchors;
+- Eco1 WT RT + retron26 lnRNA working control/source row;
+- Eco1 WT RT + retron43 lnRNA failed P4/stem-extension control/source row;
+- available weak/rescue controls;
 - finite cloning-feasible MSD variants from existing Snapback/scar-nick/compiler
   primitives;
 - catalytic-dead RT negative control if selected for v1;
@@ -1006,12 +1048,18 @@ Deliverables:
 Use Construct to produce declared dual-cassette construct views. Record
 non-representable candidates rather than truncating.
 
+Current slice: the two checked-in controls can be materialized in a temporary
+USR root through the study helper in
+`src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/construct_materialization.py`.
+The next Phase 2 step is to promote this into a persistent study
+workspace/export operation before Infer or LatentDNA consume the views.
+
 Deliverables:
 
 - Construct workspace/config or neutral construct projection manifest;
 - documented projection strategy: public `construct_multi_slot_assembly_v1`
   with named lnRNA and RT CDS slots;
-- USR records for realized construct sequences;
+- USR records for realized construct sequences, first for the two control rows;
 - `_views/sequence_views.parquet` rows for the three representation views,
   using `realized_context` product kind for emitted construct contexts;
 - `_views/view_semantics.parquet` rows for study role tags, source family,
@@ -1044,7 +1092,7 @@ Deliverables:
 
 #### Phase 5: Analysis
 
-Compute distances to working/failed anchors, abundance overlay enrichment/axis
+Compute distances to working/failed controls, abundance overlay enrichment/axis
 metrics, and confound checks.
 
 Deliverables:
@@ -1064,7 +1112,7 @@ score.
 
 Candidate rationale categories may include:
 
-- close to retron26 productive anchor;
+- close to retron26 productive control;
 - between retron26 and retron43;
 - near retron43 as negative/control rows;
 - cloning-feasible variants spanning the working/failed axis;
@@ -1100,7 +1148,7 @@ Required validation should scale with the implementation phase:
 | Candidate schema | Reject missing `candidate_id`, missing RT/lnRNA provenance, duplicate ids, and unknown `payload_program_id`. |
 | Forbidden core fields | Candidate core schema must not require `perturbation_class`, `cloning_constraint_set`, or `representation_result`. |
 | `MsdDesignSpec` | Validate compiler source, cap/base/profile tokens, feasibility status, and payload id. |
-| Construct projection | Reject invalid alphabet, missing constants, anchor/slot clipping, arbitrary filler padding, and >1,600 bp views that would require truncation. Validate that implementation uses the checked public multi-slot Construct contract. |
+| Construct projection | Reject invalid alphabet, missing constants, slot clipping, arbitrary filler padding, and >1,600 bp views that would require truncation. Validate that implementation uses the checked public multi-slot Construct contract. |
 | Sequence views | Validate product kind, orientation, construct spans, length, pooling bounds, transform version, and that no study-specific `product_kind` values were invented. |
 | Infer completion | Run Infer sequence-view completion validation before model execution. |
 | Feature aliases | Verify every materialized `InferFeatureAlias` points to one declared `ConstructContextView` and one payload sidecar. |
@@ -1108,7 +1156,7 @@ Required validation should scale with the implementation phase:
 | Overlay linkage | Verify Khan 99-row and Crawford 4,174-row abundance overlays retain raw numeric labels, normalized values, provenance, and regime ids. |
 | Label separation | Verify no `AbundancePriorOverlay` column is exported as `normalized_TF_sponging_label`. |
 | OPAL precondition | OPAL config validation requires one explicit Arrow fixed-size-list vector `X` column. A future or empty label slot is allowed for study readiness prose, but OPAL `run`/`explain` must use a configured label source that satisfies OPAL's `campaign_history` or `usr_sidecar` contract. |
-| Metrics | Unit-test anchor distance formulas and fail when anchors are missing or from mismatched views. |
+| Metrics | Unit-test working/failed control distance formulas and fail when controls are missing or from mismatched views. |
 | Confounds | Emit a report that includes length, GC, repeat burden, inverted-repeat burden, stem length if available, and codon policy. |
 
 Acceptance for the first useful v1 workbench:
@@ -1132,7 +1180,7 @@ lab records:
 - Whether later construct contracts need additional slots beyond lnRNA and RT
   CDS after the v1 two-slot path is materialized.
 - Exact source of retron26/retron43 sequences and naming normalization.
-- Which weak/rescue anchors are already available.
+- Which weak/rescue controls are already available.
 - Whether Crawford abundance labels are directly joinable to
   retron26/retron43-adjacent candidate designs after sequence/design
   normalization and construct projection.
@@ -1149,18 +1197,18 @@ lab records:
 - Exact OPAL `y_space` for first lab labels: scalar normalized TF-sponging
   score, vector-valued assay summary, or a staged abundance-then-sponging label
   lifecycle.
-- Exact owner and path for the OPAL-ready `records.parquet`: study-generated
-  candidate dataset, LatentDNA export bundle materialized into USR, or a
-  purpose-built study helper.
+- Exact implementation owner for writing
+  `rt_lnrna_sponging_construct_triage_opal_training_examples_v1`: study helper
+  versus LatentDNA export materialized into the study USR root.
 - Whether the diagnostic lnRNA-span view needs a reverse-complement companion
   in v1 or should wait for v2.
 - Whether construct-compatible non-Eco1 references should be actual candidate
-  rows, overlay-only rows, or both with explicit anchor roles.
+  rows, overlay-only rows, or both with explicit candidate roles.
 
 ### 19. Distilled Plan
 
-Build a dual-cassette RT-lnRNA construct representation study, anchored by
-Eco1 WT RT with retron26 and retron43 lnRNA designs, using Crawford Eco1
+Build a dual-cassette RT-lnRNA construct representation study, starting with
+Eco1 WT RT plus retron26 and retron43 lnRNA designs, using Crawford Eco1
 abundance priors and Khan cross-retron abundance priors as small reference
 overlays. Test whether standardized construct-context Evo2 embeddings contain
 an ordinal multicopy ssDNA / RT-DNA abundance structure before using them to
@@ -1186,7 +1234,7 @@ these questions.
 | Where is the embedding or feature vector? | `InferFeatureAlias`, feature sidecars, `x_column_name` | Model outputs attach to view aliases, not to source records or assay labels. |
 | Which source abundance priors apply? | `AbundancePriorOverlay`, regime id, overlay join report | Khan and Crawford remain separate overlay regimes with raw values preserved. |
 | Which rows have true TF-sponging labels? | `SpongingAssayObservation` | OPAL `Y` is absent until lab labels exist; abundance priors cannot be promoted to `Y`. |
-| Can the representation support triage? | geometry metrics, overlay metrics, confound audit | Triage is blocked if anchors collapse or confounds explain the geometry. |
+| Can the representation support triage? | geometry metrics, overlay metrics, confound audit | Triage is blocked if working/failed controls collapse or confounds explain the geometry. |
 | What should be built next? | phase deliverables, open questions, validation tests | The next implementation slice has explicit entry and exit criteria. |
 
 The model is intentionally table-first. A future RDF/JSON-LD surface can be
@@ -1218,13 +1266,13 @@ lnrna_provenance_id: lnrna_prov__eco1_derived_retron26
 msd_design_spec_id: msd_spec__retron26__tetO_sponging_v1
 variant_derivation: null
 source_basis: lab_anchor
-anchor_role: working_anchor
+candidate_role: working_control
 construct_projection_status: pending
 construct_id: null
 construct_context_view_ids: []
 abundance_prior_overlay_ids: []
 sponging_assay_observation_ids: []
-candidate_note: Working Eco1 WT RT plus Eco1-derived retron26 lnRNA anchor.
+candidate_note: Working Eco1 WT RT plus Eco1-derived retron26 lnRNA control.
 ```
 
 ```yaml
@@ -1244,13 +1292,13 @@ lnrna_provenance_id: lnrna_prov__eco1_derived_retron43
 msd_design_spec_id: msd_spec__retron43_p4_stem_extension__tetO_sponging_v1
 variant_derivation: p4_stem_extension
 source_basis: lab_anchor
-anchor_role: failed_anchor
+candidate_role: failed_control
 construct_projection_status: pending
 construct_id: null
 construct_context_view_ids: []
 abundance_prior_overlay_ids: []
 sponging_assay_observation_ids: []
-candidate_note: Failed Eco1 WT RT plus Eco1-derived retron43 P4/stem-extension anchor.
+candidate_note: Failed Eco1 WT RT plus Eco1-derived retron43 P4/stem-extension control.
 ```
 
 #### MsdDesignSpec Sketch
@@ -1413,7 +1461,7 @@ dual-cassette construct contract.
   the emitted construct fits the declared representation view without
   truncation.
 - High-producing non-Eco1 systems should default to `source_basis:
-  khan_reference` and `anchor_role: reference_overlay`, unless Phase 0 promotes
+  khan_reference` and `candidate_role: reference_overlay`, unless Phase 0 promotes
   a specific row into the main candidate set with a written rationale.
 
 #### Crawford Join Rules
@@ -1541,19 +1589,19 @@ contract.
 
 If the implementation discovers that a reusable schema belongs in Construct,
 USR, Infer, or OPAL, move only that reusable contract to the owning package.
-Keep study-specific anchor names, rationale, and wet-lab categories in the
-study surface.
+Keep study-specific source labels, candidate roles, rationale, and wet-lab
+categories in the study surface.
 
 ### Appendix E. Minimal Vertical Slice
 
 The smallest useful implementation is not the full candidate universe. It is a
-contract proof that the anchors, views, overlays, and labels are separated
+contract proof that source roles, Construct slots, views, overlays, and labels are separated
 correctly.
 
 1. Create Phase 0 schema fixtures for candidate rows, `MsdDesignSpec`,
    construct views, and overlay mappings.
-2. Create two candidate rows: retron26 working anchor and retron43 failed
-   anchor, both with Eco1 WT RT and explicit lnRNA provenance.
+2. Create two candidate rows: retron26 working control and retron43 failed
+   control, both with Eco1 WT RT and explicit lnRNA provenance.
 3. Add one catalytic-dead RT candidate only if the exact RT CDS edit and
    codon policy are already known; otherwise leave it in open questions.
 4. Add a tiny Crawford overlay sample and a tiny Khan overlay sample without
@@ -1561,16 +1609,19 @@ correctly.
 5. Resolve the dual-cassette plasmid constants and 1,600 bp padding source.
 6. Use the public multi-slot Construct projection strategy with explicit lnRNA
    and RT CDS slots.
-7. Project only the two anchors through Construct and record
-   representability.
-8. Generate the three declared view records for those anchors.
+7. Materialize only the two lab-reference candidates through Construct and
+   record representability. The temporary integration helper now proves this
+   path; a persistent workspace/export operation is still needed.
+8. Generate the three declared view records for those candidates. The forward
+   concat member should reuse the `dual_cassette_1600bp_seq_mean` forward row,
+   with a separate reverse-complement row for the concat contract.
 9. Materialize or dry-run Infer feature aliases for the three views.
 10. Materialize a minimal LatentDNA review workspace or equivalent table-first
     analysis surface from the Infer sidecars.
-11. Compute anchor distance metrics and confirm the metrics code refuses
+11. Compute working/failed control distance metrics and confirm the metrics code refuses
     mismatched views.
 12. Emit a triage-readiness report that says either "representation contract
-    can proceed to a larger cohort" or "blocked until anchors or constants are
+    can proceed to a larger cohort" or "blocked until controls or constants are
     corrected."
 
 Exit criteria for the vertical slice:
@@ -1615,11 +1666,11 @@ Required tables:
 
 | Artifact | Required columns |
 | --- | --- |
-| `candidate_geometry_metrics.tsv` | `candidate_id`, `construct_context_view_id`, `d_to_retron26_working`, `d_to_retron43_failed`, `working_failed_axis_coordinate`, `off_axis_distance`, `anchor_metric_status` |
+| `candidate_geometry_metrics.tsv` | `candidate_id`, `construct_context_view_id`, `d_to_retron26_working`, `d_to_retron43_failed`, `working_failed_axis_coordinate`, `off_axis_distance`, `control_metric_status` |
 | `overlay_regime_metrics.tsv` | `reference_overlay_id`, `regime`, `construct_context_view_id`, `metric_name`, `metric_value`, `n_rows`, `censoring_policy`, `notes` |
 | `confound_audit.tsv` | `candidate_id`, `construct_context_view_id`, `length_nt_construct`, `length_nt_lnrna`, `gc_fraction_construct`, `gc_fraction_lnrna`, `repeat_burden`, `inverted_repeat_burden`, `stem_length_estimate`, `codon_policy`, `payload_program_id` |
 | `representability_failures.tsv` | `candidate_id`, `construct_contract`, `representation_contract`, `failure_reason`, `blocking_field`, `recommended_action` |
-| `wet_lab_candidate_handoff.tsv` | `candidate_id`, `candidate_rationale`, `anchor_role`, `view_id_used_for_rationale`, `required_control`, `expected_readout`, `known_risk` |
+| `wet_lab_candidate_handoff.tsv` | `candidate_id`, `candidate_rationale`, `candidate_role`, `view_id_used_for_rationale`, `required_control`, `expected_readout`, `known_risk` |
 
 The decision report should answer:
 
@@ -1638,7 +1689,7 @@ The decision report should answer:
 
 | Risk | Why it matters | Mitigation |
 | --- | --- | --- |
-| Anchor collapse | If retron26 and retron43 are not separated, the view cannot support triage. | Gate all broader analysis on anchor non-collapse in the primary views. |
+| Control collapse | If retron26 and retron43 are not separated, the view cannot support triage. | Gate all broader analysis on working/failed control separation in the primary views. |
 | Length or repeat confounding | The model may separate rows by obvious sequence mechanics rather than abundance-relevant biology. | Include length, GC, repeat, inverted-repeat, stem-length, and payload confound audits before selection. |
 | Payload semantic noise | Payload changes can move embeddings for reasons unrelated to multicopy ssDNA production. | Keep `tetO_sponging_v1` narrow; treat bifunctional payloads as future payload programs. |
 | Source-regime overmixing | Khan and Crawford measure different regimes and should not be one label. | Keep separate `reference_overlay_id`, `regime`, and overlay-specific metrics. |

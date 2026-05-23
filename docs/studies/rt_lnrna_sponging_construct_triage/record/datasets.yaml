@@ -1,6 +1,6 @@
 study_id: rt_lnrna_sponging_construct_triage
 usr_remotes_path: n/a
-verified_at: 2026-05-22
+verified_at: 2026-05-23
 datasets:
   - role: khan_abundance_prior_overlay
     owner_tool: dnadesign-data
@@ -125,7 +125,45 @@ datasets:
     notes: >-
       Orientation-only reference with explicit left base, right base, snapback
       cap, foldback, payload primary, and payload complement annotations.
+  - role: construct_slot_inputs_usr_dataset
+    owner_tool: study
+    lifecycle: construct_materialization_input
+    status: planned_persistent_dataset_id
+    dataset_id: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+    row_identity: usr_canonical_sequence_id
+    semantic_identity: candidate__candidate_id
+    notes: >-
+      USR input dataset for Construct realization. Base row ids remain
+      canonical sequence ids; the paired RT-lnRNA candidate id and slot
+      sequences live in the candidate overlay.
+  - role: construct_contexts_1600bp_usr_dataset
+    owner_tool: construct
+    lifecycle: construct_materialization_output
+    status: planned_persistent_dataset_id
+    dataset_id: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    row_identity: usr_canonical_emitted_sequence_id
+    expected_sequence_views:
+      - dual_cassette_1600bp_seq_mean
+      - dual_cassette_1600bp_fwd_rc_concat
+      - lnrna_span_in_construct_anchor_mean
+    notes: >-
+      USR output dataset for realized 1,600 bp construct contexts. Sequence
+      views remain attached to this dataset; they are not separate datasets.
+  - role: opal_training_examples_usr_dataset
+    owner_tool: study
+    lifecycle: opal_training_examples
+    status: blocked_until_infer_features_and_sponging_labels
+    dataset_id: rt_lnrna_sponging_construct_triage_opal_training_examples_v1
+    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_opal_training_examples_v1
+    row_identity: study_candidate_id
+    notes: >-
+      Future OPAL-ready table for this study only. Rows require one selected
+      fixed-size X vector and real SpongingAssayObservation labels before OPAL
+      run/explain. Do not use generic names such as opal_handoff_v1 in mixed
+      USR roots.
 notes:
-  - No USR dataset is registered for this study yet.
+  - Planned study-prefixed USR dataset ids are registered above.
   - No generated candidate, construct, Infer, LatentDNA, or OPAL outputs are checked in.
   - GenBank source authority is recorded in workbench/provenance/genbank-source-authority.yaml.

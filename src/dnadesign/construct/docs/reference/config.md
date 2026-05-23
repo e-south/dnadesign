@@ -218,6 +218,15 @@ whole-output reverse-complement products from one realized forward construct.
 - `product_kind: realized_context` with `orientation: forward` emits the forward context product
 - `product_kind: realized_context` with `orientation: reverse_complement` emits the whole-output
   reverse-complement context product
+- `anchor_part`: optional named part whose emitted span is copied into that
+  sequence-view row's `anchor_start_0` / `anchor_end_0` bounds; use this for
+  multi-slot studies that need slot-specific `anchor_mean` features
+- `view_name`: optional explicit sequence-view name for a study representation,
+  for example `lnrna_span_in_construct_anchor_mean`
+- variant sequence views require an anchor handoff span. For multi-slot jobs
+  whose parts are not named or role-tagged `anchor`, set either
+  `output_variants[].anchor_part` for the slot-specific view or
+  `realize.focal_part` for one primary row-level compatibility span.
 - reverse-complement variants carry emitted-orientation anchor bounds plus
   `construct__forward_anchor_start` / `construct__forward_anchor_end` for downstream audits
 - reverse-complement variants are the reverse complement of the full emitted context sequence, not
@@ -235,6 +244,9 @@ whole-output reverse-complement products from one realized forward construct.
   Evo2 models, an Infer `anchor_mean` vector averages prefix-conditioned token
   states in that emitted orientation; two-sided context requires a separate
   reverse-complement pass or another explicit downstream representation.
+- multiple output variants may point at the same emitted sequence and
+  orientation when they declare distinct `anchor_part` / `view_name` pairs;
+  Construct writes one base sequence row plus distinct sequence-view rows
 - semantic variants may share one base sequence id; construct writes distinct sequence-view rows
   instead of forcing duplicate base records
 - with `output.on_conflict=ignore`, already-present base rows are skipped, but planned sequence-view

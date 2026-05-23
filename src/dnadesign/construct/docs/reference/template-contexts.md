@@ -31,6 +31,15 @@ For template-backed inference or other downstream analysis, the resolved constru
 These values are emitted relative to the realized sequence that construct writes.
 For multi-slot jobs, `construct__anchor_*` remains the focal part span for
 existing consumers, while `construct__slots` carries every named slot span.
+Any job that emits `realized_context` sequence-view variants must therefore
+declare an anchor handoff span when the view needs `anchor_mean`, either through
+`output_variants[].anchor_part`, `realize.focal_part`, or a single part named or
+role-tagged `anchor`.
+For slot-specific views, prefer `output_variants[].anchor_part`: Construct copies
+that named slot's emitted-orientation bounds into the sequence-view
+`anchor_start_0` / `anchor_end_0` fields without pretending the whole package has
+multiple generic anchors. Downstream Infer configs for those views should use
+`bounds_from: sequence_view`.
 
 ### What infer expects
 

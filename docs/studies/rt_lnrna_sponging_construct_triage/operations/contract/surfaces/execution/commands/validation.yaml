@@ -14,7 +14,7 @@ commands:
     command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_projection.py
   infer_execution:
     status: blocked
-    blocked_by: materialized_sequence_views
+    blocked_by: persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
   opal_run:
     status: blocked
-    blocked_by: real_sponging_assay_observations
+    blocked_by: rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent

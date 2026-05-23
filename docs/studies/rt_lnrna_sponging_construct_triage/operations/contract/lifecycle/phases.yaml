@@ -7,13 +7,13 @@
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/candidates
   notes: Anchor fixtures are source-authority resolved and representable under the multi-slot Construct manifest.
 - id: phase_2_construct_projection
-  status: blocked
+  status: active
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-contract.md
-  notes: Strategy resolved as public multi-slot Construct assembly; blocked on materialized Construct context views.
+  notes: Strategy resolved as public multi-slot Construct assembly; temporary materialization is test-backed and persistent study USR output is next.
 - id: phase_3_infer_handoff
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/representation-contract.md
-  notes: Blocked until sequence views are materialized by Construct/USR.
+  notes: Blocked until rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1 is persistently materialized.
 - id: phase_4_overlay_linkage
   status: planned
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
@@ -29,4 +29,4 @@
 - id: phase_7_opal_readiness
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/opal-handoff.md
-  notes: Blocked until fixed-size vector X and real sponging labels exist.
+  notes: Blocked until rt_lnrna_sponging_construct_triage_opal_training_examples_v1 has fixed-size X and real sponging labels.

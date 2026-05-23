@@ -1,14 +1,24 @@
 ---
-doc_id: study-rt-lnrna-sponging-construct-triage-opal-handoff
+doc_id: study-rt-lnrna-sponging-construct-triage-opal-training-dataset
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-22
+last_verified: 2026-05-23
 ---
 
-## OPAL Handoff
+## OPAL Training Dataset
 
-OPAL readiness means:
+The future OPAL-ready USR dataset id is:
+
+```text
+rt_lnrna_sponging_construct_triage_opal_training_examples_v1
+```
+
+Use the full study prefix because this dataset may live in a mixed USR root.
+Do not use generic dataset ids such as `opal_handoff_v1` or
+`sponging_handoff_v1`.
+
+OPAL readiness means this dataset has:
 
 - one candidate universe with stable `id` values in a USR-shaped
   `records.parquet`;
