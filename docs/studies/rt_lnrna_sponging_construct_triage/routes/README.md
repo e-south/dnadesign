@@ -27,6 +27,9 @@ registered yet.
 | GenBank source authority | `../workbench/provenance/genbank-source-authority.yaml` |
 | Parsed feature-offset audit | `../workbench/provenance/genbank-feature-offset-audit.md` |
 | Construct projection manifest | `../operations/contract/fixtures/construct/construct-projection-manifest.yaml` |
+| Representation table contract | `../operations/contract/schemas/representation-table.schema.yaml` |
+| Infer feature-bundle fixture | `../operations/contract/fixtures/infer/evo2-7b-six-view-feature-bundle.yaml` |
+| LatentDNA workspace config | `../../../../src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml` |
 | Machine-readable contract index | `../operations/ops.study.yaml` |
 | Candidate/table schemas | `../operations/contract/schemas/` |
 | Minimal candidate fixtures | `../operations/contract/fixtures/candidates/` |
@@ -38,8 +41,9 @@ registered yet.
 | Biological scope | this page and `../workbench/ontology/vocabulary.md` | Phase 0 planned |
 | Candidate universe | `../workbench/design_sets/v1-candidate-scope.md` | Phase 0 planned |
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
-| Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; temporary materialization proved; persistent study USR output blocked |
+| Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
+| Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture and planned health/ordinal/UMAP gallery config present; sidecars absent |
 | OPAL readiness | `../contexts/opal-handoff.md` | `rt_lnrna_sponging_construct_triage_opal_training_examples_v1` absent; OPAL run blocked |
 
 ### Boundary Rules

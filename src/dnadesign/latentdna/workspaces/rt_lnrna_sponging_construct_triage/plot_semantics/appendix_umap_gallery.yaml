@@ -1,0 +1,20 @@
+plot_id: appendix_umap_gallery
+question: How do the construct, slot, slot-pair, and output-layer RT-lnRNA representation views distribute in persisted UMAP coordinates?
+decision_role: appendix
+encoding: Multi-panel persisted UMAP scatter gallery with hue controls for construct metadata plus Khan and Crawford abundance-prior overlays.
+scope: >-
+  The gallery covers the four derived intermediate views and their four
+  output-layer mean companions: full 1.6 kb forward/RC concat, lnRNA slot,
+  RT CDS slot, and lnRNA plus RT slot-pair concat.
+guardrails:
+  - Use UMAP for orientation and overlay inspection, not as the OPAL X selector.
+  - Hue changes recolor fixed coordinates and do not refit the projection.
+  - Interpret output-layer mean panels as diagnostics unless a later review explicitly promotes them.
+caption: Appendix UMAP gallery for RT-lnRNA Evo2 7B intermediate and output-layer representation views.
+alt_text: Eight-panel UMAP gallery showing full construct, lnRNA-slot, RT-slot, slot-pair, and output-layer RT-lnRNA representation views with construct and source-overlay hue controls.
+preprocessing_md: Uses persisted projection artifacts fit from materialized LatentDNA view matrices. Forward and reverse-complement blocks are normalized before concatenation for the bidirectional views.
+math_md: |
+  The plotted coordinates are UMAP embeddings of each declared view matrix. The high-dimensional representation remains the source of record; UMAP coordinates are a nonlinear two-dimensional diagnostic.
+rationale_md: The construct has two inserts and multiple biologically plausible pooling contracts. A shared UMAP gallery makes gross geometry and overlay failure modes visible before OPAL selection.
+limitations_md: UMAP can distort distances, invent apparent clusters, and depend on sampling. It should be read alongside scalar health and ordinal-audit panels.
+failure_modes_md: Missing sidecars, low candidate count, unresolved overlays, or duplicated controls can leave panels empty or visually misleading.

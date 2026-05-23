@@ -11,6 +11,7 @@ rules:
   - Parse registered GenBank files through dnadesign.usr.BiopythonGenBankParser.
   - Fail when required labels are missing or ambiguous.
   - Require two tet operator placements for anchor vectors and retron26 a1-a2.
+  - Require `1600bp-region.gb` containment in pES retron-26 at the audited target-context offset.
   - Require RT CDS sequence and translation identity across retron26 vector, retron43 vector, and standalone Eco1 RT.
   - Require retron26 a1-a2 sequence containment in the full retron26 vector.
   - Require explicit left base, right base, foldback, cap, payload, and payload-complement labels in the retron179 orientation reference.

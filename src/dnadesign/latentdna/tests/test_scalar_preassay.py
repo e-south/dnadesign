@@ -9,6 +9,7 @@ def test_preassay_builder_registry_tracks_active_summary_kinds() -> None:
         "representation_health_summary",
         "design_structure_summary",
         "ordinal_axis_audit",
+        "ordinal_axes_audit",
         "ordinal_ladder_rows",
         "axis_centroid_distance",
         "candidate_x_selection_scorecard",

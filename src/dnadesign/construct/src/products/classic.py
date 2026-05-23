@@ -270,6 +270,7 @@ def build_variant_record(
     record.sequence_view = build_variant_sequence_view(
         record=record,
         output_dataset_id=output_dataset_id,
+        context_kind=variant.context_kind,
         recommended_pooling=variant.recommended_pooling,
         anchor_start_0=view_anchor_start,
         anchor_end_0=view_anchor_end,

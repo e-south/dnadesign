@@ -25,8 +25,9 @@ candidate:
   candidate_role: working_control
   source_authority_status: resolved_by_genbank_source_authority
   blockers:
-    - persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
-  candidate_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; context views are proved in temporary tests but not persistently materialized yet.
+    - evo2_7b_feature_sidecars_absent
+    - real_sponging_assay_observations_absent
+  candidate_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 1,600 bp source view lanes are test-backed, while Infer sidecars and real labels remain absent.
 msd_design_spec:
   msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
   schema_version: msd_design_spec_v1

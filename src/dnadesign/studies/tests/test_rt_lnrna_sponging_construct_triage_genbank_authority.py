@@ -55,6 +55,7 @@ def test_genbank_source_authority_audit_passes_for_registered_references() -> No
 
     retron26_vector = audit.source("pes_retron_26_vector")
     retron43_vector = audit.source("pes_retron_43_vector")
+    region = audit.source("dual_cassette_1600bp_region")
     eco1_rt = audit.source("retron_eco1_rt")
     orientation = audit.source("retron_179_orientation_reference")
 
@@ -69,6 +70,12 @@ def test_genbank_source_authority_audit_passes_for_registered_references() -> No
     assert retron43_vector.length == 4970
     assert retron43_vector.feature("loop").sequence == "CGGG"
     assert retron43_vector.feature("msd[tetO]").span_1 == (265, 352)
+
+    assert region.record_id == "1600bp-region"
+    assert region.length == 1600
+    assert region.topology == "linear"
+    assert region.feature("a1(20)").span_1 == (131, 150)
+    assert region.feature("ECD_00831").span_1 == (469, 1431)
 
     assert eco1_rt.length == 963
     assert eco1_rt.feature("ECD_00831").span_1 == (1, 963)

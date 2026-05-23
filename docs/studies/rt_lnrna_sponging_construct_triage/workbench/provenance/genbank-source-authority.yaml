@@ -29,6 +29,32 @@ sources:
       - YXDD motif
     required_label_counts:
       tet operator: 2
+  - source_id: dual_cassette_1600bp_region
+    role: dual_cassette_target_context_region
+    path: ../1600bp-region.gb
+    authority_for:
+      - 1,600 bp dual-cassette target context coordinates
+      - region-relative lnRNA and Eco1 WT RT CDS offsets
+      - construct window start in pES retron-26 vector context
+    required_unique_labels:
+      - a1(20)
+      - msr
+      - Branched G
+      - P3 Loop
+      - RT recognition motif (GUU)
+      - 3' Flanking
+      - msd[tetO]
+      - WT loop
+      - 5' Flanking
+      - a2
+      - a2(20)
+      - T7 terminator
+      - BBa_J23116
+      - RBS
+      - ECD_00831
+      - YXDD motif
+    required_label_counts:
+      tet operator: 2
   - source_id: pes_retron_26_lnrna_a1_a2
     role: working_anchor_lnrna_reference
     path: ../pes-retron-26-a1-a2.gb
@@ -120,9 +146,12 @@ rt_cds_identity:
     - retron_eco1_rt
   feature_label: ECD_00831
 subsequence_checks:
+  - subject_source_id: dual_cassette_1600bp_region
+    container_source_id: pes_retron_26_vector
   - subject_source_id: pes_retron_26_lnrna_a1_a2
     container_source_id: pes_retron_26_vector
 notes:
+  - The 1,600 bp region GenBank is the target context authority; it maps to pES retron-26 [56,1656) in zero-based half-open coordinates.
   - The two tet operator features are required as primary plus complement placements.
   - Retron-179 is orientation evidence only; it is not a Phase 1 candidate source.
   - Left/right bases for retron26 and retron43 are derived from the adjacent flanking spans until explicit labels are added to those anchor GenBanks.

@@ -28,6 +28,12 @@ OPAL readiness means this dataset has:
 - a future label slot for `SpongingAssayObservation`;
 - no learned `Y ~ X` campaign before real labels exist.
 
+The candidate `X` columns are declared in
+`../operations/contract/schemas/representation-table.schema.yaml`. Selection is
+deferred until LatentDNA reviews the full construct, lnRNA-slot, RT-slot, and
+slot-pair gallery views. Do not default to the largest slot-pair concat merely
+because it contains more dimensions.
+
 Pre-assay records may be OPAL-ready in shape, but OPAL `run` and `explain` are
 blocked until a configured label source satisfies OPAL's own label contract.
 For shared labels, prefer `labels.source.kind: usr_sidecar` and

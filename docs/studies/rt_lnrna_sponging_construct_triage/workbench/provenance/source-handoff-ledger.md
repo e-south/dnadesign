@@ -25,6 +25,7 @@
 | Source | Path | Record | Length | Use |
 | --- | --- | --- | ---: | --- |
 | pES retron-26 expression vector | `../pes-retron-26.gb` | `pES-retron-26` | 4956 | Working-anchor vector constants, lnRNA offsets, and RT in vector context. |
+| Dual-cassette 1,600 bp region | `../1600bp-region.gb` | `1600bp-region` | 1600 | Target context authority; maps to pES retron-26 `[56,1656)` in zero-based half-open coordinates. |
 | pES retron-26 a1-a2 | `../pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | Working-anchor lnRNA/a1-a2 subcomponent offsets. |
 | Eco1 WT RT | `../retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | Canonical Eco1 WT RT CDS and translation reference. |
 | pES retron-43 expression vector | `../pes-retron-43.gb` | `pES-retron-43` | 4970 | Failed-anchor vector constants, lnRNA offsets, and RT in vector context. |
@@ -45,6 +46,8 @@ Parsed offsets and SHA-256 values are pinned in
 - Exact retron43 lnRNA cassette source:
   `genbank:pes-retron-43.gb#a1-a2`.
 - Exact pES retron-26 and pES retron-43 vector constants in source records.
+- Exact 1,600 bp target context:
+  `genbank:1600bp-region.gb#record`, contained in pES retron-26 at `[56,1656)`.
 
 ### Remaining Blockers
 

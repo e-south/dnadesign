@@ -3375,6 +3375,85 @@ def test_ordinal_axis_audit_supports_numeric_rank_metadata_without_sig35_columns
     assert all(row["ordinal_order_source"] == "strength" for row in rows_table)
 
 
+def test_ordinal_axes_audit_combines_multiple_ordered_metadata_axes(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_margin_workspace_config(workspace_dir)
+    rows = [
+        {"id": "a1", "subject_id": "a1", "khan_bin": "low", "crawford_bin": "very_low", "embedding": [1.0, 0.0]},
+        {"id": "a2", "subject_id": "a2", "khan_bin": "low", "crawford_bin": "very_low", "embedding": [0.9, 0.1]},
+        {"id": "b1", "subject_id": "b1", "khan_bin": "medium", "crawford_bin": "medium", "embedding": [0.1, 0.9]},
+        {"id": "b2", "subject_id": "b2", "khan_bin": "medium", "crawford_bin": "medium", "embedding": [0.0, 1.0]},
+        {"id": "c1", "subject_id": "c1", "khan_bin": "high", "crawford_bin": "very_high", "embedding": [-1.0, 0.0]},
+        {"id": "c2", "subject_id": "c2", "khan_bin": "high", "crawford_bin": "very_high", "embedding": [-0.9, 0.1]},
+    ]
+    _write_source(workspace_dir / "inputs" / "anchor.parquet", rows)
+    _write_view_artifact(
+        workspace_dir,
+        view_id="degenerate_view",
+        rows=rows,
+        matrix=np.asarray([row["embedding"] for row in rows], dtype=np.float32),
+        record_key="id",
+    )
+    study_inputs_dir = workspace_dir / "study_inputs"
+    study_inputs_dir.mkdir(parents=True, exist_ok=True)
+    (study_inputs_dir / "khan_order.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source": "khan fixture",
+                "order": [{"value": "low", "rank": 1}, {"value": "medium", "rank": 2}, {"value": "high", "rank": 3}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (study_inputs_dir / "crawford_order.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source": "crawford fixture",
+                "order": [
+                    {"value": "very_low", "rank": 1},
+                    {"value": "medium", "rank": 2},
+                    {"value": "very_high", "rank": 3},
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    artifact = build_scalar_artifact(
+        context,
+        scalar_id="overlay_ordinal_audit_metrics",
+        builder_kind="ordinal_axes_audit",
+        params={
+            "candidates": [{"view_id": "degenerate_view"}],
+            "axes": [
+                {"axis_id": "khan", "column": "khan_bin", "order_path": "study_inputs/khan_order.yaml"},
+                {
+                    "axis_id": "crawford",
+                    "column": "crawford_bin",
+                    "order_path": "study_inputs/crawford_order.yaml",
+                },
+            ],
+            "bootstrap_iterations": 3,
+            "permutations": 3,
+            "balance_columns": [],
+        },
+    )
+
+    rows_table = pq.read_table(artifact.artifact_dir / "table.parquet").to_pylist()
+    assert artifact.stats["axis_ids"] == ["khan", "crawford"]
+    assert {row["ordinal_axis_id"] for row in rows_table} == {"khan", "crawford"}
+    assert {row["metric_id"] for row in rows_table} == {
+        "ordinal_axis_spearman",
+        "ordinal_axis_kendall",
+        "ordinal_axis_balanced_spearman",
+        "ordinal_axis_label_permutation_pvalue",
+    }
+
+
 def test_reference_to_centroid_similarity_maps_references_to_plan_centroids(tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()

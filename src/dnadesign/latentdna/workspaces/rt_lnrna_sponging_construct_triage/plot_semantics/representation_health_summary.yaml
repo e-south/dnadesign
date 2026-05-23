@@ -1,0 +1,16 @@
+plot_id: representation_health_summary
+question: Do the RT-lnRNA candidate representation views avoid obvious collapse after Evo2 sidecars exist?
+decision_role: gate
+encoding: Metric-panel grid over PCA rank, leading-component concentration, and pairwise cosine distance spread for each declared intermediate and output-layer view.
+scope: The panel covers the dual-cassette full-context, lnRNA-slot, RT CDS-slot, and lnRNA plus RT slot-pair views for Evo2 7B intermediate embeddings and output-layer mean vectors.
+guardrails:
+  - Use this as a representation health gate, not as biological evidence for sponging activity.
+  - Compare output-layer mean vectors as diagnostics; OPAL X selection remains deferred to the intermediate-view review unless a later decision explicitly changes that.
+caption: RT-lnRNA representation health summary for the declared Evo2 7B gallery views.
+alt_text: Metric-panel summary comparing collapse and spread diagnostics across full construct, lnRNA-slot, RT-slot, slot-pair, and output-layer RT-lnRNA representation views.
+preprocessing_md: Each view is materialized from its declared Infer sidecar or derived by block-normalized forward and reverse-complement concatenation. PCA reducers are fit on the declared sample for each view before health metrics are computed.
+math_md: |
+  The health gate reports retained-component effective rank, the fraction of retained PCA variance in PC1, and a pairwise cosine-distance spread statistic. These are collapse diagnostics over view matrices, not endpoint labels.
+rationale_md: The study has multiple plausible representation contracts because the construct has a full dual-cassette context plus two biological slots. A shared health gate keeps obviously degenerate views out of downstream OPAL X selection.
+limitations_md: Passing this gate does not prove that a representation captures RT-lnRNA sponging behavior. It only checks matrix health after Infer sidecars exist.
+failure_modes_md: Small candidate count, duplicated construct controls, missing overlay joins, or output-layer saturation can make the diagnostics weak or non-informative.

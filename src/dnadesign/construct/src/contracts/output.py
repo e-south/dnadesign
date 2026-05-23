@@ -21,6 +21,7 @@ from .datasets import USRDatasetLocatorConfig
 
 class OutputVariantConfig(StrictConfigModel):
     product_kind: Literal["realized_context"]
+    context_kind: Literal["template_1kb", "template_custom"] = "template_1kb"
     orientation: Literal["forward", "reverse_complement"]
     recommended_pooling: Optional[Literal["seq_mean", "anchor_mean", "core60_mean"]] = None
     anchor_part: Optional[str] = None

@@ -1,0 +1,25 @@
+plot_id: rt_lnrna_overlay_ordinal_audit
+question: Do Khan and Crawford abundance-prior overlays form coherent ordered axes in the RT-lnRNA representation views?
+decision_role: primary
+encoding: Candidate-by-metric bar panels for centroid-distance ordinal statistics, faceted by source overlay axis and colored by representation family.
+scope: The audit treats Khan cross-retron RT-DNA abundance and Crawford Eco1 msDNA abundance as separate prior axes. It does not pool them and does not treat either as a TF-sponging assay label.
+guardrails:
+  - Preserve raw_value and normalized_value as the primary source fields; ordinal bins are secondary metadata for geometry review.
+  - Keep Khan and Crawford regimes separate because their source experiments and normalization references differ.
+  - Do not promote Crawford design-reference rows into abundance labels; only the abundance-observation lane can feed the Crawford abundance axis.
+caption: Ordered-overlay geometry audit for Khan and Crawford abundance priors across RT-lnRNA candidate views.
+alt_text: Metric-panel summary showing ordinal geometry statistics for separate Khan and Crawford abundance-prior axes across the RT-lnRNA representation gallery.
+preprocessing_md: The scalar audit uses the materialized gallery view matrices and row metadata after the overlay resolver attaches Khan and Crawford abundance-prior fields. The current workspace declares unresolved overlay columns as planned metadata until that resolver exists.
+math_md: |
+  For each source axis, the audit compares expected rank gaps
+  $$
+  \Delta_{\mathrm{rank}}(g,h)=|r_g-r_h|
+  $$
+  with observed centroid distances
+  $$
+  d_{\mathrm{emb}}(g,h)=1-\cos(c_g,c_h).
+  $$
+  Spearman, Kendall, balanced Spearman, and permutation summaries are computed separately for the Khan and Crawford axes.
+rationale_md: A representation that respects abundance-prior order is a useful pre-assay sanity check, but the priors remain literature/source overlays rather than supervised labels.
+limitations_md: The audit is overlay-dependent and should remain empty or non-decisive until enough construct-compatible Khan or Crawford rows are resolved. It is not a substitute for real SpongingAssayObservation labels.
+failure_modes_md: Sparse construct-compatible overlays, source-regime confounding, candidate duplication, or uncertain ordinal binning can make the ordered-axis result unstable.

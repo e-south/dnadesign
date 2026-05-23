@@ -470,3 +470,37 @@ def _ordinal_axis_audit_table(
             "rows": len(rows),
         },
     )
+
+
+def _ordinal_axes_audit_table(
+    context: WorkspaceContext,
+    params: dict[str, Any],
+) -> ScalarBuilderResult:
+    axes = [dict(value) for value in _require_param(params, "axes")]
+    tables: list[pa.Table] = []
+    inputs: list[ScalarInputRef] = []
+    input_keys: set[tuple[str, str, str]] = set()
+    axis_ids: list[str] = []
+    total_rows = 0
+    for axis in axes:
+        axis_params = dict(params)
+        axis_params.pop("axes", None)
+        axis_params["axis"] = axis
+        table, axis_inputs, axis_stats = _ordinal_axis_audit_table(context, axis_params)
+        tables.append(table)
+        axis_ids.append(str(axis_stats.get("axis_id") or _require_param(axis, "axis_id")))
+        total_rows += int(axis_stats.get("rows") or table.num_rows)
+        for input_ref in axis_inputs:
+            key = (input_ref.kind, input_ref.artifact_id, input_ref.path.as_posix())
+            if key not in input_keys:
+                inputs.append(input_ref)
+                input_keys.add(key)
+    return (
+        pa.concat_tables(tables, promote_options="default") if tables else pa.Table.from_pylist([]),
+        inputs,
+        {
+            "axis_ids": axis_ids,
+            "axis_count": len(axis_ids),
+            "rows": total_rows,
+        },
+    )

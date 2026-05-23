@@ -51,15 +51,18 @@ def test_construct_projection_manifest_uses_public_multi_slot_construct_strategy
         "dual_cassette_1600bp_seq_mean",
         "dual_cassette_1600bp_fwd_rc_concat",
         "lnrna_span_in_construct_anchor_mean",
+        "lnrna_span_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_span_in_construct_anchor_mean",
+        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
     )
     assert audit.candidate_count == 2
     assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"] == {
-        "lnrna": (186, 359),
-        "rt_cds": (524, 1487),
+        "lnrna": (130, 303),
+        "rt_cds": (468, 1431),
     }
     assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO"] == {
-        "lnrna": (186, 373),
-        "rt_cds": (538, 1501),
+        "lnrna": (123, 310),
+        "rt_cds": (475, 1438),
     }
 
 
@@ -99,7 +102,7 @@ def test_construct_projection_manifest_rejects_oversized_required_slot() -> None
     audit = validate_projection_manifest_payload(payload)
 
     assert not audit.ok
-    assert any("required slot rt_cds ends at" in error for error in audit.errors)
+    assert any("required slot rt_cds resolves to" in error for error in audit.errors)
 
 
 def test_construct_projection_manifest_rejects_missing_reverse_complement_view() -> None:
@@ -122,6 +125,16 @@ def test_construct_projection_manifest_rejects_missing_lnrna_anchor_part_mapping
 
     assert not audit.ok
     assert "lnrna_span_in_construct_anchor_mean: construct_output_anchor_part must be lnrna" in audit.errors
+
+
+def test_construct_projection_manifest_rejects_missing_rt_cds_anchor_part_mapping() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    payload["representation_views"][4]["construct_output_anchor_part"] = ""
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert "rt_cds_span_in_construct_anchor_mean: construct_output_anchor_part must be rt_cds" in audit.errors
 
 
 def test_construct_projection_manifest_rejects_swapped_slot_sequence_fields() -> None:

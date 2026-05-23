@@ -55,7 +55,16 @@ temporary candidate rows are passed to Construct.
   as the study-side projection manifest for named slots and expected spans.
 - Materialize construct context views from audited offsets and slot spans, not
   arbitrary padding.
-- Candidates that exceed the 1,600 bp view fail instead of being truncated.
+- The 1,600 bp context is the dedicated `1600bp-region.gb` target region,
+  contained in pES retron-26 at zero-based half-open vector coordinates
+  `[56,1656)`, not the first 1,600 bp of the circular pES-retron-26 record.
+- Region-relative retron26 control spans are `lnrna: [130,303)` and
+  `rt_cds: [468,1431)`. Longer lnRNA candidates keep the interstitial constant
+  and shift the fixed 1,600 bp window by the lnRNA center delta, symmetrically
+  trimming the prefix and suffix flanks. Retron43 therefore emits
+  `lnrna: [123,310)` and `rt_cds: [475,1438)`.
+- Candidates whose required slots cannot fit inside the 1,600 bp view fail
+  instead of being arbitrarily truncated.
 
 Construct must emit `realized_context` sequence views. Study role tags,
 source-family semantics, candidate roles, and abundance-overlay regimes belong

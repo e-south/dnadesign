@@ -17,7 +17,7 @@ from ..io.parquet_io import write_table
 from ..workspaces.loader import WorkspaceContext
 from .common import BuiltScalarArtifact
 from .preassay_common import ScalarTableBuilder
-from .preassay_ordinal import _ordinal_axis_audit_table
+from .preassay_ordinal import _ordinal_axes_audit_table, _ordinal_axis_audit_table
 from .preassay_reference import _reference_alignment_summary_table, _reference_to_centroid_similarity_table
 from .preassay_selection import (
     _axis_centroid_distance_table,
@@ -39,6 +39,7 @@ _PREASSAY_BUILDERS: dict[str, ScalarTableBuilder] = {
     "design_structure_summary": _design_structure_summary_table,
     "cohort_structure_summary": _cohort_structure_summary_table,
     "ordinal_axis_audit": _ordinal_axis_audit_table,
+    "ordinal_axes_audit": _ordinal_axes_audit_table,
     "context_robustness_summary": _context_robustness_summary_table,
     "context_pair_summary": _context_pair_summary_table,
     "reference_alignment_summary": _reference_alignment_summary_table,

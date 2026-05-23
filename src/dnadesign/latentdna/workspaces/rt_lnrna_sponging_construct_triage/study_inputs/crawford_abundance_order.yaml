@@ -1,0 +1,13 @@
+source: Planned Crawford Eco1 msDNA abundance prior quantile bins derived from normalized source abundance values after overlay resolution.
+exploratory: true
+order:
+  - value: very_low
+    rank: 0
+  - value: low
+    rank: 1
+  - value: medium
+    rank: 2
+  - value: high
+    rank: 3
+  - value: very_high
+    rank: 4

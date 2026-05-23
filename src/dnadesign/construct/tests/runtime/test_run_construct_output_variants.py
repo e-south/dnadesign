@@ -134,6 +134,72 @@ job:
     ]
 
 
+def test_run_construct_output_variants_can_emit_custom_template_context_kind(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+
+    input_ds = Dataset(usr_root, "anchors_demo")
+    input_ds.init(source="test", notes="runtime test")
+    input_ds.add_sequences(["AGTC"], bio_type="dna", alphabet="dna_4", source="test")
+
+    config_path = tmp_path / "construct_template_custom_variant.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: context_variant_template_custom
+  input:
+    source:
+      kind: usr
+      dataset: anchors_demo
+      root: {usr_root.as_posix()}
+    field: sequence
+  template:
+    id: custom_template
+    source:
+      kind: literal
+      sequence: AAAATTTTCCCCGGGG
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 8
+          end: 12
+  realize:
+    mode: full_construct
+  output_variants:
+    - product_kind: realized_context
+      context_kind: template_custom
+      orientation: forward
+      recommended_pooling: seq_mean
+      view_name: custom_1600bp_context_seq_mean
+  output:
+    target:
+      kind: usr
+      dataset: anchors_constructed
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_from_config(config_path)
+
+    assert result.records_total == 1
+    output_ds = Dataset(usr_root, "anchors_constructed")
+    views = load_sequence_views(output_ds)
+    assert len(views) == 1
+    assert views[0].view_name == "custom_1600bp_context_seq_mean"
+    assert views[0].context_kind == "template_custom"
+
+
 def test_run_construct_output_variants_complete_views_for_existing_forward_rows(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)

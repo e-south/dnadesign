@@ -28,6 +28,10 @@ def _regulondb_workspace() -> Path:
     return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
 
 
+def _rt_lnrna_workspace() -> Path:
+    return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "rt_lnrna_sponging_construct_triage"
+
+
 def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
@@ -83,6 +87,39 @@ _BROWSER_GEOMETRY_VIEWS = [
 
 
 _FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VIEWS]
+
+
+_RT_LNRNA_SOURCE_VIEW_SELECTORS = {
+    "dual_cassette_1600bp_seq_mean": "dual_cassette_1600bp_seq_mean",
+    "dual_cassette_1600bp_reverse_complement_seq_mean": "dual_cassette_1600bp_fwd_rc_concat",
+    "lnrna_span_in_construct_anchor_mean": "lnrna_span_in_construct_anchor_mean",
+    "lnrna_span_in_construct_reverse_complement_anchor_mean": (
+        "lnrna_span_in_construct_reverse_complement_anchor_mean"
+    ),
+    "rt_cds_span_in_construct_anchor_mean": "rt_cds_span_in_construct_anchor_mean",
+    "rt_cds_span_in_construct_reverse_complement_anchor_mean": (
+        "rt_cds_span_in_construct_reverse_complement_anchor_mean"
+    ),
+}
+
+
+_RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS = [
+    "intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat",
+    "intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat",
+]
+
+
+_RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS = [
+    "output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat",
+    "output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat",
+]
+
+
+_RT_LNRNA_GALLERY_VIEWS = [*_RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS, *_RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS]
 
 
 def _candidate_grid_layout(controls):
@@ -322,6 +359,84 @@ def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
         assert [option.column for option in plot.hue_options] == expected_hues
         assert plot.hue_options[-2].type == "ordinal"
         assert plot.hue_options[-1].type == "ordinal"
+
+
+def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
+    context = load_workspace_config(_rt_lnrna_workspace())
+
+    for source_base, view_name in _RT_LNRNA_SOURCE_VIEW_SELECTORS.items():
+        intermediate_source = context.config.sources[f"{source_base}_intermediate"]
+        output_layer_source = context.config.sources[f"{source_base}_output_layer"]
+        assert intermediate_source.role == "planned"
+        assert output_layer_source.role == "planned"
+        assert intermediate_source.where["view_name"] == view_name
+        assert output_layer_source.where["view_name"] == view_name
+        assert intermediate_source.where["representation_kind"] == "intermediate_embedding"
+        assert output_layer_source.where["representation_kind"] == "output_layer_mean"
+
+        for scalar_suffix, scalar_kind in [
+            ("log_likelihood_total", "log_likelihood__total"),
+            ("log_likelihood_mean_per_token", "log_likelihood__mean_per_token"),
+        ]:
+            source = context.config.sources[f"{source_base}_{scalar_suffix}"]
+            assert source.kind == "infer_feature_scalar_sidecar"
+            assert source.role == "planned"
+            assert source.where["view_name"] == view_name
+            assert source.where["scalar_kind"] == scalar_kind
+
+
+def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views() -> None:
+    context = load_workspace_config(_rt_lnrna_workspace())
+    gallery = context.config.candidate_sets["rt_lnrna_construct_gallery_v1"]
+    output_layer_diagnostics = context.config.candidate_sets["rt_lnrna_output_layer_diagnostics_v1"]
+    opal_gate = context.config.candidate_sets["rt_lnrna_opal_x_review_v1"]
+    notebook = context.config.notebooks["latent_geometry_browser"]
+
+    assert list(gallery.views) == _RT_LNRNA_GALLERY_VIEWS
+    assert list(output_layer_diagnostics.views) == _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS
+    assert list(opal_gate.views) == _RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS
+    assert list(notebook.geometry_order) == _RT_LNRNA_GALLERY_VIEWS
+    assert list(notebook.candidate_grid_views) == _RT_LNRNA_GALLERY_VIEWS
+    assert notebook.default_candidate_set == "rt_lnrna_construct_gallery_v1"
+    assert notebook.default_layout == "candidate_grid"
+    assert notebook.preferred_hue_kinds["khan_abundance_ordinal_bin"] == "ordinal"
+    assert notebook.preferred_hue_kinds["crawford_abundance_ordinal_bin"] == "ordinal"
+
+    for view_id in _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS:
+        view = context.config.views[view_id]
+        assert view.tags["family"] == "output_layer_mean"
+        assert view.role == "appendix"
+
+
+def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> None:
+    context = load_workspace_config(_rt_lnrna_workspace())
+    umap_gallery = context.config.plots["appendix_umap_gallery"]
+    ordinal_audit = context.config.plots["rt_lnrna_overlay_ordinal_audit"]
+    expected_overlay_hues = [
+        "candidate_source",
+        "construct_projection_status",
+        "template_name",
+        "khan_abundance_normalized_value",
+        "khan_abundance_ordinal_bin",
+        "crawford_abundance_normalized_value",
+        "crawford_abundance_ordinal_bin",
+        "crawford_design_reference_status",
+    ]
+
+    assert umap_gallery.kind == "projection_grid"
+    assert umap_gallery.visibility_tier == "appendix"
+    assert list(umap_gallery.projections) == [f"umap_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
+    assert [option.column for option in umap_gallery.hue_options] == expected_overlay_hues
+    assert umap_gallery.hue_options[3].type == "continuous"
+    assert umap_gallery.hue_options[4].type == "ordinal"
+    assert umap_gallery.hue_options[5].type == "continuous"
+    assert umap_gallery.hue_options[6].type == "ordinal"
+
+    assert ordinal_audit.kind == "metric_panel_grid"
+    assert ordinal_audit.visibility_tier == "primary"
+    assert ordinal_audit.scalar == "rt_lnrna_overlay_ordinal_audit_metrics"
+    assert resolve_plot_semantics(context, plot_id="appendix_umap_gallery").decision_role == "appendix"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_overlay_ordinal_audit").decision_role == "primary"
 
 
 def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:

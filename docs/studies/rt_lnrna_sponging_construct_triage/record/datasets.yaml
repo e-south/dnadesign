@@ -77,6 +77,20 @@ datasets:
     notes: >-
       Full pES retron-26 expression vector authority for working-anchor
       plasmid constants, lnRNA cassette offsets, and vector-context Eco1 WT RT.
+  - role: dual_cassette_1600bp_region_genbank
+    owner_tool: study
+    lifecycle: genbank_source_authority
+    status: present
+    path: ../1600bp-region.gb
+    record_id: 1600bp-region
+    sequence_length_bp: 1600
+    topology: linear
+    source_sha256: 515bca47fb7f29d599a6800f8e8f5909ed94e491357b28217d6e861b81fbdaf3  # pragma: allowlist secret
+    notes: >-
+      Dedicated target-context GenBank. Its full sequence is contained in
+      pES retron-26 at zero-based half-open coordinates [56,1656), making
+      region-relative lnRNA and RT offsets shifted by 56 bp from the full
+      circular vector coordinates.
   - role: pes_retron_26_a1_a2_genbank
     owner_tool: study
     lifecycle: genbank_source_authority
@@ -128,7 +142,7 @@ datasets:
   - role: construct_slot_inputs_usr_dataset
     owner_tool: study
     lifecycle: construct_materialization_input
-    status: planned_persistent_dataset_id
+    status: persistent_control_dataset_id
     dataset_id: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
     path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
     row_identity: usr_canonical_sequence_id
@@ -140,7 +154,7 @@ datasets:
   - role: construct_contexts_1600bp_usr_dataset
     owner_tool: construct
     lifecycle: construct_materialization_output
-    status: planned_persistent_dataset_id
+    status: persistent_control_dataset_id
     dataset_id: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
     path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
     row_identity: usr_canonical_emitted_sequence_id
@@ -148,9 +162,23 @@ datasets:
       - dual_cassette_1600bp_seq_mean
       - dual_cassette_1600bp_fwd_rc_concat
       - lnrna_span_in_construct_anchor_mean
+      - lnrna_span_in_construct_reverse_complement_anchor_mean
+      - rt_cds_span_in_construct_anchor_mean
+      - rt_cds_span_in_construct_reverse_complement_anchor_mean
     notes: >-
       USR output dataset for realized 1,600 bp construct contexts. Sequence
       views remain attached to this dataset; they are not separate datasets.
+      All six source views are expected to use `context_kind=template_custom`.
+  - role: representation_table_contract
+    owner_tool: study
+    lifecycle: infer_latentdna_opal_handoff_contract
+    status: present
+    path: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/representation-table.schema.yaml
+    row_identity: candidate__candidate_id
+    notes: >-
+      Declares the fixed-size vector exports, selected source view names,
+      expected Evo2 7B vector/scalar sidecars, OPAL X selection posture, and
+      Khan/Crawford source-overlay integration boundaries.
   - role: opal_training_examples_usr_dataset
     owner_tool: study
     lifecycle: opal_training_examples
@@ -164,6 +192,6 @@ datasets:
       run/explain. Do not use generic names such as opal_handoff_v1 in mixed
       USR roots.
 notes:
-  - Planned study-prefixed USR dataset ids are registered above.
-  - No generated candidate, construct, Infer, LatentDNA, or OPAL outputs are checked in.
+  - Study-prefixed USR dataset ids are registered above.
+  - Construct control datasets are small Phase 2 artifacts; Infer, LatentDNA, and OPAL outputs remain absent until sidecars and labels exist.
   - GenBank source authority is recorded in workbench/provenance/genbank-source-authority.yaml.

@@ -32,6 +32,7 @@ _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_
 _MATERIALIZATION_SOURCE = "rt_lnrna_sponging_construct_triage construct materialization"
 _REQUIRED_SLOT_IDS = ("lnrna", "rt_cds")
 _SEQUENCE_ID_SOURCE_MAP = {
+    "1600bp-region.gb": "dual_cassette_1600bp_region",
     "pes-retron-26.gb": "pes_retron_26_vector",
     "pes-retron-26-a1-a2.gb": "pes_retron_26_lnrna_a1_a2",
     "retron-eco1-rt.gb": "retron_eco1_rt",
@@ -51,6 +52,7 @@ class ControlConstructMaterializationReport:
     input_ids_by_candidate_id: dict[str, str]
     config_paths: tuple[Path, ...]
     run_results: tuple[RunResult, ...]
+    template_sequence: str
     template_context_sequence: str
     expected_sequences: dict[str, str]
 
@@ -98,46 +100,74 @@ def materialize_control_construct_contexts(
         output_variants=[
             {
                 "product_kind": "realized_context",
+                "context_kind": "template_custom",
                 "orientation": "forward",
                 "recommended_pooling": "seq_mean",
                 "view_name": "dual_cassette_1600bp_seq_mean",
             },
             {
                 "product_kind": "realized_context",
+                "context_kind": "template_custom",
                 "orientation": "reverse_complement",
                 "recommended_pooling": "seq_mean",
                 "view_name": "dual_cassette_1600bp_fwd_rc_concat",
             },
         ],
     )
-    diagnostic_config = _construct_config(
+    slot_anchor_config = _construct_config(
         manifest=manifest,
         template_sequence=template_sequence,
         usr_root=usr_root,
         input_ids_by_candidate_id=input_ids_by_candidate_id,
-        job_id="rt_lnrna_lnrna_anchor_diagnostic_view",
+        job_id="rt_lnrna_slot_anchor_views",
         output_on_conflict="ignore",
         output_variants=[
             {
                 "product_kind": "realized_context",
+                "context_kind": "template_custom",
                 "orientation": "forward",
                 "recommended_pooling": "anchor_mean",
                 "anchor_part": "lnrna",
                 "view_name": "lnrna_span_in_construct_anchor_mean",
-            }
+            },
+            {
+                "product_kind": "realized_context",
+                "context_kind": "template_custom",
+                "orientation": "reverse_complement",
+                "recommended_pooling": "anchor_mean",
+                "anchor_part": "lnrna",
+                "view_name": "lnrna_span_in_construct_reverse_complement_anchor_mean",
+            },
+            {
+                "product_kind": "realized_context",
+                "context_kind": "template_custom",
+                "orientation": "forward",
+                "recommended_pooling": "anchor_mean",
+                "anchor_part": "rt_cds",
+                "view_name": "rt_cds_span_in_construct_anchor_mean",
+            },
+            {
+                "product_kind": "realized_context",
+                "context_kind": "template_custom",
+                "orientation": "reverse_complement",
+                "recommended_pooling": "anchor_mean",
+                "anchor_part": "rt_cds",
+                "view_name": "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+            },
         ],
     )
     context_path = _write_config(config_dir / "construct-context-views.yaml", context_config)
-    diagnostic_path = _write_config(config_dir / "construct-lnrna-anchor-view.yaml", diagnostic_config)
+    slot_anchor_path = _write_config(config_dir / "construct-slot-anchor-views.yaml", slot_anchor_config)
     context_result = run_from_config(context_path)
-    diagnostic_result = run_from_config(diagnostic_path)
+    slot_anchor_result = run_from_config(slot_anchor_path)
     return ControlConstructMaterializationReport(
         usr_root=usr_root,
         input_dataset=_INPUT_DATASET,
         output_dataset=_OUTPUT_DATASET,
         input_ids_by_candidate_id=input_ids_by_candidate_id,
-        config_paths=(context_path, diagnostic_path),
-        run_results=(context_result, diagnostic_result),
+        config_paths=(context_path, slot_anchor_path),
+        run_results=(context_result, slot_anchor_result),
+        template_sequence=template_sequence,
         template_context_sequence=template_context_sequence,
         expected_sequences=expected_sequences,
     )
@@ -176,10 +206,11 @@ def _target_context_bounds(manifest: dict[str, object]) -> tuple[int, int]:
     target = _mapping(template["target_context"], label="construct_template.target_context")
     start = int(target["window_start_0"])
     end = int(target["window_end_0"])
-    if start != 0:
-        raise MaterializationContractError("RT-lnRNA v1 materialization requires target_context.window_start_0=0.")
     if end <= start:
         raise MaterializationContractError("target_context.window_end_0 must be greater than window_start_0.")
+    expected_length = int(target.get("length_nt", end - start))
+    if end - start != expected_length:
+        raise MaterializationContractError("target_context window span must equal target_context.length_nt.")
     return start, end
 
 
@@ -260,6 +291,8 @@ def _expected_context_sequence(
 ) -> str:
     cursor = 0
     out: list[str] = []
+    realized_spans: dict[str, tuple[int, int]] = {}
+    out_len = 0
     for slot in sorted(slots, key=lambda item: _span_0(item["template_span_0"], label="template_span_0")[0]):
         start, end = _span_0(slot["template_span_0"], label=f"{slot['slot_id']}.template_span_0")
         field_name = str(slot["sequence_field"])
@@ -268,11 +301,29 @@ def _expected_context_sequence(
             raise MaterializationContractError(
                 f"Input row '{row.get('id')}' is missing field '{field_name}' for part '{slot['slot_id']}'."
             )
-        out.append(template_sequence[cursor:start])
-        out.append(str(value))
+        prefix = template_sequence[cursor:start]
+        sequence = str(value)
+        out.append(prefix)
+        out_len += len(prefix)
+        realized_start = out_len
+        out.append(sequence)
+        out_len += len(sequence)
+        realized_spans[str(slot["slot_id"])] = (realized_start, out_len)
         cursor = end
     out.append(template_sequence[cursor:])
-    return "".join(out)[target_start:target_end]
+    full_construct = "".join(out)
+    window_start, window_end = _candidate_window_bounds(
+        slots=slots,
+        realized_spans=realized_spans,
+        target_start=target_start,
+        target_end=target_end,
+    )
+    if window_start < 0 or window_end > len(full_construct):
+        raise MaterializationContractError(
+            f"Input row '{row.get('id')}' target context [{window_start}, {window_end}) falls outside the "
+            f"realized construct length {len(full_construct)}."
+        )
+    return full_construct[window_start:window_end]
 
 
 def _write_candidate_dataset(*, usr_root: Path, rows: list[dict[str, object]]) -> dict[str, str]:
@@ -342,11 +393,8 @@ def _construct_config(
     output_variants: list[dict[str, object]],
 ) -> dict[str, object]:
     slots = tuple(_mapping(slot, label="slots[]") for slot in _list(manifest["slots"], label="slots"))
-    lnrna_slot = next(slot for slot in slots if str(slot["slot_id"]) == "lnrna")
-    lnrna_start, _lnrna_end = _span_0(lnrna_slot["template_span_0"], label="lnrna.template_span_0")
     target_start, target_end = _target_context_bounds(manifest)
-    if target_start != 0:
-        raise MaterializationContractError("Only target windows starting at 0 are supported in v1.")
+    window_offset_bp = _centered_window_offset_bp(slots=slots, target_start=target_start, target_end=target_end)
     return {
         "job": {
             "id": job_id,
@@ -380,10 +428,10 @@ def _construct_config(
                 "required_slots": list(_REQUIRED_SLOT_IDS),
                 "window": {
                     "semantics": "fixed_total",
-                    "reference": "start",
-                    "direction": "three_prime",
+                    "reference": "center",
+                    "direction": "symmetric",
                     "size_bp": target_end - target_start,
-                    "offset_bp": -lnrna_start,
+                    "offset_bp": window_offset_bp,
                 },
             },
             "output_variants": output_variants,
@@ -398,6 +446,39 @@ def _construct_config(
             },
         }
     }
+
+
+def _centered_window_offset_bp(
+    *,
+    slots: tuple[dict[str, object], ...],
+    target_start: int,
+    target_end: int,
+) -> int:
+    lnrna_slot = next((slot for slot in slots if str(slot["slot_id"]) == "lnrna"), None)
+    if lnrna_slot is None:
+        raise MaterializationContractError("Centered RT-lnRNA window requires an lnrna slot.")
+    lnrna_start, lnrna_end = _span_0(lnrna_slot["template_span_0"], label="lnrna.template_span_0")
+    base_center = lnrna_start + ((lnrna_end - lnrna_start) // 2)
+    window_length = target_end - target_start
+    return target_start - (base_center - (window_length // 2))
+
+
+def _candidate_window_bounds(
+    *,
+    slots: tuple[dict[str, object], ...],
+    realized_spans: dict[str, tuple[int, int]],
+    target_start: int,
+    target_end: int,
+) -> tuple[int, int]:
+    lnrna_slot = next((slot for slot in slots if str(slot["slot_id"]) == "lnrna"), None)
+    if lnrna_slot is None:
+        raise MaterializationContractError("Centered RT-lnRNA window requires an lnrna slot.")
+    base_start, base_end = _span_0(lnrna_slot["template_span_0"], label="lnrna.template_span_0")
+    realized_start, realized_end = realized_spans["lnrna"]
+    base_center = base_start + ((base_end - base_start) // 2)
+    realized_center = realized_start + ((realized_end - realized_start) // 2)
+    window_start = target_start + (realized_center - base_center)
+    return window_start, window_start + (target_end - target_start)
 
 
 def _part_config(*, slot: dict[str, object], template_sequence: str) -> dict[str, object]:

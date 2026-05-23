@@ -1,0 +1,67 @@
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+jobs:
+  - id: rt_lnrna_construct_six_view_features
+    operation: extract
+    ingest:
+      source: usr
+      dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+      root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+      field: sequence
+    feature_bundle:
+      kind: evo2_sequence_feature_v1
+      intermediate_block: 26
+      collect_log_likelihood: true
+      collect_output_layer_mean: true
+      collect_intermediate_embedding: true
+      sequence_view_inputs:
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: dual_cassette_1600bp_seq_mean
+          pooling:
+            operation: seq_mean
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: dual_cassette_1600bp_fwd_rc_concat
+          pooling:
+            operation: seq_mean
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: lnrna_span_in_construct_anchor_mean
+          pooling:
+            operation: anchor_mean
+            bounds_from: sequence_view
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+          pooling:
+            operation: anchor_mean
+            bounds_from: sequence_view
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: rt_cds_span_in_construct_anchor_mean
+          pooling:
+            operation: anchor_mean
+            bounds_from: sequence_view
+        - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+          root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+          view_selector:
+            view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+          pooling:
+            operation: anchor_mean
+            bounds_from: sequence_view
+      deduplicate:
+        by_forward_pass_key: true
+        by_feature_vector_key: true
+        write_alias_map: true
+    io:
+      write_back: true
+      overwrite: false

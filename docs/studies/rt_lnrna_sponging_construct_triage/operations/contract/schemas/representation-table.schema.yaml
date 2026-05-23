@@ -1,0 +1,274 @@
+schema_id: rt_lnrna_sponging_construct_triage_representation_table_v1
+study_id: rt_lnrna_sponging_construct_triage
+representation_contract: dual_cassette_construct_context_embedding_v1
+row_key: candidate__candidate_id
+source_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+source_sequence_views:
+  - view_name: dual_cassette_1600bp_seq_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: forward
+    pooling_operation: seq_mean
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: reverse_complement
+    pooling_operation: seq_mean
+  - view_name: lnrna_span_in_construct_anchor_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: forward
+    pooling_operation: anchor_mean
+    pooling_slot: lnrna
+  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: reverse_complement
+    pooling_operation: anchor_mean
+    pooling_slot: lnrna
+  - view_name: rt_cds_span_in_construct_anchor_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: forward
+    pooling_operation: anchor_mean
+    pooling_slot: rt_cds
+  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    context_kind: template_custom
+    orientation: reverse_complement
+    pooling_operation: anchor_mean
+    pooling_slot: rt_cds
+infer_feature_outputs:
+  - view_name: dual_cassette_1600bp_seq_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: seq_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: dual_cassette_1600bp_seq_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: seq_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: dual_cassette_1600bp_seq_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: dual_cassette_1600bp_seq_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: seq_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: seq_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: dual_cassette_1600bp_fwd_rc_concat
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+  - view_name: lnrna_span_in_construct_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: anchor_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: lnrna_span_in_construct_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: anchor_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: lnrna_span_in_construct_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: lnrna_span_in_construct_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: anchor_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: anchor_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+  - view_name: rt_cds_span_in_construct_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: anchor_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: rt_cds_span_in_construct_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: anchor_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: rt_cds_span_in_construct_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: rt_cds_span_in_construct_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: intermediate_embedding
+    layer_name: block26_mlp_out
+    pooling_operation: anchor_mean
+    dimension: 4096
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+    output_kind: vector
+    model_name: evo2_7b
+    representation_kind: output_layer_mean
+    pooling_operation: anchor_mean
+    dimension: 512
+    sidecar_value_dtype: float64_list
+    fixed_size_export_dtype: float32
+  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__total
+  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+    output_kind: scalar
+    model_name: evo2_7b
+    scalar_kind: log_likelihood__mean_per_token
+fixed_size_vector_exports:
+  - view_id: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+    derive: block_normalized_concatenate
+    inputs:
+      - intermediate_embedding_7b_dual_cassette_1600bp_seq_mean
+      - intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean
+    dtype: float32
+    dimension: 8192
+    physical_type: fixed_size_list<float32, 8192>
+  - view_id: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+    derive: block_normalized_concatenate
+    inputs:
+      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean
+      - intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean
+    dtype: float32
+    dimension: 8192
+    physical_type: fixed_size_list<float32, 8192>
+  - view_id: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+    derive: block_normalized_concatenate
+    inputs:
+      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean
+      - intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean
+    dtype: float32
+    dimension: 8192
+    physical_type: fixed_size_list<float32, 8192>
+  - view_id: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+    derive: block_normalized_concatenate
+    inputs:
+      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+    dtype: float32
+    dimension: 16384
+    physical_type: fixed_size_list<float32, 16384>
+opal_x_selection:
+  status: deferred_until_latentdna_gallery_health_review
+  candidate_columns:
+    - latentdna__evo2_7b__dual_cassette_1600bp_fwd_rc_concat
+    - latentdna__evo2_7b__lnrna_span_in_construct_anchor_mean_bidir_concat
+    - latentdna__evo2_7b__rt_cds_span_in_construct_anchor_mean_bidir_concat
+    - latentdna__evo2_7b__lnrna_rt_slot_pair_anchor_mean_concat
+  label_status: blocked_until_sponging_assay_observations
+source_overlay_inputs:
+  - reference_overlay_id: khan_cross_retron_rt_dna_abundance_v1
+    source_role: khan_abundance_prior_overlay
+    integration_mode: abundance_prior_overlay
+    allowed_as_opal_y: false
+    join_basis: maps_to_reference_record_id
+    required_numeric_fields:
+      - raw_value
+      - normalized_value
+    notes: Preserve ordinal_bin as metadata only.
+  - reference_overlay_id: crawford_eco1_lnrna_msd_abundance_v1
+    source_role: crawford_eco1_ncrna_abundance_observations
+    integration_mode: abundance_prior_overlay
+    allowed_as_opal_y: false
+    join_basis: canonical_lnrna_sequence_id
+    required_numeric_fields:
+      - raw_value
+      - normalized_value
+    notes: Source abundance observations are not TF-sponging labels.
+  - reference_overlay_id: crawford_eco1_lnrna_msd_design_reference_v1
+    source_role: crawford_eco1_lnrna_msd_design_references
+    integration_mode: candidate_sequence_reference
+    allowed_as_opal_y: false
+    join_basis: lnrna_design_id
+    required_sequence_fields:
+      - lnrna_sequence
+      - msr_sequence
+      - msd_sequence
+    notes: Rows require explicit RT plus lnRNA authority before construct projection.
+p4_stem_appendix_gate:
+  status: blocked_until_candidate_owned_subspan_table
+  required_schema: candidate_owned_lnrna_subspan_table_v1
+  required_fields:
+    - candidate_id
+    - parent_view_name
+    - subspan_id
+    - subspan_kind
+    - coordinate_basis
+    - forward_span_0
+    - reverse_complement_span_0
+    - source_ref
+    - confidence

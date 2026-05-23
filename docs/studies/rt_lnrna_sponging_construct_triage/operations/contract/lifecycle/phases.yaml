@@ -9,11 +9,11 @@
 - id: phase_2_construct_projection
   status: active
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-contract.md
-  notes: Strategy resolved as public multi-slot Construct assembly; temporary materialization is test-backed and persistent study USR output is next.
+  notes: Strategy resolved as public multi-slot Construct assembly; six source view lanes are test-backed with template_custom context metadata.
 - id: phase_3_infer_handoff
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/representation-contract.md
-  notes: Blocked until rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1 is persistently materialized.
+  notes: Blocked until Evo2 7B sidecars exist for the six explicit view_name selectors.
 - id: phase_4_overlay_linkage
   status: planned
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
@@ -21,7 +21,7 @@
 - id: phase_5_analysis
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/design_sets/v1-candidate-scope.md
-  notes: Blocked until Infer sidecars exist.
+  notes: LatentDNA gallery config exists; materialization is blocked until Infer sidecars exist.
 - id: phase_6_wet_lab_handoff
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md

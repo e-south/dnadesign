@@ -10,13 +10,24 @@ command_groups:
     status: active
     purpose: Materialize dual-cassette construct contexts from the multi-slot projection manifest.
     blockers:
-      - persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_not_written
       - overlay_resolver_not_implemented
   - id: infer_handoff
     status: blocked
     purpose: Extract feature aliases from declared construct-context views.
     blockers:
-      - persistent_rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1_absent
+      - evo2_7b_feature_sidecars_absent
+      - infer_sequence_view_completion_not_run
+    commands:
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py
+      - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-stale-vectors 0 --max-stale-scalars 0
+  - id: latentdna_gallery
+    status: blocked
+    purpose: Validate and materialize the RT-lnRNA health, ordinal-audit, and UMAP gallery surfaces from Infer sidecars.
+    blockers:
+      - evo2_7b_feature_sidecars_absent
+    commands:
+      - uv run latentdna validate workspace --workspace rt_lnrna_sponging_construct_triage --deep --json
+      - uv run latentdna recipe validate rt_lnrna_representation_review_recipe --workspace rt_lnrna_sponging_construct_triage --json
   - id: opal_readiness
     status: blocked
     purpose: Validate candidate records with one fixed-size vector X and real labels.

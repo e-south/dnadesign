@@ -300,12 +300,12 @@ Use three process names consistently:
   sidecars written after realization.
 
 Implementation status as of 2026-05-23: the study now has a test-backed
-temporary materialization helper for the two control candidates. It converts the
+materialization helper for the two control candidates. It converts the
 projection manifest plus GenBank authority into public Construct configs, runs
 multi-slot realization, and asserts the 1,600 bp context, emitted slot spans,
-real prefix/interstitial/suffix sequence, forward/reverse-complement rows, and
-the lnRNA anchor-mean diagnostic view. It is not yet a persistent study
-workspace/export materialization step.
+real prefix/interstitial/suffix sequence, forward/reverse-complement rows,
+lnRNA forward/RC anchor views, RT CDS forward/RC anchor views, and
+`template_custom` sequence-view context metadata.
 
 Use study-prefixed USR dataset ids because these datasets may live in mixed USR
 roots:
@@ -375,23 +375,26 @@ The representation contract is:
 representation_contract: dual_cassette_construct_context_embedding_v1
 ```
 
-Start with exactly three views:
+Start with exactly six source sequence views:
 
 ```text
 dual_cassette_1600bp_seq_mean
 dual_cassette_1600bp_fwd_rc_concat
 lnrna_span_in_construct_anchor_mean
+lnrna_span_in_construct_reverse_complement_anchor_mean
+rt_cds_span_in_construct_anchor_mean
+rt_cds_span_in_construct_reverse_complement_anchor_mean
 ```
 
 These are representation views, not necessarily one USR sequence-view row each.
 `dual_cassette_1600bp_seq_mean` maps to one forward `realized_context` sequence
 view. `dual_cassette_1600bp_fwd_rc_concat` uses that same forward member plus a
 reverse-complement `realized_context` sequence view and one explicit derived
-vector view. The third is diagnostic and must still be computed from the lnRNA
-span inside the full construct context, not as an independent msd-only selector
-space.
+vector view. The lnRNA and RT CDS anchor views must still be computed from slot
+spans inside the full construct context, not as independent lnRNA-only or RT-only
+selector spaces.
 
-All three views should be represented with existing USR sequence-view
+All six source views should be represented with existing USR sequence-view
 vocabulary. The full construct context rows are `product_kind:
 realized_context`, `context_kind: template_custom`, with `orientation:
 forward` or `reverse_complement`. Study-specific semantics such as
@@ -399,15 +402,14 @@ forward` or `reverse_complement`. Study-specific semantics such as
 `crawford_reference` belong in `_views/view_semantics.parquet` or candidate
 metadata, not in `product_kind`.
 
-`dual_cassette_1600bp_seq_mean`, `dual_cassette_1600bp_fwd_rc_concat`, and
-`lnrna_span_in_construct_anchor_mean` are study representation-view names.
-They are not new USR `product_kind` values. When persisted against current USR
-contracts, use `SequenceViewRecord.view_name` or `aliases` for the source view
-label and use `_views/view_semantics.parquet` for study collection membership,
-candidate roles, source regimes, and other mutable interpretation. Do not emit a
-duplicate forward sequence-view row solely to give the forward concat member a
-second view name; the concat layer should reference the
-`dual_cassette_1600bp_seq_mean` forward row plus the reverse-complement row.
+The six source view names are study representation-view names. They are not new
+USR `product_kind` values. When persisted against current USR contracts, use
+`SequenceViewRecord.view_name` or `aliases` for the source view label and use
+`_views/view_semantics.parquet` for study collection membership, candidate
+roles, source regimes, and other mutable interpretation. Do not emit a duplicate
+forward sequence-view row solely to give the forward concat member a second view
+name; the concat layer should reference the `dual_cassette_1600bp_seq_mean`
+forward row plus the reverse-complement row.
 The spans that describe RT CDS, lnRNA, promoters, terminators, interstitial
 region, prefix, and suffix are part of the construct projection contract or a
 study-owned view-semantics/fixture table; do not add them as ad hoc columns to
@@ -470,12 +472,12 @@ vector splice.
 | Transform version | `dual_cassette_construct_context_embedding_v1`. |
 | Failure behavior | Missing lnRNA span or clipped span fails before Infer. This view must not be generated from a naked lnRNA-only input. |
 
-The diagnostic lnRNA-span view can be represented as a distinct sequence-view
+The slot anchor views can be represented as distinct sequence-view
 row over the same emitted construct sequence by setting `anchor_start_0` /
-`anchor_end_0` to the lnRNA span and `recommended_pooling: anchor_mean`. That
-keeps Infer's existing single-span pooling contract intact. If later work needs
-RT-span diagnostics too, add a separate diagnostic view row with RT pooling
-bounds rather than overloading one view with multiple pooled slot spans.
+`anchor_end_0` to the lnRNA or RT CDS span and
+`recommended_pooling: anchor_mean`. That keeps Infer's existing single-span
+pooling contract intact. Add future P4/foldback/stem views only after a
+candidate-owned subspan table makes those coordinates source-backed.
 
 Model outputs attach to declared `ConstructContextView` / `InferFeatureAlias`
 sidecars. They do not attach directly to source records, raw candidates, or
@@ -727,8 +729,8 @@ not let payload naming drift become a new ontology branch.
 
 ### 10. Infer Handoff And Feature Sidecar Schema
 
-Infer consumes sequence views. The study should create an explicit Infer
-config for the three v1 views and then rely on Infer's feature alias sidecars.
+Infer consumes sequence views. The study has an explicit six-view Infer
+feature-bundle fixture and should rely on Infer's feature alias sidecars.
 
 The handoff should produce:
 
@@ -1048,11 +1050,11 @@ Deliverables:
 Use Construct to produce declared dual-cassette construct views. Record
 non-representable candidates rather than truncating.
 
-Current slice: the two checked-in controls can be materialized in a temporary
-USR root through the study helper in
+Current slice: the two checked-in controls can be materialized through the study
+helper in
 `src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/construct_materialization.py`.
-The next Phase 2 step is to promote this into a persistent study
-workspace/export operation before Infer or LatentDNA consume the views.
+The next Phase 3 step is Infer sequence-view completion validation and Evo2 7B
+sidecar generation for the six explicit `view_name` selectors.
 
 Deliverables:
 
@@ -1060,15 +1062,16 @@ Deliverables:
 - documented projection strategy: public `construct_multi_slot_assembly_v1`
   with named lnRNA and RT CDS slots;
 - USR records for realized construct sequences, first for the two control rows;
-- `_views/sequence_views.parquet` rows for the three representation views,
-  using `realized_context` product kind for emitted construct contexts;
+- `_views/sequence_views.parquet` rows for the six representation views, using
+  `realized_context` product kind and `template_custom` context kind for emitted
+  construct contexts;
 - `_views/view_semantics.parquet` rows for study role tags, source family,
   and candidate/view collections;
 - representability report.
 
 #### Phase 3: Infer Handoff
 
-Generate Infer configs for the three v1 embedding views and write
+Generate Infer configs for the six v1 source views and write
 `InferFeatureAlias`/sidecar references.
 
 Deliverables:
@@ -1200,8 +1203,8 @@ lab records:
 - Exact implementation owner for writing
   `rt_lnrna_sponging_construct_triage_opal_training_examples_v1`: study helper
   versus LatentDNA export materialized into the study USR root.
-- Whether the diagnostic lnRNA-span view needs a reverse-complement companion
-  in v1 or should wait for v2.
+- Exact source-backed coordinate authority and naming for any P4, foldback,
+  cap, or hairpin-stem appendix views.
 - Whether construct-compatible non-Eco1 references should be actual candidate
   rows, overlay-only rows, or both with explicit candidate roles.
 
@@ -1610,12 +1613,11 @@ correctly.
 6. Use the public multi-slot Construct projection strategy with explicit lnRNA
    and RT CDS slots.
 7. Materialize only the two lab-reference candidates through Construct and
-   record representability. The temporary integration helper now proves this
-   path; a persistent workspace/export operation is still needed.
-8. Generate the three declared view records for those candidates. The forward
+   record representability with `template_custom` 1,600 bp context metadata.
+8. Generate the six declared source view records for those candidates. The forward
    concat member should reuse the `dual_cassette_1600bp_seq_mean` forward row,
    with a separate reverse-complement row for the concat contract.
-9. Materialize or dry-run Infer feature aliases for the three views.
+9. Materialize or dry-run Infer feature aliases for the six views.
 10. Materialize a minimal LatentDNA review workspace or equivalent table-first
     analysis surface from the Infer sidecars.
 11. Compute working/failed control distance metrics and confirm the metrics code refuses
@@ -1675,8 +1677,8 @@ Required tables:
 The decision report should answer:
 
 - Did retron26 and retron43 separate in each primary view?
-- Did the diagnostic lnRNA-span view agree or reveal a likely payload/lnRNA
-  artifact?
+- Did the lnRNA and RT CDS anchor views agree, or did one reveal a likely
+  payload/lnRNA or RT-context artifact?
 - Did Crawford abundance bins show local structure in the Eco1 regime?
 - Did Khan high producers remain interpretable after projection, or were they
   dominated by source/clade/length effects?
