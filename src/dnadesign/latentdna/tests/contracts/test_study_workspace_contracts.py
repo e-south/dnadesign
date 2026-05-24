@@ -412,6 +412,10 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     context = load_workspace_config(_rt_lnrna_workspace())
     umap_gallery = context.config.plots["appendix_umap_gallery"]
     ordinal_audit = context.config.plots["rt_lnrna_overlay_ordinal_audit"]
+    scree_diagnostic = context.config.plots["representation_scree_diagnostic"]
+    notebook = context.config.notebooks["latent_geometry_browser"]
+    deliverable = context.config.deliverables["representation_scree_diagnostic"]
+    recipe_steps = {step.id: step for step in _recipe_steps(context, "rt_lnrna_representation_review_recipe")}
     expected_overlay_hues = [
         "candidate_source",
         "construct_projection_status",
@@ -437,6 +441,23 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert ordinal_audit.scalar == "rt_lnrna_overlay_ordinal_audit_metrics"
     assert resolve_plot_semantics(context, plot_id="appendix_umap_gallery").decision_role == "appendix"
     assert resolve_plot_semantics(context, plot_id="rt_lnrna_overlay_ordinal_audit").decision_role == "primary"
+
+    assert scree_diagnostic.kind == "curve_grid"
+    assert scree_diagnostic.visibility_tier == "appendix"
+    assert list(scree_diagnostic.reducers) == [f"pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
+    assert resolve_plot_semantics(context, plot_id="representation_scree_diagnostic").decision_role == "appendix"
+    assert list(notebook.ordered_plots) == [
+        "representation_health_summary",
+        "representation_scree_diagnostic",
+        "rt_lnrna_overlay_ordinal_audit",
+        "appendix_umap_gallery",
+    ]
+    assert "render_representation_scree_diagnostic" in recipe_steps
+    assert recipe_steps["render_representation_scree_diagnostic"].depends_on == [
+        f"reduce_pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert deliverable.outputs["plots"] == ["representation_scree_diagnostic"]
+    assert deliverable.requires["views"] == _RT_LNRNA_GALLERY_VIEWS
 
 
 def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:

@@ -62,6 +62,12 @@ def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_i
         "float32",
         16384,
     )
+    assert audit.construct_candidate_promotion == {
+        "source_dataset": "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1",
+        "consolidated_construct_dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1",
+        "required_sequence_fields": ("candidate__lnrna_sequence", "candidate__rt_cds_sequence"),
+        "required_construct_views": REQUIRED_SOURCE_VIEW_NAMES,
+    }
 
 
 def test_rt_lnrna_infer_feature_bundle_fixture_selects_every_view_by_explicit_view_name() -> None:

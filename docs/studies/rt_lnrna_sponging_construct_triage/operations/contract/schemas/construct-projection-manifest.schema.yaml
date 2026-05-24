@@ -83,10 +83,12 @@ validation_notes:
   - Use `1600bp-region.gb`, mapped to pES-retron-26 `[56,1656)`, as the
     target context authority.
   - "Retron26 control region-relative spans are `lnrna: [130,303)` and `rt_cds: [468,1431)`."
-  - Longer lnRNA candidates shift the 1,600 bp window by the lnRNA center delta
-    so prefix and suffix flanks are trimmed symmetrically.
-  - Reject arbitrary filler padding and any required slot that cannot fit in the
-    fixed context.
+  - Candidate lnRNA and RT length deltas shift the 1,600 bp window by
+    symmetric prefix/suffix flank adjustment, preserving the constant
+    interstitial between slots.
+  - Reject arbitrary filler padding and any biological lnRNA or RT slot that
+    cannot fit in the fixed context. Prefix/suffix flank trimming is allowed
+    only when all required slots remain intact.
   - Reject missing forward or reverse-complement view declarations before Infer handoff.
   - Reject missing lnRNA or RT CDS slot span for anchor_mean pooling.
   - Reject anchor-mean views that do not declare which named slot supplies the

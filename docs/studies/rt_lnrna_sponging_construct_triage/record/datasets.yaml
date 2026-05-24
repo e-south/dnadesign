@@ -1,6 +1,6 @@
 study_id: rt_lnrna_sponging_construct_triage
 usr_remotes_path: n/a
-verified_at: 2026-05-23
+verified_at: 2026-05-24
 datasets:
   - role: khan_abundance_prior_overlay
     owner_tool: dnadesign-data
@@ -69,7 +69,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../pes-retron-26.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
     record_id: pES-retron-26
     sequence_length_bp: 4956
     topology: circular
@@ -81,7 +81,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../1600bp-region.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/1600bp-region.gb
     record_id: 1600bp-region
     sequence_length_bp: 1600
     topology: linear
@@ -95,7 +95,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../pes-retron-26-a1-a2.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
     record_id: pES-retron-26-a1-a2
     sequence_length_bp: 173
     topology: linear
@@ -107,7 +107,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../retron-eco1-rt.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb
     record_id: retron-Eco1-rt
     sequence_length_bp: 963
     topology: linear
@@ -119,7 +119,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../pes-retron-43.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-43.gb
     record_id: pES-retron-43
     sequence_length_bp: 4970
     topology: circular
@@ -131,7 +131,7 @@ datasets:
     owner_tool: study
     lifecycle: genbank_source_authority
     status: present
-    path: ../retron-179-a1-a2.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-179-a1-a2.gb
     record_id: retron-179-a1-a2
     sequence_length_bp: 178
     topology: linear
@@ -139,6 +139,21 @@ datasets:
     notes: >-
       Orientation-only reference with explicit left base, right base, snapback
       cap, foldback, payload primary, and payload complement annotations.
+  - role: retron_variant_genbank_catalog
+    owner_tool: study
+    lifecycle: genbank_variant_source_authority
+    status: present
+    metadata_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
+    catalog_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+    source_dir: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank
+    row_count: 36
+    source_file_count: 40
+    notes: >-
+      Study-owned GenBank authority for additional retron whole-plasmid
+      variants plus the BL21 wild-type lnRNA-only source. The catalog preserves
+      available Benchling URLs and user comments, extracts lnRNA and RT slot
+      spans, and records the prefix/suffix flank adjustment needed to keep full
+      biological slots inside the 1,600 bp Construct view.
   - role: construct_slot_inputs_usr_dataset
     owner_tool: study
     lifecycle: construct_materialization_input
@@ -179,6 +194,31 @@ datasets:
       Declares the fixed-size vector exports, selected source view names,
       expected Evo2 7B vector/scalar sidecars, OPAL X selection posture, and
       Khan/Crawford source-overlay integration boundaries.
+  - role: reader_spop_label_plan
+    owner_tool: study_reader_bridge
+    lifecycle: planned_label_materialization
+    status: planned
+    source_owner_tool: reader
+    source_record: ratio_reporter_normalizer/df
+    metric_id: reader_spop_endpoint_auc_v1
+    schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
+    materializer: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan
+    reader_experiment_ids:
+      - 20250622_retron_Eco1_26_43_benchmark
+      - 20250707_retron_Eco1_26_43_45_46_benchmark
+      - 20250718_retron_Eco1_26_45_47_48_benchmark
+      - 20251105_retron_Eco1_RT_variants
+      - 20260418_retron_Eco1_26_43_170_171_benchmark
+      - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    notes: >-
+      Planned Reader-derived TF-sponging scalar labels from pES-retron plus
+      pBbS2c-RFP experiments. Rows keep Reader assay subject identity separate
+      from Construct candidate identity; retron rows resolve through the
+      variant GenBank catalog when explicit RT plus lnRNA sequence authority
+      exists. The 20251105 RT-variant Reader artifact is a single-point mid-log
+      read recorded at artifact time 0 h but interpreted as approximately 10 h
+      after seeding; the 20260507 retron176 wells are omitted because no actual
+      strain was present.
   - role: opal_training_examples_usr_dataset
     owner_tool: study
     lifecycle: opal_training_examples

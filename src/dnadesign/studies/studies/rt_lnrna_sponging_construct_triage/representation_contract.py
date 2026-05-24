@@ -19,6 +19,7 @@ import yaml
 
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
 _REPRESENTATION_TABLE_CONTRACT_PATH = _STUDY_DIR / "operations/contract/schemas/representation-table.schema.yaml"
+_INPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
 _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1"
 _EXPECTED_MODEL = "evo2_7b"
 _EXPECTED_INTERMEDIATE_BLOCK = 26
@@ -53,6 +54,7 @@ _EXPECTED_FIXED_SIZE_VECTORS = {
     "intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat": ("float32", 16384),
 }
 _EXPECTED_SCALAR_KINDS = ("log_likelihood__total", "log_likelihood__mean_per_token")
+_EXPECTED_CANDIDATE_SEQUENCE_FIELDS = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,7 @@ class RepresentationTableContractAudit:
     source_view_names: tuple[str, ...] = ()
     fixed_size_vectors: dict[str, tuple[str, int]] = field(default_factory=dict)
     overlay_reference_ids: tuple[str, ...] = ()
+    construct_candidate_promotion: dict[str, object] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -125,11 +128,16 @@ def validate_representation_table_contract_payload(payload: object) -> Represent
         errors.append(
             "source_overlay_inputs must declare Khan abundance, Crawford abundance, and Crawford design references"
         )
+    construct_candidate_promotion = _parse_construct_candidate_promotion(
+        payload.get("construct_candidate_promotion"),
+        errors=errors,
+    )
     return RepresentationTableContractAudit(
         errors=tuple(errors),
         source_view_names=source_view_names,
         fixed_size_vectors=fixed_size_vectors,
         overlay_reference_ids=overlay_reference_ids,
+        construct_candidate_promotion=construct_candidate_promotion,
     )
 
 
@@ -278,6 +286,49 @@ def _parse_fixed_size_vectors(payload: object, *, errors: list[str]) -> dict[str
             continue
         parsed[vector_id] = (dtype, dimension)
     return parsed
+
+
+def _parse_construct_candidate_promotion(value: object, *, errors: list[str]) -> dict[str, object]:
+    payload = _mapping(value, label="construct_candidate_promotion", errors=errors)
+    source_dataset = _string(payload.get("source_dataset"))
+    consolidated_construct_dataset = _string(payload.get("consolidated_construct_dataset"))
+    sequence_fields = tuple(
+        _string(field)
+        for field in _list(
+            payload.get("required_sequence_fields"),
+            label="construct_candidate_promotion.required_sequence_fields",
+            errors=errors,
+        )
+    )
+    construct_views = tuple(
+        _string(view)
+        for view in _list(
+            payload.get("required_construct_views"),
+            label="construct_candidate_promotion.required_construct_views",
+            errors=errors,
+        )
+    )
+    if source_dataset != _INPUT_DATASET:
+        errors.append(f"construct_candidate_promotion.source_dataset must be {_INPUT_DATASET}")
+    if consolidated_construct_dataset != _OUTPUT_DATASET:
+        errors.append(f"construct_candidate_promotion.consolidated_construct_dataset must be {_OUTPUT_DATASET}")
+    if sequence_fields != _EXPECTED_CANDIDATE_SEQUENCE_FIELDS:
+        errors.append(
+            "construct_candidate_promotion.required_sequence_fields must be candidate__lnrna_sequence, "
+            "candidate__rt_cds_sequence"
+        )
+    if construct_views != REQUIRED_SOURCE_VIEW_NAMES:
+        errors.append("construct_candidate_promotion.required_construct_views must match the six source views")
+    if payload.get("requires_explicit_rt_plus_lnrna_authority") is not True:
+        errors.append("construct_candidate_promotion.requires_explicit_rt_plus_lnrna_authority must be true")
+    if payload.get("forbid_overlay_only_infer_rows") is not True:
+        errors.append("construct_candidate_promotion.forbid_overlay_only_infer_rows must be true")
+    return {
+        "source_dataset": source_dataset,
+        "consolidated_construct_dataset": consolidated_construct_dataset,
+        "required_sequence_fields": sequence_fields,
+        "required_construct_views": construct_views,
+    }
 
 
 def _mapping(value: object, *, label: str, errors: list[str]) -> dict[str, object]:

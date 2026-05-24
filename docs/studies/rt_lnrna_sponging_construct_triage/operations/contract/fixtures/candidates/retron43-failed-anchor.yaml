@@ -48,7 +48,7 @@ msd_design_spec:
   feasibility_reason: GenBank offsets resolve source authority and construct representability; cloning feasibility and context materialization remain unrun.
   source_refs:
     - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml#pes_retron_43_vector
-    - ../pes-retron-43.gb
-    - ../retron-eco1-rt.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-43.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb
     - docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml#caps.C43
     - docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C43

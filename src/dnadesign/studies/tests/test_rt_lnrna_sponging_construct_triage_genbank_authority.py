@@ -95,7 +95,7 @@ def test_genbank_authority_validator_fails_missing_required_feature() -> None:
         sources=(
             GenBankAuthoritySource(
                 source_id="broken_retron26_vector",
-                path="../pes-retron-26.gb",
+                path=("docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb"),
                 role="test_only",
                 required_unique_labels=("missing-msr",),
             ),

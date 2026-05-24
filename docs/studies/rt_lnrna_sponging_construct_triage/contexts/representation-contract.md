@@ -50,6 +50,10 @@ Retron43's 14 bp longer lnRNA shifts the emitted window start to 63, so the
 region-relative anchors become `lnrna: [123,310)` and `rt_cds: [475,1438)`;
 the 165 bp interstitial remains constant while the prefix/suffix flanks are
 trimmed symmetrically.
+The same policy applies to RT length changes: retron47/retron48 keep the full
+Sso7d-fusion RT slot inside the 1,600 bp view by trimming outer flanks, yielding
+`lnrna: [27,200)` and `rt_cds: [365,1535)`. The policy never clips the lnRNA or
+RT slot itself; only the non-slot prefix/suffix context changes.
 The bidirectional anchor views are also downstream derived vector views, not
 extra sequence rows: LatentDNA concatenates the declared forward and RC anchor
 aliases after Infer writes sidecars.
@@ -83,10 +87,13 @@ bidirectional concat, and lnRNA plus RT slot-pair concat. The output-layer
 companions use the same view geometry as diagnostics; they do not automatically
 become OPAL `X`.
 
-The planned plot surface has three study-agnostic pieces ported from the
+The planned plot surface has four study-agnostic pieces ported from the
 promoter-style LatentDNA work:
 
-- a representation-health metric panel;
+- a representation-health metric panel that gates obvious collapse using PCA
+  effective rank, PC1 variance concentration, and pairwise-distance spread;
+- an appendix PCA scree diagnostic for the same eight intermediate and
+  output-layer views;
 - a Khan/Crawford ordinal overlay audit, with separate axes for Khan RT-DNA
   abundance priors and Crawford Eco1 msDNA abundance priors;
 - an appendix UMAP gallery spanning intermediate and output-layer views with
@@ -99,12 +106,22 @@ metadata axis for geometry review, not a replacement label and not OPAL `Y`.
 Crawford design-reference rows remain a separate sequence/design reference
 lane; they are not abundance observations.
 
+Khan and Crawford rows can participate in LatentDNA overlays only after they
+become construct-compatible candidate rows with explicit `candidate__lnrna_sequence`
+and `candidate__rt_cds_sequence` authority. Promoted rows must enter
+`rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1`, be emitted into
+the consolidated
+`rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1` dataset, and
+receive the same six source sequence-view declarations as the retron26/retron43
+controls before Infer runs. Overlay-only rows must not be passed to Infer.
+
 ### Failure Rules
 
 - Missing constants fail before Infer.
 - Invalid DNA alphabet fails before Infer.
-- Any focal lnRNA span, lnRNA slot, or RT CDS slot clipping or truncation fails
-  before Infer.
+- Any focal lnRNA span, lnRNA slot, or RT CDS slot clipping fails before Infer.
+  Prefix/suffix flank truncation or extension is allowed only when the catalog
+  can still emit full lnRNA and RT slot spans inside the 1,600 bp context.
 - Missing reverse-complement view fails the concat alias.
 - Missing lnRNA or RT CDS slot span fails the matching anchor-mean view.
 

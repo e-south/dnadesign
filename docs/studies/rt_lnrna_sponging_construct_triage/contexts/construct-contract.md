@@ -59,12 +59,16 @@ temporary candidate rows are passed to Construct.
   contained in pES retron-26 at zero-based half-open vector coordinates
   `[56,1656)`, not the first 1,600 bp of the circular pES-retron-26 record.
 - Region-relative retron26 control spans are `lnrna: [130,303)` and
-  `rt_cds: [468,1431)`. Longer lnRNA candidates keep the interstitial constant
-  and shift the fixed 1,600 bp window by the lnRNA center delta, symmetrically
-  trimming the prefix and suffix flanks. Retron43 therefore emits
-  `lnrna: [123,310)` and `rt_cds: [475,1438)`.
-- Candidates whose required slots cannot fit inside the 1,600 bp view fail
-  instead of being arbitrarily truncated.
+  `rt_cds: [468,1431)`. Candidate-specific lnRNA or RT length deltas keep the
+  165 bp interstitial constant and adjust only the outer prefix/suffix flanks
+  until the emitted context is exactly 1,600 bp. Positive deltas truncate those
+  flanks symmetrically; negative deltas extend them symmetrically. Odd deltas
+  use the unavoidable 1 bp left/right imbalance recorded in catalog QC flags.
+  Retron43 therefore emits `lnrna: [123,310)` and `rt_cds: [475,1438)`;
+  the Sso7d-fusion retron47/retron48 RT slots emit
+  `lnrna: [27,200)` and `rt_cds: [365,1535)`.
+- Candidates whose full lnRNA plus RT slots cannot fit after prefix/suffix
+  adjustment fail instead of clipping either biological slot.
 
 Construct must emit `realized_context` sequence views. Study role tags,
 source-family semantics, candidate roles, and abundance-overlay regimes belong

@@ -49,8 +49,8 @@ msd_design_spec:
   source_refs:
     - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml#pes_retron_26_vector
     - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml#pes_retron_26_lnrna_a1_a2
-    - ../pes-retron-26.gb
-    - ../pes-retron-26-a1-a2.gb
-    - ../retron-eco1-rt.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb
     - docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml#caps.C26
     - docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C26

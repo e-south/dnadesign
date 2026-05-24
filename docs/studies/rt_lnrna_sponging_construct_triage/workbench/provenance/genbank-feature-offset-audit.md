@@ -1,7 +1,7 @@
 ## GenBank Feature Offset Audit
 
 - Study: `rt_lnrna_sponging_construct_triage`
-- Verified: 2026-05-22
+- Verified: 2026-05-24
 - Parser: `dnadesign.usr.BiopythonGenBankParser`
 - Registry: `genbank-source-authority.yaml`
 - Coordinate convention: 1-based inclusive spans copied from parsed GenBank
@@ -11,12 +11,12 @@
 
 | Source id | File | Locus | Length | Topology | SHA-256 |
 | --- | --- | --- | ---: | --- | --- |
-| `pes_retron_26_vector` | `../pes-retron-26.gb` | `pES-retron-26` | 4956 | circular | `eb76e50add545bdba31b0ad2a6dacf9e85de22862f52ca5d61960e65f4ab5c39` |
-| `dual_cassette_1600bp_region` | `../1600bp-region.gb` | `1600bp-region` | 1600 | linear | `515bca47fb7f29d599a6800f8e8f5909ed94e491357b28217d6e861b81fbdaf3` |
-| `pes_retron_26_lnrna_a1_a2` | `../pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | linear | `f25a3ab588f058562903899164d2b56715d21a6a28d718104e68d2f07cf6e73b` |
-| `retron_eco1_rt` | `../retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | linear | `8b6f9219fffb43af3134c637bf753320811a90974a4952f4693cde1c322437af` |
-| `pes_retron_43_vector` | `../pes-retron-43.gb` | `pES-retron-43` | 4970 | circular | `a438d7cb8ef1e846be3ad2a84e5ecc948358b535585757a0487457c6ef7c4a18` |
-| `retron_179_orientation_reference` | `../retron-179-a1-a2.gb` | `retron-179-a1-a2` | 178 | linear | `763e9a37481206c6559d60c602eff857d2e056b44518944263d03e3f61db1263` |
+| `pes_retron_26_vector` | `genbank/pes-retron-26.gb` | `pES-retron-26` | 4956 | circular | `eb76e50add545bdba31b0ad2a6dacf9e85de22862f52ca5d61960e65f4ab5c39` |
+| `dual_cassette_1600bp_region` | `genbank/1600bp-region.gb` | `1600bp-region` | 1600 | linear | `515bca47fb7f29d599a6800f8e8f5909ed94e491357b28217d6e861b81fbdaf3` |
+| `pes_retron_26_lnrna_a1_a2` | `genbank/pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | linear | `f25a3ab588f058562903899164d2b56715d21a6a28d718104e68d2f07cf6e73b` |
+| `retron_eco1_rt` | `genbank/retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | linear | `8b6f9219fffb43af3134c637bf753320811a90974a4952f4693cde1c322437af` |
+| `pes_retron_43_vector` | `genbank/pes-retron-43.gb` | `pES-retron-43` | 4970 | circular | `a438d7cb8ef1e846be3ad2a84e5ecc948358b535585757a0487457c6ef7c4a18` |
+| `retron_179_orientation_reference` | `genbank/retron-179-a1-a2.gb` | `retron-179-a1-a2` | 178 | linear | `763e9a37481206c6559d60c602eff857d2e056b44518944263d03e3f61db1263` |
 
 ### Retron-26 Working Anchor
 
@@ -115,5 +115,7 @@ Construct placement ontology is still multi-slot: `lnrna` and `rt_cds` are
 separate required slots in one template realization. The public strategy is
 `construct_multi_slot_assembly_v1`, recorded in
 `operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
-The remaining gate is runtime materialization of Construct context views from
-those audited offsets, without arbitrary padding or truncation.
+Construct context materialization now consumes those audited offsets without
+arbitrary filler padding or biological slot truncation. Candidate-specific
+lnRNA and RT length changes are handled by symmetric prefix/suffix flank
+adjustment until the emitted context is exactly 1,600 bp.

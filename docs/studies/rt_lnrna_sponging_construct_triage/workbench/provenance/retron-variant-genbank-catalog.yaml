@@ -1,0 +1,2153 @@
+catalog_id: rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1
+study_id: rt_lnrna_sponging_construct_triage
+source_metadata_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
+genbank_dir: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank
+variant_count: 36
+ok: true
+missing_metadata_source_files: []
+missing_genbank_source_files: []
+errors: []
+records:
+  msrmsdwt_bl21:
+    variant_id: msrmsdwt_bl21
+    retron_number: 0
+    plasmid_name: msr/msd(wt)_BL21
+    source_file: msrmsdwt-bl21.gb
+    source_kind: lnrna_only
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/msrmsdwt-bl21.gb
+    source_sha256: 5e15c83476779d43302b6215c32f2a3d92cca057ed35c8db690836ef8a10d57e  # pragma: allowlist secret
+    record_id: CP010816.1
+    record_name: msr/msd(wt)_BL21
+    sequence_length_bp: 170
+    topology: linear
+    antibiotic: n/a
+    benchling_url: local_genbank_only
+    reader_design_id: msrmsdwt-bl21; pBbS2c-rfp
+    variant_class: native_lnrna_wt_rt
+    comment: Wild-type Eco1 msr/msd lnRNA found in Escherichia coli BL21; GenBank
+      source is the a1-through-a2 lnRNA only, paired with the Eco1 WT RT reference
+      for Construct projection.
+    lnrna:
+      sequence_id: genbank:msrmsdwt-bl21.gb#record
+      label: record
+      span_0:
+      - 0
+      - 170
+      span_1:
+      - 1
+      - 170
+      strand: 1
+      length_nt: 170
+      sequence_sha256: dea6f7f1a168d83f78a8860a6fb0c548fc0a2b49d63ec53df31d365f9b56057c  # pragma: allowlist secret
+      authority_kind: record
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 0
+      - 963
+      span_1:
+      - 1
+      - 963
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native
+    construct_spans_0:
+      lnrna:
+      - 132
+      - 302
+      rt_cds:
+      - 467
+      - 1430
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron18:
+    variant_id: retron18
+    retron_number: 18
+    plasmid_name: pES-retron-18
+    source_file: pes-retron-18.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-18.gb
+    source_sha256: 89c9081679bf9077b56b07c746efec8a8b76b0fb995dd535b3111e65e3a3a825  # pragma: allowlist secret
+    record_id: pES-retron-18
+    record_name: pES-retron-18
+    sequence_length_bp: 4941
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-1fv5Acxi3q2iGl9t1bS7?m=slm-x5iZ07o5NlCRL7bOSvAo
+    reader_design_id: pES-retron-18; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Retron-Eco1 system with a tetO binding site placed in the RT-DNA hairpin;
+      pBbA6a-retron-Eco1-msd[tetO]-PJ23116-RT
+    lnrna:
+      sequence_id: genbank:pes-retron-18.gb#msr..a2
+      label: msr..a2
+      span_0:
+      - 186
+      - 344
+      span_1:
+      - 187
+      - 344
+      strand: 1
+      length_nt: 158
+      sequence_sha256: 37190e4d432b7357af48cde960ed7ac7804a50d7ae315b9a5f40d055110ed8ba  # pragma: allowlist secret
+      authority_kind: legacy_msr_to_a2
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-18.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 509
+      - 1472
+      span_1:
+      - 510
+      - 1472
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron18_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 138
+      - 296
+      rt_cds:
+      - 461
+      - 1424
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron24:
+    variant_id: retron24
+    retron_number: 24
+    plasmid_name: pES-retron-24
+    source_file: pes-retron-24.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-24.gb
+    source_sha256: ded5e4098b5903192bfc222f3edb0d889a61345c94a73329d48d944a609a880f  # pragma: allowlist secret
+    record_id: pES-retron-24
+    record_name: pES-retron-24
+    sequence_length_bp: 4956
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-FnAVg2bBmRu2zEwWgR82?m=slm-NGfxiXw2udGHp6DM1Ccu
+    reader_design_id: pES-retron-24; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Retron-Eco1 system with a TetR binding site placed in the RT-DNA hairpin;
+      a1/a2 region extended to 20 bp; pBbA6a-retron-Eco1-a1/a2(length=20)-msd[tetO]-PJ23116-RT
+    lnrna:
+      sequence_id: genbank:pes-retron-24.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 359
+      span_1:
+      - 187
+      - 359
+      strand: 1
+      length_nt: 173
+      sequence_sha256: c161b93cd268499167d3ba8fafe8b6b0d8a7691fd14ed4c15a0a9c5ecfd70fcf  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-24.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 524
+      - 1487
+      span_1:
+      - 525
+      - 1487
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron24_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 130
+      - 303
+      rt_cds:
+      - 468
+      - 1431
+    construct_projection_status: representable
+    qc_flags: []
+  retron25:
+    variant_id: retron25
+    retron_number: 25
+    plasmid_name: pES-retron-25
+    source_file: pes-retron-25.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-25.gb
+    source_sha256: b5e044efa0a2d7a274d879f702459f2488149463a1bd01234fc2238e91506e82  # pragma: allowlist secret
+    record_id: pES-retron-25
+    record_name: pES-retron-25
+    sequence_length_bp: 4972
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-hU3nGXwOPq8Ju0hrzuMh?m=slm-tWo5MaO1K2f832sBMf1Z
+    reader_design_id: pES-retron-25; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Retron-Eco1 system, cloned with a YIU method, with a TetR binding site
+      placed in the RT-DNA hairpin; a1/a2 region extended to 20 bp; pBbA6a-retron-Eco1-a1/a2(length=20)-msd[YIU-tetO]-PJ23116-RT
+    lnrna:
+      sequence_id: genbank:pes-retron-25.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 375
+      span_1:
+      - 187
+      - 375
+      strand: 1
+      length_nt: 189
+      sequence_sha256: 5a0d79571e5251a5ce0e197117140d8b1d5d72dd4fd1e1e2694f4619fd29543b  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-25.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 540
+      - 1503
+      span_1:
+      - 541
+      - 1503
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron25_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 122
+      - 311
+      rt_cds:
+      - 476
+      - 1439
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron26:
+    variant_id: retron26
+    retron_number: 26
+    plasmid_name: pES-retron-26
+    source_file: pes-retron-26.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
+    source_sha256: eb76e50add545bdba31b0ad2a6dacf9e85de22862f52ca5d61960e65f4ab5c39  # pragma: allowlist secret
+    record_id: pES-retron-26
+    record_name: pES-retron-26
+    sequence_length_bp: 4956
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-U5fZ9LdotIsqORxKR2Tb?m=slm-TQze3dNWWnbOdHFeHD3w
+    reader_design_id: pES-retron-26; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: 'Derived from pES-retron-24, with the "UUU" RT recognition sequence in
+      the P2 loop edited to "GUU" which should increase msDNA abundance (DOI: 10.1093/nar/gkae1199);
+      pBbA6a-retron-Eco1-a1/a2[length=20]-P2Loop[GUU]-msd[tetO]-PJ23116-RT'
+    lnrna:
+      sequence_id: genbank:pes-retron-26.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 359
+      span_1:
+      - 187
+      - 359
+      strand: 1
+      length_nt: 173
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-26.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 524
+      - 1487
+      span_1:
+      - 525
+      - 1487
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 130
+      - 303
+      rt_cds:
+      - 468
+      - 1431
+    construct_projection_status: representable
+    qc_flags: []
+  retron27:
+    variant_id: retron27
+    retron_number: 27
+    plasmid_name: pES-retron-27
+    source_file: pes-retron-27.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-27.gb
+    source_sha256: 5b27fdba96c3d203168720de1126a72a58da577a7abe9c2982deae881b56c2a1  # pragma: allowlist secret
+    record_id: pES-retron-27
+    record_name: pES-retron-27
+    sequence_length_bp: 4972
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-mJ1sKGVkwteW80MxIFTH?m=slm-CK5nlqm6D5CFCtz6CYHV
+    reader_design_id: pES-retron-27; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: 'Derived from pES-retron-25, with the "UUU" RT recognition sequence in
+      the P2 loop edited to "GUU" which should increase msDNA abundance (DOI: 10.1093/nar/gkae1199);
+      pBbA6a-retron-Eco1-a1/a2[length=20]-P2Loop[GUU]-msd[YIU-tetO]-PJ23116-RT'
+    lnrna:
+      sequence_id: genbank:pes-retron-27.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 375
+      span_1:
+      - 187
+      - 375
+      strand: 1
+      length_nt: 189
+      sequence_sha256: fcd7a4b3c653c9d62fcbfdd09223aa19ab3e56bf60f77fea5c8d4923716a2c14  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-27.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 540
+      - 1503
+      span_1:
+      - 541
+      - 1503
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron27_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 122
+      - 311
+      rt_cds:
+      - 476
+      - 1439
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron43:
+    variant_id: retron43
+    retron_number: 43
+    plasmid_name: pES-retron-43
+    source_file: pes-retron-43.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-43.gb
+    source_sha256: a438d7cb8ef1e846be3ad2a84e5ecc948358b535585757a0487457c6ef7c4a18  # pragma: allowlist secret
+    record_id: pES-retron-43
+    record_name: pES-retron-43
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-jHpim5SKMgRXda36gatb?m=slm-iCv2HwKYfLE6E2XQDkBn
+    reader_design_id: pES-retron-43; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-26; cloned with the msd-HOP method (v5), with
+      a TetR binding site placed in the RT-DNA hairpin; a1/a2 region is 20 bp; "GUU"
+      RT recognition sequence in P2 loop; P4 loop is capped via a Nt.Bpu10I nicking
+      endonuclease reaction; pBbA6a-retron-Eco1-a1/a2(length=20)-P2Loop[GUU]-msd-HOP[tetO]-PJ23116-RT
+    lnrna:
+      sequence_id: genbank:pes-retron-43.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-43.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron45:
+    variant_id: retron45
+    retron_number: 45
+    plasmid_name: pES-retron-45
+    source_file: pes-retron-45.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-45.gb
+    source_sha256: 608163ef5cbd4242ba191f11f6e39b42a169e8850ff98e61ef0336b473305d56  # pragma: allowlist secret
+    record_id: pES-retron-45
+    record_name: pES-retron-45
+    sequence_length_bp: 4986
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-g6UiPO8vSAaXZNgDvkUF?m=slm-psLTTtnqVjXQmUsWlsUD
+    reader_design_id: pES-retron-45; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-26 and 43, modified P4 loop with WT 5' and 3'
+      flanks, the first four WT stem base pairs, and the msd-HOP-derived tetO stem
+      inserted between them.
+    lnrna:
+      sequence_id: genbank:pes-retron-45.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 389
+      span_1:
+      - 187
+      - 389
+      strand: 1
+      length_nt: 203
+      sequence_sha256: 3d4b933f265049ec2a2074adfb7a0f7db45467a75fe312f58e44efa60fc99351  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-45.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 554
+      - 1517
+      span_1:
+      - 555
+      - 1517
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 115
+      - 318
+      rt_cds:
+      - 483
+      - 1446
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron46:
+    variant_id: retron46
+    retron_number: 46
+    plasmid_name: pES-retron-46
+    source_file: pes-retron-46.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-46.gb
+    source_sha256: 2aec3172d13cf23d4cc3ba548794295ded34d3e49adae67460e1479e2f24834c  # pragma: allowlist secret
+    record_id: pES-retron-46
+    record_name: pES-retron-46
+    sequence_length_bp: 4994
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-zkZOyfY5TaqZVvYle52i?m=slm-YFY1q2Aocx0AQagc8cLL
+    reader_design_id: pES-retron-46; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-26 and 43, modified P4 loop with WT 5' and 3'
+      flanks, the first four WT stem base pairs, a 4 bp bulge, and the msd-HOP-derived
+      tetO stem inserted between them.
+    lnrna:
+      sequence_id: genbank:pes-retron-46.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 397
+      span_1:
+      - 187
+      - 397
+      strand: 1
+      length_nt: 211
+      sequence_sha256: 8e15a9d65ad0d12177f6b6ded6564ef0316f435830202440925760c2300c2d21  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-46.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 562
+      - 1525
+      span_1:
+      - 563
+      - 1525
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 111
+      - 322
+      rt_cds:
+      - 487
+      - 1450
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron47:
+    variant_id: retron47
+    retron_number: 47
+    plasmid_name: pES-retron-47
+    source_file: pes-retron-47.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-47.gb
+    source_sha256: 04e9155834d4da632dff34d741a3648431ee8ee9e6fa61c475eef2775ed14863  # pragma: allowlist secret
+    record_id: pES-retron-47
+    record_name: pES-retron-47
+    sequence_length_bp: 5163
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-T0xOx5dn6vb6LTXXd1vU?m=slm-aZ1VnRwRiZ1OEehrzD23
+    reader_design_id: pES-retron-47; pBbS2c-rfp
+    variant_class: rt_translational_fusion
+    comment: Derived from pES-retron-26, N-terminal Sso7d domain fused to reverse
+      transcriptase.
+    lnrna:
+      sequence_id: genbank:pes-retron-47.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 359
+      span_1:
+      - 187
+      - 359
+      strand: 1
+      length_nt: 173
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-47.gb#Sso7d+GGS_2+ECD_00831
+      label: Sso7d+GGS_2+ECD_00831
+      span_0:
+      - 524
+      - 1694
+      span_1:
+      - 525
+      - 1694
+      strand: 1
+      length_nt: 1170
+      sequence_sha256: 4d4b556420966727314548c68afac6b190bdd2e5a9ae981b28c17c00be5d4400  # pragma: allowlist secret
+      authority_kind: rt_translational_fusion
+      mutation_labels: []
+      fusion_part_labels:
+      - Sso7d
+      - GGS_2
+      - ECD_00831
+    construct_candidate_id: rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 27
+      - 200
+      rt_cds:
+      - 365
+      - 1535
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron48:
+    variant_id: retron48
+    retron_number: 48
+    plasmid_name: pES-retron-48
+    source_file: pes-retron-48.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-48.gb
+    source_sha256: e076ff5c74c729289a384ed8c0327aec3d1ea05830ff29137383762d006a7b13  # pragma: allowlist secret
+    record_id: pES-retron-48
+    record_name: pES-retron-48
+    sequence_length_bp: 5163
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-YuTUEwWCNbFnc4cu6bdv?m=slm-nC6ISoZwUQ87qaJsLZd6
+    reader_design_id: pES-retron-48; pBbS2c-rfp
+    variant_class: rt_translational_fusion
+    comment: Derived from pES-retron-26, C-terminal Sso7d domain fused to reverse
+      transcriptase.
+    lnrna:
+      sequence_id: genbank:pes-retron-48.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 359
+      span_1:
+      - 187
+      - 359
+      strand: 1
+      length_nt: 173
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-48.gb#ECD_00831+GGS_2+Sso7d
+      label: ECD_00831+GGS_2+Sso7d
+      span_0:
+      - 524
+      - 1694
+      span_1:
+      - 525
+      - 1694
+      strand: 1
+      length_nt: 1170
+      sequence_sha256: 309b7b72a7a84403ce32d985d57b1bf386682e767624e0eeee8af13d39c46041  # pragma: allowlist secret
+      authority_kind: rt_translational_fusion
+      mutation_labels: []
+      fusion_part_labels:
+      - ECD_00831
+      - GGS_2
+      - Sso7d
+    construct_candidate_id: rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 27
+      - 200
+      rt_cds:
+      - 365
+      - 1535
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron49:
+    variant_id: retron49
+    retron_number: 49
+    plasmid_name: pES-retron-49
+    source_file: pes-retron-49.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-49.gb
+    source_sha256: cd08469fb4f4471a040c3b785494b24745179d7fc3d6b369594d7550b5c76063  # pragma: allowlist secret
+    record_id: pES-retron-49
+    record_name: pES-retron-49
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-5SuxIGC9l3zhK7gh2ToC?m=slm-xNlHaFIHgIiewslHnxuo
+    reader_design_id: pES-retron-49; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_R38Y
+    lnrna:
+      sequence_id: genbank:pes-retron-49.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-49.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ce5a0829bc825fead4e8ba806c150588bd0129ed17eb3ffb9308815aadc5a3a3  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - R38Y
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron49_rt_variant__retron49_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron50:
+    variant_id: retron50
+    retron_number: 50
+    plasmid_name: pES-retron-50
+    source_file: pes-retron-50.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-50.gb
+    source_sha256: 65f6907dc255fa514f110cbd048fee4b2c8239d5ec8197d3d884967a322d66e2  # pragma: allowlist secret
+    record_id: pES-retron-50
+    record_name: pES-retron-50
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-D1IWceRG2U35JS6AHtLR?m=slm-2lMCl2KhU1xQK9Wyei2n
+    reader_design_id: pES-retron-50; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_L39R
+    lnrna:
+      sequence_id: genbank:pes-retron-50.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-50.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: 459a0150ce39fa17e72f550ae7f303c713f0315d0f4eb378687919959502ed3b  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - L39R
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron50_rt_variant__retron50_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron51:
+    variant_id: retron51
+    retron_number: 51
+    plasmid_name: pES-retron-51
+    source_file: pes-retron-51.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-51.gb
+    source_sha256: 52533bec5a72ec60141a1323e4e64602a4f664d8f72522f5e21b8969bae50694  # pragma: allowlist secret
+    record_id: pES-retron-51
+    record_name: pES-retron-51
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-ewXQ16zblhX8rmhd5FM7?m=slm-v5ZVfoIlyRc07oH8OR7Z
+    reader_design_id: pES-retron-51; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_L40G
+    lnrna:
+      sequence_id: genbank:pes-retron-51.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-51.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: 1b70ba5666a02cc5585374b28ce15c84166bb6bc1ef831510c3effa7c078a00f  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - L40G
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron51_rt_variant__retron51_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron52:
+    variant_id: retron52
+    retron_number: 52
+    plasmid_name: pES-retron-52
+    source_file: pes-retron-52.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-52.gb
+    source_sha256: ae383c78c968acba438df4742f07d38338864867ffc218807557091954752ef1  # pragma: allowlist secret
+    record_id: pES-retron-52
+    record_name: pES-retron-52
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-pc23G9usfUXuczk5H216?m=slm-e2Nd5VWaMczaXopfn7pr
+    reader_design_id: pES-retron-52; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_I41G
+    lnrna:
+      sequence_id: genbank:pes-retron-52.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-52.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: d38a08f57d2681a40f7f4c10349f145862596131b6f9570df7de208c3b608af9  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - I41G
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron52_rt_variant__retron52_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron53:
+    variant_id: retron53
+    retron_number: 53
+    plasmid_name: pES-retron-53
+    source_file: pes-retron-53.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-53.gb
+    source_sha256: 9242cae1f3b9e26591518e66adc0289cd6f93887be64c8161a2b0612ab9c4209  # pragma: allowlist secret
+    record_id: pES-retron-53
+    record_name: pES-retron-53
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-RlBNikeblFxUTAwZozWy?m=slm-A7thbdCYcSJciy0YnDno
+    reader_design_id: pES-retron-53; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_T43E
+    lnrna:
+      sequence_id: genbank:pes-retron-53.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-53.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: 2ef0e969499d48f22c46e8f5f49d70261d8cc48549fd6ed4ea4bf433bd92012e  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - T43E
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron53_rt_variant__retron53_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron54:
+    variant_id: retron54
+    retron_number: 54
+    plasmid_name: pES-retron-54
+    source_file: pes-retron-54.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-54.gb
+    source_sha256: 8a7d3b46315d447404fa638c9556a4a47d540113f95b6d5340f282973f21938c  # pragma: allowlist secret
+    record_id: pES-retron-54
+    record_name: pES-retron-54
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-55mCRfkI2QU4qS26xtDb?m=slm-H1DPUk5l5L4XEjims4Pu
+    reader_design_id: pES-retron-54; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_R49E
+    lnrna:
+      sequence_id: genbank:pes-retron-54.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-54.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: dd8798e7ea7f1f0ddfaf8d23d3bf3181c3bfaeca0fdeb7d06cc4a753f32b2bfb  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - R49E
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron54_rt_variant__retron54_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron55:
+    variant_id: retron55
+    retron_number: 55
+    plasmid_name: pES-retron-55
+    source_file: pes-retron-55.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-55.gb
+    source_sha256: 17c26ba38bcf79383ba35e637f14ff2e07719d8496aba867e50a1ae203ed0214  # pragma: allowlist secret
+    record_id: pES-retron-55
+    record_name: pES-retron-55
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-J6tkqtv1MTS8AgSul2zN?m=slm-QfSfWtZzttv0GkJJ0JRf
+    reader_design_id: pES-retron-55; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_E54P
+    lnrna:
+      sequence_id: genbank:pes-retron-55.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-55.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: e8b4de35cd547028a7d0809052fd90448ff5cb572315d4b6efdfbdb35e8f7aa0  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - E54P
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron55_rt_variant__retron55_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron56:
+    variant_id: retron56
+    retron_number: 56
+    plasmid_name: pES-retron-56
+    source_file: pes-retron-56.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-56.gb
+    source_sha256: 85305bfe99a5f4ae8fc701ecb98c952d485e9fa03140cbb1e21b7c003d5822dc  # pragma: allowlist secret
+    record_id: pES-retron-56
+    record_name: pES-retron-56
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-QXhlC38wHARk0PVaRvMs?m=slm-uQHbqxjXeicNCpZGYmYV
+    reader_design_id: pES-retron-56; pBbS2c-rfp
+    variant_class: rt_point_mutation
+    comment: pES-retron-43 with mutated RT-Eco1_P58G
+    lnrna:
+      sequence_id: genbank:pes-retron-56.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-56.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: 085a2e0e39f8d2e8f875e8fbe4b1c8450e5fb307ef5afdff5b612a84c4edbf84  # pragma: allowlist secret
+      authority_kind: rt_point_mutation
+      mutation_labels:
+      - P58G
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__retron56_rt_variant__retron56_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron170:
+    variant_id: retron170
+    retron_number: 170
+    plasmid_name: pES-retron-170-msd[TetR]; tetO2-WT-S8C>T,AS11A>G
+    source_file: pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb
+    source_sha256: 30f9f81e1c14c65e1df454852bd1a69c139f69358aa148000cfb15d908596032  # pragma: allowlist secret
+    record_id: pES-retron-170-msd[TetR
+    record_name: pES-retron-170-msd[TetR
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-1JqzfwlPksneDtNNwDws?m=slm-qEGlocTcoQ4hZxbPGhfv
+    reader_design_id: pES-retron-170; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43, with WT tetO2 derived binding site(s), with
+      intentional mismatch bases, for TetR.
+    lnrna:
+      sequence_id: genbank:pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: 7114d789e033f05c704237d9068cab11870435e60aeff26fb07dd34203b02d0c  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron171:
+    variant_id: retron171
+    retron_number: 171
+    plasmid_name: pES-retron-171-msd[TetR]; tetO2-CR-2x-S9C>T,AS11C>T
+    source_file: pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb
+    source_sha256: c5dfbe0f72a70fdc79d2f2dddc6d1d64272c1c023fb85db5b544a27fff276f22  # pragma: allowlist secret
+    record_id: pES-retron-171-msd[TetR
+    record_name: pES-retron-171-msd[TetR
+    sequence_length_bp: 4970
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-pAH4tTgoE6LgNrMrOblo?m=slm-PKFV1S0j1XLTiN8G6tHX
+    reader_design_id: pES-retron-171; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43, with MEME/Cruncher derived binding site(s),
+      with intentional mismatch bases, for TetR.
+    lnrna:
+      sequence_id: genbank:pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 373
+      span_1:
+      - 187
+      - 373
+      strand: 1
+      length_nt: 187
+      sequence_sha256: 57f61959c758ee8f5550106320f641deed36286fe3ebe5dfdef500a8362fcf15  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 538
+      - 1501
+      span_1:
+      - 539
+      - 1501
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 123
+      - 310
+      rt_cds:
+      - 475
+      - 1438
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+  retron172:
+    variant_id: retron172
+    retron_number: 172
+    plasmid_name: pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC
+    source_file: pes-retron-172-msdtetr-033-gag-aga-ctc.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-172-msdtetr-033-gag-aga-ctc.gb
+    source_sha256: ad18630814154906e05db146d6f3bc90a0f0218e3190718e2c95be3f6c21efdc  # pragma: allowlist secret
+    record_id: pES-retron-172-msd[TetR
+    record_name: pES-retron-172-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-Ciy37ImwSh5MRQyfdAI2?m=slm-U0CHpWS1jfQs8HsQMFjg
+    reader_design_id: pES-retron-172; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43; retains the TetR payload context with compact
+      0/3/3 foldback core GAG-AGA-CTC.
+    lnrna:
+      sequence_id: genbank:pes-retron-172-msdtetr-033-gag-aga-ctc.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 7913c92a8367b5ddd3a5576d3524682153710a2150a69c40fbd6674bace3ff52  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-172-msdtetr-033-gag-aga-ctc.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron173:
+    variant_id: retron173
+    retron_number: 173
+    plasmid_name: pES-retron-173-msd[TetR]; 033-GGA-AGA-TCC
+    source_file: pes-retron-173-msdtetr-033-gga-aga-tcc.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-173-msdtetr-033-gga-aga-tcc.gb
+    source_sha256: ce148a42c71c49700a66131b7d80a34ff195458053266aa5dfe9a8ffbaa3946f  # pragma: allowlist secret
+    record_id: pES-retron-173-msd[TetR
+    record_name: pES-retron-173-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-8nhppCsFdE4ZjriHFUHB?m=slm-r3WmWYMv4kZeIqslAM5g
+    reader_design_id: pES-retron-173; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43; retains the TetR payload context with compact
+      0/3/3 foldback core GGA-AGA-TCC.
+    lnrna:
+      sequence_id: genbank:pes-retron-173-msdtetr-033-gga-aga-tcc.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 58eb33f3d0c2ea84c2c6626e8b98dd7906c11bd472ff9453769c3c5906ae50d9  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-173-msdtetr-033-gga-aga-tcc.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron174:
+    variant_id: retron174
+    retron_number: 174
+    plasmid_name: pES-retron-174-msd[TetR]; 033-AGA-GAC-TCT
+    source_file: pes-retron-174-msdtetr-033-aga-gac-tct.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-174-msdtetr-033-aga-gac-tct.gb
+    source_sha256: 57146ba62ffcb45419b473f219319974369e2166f994465f26af37122e4ee64c  # pragma: allowlist secret
+    record_id: pES-retron-174-msd[TetR
+    record_name: pES-retron-174-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-Bilm78q6Ax4XwIWg5Twv?m=slm-gGBVJGSs0MPHHbEZdr50
+    reader_design_id: pES-retron-174; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43; retains the TetR payload context with compact
+      0/3/3 foldback core AGA-GAC-TCT.
+    lnrna:
+      sequence_id: genbank:pes-retron-174-msdtetr-033-aga-gac-tct.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 8a6afb2db0aca14732aca407d68eb96541a8aa0ae548cc73d0cb1e4a87573c90  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-174-msdtetr-033-aga-gac-tct.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron175:
+    variant_id: retron175
+    retron_number: 175
+    plasmid_name: pES-retron-175-msd[TetR]; 033-GTA-ACG-TAC
+    source_file: pes-retron-175-msdtetr-033-gta-acg-tac.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-175-msdtetr-033-gta-acg-tac.gb
+    source_sha256: ca5f829815f0468baa8276df60c8b0b9550eeae0aa1f4217093129027364e953  # pragma: allowlist secret
+    record_id: pES-retron-175-msd[TetR
+    record_name: pES-retron-175-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-FJTCAz2wtu0AlamrmdJo?m=slm-He65qvXuvoXUxCZ8jywA
+    reader_design_id: pES-retron-175; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43; retains the TetR payload context with compact
+      0/3/3 foldback core GTA-ACG-TAC.
+    lnrna:
+      sequence_id: genbank:pes-retron-175-msdtetr-033-gta-acg-tac.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 771679f9d2a8e2801fc46a63cf1cff16c6180c6f59db00233e77e8ae2a8c28fb  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-175-msdtetr-033-gta-acg-tac.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron176:
+    variant_id: retron176
+    retron_number: 176
+    plasmid_name: pES-retron-176-msd[TetR]; 033-GTG-ACG-CAC
+    source_file: pes-retron-176-msdtetr-033-gtg-acg-cac.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-176-msdtetr-033-gtg-acg-cac.gb
+    source_sha256: c71212f8e934f9f6a8a42ad495aa9ac69f63baf80514b25cc10bc2674feacbfc  # pragma: allowlist secret
+    record_id: pES-retron-176-msd[TetR
+    record_name: pES-retron-176-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: pending_local_genbank_source
+    reader_design_id: pES-retron-176; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Derived from pES-retron-43; retains the TetR payload context with compact
+      0/3/3 foldback core 033-GTG-ACG-CAC.
+    lnrna:
+      sequence_id: genbank:pes-retron-176-msdtetr-033-gtg-acg-cac.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 5be6e8a9ce2b95f76412773137c465250b56a4ae19cf3b95d9727256fe1a8d72  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-176-msdtetr-033-gtg-acg-cac.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron177:
+    variant_id: retron177
+    retron_number: 177
+    plasmid_name: pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
+    source_file: pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb
+    source_sha256: b4113ead01d2f219f14855c6b10077e366c2a9d7d7270a4fdec233656f4efad6  # pragma: allowlist secret
+    record_id: pES-retron-177-msd[TetR
+    record_name: pES-retron-177-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-DsK80wmrCHw3uuw7XmV8?m=slm-AsE7kpxivW3Q5Y6IUNTB
+    reader_design_id: pES-retron-177; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: 26-derived base / 43-cap crossover; tests 43-cap permissiveness.
+    lnrna:
+      sequence_id: genbank:pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: de506208fdca6570ae2d68266a978effb01f54b17714d7c315348e254e60a597  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron178:
+    variant_id: retron178
+    retron_number: 178
+    plasmid_name: pES-retron-178-msd[TetR]; C26-LCAAG-RCTCG-MXMM
+    source_file: pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb
+    source_sha256: 268738a03436b9d6206543384cec6b9fac69ca55244692a990ef8bce9c297c86  # pragma: allowlist secret
+    record_id: pES-retron-178-msd[TetR
+    record_name: pES-retron-178-msd[TetR
+    sequence_length_bp: 4956
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-MkfqlynDwaAnI96Hvg1D?m=slm-p7ff0rmgmuxSDMpVhZ4t
+    reader_design_id: pES-retron-178; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: 43-derived base / 26-cap crossover; tests whether the 43-like base drives
+      failure.
+    lnrna:
+      sequence_id: genbank:pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 359
+      span_1:
+      - 187
+      - 359
+      strand: 1
+      length_nt: 173
+      sequence_sha256: bcc68d0bcfdc1479c287308c93ee15ada6df3c5a4b029335930bf36d840ef231  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 524
+      - 1487
+      span_1:
+      - 525
+      - 1487
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 130
+      - 303
+      rt_cds:
+      - 468
+      - 1431
+    construct_projection_status: representable
+    qc_flags: []
+  retron179:
+    variant_id: retron179
+    retron_number: 179
+    plasmid_name: pES-retron-179-msd[TetR]; C172-LAGTG-RCAAT-MXMM
+    source_file: pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb
+    source_sha256: 3122c125757194586abc7202615d8ba0657cee7951d755cc5d5c5dc4d35b1b83  # pragma: allowlist secret
+    record_id: pES-retron-179-msd[TetR
+    record_name: pES-retron-179-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-f4nO4UrUKIZnGqCaGKye?m=slm-GPgIdyJg3SP1XmQ8AW5i
+    reader_design_id: pES-retron-179; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: 43-like S2-hard comparator; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 930c806fe85c125218e1270ccae888a11bce045451f352533fc089a60fdb03c9  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron180:
+    variant_id: retron180
+    retron_number: 180
+    plasmid_name: pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM
+    source_file: pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb
+    source_sha256: da2266398d4627f246f3720ab692644d817f1c16557d9ac8a2b09fabf69d9b07  # pragma: allowlist secret
+    record_id: pES-retron-180-msd[TetR
+    record_name: pES-retron-180-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-2rhpwHMD4idhuOADPaFT?m=slm-HaSIoZJJOdOreRS2bsS5
+    reader_design_id: pES-retron-180; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: S3 hard plus S2 G:T wobble; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 3e858e80ddb5b5a1c3b6616245e9953628deedee6f871b086871df90cb7c415c  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron181:
+    variant_id: retron181
+    retron_number: 181
+    plasmid_name: pES-retron-181-msd[TetR]; C172-LAGTG-RCTTT-MWXM
+    source_file: pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb
+    source_sha256: 885bb8ee097ea6f5da0ac90cc5a514b17cac56aecf72387537025dbac5764592  # pragma: allowlist secret
+    record_id: pES-retron-181-msd[TetR
+    record_name: pES-retron-181-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-JbSVfzEl2zUsqNZtRkq7?m=slm-1uKTjZrzC9aRSaQqD5RX
+    reader_design_id: pES-retron-181; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: S2 G:T wobble plus S1 hard; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: a4169904007413eb9af1969c5431c69a72cd5e2128fd893aee7c42c809a5d1da  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron182:
+    variant_id: retron182
+    retron_number: 182
+    plasmid_name: pES-retron-182-msd[TetR]; C172-LAGTG-RCGAT-MXWM
+    source_file: pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb
+    source_sha256: 98f9b7132b25f70ae6075f70c1b098060893759fc09b4a843373ae4f93da8840  # pragma: allowlist secret
+    record_id: pES-retron-182-msd[TetR
+    record_name: pES-retron-182-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-ZktPQvKSkXOC5cZj2Lu1?m=slm-NGTZIB6Ou15sv6bCh5su
+    reader_design_id: pES-retron-182; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: S2 hard plus S1 G:T wobble; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 6ed327991b74bef8989d6b67367181ac604935499587099faded26678514aca5  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron183:
+    variant_id: retron183
+    retron_number: 183
+    plasmid_name: pES-retron-183-msd[TetR]; C172-LAATG-RCGTG-XMWM
+    source_file: pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb
+    source_sha256: 106cc7cb1954c0dc3d345a6d7457491321a718f82fd77fea160864a75fcacdad  # pragma: allowlist secret
+    record_id: pES-retron-183-msd[TetR
+    record_name: pES-retron-183-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-Bevjbdl3uSC3vTovCuqq?m=slm-TjYmjeaIImeq1YkP11Tf
+    reader_design_id: pES-retron-183; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: S3 hard plus S1 G:T wobble; bottom nick via Nb.BsrDI.
+    lnrna:
+      sequence_id: genbank:pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 38b7da1c65a8665c18829882b551d1959f6327c607820730472335e2f16ba286  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron184:
+    variant_id: retron184
+    retron_number: 184
+    plasmid_name: pES-retron-184-msd[TetR]; C172-LAGTG-RCATT-MWMM
+    source_file: pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb
+    source_sha256: 7ab30088e881863a79f56d41182e363b6dde74f6522cfad92af1f4582899bceb  # pragma: allowlist secret
+    record_id: pES-retron-184-msd[TetR
+    record_name: pES-retron-184-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-qFohRC9xY29rQaRhkAoP?m=slm-tAGDs8SaVXb01go7UY2j
+    reader_design_id: pES-retron-184; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Single S2 G:T wobble control; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 2b32f7c73c25affa71e492176484c814649636749d29f9908707d3a779ad24dc  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron185:
+    variant_id: retron185
+    retron_number: 185
+    plasmid_name: pES-retron-185-msd[TetR]; C172-LAATG-RCGTT-MMWM
+    source_file: pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb
+    source_sha256: 35765f1fc92cc205b034625ac6182148813f837ad77c8805ad12bbdc766f92f3  # pragma: allowlist secret
+    record_id: pES-retron-185-msd[TetR
+    record_name: pES-retron-185-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-Twrdhi8qdZrmtdV5FuuL?m=slm-2GVyZ0tRl1WD8UYYRZjB
+    reader_design_id: pES-retron-185; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Single S1 G:T wobble control; bottom nick via Nb.BsrDI.
+    lnrna:
+      sequence_id: genbank:pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: 4f25f0fa3861e6b54a7a359a8129957efe7cafd2b112d12b6765fb5774ff0248  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron186:
+    variant_id: retron186
+    retron_number: 186
+    plasmid_name: pES-retron-186-msd[TetR]; C172-LAGTG-RCGTT-MWWM
+    source_file: pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb
+    source_kind: whole_plasmid
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb
+    source_sha256: e3ca4f123cf36e5a0617ba35f6bebbd9ca049c1830aacf737dcc55305b1276d0  # pragma: allowlist secret
+    record_id: pES-retron-186-msd[TetR
+    record_name: pES-retron-186-msd[TetR
+    sequence_length_bp: 4961
+    topology: circular
+    antibiotic: Carb
+    benchling_url: https://benchling.com/s/seq-V3ZnG2Er2ap0iAoECz5C?m=slm-UdeiTeP4mZvMrrCpgCDN
+    reader_design_id: pES-retron-186; pBbS2c-rfp
+    variant_class: lnrna_variant_wt_rt
+    comment: Two middle G:T wobbles; bottom nick via Nb.BtsI.
+    lnrna:
+      sequence_id: genbank:pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb#a1(20)..a2(20)
+      label: a1(20)..a2(20)
+      span_0:
+      - 186
+      - 364
+      span_1:
+      - 187
+      - 364
+      strand: 1
+      length_nt: 178
+      sequence_sha256: b4a444e5c3f793201661069af8f2bbf93db2f2ad17f682141834188414b4775d  # pragma: allowlist secret
+      authority_kind: a1_20_to_a2_20
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 529
+      - 1492
+      span_1:
+      - 530
+      - 1492
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 128
+      - 306
+      rt_cds:
+      - 471
+      - 1434
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_truncated_to_1600bp
+    - context_flank_adjustment_1bp_asymmetry

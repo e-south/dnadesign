@@ -6,6 +6,8 @@ command_groups:
     purpose: Validate checked-in docs and contract fixtures.
     commands:
       - uv run python -m dnadesign.devtools.docs.checks --repo-root .
+      - uv run python -m dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.variant_genbank_catalog --json
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
   - id: construct_projection
     status: active
     purpose: Materialize dual-cassette construct contexts from the multi-slot projection manifest.
@@ -22,12 +24,21 @@ command_groups:
       - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-stale-vectors 0 --max-stale-scalars 0
   - id: latentdna_gallery
     status: blocked
-    purpose: Validate and materialize the RT-lnRNA health, ordinal-audit, and UMAP gallery surfaces from Infer sidecars.
+    purpose: Validate and materialize the RT-lnRNA PCA health, scree, ordinal-audit, and UMAP gallery surfaces from Infer sidecars.
     blockers:
       - evo2_7b_feature_sidecars_absent
     commands:
       - uv run latentdna validate workspace --workspace rt_lnrna_sponging_construct_triage --deep --json
       - uv run latentdna recipe validate rt_lnrna_representation_review_recipe --workspace rt_lnrna_sponging_construct_triage --json
+  - id: reader_spop_label_materialization
+    status: planned
+    purpose: Plan Reader-derived SPOP scalar labels for RT-lnRNA assay subjects without promoting unresolved sequence identities.
+    blockers:
+      - unresolved_variant_sequence_authority_for_construct_promotion
+      - reader_spop_labels_not_materialized
+    commands:
+      - uv run python -m dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --json
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_reader_spop_plan.py
   - id: opal_readiness
     status: blocked
     purpose: Validate candidate records with one fixed-size vector X and real labels.

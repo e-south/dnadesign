@@ -1,6 +1,6 @@
 ## Source Handoff Ledger
 
-- Last verified: 2026-05-22
+- Last verified: 2026-05-24
 - Owner: dnadesign-maintainers
 
 ### Live Inventories
@@ -19,17 +19,19 @@
 | MSD design registry | `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` | C26/C43 source labels and cap provenance. |
 | MSD cap source lookup | `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml` | C26/C43 cap sequences and source labels. |
 | Scar-nick profile panel | `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml` | Finite engineered variant rationale and MsdDesignSpec provenance. |
+| RT-lnRNA variant GenBank metadata | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml` | User-supplied variant comments, Benchling links, and expected RT/lnRNA class. |
+| RT-lnRNA variant GenBank catalog | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml` | Parsed lnRNA and RT slot source authority for 36 Construct-representable variants: 35 whole-plasmid GenBank sources plus the BL21 lnRNA-only source paired with Eco1 WT RT. |
 
 ### GenBank Source Authorities
 
 | Source | Path | Record | Length | Use |
 | --- | --- | --- | ---: | --- |
-| pES retron-26 expression vector | `../pes-retron-26.gb` | `pES-retron-26` | 4956 | Working-anchor vector constants, lnRNA offsets, and RT in vector context. |
-| Dual-cassette 1,600 bp region | `../1600bp-region.gb` | `1600bp-region` | 1600 | Target context authority; maps to pES retron-26 `[56,1656)` in zero-based half-open coordinates. |
-| pES retron-26 a1-a2 | `../pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | Working-anchor lnRNA/a1-a2 subcomponent offsets. |
-| Eco1 WT RT | `../retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | Canonical Eco1 WT RT CDS and translation reference. |
-| pES retron-43 expression vector | `../pes-retron-43.gb` | `pES-retron-43` | 4970 | Failed-anchor vector constants, lnRNA offsets, and RT in vector context. |
-| Retron-179 orientation reference | `../retron-179-a1-a2.gb` | `retron-179-a1-a2` | 178 | Orientation-only left/right base, foldback, and snapback cap geometry reference. |
+| pES retron-26 expression vector | `genbank/pes-retron-26.gb` | `pES-retron-26` | 4956 | Working-anchor vector constants, lnRNA offsets, and RT in vector context. |
+| Dual-cassette 1,600 bp region | `genbank/1600bp-region.gb` | `1600bp-region` | 1600 | Target context authority; maps to pES retron-26 `[56,1656)` in zero-based half-open coordinates. |
+| pES retron-26 a1-a2 | `genbank/pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | Working-anchor lnRNA/a1-a2 subcomponent offsets. |
+| Eco1 WT RT | `genbank/retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | Canonical Eco1 WT RT CDS and translation reference. |
+| pES retron-43 expression vector | `genbank/pes-retron-43.gb` | `pES-retron-43` | 4970 | Failed-anchor vector constants, lnRNA offsets, and RT in vector context. |
+| Retron-179 orientation reference | `genbank/retron-179-a1-a2.gb` | `retron-179-a1-a2` | 178 | Orientation-only left/right base, foldback, and snapback cap geometry reference. |
 
 Parsed offsets and SHA-256 values are pinned in
 `genbank-feature-offset-audit.md`. The machine-readable registry is

@@ -259,6 +259,27 @@ source_overlay_inputs:
       - msr_sequence
       - msd_sequence
     notes: Rows require explicit RT plus lnRNA authority before construct projection.
+construct_candidate_promotion:
+  source_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+  consolidated_construct_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  required_sequence_fields:
+    - candidate__lnrna_sequence
+    - candidate__rt_cds_sequence
+  required_construct_views:
+    - dual_cassette_1600bp_seq_mean
+    - dual_cassette_1600bp_fwd_rc_concat
+    - lnrna_span_in_construct_anchor_mean
+    - lnrna_span_in_construct_reverse_complement_anchor_mean
+    - rt_cds_span_in_construct_anchor_mean
+    - rt_cds_span_in_construct_reverse_complement_anchor_mean
+  requires_explicit_rt_plus_lnrna_authority: true
+  forbid_overlay_only_infer_rows: true
+  notes: >-
+    Khan and Crawford rows may color or ordinally audit latent views only after
+    a resolver promotes them to construct-compatible candidate rows with both
+    lnRNA and RT CDS sequences. Promoted rows must enter the same Construct
+    input dataset, consolidated 1,600 bp Construct output dataset, and six
+    Infer source-view lanes as the retron26/retron43 controls.
 p4_stem_appendix_gate:
   status: blocked_until_candidate_owned_subspan_table
   required_schema: candidate_owned_lnrna_subspan_table_v1

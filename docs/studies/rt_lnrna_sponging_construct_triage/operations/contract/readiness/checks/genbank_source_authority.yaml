@@ -5,8 +5,11 @@ phase: phase_0_contracts
 inputs:
   registry: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
   audit: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
+  variant_metadata: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
+  variant_catalog: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
   tests:
     - repo:src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py
+    - repo:src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
 rules:
   - Parse registered GenBank files through dnadesign.usr.BiopythonGenBankParser.
   - Fail when required labels are missing or ambiguous.
@@ -15,5 +18,7 @@ rules:
   - Require RT CDS sequence and translation identity across retron26 vector, retron43 vector, and standalone Eco1 RT.
   - Require retron26 a1-a2 sequence containment in the full retron26 vector.
   - Require explicit left base, right base, foldback, cap, payload, and payload-complement labels in the retron179 orientation reference.
+  - Require every variant GenBank source to have metadata with source kind, expected RT mode, and preserved user comment; whole-plasmid rows also carry antibiotic marker and available Benchling URL.
+  - Extract lnRNA and RT slot spans from variant GenBanks before Construct promotion; require full biological slots to fit after symmetric prefix/suffix flank adjustment inside the 1,600 bp context.
 validation:
-  command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py
+  command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py

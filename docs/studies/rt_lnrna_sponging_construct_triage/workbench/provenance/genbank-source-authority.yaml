@@ -1,11 +1,11 @@
 registry_id: rt_lnrna_sponging_construct_triage_genbank_source_authority_v1
 study_id: rt_lnrna_sponging_construct_triage
-verified_at: 2026-05-22
+verified_at: 2026-05-24
 parser_surface: dnadesign.usr.BiopythonGenBankParser
 sources:
   - source_id: pes_retron_26_vector
     role: working_anchor_expression_vector
-    path: ../pes-retron-26.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
     authority_for:
       - retron26 working-anchor full plasmid constants
       - retron26 lnRNA cassette offsets in vector context
@@ -31,7 +31,7 @@ sources:
       tet operator: 2
   - source_id: dual_cassette_1600bp_region
     role: dual_cassette_target_context_region
-    path: ../1600bp-region.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/1600bp-region.gb
     authority_for:
       - 1,600 bp dual-cassette target context coordinates
       - region-relative lnRNA and Eco1 WT RT CDS offsets
@@ -57,7 +57,7 @@ sources:
       tet operator: 2
   - source_id: pes_retron_26_lnrna_a1_a2
     role: working_anchor_lnrna_reference
-    path: ../pes-retron-26-a1-a2.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
     authority_for:
       - retron26 lnRNA/a1-a2 subcomponent offsets
       - retron26 tetO payload and complement positioning
@@ -77,7 +77,7 @@ sources:
       tet operator: 2
   - source_id: retron_eco1_rt
     role: eco1_wt_rt_cds_reference
-    path: ../retron-eco1-rt.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb
     authority_for:
       - Eco1 WT RT CDS
       - Eco1 WT RT translation identity
@@ -86,7 +86,7 @@ sources:
       - YXDD motif
   - source_id: pes_retron_43_vector
     role: failed_anchor_expression_vector
-    path: ../pes-retron-43.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-43.gb
     authority_for:
       - retron43 failed-anchor full plasmid constants
       - retron43 lnRNA cassette offsets in vector context
@@ -116,7 +116,7 @@ sources:
       G-T mismatch: 2
   - source_id: retron_179_orientation_reference
     role: snapback_geometry_orientation_reference
-    path: ../retron-179-a1-a2.gb
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-179-a1-a2.gb
     authority_for:
       - explicit left/right base geometry
       - explicit snapback cap and foldback geometry
@@ -151,6 +151,7 @@ subsequence_checks:
   - subject_source_id: pes_retron_26_lnrna_a1_a2
     container_source_id: pes_retron_26_vector
 notes:
+  - GenBank files are study-owned under workbench/provenance/genbank; do not rely on temporary transfer directories.
   - The 1,600 bp region GenBank is the target context authority; it maps to pES retron-26 [56,1656) in zero-based half-open coordinates.
   - The two tet operator features are required as primary plus complement placements.
   - Retron-179 is orientation evidence only; it is not a Phase 1 candidate source.

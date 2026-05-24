@@ -20,6 +20,7 @@ from Bio.Seq import Seq
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization import (
     MaterializationContractError,
     materialize_control_construct_contexts,
+    materialize_variant_construct_contexts,
 )
 from dnadesign.usr import Dataset, load_sequence_views
 
@@ -115,6 +116,41 @@ def test_rt_lnrna_controls_materialize_real_1600bp_construct_context_views(tmp_p
         (view.anchor_start_0, view.anchor_end_0)
         for view in views_by_name["rt_cds_span_in_construct_reverse_complement_anchor_mean"]
     } == {(162, 1125), (169, 1132)}
+
+
+def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_path: Path) -> None:
+    report = materialize_variant_construct_contexts(repo_root=_repo_root(), work_root=tmp_path)
+
+    assert len(report.input_ids_by_candidate_id) == 36
+    output = Dataset(report.usr_root, report.output_dataset).head(n=100)
+    assert output.shape[0] == 72
+
+    candidate_id = "rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO"
+    input_id = report.input_ids_by_candidate_id[candidate_id]
+    forward = output[
+        (output["construct__input_id"] == input_id) & (output["construct__orientation"] == "forward")
+    ].iloc[0]
+    assert len(forward["sequence"]) == 1600
+    assert forward["construct__window_start"] == 159
+    assert {
+        slot["slot_id"]: (slot["start"], slot["end"])
+        for slot in forward["construct__slots"]
+        if slot["slot_id"] in {"lnrna", "rt_cds"}
+    } == {
+        "lnrna": (27, 200),
+        "rt_cds": (365, 1535),
+    }
+
+    views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
+    assert len(views) == 216
+    assert {view.view_name for view in views if view.parent_sequence_id == input_id and view.view_name is not None} == {
+        "dual_cassette_1600bp_seq_mean",
+        "dual_cassette_1600bp_fwd_rc_concat",
+        "lnrna_span_in_construct_anchor_mean",
+        "lnrna_span_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_span_in_construct_anchor_mean",
+        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+    }
 
 
 def test_rt_lnrna_materialization_rejects_swapped_candidate_slot_sequences(tmp_path: Path) -> None:

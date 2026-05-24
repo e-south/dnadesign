@@ -1,19 +1,75 @@
 schema_id: sponging_assay_observation_v1
 study_id: rt_lnrna_sponging_construct_triage
-status: future_label_schema
+status: planned_reader_label_materialization
+label_contract:
+  metric_id: reader_spop_endpoint_auc_v1
+  metric_family: sponging_percent_of_positive
+  score_direction: maximize
+  y_expected_length: 1
+  allowed_as_opal_y: true
+  opal_objective: scalar_identity_v1/scalar
+  source_owner: reader
+  materializer: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan
+  reporter_plasmid_id: pBbS2c-RFP
+  reporter_design_id: pBbS2c-rfp
+  reporter_readout: RFP/OD600
+  positive_control_condition: 200 nm aTc; 0 uM IPTG
+  baseline_condition: 0 nm aTc; 0 uM IPTG
+  iptg_scoring_policy: nonzero_iptg_only
+  default_lambda_viability: 0.5
+  scalar_definition: >-
+    Median endpoint RFP/OD600 is baseline-subtracted and divided by the
+    aTc-positive derepression range for each Reader experiment and candidate.
+    Nonzero IPTG doses are averaged after clipping only for the primary scalar
+    floor at zero; raw dose values remain available for QC. The viability factor
+    is the mean one-sided OD600 ratio relative to zero IPTG and scales potency by
+    ((1 - lambda) + lambda * viability).
 required_fields:
   observation_id: string
-  candidate_id: string
+  assay_subject_key: string
+  proposed_candidate_id: string
+  construct_candidate_id: string_or_null
+  candidate_bridge_status: string
+  reader_design_id: string
+  reader_experiment_id: string
+  reader_artifact_ref: string
+  reader_artifact_record_id: string
+  reader_artifact_content_digest: string
+  metric_id: string
   payload_program_id: string
   assay_id: string
   batch_id: string
   readout_kind: string
+  reporter_plasmid_id: string
+  report_time_h: numeric
+  endpoint_time_h: numeric
+  iptg_doses_uM: numeric_list
   raw_value: numeric
   normalized_value: numeric_or_null
   normalization_basis: string_or_null
   replicate_count: integer_or_null
   uncertainty: numeric_or_struct_or_null
   assay_metadata: mapping
+derived_fields:
+  spop_score_raw: numeric
+  spop_score_calibrated: numeric_or_null
+  spop_potency: numeric
+  spop_viability: numeric
+  y_derepression_by_dose: numeric_list
+  viability_by_dose: numeric_list
+  rfp_over_od600_baseline: numeric
+  rfp_over_od600_positive: numeric
+  qc_flags: string_list
+candidate_bridge_status_values:
+  - resolved_construct_sequence_authority
+  - missing_construct_sequence_authority
+  - unresolved_reader_design_id
+validation_rules:
+  - Reader rows must parse treatment strings into explicit aTc nM and IPTG uM values.
+  - The zero-inducer baseline and aTc positive-control rows are required before scoring.
+  - At least one nonzero IPTG condition is required before emitting a scalar label.
+  - Wider retron variants may receive Reader SPOP labels before Construct promotion, but must carry missing_construct_sequence_authority until explicit RT plus lnRNA authority exists.
+  - OPAL receives this scalar through scalar_identity_v1/scalar; OPAL must not run the draft spop_v1 objective unless a real plugin is implemented.
 validation_notes:
   - This is the only planned source for OPAL TF-sponging Y values.
   - Literature abundance priors must not be converted into this schema.

@@ -747,6 +747,28 @@ plots:
     value_kind: score
     value_label: Metric value
     semantics_ref: plot_semantics/representation_health_summary.yaml
+  representation_scree_diagnostic:
+    kind: curve_grid
+    visibility_tier: appendix
+    reducers:
+      - pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+      - pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
+      - pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+    panel_titles:
+      - Full 1.6 kb intermediate
+      - lnRNA-slot intermediate
+      - RT CDS-slot intermediate
+      - lnRNA plus RT slot-pair intermediate
+      - Full 1.6 kb output layer
+      - lnRNA-slot output layer
+      - RT CDS-slot output layer
+      - lnRNA plus RT slot-pair output layer
+    semantics_ref: plot_semantics/representation_scree_diagnostic.yaml
   rt_lnrna_overlay_ordinal_audit:
     kind: metric_panel_grid
     visibility_tier: primary
@@ -862,6 +884,7 @@ notebooks:
       - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
     ordered_plots:
       - representation_health_summary
+      - representation_scree_diagnostic
       - rt_lnrna_overlay_ordinal_audit
       - appendix_umap_gallery
 recipes:
@@ -1017,6 +1040,18 @@ recipes:
               column: crawford_abundance_ordinal_bin
               order_path: study_inputs/crawford_abundance_order.yaml
       - {id: render_representation_health_summary, op: plot.render, depends_on: [build_representation_health_summary_metrics], params: {plot_id: representation_health_summary}}
+      - id: render_representation_scree_diagnostic
+        op: plot.render
+        depends_on:
+          - reduce_pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - reduce_pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        params: {plot_id: representation_scree_diagnostic}
       - {id: render_rt_lnrna_overlay_ordinal_audit, op: plot.render, depends_on: [build_rt_lnrna_overlay_ordinal_audit_metrics], params: {plot_id: rt_lnrna_overlay_ordinal_audit}}
       - id: render_appendix_umap_gallery
         op: plot.render
@@ -1053,6 +1088,27 @@ deliverables:
     docs_refs: []
     acceptance_checks:
       - {kind: required_plot_kind, value: metric_panel_grid}
+  representation_scree_diagnostic:
+    title: RT-lnRNA representation scree diagnostic
+    section: appendix
+    question: How concentrated is retained PCA variance for each intermediate and output-layer RT-lnRNA view?
+    summary: Appendix scree curves for the PCA reducers that feed the representation-health collapse gate.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+    outputs:
+      plots: [representation_scree_diagnostic]
+    docs_refs: []
+    acceptance_checks:
+      - {kind: required_plot_kind, value: curve_grid}
   rt_lnrna_overlay_ordinal_audit:
     title: RT-lnRNA overlay ordinal audit
     section: primary

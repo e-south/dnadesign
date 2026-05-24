@@ -28,7 +28,8 @@ construct_template:
     window_end_0: 1656
     padding_policy: real_plasmid_sequence_only
     truncation_policy: fail
-    variable_length_policy: symmetric_flank_trim_from_lnrna_center
+    slot_truncation_policy: fail
+    variable_length_policy: symmetric_prefix_suffix_flank_adjustment_to_fixed_1600bp
 slots:
   - slot_id: lnrna
     construct_part_name: lnrna
