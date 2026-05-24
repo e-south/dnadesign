@@ -32,6 +32,9 @@ campaign:
   name: "Demo"
   slug: "demo"
   workdir: "."
+  metadata:
+    scenario_kind: positive
+    split_id: random
 data:
   location: { kind: local, path: "./records.parquet" }
   x_column_name: "X"
@@ -51,6 +54,7 @@ selection:
     cfg = load_config(cfg_path)
     assert len(cfg.objectives.objectives) == 2
     assert cfg.selection.selection.params["score_ref"] == "scalar_identity_v1/scalar"
+    assert cfg.campaign.metadata == {"scenario_kind": "positive", "split_id": "random"}
 
 
 def test_load_config_accepts_sfxi_uncertainty_method(tmp_path: Path) -> None:

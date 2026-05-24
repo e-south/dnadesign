@@ -137,6 +137,7 @@ class PCampaign(BaseModel):
     slug: str
     workdir: str
     description: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("slug")
     @classmethod
@@ -403,6 +404,7 @@ def load_config(path: Path | str) -> RootConfig:
             slug=pyd.campaign.slug,
             workdir=str(resolve_path_like(cfg_path, pyd.campaign.workdir, base_dir=campaign_root)),
             description=(str(pyd.campaign.description).strip() if pyd.campaign.description else None),
+            metadata=dict(pyd.campaign.metadata or {}),
         ),
         data=data_dc,
         model=PluginRef(mdl.name, mdl_params),

@@ -25,9 +25,8 @@ from ..analysis.ledger import load_predictions_with_setpoint, read_runs
 from ..analysis.sfxi.uncertainty import UncertaintyContext, compute_uncertainty, supports_uncertainty
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
-from ..storage.parquet_io import read_parquet_df
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_str, normalize_metric_field, reject_params
+from ._param_utils import get_bool, get_int, get_str, normalize_metric_field, reject_params
 from .sfxi_diag_data import (
     parse_delta_from_runs,
     parse_exponents_from_runs,
@@ -62,6 +61,10 @@ def _coerce_y_ops(value: object) -> list[dict]:
             "kind": "Uncertainty kind (score only).",
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default logic_fidelity).",
+            "sample_n": "Optional deterministic candidate sample size before loading X.",
+            "seed": "Sampling seed used when sample_n is smaller than the candidate count.",
+            "batch_size": "Rows per ensemble prediction batch.",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=["model artifact", "predictions", "records"],
         notes=["Loads artifact model from outputs/rounds/round_<r>/model/model.joblib."],
@@ -75,6 +78,7 @@ def _coerce_y_ops(value: object) -> list[dict]:
             "model does not support uncertainty",
             "missing records X column",
             "invalid X or prediction vectors",
+            "invalid sample_n or seed",
         ],
     ),
 )
@@ -87,13 +91,24 @@ def render(context, params: dict) -> None:
     kind = get_str(params, ["kind"], "score")
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "logic_fidelity"))
+    sample_n = get_int(params, ["sample_n", "sample", "n"], 0)
+    seed = get_int(params, ["seed"], 0)
+    batch_size = get_int(params, ["batch_size"], 2048)
+    title = get_str(params, ["title"], "SFXI score uncertainty")
+    show_meta = get_bool(params, ["show_meta"], False)
     reject_params(
         params,
-        ["sample_n", "sample", "n", "seed", "components", "reduction"],
+        ["components", "reduction"],
         ctx="sfxi_uncertainty",
     )
     if kind != "score":
         raise ValueError("sfxi_uncertainty only supports kind=score.")
+    if sample_n < 0:
+        raise ValueError("sfxi_uncertainty sample_n must be >= 0.")
+    if seed < 0:
+        raise ValueError("sfxi_uncertainty seed must be >= 0.")
+    if batch_size <= 0:
+        raise ValueError("sfxi_uncertainty batch_size must be > 0.")
 
     run_sel = runs_df.filter(pl.col("as_of_round") == int(round_k))
     if run_id is not None and "run_id" in run_sel.columns:
@@ -151,12 +166,20 @@ def render(context, params: dict) -> None:
     )
     if pred_df.is_empty():
         raise OpalError("No predictions available for uncertainty plot.", ExitCodes.BAD_ARGS)
+    total_candidates = int(pred_df.height)
+    sampled = sample_n > 0 and total_candidates > sample_n
+    if sampled:
+        pred_df = pred_df.sample(n=sample_n, seed=seed, shuffle=True)
 
-    records = read_parquet_df(records_path, columns=["id", x_col])
-    rec_df = pl.from_pandas(records)
+    ids = pred_df.get_column("id").cast(pl.Utf8).to_list()
+    rec_df = (
+        pl.scan_parquet(str(records_path)).select(["id", x_col]).filter(pl.col("id").cast(pl.Utf8).is_in(ids)).collect()
+    )
     df_joined = pred_df.join(rec_df, on="id", how="left")
     if x_col not in df_joined.columns:
         raise OpalError(f"records.parquet missing x column: {x_col}", ExitCodes.CONTRACT_VIOLATION)
+    if df_joined.get_column(x_col).null_count() > 0:
+        raise OpalError("records.parquet missing X vectors for sampled prediction ids.", ExitCodes.CONTRACT_VIOLATION)
 
     X = list_series_to_numpy(df_joined.get_column(x_col), expected_len=None)
     if X is None:
@@ -175,7 +198,7 @@ def render(context, params: dict) -> None:
         model,
         X,
         ctx=ctx,
-        batch_size=2048,
+        batch_size=batch_size,
     )
 
     df_plot = df_joined.with_columns(pl.Series("uncertainty", result.values))
@@ -189,8 +212,17 @@ def render(context, params: dict) -> None:
         x_col="uncertainty",
         y_col=y_axis,
         hue_col=hue,
-        subtitle=None,
+        title=str(title),
+        subtitle=(
+            f"Round {round_k}; deterministic sample n={df_plot.height:,} of {total_candidates:,}; seed={seed}"
+            if sampled
+            else f"Round {round_k}; full candidate set n={df_plot.height:,}"
+        ),
+        show_meta=show_meta,
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

@@ -11,6 +11,7 @@ def build_notebook_plot_scope_options(choice: Mapping[str, Any]) -> list[dict[st
     """Return manifest-backed scope choices for a selected visual plot."""
 
     options = sequence(mapping(choice).get("scope_options")) or [choice]
+    control_label = plot_scope_control_label(options)
     rows: list[dict[str, Any]] = []
     for option in options:
         if not isinstance(option, Mapping):
@@ -18,6 +19,7 @@ def build_notebook_plot_scope_options(choice: Mapping[str, Any]) -> list[dict[st
         rows.append(
             {
                 "label": str(option.get("scope_label") or plot_scope_label(option)),
+                "control_label": control_label,
                 "rounds": option.get("rounds"),
                 "run_id": option.get("run_id"),
                 "path": option.get("path"),
@@ -59,7 +61,12 @@ def plot_choice_from_manifest(
     if media_output is None:
         return None
     path = str(media_output.get("path"))
-    title = str(entry.get("title") or manifest.get("title") or display_name(entry.get("name") or manifest.get("name")))
+    title = str(
+        entry.get("title")
+        or manifest.get("title")
+        or mapping(manifest.get("params")).get("title")
+        or display_name(entry.get("name") or manifest.get("name"))
+    )
     warnings = sequence(manifest.get("warnings"))
     tidy_csv = manifest.get("tidy_csv")
     inputs = [
@@ -125,7 +132,7 @@ def plot_scope_sort_key(manifest: Mapping[str, Any]) -> tuple[int, int, str]:
     items = sequence(rounds)
     if len(items) == 1:
         try:
-            return (2, int(items[0]), "")
+            return (2, -int(items[0]), "")
         except Exception:
             return (2, 0, str(items[0]))
     if items:
@@ -156,3 +163,24 @@ def plot_scope_label(value: Mapping[str, Any]) -> str:
     if run_id not in (None, ""):
         label = f"{label}; run {run_id}"
     return label
+
+
+def plot_scope_control_label(values: Iterable[Mapping[str, Any]]) -> str:
+    options = [value for value in values if isinstance(value, Mapping)]
+    if not options:
+        return "Plot scope"
+    if all(_is_single_round_scope(option.get("rounds")) for option in options):
+        has_run_scope = any(option.get("run_id") not in (None, "") for option in options)
+        return "Round/run" if has_run_scope else "Round"
+    return "Plot scope"
+
+
+def _is_single_round_scope(value: Any) -> bool:
+    items = sequence(value)
+    if len(items) != 1:
+        return False
+    try:
+        int(items[0])
+    except Exception:
+        return False
+    return True

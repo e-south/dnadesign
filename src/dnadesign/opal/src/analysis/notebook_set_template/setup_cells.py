@@ -41,6 +41,8 @@ def _import_cell() -> str:
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
+                build_notebook_campaign_set_group_options,
+                build_notebook_campaign_set_metric_comparison_rows,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
                 build_notebook_evidence_rows,
@@ -51,6 +53,7 @@ def _import_cell() -> str:
                 build_notebook_plot_scope_options,
                 build_notebook_visual_surface_model,
                 build_notebook_validity_rows,
+                render_notebook_campaign_set_metric_comparison_image,
                 select_notebook_plot_scope,
             )
             return (
@@ -62,6 +65,8 @@ def _import_cell() -> str:
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
+                build_notebook_campaign_set_group_options,
+                build_notebook_campaign_set_metric_comparison_rows,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
                 build_notebook_evidence_rows,
@@ -75,6 +80,7 @@ def _import_cell() -> str:
                 generated_with,
                 mo,
                 pl,
+                render_notebook_campaign_set_metric_comparison_image,
                 select_notebook_plot_scope,
             )
         """

@@ -14,8 +14,17 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_sizes, scatter_smart
-from .diagnostics_style import diagnostics_figsize
+from ....plots._mpl_utils import (
+    add_flush_colorbar,
+    annotate_plot_meta,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    math_label,
+    pretty_label,
+    scale_to_sizes,
+    scatter_smart,
+)
+from .diagnostics_style import diagnostics_figsize, finalize_single_panel_diagnostics
 
 
 def make_uncertainty_figure(
@@ -32,6 +41,7 @@ def make_uncertainty_figure(
     size_max: float = 80.0,
     rasterize_at: int | None = None,
     cmap: str = "viridis",
+    show_meta: bool = False,
 ):
     if df.is_empty():
         raise ValueError("Uncertainty plot requires non-empty data.")
@@ -58,7 +68,8 @@ def make_uncertainty_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=diagnostics_figsize(), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=diagnostics_figsize())
+    apply_notebook_axes_style(ax, square=True)
     sc = scatter_smart(
         ax,
         x,
@@ -69,21 +80,19 @@ def make_uncertainty_figure(
         cmap=cmap,
         rasterize_at=rasterize_at,
     )
-    ax.set_xlabel(x_col)
-    ax.set_ylabel(y_col)
+    ax.set_xlabel(math_label("score_uncertainty") if x_col == "uncertainty" else pretty_label(x_col))
+    ax.set_ylabel(math_label(y_col))
     if c is not None:
-        cb = fig.colorbar(sc, ax=ax, pad=0.02)
-        cb.set_label(hue_col)
+        cb = add_flush_colorbar(fig, ax, sc, pad=0.045)
+        cb.set_label(math_label(hue_col), labelpad=8)
 
-    annotate_plot_meta(
-        ax,
-        hue=hue_col,
-        size_by=size_col,
-        alpha=alpha,
-        rasterized=bool(rasterize_at),
-    )
-    if subtitle:
-        ax.set_title(f"{title}\n{subtitle}")
-    else:
-        ax.set_title(title)
+    if show_meta:
+        annotate_plot_meta(
+            ax,
+            hue=hue_col,
+            size_by=size_col,
+            alpha=alpha,
+            rasterized=bool(rasterize_at),
+        )
+    finalize_single_panel_diagnostics(fig, title=title, subtitle=subtitle, right=0.75 if c is not None else 0.84)
     return fig

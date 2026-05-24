@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from ...plots._mpl_utils import pretty_title
+
 
 def mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
@@ -29,8 +31,7 @@ def display_name(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
         return "Untitled"
-    words = text.replace("__", " ").replace("_", " ").replace("-", " ").split()
-    return " ".join(word[:1].upper() + word[1:] for word in words) if words else text
+    return pretty_title(text)
 
 
 def compact_path(value: Any, *, base: Any | None = None, max_parts: int = 3) -> str:

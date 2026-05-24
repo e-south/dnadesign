@@ -8,7 +8,6 @@ from ._support import (
     compact_path,
     display_name,
     first_media_output,
-    join_list,
     mapping,
     plot_entries_from_manifests,
     sequence,
@@ -18,7 +17,7 @@ from .plot_scopes import (
     plot_choice_from_manifest,
     sort_plot_scope_manifests,
 )
-from .plot_text import capability_text, compact_params, plot_math_description, rounds_text
+from .plot_text import rounds_text
 
 
 def build_notebook_visual_surface_model(
@@ -103,7 +102,12 @@ def build_notebook_visual_surface_model(
                 )
             )
             continue
-        title = str(entry.get("title") or manifest.get("title") or display_name(name))
+        title = str(
+            entry.get("title")
+            or manifest.get("title")
+            or mapping(manifest.get("params")).get("title")
+            or display_name(name)
+        )
         label = title
         labels_seen[label] = labels_seen.get(label, 0) + 1
         if labels_seen[label] > 1:
@@ -171,7 +175,7 @@ def build_notebook_plot_inventory_rows(visual_surface_model: Mapping[str, Any]) 
                 "plot": item.get("name") or "not recorded",
                 "kind": item.get("kind") or "not recorded",
                 "status": item.get("status") or "unknown",
-                "rounds": item.get("rounds") or "not recorded",
+                "rounds": rounds_text(item.get("rounds")),
                 "objective": item.get("objective_family") or "unknown",
                 "data": item.get("data_layer") or "unspecified",
                 "round behavior": item.get("round_scope") or "unspecified",
@@ -184,102 +188,8 @@ def build_notebook_plot_inventory_rows(visual_surface_model: Mapping[str, Any]) 
     return rows
 
 
-def build_notebook_plot_card_rows(choice: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Build compact evidence rows for the selected plot."""
-
-    entry = mapping(choice.get("entry"))
-    manifest = mapping(choice.get("manifest"))
-    inputs = [
-        item
-        for item in sequence(manifest.get("inputs"))
-        if isinstance(item, Mapping) and (item.get("path") or item.get("role"))
-    ]
-    base = choice.get("workdir") or manifest.get("campaign_workdir") or manifest.get("workdir")
-    return [
-        {"field": "plot", "value": entry.get("name") or manifest.get("name")},
-        {"field": "display", "value": choice.get("title") or display_name(entry.get("name") or manifest.get("name"))},
-        {"field": "kind", "value": entry.get("kind") or manifest.get("kind")},
-        {"field": "status", "value": manifest.get("status")},
-        {"field": "freshness", "value": choice.get("freshness") or "unknown"},
-        {"field": "capability", "value": capability_text(choice.get("capability"))},
-        {"field": "generated", "value": manifest.get("generated_at")},
-        {"field": "run", "value": manifest.get("run_id") or "all runs"},
-        {"field": "rounds", "value": manifest.get("rounds")},
-        {"field": "media", "value": choice.get("path_label") or compact_path(choice.get("path"), base=base)},
-        {"field": "tidy data", "value": choice.get("tidy_label") or compact_path(manifest.get("tidy_csv"), base=base)},
-        {
-            "field": "source data",
-            "value": "; ".join(
-                f"{item.get('role') or 'input'}={compact_path(item.get('path'), base=base)}" for item in inputs[:5]
-            )
-            or "not recorded",
-        },
-        {"field": "warnings", "value": len(sequence(manifest.get("warnings")))},
-    ]
-
-
-def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Build plot interpretation and math/data-contract rows."""
-
-    manifest = mapping(choice.get("manifest"))
-    metadata = mapping(manifest.get("metadata"))
-    capability = mapping(metadata.get("capability")) or mapping(choice.get("capability"))
-    kind = str(choice.get("kind") or manifest.get("kind") or "unknown")
-    return [
-        {
-            "section": "reading",
-            "detail": str(choice.get("caption") or metadata.get("summary") or "No plot description recorded."),
-        },
-        {"section": "capability", "detail": capability_text(capability)},
-        {"section": "data shape", "detail": str(metadata.get("data_shape") or "not recorded")},
-        {"section": "math", "detail": plot_math_description(kind)},
-        {"section": "parameters", "detail": compact_params(manifest.get("params"))},
-        {"section": "tidy schema", "detail": join_list(metadata.get("tidy_schema"), sep=", ")},
-        {"section": "failure modes", "detail": join_list(metadata.get("failure_modes"), sep="; ")},
-    ]
-
-
-def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, str]:
-    """Build readable accordion sections for the selected plot's method."""
-
-    rows = {str(row["section"]): str(row["detail"]) for row in build_notebook_plot_method_rows(choice)}
-    title = str(choice.get("title") or display_name(choice.get("name"))).strip()
-    kind = str(choice.get("kind") or "unknown").replace("_", " ")
-    rounds = rounds_text(choice.get("rounds"))
-    freshness = str(choice.get("freshness") or "unknown")
-    warnings = int(choice.get("warning_count") or 0)
-    return {
-        "Read": (f"{title} shows a {kind} view for {rounds}. {rows.get('reading', 'No plot description recorded.')}"),
-        "Math": rows.get("math", "No math description recorded."),
-        "Data contract": (
-            f"Data shape: {rows.get('data shape', 'not recorded')}.\n\n"
-            f"Capability: {rows.get('capability', 'not recorded')}.\n\n"
-            f"Parameters: {rows.get('parameters', 'not recorded')}.\n\n"
-            f"Tidy schema: {rows.get('tidy schema', 'not recorded')}.\n\n"
-            f"Failure modes: {rows.get('failure modes', 'not recorded')}.\n\n"
-            f"Freshness: `{freshness}`. Warnings: `{warnings}`."
-        ),
-    }
-
-
 def _plot_kind_metadata(kind: str) -> Mapping[str, Any]:
-    try:
-        return describe_plot_kind(kind)
-    except Exception as exc:
-        return {
-            "kind": kind,
-            "summary": None,
-            "capability_error": str(exc),
-            "capability": {
-                "objective_family": "unknown",
-                "data_layer": "unspecified",
-                "round_scope": "single_or_round_history",
-                "label_requirement": "none",
-                "requires_labels": False,
-                "requires_model_artifact": False,
-                "tidy_available": False,
-            },
-        }
+    return describe_plot_kind(kind)
 
 
 def _plot_inventory_entry(

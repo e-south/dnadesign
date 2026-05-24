@@ -5,6 +5,9 @@ campaign:
   slug: "stress_eth_cip_and_rf_sfxi_topn"
   description: "Stress ethanol/ciprofloxacin promoter campaign that prioritizes records predicted to satisfy the joint ethanol-and-ciprofloxacin SFXI response."
   workdir: "."
+  metadata:
+    comparison_group: "AND objective"
+    response_axis: "ethanol_ciprofloxacin"
 
 plot_config: "plots.yaml"
 

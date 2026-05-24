@@ -131,6 +131,7 @@ class CampaignBlock:
     slug: str
     workdir: str
     description: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

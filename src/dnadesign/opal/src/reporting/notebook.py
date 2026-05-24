@@ -115,6 +115,7 @@ def build_notebook_view_model(
             "slug": cfg.campaign.slug,
             "description": cfg.campaign.description,
             "description_source": "config" if str(cfg.campaign.description or "").strip() else "derived",
+            "metadata": dict(getattr(cfg.campaign, "metadata", {}) or {}),
             "workdir": str(ws.workdir),
             "config_path": str(analysis.config_path),
             "records_path": str(analysis.records_store().records_path),

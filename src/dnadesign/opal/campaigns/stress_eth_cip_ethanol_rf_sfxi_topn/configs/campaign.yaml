@@ -5,6 +5,9 @@ campaign:
   slug: "stress_eth_cip_ethanol_rf_sfxi_topn"
   description: "Stress ethanol/ciprofloxacin promoter campaign focused on the ethanol response factor under the SFXI active-learning objective."
   workdir: "."
+  metadata:
+    comparison_group: "Ethanol factor"
+    response_axis: "ethanol"
 
 plot_config: "plots.yaml"
 

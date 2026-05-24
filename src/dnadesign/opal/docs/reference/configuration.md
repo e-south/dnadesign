@@ -11,7 +11,7 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 
 `configs/campaign.yaml` is organized into these top-level blocks:
 
-- `campaign`: `name`, `slug`, `workdir`
+- `campaign`: `name`, `slug`, `workdir`, optional `description`, optional `metadata`
 - `ownership`: optional owner metadata for non-portable study fixtures
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
 - `labels`: optional training-label source contract; defaults to
@@ -62,6 +62,11 @@ If an optional block is omitted, OPAL supplies conservative defaults:
 - `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
   conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true,
   accept_x_mismatch=false, max_x_matrix_gib=8.0
+
+`campaign.metadata` is metadata only; it does not change runtime behavior.
+Generated campaign-set notebooks use scalar metadata values as comparison
+facets, so prefer explicit campaign-agnostic keys such as `comparison_group`,
+`response_axis`, or `scenario_kind` over study-private scratch labels.
 
 `ownership` is metadata only; it does not change runtime behavior. Use it to
 make non-portable checked-in configs explicit, for example:

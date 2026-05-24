@@ -18,11 +18,22 @@ from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, log_kv
+from ._mpl_utils import (
+    apply_notebook_axes_style,
+    apply_plot_style,
+    ensure_mpl_config_dir,
+    log_kv,
+    pretty_label,
+    pretty_title,
+    save_notebook_square_figure,
+    sequential_colormap,
+)
 
 if TYPE_CHECKING:
     import numpy as np
     import pandas as pd
+
+DEFAULT_FEATURE_IMPORTANCE_BARS_FIGSIZE: tuple[float, float] = (14.0, 4.4)
 
 # -----------------------------
 # Helpers (pure, testable)
@@ -163,11 +174,11 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
 @register_plot(
     "feature_importance_bars",
     meta=PlotMeta(
-        summary="Overlayed feature-importance bars across rounds.",
+        summary="Overlaid feature-importance bars across rounds.",
         params={
             "order_policy": "preserve|sort_index (default preserve).",
             "alpha": "Bar transparency (default 0.45).",
-            "figsize_in": "Figure size in inches (default [12, 5]).",
+            "figsize_in": "Figure size in inches (default landscape [14.0, 4.4]).",
         },
         requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
         notes=["Reads per-round outputs, not ledger."],
@@ -190,8 +201,8 @@ def render(context, params: dict) -> None:
     Params (all optional, assertively validated):
       - alpha: float in (0,1], transparency for overlaid bars (default 0.45)
       - bar_width: float (default 0.80)
-      - cmap: str, Matplotlib colormap (default "tab10")
-      - figsize_in: [W, H] inches (default [12, 5])
+      - cmap: str, Matplotlib colormap (default "round_progression")
+      - figsize_in: [W, H] inches (default [14.0, 4.4])
       - xtick_step: int, draw every Nth x tick (default: auto ≤ ~30 ticks)
       - title: str
       - ylabel: str
@@ -201,23 +212,25 @@ def render(context, params: dict) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
 
     # ---- Parameters
     alpha = float(params.get("alpha", 0.45))
     if not (0.0 < alpha <= 1.0):
         raise ValueError("alpha must be in (0, 1].")
 
-    bar_width = float(params.get("bar_width", 0.80))
+    bar_width = float(params.get("bar_width", 1.05))
     if not (0.05 <= bar_width <= 1.5):
         raise ValueError("bar_width must be in [0.05, 1.5].")
 
-    cmap_name = str(params.get("cmap", "tab10"))
-    figsize = tuple(params.get("figsize_in", (12, 5)))
+    cmap_name = str(params.get("cmap", "round_progression"))
+    figsize = tuple(params.get("figsize_in", DEFAULT_FEATURE_IMPORTANCE_BARS_FIGSIZE))
     if len(figsize) != 2:
         raise ValueError("figsize_in must be a 2-element [W, H] list.")
 
-    title = str(params.get("title", "Feature importance (overlay by round)"))
-    ylabel = str(params.get("ylabel", "Importance"))
+    title = pretty_title(params.get("title", "Feature importance by round"))
+    ylabel = str(params.get("ylabel", "rf_feature_importance"))
     xtick_step_cfg = params.get("xtick_step", None)
     xtick_step = int(xtick_step_cfg) if xtick_step_cfg is not None else None
     order_policy = str(params.get("order_policy", "preserve")).strip().lower()
@@ -249,28 +262,22 @@ def render(context, params: dict) -> None:
         Ys.append((r, y))
 
     # ---- Figure
-    plt.rcParams.update(
-        {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 12,
-        }
-    )
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-    ax.grid(axis="y", alpha=0.25, linewidth=0.8)
+    apply_plot_style()
+    fig, ax = plt.subplots(figsize=figsize)
+    apply_notebook_axes_style(ax, square=False)
 
-    cmap = plt.cm.get_cmap(cmap_name, max(1, len(Ys)))
+    cmap = sequential_colormap(cmap_name)
+    denom = max(len(Ys) - 1, 1)
+    round_min = min(r for r, _ in Ys)
+    round_max = max(r for r, _ in Ys)
     for i, (r, y) in enumerate(Ys):
         ax.bar(
             x,
             y,
             width=bar_width,
             alpha=alpha,
-            label=f"r{r}",
-            color=cmap(i),
+            label=f"Round {r}",
+            color=cmap(i / denom),
             edgecolor="none",
             align="center",
         )
@@ -278,7 +285,8 @@ def render(context, params: dict) -> None:
     # ---- Axes, ticks, legend, labels
     if xtick_step is None:
         # Aim for ~30 ticks max by default (assertive, deterministic)
-        xtick_step = max(1, int(np.ceil(n_features / 30)))
+        max_xticks = int(params.get("max_xticks", 18))
+        xtick_step = max(1, int(np.ceil(n_features / max(1, max_xticks))))
     ax.set_xticks(x[::xtick_step])
     ax.set_xticklabels([str(order[i]) for i in range(0, n_features, xtick_step)], rotation=0)
     ax.set_xlim(-0.5, n_features - 0.5)
@@ -286,12 +294,21 @@ def render(context, params: dict) -> None:
         ax.set_ylim(0, ymax * 1.05)
 
     ax.set_xlabel("Feature index")
-    ax.set_ylabel(ylabel)
+    ylabel_text = "RF importance" if ylabel == "rf_feature_importance" else pretty_label(ylabel)
+    ax.set_ylabel(ylabel_text)
     ax.set_title(title)
-
-    lg = ax.legend(title="round", frameon=False, loc="upper right")
-    if lg and lg.get_title():
-        lg.get_title().set_fontsize(11)
+    fig.subplots_adjust(left=0.10, right=0.985, bottom=0.34, top=0.80)
+    sm = ScalarMappable(norm=Normalize(vmin=round_min, vmax=round_max), cmap=cmap)
+    sm.set_array([])
+    fig.canvas.draw()
+    bbox = ax.get_position()
+    cax = fig.add_axes([bbox.x0, max(0.07, bbox.y0 - 0.18), bbox.width, 0.032])
+    cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
+    cbar.set_label("Round")
+    if len(Ys) <= 12:
+        cbar.set_ticks([r for r, _ in Ys])
+    else:
+        cbar.set_ticks([round_min, round_max])
 
     # ---- Log + annotate
     log_kv(
@@ -304,18 +321,10 @@ def render(context, params: dict) -> None:
         features=int(n_features),
         order_policy=order_policy,
     )
-    annotate_plot_meta(
-        ax,
-        hue="round",
-        size_by=None,
-        alpha=alpha,
-        rasterized=False,
-        extras={"rounds": f"{len(target_rounds)}", "bars": "overlay"},
-    )
 
     # ---- Save
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     # Optional tidy export (long form)

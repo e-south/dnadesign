@@ -19,8 +19,18 @@ from ..storage.parquet_io import read_parquet_df
 from ._cohort_utils import selected_mask
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import (
+    DEFAULT_SQUARE_FIGSIZE,
+    add_flush_colorbar,
     annotate_plot_meta,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    categorical_color,
+    categorical_marker,
     ensure_mpl_config_dir,
+    legend_below_single_row,
+    math_label,
+    pretty_label,
+    save_notebook_square_figure,
     scale_to_sizes,
     scatter_smart,
 )
@@ -46,6 +56,7 @@ from .sfxi_reference_overlay import (
             "reference_collection_id": "Optional sfxi_ref collection filter.",
             "reference_metric_id": "Optional sfxi_ref metric filter.",
             "reference_y_axis": "Optional reference y metric when y_axis is not directly supported.",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=[
             "as_of_round",
@@ -75,6 +86,7 @@ def render(context, params: dict) -> None:
     import numpy as np
     import pandas as pd
 
+    apply_plot_style()
     outputs_dir = resolve_outputs_dir(context)
 
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
@@ -112,8 +124,9 @@ def render(context, params: dict) -> None:
                 raise ValueError("Categorical hue requested but no records column provided.")
     # Colormaps: keep 'cmap' for continuous; allow 'hue_cmap' for categoricals (default tab10)
     cmap = get_str(params, ["cmap"], "viridis")
-    hue_cmap = get_str(params, ["hue_cmap"], "tab10")
+    hue_cmap = get_str(params, ["hue_cmap"], "okabe_ito")
     cbar = bool(params.get("cbar", True))  # ignored for categorical hue
+    show_meta = bool(params.get("show_meta", False))
     # Selected-point styling (shape override instead of overlay)
     selected_marker = get_str(params, ["selected_marker"], "*")
     selected_size_scale = get_float(params, ["selected_size_scale"], 1.0)
@@ -211,8 +224,11 @@ def render(context, params: dict) -> None:
 
         # Build palette: if user supplies a partial hue_palette, fill the rest from a discrete cmap deterministically.
         user_palette = params.get("hue_palette") or {}
-        cm = plt.cm.get_cmap(hue_cmap, max(1, len(hue_order)))
-        color_map = {c: cm(i) for i, c in enumerate(hue_order)}
+        if str(hue_cmap).strip().lower().replace("-", "_") in {"okabe_ito", "okabeito", "colorblind", "opal"}:
+            color_map = {c: categorical_color(i) for i, c in enumerate(hue_order)}
+        else:
+            cm = plt.cm.get_cmap(hue_cmap, max(1, len(hue_order)))
+            color_map = {c: cm(i) for i, c in enumerate(hue_order)}
         # Ensure '(missing)' is readable, unless explicitly overridden by user
         if "(missing)" in hue_order and "(missing)" not in user_palette:
             color_map["(missing)"] = (0.6, 0.6, 0.6, 1.0)
@@ -228,8 +244,6 @@ def render(context, params: dict) -> None:
                 "fold_change_vs_logic_fidelity: category-to-color mapping incomplete. "
                 f"Missing colors for: {missing_cats}. Check hue_order / hue_palette."
             )
-        # Numpy object array plays well with boolean masks later
-        colors_all = np.array(mapped.tolist(), dtype=object)
 
     # Split logic (0:4) and intensity (4:8)
     def _split(a):
@@ -266,37 +280,27 @@ def render(context, params: dict) -> None:
         if "obj__effect_raw" not in df.columns:
             raise ValueError("Requested y_axis=effect_raw but obj__effect_raw is missing.")
         y_plot = df["obj__effect_raw"].astype(float).to_numpy()
-        y_field_label = "Objective effect (raw)"
+        y_field_label = math_label("effect_raw")
         y_title_short = "Effect (raw)"
         tidy_col = "obj__effect_raw"
     elif _ya in ("effect_scaled", "obj__effect_scaled"):
         if "obj__effect_scaled" not in df.columns:
             raise ValueError("Requested y_axis=effect_scaled but obj__effect_scaled is missing.")
         y_plot = df["obj__effect_scaled"].astype(float).to_numpy()
-        y_field_label = "Objective effect (scaled)"
+        y_field_label = math_label("effect_scaled")
         y_title_short = "Effect (scaled)"
         tidy_col = "obj__effect_scaled"
     elif _ya in ("score", "pred__score_selected"):
         y_plot = df["pred__score_selected"].astype(float).to_numpy()
-        y_field_label = "Objective score"
+        y_field_label = math_label("objective_score")
         y_title_short = "Score"
         tidy_col = "pred__score_selected"
     else:
         raise ValueError(f"Unknown y_axis: {y_axis!r}")
 
-    # Simple in-house styling (no seaborn dependency)
-    plt.rcParams.update(
-        {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 14,
-            "ytick.labelsize": 14,
-        }
-    )
-    figsize = tuple(params.get("figsize_in", (7.8, 5.2)))
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
+    figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
+    fig, ax = plt.subplots(figsize=figsize)
+    apply_notebook_axes_style(ax, square=True)
 
     # Point sizes (optional) — can use derived series
     if size_by is None:
@@ -340,56 +344,90 @@ def render(context, params: dict) -> None:
     )
     not_sel = ~sel_mask
 
-    # Draw NON-selected first (base layer)
-    base_sizes = sizes if np.isscalar(sizes) else (sizes[not_sel])
-    base_color_kw = {}
     if hue_is_categorical:
-        base_color_kw = {"c": colors_all[not_sel]}
-    elif hue_vals_all is not None:
-        base_color_kw = {"c": hue_vals_all[not_sel], "cmap": cmap}
-        if vmin is not None and vmax is not None:
-            base_color_kw.update({"vmin": vmin, "vmax": vmax})
-    scatter_smart(
-        ax,
-        lf[not_sel],
-        y_plot[not_sel],
-        s=base_sizes,
-        alpha=alpha,
-        rasterize_at=rasterize_at,
-        **base_color_kw,
-    )
+        cat_values = cat_series.to_numpy(dtype=object)
+        for cat_index, category in enumerate(hue_order):
+            mask = not_sel & (cat_values == category)
+            if not np.any(mask):
+                continue
+            scatter_smart(
+                ax,
+                lf[mask],
+                y_plot[mask],
+                s=(sizes if np.isscalar(sizes) else sizes[mask]),
+                alpha=alpha,
+                marker=categorical_marker(cat_index),
+                c=color_map[category],
+                rasterize_at=rasterize_at,
+            )
+    else:
+        # Draw NON-selected first (base layer)
+        base_sizes = sizes if np.isscalar(sizes) else (sizes[not_sel])
+        base_color_kw = {}
+        if hue_vals_all is not None:
+            base_color_kw = {"c": hue_vals_all[not_sel], "cmap": cmap}
+            if vmin is not None and vmax is not None:
+                base_color_kw.update({"vmin": vmin, "vmax": vmax})
+        scatter_smart(
+            ax,
+            lf[not_sel],
+            y_plot[not_sel],
+            s=base_sizes,
+            alpha=alpha,
+            rasterize_at=rasterize_at,
+            **base_color_kw,
+        )
 
     # Draw SELECTED as a different marker (override, not overlay)
     if sel_mask.any():
         sel_sizes = sizes if np.isscalar(sizes) else (sizes[sel_mask] * float(selected_size_scale))
-        sel_color_kw = {}
         if hue_is_categorical:
-            sel_color_kw = {"c": colors_all[sel_mask]}
-        elif hue_vals_all is not None:
-            sel_color_kw = {"c": hue_vals_all[sel_mask], "cmap": cmap}
-            if vmin is not None and vmax is not None:
-                sel_color_kw.update({"vmin": vmin, "vmax": vmax})
-        scatter_smart(
-            ax,
-            lf[sel_mask],
-            y_plot[sel_mask],
-            s=sel_sizes,
-            alpha=selected_alpha,
-            marker=selected_marker,
-            edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
-            linewidths=0.6 if selected_edgecolor else 0.0,
-            rasterize_at=rasterize_at,
-            **sel_color_kw,
-        )
+            cat_values = cat_series.to_numpy(dtype=object)
+            for cat_index, category in enumerate(hue_order):
+                mask = sel_mask & (cat_values == category)
+                if not np.any(mask):
+                    continue
+                scatter_smart(
+                    ax,
+                    lf[mask],
+                    y_plot[mask],
+                    s=(sel_sizes if np.isscalar(sel_sizes) else sel_sizes[cat_values[sel_mask] == category]),
+                    alpha=selected_alpha,
+                    marker=categorical_marker(cat_index),
+                    c=color_map[category],
+                    edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
+                    linewidths=0.8 if selected_edgecolor else 0.0,
+                    rasterize_at=rasterize_at,
+                )
+        else:
+            sel_color_kw = {}
+            if hue_vals_all is not None:
+                sel_color_kw = {"c": hue_vals_all[sel_mask], "cmap": cmap}
+                if vmin is not None and vmax is not None:
+                    sel_color_kw.update({"vmin": vmin, "vmax": vmax})
+            scatter_smart(
+                ax,
+                lf[sel_mask],
+                y_plot[sel_mask],
+                s=sel_sizes,
+                alpha=selected_alpha,
+                marker=selected_marker,
+                edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
+                linewidths=0.6 if selected_edgecolor else 0.0,
+                rasterize_at=rasterize_at,
+                **sel_color_kw,
+            )
 
     # Dedicated colorbar (continuous hue only)
+    continuous_colorbar_drawn = False
     if (not hue_is_categorical) and (hue_vals_all is not None) and cbar and (vmin is not None) and (vmax is not None):
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
+        fig.subplots_adjust(left=0.13, right=0.76, bottom=0.13, top=0.88)
         mappable = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
-        cb = fig.colorbar(mappable, ax=ax)
-        cb.set_label(hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", ""))
+        add_flush_colorbar(fig, ax, mappable, label=math_label(hue_field), pad=0.055)
+        continuous_colorbar_drawn = True
 
     # Legend for categorical hue
     if hue_is_categorical:
@@ -400,21 +438,23 @@ def render(context, params: dict) -> None:
                 [],
                 [],
                 marker="o",
+                markerfacecolor=color_map[c],
+                markeredgecolor="#202020",
                 linestyle="None",
-                color=color_map[c],
+                color="none",
                 label=c,
-                markersize=6,
+                markersize=7,
             )
             for c in hue_order
         ]
-        lg = ax.legend(handles=handles, title=cat_hue_col, frameon=False, loc="best")
-        if lg and lg.get_title():
-            lg.get_title().set_fontsize(11)
+        for i, handle in enumerate(handles):
+            handle.set_marker(categorical_marker(i))
+        legend_below_single_row(fig, ax, handles=handles, labels=[pretty_label(c) for c in hue_order])
 
     # Axes, labels, and enforced x-limits for logic fidelity
-    ax.set_xlabel("Logic fidelity (0-1)")
+    ax.set_xlabel(math_label("logic_fidelity"))
     ax.set_ylabel(y_field_label)
-    ax.set_title(f"Trade-off: {y_title_short} vs Logic Fidelity")
+    ax.set_title(str(params.get("title") or f"{y_title_short} vs logic fidelity"))
     if force_xlim_01:
         ax.set_xlim(0.0, 1.0)
         if xticks_n and xticks_n >= 2:
@@ -457,7 +497,8 @@ def render(context, params: dict) -> None:
                     fontsize=7,
                     alpha=0.85,
                 )
-        ax.legend(frameon=False, loc="best")
+        if not hue_is_categorical:
+            ax.legend(frameon=False, loc="upper right")
         context.logger.info(
             "[fold_change_vs_logic] reference_overlay rows=%d y=%s",
             reference_count,
@@ -478,23 +519,26 @@ def render(context, params: dict) -> None:
         points=int(lf.size),
         reference_points=int(reference_count),
     )
-    annotate_plot_meta(
-        ax,
-        hue=(f"records.{cat_hue_col}" if hue_is_categorical else hue_field),
-        size_by=size_by,
-        alpha=alpha,
-        rasterized=rasterized,
-        extras={
-            "delta": f"{delta:.3g}",
-            "selected_marker": selected_marker,
-            "selected_n": int(sel_mask.sum()),
-            "reference_n": int(reference_count),
-            "xlim": "[0,1]" if force_xlim_01 else "auto",
-        },
-    )
+    if show_meta:
+        annotate_plot_meta(
+            ax,
+            hue=(f"records.{cat_hue_col}" if hue_is_categorical else hue_field),
+            size_by=size_by,
+            alpha=alpha,
+            rasterized=rasterized,
+            extras={
+                "delta": f"{delta:.3g}",
+                "selected_marker": selected_marker,
+                "selected_n": int(sel_mask.sum()),
+                "reference_n": int(reference_count),
+                "xlim": "[0,1]" if force_xlim_01 else "auto",
+            },
+        )
 
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    if not hue_is_categorical and not continuous_colorbar_drawn:
+        fig.subplots_adjust(left=0.13, right=0.88, bottom=0.13, top=0.88)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:

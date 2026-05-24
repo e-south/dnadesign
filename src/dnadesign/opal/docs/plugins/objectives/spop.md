@@ -5,7 +5,13 @@
 
 
 This page documents the draft `spop` objective design and its proposed scoring equations.
-Status: draft objective note; it may not correspond to a built-in registered plugin yet.
+Status: historical draft objective note; it is not a registered OPAL runtime
+objective for the RT-lnRNA sponging construct triage study.
+
+The current pragmatic RT-lnRNA study path is study-owned Reader label
+materialization to `reader_spop_endpoint_auc_v1`, then OPAL
+`scalar_identity_v1/scalar`. Do not route that study through OPAL `spop_v1`
+unless a real OPAL objective plugin is implemented and registered.
 
 ---
 

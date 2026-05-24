@@ -102,10 +102,11 @@ def render_visual_surface_cells() -> str:
                 plot_scope_options_by_plot[plot_choice["label"]] = _scope_options
                 if len(_scope_options) > 1:
                     _scope_labels = [option["label"] for option in _scope_options]
+                    _scope_control_label = str(_scope_options[0].get("control_label") or "Plot scope")
                     plot_scope_controls[plot_choice["label"]] = mo.ui.dropdown(
                         _scope_labels,
                         value=_scope_labels[0],
-                        label="Plot scope",
+                        label=_scope_control_label,
                     )
             return plot_scope_controls, plot_scope_options_by_plot
 

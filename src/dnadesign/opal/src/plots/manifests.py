@@ -139,6 +139,24 @@ def write_plot_manifest(manifest: Mapping[str, Any]) -> Path:
     return manifest_path
 
 
+def refresh_plot_manifest_freshness(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    refreshed = dict(manifest)
+    inputs = [
+        _file_entry(entry["path"], role=str(entry.get("role") or "input"))
+        for entry in manifest.get("inputs") or []
+        if isinstance(entry, Mapping) and entry.get("path")
+    ]
+    outputs = [
+        _file_entry(entry["path"], role=str(entry.get("role") or "output"))
+        for entry in manifest.get("outputs") or []
+        if isinstance(entry, Mapping) and entry.get("path")
+    ]
+    refreshed["inputs"] = inputs
+    refreshed["outputs"] = outputs
+    refreshed["freshness"] = _freshness_entry(inputs=inputs, outputs=outputs)
+    return refreshed
+
+
 def write_plot_manifest_index(output_dir: Path, manifests: Iterable[Mapping[str, Any]]) -> Path:
     rows = [dict(row) for row in manifests]
     index = {

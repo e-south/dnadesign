@@ -18,7 +18,18 @@ import pandas as pd
 from ..registries.plots import PlotMeta, register_plot
 from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
+from ._mpl_utils import (
+    DEFAULT_SQUARE_FIGSIZE,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    categorical_color,
+    categorical_style,
+    ensure_mpl_config_dir,
+    legend_below_single_row,
+    pretty_label,
+    pretty_title,
+    save_notebook_square_figure,
+)
 from ._param_utils import get_str, normalize_metric_field
 from ._round_overlay import add_round_vline, resolve_highlight_round
 
@@ -32,6 +43,8 @@ from ._round_overlay import add_round_vline, resolve_highlight_round
             "cohort": "Cohort or list of cohorts: selected, top_k, all_pool (default selected).",
             "top_k": "Rank cutoff for top_k cohort (default 10).",
             "summaries": "Summary or list: mean, median, count, q10, q25, q75, q90.",
+            "band": "Optional uncertainty band for matching summaries: none|iqr (default none).",
+            "band_alpha": "Transparency for band='iqr' (default 0.18).",
             "threshold": "Optional horizontal threshold/reference line.",
             "highlight_round": "Optional round overlay marker: latest, true, false, or an integer.",
         },
@@ -66,7 +79,16 @@ def render(context, params: dict) -> None:
     bad = sorted(set(cohorts) - allowed)
     if bad:
         raise ValueError(f"Unknown cohort(s) for metric_over_rounds: {bad}. Allowed: {sorted(allowed)}")
-    summaries = _list_param(params.get("summaries", params.get("summary", ["mean", "median"])))
+    summary_param = params.get("summaries", params.get("summary", ["mean", "median"]))
+    summaries = [summary.lower() for summary in _list_param(summary_param)]
+    band = _band_param(params.get("band", params.get("interval", "none")))
+    band_alpha = float(params.get("band_alpha", 0.18))
+    if not (0.0 <= band_alpha <= 1.0):
+        raise ValueError("band_alpha must be between 0 and 1.")
+    if band == "iqr":
+        for summary in ("q25", "q75"):
+            if summary not in summaries:
+                summaries.append(summary)
     top_k = int(params.get("top_k", 10))
     if top_k <= 0:
         raise ValueError("top_k must be positive.")
@@ -104,19 +126,57 @@ def render(context, params: dict) -> None:
                 )
     tidy = pd.DataFrame(rows).sort_values(["cohort", "summary", "round"]).reset_index(drop=True)
 
-    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
+    figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
     fig, ax = plt.subplots(figsize=figsize)
-    apply_notebook_axes_style(ax)
-    plotted_series = 0
+    apply_notebook_axes_style(ax, square=True)
     highlight_round = resolve_highlight_round(
         params.get("highlight_round", params.get("overlay_round")),
         tidy["round"].unique().tolist(),
     )
+    if band == "iqr":
+        cohort_order = {cohort: index for index, cohort in enumerate(sorted(tidy["cohort"].unique()))}
+        for cohort, cohort_tidy in tidy.groupby("cohort"):
+            low = cohort_tidy[cohort_tidy["summary"] == "q25"].sort_values("round")
+            high = cohort_tidy[cohort_tidy["summary"] == "q75"].sort_values("round")
+            if low.empty or high.empty:
+                continue
+            band_df = low[["round", "value"]].merge(
+                high[["round", "value"]],
+                on="round",
+                suffixes=("_low", "_high"),
+            )
+            if band_df.empty:
+                continue
+            ax.fill_between(
+                band_df["round"].to_numpy(dtype=float),
+                band_df["value_low"].to_numpy(dtype=float),
+                band_df["value_high"].to_numpy(dtype=float),
+                alpha=band_alpha,
+                color=categorical_color(cohort_order[str(cohort)]),
+                linewidth=0,
+                label=f"{pretty_label(cohort)} IQR",
+                zorder=1,
+            )
+    line_index = 0
     for (cohort, summary), sub in tidy.groupby(["cohort", "summary"]):
         if summary == "count" and len(set(summaries)) > 1:
             continue
-        label = f"{cohort}:{summary}"
-        line = ax.plot(sub["round"], sub["value"], marker="o", linewidth=1.8, label=label)[0]
+        if band == "iqr" and summary in {"q25", "q75"}:
+            continue
+        style = categorical_style(line_index)
+        label = f"{pretty_label(cohort)} {pretty_label(summary)}"
+        line = ax.plot(
+            sub["round"],
+            sub["value"],
+            marker=style["marker"],
+            color=style["color"],
+            linestyle=style["linestyle"],
+            linewidth=2.2,
+            markersize=6,
+            label=label,
+            zorder=3,
+        )[0]
+        line_index += 1
         if highlight_round is not None:
             hi = sub[sub["round"] == int(highlight_round)]
             if not hi.empty:
@@ -127,10 +187,9 @@ def render(context, params: dict) -> None:
                     marker="o",
                     facecolors="none",
                     edgecolors=line.get_color(),
-                    linewidths=1.6,
+                    linewidths=1.8,
                     zorder=5,
                 )
-        plotted_series += 1
     threshold = params.get("threshold", params.get("reference_line"))
     if threshold is not None:
         ax.axhline(float(threshold), color="#444444", linestyle="--", linewidth=1.0, alpha=0.8)
@@ -138,17 +197,16 @@ def render(context, params: dict) -> None:
         add_round_vline(ax, int(highlight_round))
     ax.set_xlabel("Round")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.set_ylabel(metric)
-    ax.set_title(str(params.get("title", "Metric over rounds")))
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        ncol = min(3, max(1, int(np.ceil(plotted_series / 4))))
-        fig.legend(handles, labels, loc="lower center", ncol=ncol, frameon=False, fontsize=8)
-        fig.tight_layout(rect=(0, 0.18, 1, 1))
-    else:
-        fig.tight_layout()
+    ax.set_ylabel(pretty_label(metric))
+    title = pretty_title(params.get("title", f"{pretty_label(metric)} over rounds"))
+    count_text = _cohort_count_text(tidy)
+    if count_text:
+        title = f"{title}\n{count_text}"
+    ax.set_title(title)
+    if not legend_below_single_row(fig, ax):
+        fig.tight_layout(pad=0.35)
     out = context.output_dir / context.filename
-    save_notebook_square_figure(fig, out, dpi=context.dpi)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:
@@ -161,6 +219,15 @@ def _list_param(value: object) -> list[str]:
     if isinstance(value, Iterable):
         return [str(item).strip() for item in value if str(item).strip()]
     return [str(value).strip()]
+
+
+def _band_param(value: object) -> str:
+    band = str(value or "none").strip().lower()
+    if band in {"", "none", "false", "off"}:
+        return "none"
+    if band in {"iqr", "quartile", "quartiles"}:
+        return "iqr"
+    raise ValueError("band must be one of: none, iqr.")
 
 
 def _cohort_frame(df, *, cohort: str, top_k: int):
@@ -188,3 +255,17 @@ def _summary_value(values, summary: str) -> float:
     if summary.startswith("q"):
         return float(values.quantile(float(summary.removeprefix("q")) / 100.0))
     raise ValueError(f"Unknown summary for metric_over_rounds: {summary}")
+
+
+def _cohort_count_text(tidy: pd.DataFrame) -> str:
+    counts = tidy.loc[tidy["summary"] == "count", "value"]
+    if counts.empty:
+        return ""
+    values = sorted({int(round(float(value))) for value in counts.tolist()})
+    if not values:
+        return ""
+    cohorts = sorted(set(tidy.loc[tidy["summary"] == "count", "cohort"].astype(str)))
+    cohort_text = pretty_label(cohorts[0]) if len(cohorts) == 1 else "Cohort"
+    if len(values) == 1:
+        return f"{cohort_text} n={values[0]} per round"
+    return f"{cohort_text} n={values[0]}-{values[-1]} per round"

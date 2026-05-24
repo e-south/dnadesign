@@ -22,7 +22,7 @@ from ..analysis.sfxi.support import dist_to_labeled_logic
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_int, get_str, normalize_metric_field, reject_params
+from ._param_utils import get_bool, get_int, get_str, normalize_metric_field, reject_params
 from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
 
 
@@ -34,6 +34,7 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default effect_scaled).",
             "batch_size": "Batch size for distance computation (default 2048).",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=["pred__y_hat_model", "pred__score_selected"],
         notes=["Uses labels-as-of round for support distances."],
@@ -59,6 +60,8 @@ def render(context, params: dict) -> None:
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "effect_scaled"))
     batch_size = get_int(params, ["batch_size"], 2048)
+    title = get_str(params, ["title"], "SFXI support diagnostics")
+    show_meta = get_bool(params, ["show_meta"], False)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
     need = {"id", "pred__y_hat_model", "pred__score_selected"}
@@ -111,8 +114,13 @@ def render(context, params: dict) -> None:
         x_col="dist_to_labeled_logic",
         y_col=y_axis,
         hue_col=hue,
-        subtitle=None,
+        title=str(title),
+        subtitle=f"Round {round_k}; nearest-neighbor distance computed against {labels_vec.shape[0]} observed labels",
+        show_meta=show_meta,
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

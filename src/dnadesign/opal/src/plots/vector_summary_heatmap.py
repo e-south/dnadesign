@@ -19,7 +19,17 @@ import numpy as np
 from ..registries.plots import PlotMeta, register_plot
 from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
+from ._mpl_utils import (
+    DEFAULT_SQUARE_FIGSIZE,
+    add_flush_colorbar,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    ensure_mpl_config_dir,
+    pretty_label,
+    pretty_title,
+    save_notebook_square_figure,
+    sequential_colormap,
+)
 
 
 @register_plot(
@@ -35,11 +45,14 @@ from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_
             "reference_label": "Optional y-axis label for the reference row.",
             "channel_labels": "Optional channel labels, same length as the vector.",
             "aggregation": "Currently mean.",
+            "reference_mse_panel": "When a reference vector is present, add a round-wise MSE panel (default false).",
+            "cmap": "Matplotlib colormap (default opal_seafoam: low values white, high values dark seafoam).",
+            "value_label": "Colorbar label (default Mean predicted response for prediction vectors).",
         },
         requires=["as_of_round", "run_id", "pred__y_hat_model"],
         notes=["SFXI can configure semantic channel labels, but the primitive is vector-shaped."],
-        data_shape="vector over rounds",
-        tidy_schema=["row_type", "round", "cohort", "channel", "value"],
+        data_shape="vector over rounds plus optional reference-distance series",
+        tidy_schema=["row_type", "round", "cohort", "channel", "value", "n"],
         objective_family="generic",
         data_layer="predictions_vector",
         round_scope="round_history",
@@ -75,6 +88,7 @@ def render(context, params: dict) -> None:
             params.get("include_target_vector", params.get("include_setpoint", False)),
         )
     )
+    show_reference_mse = bool(params.get("reference_mse_panel", False))
 
     need = {"as_of_round", "run_id", vector_field}
     if cohort == "selected":
@@ -112,6 +126,7 @@ def render(context, params: dict) -> None:
     rows = []
     matrix_rows = []
     y_labels = []
+    reference = None
     if include_reference:
         if explicit_reference is not None:
             reference = _coerce_vector(explicit_reference, field="params.reference_vector")
@@ -137,9 +152,11 @@ def render(context, params: dict) -> None:
                     "cohort": reference_label,
                     "channel": channel,
                     "value": value,
+                    "n": None,
                 }
             )
 
+    mse_rows = []
     for round_index, sub in df.groupby("as_of_round"):
         arr = np.asarray(sub["__vector__"].to_list(), dtype=float)
         if arr.ndim != 2 or arr.shape[1] != dim:
@@ -147,8 +164,21 @@ def render(context, params: dict) -> None:
         if not np.isfinite(arr).all():
             raise ValueError(f"round {round_index} contains non-finite vector values.")
         summary = arr.mean(axis=0)
+        n_selected = int(arr.shape[0])
         matrix_rows.append(summary.tolist())
-        y_labels.append(f"r{int(round_index)}:{cohort}")
+        y_labels.append(_round_row_label(int(round_index), cohort=cohort, n=n_selected))
+        if reference is not None:
+            ref_arr = np.asarray(reference, dtype=float)
+            mse_rows.append(
+                {
+                    "row_type": "reference_mse",
+                    "round": int(round_index),
+                    "cohort": cohort,
+                    "channel": "mse",
+                    "value": float(np.mean((summary - ref_arr) ** 2)),
+                    "n": n_selected,
+                }
+            )
         for channel, value in zip(channel_labels, summary.tolist()):
             rows.append(
                 {
@@ -157,27 +187,88 @@ def render(context, params: dict) -> None:
                     "cohort": cohort,
                     "channel": channel,
                     "value": float(value),
+                    "n": n_selected,
                 }
             )
 
     matrix = np.asarray(matrix_rows, dtype=float)
-    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
-    fig, ax = plt.subplots(figsize=figsize)
-    im = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap=str(params.get("cmap", "viridis")))
-    apply_notebook_axes_style(ax)
-    ax.set_xticks(range(dim))
+    if show_reference_mse and reference is not None:
+        figsize = tuple(params.get("figsize_in", (11.6, 6.4)))
+        fig = plt.figure(figsize=figsize)
+        gs = fig.add_gridspec(1, 3, width_ratios=[1.12, 0.035, 1.06], wspace=0.34)
+        ax = fig.add_subplot(gs[0, 0])
+        cax = fig.add_subplot(gs[0, 1])
+        ax_mse = fig.add_subplot(gs[0, 2])
+    else:
+        figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
+        fig, ax = plt.subplots(figsize=figsize)
+        cax = None
+        ax_mse = None
+    cmap = sequential_colormap(params.get("cmap", "opal_seafoam"))
+    masked_matrix = np.ma.masked_invalid(matrix)
+    x_edges = np.arange(dim + 1)
+    y_edges = np.arange(len(y_labels) + 1)
+    im = ax.pcolormesh(
+        x_edges,
+        y_edges,
+        masked_matrix,
+        cmap=cmap,
+        edgecolors="white",
+        linewidth=0.75,
+        shading="flat",
+    )
+    ax.set_xlim(0, dim)
+    ax.set_ylim(len(y_labels), 0)
+    ax.set_aspect("equal", adjustable="box")
+    apply_notebook_axes_style(ax, grid=False, square=False)
+    ax.set_xticks(np.arange(dim) + 0.5)
     ax.set_xticklabels(channel_labels, rotation=45, ha="right")
-    ax.set_yticks(range(len(y_labels)))
+    ax.set_yticks(np.arange(len(y_labels)) + 0.5)
     ax.set_yticklabels(y_labels)
     ax.set_xlabel("Vector channel")
-    ax.set_title(str(params.get("title", "Vector summary heatmap")))
-    fig.colorbar(im, ax=ax, label=aggregation)
-    fig.tight_layout()
+    ax.set_title(pretty_title(params.get("title", "Vector summary heatmap")))
+    value_label = str(params.get("value_label", f"{pretty_label(aggregation)} predicted response"))
+    if cax is None:
+        add_flush_colorbar(fig, ax, im, label=value_label)
+    else:
+        fig.subplots_adjust(left=0.12, right=0.965, bottom=0.23, top=0.84, wspace=0.34)
+        fig.canvas.draw()
+        heatmap_box = ax.get_position()
+        cbar_width = max(0.014, heatmap_box.width * 0.035)
+        cbar_pad = 0.012
+        cax.set_position([heatmap_box.x1 + cbar_pad, heatmap_box.y0, cbar_width, heatmap_box.height])
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label(_short_colorbar_title(value_label), rotation=90, labelpad=8, va="center")
+        cbar.ax.yaxis.set_label_position("right")
+    if ax_mse is not None:
+        apply_notebook_axes_style(ax_mse, square=False)
+        mse_frame = pd.DataFrame(mse_rows).sort_values("round")
+        ax_mse.plot(
+            mse_frame["round"].astype(int),
+            mse_frame["value"].astype(float),
+            color="#005F56",
+            marker="o",
+            linewidth=2.2,
+            markersize=6,
+        )
+        ax_mse.set_xlabel("Round")
+        ax_mse.set_ylabel("MSE to target")
+        ax_mse.set_title("MSE to target")
+        ax_mse.set_xticks(mse_frame["round"].astype(int).tolist())
+        try:
+            ax_mse.set_box_aspect(len(y_labels) / max(dim, 1))
+        except Exception:
+            pass
+    left_margin = 0.13 if ax_mse is not None else 0.18
+    if ax_mse is None:
+        fig.subplots_adjust(left=left_margin, right=0.96, bottom=0.22, top=0.86)
     out = context.output_dir / context.filename
-    save_notebook_square_figure(fig, out, dpi=context.dpi)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:
+        if mse_rows:
+            rows.extend(mse_rows)
         context.save_df(pd.DataFrame(rows))
 
 
@@ -193,6 +284,20 @@ def _cohort_frame(df, *, cohort: str, top_k: int):
             raise ValueError("top_k cohort requires sel__rank_competition.")
         return df[positive_ranks(df["sel__rank_competition"]) <= int(top_k)].copy()
     raise ValueError(f"Unknown cohort: {cohort}")
+
+
+def _round_row_label(round_index: int, *, cohort: str, n: int) -> str:
+    cohort_label = pretty_label(cohort)
+    if str(cohort).strip().lower() == "selected":
+        return f"R{int(round_index)} (n={int(n)})"
+    return f"R{int(round_index)}: {cohort_label} (n={int(n)})"
+
+
+def _short_colorbar_title(label: str) -> str:
+    text = str(label or "").strip()
+    if not text:
+        return ""
+    return text.replace("predicted ", "").replace("Predicted ", "")
 
 
 def _coerce_vector(value: object, *, field: str) -> list[float]:

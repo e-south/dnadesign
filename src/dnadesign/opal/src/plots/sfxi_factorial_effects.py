@@ -30,6 +30,7 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
             "size_by": "Column for point size (default obj__effect_scaled).",
             "include_labels": "Overlay labeled records (default true).",
             "rasterize_at": "Rasterize scatter above this count (default None).",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=["pred__y_hat_model"],
         notes=["Reads outputs/ledger/predictions and labels.parquet (optional) for overlays."],
@@ -54,6 +55,8 @@ def render(context, params: dict) -> None:
 
     size_by = get_str(params, ["size_by", "size", "size_field"], "obj__effect_scaled")
     include_labels = get_bool(params, ["include_labels", "labels"], True)
+    title = get_str(params, ["title"], "SFXI factorial effects map")
+    show_meta = get_bool(params, ["show_meta"], False)
     rasterize_at = params.get("rasterize_at", None)
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
@@ -91,10 +94,15 @@ def render(context, params: dict) -> None:
         logic_col="pred__y_hat_model",
         size_col=size_by,
         label_col="__is_labeled",
-        subtitle=None,
+        title=str(title),
+        subtitle=f"Round {round_k}; labeled overlay uses labels observed as of this round",
         rasterize_at=rasterize_at,
+        show_meta=show_meta,
     )
 
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

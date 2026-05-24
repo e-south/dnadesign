@@ -13,25 +13,39 @@ from __future__ import annotations
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import apply_notebook_axes_style, apply_plot_style, ensure_mpl_config_dir, save_notebook_square_figure
+from ._mpl_utils import (
+    add_flush_colorbar,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    ensure_mpl_config_dir,
+    pretty_label,
+    pretty_title,
+    save_notebook_square_figure,
+    sequential_colormap,
+)
 from .feature_importance_bars import _discover_round_fi_files, _read_fi_csv, _resolve_order, _select_rounds
+
+DEFAULT_FEATURE_IMPORTANCE_HEATMAP_FIGSIZE: tuple[float, float] = (14.0, 4.4)
 
 
 @register_plot(
     "feature_importance_heatmap",
     meta=PlotMeta(
-        summary="Feature-importance heatmap with stable feature rows and round columns.",
+        summary="Feature-importance heatmap with stable feature columns and round rows.",
         params={
             "order_policy": "preserve|sort_index|max_importance (default sort_index).",
             "top_n": "Optional positive debugging cap; omit for the full ordinal feature heatmap.",
             "sort": "Legacy alias for order_policy.",
             "cluster": "Optional clustering flag; defaults false and is currently unsupported when true.",
-            "cmap": "Matplotlib colormap (default viridis).",
+            "cmap": "Matplotlib colormap (default opal_importance: low values white, high values dark blue).",
+            "colorbar_label": "Colorbar label (default Random forest feature importance).",
+            "contrast_gamma": "PowerNorm gamma for dense importance contrast; lower emphasizes weak nonzero signal.",
+            "max_xticks": "Maximum feature-index tick labels (default 28).",
             "rasterized": "Rasterize the heatmap image artist while keeping axes/text vector-ready (default true).",
         },
         requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
         notes=[
-            "Sorts by ascending feature_index by default so dense ordinal X surfaces keep all feature rows.",
+            "Sorts by ascending feature_index by default so dense ordinal X surfaces keep all feature columns.",
             "Clustering is intentionally off by default.",
         ],
         data_shape="attribution matrix",
@@ -66,6 +80,9 @@ def render(context, params: dict) -> None:
     top_n_int = int(top_n) if top_n is not None else None
     if top_n_int is not None and top_n_int <= 0:
         raise ValueError("top_n must be positive when provided.")
+    contrast_gamma = float(params.get("contrast_gamma", 0.55))
+    if contrast_gamma <= 0:
+        raise ValueError("contrast_gamma must be positive.")
 
     outputs_dir = resolve_outputs_dir(context)
     fi_map = _discover_round_fi_files(outputs_dir)
@@ -100,30 +117,35 @@ def render(context, params: dict) -> None:
                 raise ValueError(f"feature {feature_index} is missing for round {round_index}.")
             row.append(float(by_round[round_index]))
         matrix.append(row)
-    arr = np.asarray(matrix, dtype=float)
+    arr = np.asarray(matrix, dtype=float).T
     if not np.isfinite(arr).all():
         raise ValueError("feature_importance_heatmap contains non-finite importances.")
 
-    figsize = tuple(params.get("figsize_in", (7.2, 7.2)))
+    figsize = tuple(params.get("figsize_in", DEFAULT_FEATURE_IMPORTANCE_HEATMAP_FIGSIZE))
     fig, ax = plt.subplots(figsize=figsize)
-    im = ax.imshow(arr, aspect="auto", interpolation="nearest", cmap=str(params.get("cmap", "viridis")))
+    cmap = sequential_colormap(params.get("cmap", "opal_importance"))
+    from matplotlib.colors import Normalize, PowerNorm
+
+    vmax = float(np.nanmax(arr)) if arr.size else 0.0
+    norm = PowerNorm(gamma=contrast_gamma, vmin=0.0, vmax=vmax) if vmax > 0 else Normalize(vmin=0.0, vmax=1.0)
+    im = ax.imshow(arr, aspect="auto", interpolation="nearest", cmap=cmap, norm=norm)
     if bool(params.get("rasterized", True)):
         im.set_rasterized(True)
-    apply_notebook_axes_style(ax)
-    ax.set_xticks(range(len(target_rounds)))
-    ax.set_xticklabels([str(round_index) for round_index in target_rounds])
-    max_yticks = int(params.get("max_yticks", 40))
-    step = max(1, int(np.ceil(len(order) / max_yticks)))
-    yticks = list(range(0, len(order), step))
-    ax.set_yticks(yticks)
-    ax.set_yticklabels([str(order[index]) for index in yticks])
-    ax.set_xlabel("Round")
-    ax.set_ylabel(f"Feature ID ({len(order)} rows)")
-    ax.set_title(str(params.get("title", "Feature importance heatmap")))
-    fig.colorbar(im, ax=ax, label="Importance")
-    fig.tight_layout()
+    apply_notebook_axes_style(ax, grid=False, square=False)
+    max_xticks = int(params.get("max_xticks", params.get("max_yticks", 28)))
+    step = max(1, int(np.ceil(len(order) / max_xticks)))
+    xticks = list(range(0, len(order), step))
+    ax.set_xticks(xticks)
+    ax.set_xticklabels([str(order[index]) for index in xticks], rotation=0)
+    ax.set_yticks(range(len(target_rounds)))
+    ax.set_yticklabels([str(round_index) for round_index in target_rounds])
+    ax.set_xlabel(f"{pretty_label('feature_index')} ({len(order)} features)")
+    ax.set_ylabel("Round")
+    ax.set_title(pretty_title(params.get("title", "RF feature importance by round")))
+    fig.subplots_adjust(left=0.07, right=0.86, bottom=0.24, top=0.80)
+    add_flush_colorbar(fig, ax, im, label=pretty_label(params.get("colorbar_label", "rf_feature_importance")), pad=0.03)
     out = context.output_dir / context.filename
-    save_notebook_square_figure(fig, out, dpi=context.dpi)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:

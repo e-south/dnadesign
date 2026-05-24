@@ -17,10 +17,20 @@ from typing import List
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
 from ._mpl_utils import (
+    DEFAULT_SQUARE_FIGSIZE,
+    add_flush_colorbar,
     annotate_plot_meta,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    categorical_style,
     ensure_mpl_config_dir,
+    legend_below_single_row,
+    pretty_label,
+    pretty_title,
+    save_notebook_square_figure,
     scale_to_sizes,
     scatter_smart,
+    sequential_colormap,
 )
 from ._param_utils import (
     event_columns_for,
@@ -40,6 +50,8 @@ from ._param_utils import (
             "hue_field": "Optional obj__/pred__/sel__ field for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
             "alpha": "Point alpha (default 0.45).",
+            "round_cmap": "Sequential colormap for multi-round plots when hue_field is not set.",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=[
             "as_of_round",
@@ -66,6 +78,9 @@ def render(context, params: dict) -> None:
     ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
 
+    apply_plot_style()
+    from matplotlib.ticker import MaxNLocator
+
     outputs_dir = resolve_outputs_dir(context)
 
     score_field = get_str(params, ["score_field"], "pred__score_selected")
@@ -75,6 +90,7 @@ def render(context, params: dict) -> None:
     alpha = get_float(params, ["alpha"], 0.45)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
     cmap = get_str(params, ["cmap"], "viridis")
+    round_cmap = get_str(params, ["round_cmap"], "round_progression")
     size_by = normalize_metric_field(get_str(params, ["size_by", "size", "size_field", "point_size_by"], None))
     # Assert: if user supplied hue/size keys but normalization yielded none → misconfiguration
     if any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by")) and not hue_field:
@@ -94,6 +110,8 @@ def render(context, params: dict) -> None:
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
     rasterize_at_log = int(rasterize_at) if rasterize_at is not None else 0
+    show_meta = bool(params.get("show_meta", False))
+    manual_layout = False
 
     # Pull from predictions (full schema) and always join setpoint
     need = {
@@ -147,23 +165,13 @@ def render(context, params: dict) -> None:
         )
 
     rounds: List[int] = sorted(df["as_of_round"].unique().tolist())
-    plt.rcParams.update(
-        {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 14,
-            "ytick.labelsize": 14,
-        }
-    )
-
     if len(rounds) == 1:
         r = rounds[0]
         sub = df[df["as_of_round"] == r].sort_values(x_field, ascending=True)
 
-        figsize = tuple(params.get("figsize_in", (8.5, 5.0)))
-        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-        for s in ("top", "right"):
-            ax.spines[s].set_visible(False)
+        figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
+        fig, ax = plt.subplots(figsize=figsize)
+        apply_notebook_axes_style(ax, square=True)
         x = sub[x_field].to_numpy()
         y = sub[score_field].to_numpy(dtype=float)
         # optional size mapping
@@ -175,7 +183,17 @@ def render(context, params: dict) -> None:
         else:
             sizes = s_min
         # line for shape, then scatter for density
-        ax.plot(x, y, linewidth=1.2, alpha=min(0.9, alpha + 0.2))
+        style = categorical_style(0)
+        ax.plot(
+            x,
+            y,
+            color=style["color"],
+            linestyle=style["linestyle"],
+            linewidth=1.6,
+            alpha=min(0.9, alpha + 0.2),
+            label=f"Round {r}",
+            zorder=2,
+        )
         color_kw = {}
         if hue_vals is not None:
             color_kw = {"c": sub[hue_field].to_numpy(dtype=float), "cmap": cmap}
@@ -186,6 +204,7 @@ def render(context, params: dict) -> None:
             y,
             s=sizes,
             alpha=alpha,
+            marker=style["marker"],
             **color_kw,
             rasterize_at=rasterize_at,
         )
@@ -198,13 +217,18 @@ def render(context, params: dict) -> None:
                     y[sel_mask],
                     s=max(s_min, 1.4 * s_min),
                     alpha=min(1.0, alpha + 0.25),
+                    marker="D",
+                    facecolors="none",
                     edgecolors="black",
+                    linewidths=1.0,
                     rasterize_at=rasterize_at,
+                    label="Selected",
                 )
-        ax.set_xlabel(f"Rank ({'sequential' if rank_mode == 'sequential' else 'competition'})")
-        ax.set_ylabel("Objective score")
-        ax.set_title(f"Score vs Rank — round {r}")
-        ax.set_xlim(left=sub[x_field].max(), right=1)
+        ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
+        ax.set_ylabel(pretty_label(score_field))
+        ax.set_title(pretty_title(params.get("title", f"Score vs rank, round {r}")))
+        _set_rank_xlim(ax, float(sub[x_field].max()))
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         # On-plot meta + log
         context.logger.info(
             "params score_vs_rank: round=%s rank_mode=%s hue=%s size_by=%s alpha=%.2f rasterize_at=%d points=%d",
@@ -216,32 +240,44 @@ def render(context, params: dict) -> None:
             rasterize_at_log,
             int(x.size),
         )
-        annotate_plot_meta(
-            ax,
-            hue=hue_field,
-            size_by=size_by,
-            alpha=alpha,
-            rasterized=rasterized,
-            extras={"rank": rank_mode},
-        )
+        if show_meta:
+            annotate_plot_meta(
+                ax,
+                hue=hue_field,
+                size_by=size_by,
+                alpha=alpha,
+                rasterized=rasterized,
+                extras={"rank": rank_mode},
+            )
     else:
-        default_multi = (9.5, 6.0)
+        from matplotlib.cm import ScalarMappable
+        from matplotlib.colors import Normalize
+
+        default_multi = DEFAULT_SQUARE_FIGSIZE
         figsize = tuple(params.get("figsize_in", default_multi))
-        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-        for s in ("top", "right"):
-            ax.spines[s].set_visible(False)
-        for r, sub in df.groupby("as_of_round"):
+        fig, ax = plt.subplots(figsize=figsize)
+        apply_notebook_axes_style(ax, square=True)
+        round_norm = Normalize(vmin=min(rounds), vmax=max(rounds))
+        round_colors = sequential_colormap(round_cmap)
+        point_alpha = float(params.get("multi_round_alpha", min(alpha, 0.28)))
+        for line_index, (r, sub) in enumerate(df.groupby("as_of_round")):
             sub = sub.sort_values(x_field)
+            style = categorical_style(line_index)
+            round_color = round_colors(round_norm(float(r)))
             ax.plot(
                 sub[x_field],
                 sub[score_field],
-                label=f"r{r}",
-                linewidth=1.5,
-                alpha=0.8,
+                color=round_color,
+                linestyle=style["linestyle"],
+                linewidth=1.4,
+                alpha=0.45,
+                zorder=2,
             )
             color_kw = {}
             if hue_field and hue_field in sub.columns:
                 color_kw = {"c": sub[hue_field], "cmap": cmap}
+            else:
+                color_kw = {"color": round_color}
             scatter_smart(
                 ax,
                 sub[x_field],
@@ -251,14 +287,41 @@ def render(context, params: dict) -> None:
                     if size_by and size_by in sub.columns
                     else s_min
                 ),
-                alpha=alpha,
+                alpha=point_alpha,
+                marker=style["marker"],
+                rasterize_at=rasterize_at,
                 **color_kw,
             )
-        ax.legend(title="round", frameon=False)
-        ax.set_xlabel(f"Rank ({'sequential' if rank_mode == 'sequential' else 'competition'})")
-        ax.set_ylabel("Objective score")
-        ax.set_title("Score vs Rank by Round")
-        ax.set_xlim(left=df[x_field].max(), right=1)
+            if "sel__is_selected" in sub.columns:
+                sel_mask = sub["sel__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
+                if sel_mask.any():
+                    sx = sub.loc[sel_mask, x_field].to_numpy()
+                    sy = sub.loc[sel_mask, score_field].to_numpy(dtype=float)
+                    scatter_smart(
+                        ax,
+                        sx,
+                        sy,
+                        s=max(s_min, 1.7 * s_min),
+                        alpha=min(1.0, alpha + 0.25),
+                        marker=style["marker"],
+                        facecolors="none",
+                        edgecolors=round_color,
+                        linewidths=1.2,
+                        rasterize_at=rasterize_at,
+                        label="_nolegend_",
+                    )
+        ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
+        ax.set_ylabel(pretty_label(score_field))
+        ax.set_title(pretty_title(params.get("title", "Score vs rank by round")))
+        _set_rank_xlim(ax, float(df[x_field].max()))
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
+        if hue_field is None:
+            fig.subplots_adjust(left=0.14, right=0.80, bottom=0.16, top=0.86)
+            mappable = ScalarMappable(norm=round_norm, cmap=round_colors)
+            mappable.set_array([])
+            cbar = add_flush_colorbar(fig, ax, mappable, label="Round", pad=0.04)
+            cbar.set_ticks(rounds if len(rounds) <= 12 else [min(rounds), max(rounds)])
+            manual_layout = True
         context.logger.info(
             "params score_vs_rank multi-rounds: rounds=%s rank_mode=%s hue=%s size_by=%s alpha=%.2f rasterize_at=%d",
             rounds,
@@ -269,17 +332,22 @@ def render(context, params: dict) -> None:
             rasterize_at_log,
         )
         rasterized_multi = False if rasterize_at is None else len(df) >= rasterize_at
-        annotate_plot_meta(
-            ax,
-            hue=hue_field,
-            size_by=size_by,
-            alpha=alpha,
-            rasterized=rasterized_multi,
-            extras={"rank": rank_mode, "rounds": f"{len(rounds)}"},
-        )
+        if show_meta:
+            annotate_plot_meta(
+                ax,
+                hue=hue_field,
+                size_by=size_by,
+                alpha=alpha,
+                rasterized=rasterized_multi,
+                extras={"rank": rank_mode, "rounds": f"{len(rounds)}"},
+            )
 
+    if manual_layout:
+        pass
+    elif not legend_below_single_row(fig, ax):
+        fig.tight_layout(pad=0.35)
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:
@@ -291,3 +359,8 @@ def render(context, params: dict) -> None:
             score_field,
         ]
         context.save_df(df[keep])
+
+
+def _set_rank_xlim(ax, max_rank: float) -> None:
+    pad = max(1.0, float(max_rank) * 0.01)
+    ax.set_xlim(float(max_rank) + pad, 1.0 - pad)

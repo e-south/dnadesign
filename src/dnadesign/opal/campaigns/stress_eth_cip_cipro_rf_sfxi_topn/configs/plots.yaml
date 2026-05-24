@@ -7,78 +7,86 @@ plot_defaults:
 plots:
   - name: score_selected_over_rounds
     kind: metric_over_rounds
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, selection]
     params:
       metric: "pred__score_selected"
-      cohort: [selected, top_k, all_pool]
-      top_k: 6
-      summaries: [mean, median, q25, q75]
+      cohort: selected
+      summaries: [median, q25, q75, count]
+      band: iqr
       highlight_round: latest
+      title: "Ciprofloxacin factor: RF top-N selected score over rounds"
 
-  - name: score_vs_rank_by_round
+  - name: score_vs_rank_over_rounds
     kind: scatter_score_vs_rank
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, selection]
     params:
       rank_mode: competition
       alpha: 0.45
+      multi_round_alpha: 0.24
+      round_cmap: "round_progression"
       rasterize_at: 20000
-      figsize_in: [9, 5]
+      title: "Ciprofloxacin factor: RF score vs selection rank by round"
 
   - name: score_threshold_over_rounds
     kind: percent_high_activity_over_rounds
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, selection, threshold]
     params:
       metric: "pred__score_selected"
-      threshold: 0.8
-      mode: both
-      hue: logic_fidelity
-      highlight_round: latest
-      rasterize_at: 20000
+      threshold_quantile: 0.9
+      mode: line
+      title: "Ciprofloxacin factor: RF score enrichment above fixed P90 over rounds"
 
   - name: feature_importance_heatmap
     kind: feature_importance_heatmap
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, model]
     params:
       order_policy: sort_index
       cluster: false
-      cmap: "viridis"
+      figsize_in: [14.0, 4.4]
+      cmap: "opal_importance"
+      colorbar_label: "rf_feature_importance"
       rasterized: true
-      figsize_in: [8.5, 12]
-      max_yticks: 24
-      title: "ciprofloxacin factor: feature importance over rounds"
+      max_xticks: 16
+      contrast_gamma: 0.55
+      title: "Ciprofloxacin factor: random forest feature importance over rounds"
 
   - name: feature_importance_bars
     kind: feature_importance_bars
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, model]
     params:
       order_policy: sort_index
-      alpha: 0.32
-      figsize_in: [12, 5]
-      title: "ciprofloxacin factor: feature importance bars"
+      alpha: 0.40
+      figsize_in: [14.0, 4.4]
+      bar_width: 1.05
+      cmap: "round_progression"
+      max_xticks: 16
+      title: "Ciprofloxacin factor: random forest feature importance by round"
 
   - name: selected_vec8_summary
     kind: vector_summary_heatmap
-    round_variants: [all, each]
+    round_selector: all
     tags: [rounds, sfxi, vector]
     params:
       vector_field: "pred__y_hat_model"
       cohort: selected
       include_reference_vector: true
       reference_vector: [0, 0, 1, 1, 0, 0, 1, 1]
-      reference_label: "target vec8"
+      reference_label: "Target vec8"
       channel_labels: [v00, v10, v01, v11, y00_star, y10_star, y01_star, y11_star]
-      cmap: "viridis"
-      title: "ciprofloxacin factor: selected vec8 summary"
+      reference_mse_panel: true
+      cmap: "opal_seafoam"
+      value_label: "Mean predicted response"
+      title: "Ciprofloxacin factor: selected response vector vs target"
 
   - name: fold_change_vs_logic_fidelity_latest
     kind: fold_change_vs_logic_fidelity
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, selection, overlay, single-round]
     params:
       y_axis: score
@@ -86,59 +94,68 @@ plots:
       size_by: logic_fidelity
       alpha: 0.35
       rasterize_at: 20000
+      title: "Ciprofloxacin factor: SFXI score vs logic fidelity by round"
 
-  - name: sfxi_logic_fidelity_closeness_latest
+  - name: sfxi_observed_logic_closeness_over_rounds
     kind: sfxi_logic_fidelity_closeness
-    round_selector: latest
-    round_variants: [latest, each]
-    tags: [sfxi, labels, overlay, single-round]
+    round_selector: all
+    tags: [sfxi, labels, overlay, rounds]
     params:
       on_violin_invalid: line
       violin_min_points: 3
+      cmap: "opal_seafoam"
 
   - name: sfxi_factorial_effects_latest
     kind: sfxi_factorial_effects
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, labels, overlay, single-round]
     params:
       size_by: obj__effect_scaled
       include_labels: true
       rasterize_at: 20000
+      title: "Ciprofloxacin factor: SFXI factorial effects by round"
 
   - name: sfxi_setpoint_sweep_latest
     kind: sfxi_setpoint_sweep
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, labels, single-round]
     params:
       min_n: 5
+      title: "Ciprofloxacin factor: SFXI setpoint sweep by round"
 
   - name: sfxi_support_diagnostics_latest
     kind: sfxi_support_diagnostics
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, labels, overlay, single-round]
     params:
       y_axis: score
       hue: effect_scaled
       batch_size: 2048
+      title: "Ciprofloxacin factor: SFXI support diagnostics by round"
 
   - name: sfxi_uncertainty_latest
     kind: sfxi_uncertainty
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, model, single-round]
     params:
       kind: score
       y_axis: score
       hue: logic_fidelity
+      sample_n: 1024
+      seed: 0
+      batch_size: 2048
+      title: "Ciprofloxacin factor: SFXI score uncertainty by round"
 
   - name: sfxi_intensity_scaling_latest
     kind: sfxi_intensity_scaling
     round_selector: latest
-    round_variants: [latest, each]
+    round_variants: each
     tags: [sfxi, labels, single-round]
     params:
       min_n: 5
       include_pool: true
+      title: "Ciprofloxacin factor: SFXI intensity scaling by round"

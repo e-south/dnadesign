@@ -116,6 +116,8 @@ def test_generated_notebook_templates_do_not_import_dashboard_internals() -> Non
 
 
 def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
+    import dnadesign.opal.notebooks.api as notebook_api
+
     api_package = OPAL_ROOT / "notebooks" / "api"
     generated_api = api_package / "generated.py"
     progress_api = api_package / "progress.py"
@@ -129,6 +131,13 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     assert "Compatibility aggregate" in aggregate_api.read_text()
     module_lengths = {path.name: len(path.read_text().splitlines()) for path in api_package.glob("*.py")}
     assert max(module_lengths.values()) <= 160
+    for name in [
+        "build_notebook_campaign_set_group_options",
+        "build_notebook_campaign_set_metric_comparison_rows",
+        "render_notebook_campaign_set_metric_comparison_image",
+    ]:
+        assert name in notebook_api.__all__
+        assert hasattr(notebook_api, name)
 
 
 def test_analysis_root_has_no_facade_or_flat_helper_modules() -> None:

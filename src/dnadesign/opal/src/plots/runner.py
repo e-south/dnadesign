@@ -26,8 +26,14 @@ from ..analysis.ledger import RoundSelector, available_rounds, parse_round_selec
 from ..core.utils import now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir
-from ..plots.manifests import build_plot_manifest, write_plot_manifest, write_plot_manifest_index
-from ..registries.plots import get_plot
+from ..plots.manifests import (
+    build_plot_manifest,
+    load_plot_manifest_index,
+    refresh_plot_manifest_freshness,
+    write_plot_manifest,
+    write_plot_manifest_index,
+)
+from ..registries.plots import describe_plot_kind, get_plot
 from ..storage.data_access import RecordsStore
 from ..storage.workspace import CampaignWorkspace
 from .config import apply_data_entries, parse_enabled, parse_tags, validate_plot_entry
@@ -120,6 +126,7 @@ def _entry_round_scopes(
     entry: Dict[str, Any],
     preset: Dict[str, Any],
     plot_name: str,
+    plot_kind: str,
 ) -> list[tuple[RoundSelector, str]]:
     """Resolve one or more concrete plot output scopes for a configured entry."""
 
@@ -134,6 +141,7 @@ def _entry_round_scopes(
         )
 
     variants = _parse_round_variants(raw_variants, plot_name=plot_name)
+    _reject_inherent_history_fanout(variants=variants, plot_name=plot_name, plot_kind=plot_kind)
     scopes: list[tuple[RoundSelector, str]] = []
     for variant in variants:
         variant_key = variant.strip().lower()
@@ -185,6 +193,26 @@ def _parse_round_variants(value: Any, *, plot_name: str) -> list[str]:
             raise ValueError(f"[plot] plot '{plot_name}' round_variants entries must be non-empty strings.")
         parsed.append(item.strip())
     return parsed
+
+
+def _reject_inherent_history_fanout(*, variants: list[str], plot_name: str, plot_kind: str) -> None:
+    variant_keys = {variant.strip().lower() for variant in variants}
+    if "each" not in variant_keys:
+        return
+    try:
+        metadata = describe_plot_kind(plot_kind)
+    except Exception:
+        return
+    capability = metadata.get("capability")
+    if not isinstance(capability, dict):
+        return
+    if str(capability.get("round_scope") or "") != "round_history":
+        return
+    raise ValueError(
+        f"[plot] plot '{plot_name}' kind '{plot_kind}' declares round_scope=round_history, so "
+        "round_variants must not include 'each'. Generate one all-round history artifact, or request "
+        "a specific round explicitly when debugging a snapshot."
+    )
 
 
 def _available_variant_rounds(*, req: PlotRequest, plot_name: str) -> list[int]:
@@ -306,6 +334,7 @@ def run_plots(req: PlotRequest) -> bool:
             entry=entry,
             preset=preset,
             plot_name=pname,
+            plot_kind=pkind,
         )
         save_data = bool(out_cfg.get("save_data", False))
 
@@ -421,11 +450,49 @@ def run_plots(req: PlotRequest) -> bool:
                 _plot_status(req, f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
                 if req.emit_status:
                     traceback.print_exc()
+            finally:
+                _close_plot_figures()
 
+    merge_existing_index = bool(req.name_filter or req.tag_filters)
     for output_dir, manifests in manifests_by_dir.items():
-        write_plot_manifest_index(output_dir, manifests)
+        write_plot_manifest_index(
+            output_dir,
+            _merged_manifest_index_rows(output_dir, manifests, merge_existing=merge_existing_index),
+        )
 
     return any_fail
+
+
+def _merged_manifest_index_rows(
+    output_dir: Path,
+    manifests: List[dict[str, Any]],
+    *,
+    merge_existing: bool,
+) -> list[dict[str, Any]]:
+    """Preserve unrelated manifest-index rows during targeted plot reruns."""
+
+    rows = [dict(row) for row in manifests]
+    if not merge_existing or not rows:
+        return rows
+    index_path = Path(output_dir) / "plot_manifest.json"
+    if not index_path.exists():
+        return rows
+    existing = load_plot_manifest_index(index_path)
+    replaced_names = {str(row.get("name") or "") for row in rows}
+    preserved = [
+        _refresh_preserved_manifest_row(row)
+        for row in existing.get("manifests", [])
+        if isinstance(row, dict) and str(row.get("name") or "") not in replaced_names
+    ]
+    return [*preserved, *rows]
+
+
+def _refresh_preserved_manifest_row(row: dict[str, Any]) -> dict[str, Any]:
+    refreshed = refresh_plot_manifest_freshness(row)
+    manifest_path = refreshed.get("manifest_path")
+    if manifest_path:
+        write_plot_manifest(refreshed)
+    return refreshed
 
 
 def _plot_logger(plot_name: str, *, emit_status: bool) -> logging.Logger:
@@ -455,3 +522,11 @@ def _plot_logger(plot_name: str, *, emit_status: bool) -> logging.Logger:
 def _plot_status(req: PlotRequest, message: str, *, fg: str) -> None:
     if req.emit_status:
         typer.secho(message, fg=fg)
+
+
+def _close_plot_figures() -> None:
+    try:
+        import matplotlib.pyplot as plt
+    except Exception:
+        return
+    plt.close("all")

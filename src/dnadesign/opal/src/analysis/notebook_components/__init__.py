@@ -22,6 +22,11 @@ from .baserender_records import (
 from .baserender_render import (
     render_notebook_baserender_record,
 )
+from .campaign_set_comparison import (
+    build_notebook_campaign_set_group_options,
+    build_notebook_campaign_set_metric_comparison_rows,
+    render_notebook_campaign_set_metric_comparison_image,
+)
 from .overview import (
     build_notebook_at_a_glance_rows,
     build_notebook_campaign_header_lines,
@@ -35,12 +40,14 @@ from .overview import (
     build_notebook_validity_lines,
     build_notebook_validity_rows,
 )
-from .plot_scopes import build_notebook_plot_scope_options, select_notebook_plot_scope
-from .plots import (
+from .plot_method import (
     build_notebook_plot_card_rows,
-    build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
+)
+from .plot_scopes import build_notebook_plot_scope_options, select_notebook_plot_scope
+from .plots import (
+    build_notebook_plot_inventory_rows,
     build_notebook_visual_surface_model,
 )
 from .project import find_notebook_repo_root, list_notebook_campaign_paths
@@ -66,6 +73,8 @@ __all__ = [
     "build_notebook_baserender_record_options",
     "build_notebook_campaign_header_lines",
     "build_notebook_campaign_summary_row",
+    "build_notebook_campaign_set_group_options",
+    "build_notebook_campaign_set_metric_comparison_rows",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",
@@ -91,6 +100,7 @@ __all__ = [
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
+    "render_notebook_campaign_set_metric_comparison_image",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_plot_scope",

@@ -13,6 +13,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_baserender_contract_rows,
     build_notebook_baserender_record_options,
     build_notebook_campaign_header_lines,
+    build_notebook_campaign_set_group_options,
+    build_notebook_campaign_set_metric_comparison_rows,
     build_notebook_change_lines,
     build_notebook_change_rows,
     build_notebook_evidence_rows,
@@ -27,12 +29,14 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_visual_surface_model,
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
+    render_notebook_campaign_set_metric_comparison_image,
     render_visual_surface_cells,
     select_notebook_plot_scope,
 )
+from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
-from dnadesign.opal.src.registries.plots import get_plot, list_plot_kinds
+from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, list_plot_kinds
 
 
 def test_notebook_template_data_source_options() -> None:
@@ -58,6 +62,7 @@ def test_notebook_template_removes_extra_tables() -> None:
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert 'label="Visual surface"' in text
+    assert 'label="Compare by"' in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
@@ -90,6 +95,8 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert "Plot:" not in text
     assert "build_notebook_plot_method_sections" in text
     assert "thumbnail_gallery" not in text
+    assert "plot_scope_controls" not in text
+    assert "selected_plot_choice" in text
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -129,6 +136,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_campaign_set_round_options" in text
     assert "build_notebook_campaign_summary_row" in text
     assert "build_notebook_visual_surface_model" in text
+    assert "build_notebook_campaign_set_metric_comparison_rows" in text
 
 
 def test_notebook_template_degrades_without_runs() -> None:
@@ -166,6 +174,80 @@ def test_notebook_template_keeps_lateral_tools_out() -> None:
     assert "obj__logic_fidelity" not in text
     assert "obj__effect_raw" not in text
     assert "obj__effect_scaled" not in text
+
+
+def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -> None:
+    def _campaign(slug: str, group: str, values: list[float]) -> dict:
+        workdir = tmp_path / slug
+        plots_dir = workdir / "outputs" / "plots"
+        plots_dir.mkdir(parents=True)
+        tidy_path = plots_dir / "score_selected_over_rounds_rall.csv"
+        tidy_path.write_text(
+            "round,cohort,metric,summary,value\n"
+            + "\n".join(
+                f"{round_index},selected,pred__score_selected,median,{value}"
+                for round_index, value in enumerate(values)
+            )
+            + "\n"
+            + "\n".join(
+                f"{round_index},selected,pred__score_selected,count,6" for round_index, _value in enumerate(values)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return {
+            "campaign": {
+                "slug": slug,
+                "workdir": str(workdir),
+                "metadata": {
+                    "probe_oracle_kind": group,
+                    "probe_oracle_id": f"{group}_id",
+                    "probe_split_id": "random_id",
+                },
+            },
+            "plot_manifests": [
+                {
+                    "name": "score_selected_over_rounds",
+                    "kind": "metric_over_rounds",
+                    "status": "written",
+                    "rounds": "all",
+                    "tidy_csv": str(tidy_path),
+                    "outputs": [{"role": "tidy_csv", "path": str(tidy_path), "exists": True}],
+                }
+            ],
+        }
+
+    campaigns = [
+        _campaign("cipro_positive_random_id", "positive", [0.2, 0.5]),
+        _campaign("cipro_null_random_id", "null", [0.1, 0.15]),
+    ]
+
+    options = build_notebook_campaign_set_group_options(campaigns)
+    assert options == ["probe_oracle_kind"]
+    rows = build_notebook_campaign_set_metric_comparison_rows(
+        campaigns,
+        plot_name="score_selected_over_rounds",
+        group_key="probe_oracle_kind",
+    )
+    assert {row["group"] for row in rows} == {"positive", "null"}
+    payload = render_notebook_campaign_set_metric_comparison_image(
+        rows,
+        title="Selected score over rounds",
+        group_key="probe_oracle_kind",
+    )
+    assert payload is not None
+    assert payload["image_bytes"].startswith(b"\x89PNG")
+    assert "probe_oracle_kind" in payload["alt_text"]
+    assert "Selected n=6" in payload["alt_text"]
+    mixed_rows = [
+        {**row, "cohort": "all_pool" if row["campaign"] == "cipro_null_random_id" else row["cohort"]} for row in rows
+    ]
+    with pytest.raises(ValueError, match="one metric/cohort pair"):
+        render_notebook_campaign_set_metric_comparison_image(
+            mixed_rows,
+            title="Selected score over rounds",
+            group_key="probe_oracle_kind",
+        )
 
 
 def test_notebook_template_omits_altair_import() -> None:
@@ -365,7 +447,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
         "plot": "score",
         "kind": "metric_over_rounds",
         "status": "generated_current",
-        "rounds": [3],
+        "rounds": "round 3",
         "objective": "generic",
         "data": "predictions",
         "round behavior": "round_history",
@@ -391,6 +473,11 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
         and row["round behavior"] == "single_or_round_history"
         for row in configured_inventory
     )
+    with pytest.raises(KeyError, match="not_registered"):
+        build_notebook_visual_surface_model(
+            view_model,
+            plot_entries=[{"name": "bad_plot", "kind": "not_registered"}],
+        )
 
     card_rows = build_notebook_plot_card_rows(visual_surface["choices"][0])
     assert {"field": "media", "value": "plots/score.png"} in card_rows
@@ -398,6 +485,9 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert any(row["field"] == "capability" and "objective_family=generic" in row["value"] for row in card_rows)
     assert {"field": "tidy data", "value": "plots/score.csv"} in card_rows
     assert any(row["field"] == "source data" for row in card_rows)
+    per_round_card_rows = build_notebook_plot_card_rows(select_notebook_plot_scope(scope_choice, "round 3; run run-3"))
+    assert {"field": "rounds", "value": "round 3"} in per_round_card_rows
+    assert {"field": "warnings", "value": "0"} in per_round_card_rows
     method_rows = build_notebook_plot_method_rows(visual_surface["choices"][0])
     assert any(row["section"] == "math" and "mean = sum(x) / n" in row["detail"] for row in method_rows)
     method_sections = build_notebook_plot_method_sections(visual_surface["choices"][0])
@@ -464,7 +554,23 @@ def test_registered_plot_kinds_have_explicit_math_disclosure() -> None:
     assert builtin_kinds
 
     for kind in builtin_kinds:
-        choice = {"kind": kind, "name": kind, "manifest": {"kind": kind, "metadata": {}}}
+        meta = describe_plot_kind(kind)
+        choice = {
+            "kind": kind,
+            "name": kind,
+            "rounds": [2],
+            "freshness": "fresh",
+            "manifest": {
+                "kind": kind,
+                "rounds": [2],
+                "run_id": "run-2",
+                "generated_at": "2026-05-21T00:00:00Z",
+                "manifest_path": "outputs/plots/example.manifest.json",
+                "metadata": meta,
+                "inputs": [{"role": "input", "path": "outputs/ledger/predictions.parquet"}],
+                "params": {"metric": "pred__score_selected", "sample_n": 50, "min_n": 5, "top_k": 10},
+            },
+        }
         method_rows = build_notebook_plot_method_rows(choice)
         math_rows = [row for row in method_rows if row["section"] == "math"]
         method_sections = build_notebook_plot_method_sections(choice)
@@ -473,6 +579,42 @@ def test_registered_plot_kinds_have_explicit_math_disclosure() -> None:
         assert math_rows[0]["detail"], kind
         assert fallback not in math_rows[0]["detail"], kind
         assert fallback not in method_sections["Math"], kind
+        assert "Input data layer:" in method_sections["Data contract"], kind
+        assert "Provenance:" in method_sections["Data contract"], kind
+        assert "Counts and replicates:" in method_sections["Data contract"], kind
+        assert "manifest=outputs/plots/example.manifest.json" in method_sections["Data contract"], kind
+
+
+def test_registered_plot_alt_text_exposes_primary_visual_encoding() -> None:
+    builtin_kinds = [
+        kind for kind in list_plot_kinds() if get_plot(kind).__module__.startswith("dnadesign.opal.src.plots.")
+    ]
+    assert builtin_kinds
+
+    for kind in builtin_kinds:
+        meta = describe_plot_kind(kind)
+        alt_text = plot_alt_text(
+            title=kind,
+            kind=kind,
+            summary=meta["summary"],
+            params={
+                "metric": "pred__score_selected",
+                "score_field": "pred__score_selected",
+                "y_axis": "score",
+                "hue": "logic_fidelity",
+                "size_by": "obj__effect_scaled",
+                "vector_field": "pred__y_hat_model",
+            },
+            metadata=meta,
+            rounds=[3],
+            run_id=None,
+            freshness="fresh",
+            warning_count=0,
+        )
+
+        assert "Encoded fields:" in alt_text, kind
+        assert any(token in alt_text for token in ("x=", "left panel x=", "panels=")), kind
+        assert "Scope: round 3" in alt_text, kind
 
 
 def test_notebook_template_is_valid_python() -> None:
@@ -528,10 +670,12 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
         round_selector="latest",
     )
 
-    assert 'label="Plot scope"' in single
-    assert 'label="Plot scope"' in campaign_set
+    assert '_scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")' in single
+    assert "label=_scope_control_label" in single
+    assert '_scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")' in campaign_set
+    assert "label=_scope_control_label" in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 360
+    assert len(campaign_set.splitlines()) <= 430
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:

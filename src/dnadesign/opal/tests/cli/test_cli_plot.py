@@ -8,6 +8,7 @@ Module Author(s): Eric J. South
 """
 
 import json
+import time
 from pathlib import Path
 
 import yaml
@@ -92,6 +93,42 @@ def test_plot_cli_writes_output(tmp_path):
     assert index["plot_count"] == 1
 
 
+def test_plot_cli_name_filter_preserves_other_manifest_index_entries(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {"name": "mini_a", "kind": "test_plot_cli_minimal", "params": {"tag": "a"}},
+            {"name": "mini_b", "kind": "test_plot_cli_minimal", "params": {"tag": "b"}},
+        ],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign)])
+    assert res.exit_code == 0, res.stdout
+    time.sleep(0.01)
+    records.write_bytes(records.read_bytes())
+
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--name", "mini_a"])
+    assert res.exit_code == 0, res.stdout
+
+    index = json.loads((workdir / "outputs" / "plots" / "plot_manifest.json").read_text())
+    assert index["plot_count"] == 2
+    assert {row["name"] for row in index["manifests"]} == {"mini_a", "mini_b"}
+    freshness_by_name = {row["name"]: row["freshness"]["status"] for row in index["manifests"]}
+    assert freshness_by_name == {"mini_a": "fresh", "mini_b": "stale"}
+    mini_b_manifest = json.loads((workdir / "outputs" / "plots" / "mini_b.manifest.json").read_text())
+    assert mini_b_manifest["freshness"]["status"] == "stale"
+    assert (workdir / "outputs" / "plots" / "mini_b.png").exists()
+
+
 def test_plot_cli_plot_local_round_selector_overrides_global_round(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -161,6 +198,33 @@ def test_plot_cli_round_variants_write_manifested_scope_artifacts(tmp_path):
     assert manifests["mini_rall.manifest.json"]["rounds"] == "all"
     assert manifests["mini_r0.manifest.json"]["rounds"] == [0]
     assert manifests["mini_r1.manifest.json"]["rounds"] == [1]
+
+
+def test_plot_cli_rejects_each_variant_for_inherent_round_history_plots(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "score_history",
+                "kind": "metric_over_rounds",
+                "round_variants": ["all", "each"],
+            }
+        ],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "all"])
+
+    assert res.exit_code != 0
+    assert "round_scope=round_history" in str(res.exception)
 
 
 def test_round_highlight_overlay_resolves_round_zero() -> None:
@@ -309,13 +373,13 @@ def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
     ]
     expected = {
         "score_selected_over_rounds": "metric_over_rounds",
-        "score_vs_rank_by_round": "scatter_score_vs_rank",
+        "score_vs_rank_over_rounds": "scatter_score_vs_rank",
         "score_threshold_over_rounds": "percent_high_activity_over_rounds",
         "feature_importance_heatmap": "feature_importance_heatmap",
         "feature_importance_bars": "feature_importance_bars",
         "selected_vec8_summary": "vector_summary_heatmap",
         "fold_change_vs_logic_fidelity_latest": "fold_change_vs_logic_fidelity",
-        "sfxi_logic_fidelity_closeness_latest": "sfxi_logic_fidelity_closeness",
+        "sfxi_observed_logic_closeness_over_rounds": "sfxi_logic_fidelity_closeness",
         "sfxi_factorial_effects_latest": "sfxi_factorial_effects",
         "sfxi_setpoint_sweep_latest": "sfxi_setpoint_sweep",
         "sfxi_support_diagnostics_latest": "sfxi_support_diagnostics",
@@ -339,11 +403,16 @@ def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
         for spec in specs:
             if spec["name"].endswith("_latest"):
                 assert spec["round_selector"] == "latest"
-                assert spec["round_variants"] == ["latest", "each"]
+                assert spec["round_variants"] == "each"
                 assert "single-round" in spec["tags"]
             else:
-                assert spec["round_variants"] == ["all", "each"]
+                assert spec["round_selector"] == "all"
+                assert "round_variants" not in spec
         entries = {entry["name"]: entry for entry in plot_cfg.plots}
+        score_params = entries["score_selected_over_rounds"]["params"]
+        assert score_params["cohort"] == "selected"
+        assert score_params["summaries"] == ["median", "q25", "q75", "count"]
+        assert score_params["band"] == "iqr"
         heatmap_params = entries["feature_importance_heatmap"]["params"]
         assert heatmap_params["order_policy"] == "sort_index"
         assert heatmap_params["rasterized"] is True
@@ -492,7 +561,9 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
                 "kind": "metric_over_rounds",
                 "params": {
                     "metric": "pred__score_selected",
-                    "cohort": ["selected", "all_pool"],
+                    "cohort": "selected",
+                    "summaries": ["median", "q25", "q75"],
+                    "band": "iqr",
                     "highlight_round": "latest",
                 },
                 "output": {"save_data": True},
@@ -536,7 +607,10 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
         assert manifest["status"] == "written"
         assert manifest["tidy_csv"].endswith(".csv")
         width, height = _png_dimensions(workdir / "outputs" / "plots" / f"{name}_r0.png")
-        assert width == height
+        if name == "feature_heat":
+            assert width > height
+        else:
+            assert width == height
 
 
 def test_plot_cli_rejects_top_level_plot_keys(tmp_path):
