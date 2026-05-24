@@ -17,7 +17,7 @@ Builds multi‑mutation RT variants from **single‑amino‑acid** DMS results a
 **Inputs**
 
 * `refs.csv`: `ref_name`, coding DNA `sequence` (length divisible by 3), optional `protein`.
-* Singles DMS parquet: round‑1 rows with `permuter__aa_pos`, `permuter__aa_wt`, `permuter__aa_alt`, and a metric (e.g., `permuter__metric__llr_mean`).
+* Singles DMS parquet: round‑1 rows with `permuter__aa_pos`, `permuter__aa_wt`, `permuter__aa_alt`, and a metric (e.g., `permuter__observed__llr_mean`).
 * Codon usage CSV: `codon`, `amino_acid`, and `frequency|fraction` (used to select the top/weighted codon).
 
 

@@ -22,6 +22,11 @@ import pandas as pd
 import yaml
 from rich.console import Console
 
+from dnadesign.permuter.src.contracts.metrics import (
+    interaction_metric_column,
+    observed_metric_column,
+    observed_metric_subcolumn,
+)
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.paths import (
     normalize_data_path,
@@ -290,13 +295,8 @@ def evaluate(
                 ) from e
             raise
 
-        # Normalize evaluator output → rename to canonical observed namespace
+        # Normalize evaluator output directly into the canonical observed namespace.
         cols = _normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
-        cols = {
-            # canonicalize: permuter__metric__*  →  permuter__observed__*
-            k.replace("permuter__metric__", "permuter__observed__"): v
-            for k, v in cols.items()
-        }
         cols_df = pd.DataFrame(cols)  # aligns on RangeIndex 0..n-1
         new_metric_frames.append(cols_df)
         # Log quick stats for the first column (without mutating df yet)
@@ -336,13 +336,13 @@ def evaluate(
         # Defragment once so downstream ops (parquet write / slicing) stay fast
         df = df.copy()
 
-    # ---- Canonical epistasis (generic, non‑protocol‑specific) ---------------
+    # ---- Canonical interaction metric (generic, non-protocol-specific) ------
     # If a protocol emitted exactly one expected column, compute epistasis.
     exp_cols = [c for c in df.columns if c.startswith("permuter__expected__")]
     if len(exp_cols) == 1:
         exp_col = exp_cols[0]
         metric_for_exp = exp_col[len("permuter__expected__") :]
-        obs_col = f"permuter__observed__{metric_for_exp}"
+        obs_col = observed_metric_column(metric_for_exp)
         if obs_col not in df.columns:
             raise RuntimeError(
                 "evaluate: expected column present but matching observed column is missing.\n"
@@ -350,15 +350,17 @@ def evaluate(
                 f"  missing : {obs_col}\n"
                 "Ensure the evaluator id matches the protocol's singles_metric_id."
             )
-        df["epistasis"] = df[obs_col].astype("float64") - df[exp_col].astype("float64")
+        epi_col = interaction_metric_column("epistasis", metric_for_exp)
+        df[epi_col] = df[obs_col].astype("float64") - df[exp_col].astype("float64")
         _LOG.info(
-            "evaluate: attached epistasis using observed=%s and expected=%s",
+            "evaluate: attached epistasis=%s using observed=%s and expected=%s",
+            epi_col,
             obs_col,
             exp_col,
         )
     elif len(exp_cols) > 1:
         raise RuntimeError(
-            "evaluate: multiple 'permuter__expected__*' columns found; ambiguous for a single 'epistasis' column.\n"
+            "evaluate: multiple 'permuter__expected__*' columns found; ambiguous for a single epistasis column.\n"
             f"Found: {exp_cols}\nEmit exactly one expected metric in your protocol."
         )
 
@@ -386,7 +388,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
 
     # determine record shape
     if n == 0:
-        return {f"permuter__metric__{metric_id}": pd.Series([], dtype="float64")}
+        return {observed_metric_column(metric_id): pd.Series([], dtype="float64")}
 
     first = scores[0]
     # Scalar case
@@ -398,7 +400,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
             )
         except Exception as e:
             raise _err(f"unable to coerce scalars to float: {e}") from e
-        return {f"permuter__metric__{metric_id}": ser}
+        return {observed_metric_column(metric_id): ser}
 
     # Dict-of-scalars case
     if isinstance(first, dict):
@@ -418,7 +420,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
                 [float(rec[k]) if rec[k] is not None else float("nan") for rec in scores],
                 dtype="float64",
             )
-            out[f"permuter__metric__{metric_id}__{k}"] = ser
+            out[observed_metric_subcolumn(metric_id, k)] = ser
         return out
 
     # Fixed-length sequence of numbers case
@@ -454,7 +456,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
                 cleaned.append(row)
             # Pandas→PyArrow will write this as list<item: double>
             ser = pd.Series(cleaned, dtype="object")
-            return {f"permuter__metric__{metric_id}": ser}
+            return {observed_metric_column(metric_id): ser}
 
         # Expand into __0..__K-1 scalar columns
         k = lens[0]
@@ -466,7 +468,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
                 if not (v is None or isinstance(v, numbers.Number)):
                     raise _err(f"record {i}[{j}] has non-numeric value {type(v).__name__}")
                 col.append(float(v) if v is not None else float("nan"))
-            out[f"permuter__metric__{metric_id}__{j}"] = pd.Series(col, dtype="float64")
+            out[observed_metric_subcolumn(metric_id, j)] = pd.Series(col, dtype="float64")
         return out
 
     raise _err(f"unsupported record type: {type(first).__name__}")

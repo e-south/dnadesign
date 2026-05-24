@@ -15,11 +15,13 @@ from typing import Optional, Tuple
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
+
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id is required (expects a column permuter__observed__<id>)")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
         raise RuntimeError(f"Metric column not found: {col}")
     return df[col].astype("float64"), str(metric_id)

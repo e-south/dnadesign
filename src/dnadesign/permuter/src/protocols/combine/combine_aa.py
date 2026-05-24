@@ -21,6 +21,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column, observed_metric_column
 from dnadesign.permuter.src.core.paths import expand_for_job
 from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.protocols.base import Protocol, assert_dna
@@ -170,7 +171,7 @@ class CombineAA(Protocol):
 
         # Load singles dataset and validate schema
         metric_id = str(params["singles_metric_id"]).strip()
-        metric_col = f"permuter__metric__{metric_id}"
+        metric_col = observed_metric_column(metric_id)
         # Accept from_dataset as dir or file (already expanded by CLI; still robust here).
         p_ds = Path(str(params["from_dataset"])).expanduser()
         if p_ds.is_dir():
@@ -326,5 +327,7 @@ def attach_epistasis(df, metric_id: str):
         )
 
     out = df.copy()
-    out["epistasis"] = out[canonical_obs].astype("float64") - out[canonical_exp].astype("float64")
+    out[interaction_metric_column("epistasis", metric_id)] = out[canonical_obs].astype("float64") - out[
+        canonical_exp
+    ].astype("float64")
     return out

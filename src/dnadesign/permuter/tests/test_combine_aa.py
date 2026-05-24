@@ -15,6 +15,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column
 from dnadesign.permuter.src.protocols.combine.combine_aa import (
     CombineAA,
     attach_epistasis,
@@ -28,6 +29,8 @@ AAT,N,0.47,21.9
 CAA,Q,0.30,12.1
 CAG,Q,0.70,27.7
 """
+
+EPI_COL = interaction_metric_column("epistasis", "llr_mean")
 
 
 def _write_codon_table(tmp_path: Path) -> Path:
@@ -56,7 +59,7 @@ def test_case_preservation_and_codon_substitution(tmp_path: Path):
                 permuter__aa_pos=1,
                 permuter__aa_wt="K",
                 permuter__aa_alt="N",
-                permuter__metric__llr_mean=1.0,
+                permuter__observed__llr_mean=1.0,
             ),
             dict(
                 sequence=ref,
@@ -64,7 +67,7 @@ def test_case_preservation_and_codon_substitution(tmp_path: Path):
                 permuter__aa_pos=2,
                 permuter__aa_wt="K",
                 permuter__aa_alt="Q",
-                permuter__metric__llr_mean=2.0,
+                permuter__observed__llr_mean=2.0,
             ),
         ],
     )
@@ -119,7 +122,7 @@ def test_selection_invariants(tmp_path: Path):
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.0,
+            permuter__observed__llr_mean=1.0,
         ),
         dict(
             sequence=ref,
@@ -127,7 +130,7 @@ def test_selection_invariants(tmp_path: Path):
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=3.0,
+            permuter__observed__llr_mean=3.0,
         ),
         dict(
             sequence=ref,
@@ -135,7 +138,7 @@ def test_selection_invariants(tmp_path: Path):
             permuter__aa_pos=2,
             permuter__aa_wt="K",
             permuter__aa_alt="Q",
-            permuter__metric__llr_mean=2.0,
+            permuter__observed__llr_mean=2.0,
         ),
     ]
     dms = _write_dms_singles(tmp_path, rows)
@@ -180,7 +183,7 @@ def test_determinism(tmp_path: Path):
                 permuter__aa_pos=1,
                 permuter__aa_wt="K",
                 permuter__aa_alt="N",
-                permuter__metric__llr_mean=1.0,
+                permuter__observed__llr_mean=1.0,
             ),
             dict(
                 sequence=ref,
@@ -188,7 +191,7 @@ def test_determinism(tmp_path: Path):
                 permuter__aa_pos=2,
                 permuter__aa_wt="K",
                 permuter__aa_alt="Q",
-                permuter__metric__llr_mean=2.0,
+                permuter__observed__llr_mean=2.0,
             ),
         ],
     )
@@ -238,7 +241,7 @@ def test_budget_and_k_caps(tmp_path: Path):
                 permuter__aa_pos=1,
                 permuter__aa_wt="K",
                 permuter__aa_alt="N",
-                permuter__metric__llr_mean=1.0,
+                permuter__observed__llr_mean=1.0,
             ),
             dict(
                 sequence=ref,
@@ -246,7 +249,7 @@ def test_budget_and_k_caps(tmp_path: Path):
                 permuter__aa_pos=2,
                 permuter__aa_wt="K",
                 permuter__aa_alt="Q",
-                permuter__metric__llr_mean=2.0,
+                permuter__observed__llr_mean=2.0,
             ),
         ],
     )
@@ -311,7 +314,7 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=+0.50,
+            permuter__observed__llr_mean=+0.50,
         ),
         dict(
             sequence=ref,
@@ -319,7 +322,7 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
             permuter__aa_pos=2,
             permuter__aa_wt="K",
             permuter__aa_alt="Q",
-            permuter__metric__llr_mean=+1.50,
+            permuter__observed__llr_mean=+1.50,
         ),
         dict(
             sequence=ref,
@@ -327,7 +330,7 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
             permuter__aa_pos=3,
             permuter__aa_wt="K",
             permuter__aa_alt="Q",
-            permuter__metric__llr_mean=-0.20,
+            permuter__observed__llr_mean=-0.20,
         ),
         dict(
             sequence=ref,
@@ -335,7 +338,7 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
             permuter__aa_pos=4,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=+2.00,
+            permuter__observed__llr_mean=+2.00,
         ),
     ]
     dms = _write_dms_singles(tmp_path, rows)
@@ -387,8 +390,8 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
     df["permuter__expected__llr_mean"] = df["expected__llr_mean"]
     df["permuter__observed__llr_mean"] = observed
     df2 = attach_epistasis(df, metric_id="llr_mean")
-    assert "epistasis" in df2.columns
-    diff = (df2["epistasis"].to_numpy() - np.array(epis)).astype(float)
+    assert EPI_COL in df2.columns
+    diff = (df2[EPI_COL].to_numpy() - np.array(epis)).astype(float)
     assert np.all(np.isfinite(diff))
     assert float(np.max(np.abs(diff))) <= 1e-12
 
@@ -396,16 +399,16 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
     has_pos = any(_synergy_for_positions(r) > 0 for r in df2["aa_pos_list"])
     has_neg = any(_synergy_for_positions(r) < 0 for r in df2["aa_pos_list"])
     if has_pos:
-        assert (df2["epistasis"] > 0).any()
+        assert (df2[EPI_COL] > 0).any()
     if has_neg:
-        assert (df2["epistasis"] < 0).any()
+        assert (df2[EPI_COL] < 0).any()
 
     has_pos = any(_synergy_for_positions(r) > 0 for r in df2["aa_pos_list"])
     has_neg = any(_synergy_for_positions(r) < 0 for r in df2["aa_pos_list"])
     if has_pos:
-        assert (df2["epistasis"] > 0).any()
+        assert (df2[EPI_COL] > 0).any()
     if has_neg:
-        assert (df2["epistasis"] < 0).any()
+        assert (df2[EPI_COL] < 0).any()
 
 
 def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
@@ -423,7 +426,7 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.0,
+            permuter__observed__llr_mean=1.0,
         ),
         dict(
             sequence=ref,
@@ -431,7 +434,7 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
             permuter__aa_pos=2,
             permuter__aa_wt="K",
             permuter__aa_alt="Q",
-            permuter__metric__llr_mean=2.0,
+            permuter__observed__llr_mean=2.0,
         ),
         dict(
             sequence=ref,
@@ -439,7 +442,7 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
             permuter__aa_pos=3,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=-0.5,
+            permuter__observed__llr_mean=-0.5,
         ),
     ]
     dms = _write_dms_singles(tmp_path, rows)
@@ -480,7 +483,7 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
         return toks
 
     # Single lookup for expected singles scores
-    singles = {(r["permuter__aa_pos"], r["permuter__aa_alt"]): r["permuter__metric__llr_mean"] for r in rows}
+    singles = {(r["permuter__aa_pos"], r["permuter__aa_alt"]): r["permuter__observed__llr_mean"] for r in rows}
 
     for rec in out:
         k = int(rec["mut_count"])
@@ -520,7 +523,7 @@ def test_per_position_best_applies_top_after_grouping(tmp_path: Path):
                 permuter__aa_pos=p,
                 permuter__aa_wt="K",
                 permuter__aa_alt="N",
-                permuter__metric__llr_mean=sc,
+                permuter__observed__llr_mean=sc,
             )
         )
     # Add many decoys at pos1 with slightly lower scores than the true winner, to crowd the global head
@@ -532,7 +535,7 @@ def test_per_position_best_applies_top_after_grouping(tmp_path: Path):
                 permuter__aa_pos=1,
                 permuter__aa_wt="K",
                 permuter__aa_alt="Q",
-                permuter__metric__llr_mean=3.0 - 1e-3 * (j + 1),
+                permuter__observed__llr_mean=3.0 - 1e-3 * (j + 1),
             )
         )
     dms = _write_dms_singles(tmp_path, rows)
@@ -584,7 +587,7 @@ def test_enumerate_strategy_emits_all_k(tmp_path: Path):
                 permuter__aa_pos=p,
                 permuter__aa_wt="K",
                 permuter__aa_alt="N",
-                permuter__metric__llr_mean=sc,
+                permuter__observed__llr_mean=sc,
             )
         )
     dms = _write_dms_singles(tmp_path, rows)
@@ -610,7 +613,7 @@ def test_enumerate_strategy_emits_all_k(tmp_path: Path):
     assert len(out) == 20
 
 
-def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path):
+def test_attach_epistasis_uses_canonical_observed_and_expected(tmp_path: Path):
     # Reuse the small 3-position case
     ref = "AAA" * 3
     rows = [
@@ -620,7 +623,7 @@ def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.0,
+            permuter__observed__llr_mean=1.0,
         ),
         dict(
             sequence=ref,
@@ -628,7 +631,7 @@ def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path
             permuter__aa_pos=2,
             permuter__aa_wt="K",
             permuter__aa_alt="Q",
-            permuter__metric__llr_mean=2.0,
+            permuter__observed__llr_mean=2.0,
         ),
         dict(
             sequence=ref,
@@ -636,7 +639,7 @@ def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path
             permuter__aa_pos=3,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=-0.5,
+            permuter__observed__llr_mean=-0.5,
         ),
     ]
     dms = _write_dms_singles(tmp_path, rows)
@@ -664,7 +667,7 @@ def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path
     df["permuter__expected__llr_mean"] = df["expected__llr_mean"]
     df["permuter__observed__llr_mean"] = df["permuter__expected__llr_mean"] + 0.5
     df2 = attach_epistasis(df, metric_id="llr_mean")
-    assert "epistasis" in df2.columns and np.allclose(df2["epistasis"], 0.5)
+    assert EPI_COL in df2.columns and np.allclose(df2[EPI_COL], 0.5)
     assert "permuter__observed__llr_mean" in df2.columns
 
 
@@ -678,7 +681,7 @@ def test_allowed_position_ranges_are_respected(tmp_path: Path):
             permuter__aa_pos=1,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.0,
+            permuter__observed__llr_mean=1.0,
         ),
         dict(
             sequence=ref,
@@ -686,7 +689,7 @@ def test_allowed_position_ranges_are_respected(tmp_path: Path):
             permuter__aa_pos=2,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.1,
+            permuter__observed__llr_mean=1.1,
         ),
         dict(
             sequence=ref,
@@ -694,7 +697,7 @@ def test_allowed_position_ranges_are_respected(tmp_path: Path):
             permuter__aa_pos=3,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.2,
+            permuter__observed__llr_mean=1.2,
         ),
         dict(
             sequence=ref,
@@ -702,7 +705,7 @@ def test_allowed_position_ranges_are_respected(tmp_path: Path):
             permuter__aa_pos=4,
             permuter__aa_wt="K",
             permuter__aa_alt="N",
-            permuter__metric__llr_mean=1.3,
+            permuter__observed__llr_mean=1.3,
         ),
     ]
     dms = _write_dms_singles(tmp_path, rows)

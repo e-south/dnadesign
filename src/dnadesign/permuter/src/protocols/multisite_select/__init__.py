@@ -20,7 +20,7 @@ combine_aa + evaluate, with:
 
   • observed fitness:    permuter__observed__<metric_id>
   • expected baseline:   permuter__expected__<metric_id>
-  • epistasis:           epistasis = observed - expected
+  • epistasis:           permuter__interaction__epistasis__<metric_id>
   • logits embedding:    permuter__observed__logits_mean (list<item: double>)
 
 Run via:

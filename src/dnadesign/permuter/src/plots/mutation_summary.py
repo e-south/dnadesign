@@ -21,6 +21,8 @@ from typing import List, Optional, Tuple
 
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
+
 _LOG = logging.getLogger("permuter.summary.aa_mutation")
 
 _RE_AA_EDIT_STRUCT = re.compile(
@@ -58,15 +60,10 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id is required (expects a column permuter__observed__<id>)")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
-        # fallback: exact suffix match
-        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
-        if len(cand) == 1:
-            col = cand[0]
-        else:
-            raise RuntimeError(f"Metric column not found: {col}")
+        raise RuntimeError(f"Metric column not found: {col}")
     return df[col].astype("float64"), str(metric_id)
 
 

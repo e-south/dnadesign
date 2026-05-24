@@ -191,11 +191,56 @@ permuter plot     --data PATH [--which name]... [--metric-id ID]
 permuter export   --data PATH --fmt csv|jsonl --out PATH
 permuter validate --data PATH [--strict]
 permuter inspect  --data PATH [--head N]
+permuter workspace validate --workspace PATH
 ```
 
 * `run` resolves paths relative to the job YAML; `${JOB_DIR}` and env vars are expanded.
-* `evaluate` writes `permuter__metric__<id>` columns into the same Parquet.
+* `evaluate` writes canonical `permuter__observed__<id>` columns into the same Parquet.
 * `plot` can pick a specific metric with `--metric-id`.
+* `validate` and `inspect` are read-only by default; pass `--record` to append `RECORD.md`.
+
+---
+
+### Public API
+
+Sibling tools should import from `dnadesign.permuter.api`, not
+`dnadesign.permuter.src.*`:
+
+```python
+from dnadesign.permuter.api import NucleotideDmsRequest, generate_variants
+
+result = generate_variants(
+    NucleotideDmsRequest(
+        ref_name="toy",
+        sequence="ACGT",
+        metadata={"study": "example"},
+    )
+)
+```
+
+The initial API is filesystem-free and returns typed in-memory records for
+nucleotide and protein DMS requests.
+
+---
+
+### Workspaces
+
+A workspace is a directory with `config.yaml`:
+
+```yaml
+workspace:
+  id: example_workspace
+runs:
+  - id: dna_scan
+    protocol: scan_dna
+    inputs:
+      ref_name: toy
+      sequence: ACGT
+```
+
+Use `permuter workspace validate --workspace PATH` for contract checks and
+`permuter workspace list --root PATH` for discovery. Workspace commands do not
+execute jobs yet; they provide the migration shell for job orchestration.
 
 ---
 
@@ -242,7 +287,9 @@ Each dataset is a single Parquet file with a **USR core** and a **Permuter** nam
 * `permuter__round`: `1` (single-pass in core)
 * `permuter__modifications`: list of human-readable tokens (e.g., `["nt pos=12 wt=A alt=T"]`)
 * Protocol-specific flat fields (e.g., `permuter__nt_pos`, `permuter__aa_pos`, `permuter__hp_length_paired`, …)
-* Metrics appended by `evaluate` live in `permuter__metric__<id>` (floats)
+* Observed metrics appended by `evaluate` live in `permuter__observed__<id>`
+* Additive expected metrics live in `permuter__expected__<id>`
+* Interaction metrics live in `permuter__interaction__<interaction_id>__<metric_id>`
 
 ---
 

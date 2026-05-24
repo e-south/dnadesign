@@ -20,6 +20,10 @@ import pandas as pd
 import yaml
 from rich.console import Console
 
+from dnadesign.permuter.src.contracts.metrics import (
+    observed_metric_column,
+    observed_metric_ids,
+)
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.paths import (
     normalize_data_path,
@@ -71,21 +75,21 @@ def _call_plot(func, *, plot_name: str, **kwargs) -> None:
 
 def _normalize_for_plots(df: pd.DataFrame, metric_id: str, log=_LOG) -> pd.DataFrame:
     """
-    Assert canonical columns exist (already produced by run→evaluate) and
-    provide only convenience aliases needed by the plots.
+    Assert the study-agnostic observed metric exists and provide only
+    convenience aliases needed by downstream plots.
+
+    Plot-specific contracts remain in the plot modules. Ordinary DMS plots
+    should not be blocked by interaction-only columns such as expected score or
+    namespaced epistasis.
     """
     df2 = df.copy()
-    req = [
-        f"permuter__observed__{metric_id}",
-        f"permuter__expected__{metric_id}",
-        "epistasis",
-    ]
+    req = [observed_metric_column(metric_id)]
     missing = [c for c in req if c not in df2.columns]
     if missing:
         raise ValueError(
             "Dataset missing required canonical column(s) for plotting with "
             f"metric_id={metric_id}: {missing}\n"
-            "Run 'permuter evaluate' after generation to populate observed and epistasis."
+            "Run 'permuter evaluate' after generation to populate observed metrics."
         )
     # Unprefixed convenience columns for plot code
     if "mut_count" not in df2.columns and "permuter__mut_count" in df2.columns:
@@ -226,11 +230,11 @@ def plot(
 
     # Discover present metric ids once
     obs_cols = [c for c in df.columns if c.startswith("permuter__observed__")]
-    present_ids = sorted({c.split("permuter__observed__", 1)[1].lstrip("_").split("__", 1)[0] for c in obs_cols})
+    present_ids = observed_metric_ids(df.columns)
 
     # If no metric-id was given, infer when there is exactly one id.
     if not metric_id:
-        ids = sorted({c.split("permuter__observed__", 1)[1].lstrip("_") for c in obs_cols})
+        ids = observed_metric_ids(df.columns)
         if len(ids) == 1:
             metric_id = ids[0]
         else:
@@ -271,14 +275,13 @@ def plot(
                 subtitle = f"metric={m.id} • evaluator={m.evaluator}.{m.metric}{red_txt}"
                 break
 
-    # Prepare canonical columns for all plots (once):
-    # - writes permuter__observed__{metric_id} / permuter__expected__{metric_id}
-    # - attaches 'epistasis' (observed - expected)
+    # Prepare canonical columns shared by all plots (once):
+    # - requires permuter__observed__{metric_id}
     # - provides unprefixed 'mut_count' / 'aa_combo_str' aliases for ranked plots
     try:
         df = _normalize_for_plots(df, metric_id)
         _LOG.info(
-            "plot: normalized canonical columns for metric_id=%s (observed/expected/epistasis ready)",
+            "plot: normalized canonical columns for metric_id=%s",
             metric_id,
         )
     except Exception as e:

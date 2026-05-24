@@ -16,6 +16,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from dnadesign.permuter.src.contracts.metrics import reject_legacy_metric_columns
 from dnadesign.permuter.src.core.paths import normalize_data_path
 from dnadesign.permuter.src.core.storage import (
     append_record_md,
@@ -30,7 +31,7 @@ def _sha1(bio_type: str, sequence: str) -> str:
     return hashlib.sha1(f"{bio_type}|{sequence}".encode("utf-8")).hexdigest()
 
 
-def validate(data: Path, strict: bool = False):
+def validate(data: Path, strict: bool = False, record: bool = False):
     records = normalize_data_path(data)
     df = read_parquet(records)
 
@@ -46,6 +47,8 @@ def validate(data: Path, strict: bool = False):
         raise ValueError(f"{bad} row(s) have incorrect id for (bio_type|sequence)")
 
     # namespacing
+    if strict:
+        reject_legacy_metric_columns(df, context="validate")
     for c in df.columns:
         if c in _CORE:
             continue
@@ -65,8 +68,9 @@ def validate(data: Path, strict: bool = False):
         raise ValueError(f"Missing required permuter columns: {miss}")
 
     console.print(f"[green]✔[/green] Validation passed for {data}")
-    try:
-        cmd = shlex.join(sys.argv)
-    except Exception:
-        cmd = " ".join(sys.argv)
-    append_record_md(records.parent, "validate", cmd)
+    if record:
+        try:
+            cmd = shlex.join(sys.argv)
+        except Exception:
+            cmd = " ".join(sys.argv)
+        append_record_md(records.parent, "validate", cmd)

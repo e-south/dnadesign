@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column
 from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.protocols.multisite_select.geometry import (
     l2_normalize_rows,
@@ -29,6 +30,8 @@ from dnadesign.permuter.src.protocols.multisite_select.main import MSel
 from dnadesign.permuter.src.protocols.multisite_select.utils import (
     parse_aa_combo_to_map,
 )
+
+EPI_COL = interaction_metric_column("epistasis", "llr_mean")
 
 
 def _write_synthetic_records(tmp_path: Path) -> Path:
@@ -88,7 +91,7 @@ def _write_synthetic_records(tmp_path: Path) -> Path:
                 "sequence": sequence,
                 "permuter__observed__llr_mean": llr_obs[i],
                 "permuter__expected__llr_mean": llr_exp[i],
-                "epistasis": epistasis[i],
+                EPI_COL: epistasis[i],
                 "permuter__observed__logits_mean": emb[i].tolist(),
                 "permuter__aa_pos_list": aa_pos_lists[i],
                 "permuter__aa_combo_str": aa_combo_strs[i],
@@ -214,9 +217,9 @@ def test_multisite_select_end_to_end_invariants(tmp_path):
     assert (sel_df["delta"] >= 0.0).all()
 
     src_df = read_parquet(records_path)
-    assert "epistasis" in src_df.columns
+    assert EPI_COL in src_df.columns
 
-    src_epi = src_df.set_index("id")["epistasis"]
+    src_epi = src_df.set_index("id")[EPI_COL]
     epi_selected_source = src_epi.loc[sel_df["source_id"]].to_numpy(dtype=float)
     assert (epi_selected_source >= 0.0).all()
     np.testing.assert_allclose(epi_selected_source, sel_df["delta"].to_numpy(dtype=float))

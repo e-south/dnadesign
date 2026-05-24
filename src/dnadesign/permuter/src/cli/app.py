@@ -25,6 +25,7 @@ from . import inspect as inspect_cmd
 from . import plot as plot_cmd
 from . import run as run_cmd
 from . import validate as validate_cmd
+from . import workspace as workspace_cmd
 
 app = typer.Typer(
     add_completion=False,
@@ -48,6 +49,7 @@ app = typer.Typer(
 console = Console()
 # richer tracebacks with locals by default; no suppression
 rich_tb(show_locals=True)
+app.add_typer(workspace_cmd.app, name="workspace")
 
 
 @app.callback()
@@ -196,8 +198,13 @@ def export(
 def validate(
     data: Path = typer.Option(..., "--data", "-d", exists=True, readable=True),
     strict: bool = typer.Option(False, "--strict"),
+    record: bool = typer.Option(
+        False,
+        "--record/--no-record",
+        help="Append this validation command to RECORD.md.",
+    ),
 ):
-    validate_cmd.validate(data=data, strict=strict)
+    validate_cmd.validate(data=data, strict=strict, record=record)
 
 
 @app.command(
@@ -207,8 +214,13 @@ def validate(
 def inspect(
     data: Path = typer.Option(..., "--data", "-d", exists=True, readable=True),
     head: int = typer.Option(5, "--head", "-n"),
+    record: bool = typer.Option(
+        False,
+        "--record/--no-record",
+        help="Append this inspection command to RECORD.md.",
+    ),
 ):
-    inspect_cmd.inspect_(data=data, head=head)
+    inspect_cmd.inspect_(data=data, head=head, record=record)
 
 
 def main() -> int:

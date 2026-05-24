@@ -45,6 +45,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column, observed_metric_column
 from dnadesign.permuter.src.core.storage import (
     append_record_event,
     atomic_write_parquet,
@@ -399,7 +400,8 @@ class MSel(Protocol):
             )
         exp_col = exp_cols[0]
         metric_id = exp_col[len("permuter__expected__") :]
-        obs_col = f"permuter__observed__{metric_id}"
+        obs_col = observed_metric_column(metric_id)
+        epi_col = interaction_metric_column("epistasis", metric_id)
         if obs_col not in src.columns:
             raise RuntimeError(
                 "multisite_select: matching observed column for epistasis is missing.\n"
@@ -409,21 +411,17 @@ class MSel(Protocol):
             )
 
         _LOG.info(
-            "[data] metric\n"
-            "  metric_id: %s\n"
-            "  observed:  %s\n"
-            "  expected:  %s\n"
-            "  epistasis: 'epistasis' column (obs - exp)",
+            "[data] metric\n  metric_id: %s\n  observed:  %s\n  expected:  %s\n  epistasis: %s",
             metric_id,
             obs_col,
             exp_col,
+            epi_col,
         )
 
-        if "epistasis" not in src.columns:
+        if epi_col not in src.columns:
             raise ValueError(
-                "multisite_select: source dataset is missing required 'epistasis' column.\n"
-                "Run 'permuter evaluate' (or equivalent) to attach epistasis "
-                "before running multisite_select."
+                f"multisite_select: source dataset is missing required epistasis column {epi_col!r}.\n"
+                "Run 'permuter evaluate' (or equivalent) before running multisite_select."
             )
 
         required_cols = [
@@ -431,7 +429,7 @@ class MSel(Protocol):
             "sequence",
             obs_col,
             exp_col,
-            "epistasis",
+            epi_col,
             knobs.embedding_col,
             "permuter__aa_pos_list",
             "permuter__mut_count",
@@ -446,7 +444,7 @@ class MSel(Protocol):
             emb_col=knobs.embedding_col,
             aa_col="permuter__aa_pos_list",
             llr_col=obs_col,
-            epi_col="epistasis",
+            epi_col=epi_col,
         )
         drops_pretty = json.dumps(finfo["drops_by_cause"], sort_keys=True, indent=2)
         _LOG.info(
@@ -465,7 +463,7 @@ class MSel(Protocol):
         # Aliases
         df["__llr_obs"] = df[obs_col].astype(float).to_numpy()
         df["__llr_exp"] = df[exp_col].astype(float).to_numpy()
-        df["__delta"] = df["epistasis"].astype(float).to_numpy()
+        df["__delta"] = df[epi_col].astype(float).to_numpy()
         if (df["__delta"] < 0).any():
             raise RuntimeError(
                 "multisite_select: negative epistasis survived row-level validation; this should not happen."

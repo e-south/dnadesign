@@ -42,6 +42,8 @@ from matplotlib.ticker import NullLocator
 from matplotlib.transforms import blended_transform_factory
 from numpy import ndarray
 
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
+
 # Short → pretty mapping for axis/labels
 _METRIC_LABELS = {
     "ll": "log_likelihood",
@@ -189,19 +191,13 @@ def _pretty_metric(mid: str | None, fallback: str) -> str:
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     """
-    Native path: a single scalar column named `permuter__metric__<id>`.
+    Native path: a single scalar column named `permuter__observed__<id>`.
     """
     if not metric_id:
-        raise RuntimeError("metric_id must be provided to select a `permuter__metric__<id>` column")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id must be provided to select a `permuter__observed__<id>` column")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
-        # User might have passed the pretty name ("llr") while column is long ("log_likelihood_ratio") or vice versa.
-        # Fall back to scanning for suffix matches.
-        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
-        if len(cand) == 1:
-            col = cand[0]
-        else:
-            raise RuntimeError(f"Metric column not found: {col}")
+        raise RuntimeError(f"Metric column not found: {col}")
     s = df[col].astype("float64")
     return s, _pretty_metric(metric_id, str(metric_id))
 

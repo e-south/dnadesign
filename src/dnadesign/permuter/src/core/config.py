@@ -108,7 +108,7 @@ class JobPlot(BaseModel):
 
 
 class EvalMetric(BaseModel):
-    id: str  # column suffix → permuter__metric__<id>
+    id: str  # column suffix → permuter__observed__<id>
     evaluator: str  # registry key, e.g. evo2_llr
     metric: str  # evaluator's internal metric name (e.g. "log_likelihood_ratio")
     params: Dict[str, Any] = Field(default_factory=dict)

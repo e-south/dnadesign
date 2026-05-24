@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column, observed_metric_column
+
 
 def _require(df: pd.DataFrame, cols: List[str], ctx: str) -> None:
     missing = [c for c in cols if c not in df.columns]
@@ -28,7 +30,7 @@ def _require(df: pd.DataFrame, cols: List[str], ctx: str) -> None:
 
 
 def _observed_col(metric_id: str) -> str:
-    return f"permuter__observed__{metric_id}"
+    return observed_metric_column(metric_id)
 
 
 def _stable_jitter(keys: List[str], width: float) -> np.ndarray:
@@ -67,8 +69,9 @@ def plot(
     if "permuter__round" in df.columns and (df["permuter__round"] == 2).any():
         df = df[df["permuter__round"] == 2].copy()
     obs_col = _observed_col(metric_id)
-    _require(df, ["mut_count", "aa_combo_str", obs_col, "epistasis"], "k‑categorical scatter")
-    df = df.dropna(subset=[obs_col, "mut_count", "epistasis"]).copy()
+    epi_col = interaction_metric_column("epistasis", metric_id)
+    _require(df, ["mut_count", "aa_combo_str", obs_col, epi_col], "k‑categorical scatter")
+    df = df.dropna(subset=[obs_col, "mut_count", epi_col]).copy()
     if df.empty:
         raise RuntimeError("ranked_variants: no rows with observed/epistasis to plot")
     df["mut_count"] = df["mut_count"].astype(int)
@@ -94,7 +97,7 @@ def plot(
     sc = ax.scatter(
         x_vals,
         df[obs_col].astype(float).to_numpy(),
-        c=df["epistasis"].astype(float).to_numpy(),
+        c=df[epi_col].astype(float).to_numpy(),
         s=float(ranked_point_size),
         alpha=float(ranked_alpha),
         edgecolors="none",
