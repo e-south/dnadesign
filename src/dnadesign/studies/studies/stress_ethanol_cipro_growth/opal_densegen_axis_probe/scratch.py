@@ -19,8 +19,10 @@ from .constants import (
     DENSEGEN_SIDECAR,
     FORBIDDEN_EXACT_COLUMNS,
     FORBIDDEN_PREFIXES,
+    ORACLE_ID,
     SFXI_INTENSITY_COLUMNS,
     SFXI_STATE_COLUMNS,
+    STUDY_ID,
 )
 from .paths import _resolve_repo_path
 from .records_manifest import records_manifest_path, records_manifest_payload, records_manifest_problems
@@ -183,7 +185,7 @@ def _make_training_input(labels: pd.DataFrame, train_ids: Sequence[str]) -> pd.D
 
 def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> None:
     source_config = _resolve_repo_path(repo_root, CAMPAIGNS[run.campaign_key]["source_config"])
-    layout = ProbeArtifactLayout(run_root)
+    layout = ProbeArtifactLayout(run_root.resolve())
     cfg = yaml.safe_load(source_config.read_text(encoding="utf-8"))
     if not isinstance(cfg, dict):
         raise ValueError(f"campaign config must be a mapping: {source_config}")
@@ -193,10 +195,24 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
     sidecar_rel = run.sidecar_path.relative_to(dataset_dir)
     cfg["campaign"]["name"] = f"{cfg['campaign']['name']} [{run.run_key}]"
     cfg["campaign"]["slug"] = slug
-    cfg["campaign"]["workdir"] = str(run.workdir)
+    cfg["campaign"]["workdir"] = str(run.workdir.resolve())
+    campaign_metadata = dict(cfg["campaign"].get("metadata") or {})
+    campaign_metadata.update(
+        {
+            "study_id": STUDY_ID,
+            "probe_family": "opal_densegen_axis_probe",
+            "probe_target": run.campaign_key,
+            "probe_target_class": run.target_class,
+            "probe_oracle_kind": "positive" if run.oracle_id == ORACLE_ID else "null",
+            "probe_oracle_id": run.oracle_id,
+            "probe_split_id": run.split_id,
+            "probe_run_key": run.run_key,
+        }
+    )
+    cfg["campaign"]["metadata"] = campaign_metadata
     cfg["data"]["location"] = {
         "kind": "usr",
-        "path": str(layout.scratch_usr_dir),
+        "path": str(layout.scratch_usr_dir.resolve()),
         "dataset": dataset,
     }
     cfg["data"]["y_column_name"] = f"opal__{slug}__y"
@@ -241,89 +257,98 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             {
                 "name": "score_selected_over_rounds",
                 "kind": "metric_over_rounds",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood"],
                 "params": {
                     "metric": "pred__score_selected",
-                    "cohort": ["selected", "top_k", "all_pool"],
-                    "top_k": int(run.selection_k),
-                    "summaries": ["mean", "median", "q25", "q75"],
+                    "cohort": "selected",
+                    "summaries": ["median", "q25", "q75", "count"],
+                    "band": "iqr",
                     "highlight_round": "latest",
-                    "title": f"{run.run_key}: score over rounds",
+                    "title": "RF top-N selected score over rounds",
                 },
             },
             {
-                "name": "score_vs_rank_by_round",
+                "name": "score_vs_rank_over_rounds",
                 "kind": "scatter_score_vs_rank",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood", "selection"],
                 "params": {
                     "rank_mode": "competition",
                     "alpha": 0.45,
+                    "multi_round_alpha": 0.24,
+                    "round_cmap": "round_progression",
                     "rasterize_at": 20000,
-                    "figsize_in": [9, 5],
+                    "title": "RF score vs selection rank by round",
                 },
             },
             {
                 "name": "score_threshold_over_rounds",
                 "kind": "percent_high_activity_over_rounds",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood", "selection", "threshold"],
                 "params": {
                     "metric": "pred__score_selected",
-                    "threshold": 0.8,
-                    "mode": "both",
-                    "hue": "logic_fidelity",
-                    "highlight_round": "latest",
-                    "rasterize_at": 20000,
+                    "threshold_quantile": 0.9,
+                    "mode": "line",
+                    "title": "RF score enrichment above fixed P90 over rounds",
                 },
             },
             {
                 "name": "feature_importance_heatmap",
                 "kind": "feature_importance_heatmap",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood", "model"],
                 "params": {
                     "order_policy": "sort_index",
                     "cluster": False,
                     "rasterized": True,
-                    "figsize_in": [8.5, 12],
-                    "max_yticks": 24,
-                    "title": f"{run.run_key}: feature importance over rounds",
+                    "figsize_in": [14.0, 4.4],
+                    "max_xticks": 16,
+                    "contrast_gamma": 0.55,
+                    "cmap": "opal_importance",
+                    "colorbar_label": "rf_feature_importance",
+                    "title": "RF feature importance by round",
                 },
             },
             {
                 "name": "feature_importance_bars",
                 "kind": "feature_importance_bars",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood", "model"],
                 "params": {
                     "order_policy": "sort_index",
-                    "alpha": 0.32,
-                    "figsize_in": [12, 5],
-                    "title": f"{run.run_key}: feature importance bars",
+                    "alpha": 0.40,
+                    "figsize_in": [14.0, 4.4],
+                    "bar_width": 1.05,
+                    "cmap": "round_progression",
+                    "max_xticks": 16,
+                    "title": "Random forest feature importance by round",
                 },
             },
             {
                 "name": "selected_vec8_summary",
                 "kind": "vector_summary_heatmap",
-                "round_variants": ["all", "each"],
+                "round_selector": "all",
                 "tags": ["rounds", "dogfood", "vector"],
                 "params": {
                     "vector_field": "pred__y_hat_model",
                     "cohort": "selected",
                     "include_reference_vector": True,
                     "reference_vector": target_vec8,
-                    "reference_label": "target vec8",
+                    "reference_label": "Target vec8",
                     "channel_labels": [*SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS],
-                    "title": f"{run.run_key}: selected vec8 summary",
+                    "reference_mse_panel": True,
+                    "cmap": "opal_seafoam",
+                    "value_label": "Mean predicted response",
+                    "title": "Selected response vector vs target",
                 },
             },
             {
                 "name": "fold_change_vs_logic_fidelity_latest",
                 "kind": "fold_change_vs_logic_fidelity",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "selection", "overlay", "single-round"],
                 "params": {
                     "y_axis": "score",
@@ -331,72 +356,83 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                     "size_by": "logic_fidelity",
                     "alpha": 0.35,
                     "rasterize_at": 20000,
+                    "title": "SFXI score vs logic fidelity by round",
                 },
             },
             {
-                "name": "sfxi_logic_fidelity_closeness_latest",
+                "name": "sfxi_observed_logic_closeness_over_rounds",
                 "kind": "sfxi_logic_fidelity_closeness",
-                "round_selector": "latest",
-                "round_variants": ["latest", "each"],
-                "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
+                "round_selector": "all",
+                "tags": ["sfxi", "dogfood", "labels", "overlay", "rounds"],
                 "params": {
                     "on_violin_invalid": "line",
                     "violin_min_points": 3,
+                    "cmap": "opal_seafoam",
                 },
             },
             {
                 "name": "sfxi_factorial_effects_latest",
                 "kind": "sfxi_factorial_effects",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
                 "params": {
                     "size_by": "obj__effect_scaled",
                     "include_labels": True,
                     "rasterize_at": 20000,
+                    "title": "SFXI factorial effects by round",
                 },
             },
             {
                 "name": "sfxi_setpoint_sweep_latest",
                 "kind": "sfxi_setpoint_sweep",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "labels", "single-round"],
-                "params": {"min_n": 5},
+                "params": {
+                    "min_n": 5,
+                    "title": "SFXI setpoint sweep by round",
+                },
             },
             {
                 "name": "sfxi_support_diagnostics_latest",
                 "kind": "sfxi_support_diagnostics",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "labels", "overlay", "single-round"],
                 "params": {
                     "y_axis": "score",
                     "hue": "effect_scaled",
                     "batch_size": 2048,
+                    "title": "SFXI support diagnostics by round",
                 },
             },
             {
                 "name": "sfxi_uncertainty_latest",
                 "kind": "sfxi_uncertainty",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "model", "single-round"],
                 "params": {
                     "kind": "score",
                     "y_axis": "score",
                     "hue": "logic_fidelity",
+                    "sample_n": 1024,
+                    "seed": 0,
+                    "batch_size": 2048,
+                    "title": "SFXI score uncertainty by round",
                 },
             },
             {
                 "name": "sfxi_intensity_scaling_latest",
                 "kind": "sfxi_intensity_scaling",
                 "round_selector": "latest",
-                "round_variants": ["latest", "each"],
+                "round_variants": "each",
                 "tags": ["sfxi", "dogfood", "labels", "single-round"],
                 "params": {
                     "min_n": 5,
                     "include_pool": True,
+                    "title": "SFXI intensity scaling by round",
                 },
             },
         ],

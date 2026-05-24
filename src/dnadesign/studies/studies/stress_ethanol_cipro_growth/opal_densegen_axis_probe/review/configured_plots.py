@@ -93,6 +93,8 @@ def _configured_plot_entry(row: Mapping[str, Any]) -> dict[str, Any]:
         "media_paths": [str(output.get("path")) for output in media if output.get("path")],
         "tidy_csv_paths": [str(output.get("path")) for output in tidy if output.get("path")],
         "params": manifest.get("params") or {},
+        "metadata": manifest.get("metadata") or {},
+        "quality": manifest.get("quality") or {},
         "warnings": manifest.get("warnings") or [],
         "error": manifest.get("error"),
     }
@@ -102,6 +104,7 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
     problems: list[str] = []
     expected_final_round = entry.get("expected_final_round")
     expected_rounds = set(range(int(expected_final_round) + 1)) if expected_final_round is not None else set()
+    problems.extend(_round_scope_coverage_problems(entry.get("plots") or [], expected_final_round=expected_final_round))
     for plot in entry.get("plots") or []:
         if not isinstance(plot, Mapping):
             problems.append("plot_entry_not_mapping")
@@ -116,20 +119,69 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
             problems.extend(_image_quality_problems(media_path, label=name))
         tidy_paths = [Path(str(path)) for path in plot.get("tidy_csv_paths") or []]
         if not tidy_paths:
-            problems.append(f"{name}:tidy_csv_missing")
+            if _plot_requires_tidy_csv(plot):
+                problems.append(f"{name}:tidy_csv_missing")
+            continue
+        plot_expected_rounds = _expected_tidy_rounds_for_plot(
+            plot.get("rounds"),
+            expected_final_round=expected_final_round,
+        )
         for tidy_path in tidy_paths:
             problems.extend(
                 _tidy_csv_quality_problems(
                     tidy_path,
                     label=name,
                     kind=str(plot.get("kind") or ""),
-                    expected_rounds=expected_rounds,
+                    expected_rounds=plot_expected_rounds if plot_expected_rounds is not None else expected_rounds,
                 )
             )
     return {
         "status": "ok" if not problems else "attention",
         "problems": problems,
     }
+
+
+def _round_scope_coverage_problems(plots: Any, *, expected_final_round: Any) -> list[str]:
+    if expected_final_round is None:
+        return []
+    final_round = int(expected_final_round)
+    grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+    for plot in plots:
+        if not isinstance(plot, Mapping):
+            continue
+        key = (str(plot.get("name") or "unknown"), str(plot.get("kind") or "unknown"))
+        grouped.setdefault(key, []).append(plot)
+
+    problems: list[str] = []
+    for (name, _kind), group in grouped.items():
+        if not _expects_final_round_coverage(group):
+            continue
+        if any(_round_scope_covers_final(plot.get("rounds"), final_round=final_round) for plot in group):
+            continue
+        problems.append(f"{name}:round_scope_missing_final_round:{final_round}")
+    return problems
+
+
+def _expects_final_round_coverage(group: list[Mapping[str, Any]]) -> bool:
+    for plot in group:
+        rounds = plot.get("rounds")
+        metadata = plot.get("metadata") if isinstance(plot.get("metadata"), Mapping) else {}
+        capability = metadata.get("capability") if isinstance(metadata.get("capability"), Mapping) else {}
+        round_scope = str(capability.get("round_scope") or "")
+        name = str(plot.get("name") or "").lower()
+        if name.endswith("_latest") or round_scope in {"single_round", "single_or_round_history"}:
+            return True
+        if isinstance(rounds, list):
+            return True
+    return False
+
+
+def _round_scope_covers_final(rounds: Any, *, final_round: int) -> bool:
+    if isinstance(rounds, str) and rounds in {"all", "latest"}:
+        return True
+    if isinstance(rounds, list):
+        return final_round in {int(value) for value in rounds if value is not None}
+    return False
 
 
 def _plot_quality_summary(entries: list[dict[str, Any]]) -> dict[str, Any]:
@@ -158,6 +210,31 @@ def _review_next_steps(*, layout: ProbeArtifactLayout, plot_quality: Mapping[str
         "configured_plot_refresh_command": (f"uv run python -m {module} plot --run-root {run_root} --round all --json"),
         "rerun_report_command": f"uv run python -m {module} report --run-root {run_root} --plots --json",
     }
+
+
+def _plot_requires_tidy_csv(plot: Mapping[str, Any]) -> bool:
+    metadata = plot.get("metadata") if isinstance(plot.get("metadata"), Mapping) else {}
+    quality = plot.get("quality") if isinstance(plot.get("quality"), Mapping) else {}
+    capability = metadata.get("capability") if isinstance(metadata.get("capability"), Mapping) else {}
+    return bool(capability.get("tidy_available") or metadata.get("tidy_schema") or quality.get("tidy_schema_declared"))
+
+
+def _expected_tidy_rounds_for_plot(rounds: Any, *, expected_final_round: Any) -> set[int] | None:
+    if expected_final_round is None:
+        return None
+    final_round = int(expected_final_round)
+    if rounds == "all":
+        return set(range(final_round + 1))
+    if rounds == "latest":
+        return {final_round}
+    if isinstance(rounds, list):
+        resolved: set[int] = set()
+        for value in rounds:
+            if value is None:
+                continue
+            resolved.add(int(value))
+        return resolved
+    return None
 
 
 def _image_quality_problems(path: Path, *, label: str) -> list[str]:
