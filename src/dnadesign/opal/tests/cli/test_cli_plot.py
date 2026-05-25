@@ -15,9 +15,12 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.core.utils import ExitCodes
 from dnadesign.opal.src.plots._context import PlotContext
 from dnadesign.opal.src.plots._round_overlay import resolve_highlight_round
 from dnadesign.opal.src.plots.config import list_configured_plot_specs, load_plot_config
+from dnadesign.opal.src.plots.manifests import write_plot_manifest_index
+from dnadesign.opal.src.plots.runner import _merged_manifest_index_rows
 from dnadesign.opal.src.registries.plots import PlotMeta, describe_plot_kind, list_plots, register_plot
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
@@ -127,6 +130,45 @@ def test_plot_cli_name_filter_preserves_other_manifest_index_entries(tmp_path):
     mini_b_manifest = json.loads((workdir / "outputs" / "plots" / "mini_b.manifest.json").read_text())
     assert mini_b_manifest["freshness"]["status"] == "stale"
     assert (workdir / "outputs" / "plots" / "mini_b.png").exists()
+
+
+def test_targeted_manifest_merge_preserves_same_name_round_variant_entries(tmp_path):
+    output_dir = tmp_path / "plots"
+    output_dir.mkdir()
+    existing_rows = [
+        _manifest_row(output_dir, name="score_by_round", plot_id="score_by_round_r0"),
+        _manifest_row(output_dir, name="score_by_round", plot_id="score_by_round_r1"),
+        _manifest_row(output_dir, name="other_plot", plot_id="other_plot_rall"),
+    ]
+    write_plot_manifest_index(output_dir, existing_rows)
+    rerun_row = _manifest_row(output_dir, name="score_by_round", plot_id="score_by_round_r2")
+
+    merged = _merged_manifest_index_rows(output_dir, [rerun_row], merge_existing=True)
+
+    assert {row["plot_id"] for row in merged} == {
+        "score_by_round_r0",
+        "score_by_round_r1",
+        "score_by_round_r2",
+        "other_plot_rall",
+    }
+    assert sum(row["name"] == "score_by_round" for row in merged) == 3
+
+
+def _manifest_row(output_dir: Path, *, name: str, plot_id: str) -> dict:
+    media_path = output_dir / f"{plot_id}.png"
+    media_path.write_text(plot_id)
+    return {
+        "schema_version": "opal.plot_artifact.v1",
+        "plot_id": plot_id,
+        "name": name,
+        "kind": "test_plot_cli_minimal",
+        "status": "written",
+        "manifest_path": str(output_dir / f"{plot_id}.manifest.json"),
+        "inputs": [],
+        "outputs": [{"role": "media", "path": str(media_path), "exists": True}],
+        "freshness": {"schema_version": "opal.plot_freshness.v1", "status": "fresh"},
+        "warnings": [],
+    }
 
 
 def test_plot_cli_plot_local_round_selector_overrides_global_round(tmp_path):
@@ -365,6 +407,21 @@ def test_plot_cli_list_configured_json_error_when_no_plots(tmp_path):
     assert "No plots found" in payload["error"]["message"]
 
 
+def test_plot_cli_list_configured_json_error_when_config_missing():
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--list-config", "--json"])
+
+    assert res.exit_code == ExitCodes.BAD_ARGS, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "plot list-config"
+    assert "No config provided" in payload["error"]["message"]
+    assert "Traceback" not in res.stdout
+    assert "Traceback" not in res.stderr
+
+
 def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
     config_paths = [
         Path("src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
@@ -466,6 +523,35 @@ def test_plot_cli_rejects_run_id_round_mismatch(tmp_path):
     )
     assert res.exit_code != 0, res.stdout
     assert "run_id" in res.output
+    assert "Traceback" not in res.output
+
+
+def test_plot_cli_missing_runs_ledger_returns_json_error_without_traceback(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[{"name": "mini", "kind": "test_plot_cli_minimal", "params": {"tag": "demo"}}],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--no-color", "plot", "-c", str(campaign), "--run-id", "missing", "--json", "--name", "mini"],
+    )
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.output)
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "plot"
+    assert "Missing runs sink" in payload["error"]["message"]
+    assert "Traceback" not in res.output
 
 
 def test_plot_cli_rejects_bad_round_selector(tmp_path):
@@ -489,6 +575,7 @@ def test_plot_cli_rejects_bad_round_selector(tmp_path):
     res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "bad"])
     assert res.exit_code != 0, res.stdout
     assert "Invalid round selector" in res.output
+    assert "Traceback" not in res.output
 
 
 def test_plot_cli_writes_failed_manifest_when_plugin_does_not_write_output(tmp_path):

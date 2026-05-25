@@ -25,7 +25,7 @@ from ...plots.runner import PlotRequest, resolve_run_round, run_plots
 from ...registries.plots import describe_plot_kind, get_plot_meta, list_plots
 from ..formatting import bullet_list
 from ..registry import cli_command
-from ._common import json_error, json_out, print_config_context
+from ._common import json_error, json_out, opal_error, print_config_context
 
 
 @cli_command("plot", help="Generate plots from plot_config (preferred) or inline 'plots:'.")
@@ -73,9 +73,45 @@ def cmd_plot(
     """
     Runs all plots by default (or a single plot via --name).
     Overwrites output files by default.
-    Continues on error, printing full tracebacks.
+    Collects per-plot render failures while surfacing CLI/config contract
+    failures as OPAL errors.
     Exit code 1 if any plot failed.
     """
+    try:
+        _run_plot_command(
+            config=config,
+            plot_config=plot_config,
+            list_registry=list_registry,
+            list_config=list_config,
+            describe=describe,
+            round=round,
+            run_id=run_id,
+            name=name,
+            tag=tag,
+            json_output=json_output,
+        )
+    except OpalError as e:
+        ctx = "plot list-config" if list_config and not describe else "plot"
+        if json_output:
+            json_error(ctx, e)
+        else:
+            opal_error(ctx, e)
+        raise typer.Exit(code=e.exit_code) from e
+
+
+def _run_plot_command(
+    *,
+    config: Optional[Path],
+    plot_config: Optional[Path],
+    list_registry: bool,
+    list_config: bool,
+    describe: Optional[str],
+    round: Optional[str],
+    run_id: Optional[str],
+    name: Optional[str],
+    tag: Optional[List[str]],
+    json_output: bool,
+) -> None:
     if describe:
         try:
             meta = get_plot_meta(describe)
@@ -208,22 +244,30 @@ def cmd_plot(
         try:
             runs_df = analysis.read_runs()
         except OpalError as e:
-            raise ValueError(f"[plot] {e}") from e
-        run_round = resolve_run_round(runs_df, run_id)
+            raise OpalError(f"[plot] {e}", e.exit_code) from e
+        try:
+            run_round = resolve_run_round(runs_df, run_id)
+        except ValueError as e:
+            raise OpalError(str(e), ExitCodes.BAD_ARGS) from e
         if rounds_sel == "all":
-            raise ValueError("[plot] Do not combine --run-id with --round all; run_id is single-round.")
+            raise OpalError(
+                "[plot] Do not combine --run-id with --round all; run_id is single-round.",
+                ExitCodes.BAD_ARGS,
+            )
         if rounds_sel in ("unspecified", "latest"):
             rounds_sel = [run_round]
         elif isinstance(rounds_sel, list):
             if run_round not in rounds_sel:
-                raise ValueError(
-                    f"[plot] run_id {run_id!r} belongs to as_of_round={run_round}, but --round={round!r} excludes it."
+                raise OpalError(
+                    f"[plot] run_id {run_id!r} belongs to as_of_round={run_round}, but --round={round!r} excludes it.",
+                    ExitCodes.BAD_ARGS,
                 )
         else:
             if int(rounds_sel) != int(run_round):
-                raise ValueError(
+                raise OpalError(
                     f"[plot] run_id {run_id!r} belongs to as_of_round={run_round}, "
-                    f"but --round={round!r} selects a different round."
+                    f"but --round={round!r} selects a different round.",
+                    ExitCodes.BAD_ARGS,
                 )
     suffix = round_suffix(rounds_sel)
 

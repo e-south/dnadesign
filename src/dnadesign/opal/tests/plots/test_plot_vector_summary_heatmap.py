@@ -58,5 +58,6 @@ def test_vector_summary_explicit_reference_does_not_require_objective_setpoint(t
     )
 
     tidy = pd.read_csv(ctx.output_dir / "vector_summary.csv")
-    assert set(tidy["row_type"]) == {"reference_vector", "round"}
+    assert set(tidy["row_type"]) == {"reference_vector", "reference_mse", "round"}
     assert tidy.loc[tidy["row_type"] == "reference_vector", "cohort"].unique().tolist() == ["target vec2"]
+    assert tidy.loc[tidy["row_type"] == "reference_mse", "channel"].unique().tolist() == ["mse"]

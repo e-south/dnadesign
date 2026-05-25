@@ -10,6 +10,7 @@ def render_visual_panel_cell() -> str:
         def _(
             Path,
             build_notebook_campaign_set_metric_comparison_rows,
+            build_notebook_no_plot_scope_rows,
             build_notebook_plot_card_rows,
             build_notebook_plot_method_sections,
             campaigns,
@@ -24,6 +25,7 @@ def render_visual_panel_cell() -> str:
             render_notebook_campaign_set_metric_comparison_image,
             selected_plot_choice,
             select_notebook_plot_scope,
+            selected_campaign_model,
         ):
             if selected_plot_choice is None:
                 _lines = ["No written manifest-backed plot media are available for this campaign."]
@@ -34,6 +36,9 @@ def render_visual_panel_cell() -> str:
                     ]
                     _lines.append("Plot inventory: " + ", ".join(_parts))
                 _items = [mo.md("\\n".join(_lines))]
+                _scope_rows = build_notebook_no_plot_scope_rows(selected_campaign_model)
+                _scope_panel = mo.ui.table(pl.DataFrame(_scope_rows), page_size=12)
+                _items.append(mo.accordion({"Current scope and probe implication": _scope_panel}, multiple=True))
                 if plot_inventory_rows:
                     _items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
                 plot_panel = mo.vstack(_items, gap=0.45)

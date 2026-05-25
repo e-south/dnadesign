@@ -19,6 +19,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_change_rows,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
+    build_notebook_no_plot_scope_rows,
     build_notebook_plot_card_rows,
     build_notebook_plot_inventory_rows,
     build_notebook_plot_method_rows,
@@ -89,6 +90,8 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert "def render_visual_surface_cells" not in text
     assert surface_text not in text
     assert "manifest-backed plot media are available" in text
+    assert "build_notebook_no_plot_scope_rows" in text
+    assert "Current scope and probe implication" in text
     assert 'label="Visual surface"' in text
     assert '"label": plot_choice["title"]' not in text
     assert "max-height" in text
@@ -274,6 +277,11 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
             "model": "random_forest",
             "selection": "top_n",
             "objectives": ["sfxi_v1"],
+            "objective_params": [{"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 1, 1]}}],
+            "metadata": {
+                "response_axis": "ciprofloxacin",
+                "comparison_group": "Ciprofloxacin factor",
+            },
         },
         "status": {
             "progress_status": "attention",
@@ -478,6 +486,26 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
             view_model,
             plot_entries=[{"name": "bad_plot", "kind": "not_registered"}],
         )
+    no_plot_rows = {
+        row["field"]: row["value"]
+        for row in build_notebook_no_plot_scope_rows(
+            {
+                **view_model,
+                "plot_manifests": [],
+                "configured_plots": [
+                    {"name": "score", "kind": "metric_over_rounds"},
+                    {"name": "missing_plot", "kind": "scatter_score_vs_rank"},
+                ],
+            }
+        )
+    }
+    assert no_plot_rows["response axis"] == ("response_axis=ciprofloxacin; comparison_group=Ciprofloxacin factor")
+    assert no_plot_rows["objective setpoint"] == "sfxi_v1 setpoint_vector=[0, 0, 1, 1]"
+    assert "configured=2" in no_plot_rows["plot state"]
+    assert "media_choices=0" in no_plot_rows["plot state"]
+    assert "missing_outputs=2" in no_plot_rows["plot state"]
+    assert "do not draw visual or biological conclusions" in no_plot_rows["evidence boundary"]
+    assert "uv run opal plot -c campaign.yaml --round all" in no_plot_rows["next commands"]
 
     card_rows = build_notebook_plot_card_rows(visual_surface["choices"][0])
     assert {"field": "media", "value": "plots/score.png"} in card_rows
@@ -653,7 +681,9 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_plot_card_rows" in text
     assert "build_notebook_plot_method_sections" in text
+    assert "build_notebook_no_plot_scope_rows" in text
     assert "build_notebook_validity_rows" in text
+    assert "Current scope and probe implication" in text
     assert "build_notebook_validity_lines" not in text
     assert "build_notebook_artifact_garden_lines" not in text
     assert "build_notebook_change_lines" not in text

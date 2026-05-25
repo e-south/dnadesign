@@ -1,4 +1,37 @@
+import json
+import subprocess
+import sys
+
 import dnadesign.opal as opal
+
+
+def test_package_root_defers_heavy_public_imports() -> None:
+    code = """
+import json
+import sys
+import dnadesign.opal as opal
+
+from dnadesign.opal import load_config
+
+print(json.dumps({
+    "has_load_config": callable(load_config),
+    "load_config_exported": "load_config" in opal.__all__,
+    "gaussian_process_loaded": "dnadesign.opal.src.models.gaussian_process" in sys.modules,
+    "sklearn_loaded": any(name == "sklearn" or name.startswith("sklearn.") for name in sys.modules),
+}))
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(proc.stdout)
+
+    assert payload["has_load_config"] is True
+    assert payload["load_config_exported"] is True
+    assert payload["gaussian_process_loaded"] is False
+    assert payload["sklearn_loaded"] is False
 
 
 def test_package_root_does_not_export_dashboard_helpers() -> None:

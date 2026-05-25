@@ -27,6 +27,7 @@ from .campaign_set_comparison import (
     build_notebook_campaign_set_metric_comparison_rows,
     render_notebook_campaign_set_metric_comparison_image,
 )
+from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
     build_notebook_at_a_glance_rows,
     build_notebook_campaign_header_lines,
@@ -83,6 +84,7 @@ __all__ = [
     "build_notebook_evidence_rows",
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
+    "build_notebook_no_plot_scope_rows",
     "build_notebook_plot_card_rows",
     "build_notebook_plot_inventory_rows",
     "build_notebook_plot_method_sections",

@@ -11,36 +11,52 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .src.analysis.campaign import CampaignAnalysis
-from .src.analysis.campaign_progress import (
-    assess_records_contract,
-    assess_records_contract_for_schema,
-    assess_records_contract_for_values,
-    build_ledger_status_table,
-    build_records_preview,
-    cli_handoff_lines,
-    read_optional_table,
-    records_status_lines,
-    table_status_lines,
-    unavailable_table,
-    x_provenance_status_lines,
-)
-from .src.analysis.ledger import available_rounds, latest_round, latest_run_id, require_columns
-from .src.analysis.notebook_set_template import render_campaign_set_notebook
-from .src.analysis.notebook_template import render_campaign_notebook
-from .src.config.loader import load_config
-from .src.plots.api import run_campaign_plots
-from .src.plots.config import load_plot_config, parse_enabled, parse_tags
-from .src.plots.manifests import load_plot_artifact_manifest, load_plot_manifest_index
-from .src.registries.plots import describe_plot_kind, list_plot_kinds
-from .src.reporting.artifact_garden import build_artifact_garden_audit, prune_stale_artifacts
-from .src.reporting.notebook import build_notebook_view_model, smoke_check_notebook
-from .src.reporting.notebook_set import build_campaign_set_notebook_view_model
-from .src.reporting.predictions import read_campaign_predictions
-from .src.reporting.progress import build_campaign_progress, render_campaign_progress_text
-from .src.reporting.review import build_campaign_review, load_review_manifest
-from .src.runtime.memory_guard import enforce_x_matrix_memory_budget, estimate_x_matrix_memory
-from .src.storage.x_contracts import validate_x_parquet_column
+from importlib import import_module
+from typing import Any
+
+_PUBLIC_EXPORTS = {
+    "CampaignAnalysis": ".src.analysis.campaign",
+    "assess_records_contract": ".src.analysis.campaign_progress",
+    "assess_records_contract_for_schema": ".src.analysis.campaign_progress",
+    "assess_records_contract_for_values": ".src.analysis.campaign_progress",
+    "available_rounds": ".src.analysis.ledger",
+    "build_ledger_status_table": ".src.analysis.campaign_progress",
+    "build_artifact_garden_audit": ".src.reporting.artifact_garden",
+    "build_campaign_progress": ".src.reporting.progress",
+    "build_campaign_review": ".src.reporting.review",
+    "build_notebook_view_model": ".src.reporting.notebook",
+    "build_campaign_set_notebook_view_model": ".src.reporting.notebook_set",
+    "build_records_preview": ".src.analysis.campaign_progress",
+    "cli_handoff_lines": ".src.analysis.campaign_progress",
+    "describe_plot_kind": ".src.registries.plots",
+    "enforce_x_matrix_memory_budget": ".src.runtime.memory_guard",
+    "estimate_x_matrix_memory": ".src.runtime.memory_guard",
+    "latest_round": ".src.analysis.ledger",
+    "latest_run_id": ".src.analysis.ledger",
+    "list_configured_plot_specs": ".src.plots.config",
+    "list_plot_kinds": ".src.registries.plots",
+    "load_config": ".src.config.loader",
+    "load_plot_artifact_manifest": ".src.plots.manifests",
+    "load_plot_config": ".src.plots.config",
+    "load_plot_manifest_index": ".src.plots.manifests",
+    "load_review_manifest": ".src.reporting.review",
+    "parse_enabled": ".src.plots.config",
+    "parse_tags": ".src.plots.config",
+    "prune_stale_artifacts": ".src.reporting.artifact_garden",
+    "read_optional_table": ".src.analysis.campaign_progress",
+    "read_campaign_predictions": ".src.reporting.predictions",
+    "records_status_lines": ".src.analysis.campaign_progress",
+    "render_campaign_notebook": ".src.analysis.notebook_template",
+    "render_campaign_set_notebook": ".src.analysis.notebook_set_template",
+    "render_campaign_progress_text": ".src.reporting.progress",
+    "require_columns": ".src.analysis.ledger",
+    "run_campaign_plots": ".src.plots.api",
+    "smoke_check_notebook": ".src.reporting.notebook",
+    "table_status_lines": ".src.analysis.campaign_progress",
+    "unavailable_table": ".src.analysis.campaign_progress",
+    "validate_x_parquet_column": ".src.storage.x_contracts",
+    "x_provenance_status_lines": ".src.analysis.campaign_progress",
+}
 
 
 def main() -> None:
@@ -52,45 +68,20 @@ def main() -> None:
 
 
 __all__ = [
-    "CampaignAnalysis",
-    "assess_records_contract",
-    "assess_records_contract_for_schema",
-    "assess_records_contract_for_values",
-    "available_rounds",
-    "build_ledger_status_table",
-    "build_artifact_garden_audit",
-    "build_campaign_progress",
-    "build_campaign_review",
-    "build_notebook_view_model",
-    "build_campaign_set_notebook_view_model",
-    "build_records_preview",
-    "cli_handoff_lines",
-    "describe_plot_kind",
-    "enforce_x_matrix_memory_budget",
-    "estimate_x_matrix_memory",
-    "latest_round",
-    "latest_run_id",
-    "list_plot_kinds",
-    "load_config",
-    "load_plot_artifact_manifest",
-    "load_plot_config",
-    "load_plot_manifest_index",
-    "load_review_manifest",
+    *_PUBLIC_EXPORTS,
     "main",
-    "parse_enabled",
-    "parse_tags",
-    "prune_stale_artifacts",
-    "read_optional_table",
-    "read_campaign_predictions",
-    "records_status_lines",
-    "render_campaign_notebook",
-    "render_campaign_set_notebook",
-    "render_campaign_progress_text",
-    "require_columns",
-    "run_campaign_plots",
-    "smoke_check_notebook",
-    "table_status_lines",
-    "unavailable_table",
-    "validate_x_parquet_column",
-    "x_provenance_status_lines",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    module_name = _PUBLIC_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_name, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted([*globals(), *_PUBLIC_EXPORTS])

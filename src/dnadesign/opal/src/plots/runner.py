@@ -478,13 +478,28 @@ def _merged_manifest_index_rows(
     if not index_path.exists():
         return rows
     existing = load_plot_manifest_index(index_path)
-    replaced_names = {str(row.get("name") or "") for row in rows}
+    replaced_identities = {identity for row in rows for identity in _manifest_index_identity_values(row)}
     preserved = [
         _refresh_preserved_manifest_row(row)
         for row in existing.get("manifests", [])
-        if isinstance(row, dict) and str(row.get("name") or "") not in replaced_names
+        if isinstance(row, dict) and _manifest_index_identity_values(row).isdisjoint(replaced_identities)
     ]
     return [*preserved, *rows]
+
+
+def _manifest_index_identity_values(row: dict[str, Any]) -> set[tuple[str, str]]:
+    identities: set[tuple[str, str]] = set()
+    plot_id = str(row.get("plot_id") or "").strip()
+    if plot_id:
+        identities.add(("plot_id", plot_id))
+    manifest_path = str(row.get("manifest_path") or "").strip()
+    if manifest_path:
+        identities.add(("manifest_path", str(Path(manifest_path))))
+    if not identities:
+        name = str(row.get("name") or "").strip()
+        if name:
+            identities.add(("name", name))
+    return identities
 
 
 def _refresh_preserved_manifest_row(row: dict[str, Any]) -> dict[str, Any]:

@@ -125,6 +125,10 @@ def build_notebook_view_model(
             "model": cfg.model.name,
             "selection": cfg.selection.selection.name,
             "objectives": [objective.name for objective in cfg.objectives.objectives],
+            "objective_params": [
+                {"name": objective.name, "params": dict(objective.params or {})}
+                for objective in cfg.objectives.objectives
+            ],
         },
         "status": {
             "progress_status": progress.get("status"),

@@ -119,9 +119,11 @@ def render_visual_surface_cells() -> str:
             build_notebook_baserender_label_rows,
             build_notebook_plot_method_sections,
             build_notebook_baserender_contract_rows,
+            build_notebook_no_plot_scope_rows,
             build_notebook_plot_card_rows,
             labels_df,
             mo,
+            notebook_view_model,
             notebook_baserender_contract,
             pl,
             plot_choices,
@@ -136,6 +138,17 @@ def render_visual_surface_cells() -> str:
         ):
             if visual_surface_ui is None:
                 _items = [mo.md(visual_surface_note)]
+                _items.append(
+                    mo.accordion(
+                        {
+                            "Current scope and probe implication": mo.ui.table(
+                                pl.DataFrame(build_notebook_no_plot_scope_rows(notebook_view_model)),
+                                page_size=12,
+                            )
+                        },
+                        multiple=True,
+                    )
+                )
                 if plot_inventory_rows:
                     _items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
                 plot_panel = mo.vstack(_items, gap=0.45)

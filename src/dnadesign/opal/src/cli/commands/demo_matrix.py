@@ -44,7 +44,16 @@ def _run_cli_quiet(fn, /, **kwargs) -> dict[str, str]:
     out = io.StringIO()
     err = io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        fn(**kwargs)
+        try:
+            fn(**kwargs)
+        except typer.Exit as e:
+            if int(e.exit_code or 0) != 0:
+                output = "\n".join(part.strip() for part in (out.getvalue(), err.getvalue()) if part.strip())
+                suffix = f" Output: {output}" if output else ""
+                raise OpalError(
+                    f"CLI step exited with code {int(e.exit_code or 0)}.{suffix}",
+                    ExitCodes.BAD_ARGS,
+                ) from e
     return {"stdout": out.getvalue(), "stderr": err.getvalue()}
 
 
@@ -235,6 +244,8 @@ def cmd_demo_matrix(
     except OpalError as e:
         opal_error("demo-matrix", e)
         raise typer.Exit(code=e.exit_code)
+    except typer.Exit:
+        raise
     except Exception as e:
         internal_error("demo-matrix", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
