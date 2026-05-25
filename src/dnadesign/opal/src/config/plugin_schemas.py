@@ -127,6 +127,44 @@ class _ScalarTableParams(BaseModel):
         return v
 
 
+@register_param_schema("transform_y", "vector_from_table_v1")
+class _VectorTableParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id_column: Optional[str] = None
+    sequence_column: str = "sequence"
+    value_columns: List[str]
+
+    @field_validator("id_column")
+    @classmethod
+    def _id_col_not_blank(cls, v):
+        if v is None:
+            return v
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("id_column must be a non-empty string when provided.")
+        return vv
+
+    @field_validator("sequence_column")
+    @classmethod
+    def _sequence_col_not_blank(cls, v):
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("sequence_column must be a non-empty string.")
+        return vv
+
+    @field_validator("value_columns")
+    @classmethod
+    def _value_columns_valid(cls, v):
+        if not v:
+            raise ValueError("value_columns must contain at least one target column.")
+        cols = [str(item).strip() for item in v]
+        if any(not item for item in cols):
+            raise ValueError("value_columns entries must be non-empty strings.")
+        if len(set(cols)) != len(cols):
+            raise ValueError("value_columns must not contain duplicates.")
+        return cols
+
+
 @register_param_schema("model", "random_forest")
 class _RFParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -291,6 +329,45 @@ class _SFXIParams(BaseModel):
 @register_param_schema("objective", "scalar_identity_v1")
 class _ScalarIdentityParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+@register_param_schema("objective", "vector_channel_v1")
+class _VectorChannelParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    channel_index: int = 0
+    channel_name: str = "channel"
+    mode: Literal["maximize", "minimize"] = "maximize"
+
+    @field_validator("channel_index")
+    @classmethod
+    def _channel_index_valid(cls, v):
+        if int(v) < 0:
+            raise ValueError("channel_index must be >= 0.")
+        return int(v)
+
+    @field_validator("channel_name")
+    @classmethod
+    def _channel_name_not_blank(cls, v):
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("channel_name must be a non-empty string.")
+        return vv
+
+
+@register_param_schema("objective", "vector_target_similarity_v1")
+class _VectorTargetSimilarityParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_vector: List[float]
+
+    @field_validator("target_vector")
+    @classmethod
+    def _target_vector_valid(cls, v):
+        if not v:
+            raise ValueError("target_vector must contain at least one numeric channel.")
+        vals = [float(item) for item in v]
+        if any(not np.isfinite(item) for item in vals):
+            raise ValueError("target_vector entries must be finite.")
+        return vals
 
 
 @register_param_schema("selection", "top_n")

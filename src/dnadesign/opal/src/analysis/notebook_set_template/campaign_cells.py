@@ -21,7 +21,7 @@ def _campaign_selector_cell() -> str:
             header_md = mo.md(
                 "# Campaigns\\n\\n"
                 f"`{campaign_set_view_model['campaign_count']}` campaigns. "
-                f"Round selector: `{selected_round_selector}`."
+                f"Review scope: `{selected_round_selector}`."
             )
             return campaign_labels, campaign_summary_df, campaign_ui, header_md
         """

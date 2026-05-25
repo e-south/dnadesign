@@ -35,14 +35,13 @@ def _import_cell() -> str:
 
             from dnadesign.opal.notebooks.api.generated import (
                 build_campaign_set_notebook_view_model,
-                build_campaign_set_round_options,
                 build_notebook_artifact_garden_rows,
                 build_notebook_artifact_garden_summary_rows,
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
-                build_notebook_campaign_set_group_options,
                 build_notebook_campaign_set_metric_comparison_rows,
+                build_notebook_campaign_set_visual_choices,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
                 build_notebook_evidence_rows,
@@ -60,14 +59,13 @@ def _import_cell() -> str:
             return (
                 Path,
                 build_campaign_set_notebook_view_model,
-                build_campaign_set_round_options,
                 build_notebook_artifact_garden_rows,
                 build_notebook_artifact_garden_summary_rows,
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
-                build_notebook_campaign_set_group_options,
                 build_notebook_campaign_set_metric_comparison_rows,
+                build_notebook_campaign_set_visual_choices,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
                 build_notebook_evidence_rows,
@@ -95,29 +93,22 @@ def _view_model_cell() -> str:
         @app.cell
         def _(Path):
             config_paths = [Path(path) for path in __CONFIG_PATHS__]
-            return config_paths
+            collection_manifest_path = __COLLECTION_MANIFEST_PATH__
+            return collection_manifest_path, config_paths
 
 
         @app.cell
-        def _(build_campaign_set_round_options, config_paths, mo):
-            round_options = build_campaign_set_round_options(config_paths)
-            round_default = __DEFAULT_ROUND__
-            if round_default not in round_options:
-                round_options = [round_default, *round_options]
-            round_ui = mo.ui.dropdown(round_options, value=round_default, label="Round")
-            return round_options, round_ui
-
-
-        @app.cell
-        def _(build_campaign_set_notebook_view_model, config_paths, round_ui):
-            selected_round_selector = str(round_ui.value)
+        def _(build_campaign_set_notebook_view_model, collection_manifest_path, config_paths):
+            selected_round_selector = __DEFAULT_ROUND__
             campaign_set_view_model = build_campaign_set_notebook_view_model(
                 config_paths,
                 round_selector=selected_round_selector,
                 run_id=__DEFAULT_RUN_ID__,
+                collection_manifest_path=collection_manifest_path,
             )
             campaigns = campaign_set_view_model["campaigns"]
-            return campaign_set_view_model, campaigns, selected_round_selector
+            collection = campaign_set_view_model.get("collection")
+            return campaign_set_view_model, campaigns, collection, selected_round_selector
         """
     )
 

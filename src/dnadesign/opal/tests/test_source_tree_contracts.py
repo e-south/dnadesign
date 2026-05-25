@@ -134,6 +134,8 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     for name in [
         "build_notebook_campaign_set_group_options",
         "build_notebook_campaign_set_metric_comparison_rows",
+        "build_notebook_campaign_set_visual_choices",
+        "load_campaign_collection_manifest",
         "render_notebook_campaign_set_metric_comparison_image",
     ]:
         assert name in notebook_api.__all__

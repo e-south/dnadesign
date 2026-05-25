@@ -275,6 +275,50 @@ def test_round_highlight_overlay_resolves_round_zero() -> None:
     assert resolve_highlight_round(False, [0, 1]) is None
 
 
+def test_metric_over_rounds_highlight_does_not_draw_vertical_round_marker(tmp_path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "metric",
+                "kind": "metric_over_rounds",
+                "params": {
+                    "metric": "pred__score_selected",
+                    "cohort": "selected",
+                    "summaries": ["median"],
+                    "highlight_round": "latest",
+                },
+            }
+        ],
+    )
+    from dnadesign.opal.tests._cli_helpers import write_ledger, write_state
+
+    write_state(workdir, records_path=records, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_state(workdir, records_path=records, run_id="r1", round_index=1)
+    write_ledger(workdir, run_id="r1", round_index=1)
+
+    import matplotlib.axes
+
+    def fail_axvline(self, *args, **kwargs):
+        raise AssertionError("metric_over_rounds should not draw a vertical round marker")
+
+    monkeypatch.setattr(matplotlib.axes.Axes, "axvline", fail_axvline)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "all"])
+
+    assert res.exit_code == 0, res.stdout
+
+
 def test_plot_cli_list_registry(tmp_path):
     app = _build()
     runner = CliRunner()

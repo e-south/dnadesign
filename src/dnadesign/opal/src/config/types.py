@@ -30,6 +30,13 @@ class LocationLocal:
 DataLocation = Union[LocationUSR, LocationLocal]
 
 
+@dataclass
+class CandidateScope:
+    kind: str  # "id_list"
+    path: str
+    id_column: str = "id"
+
+
 # ---- Label sources ----
 @dataclass
 class LabelSourceCampaignHistory:
@@ -62,6 +69,7 @@ class DataBlock:
     transforms_x: PluginRef
     transforms_y: PluginRef
     y_expected_length: Optional[int] = None
+    candidate_scope: Optional[CandidateScope] = None
 
 
 @dataclass

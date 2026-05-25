@@ -57,6 +57,46 @@ selection:
     assert cfg.campaign.metadata == {"scenario_kind": "positive", "split_id": "random"}
 
 
+def test_load_config_accepts_candidate_scope_id_list(tmp_path: Path) -> None:
+    scope_path = tmp_path / "scope.parquet"
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: {{ kind: local, path: "./records.parquet" }}
+  x_column_name: "X"
+  y_column_name: "Y"
+  candidate_scope:
+    kind: id_list
+    path: "{scope_path}"
+    id_column: id
+transforms_x: {{ name: identity, params: {{}} }}
+transforms_y: {{ name: scalar_from_table_v1, params: {{}} }}
+model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
+objectives:
+  - {{ name: scalar_identity_v1, params: {{}} }}
+selection:
+  name: top_n
+  params:
+    top_k: 2
+    score_ref: "scalar_identity_v1/scalar"
+    objective_mode: maximize
+    tie_handling: competition_rank
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+
+    assert cfg.data.candidate_scope is not None
+    assert cfg.data.candidate_scope.kind == "id_list"
+    assert cfg.data.candidate_scope.path == str(scope_path.resolve())
+    assert cfg.data.candidate_scope.id_column == "id"
+
+
 def test_load_config_accepts_sfxi_uncertainty_method(tmp_path: Path) -> None:
     cfg_path = _write_config(
         tmp_path / "campaign.yaml",

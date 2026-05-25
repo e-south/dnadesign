@@ -2,9 +2,9 @@
 
 **Status:** Draft for engineering planning and review
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-21
+**Last verified:** 2026-05-25
 **Audience:** OPAL maintainers, study integrators, and developer-experience owners
-**Date:** 2026-05-21
+**Date:** 2026-05-25
 **Scope:** OPAL campaign runtime, reporting, plot artifacts, CLI JSON surfaces, and generated marimo review notebooks
 **Chosen path:** `src/dnadesign/opal/docs/maintainers/dev-spec-modernization.md`
 
@@ -16,7 +16,7 @@ This document is a specification only. It intentionally does not implement produ
 
 OPAL should become a small, contract-first active-learning campaign runtime with excellent machine-readable reporting and review artifacts. Its core identity is a campaign loop over one candidate table, one explicit X column, one label source, model/objective/selector plugins, append-only ledgers, run-scoped progress, configured plots, static review bundles, and generated marimo notebooks.
 
-The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: label ingest, artifact review, and progress surfaces must make their memory and stale-evidence contracts operator-visible, not merely pass happy-path tests. The remaining gap is product and contract maturity: ingest must stay memory-safe and telemetry-rich, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and the X contract still has a split between permissive in-memory identity parsing and strict Parquet validation.
+The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The historical full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: label ingest, artifact review, and progress surfaces must make their memory and stale-evidence contracts operator-visible, not merely pass happy-path tests. The remaining gap is product and contract maturity: ingest must stay memory-safe and telemetry-rich, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and the X contract still has a split between permissive in-memory identity parsing and strict Parquet validation.
 
 Highest-priority changes:
 
@@ -40,6 +40,65 @@ Explicitly out of scope:
 - OPAL will not silently migrate invalid data, guess run scope, or fall back from configured contracts.
 - OPAL will not rely on hidden candidate caps, implicit subsets, or memory-unsafe full-table materialization as routine campaign semantics.
 - This spec does not implement production code.
+
+## 1.1 2026-05-25 Sprint Contract: Label Families And Collection Comparisons
+
+Two additions are now in scope for the next implementation slice.
+
+First, OPAL must support non-SFXI active label families without becoming a
+study ontology. The public contract is still numeric: a campaign declares a
+label transform that emits finite scalar or vector `y`, a model that predicts
+numeric `Y_hat`, an objective that emits named scalar score channels, and a
+selector that consumes one score channel. Study code may map TF presence,
+TF count, or one-hot plan-class labels into this contract, but OPAL must not
+know what LexA, CpxR, BaeR, DenseGen plans, ethanol, ciprofloxacin, or dual
+response mean biologically.
+
+The near-term OPAL-owned primitive is a generic table-to-vector label ingest
+path plus generic vector objectives. `vector_channel_v1` selects one declared
+output channel for count/presence targets; `vector_target_similarity_v1`
+selects by closeness to a declared target vector for plan-logic controls. This
+is deliberately smaller than a classifier framework: random-forest multi-output
+regression is already numeric-safe, and one-vs-rest, count-vector, or
+fixed-target-vector campaigns can select through declared score channels.
+Broader classifier/probability semantics require a separate target-probability
+contract before they become OPAL core.
+
+Second, campaign-set comparison visuals must consume declared collection
+relationships. A campaign is an atomic run surface. A campaign set is a group
+of such surfaces selected for review. A relationship lens is an optional
+operator or study-owned manifest that declares roles, match dimensions, and
+replicate dimensions. OPAL may render generic paired comparisons from that
+manifest, but it must not infer biological controls from naming patterns.
+
+For score-over-rounds comparisons, the renderer must distinguish three bands:
+
+- within-campaign cohort distribution bands, such as the `metric_over_rounds`
+  IQR of selected scores inside one campaign/round;
+- campaign-set relationship bands, such as IQR across validated positive/null
+  pairs or declared replicate units;
+- statistical confidence intervals, which may only be labeled as such when
+  replicate semantics and the estimation method are explicit.
+
+The default notebook comparison should show median lines and, where enough
+relationship units exist, an explicitly labeled IQR band. It should not call
+that band a confidence interval unless a future manifest field and estimator
+make that claim true.
+
+Implementation checklist for this slice:
+
+- Add OPAL generic vector label ingest plus vector-channel and vector-target
+  similarity objective plugins.
+- Register strict parameter schemas for those plugins.
+- Preserve campaign metadata in campaign-set tidy rows so notebooks can expose
+  provenance without study-specific parsing.
+- Pass collection relationship pairs through the notebook visual surface and
+  build comparison rows only from validated pairs when a lens is selected.
+- Add IQR bands across campaign-set comparison units with machine-readable
+  interval metadata and prose that states the unit of aggregation.
+- Update the stress/DenseGen study context to describe passive-to-active label
+  family expansion as a study-owned campaign matrix over OPAL's generic
+  target/objective contract.
 
 ## 2. Current-State Assessment
 
@@ -143,7 +202,7 @@ The generated marimo notebook is campaign-specific and covers records, ledgers, 
 
 The stress study route correctly describes OPAL as consuming the `usr_prom_eth_cip_opal_candidates` candidate feature table with explicit X column, while LatentDNA owns prior X selection and study code owns pre-assay batch-0/probe logic. The DenseGen axis probe is study-owned, exports no package-root compatibility API, uses scratch-only synthetic labels, and calls public OPAL progress/review APIs.
 
-The available DenseGen-axis dogfood evidence remains scoped. The historical K6 all-round run covered 12 scratch campaigns and reported `STOP`/`attention` under the now-retired hard null-lift threshold; that was evidence that OPAL could run and review the probe, not evidence of real assay behavior. The current study-owned follow-up is `densegen_motif_qa_k12_s3_v1`: K12, three planned seeds, manifest-backed label families, null provenance, and paired positive-vs-null trajectory QA. Those semantics belong in the study probe package, not OPAL core.
+The available DenseGen dogfood evidence remains scoped. Historical all-round runs covered scratch campaigns and reported `STOP`/`attention` under the now-retired hard null-lift threshold; that was evidence that OPAL could run and review the probe, not evidence of real assay behavior. The current study-owned follow-up is `densegen_motif_qa_k12_s3_v1`: K12, three planned seeds, `densegen_plan_logic4` plus `tf_family_count` active families, manifest-backed label families, null provenance, and paired positive-vs-null trajectory QA. Those semantics belong in the study probe package, not OPAL core.
 
 OPAL's obligation for that follow-up is generic: enforce candidate/X/label-source contracts, execute the campaign loop, emit ledgers, generate configured plot manifests, and render campaign-agnostic notebooks. TF-family presence/count, DenseGen plan class, synthetic label provenance, and biological interpretation remain study-owned readouts. If any probe-specific aggregate figure should appear in a canonical OPAL notebook, it must first become a normal OPAL plot plugin with `PlotMeta`, `PlotContext`, configured `plots.yaml`, media/tidy outputs, and `opal.plot_artifact.v1` manifests.
 
@@ -161,7 +220,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | --- | --- |
 | `opal ingest-y` fixed-sidecar appends now avoid the full records table, but the contract must stay visible and regression-tested | Operators need to see `mode=identity_index`, loaded columns, memory estimates, and write scope during normal dogfood |
 | `opal run` has scoring memory guards; `ingest-y` now reports estimated frame memory and optional peak RSS but still needs configurable hard thresholds | Operators can complete scoring safely and should get explicit ingest memory posture before label writes |
-| Local dogfood roots under ignored `.var` can grow to multi-GB bundles and accumulate stale plot siblings | Local evidence, stale artifacts, and workspace storage pressure can drift unless artifact gardening is explicit; stale K6 DenseGen probe roots should be removed before K12/S3 reruns |
+| Local dogfood roots under ignored `.var` can grow to multi-GB bundles and accumulate stale plot siblings | Local evidence, stale artifacts, and workspace storage pressure can drift unless artifact gardening is explicit; stale pre-logic4 DenseGen probe roots should be removed before K12/S3 reruns |
 | Probe review currently enriches report metrics and status from a review pass | Raw execution evidence and derived review evidence can become hard to distinguish unless artifacts are split |
 | Leakage guards are partly study-owned and partly OPAL-owned | Invalid synthetic-oracle evidence, train/eval overlap, or prediction/label contamination must fail fast at the correct layer |
 | Stress-specific campaign configs currently live under the OPAL package tree | OPAL information architecture can imply ownership of study-specific biology unless configs are moved or explicitly marked as study-owned fixtures |
@@ -215,12 +274,11 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | SFXI is an objective plugin over vec8 predictions and setpoints, not a study core concept | `src/dnadesign/opal/src/objectives/sfxi_v1.py:328-345`, `src/dnadesign/opal/src/objectives/sfxi_v1.py:363-427`, `src/dnadesign/opal/src/objectives/sfxi_math.py:18-34`, `src/dnadesign/opal/src/objectives/sfxi_math.py:45-60` |
 | Stress OPAL route defines OPAL candidate table, explicit X column, and OPAL/study boundary | `docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md:23-35`, `docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md:45-74` |
 | Candidate-table context keeps shared labels and campaign ledgers separate | `docs/studies/stress_ethanol_cipro_growth/contexts/opal/candidate-table.md:19-38`, `docs/studies/stress_ethanol_cipro_growth/contexts/opal/candidate-table.md:40-54` |
-| DenseGen probe is study-owned, scratch-only, and forbids label leakage | `docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md:1-36`, `docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-axis-probe-v0.md:143-179` |
+| DenseGen probe is study-owned, scratch-only, and forbids label leakage | `docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-motif-qa-k12-s3-v1.md` |
 | DenseGen probe package root exports no flat compatibility API | `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/__init__.py:1-9` |
 | DenseGen probe consumes public OPAL progress and review APIs | `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/progress.py:9-27`, `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/review.py:14-39` |
-| Local-only full-pool DenseGen-axis dogfood report is STOP/attention with 12 campaigns, 144 OPAL rounds, no candidate cap, 36 configured OPAL plots, 8 aggregate probe plots, 3 null-control decision reasons, and metric definitions for lift, null lift, p, and round semantics; this ignored `.var` path is not durable CI evidence | `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z/reports/review_manifest.json`, `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z/reports/metrics.json` |
-| Local-only full-pool dogfood artifact audit found an 8.1 GB run tree with 2,240 files, 13 HTML files, 256 local refs with 0 missing refs, and 104 readable/nonblank/non-undersized PNGs; future claims need a tracked summary or reproducible CI/nightly log | Read-only audit command recorded in this spec pass; root `.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/dogfood_all_rounds12_full_streaming_conservative_20260521T0231Z` |
-| Local-only full-pool dogfood showed scoring stayed bounded with `score_batch_size=256`; future ingest regressions should be caught by the identity-frame contract and memory telemetry | Operator polling during full-pool run; follow-up dogfood should record `opal.ingest_runtime.v1` evidence |
+| Superseded local DenseGen-axis dogfood roots are intentionally not durable evidence after the plan-logic4 schema change | Current evidence must come from fresh `densegen_plan_logic4` and `tf_family_count` run roots plus tracked manifests or reproducible CI/nightly logs |
+| Prior local dogfood showed bounded scoring was feasible with explicit `score_batch_size`; future ingest regressions should be caught by the identity-frame contract and memory telemetry | Follow-up dogfood should record `opal.ingest_runtime.v1` evidence and current plot manifests, not stale ignored `.var` paths |
 
 ## 3. Goals
 
@@ -254,7 +312,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 
 ## 5. Architecture Principles And Invariants
 
-1. **One explicit candidate table.** A campaign consumes exactly one configured candidate table. The candidate universe is a contract, not an implicit subset of upstream representation artifacts.
+1. **One explicit candidate table.** A campaign consumes exactly one configured candidate table. When a campaign should score a subset, it declares `data.candidate_scope` as an ID-list contract; OPAL filters by that scope instead of relying on hidden candidate caps or copied split-local records.
 2. **One explicit X column.** A campaign names one X column. OPAL may report its provenance as a string, but must not depend on how that X was produced.
 3. **Explicit label source.** Label source kind, dataset/path, y space, ID column, round column, batch column, and dedup policy are explicit. A configured shared sidecar never falls back to campaign-local history.
 4. **Explicit channel refs.** Selection reads score and uncertainty by channel ref, not by implicit "the score" columns.
@@ -266,7 +324,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 10. **Campaign agnosticism.** OPAL primitives operate on data shapes and declared channels. Study-specific semantics configure those primitives.
 11. **Machine readability.** CLI JSON, ledgers, manifests, plot data, and notebook view models carry schema versions and stable error/warning structures.
 12. **Progressive disclosure.** CLI/JSON are the control plane. Static review and marimo are inspection layers with heavy sections hidden behind lazy accordions.
-13. **Memory proportionality.** Ingest and inspection memory should scale with the requested operation, not with the full candidate feature payload unless the operation explicitly scores or validates that payload.
+13. **Memory proportionality.** Ingest and inspection memory should scale with the requested operation, not with the full candidate feature payload unless the operation explicitly scores or validates that payload. Selected/top-k plot primitives should push selection/rank predicates into ledger reads before collecting data.
 14. **Leakage fails closed.** Generic OPAL contamination states and study-owned forbidden-input states are errors by default; warnings are only acceptable for read-only inspections that cannot prove contamination.
 15. **Generated artifact lifecycle.** Artifact creation, stale detection, retention, pruning, and local-only evidence summaries are explicit lifecycle states, not incidental filesystem residue.
 
@@ -280,6 +338,7 @@ The target architecture keeps abstractions small. Use dataclasses, protocols, JS
 | --- | --- | --- |
 | `CampaignConfigContract` | Validated campaign config, config source path, schema version, and plugin refs | Dataclass wrapping `RootConfig` plus `schema_version`, `config_path`, `strict_mode` |
 | `XMatrixContract` | Physical and logical X schema for candidate table | `records_path`, `x_column`, `id_column`, `physical_type`, `x_dim`, `row_count`, `normalization_status` |
+| `CandidateScopeContract` | Optional scoring universe over a shared candidate table | `kind=id_list`, `path`, `id_column`, `row_count`, `missing_ids`, `duplicate_ids` |
 | `LabelSourceContract` | Label source identity, y space, dedup policy, and write lock semantics | `kind`, `dataset`, `path`, `y_space`, columns, `requires_existing_for_run`, `lock_scope` |
 | `IngestRuntimeContract` | Memory-safe label ingest plan and result | `mode`, `identity_columns`, `input_rows`, `candidate_index_rows`, `estimated_memory_bytes`, `peak_rss_bytes`, `unknown_policy`, `write_scope` |
 | `LeakageGuardContract` | Generic contamination and study-owned forbidden-input checks | `checks`, `scope`, `status`, `violations`, `severity`, `owner` |

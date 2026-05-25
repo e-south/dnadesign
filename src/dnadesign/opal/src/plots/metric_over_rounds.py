@@ -31,7 +31,7 @@ from ._mpl_utils import (
     save_notebook_square_figure,
 )
 from ._param_utils import get_str, normalize_metric_field
-from ._round_overlay import add_round_vline, resolve_highlight_round
+from ._round_overlay import resolve_highlight_round
 
 
 @register_plot(
@@ -46,7 +46,7 @@ from ._round_overlay import add_round_vline, resolve_highlight_round
             "band": "Optional uncertainty band for matching summaries: none|iqr (default none).",
             "band_alpha": "Transparency for band='iqr' (default 0.18).",
             "threshold": "Optional horizontal threshold/reference line.",
-            "highlight_round": "Optional round overlay marker: latest, true, false, or an integer.",
+            "highlight_round": "Optional point marker: latest, true, false, or an integer.",
         },
         requires=["as_of_round", "run_id", "pred__score_selected"],
         notes=["Reads outputs/ledger/predictions and writes tidy scalar summaries when save_data is enabled."],
@@ -94,11 +94,22 @@ def render(context, params: dict) -> None:
         raise ValueError("top_k must be positive.")
 
     need = {"as_of_round", "run_id", metric}
+    row_filters = []
     if "selected" in cohorts:
         need.add("sel__is_selected")
     if "top_k" in cohorts:
         need.add("sel__rank_competition")
-    df = load_events(resolve_outputs_dir(context), need, round_selector=context.rounds, run_id=context.run_id)
+    if cohorts == ["selected"]:
+        row_filters.append({"column": "sel__is_selected", "op": "eq", "value": True})
+    elif cohorts == ["top_k"]:
+        row_filters.append({"column": "sel__rank_competition", "op": "lte", "value": top_k})
+    df = load_events(
+        resolve_outputs_dir(context),
+        need,
+        round_selector=context.rounds,
+        run_id=context.run_id,
+        row_filters=row_filters,
+    )
     if df.empty:
         raise ValueError("metric_over_rounds had zero rows after round/run filtering.")
     if metric not in df.columns:
@@ -193,8 +204,6 @@ def render(context, params: dict) -> None:
     threshold = params.get("threshold", params.get("reference_line"))
     if threshold is not None:
         ax.axhline(float(threshold), color="#444444", linestyle="--", linewidth=1.0, alpha=0.8)
-    if highlight_round is not None:
-        add_round_vline(ax, int(highlight_round))
     ax.set_xlabel("Round")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_ylabel(pretty_label(metric))

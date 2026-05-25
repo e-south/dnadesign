@@ -10,6 +10,7 @@ import pandas as pd
 
 from dnadesign.opal.src.config.types import (
     CampaignBlock,
+    CandidateScope,
     DataBlock,
     IngestBlock,
     LabelsBlock,
@@ -166,6 +167,22 @@ def test_plan_round_uses_shared_labels_and_selector_specific_top_k(tmp_path: Pat
     assert cipro_cfg.selection.selection.params["top_k"] == 2
     assert eth_plan.candidate_df["id"].tolist() == ["c"]
     assert cipro_plan.candidate_df["id"].tolist() == ["c"]
+
+
+def test_candidate_scope_limits_candidate_universe_without_copying_records(tmp_path: Path) -> None:
+    df, usr_root, records_path = _records(tmp_path)
+    _labels(usr_root)
+    scope_path = tmp_path / "scope.parquet"
+    pd.DataFrame({"id": ["c", "b"]}).to_parquet(scope_path, index=False)
+    cfg = _cfg(usr_root, "scoped", top_k=1)
+    cfg.data.candidate_scope = CandidateScope(kind="id_list", path=str(scope_path), id_column="id")
+    store = _store(cfg, records_path)
+    source = label_source_from_config(cfg, store)
+
+    plan = plan_round(store, df, cfg, 1, label_source=source)
+
+    assert plan.candidate_total_before_filter == 2
+    assert plan.candidate_df["id"].astype(str).tolist() == ["c"]
 
 
 def test_plan_round_rejects_train_eval_overlap_when_exclusion_is_configured(tmp_path: Path) -> None:

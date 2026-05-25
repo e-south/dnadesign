@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Mapping, Sequence
 
 import polars as pl
 
@@ -19,6 +19,7 @@ def read_predictions(
     round_selector: RoundSelector | None = None,
     run_id: str | None = None,
     runs_df: pl.DataFrame | None = None,
+    row_filters: Sequence[Mapping[str, Any]] | None = None,
     allow_missing: bool = False,
     require_run_id: bool = True,
 ) -> pl.DataFrame:
@@ -53,9 +54,49 @@ def read_predictions(
     lf = _apply_round_filter(lf, round_selector=round_selector, runs_df=runs_df)
     if run_id is not None:
         lf = lf.filter(pl.col("run_id") == str(run_id))
+    lf = _apply_row_filters(lf, row_filters)
     if want is not None:
         lf = lf.select(want)
     return lf.collect()
+
+
+def _apply_row_filters(lf: pl.LazyFrame, row_filters: Sequence[Mapping[str, Any]] | None) -> pl.LazyFrame:
+    if not row_filters:
+        return lf
+    try:
+        schema_cols = set(lf.collect_schema().keys())
+    except Exception:
+        schema_cols = set(lf.schema.keys())
+    out = lf
+    for raw in row_filters:
+        column = str(raw.get("column") or "").strip()
+        op = str(raw.get("op") or "eq").strip().lower()
+        if not column:
+            raise OpalError("prediction row filter requires a non-empty column.", ExitCodes.BAD_ARGS)
+        if column not in schema_cols:
+            raise OpalError(
+                f"outputs/ledger/predictions is missing filter column: {column}",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        value = raw.get("value")
+        expr = pl.col(column)
+        if op == "eq":
+            out = out.filter(expr == value)
+        elif op == "lte":
+            out = out.filter(expr <= value)
+        elif op == "lt":
+            out = out.filter(expr < value)
+        elif op == "gte":
+            out = out.filter(expr >= value)
+        elif op == "gt":
+            out = out.filter(expr > value)
+        elif op == "is_in":
+            if not isinstance(value, list):
+                raise OpalError("prediction row filter op='is_in' requires list value.", ExitCodes.BAD_ARGS)
+            out = out.filter(expr.is_in(value))
+        else:
+            raise OpalError(f"unsupported prediction row filter op: {op!r}", ExitCodes.BAD_ARGS)
+    return out
 
 
 def _select_existing_columns(

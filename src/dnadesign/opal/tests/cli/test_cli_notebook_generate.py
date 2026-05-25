@@ -13,6 +13,7 @@ import importlib.util
 import subprocess
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -233,6 +234,123 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
     assert 'label="Visual surface"' in text
+
+
+def test_notebook_generate_campaign_set_accepts_all_round_scope(tmp_path: Path, monkeypatch) -> None:
+    campaigns = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records = workdir / "records.parquet"
+        write_records(records, slug=slug)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(campaign, workdir=workdir, records_path=records, slug=slug)
+        write_ledger(workdir, run_id=f"{slug}-run-0", round_index=0)
+        campaigns.append(campaign)
+
+    out_path = tmp_path / "campaign_set_all.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--round",
+            "all",
+            "--out",
+            str(out_path),
+        ],
+    )
+
+    assert res.exit_code == 0, res.output
+    assert "selected_round_selector = 'all'" in out_path.read_text()
+
+
+def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Path, monkeypatch) -> None:
+    campaigns = []
+    for slug, oracle_kind in {"campaign_positive": "positive", "campaign_null": "null"}.items():
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records = workdir / "records.parquet"
+        write_records(records, slug=slug)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(campaign, workdir=workdir, records_path=records, slug=slug)
+        payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+        payload["campaign"]["metadata"] = {
+            "target": "cipro",
+            "label_oracle_kind": oracle_kind,
+            "label_family_id": "sfxi_axis_vec8",
+            "label_split_id": "random_id",
+            "seed": 7,
+        }
+        campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        write_ledger(workdir, run_id=f"{slug}-run-0", round_index=0)
+        campaigns.append(campaign)
+    collection_path = tmp_path / "campaign_collection.yaml"
+    collection_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign_collection.v1",
+                "dimensions": ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"],
+                "relationships": [
+                    {
+                        "kind": "control_pair",
+                        "left_role": "positive",
+                        "right_role": "null",
+                        "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "campaign_set_collection.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--collection",
+            str(collection_path),
+            "--out",
+            str(out_path),
+        ],
+    )
+
+    assert res.exit_code == 0, res.output
+    text = out_path.read_text()
+    assert f"collection_manifest_path = {str(collection_path)!r}" in text
+    assert "build_notebook_campaign_set_visual_choices(plot_choices, campaigns, collection)" in text
 
 
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:

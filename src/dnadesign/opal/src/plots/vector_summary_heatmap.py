@@ -91,15 +91,26 @@ def render(context, params: dict) -> None:
     show_reference_mse = bool(params.get("reference_mse_panel", False))
 
     need = {"as_of_round", "run_id", vector_field}
+    row_filters = []
     if cohort == "selected":
         need.add("sel__is_selected")
+        row_filters.append({"column": "sel__is_selected", "op": "eq", "value": True})
     elif cohort == "top_k":
         need.add("sel__rank_competition")
+        row_filters.append({"column": "sel__rank_competition", "op": "lte", "value": top_k})
     outputs_dir = resolve_outputs_dir(context)
     if include_reference and explicit_reference is None:
-        df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+        df = load_events_with_setpoint(
+            outputs_dir,
+            need,
+            round_selector=context.rounds,
+            run_id=context.run_id,
+            row_filters=row_filters,
+        )
     else:
-        df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+        df = load_events(
+            outputs_dir, need, round_selector=context.rounds, run_id=context.run_id, row_filters=row_filters
+        )
     if df.empty:
         raise ValueError("vector_summary_heatmap had zero rows after round/run filtering.")
     if vector_field not in df.columns:

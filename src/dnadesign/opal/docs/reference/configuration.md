@@ -13,7 +13,8 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 
 - `campaign`: `name`, `slug`, `workdir`, optional `description`, optional `metadata`
 - `ownership`: optional owner metadata for non-portable study fixtures
-- `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
+- `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`,
+  optional `candidate_scope`
 - `labels`: optional training-label source contract; defaults to
   campaign-scoped label history
 - `transforms_x`: `{ name, params }` (raw X -> model-ready X)
@@ -78,6 +79,29 @@ ownership:
   dataset_id: usr_prom_eth_cip_opal_candidates
   portable: false
 ```
+
+`data.candidate_scope` is an optional scoring-scope contract. Use it when a
+campaign should score a declared ID subset while still reading X from the
+configured candidate `records.parquet`. The scope file must be a `.parquet`,
+`.pq`, or `.csv` table with unique, non-null IDs that all exist in
+`records.parquet`.
+
+```yaml
+data:
+  location: { kind: usr, path: src/dnadesign/usr/datasets, dataset: my_dataset }
+  x_column_name: "my_x_column"
+  y_column_name: "my_y_column"
+  candidate_scope:
+    kind: id_list
+    path: scopes/heldout_sigma35_ids.parquet
+    id_column: id
+```
+
+Candidate scopes filter the candidate pool before OPAL excludes already labeled
+IDs. They do not change label-source validation, training labels, or X
+transforms. This is the preferred way to run split-specific campaigns over a
+large shared candidate table without physically copying that table for each
+split.
 
 `safety.max_x_matrix_gib` is a fail-fast memory budget for model-ready X batches
 during `opal run`. For `writeback.prediction_records: ledger_only`, OPAL loads
@@ -180,6 +204,75 @@ training:
     cumulative_training: true
     label_cross_round_deduplication_policy: latest_only
     allow_resuggesting_candidates_until_labeled: true
+```
+
+### Vector target example (RF + one selected channel)
+
+Use this pattern when a study-owned oracle emits a finite numeric target vector,
+such as binary TF-family presence, TF-family counts, or one-vs-rest class
+columns. OPAL treats the columns as generic numeric target channels; biological
+meaning stays in the campaign metadata and source oracle.
+
+```yaml
+data:
+  y_expected_length: 3
+
+transforms_y:
+  name: vector_from_table_v1
+  params:
+    value_columns: [tf_lexA_presence, tf_cpxR_presence, tf_baeR_presence]
+
+model:
+  name: random_forest
+  params: { n_estimators: 100, random_state: 7 }
+
+objectives:
+  - name: vector_channel_v1
+    params:
+      channel_index: 0
+      channel_name: tf_lexA_presence
+      mode: maximize
+
+selection:
+  name: top_n
+  params:
+    top_k: 12
+    score_ref: "vector_channel_v1/tf_lexA_presence"
+    objective_mode: maximize
+    tie_handling: competition_rank
+```
+
+### Vector target example (RF + target-vector similarity)
+
+Use this pattern when the objective is closeness to a declared numeric vector
+rather than one channel. OPAL still treats the labels as a generic finite
+numeric vector; study-specific semantics stay in metadata and docs.
+
+```yaml
+data:
+  y_expected_length: 4
+
+transforms_y:
+  name: vector_from_table_v1
+  params:
+    value_columns: [v00, v10, v01, v11]
+
+model:
+  name: random_forest
+  params: { n_estimators: 100, random_state: 7 }
+
+objectives:
+  - name: vector_target_similarity_v1
+    params:
+      target_vector: [0, 0, 1, 1]
+
+selection:
+  name: top_n
+  params:
+    top_k: 12
+    score_ref: "vector_target_similarity_v1/negative_mse"
+    objective_mode: maximize
+    tie_handling: competition_rank
 ```
 
 ### UQ example (GP + expected_improvement)

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..core.utils import ExitCodes, OpalError, now_iso
+from .campaign_collection import load_campaign_collection_manifest
 from .notebook import build_notebook_view_model
 
 NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION = "opal.notebook_campaign_set_view_model.v1"
@@ -25,6 +26,7 @@ def build_campaign_set_notebook_view_model(
     *,
     round_selector: str | None = "latest",
     run_id: str | None = None,
+    collection_manifest_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build a manifest-backed view model for one or more OPAL campaigns."""
 
@@ -48,12 +50,18 @@ def build_campaign_set_notebook_view_model(
         for warning in (campaign.get("warnings") or [])
         if isinstance(warning, dict)
     ]
+    collection = (
+        load_campaign_collection_manifest(collection_manifest_path, campaigns)
+        if collection_manifest_path is not None
+        else None
+    )
     return {
         "schema_version": NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION,
         "generated_at": now_iso(),
         "round_selector": round_selector or "latest",
         "campaign_count": len(campaigns),
         "campaigns": campaigns,
+        "collection": collection,
         "warnings": warnings,
     }
 

@@ -15,7 +15,7 @@ class _DummyWorkspace:
 
 
 def test_vector_summary_explicit_reference_does_not_require_objective_setpoint(tmp_path, monkeypatch) -> None:
-    def _stub_load_events(outputs_dir, base_columns, round_selector=None, run_id=None):
+    def _stub_load_events(outputs_dir, base_columns, round_selector=None, run_id=None, **_kwargs):
         assert "obj__diag__setpoint" not in base_columns
         return pd.DataFrame(
             {

@@ -1,9 +1,4 @@
-"""Compatibility aggregate for OPAL notebook helper surfaces.
-
-Generated notebooks should import `dnadesign.opal.notebooks.api.generated`.
-The checked-in campaign-progress notebook should import
-`dnadesign.opal.notebooks.api.progress`.
-"""
+"""Compatibility aggregate for OPAL notebook helper surfaces."""
 
 from __future__ import annotations
 
@@ -25,6 +20,7 @@ from .generated import (
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_group_options,
     build_notebook_campaign_set_metric_comparison_rows,
+    build_notebook_campaign_set_visual_choices,
     build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -53,6 +49,7 @@ from .generated import (
     latest_run_id,
     list_configured_plot_specs,
     list_notebook_campaign_paths,
+    load_campaign_collection_manifest,
     load_notebook_baserender_record_row,
     load_plot_config,
     parse_enabled,
@@ -103,6 +100,7 @@ __all__ = [
     "build_notebook_campaign_header_lines",
     "build_notebook_campaign_set_group_options",
     "build_notebook_campaign_set_metric_comparison_rows",
+    "build_notebook_campaign_set_visual_choices",
     "build_notebook_campaign_summary_row",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
@@ -138,6 +136,7 @@ __all__ = [
     "list_configured_plot_specs",
     "list_campaign_paths",
     "list_notebook_campaign_paths",
+    "load_campaign_collection_manifest",
     "load_notebook_baserender_record_row",
     "load_plot_config",
     "load_campaign_selection",

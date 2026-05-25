@@ -27,6 +27,7 @@ from .campaign_set_comparison import (
     build_notebook_campaign_set_metric_comparison_rows,
     render_notebook_campaign_set_metric_comparison_image,
 )
+from .campaign_set_visuals import build_notebook_campaign_set_visual_choices
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
     build_notebook_at_a_glance_rows,
@@ -76,6 +77,7 @@ __all__ = [
     "build_notebook_campaign_summary_row",
     "build_notebook_campaign_set_group_options",
     "build_notebook_campaign_set_metric_comparison_rows",
+    "build_notebook_campaign_set_visual_choices",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",

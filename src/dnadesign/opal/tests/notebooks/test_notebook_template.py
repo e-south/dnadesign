@@ -15,6 +15,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_group_options,
     build_notebook_campaign_set_metric_comparison_rows,
+    build_notebook_campaign_set_visual_choices,
+    build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
     build_notebook_evidence_rows,
@@ -43,7 +45,7 @@ from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, li
 def test_notebook_template_data_source_options() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert 'label="Campaign"' in text
-    assert 'label="Round"' in text
+    assert 'label="Round"' not in text
     assert "predictions (selected run)" not in text
     assert "labels (all rounds)" not in text
 
@@ -91,7 +93,7 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert surface_text not in text
     assert "manifest-backed plot media are available" in text
     assert "build_notebook_no_plot_scope_rows" in text
-    assert "Current scope and probe implication" in text
+    assert "Current campaign and plot evidence" in text
     assert 'label="Visual surface"' in text
     assert '"label": plot_choice["title"]' not in text
     assert "max-height" in text
@@ -99,7 +101,7 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert "build_notebook_plot_method_sections" in text
     assert "thumbnail_gallery" not in text
     assert "plot_scope_controls" not in text
-    assert "selected_plot_choice" in text
+    assert "selected_visual_choice" in text
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -136,10 +138,10 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "from dnadesign.opal.notebooks.api import" not in text
     assert "dnadesign.opal.src" not in text
     assert "build_campaign_set_notebook_view_model" in text
-    assert "build_campaign_set_round_options" in text
     assert "build_notebook_campaign_summary_row" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_campaign_set_metric_comparison_rows" in text
+    assert "build_notebook_campaign_set_visual_choices" in text
 
 
 def test_notebook_template_degrades_without_runs() -> None:
@@ -152,7 +154,7 @@ def test_notebook_template_degrades_without_runs() -> None:
 def test_notebook_template_can_pin_initial_run_scope() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="0", run_id="run-1")
 
-    assert "round_default = '0'" in text
+    assert "selected_round_selector = '0'" in text
     assert "run_id='run-1'" in text
     summary = "\n".join(
         build_notebook_run_summary_lines(
@@ -203,9 +205,10 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
                 "slug": slug,
                 "workdir": str(workdir),
                 "metadata": {
-                    "probe_oracle_kind": group,
+                    "label_oracle_kind": group,
+                    "label_family_id": "sfxi_axis_vec8",
+                    "label_split_id": "random_id",
                     "probe_oracle_id": f"{group}_id",
-                    "probe_split_id": "random_id",
                 },
             },
             "plot_manifests": [
@@ -226,21 +229,62 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
     ]
 
     options = build_notebook_campaign_set_group_options(campaigns)
-    assert options == ["probe_oracle_kind"]
+    assert options == ["label_oracle_kind"]
+    assert (
+        build_notebook_campaign_set_visual_choices(
+            [
+                {
+                    "label": "Selected score over rounds",
+                    "title": "Selected score over rounds",
+                    "name": "score_selected_over_rounds",
+                    "kind": "metric_over_rounds",
+                }
+            ],
+            campaigns,
+        )[0]["surface_kind"]
+        == "campaign_plot"
+    )
+    visual_choices = build_notebook_campaign_set_visual_choices(
+        [
+            {
+                "label": "Selected score over rounds",
+                "title": "Selected score over rounds",
+                "name": "score_selected_over_rounds",
+                "kind": "metric_over_rounds",
+            }
+        ],
+        campaigns,
+        collection={
+            "comparison_lenses": [
+                {
+                    "kind": "control_pair",
+                    "label": "Control pair by label oracle kind",
+                    "group_key": "label_oracle_kind",
+                    "match_on": ["label_family_id", "label_split_id"],
+                    "pair_count": 1,
+                }
+            ]
+        },
+    )
+    assert [choice["surface_kind"] for choice in visual_choices] == [
+        "campaign_plot",
+        "campaign_set_metric_comparison",
+    ]
+    assert visual_choices[1]["source_plot_name"] == "score_selected_over_rounds"
     rows = build_notebook_campaign_set_metric_comparison_rows(
         campaigns,
         plot_name="score_selected_over_rounds",
-        group_key="probe_oracle_kind",
+        group_key="label_oracle_kind",
     )
     assert {row["group"] for row in rows} == {"positive", "null"}
     payload = render_notebook_campaign_set_metric_comparison_image(
         rows,
         title="Selected score over rounds",
-        group_key="probe_oracle_kind",
+        group_key="label_oracle_kind",
     )
     assert payload is not None
     assert payload["image_bytes"].startswith(b"\x89PNG")
-    assert "probe_oracle_kind" in payload["alt_text"]
+    assert "label_oracle_kind" in payload["alt_text"]
     assert "Selected n=6" in payload["alt_text"]
     mixed_rows = [
         {**row, "cohort": "all_pool" if row["campaign"] == "cipro_null_random_id" else row["cohort"]} for row in rows
@@ -249,8 +293,152 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
         render_notebook_campaign_set_metric_comparison_image(
             mixed_rows,
             title="Selected score over rounds",
-            group_key="probe_oracle_kind",
+            group_key="label_oracle_kind",
         )
+
+
+def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp_path: Path) -> None:
+    def _campaign(slug: str, group: str, seed: int, values: list[float]) -> dict:
+        workdir = tmp_path / slug
+        plots_dir = workdir / "outputs" / "plots"
+        plots_dir.mkdir(parents=True)
+        tidy_path = plots_dir / "score_selected_over_rounds_rall.csv"
+        tidy_path.write_text(
+            "round,cohort,metric,summary,value\n"
+            + "\n".join(
+                f"{round_index},selected,pred__score_selected,median,{value}"
+                for round_index, value in enumerate(values)
+            )
+            + "\n"
+            + "\n".join(
+                f"{round_index},selected,pred__score_selected,q25,{value - 0.1}"
+                for round_index, value in enumerate(values)
+            )
+            + "\n"
+            + "\n".join(
+                f"{round_index},selected,pred__score_selected,q75,{value + 0.1}"
+                for round_index, value in enumerate(values)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return {
+            "campaign": {
+                "slug": slug,
+                "metadata": {
+                    "target": "cipro",
+                    "label_oracle_kind": group,
+                    "label_family_id": "sfxi_axis_vec8",
+                    "label_split_id": "random_id",
+                    "seed": seed,
+                },
+            },
+            "plot_manifests": [
+                {
+                    "name": "score_selected_over_rounds",
+                    "kind": "metric_over_rounds",
+                    "status": "written",
+                    "rounds": "all",
+                    "tidy_csv": str(tidy_path),
+                }
+            ],
+        }
+
+    campaigns = [
+        _campaign("cipro_positive_s7", "positive", 7, [0.2, 0.4]),
+        _campaign("cipro_null_s7", "null", 7, [0.1, 0.15]),
+        _campaign("cipro_positive_s17", "positive", 17, [0.6, 0.8]),
+        _campaign("cipro_null_s17", "null", 17, [0.05, 0.2]),
+        _campaign("cipro_positive_unpaired", "positive", 29, [0.99, 1.2]),
+    ]
+    relationship = {
+        "relationship_kind": "control_pair",
+        "role_dimension": "label_oracle_kind",
+        "left_role": "positive",
+        "right_role": "null",
+        "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+        "replicate_on": ["seed"],
+        "pair_count": 2,
+        "pairs": [
+            {
+                "left": "cipro_positive_s7",
+                "right": "cipro_null_s7",
+                "match": {
+                    "target": "cipro",
+                    "label_family_id": "sfxi_axis_vec8",
+                    "label_split_id": "random_id",
+                    "seed": "7",
+                },
+            },
+            {
+                "left": "cipro_positive_s17",
+                "right": "cipro_null_s17",
+                "match": {
+                    "target": "cipro",
+                    "label_family_id": "sfxi_axis_vec8",
+                    "label_split_id": "random_id",
+                    "seed": "17",
+                },
+            },
+        ],
+    }
+
+    rows = build_notebook_campaign_set_metric_comparison_rows(
+        campaigns,
+        plot_name="score_selected_over_rounds",
+        group_key="label_oracle_kind",
+        relationship=relationship,
+    )
+
+    assert {row["campaign"] for row in rows} == {
+        "cipro_positive_s7",
+        "cipro_null_s7",
+        "cipro_positive_s17",
+        "cipro_null_s17",
+    }
+    assert {row["replicate_key"] for row in rows} == {"seed=7", "seed=17"}
+    assert {row["metadata__seed"] for row in rows} == {"7", "17"}
+
+    payload = render_notebook_campaign_set_metric_comparison_image(
+        rows,
+        title="Selected score over rounds",
+        group_key="label_oracle_kind",
+    )
+
+    assert payload is not None
+    assert payload["interval"]["kind"] == "iqr"
+    assert payload["interval"]["unit"] == "relationship pairs"
+    assert payload["interval"]["rounds_with_interval"] == 4
+    assert payload["interval"]["min_unit_count"] == 2
+    assert payload["interval"]["is_confidence_interval"] is False
+    assert "not statistical confidence intervals" in payload["caption"]
+
+
+def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
+    row = build_notebook_campaign_summary_row(
+        {
+            "campaign": {
+                "slug": "opal_axis_probe_v0_cipro_null_leave_sigma35_variant",
+                "name": "Stress ethanol/ciprofloxacin cipro factor RF + SFXI + top N",
+                "metadata": {
+                    "probe_target": "cipro",
+                    "probe_oracle_kind": "null",
+                    "probe_split_id": "leave_sigma35_variant",
+                    "probe_label_family_id": "sfxi_axis_vec8",
+                    "probe_seed": 29,
+                },
+            },
+            "status": {"progress_status": "done"},
+        }
+    )
+
+    assert row["label"] == "Cipro | null | sigma35 | sfxi_axis_vec8 | s29 | done"
+    assert len(row["label"]) <= 64
+    assert "probe_label_family_id" not in row["label"]
+    assert row["label_context"] == (
+        "label_family_id=sfxi_axis_vec8; label_oracle_kind=null; label_split_id=leave_sigma35_variant"
+    )
+    assert "Stress ethanol/ciprofloxacin" not in row["label"]
 
 
 def test_notebook_template_omits_altair_import() -> None:
@@ -499,7 +687,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
             }
         )
     }
-    assert no_plot_rows["response axis"] == ("response_axis=ciprofloxacin; comparison_group=Ciprofloxacin factor")
+    assert no_plot_rows["campaign metadata"] == ("response_axis=ciprofloxacin; comparison_group=Ciprofloxacin factor")
     assert no_plot_rows["objective setpoint"] == "sfxi_v1 setpoint_vector=[0, 0, 1, 1]"
     assert "configured=2" in no_plot_rows["plot state"]
     assert "media_choices=0" in no_plot_rows["plot state"]
@@ -660,18 +848,20 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "from dnadesign.opal.notebooks.api.generated import (" in text
     assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
-    assert "build_campaign_set_round_options" in text
     assert "build_notebook_campaign_header_lines" in text
     assert "dnadesign.opal.src" not in text
     assert "__generated_with" in text
     assert 'generated_with = "' in text
     assert "Generated with marimo: `{__generated_with}`" not in text
-    assert 'label="Round"' in text
-    assert "selected_round_selector = str(round_ui.value)" in text
+    assert 'label="Round"' not in text
+    assert "selected_round_selector = 'latest'" in text
     assert 'label="Campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
     assert 'label="Visual surface"' in text
+    assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
+    assert "_preferred_visual_label = visual_label_memory()" in text
+    assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
     assert "Validity" in text
     assert "Changes" in text
@@ -683,7 +873,8 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_plot_method_sections" in text
     assert "build_notebook_no_plot_scope_rows" in text
     assert "build_notebook_validity_rows" in text
-    assert "Current scope and probe implication" in text
+    assert "Current campaign and plot evidence" in text
+    assert 'Campaign-set comparison"))' not in text
     assert "build_notebook_validity_lines" not in text
     assert "build_notebook_artifact_garden_lines" not in text
     assert "build_notebook_change_lines" not in text
@@ -705,7 +896,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     assert '_scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")' in campaign_set
     assert "label=_scope_control_label" in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 430
+    assert len(campaign_set.splitlines()) <= 450
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:

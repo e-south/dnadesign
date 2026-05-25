@@ -8,6 +8,12 @@ from typing import Any, Iterable, Mapping
 
 from ...plots._mpl_utils import pretty_label
 from ._support import display_name, mapping, sequence
+from .campaign_set_relationships import (
+    is_groupable_metadata_value,
+    metadata_fields,
+    partition_signature,
+    relationship_pair_membership,
+)
 from .plot_scopes import sort_plot_scope_manifests
 
 
@@ -25,7 +31,7 @@ def build_notebook_campaign_set_group_options(campaigns: Iterable[Mapping[str, A
         slugs.append(str(campaign.get("slug") or "campaign"))
         metadata = mapping(campaign.get("metadata"))
         for key, value in metadata.items():
-            if _is_groupable_metadata_value(value):
+            if is_groupable_metadata_value(value):
                 values_by_key.setdefault(str(key), []).append(str(value))
     candidates = [
         key for key, values in values_by_key.items() if len(values) == len(campaign_list) and len(set(values)) > 1
@@ -51,7 +57,7 @@ def build_notebook_campaign_set_group_options(campaigns: Iterable[Mapping[str, A
     selected: list[str] = []
     seen_partitions: set[tuple[int, ...]] = set()
     for key in sorted(candidates, key=_sort_key):
-        signature = _partition_signature(values_by_key[key])
+        signature = partition_signature(values_by_key[key])
         if signature in seen_partitions:
             continue
         seen_partitions.add(signature)
@@ -65,15 +71,20 @@ def build_notebook_campaign_set_metric_comparison_rows(
     plot_name: str,
     group_key: str | None = None,
     summary: str = "median",
+    relationship: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Read compatible metric_over_rounds tidy CSVs across a campaign set."""
 
     if not str(plot_name or "").strip():
         return []
     rows: list[dict[str, Any]] = []
+    pair_membership = relationship_pair_membership(relationship)
     for campaign_model in campaigns:
         campaign = mapping(campaign_model.get("campaign"))
         slug = str(campaign.get("slug") or "unknown")
+        pair_contexts = pair_membership.get(slug) if pair_membership else [None]
+        if not pair_contexts:
+            continue
         campaign_label = display_name(slug)
         metadata = mapping(campaign.get("metadata"))
         group_value = slug if group_key in (None, "", "campaign") else str(metadata.get(str(group_key), "not recorded"))
@@ -84,16 +95,19 @@ def build_notebook_campaign_set_metric_comparison_rows(
         if tidy_path is None or not tidy_path.exists():
             continue
         for row in _read_metric_tidy_rows(tidy_path, summary=summary):
-            rows.append(
-                {
-                    **row,
-                    "campaign": slug,
-                    "campaign_label": campaign_label,
-                    "group_key": group_key or "campaign",
-                    "group": group_value,
-                    "tidy_csv": str(tidy_path),
-                }
-            )
+            for pair_context in pair_contexts:
+                rows.append(
+                    {
+                        **row,
+                        **metadata_fields(metadata),
+                        **(pair_context or {}),
+                        "campaign": slug,
+                        "campaign_label": campaign_label,
+                        "group_key": group_key or "campaign",
+                        "group": group_value,
+                        "tidy_csv": str(tidy_path),
+                    }
+                )
     return rows
 
 
@@ -130,7 +144,7 @@ def render_notebook_campaign_set_metric_comparison_image(
         pretty_title,
     )
 
-    grouped: dict[str, dict[int, list[float]]] = {}
+    grouped: dict[str, dict[int, list[tuple[float, str]]]] = {}
     counts_by_group_round: dict[tuple[str, int], list[float]] = {}
     metric = str(data[0].get("metric") or "value")
     cohort = str(data[0].get("cohort") or "")
@@ -143,7 +157,8 @@ def render_notebook_campaign_set_metric_comparison_image(
         group = str(row.get("group") or "not recorded")
         round_index = int(_finite_number(row.get("round")))
         value = float(_finite_number(row.get("value")))
-        grouped.setdefault(group, {}).setdefault(round_index, []).append(value)
+        unit_key = str(row.get("comparison_unit_key") or row.get("campaign") or f"row-{len(data)}")
+        grouped.setdefault(group, {}).setdefault(round_index, []).append((value, unit_key))
         count_value = _finite_number(row.get("cohort_count"))
         if count_value is not None:
             counts_by_group_round.setdefault((group, round_index), []).append(float(count_value))
@@ -152,18 +167,47 @@ def render_notebook_campaign_set_metric_comparison_image(
     fig, ax = plt.subplots(figsize=DEFAULT_SQUARE_FIGSIZE)
     apply_notebook_axes_style(ax, square=True)
     group_labels = sorted(grouped)
+    rounds_with_interval = 0
+    interval_unit_counts: list[int] = []
     for index, group in enumerate(group_labels):
         by_round = grouped[group]
         xs = sorted(by_round)
-        ys = [float(np.median(by_round[round_index])) for round_index in xs]
+        ys = [float(np.median([value for value, _unit in by_round[round_index]])) for round_index in xs]
+        lows: list[float] = []
+        highs: list[float] = []
+        for round_index in xs:
+            values = [value for value, _unit in by_round[round_index]]
+            unit_count = len({_unit for _value, _unit in by_round[round_index]})
+            if len(values) >= 2 and unit_count >= 2:
+                lows.append(float(np.quantile(values, 0.25)))
+                highs.append(float(np.quantile(values, 0.75)))
+                rounds_with_interval += 1
+                interval_unit_counts.append(unit_count)
+            else:
+                lows.append(float("nan"))
+                highs.append(float("nan"))
+        mask = np.isfinite(lows) & np.isfinite(highs)
+        color = categorical_color(index)
+        if bool(np.any(mask)):
+            x_arr = np.asarray(xs, dtype=float)
+            ax.fill_between(
+                x_arr[mask],
+                np.asarray(lows, dtype=float)[mask],
+                np.asarray(highs, dtype=float)[mask],
+                color=color,
+                alpha=0.16,
+                linewidth=0,
+                zorder=1,
+            )
         ax.plot(
             xs,
             ys,
-            color=categorical_color(index),
+            color=color,
             marker=categorical_marker(index),
             linestyle=categorical_linestyle(index),
             linewidth=2.4,
             markersize=7,
+            zorder=2,
             label=pretty_label(group),
         )
 
@@ -185,24 +229,39 @@ def render_notebook_campaign_set_metric_comparison_image(
     fig.savefig(buffer, format="png", dpi=int(dpi), facecolor="white")
     plt.close(fig)
     group_text = ", ".join(pretty_label(group) for group in group_labels)
+    relationship_mode = any(str(row.get("pair_key") or "").strip() for row in data)
+    interval_unit = "relationship pairs" if relationship_mode else "campaigns"
+    interval = {
+        "kind": "iqr",
+        "unit": interval_unit,
+        "rounds_with_interval": rounds_with_interval,
+        "min_unit_count": min(interval_unit_counts) if interval_unit_counts else 0,
+        "max_unit_count": max(interval_unit_counts) if interval_unit_counts else 0,
+        "is_confidence_interval": False,
+    }
+    if any(str(row.get("replicate_on") or "").strip() for row in data):
+        interval["replicate_on"] = sorted({str(row.get("replicate_on")) for row in data if row.get("replicate_on")})
+    interval_sentence = (
+        f" Shaded bands are IQR across {interval_unit} where at least two units contribute; "
+        "they are not statistical confidence intervals."
+        if rounds_with_interval
+        else " No interval band is drawn when fewer than two comparison units contribute per group/round."
+    )
     return {
         "image_bytes": buffer.getvalue(),
         "alt_text": (
             f"Campaign-set comparison for {rendered_title}. X axis is OPAL round; "
             f"Y axis is {summary} {metric}; color, marker, and line style encode {group_key}. "
-            f"Groups shown: {group_text}."
+            f"Groups shown: {group_text}.{interval_sentence}"
         ),
         "caption": (
             f"Campaign-set comparison grouped by `{group_key}` for `{metric}` / `{cohort}`. "
-            "Values are median across campaigns per group/round."
+            f"Values are median across {interval_unit} per group/round.{interval_sentence}"
         ),
         "group_count": len(group_labels),
         "row_count": len(data),
+        "interval": interval,
     }
-
-
-def _is_groupable_metadata_value(value: Any) -> bool:
-    return isinstance(value, (str, int, float, bool)) and str(value).strip() != ""
 
 
 def _campaign_plot_manifest(
@@ -270,17 +329,6 @@ def _read_metric_tidy_rows(path: Path, *, summary: str) -> list[dict[str, Any]]:
             }
         )
     return rows
-
-
-def _partition_signature(values: Iterable[str]) -> tuple[int, ...]:
-    seen: dict[str, int] = {}
-    signature: list[int] = []
-    for value in values:
-        token = str(value)
-        if token not in seen:
-            seen[token] = len(seen)
-        signature.append(seen[token])
-    return tuple(signature)
 
 
 def _campaign_set_count_text(counts_by_group_round: Mapping[tuple[str, int], list[float]], *, cohort: str) -> str:

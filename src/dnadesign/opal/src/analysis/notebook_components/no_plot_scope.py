@@ -23,7 +23,7 @@ def build_notebook_no_plot_scope_rows(view_model: Mapping[str, Any]) -> list[dic
         {"field": "scope", "value": _campaign_description(campaign)},
         {"field": "campaign", "value": campaign.get("slug") or "unknown"},
         {"field": "status", "value": status.get("progress_status") or "unknown"},
-        {"field": "response axis", "value": _campaign_response_axis(campaign)},
+        {"field": "campaign metadata", "value": _campaign_metadata_summary(campaign)},
         {"field": "objective setpoint", "value": _objective_setpoint_summary(campaign)},
         {
             "field": "label source",
@@ -60,13 +60,17 @@ def build_notebook_no_plot_scope_rows(view_model: Mapping[str, Any]) -> list[dic
     return rows
 
 
-def _campaign_response_axis(campaign: Mapping[str, Any]) -> str:
+def _campaign_metadata_summary(campaign: Mapping[str, Any]) -> str:
     metadata = mapping(campaign.get("metadata"))
-    parts = [
-        f"{key}={metadata[key]}"
-        for key in ("response_axis", "comparison_group", "probe_oracle_kind", "probe_split_id")
-        if metadata.get(key)
-    ]
+    parts = []
+    for key in ("response_axis", "comparison_group", "label_family_id", "label_oracle_kind", "label_split_id"):
+        if metadata.get(key):
+            parts.append(f"{key}={metadata[key]}")
+    for key in sorted(metadata):
+        if key.endswith(("_label_family_id", "_oracle_kind", "_split_id")) and metadata.get(key):
+            value = f"{key}={metadata[key]}"
+            if value not in parts:
+                parts.append(value)
     return "; ".join(parts) if parts else "not recorded"
 
 

@@ -14,11 +14,12 @@ def _():
 
     from dnadesign.opal.notebooks.api.generated import (
         build_campaign_set_notebook_view_model,
-        build_campaign_set_round_options,
         build_notebook_artifact_garden_rows,
         build_notebook_artifact_garden_summary_rows,
         build_notebook_at_a_glance_rows,
         build_notebook_campaign_header_lines,
+        build_notebook_campaign_set_metric_comparison_rows,
+        build_notebook_campaign_set_visual_choices,
         build_notebook_campaign_summary_row,
         build_notebook_change_rows,
         build_notebook_change_summary_rows,
@@ -32,18 +33,20 @@ def _():
         build_notebook_visual_surface_model,
         find_notebook_repo_root,
         list_notebook_campaign_paths,
+        render_notebook_campaign_set_metric_comparison_image,
         select_notebook_plot_scope,
     )
 
     return (
         Path,
         build_campaign_set_notebook_view_model,
-        build_campaign_set_round_options,
         build_notebook_artifact_garden_rows,
         build_notebook_artifact_garden_summary_rows,
         build_notebook_at_a_glance_rows,
         build_notebook_campaign_header_lines,
         build_notebook_campaign_summary_row,
+        build_notebook_campaign_set_metric_comparison_rows,
+        build_notebook_campaign_set_visual_choices,
         build_notebook_change_rows,
         build_notebook_change_summary_rows,
         build_notebook_evidence_rows,
@@ -58,6 +61,7 @@ def _():
         list_notebook_campaign_paths,
         mo,
         pl,
+        render_notebook_campaign_set_metric_comparison_image,
         select_notebook_plot_scope,
     )
 
@@ -76,33 +80,26 @@ def _(list_notebook_campaign_paths, repo_root):
 
 
 @app.cell
-def _(build_campaign_set_round_options, config_paths, mo):
-    if config_paths:
-        round_options = build_campaign_set_round_options(config_paths)
-    else:
-        round_options = ["latest"]
-    round_ui = mo.ui.dropdown(round_options, value=round_options[0], label="Round")
-    return round_options, round_ui
-
-
-@app.cell
-def _(build_campaign_set_notebook_view_model, config_paths, round_ui):
-    selected_round_selector = str(round_ui.value)
+def _(build_campaign_set_notebook_view_model, config_paths):
+    selected_round_selector = "all"
     if config_paths:
         campaign_set_view_model = build_campaign_set_notebook_view_model(
             config_paths,
             round_selector=selected_round_selector,
         )
         campaigns = campaign_set_view_model["campaigns"]
+        collection = campaign_set_view_model.get("collection")
     else:
         campaign_set_view_model = {
             "schema_version": "opal.notebook_campaign_set_view_model.v1",
             "campaign_count": 0,
             "campaigns": [],
+            "collection": None,
             "warnings": [],
         }
         campaigns = []
-    return campaign_set_view_model, campaigns, selected_round_selector
+        collection = None
+    return campaign_set_view_model, campaigns, collection, selected_round_selector
 
 
 @app.cell
@@ -119,7 +116,7 @@ def _(build_notebook_campaign_summary_row, campaign_set_view_model, campaigns, m
     header_md = mo.md(
         "# Campaigns\n\n"
         f"`{campaign_set_view_model['campaign_count']}` campaigns. "
-        f"Round selector: `{selected_round_selector}`."
+        f"Review scope: `{selected_round_selector}`."
     )
     return campaign_labels, campaign_summary_df, campaign_ui, header_md
 
@@ -165,35 +162,86 @@ def _(
 
 
 @app.cell
-def _(build_notebook_plot_inventory_rows, build_notebook_visual_surface_model, selected_campaign_model):
+def _(
+    build_notebook_campaign_set_visual_choices,
+    build_notebook_plot_inventory_rows,
+    build_notebook_visual_surface_model,
+    campaigns,
+    collection,
+    selected_campaign_model,
+):
     if selected_campaign_model is None:
         visual_surface_model = {"choices": [], "inventory_status_counts": {}, "stale_artifacts": []}
         plot_choices = []
+        visual_choices = []
         plot_inventory_rows = []
         plot_inventory_counts = {}
     else:
         visual_surface_model = build_notebook_visual_surface_model(selected_campaign_model)
         plot_choices = visual_surface_model["choices"]
+        visual_choices = build_notebook_campaign_set_visual_choices(plot_choices, campaigns, collection)
         plot_inventory_rows = build_notebook_plot_inventory_rows(visual_surface_model)
         plot_inventory_counts = visual_surface_model["inventory_status_counts"]
-    return plot_choices, plot_inventory_rows, plot_inventory_counts
+    return plot_choices, plot_inventory_rows, plot_inventory_counts, visual_choices
 
 
 @app.cell
-def _(mo, plot_choices):
-    if plot_choices:
-        plot_labels = [choice["label"] for choice in plot_choices]
-        plot_ui = mo.ui.dropdown(plot_labels, value=plot_labels[0], label="Visual surface")
+def _(mo):
+    visual_label_memory, set_visual_label_memory = mo.state(None)
+    return set_visual_label_memory, visual_label_memory
+
+
+@app.cell
+def _(mo, set_visual_label_memory, visual_choices, visual_label_memory):
+    if visual_choices:
+        plot_labels = [choice["label"] for choice in visual_choices]
+        _preferred_visual_label = visual_label_memory()
+        if _preferred_visual_label not in plot_labels:
+            _preferred_visual_label = plot_labels[0]
+        plot_ui = mo.ui.dropdown(
+            plot_labels,
+            value=_preferred_visual_label,
+            label="Visual surface",
+            on_change=set_visual_label_memory,
+        )
     else:
         plot_ui = None
     return plot_ui
 
 
 @app.cell
-def _(build_notebook_plot_scope_options, mo, plot_choices):
+def _(mo, plot_ui, visual_choices):
+    if plot_ui is None:
+        selected_visual_choice = None
+    else:
+        selected_visual_choice = next(choice for choice in visual_choices if choice["label"] == str(plot_ui.value))
+    if (
+        selected_visual_choice is not None
+        and selected_visual_choice.get("surface_kind") == "campaign_set_metric_comparison"
+    ):
+        comparison_group_options = list(selected_visual_choice.get("comparison_group_options") or [])
+    else:
+        comparison_group_options = []
+    if comparison_group_options:
+        comparison_group_key = str(comparison_group_options[0])
+        comparison_group_ui = (
+            mo.ui.dropdown(comparison_group_options, value=comparison_group_key, label="Compare by")
+            if len(comparison_group_options) > 1
+            else None
+        )
+    else:
+        comparison_group_key = None
+        comparison_group_ui = None
+    return comparison_group_key, comparison_group_options, comparison_group_ui, selected_visual_choice
+
+
+@app.cell
+def _(build_notebook_plot_scope_options, mo, visual_choices):
     plot_scope_controls = {}
     plot_scope_options_by_plot = {}
-    for plot_choice in plot_choices:
+    for plot_choice in visual_choices:
+        if plot_choice.get("surface_kind") == "campaign_set_metric_comparison":
+            continue
         plot_scope_options = build_notebook_plot_scope_options(plot_choice)
         plot_scope_options_by_plot[plot_choice["label"]] = plot_scope_options
         if len(plot_scope_options) > 1:
@@ -209,16 +257,21 @@ def _(build_notebook_plot_scope_options, mo, plot_choices):
 @app.cell
 def _(
     Path,
+    build_notebook_campaign_set_metric_comparison_rows,
     build_notebook_plot_card_rows,
     build_notebook_plot_method_sections,
     mo,
     pl,
-    plot_choices,
+    campaigns,
+    comparison_group_key,
+    comparison_group_ui,
     plot_inventory_counts,
     plot_inventory_rows,
     plot_scope_controls,
     plot_ui,
+    render_notebook_campaign_set_metric_comparison_image,
     select_notebook_plot_scope,
+    selected_visual_choice,
 ):
     if plot_ui is None:
         lines = ["No written manifest-backed plot media are available for this campaign."]
@@ -230,13 +283,6 @@ def _(
             items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
         plot_panel = mo.vstack(items, gap=0.45)
     else:
-        selected = str(plot_ui.value)
-        selected_plot_choice = next(choice for choice in plot_choices if choice["label"] == selected)
-        plot_scope_ui = plot_scope_controls.get(selected)
-        choice = select_notebook_plot_scope(
-            selected_plot_choice,
-            str(plot_scope_ui.value) if plot_scope_ui is not None else None,
-        )
 
         def plot_image(plot_choice):
             path = Path(plot_choice["path"])
@@ -261,31 +307,71 @@ def _(
             )
 
         control_items = [plot_ui]
-        if plot_scope_ui is not None:
-            control_items.append(plot_scope_ui)
+        if comparison_group_ui is not None:
+            control_items.append(comparison_group_ui)
         _plot_controls = mo.hstack(control_items, justify="start", align="end", wrap=True, gap=0.35)
-        method_sections = build_notebook_plot_method_sections(choice)
-        plot_panel = mo.vstack(
-            [
-                _plot_controls,
-                plot_image(choice),
-                mo.accordion(
-                    {
-                        **{label: mo.md(text) for label, text in method_sections.items()},
-                        "Evidence": mo.ui.table(
-                            pl.DataFrame(build_notebook_plot_card_rows(choice)),
-                            page_size=12,
-                        ),
-                        "Plot inventory": mo.ui.table(
-                            pl.DataFrame(plot_inventory_rows),
-                            page_size=12,
-                        ),
-                    },
-                    multiple=True,
+        if selected_visual_choice.get("surface_kind") == "campaign_set_metric_comparison":
+            source_plot_name = str(selected_visual_choice.get("source_plot_name") or "")
+            if not source_plot_name:
+                raise ValueError("Campaign-set comparison visual is missing source_plot_name.")
+            active_group = str(comparison_group_ui.value) if comparison_group_ui is not None else comparison_group_key
+            if active_group is None:
+                raise ValueError("Campaign-set comparison visual is missing comparison_group_key.")
+            comparison_rows = build_notebook_campaign_set_metric_comparison_rows(
+                campaigns,
+                plot_name=source_plot_name,
+                group_key=str(active_group),
+            )
+            comparison_payload = render_notebook_campaign_set_metric_comparison_image(
+                comparison_rows,
+                title=str(selected_visual_choice.get("title") or source_plot_name),
+                group_key=str(active_group),
+            )
+            visual = (
+                mo.image(
+                    comparison_payload["image_bytes"],
+                    alt=str(comparison_payload["alt_text"]),
+                    caption=str(comparison_payload["caption"]),
+                    rounded=True,
+                    style={"max-width": "100%", "background": "white"},
+                )
+                if comparison_payload is not None
+                else mo.md("No manifest-backed tidy rows are available for this comparison.")
+            )
+            details = {
+                "Evidence": mo.ui.table(
+                    pl.DataFrame(
+                        [
+                            {"field": "source plot", "value": source_plot_name},
+                            {"field": "compare by", "value": active_group},
+                            {"field": "rows", "value": len(comparison_rows)},
+                        ]
+                    ),
+                    page_size=12,
                 ),
-            ],
-            gap=0.45,
-        )
+                "Plot inventory": mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12),
+            }
+        else:
+            selected = str(plot_ui.value)
+            plot_scope_ui = plot_scope_controls.get(selected)
+            choice = select_notebook_plot_scope(
+                selected_visual_choice,
+                str(plot_scope_ui.value) if plot_scope_ui is not None else None,
+            )
+            if plot_scope_ui is not None:
+                control_items.append(plot_scope_ui)
+            _plot_controls = mo.hstack(control_items, justify="start", align="end", wrap=True, gap=0.35)
+            method_sections = build_notebook_plot_method_sections(choice)
+            visual = plot_image(choice)
+            details = {
+                **{label: mo.md(text) for label, text in method_sections.items()},
+                "Evidence": mo.ui.table(
+                    pl.DataFrame(build_notebook_plot_card_rows(choice)),
+                    page_size=12,
+                ),
+                "Plot inventory": mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12),
+            }
+        plot_panel = mo.vstack([_plot_controls, visual, mo.accordion(details, multiple=True)], gap=0.45)
     return plot_panel
 
 
@@ -368,18 +454,18 @@ def _(
     metric_definitions_panel,
     mo,
     plot_panel,
-    round_ui,
     selected_campaign_header_md,
     selected_overview_panel,
     selected_validity_md,
 ):
-    _controls = [round_ui]
+    _controls = []
     if campaign_ui is not None:
         _controls.append(campaign_ui)
+    controls_panel = mo.hstack(_controls, justify="start", align="end", wrap=True, gap=0.35) if _controls else mo.md("")
     mo.vstack(
         [
             header_md,
-            mo.hstack(_controls, justify="start", align="end", wrap=True, gap=0.35),
+            controls_panel,
             selected_campaign_header_md,
             plot_panel,
             mo.accordion(

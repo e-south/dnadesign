@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from ._support import compact_path, display_name, join_list, mapping, selection_count, sequence
+from .campaign_labels import campaign_dropdown_label
 from .plots import build_notebook_visual_surface_model
 
 
@@ -13,15 +14,25 @@ def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[s
     status = mapping(view_model.get("status"))
     stale_count = len(sequence(view_model.get("stale_artifacts")))
     warning_count = len(sequence(view_model.get("warnings")))
-    label = f"{campaign.get('slug') or 'unknown'} | {status.get('progress_status') or 'unknown'}"
+    label_context = _campaign_label_context(campaign)
+    label = campaign_dropdown_label(
+        campaign,
+        status=status,
+        title=_campaign_title(campaign),
+        label_context=label_context,
+    )
     return {
         "label": label,
         "campaign": campaign.get("slug"),
+        "name": _campaign_title(campaign),
         "status": status.get("progress_status"),
         "round_count": status.get("round_count"),
         "latest_run_id": status.get("latest_run_id"),
         "x_column": campaign.get("x_column"),
+        "y_column": campaign.get("y_column"),
         "label_source": campaign.get("label_source"),
+        "label_context": label_context,
+        "metadata_context": _campaign_metadata_context(campaign),
         "plots": len(sequence(view_model.get("plot_manifests"))),
         "stale": stale_count,
         "warnings": warning_count,
@@ -85,7 +96,10 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         {"field": "round count", "value": row["round_count"]},
         {"field": "latest run", "value": row["latest_run_id"]},
         {"field": "X column", "value": row["x_column"]},
+        {"field": "Y column", "value": row["y_column"]},
         {"field": "label source", "value": row["label_source"]},
+        {"field": "label context", "value": row["label_context"] or "not recorded"},
+        {"field": "campaign metadata", "value": row["metadata_context"] or "not recorded"},
         {"field": "config", "value": compact_path(campaign.get("config_path"), base=workdir)},
         {"field": "workspace", "value": compact_path(workdir, max_parts=1)},
     ]
@@ -99,6 +113,41 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         )
     )
     return rows
+
+
+def _campaign_label_context(campaign: Mapping[str, Any]) -> str:
+    metadata = mapping(campaign.get("metadata"))
+    parts = []
+    for key in ("label_family_id", "label_oracle_kind", "label_split_id"):
+        if metadata.get(key):
+            parts.append(f"{key}={metadata[key]}")
+    probe_aliases = {
+        "probe_label_family_id": "label_family_id",
+        "probe_oracle_kind": "label_oracle_kind",
+        "probe_split_id": "label_split_id",
+    }
+    for key, label in probe_aliases.items():
+        if metadata.get(key) and not metadata.get(label):
+            parts.append(f"{label}={metadata[key]}")
+    for key in sorted(metadata):
+        if key in {"label_family_id", "label_oracle_kind", "label_split_id", *probe_aliases}:
+            continue
+        if key.endswith(("_label_family_id", "_oracle_kind", "_split_id")) and metadata.get(key):
+            parts.append(f"{key}={metadata[key]}")
+    if not parts:
+        y_column = str(campaign.get("y_column") or "").strip()
+        if y_column:
+            parts.append(f"y={y_column}")
+    return "; ".join(parts[:4])
+
+
+def _campaign_metadata_context(campaign: Mapping[str, Any]) -> str:
+    metadata = mapping(campaign.get("metadata"))
+    parts = []
+    for key in ("campaign_context", "campaign_kind", "campaign_type", "study_id", "response_axis", "comparison_group"):
+        if metadata.get(key):
+            parts.append(f"{key}={metadata[key]}")
+    return "; ".join(parts[:6])
 
 
 def build_notebook_trust_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:

@@ -25,6 +25,7 @@ from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
 from .types import (
     CampaignBlock,
+    CandidateScope,
     DataBlock,
     IngestBlock,
     LabelsBlock,
@@ -98,12 +99,20 @@ class PPluginRef(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
+class PCandidateScope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["id_list"] = "id_list"
+    path: str
+    id_column: str = "id"
+
+
 class PData(BaseModel):
     model_config = ConfigDict(extra="forbid")
     location: PLocation
     x_column_name: str
     y_column_name: str
     y_expected_length: Optional[int] = None
+    candidate_scope: Optional[PCandidateScope] = None
 
 
 class PLabelSourceCampaignHistory(BaseModel):
@@ -331,6 +340,15 @@ def load_config(path: Path | str) -> RootConfig:
         y_expected_length=pyd.data.y_expected_length,
         transforms_x=PluginRef(tx.name, tx_params),
         transforms_y=PluginRef(ty.name, ty_params),
+        candidate_scope=(
+            CandidateScope(
+                kind=str(pyd.data.candidate_scope.kind),
+                path=_abs(pyd.data.candidate_scope.path),
+                id_column=str(pyd.data.candidate_scope.id_column),
+            )
+            if pyd.data.candidate_scope is not None
+            else None
+        ),
     )
 
     if isinstance(pyd.labels.source, PLabelSourceUSRSidecar):

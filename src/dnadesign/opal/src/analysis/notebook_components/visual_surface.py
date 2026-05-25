@@ -141,7 +141,7 @@ def render_visual_surface_cells() -> str:
                 _items.append(
                     mo.accordion(
                         {
-                            "Current scope and probe implication": mo.ui.table(
+                            "Current campaign and plot evidence": mo.ui.table(
                                 pl.DataFrame(build_notebook_no_plot_scope_rows(notebook_view_model)),
                                 page_size=12,
                             )

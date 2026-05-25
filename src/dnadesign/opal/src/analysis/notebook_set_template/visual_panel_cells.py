@@ -23,11 +23,11 @@ def render_visual_panel_cell() -> str:
             plot_scope_ui,
             plot_ui,
             render_notebook_campaign_set_metric_comparison_image,
-            selected_plot_choice,
+            selected_visual_choice,
             select_notebook_plot_scope,
             selected_campaign_model,
         ):
-            if selected_plot_choice is None:
+            if selected_visual_choice is None:
                 _lines = ["No written manifest-backed plot media are available for this campaign."]
                 if plot_inventory_counts:
                     _parts = [
@@ -38,15 +38,11 @@ def render_visual_panel_cell() -> str:
                 _items = [mo.md("\\n".join(_lines))]
                 _scope_rows = build_notebook_no_plot_scope_rows(selected_campaign_model)
                 _scope_panel = mo.ui.table(pl.DataFrame(_scope_rows), page_size=12)
-                _items.append(mo.accordion({"Current scope and probe implication": _scope_panel}, multiple=True))
+                _items.append(mo.accordion({"Current campaign and plot evidence": _scope_panel}, multiple=True))
                 if plot_inventory_rows:
                     _items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
                 plot_panel = mo.vstack(_items, gap=0.45)
             else:
-                _choice = select_notebook_plot_scope(
-                    selected_plot_choice,
-                    str(plot_scope_ui.value) if plot_scope_ui is not None else None,
-                )
                 def _plot_image(plot_choice):
                     _path = Path(plot_choice["path"])
                     if not _path.exists():
@@ -74,23 +70,27 @@ def render_visual_panel_cell() -> str:
                 if comparison_group_ui is not None:
                     _control_items.append(comparison_group_ui)
                 _controls = mo.hstack(_control_items, justify="start", align="end", wrap=True, gap=0.35)
-                _comparison_view = None
-                _active_comparison_group = (
-                    str(comparison_group_ui.value) if comparison_group_ui is not None else comparison_group_key
-                )
-                if _active_comparison_group is not None and _choice.get("kind") == "metric_over_rounds":
+                if selected_visual_choice.get("surface_kind") == "campaign_set_metric_comparison":
+                    _source_plot_name = str(selected_visual_choice.get("source_plot_name") or "")
+                    if not _source_plot_name:
+                        raise ValueError("Campaign-set comparison visual is missing source_plot_name.")
+                    _active_comparison_group = (
+                        str(comparison_group_ui.value) if comparison_group_ui is not None else comparison_group_key
+                    )
+                    if _active_comparison_group is None:
+                        raise ValueError("Campaign-set comparison visual is missing comparison_group_key.")
                     _comparison_rows = build_notebook_campaign_set_metric_comparison_rows(
                         campaigns,
-                        plot_name=str(_choice.get("name") or ""),
-                        group_key=str(_active_comparison_group),
+                        plot_name=_source_plot_name,
+                        group_key=str(_active_comparison_group), relationship=selected_visual_choice,
                     )
                     _comparison_payload = render_notebook_campaign_set_metric_comparison_image(
                         _comparison_rows,
-                        title=str(_choice.get("title") or _choice.get("name") or "Campaign-set comparison"),
+                        title=str(selected_visual_choice.get("title") or _source_plot_name),
                         group_key=str(_active_comparison_group),
                     )
                     if _comparison_payload is not None:
-                        _comparison_view = mo.image(
+                        _visual = mo.image(
                             _comparison_payload["image_bytes"],
                             alt=str(_comparison_payload["alt_text"]),
                             caption=str(_comparison_payload["caption"]),
@@ -107,28 +107,41 @@ def render_visual_panel_cell() -> str:
                                 "background": "white",
                             },
                         )
-                _visual_items = [_controls, _plot_image(_choice)]
-                if _comparison_view is not None:
-                    _visual_items.append(mo.md("#### Campaign-set comparison"))
-                    _visual_items.append(_comparison_view)
-                _method_sections = build_notebook_plot_method_sections(_choice)
+                    else:
+                        _visual = mo.md("No manifest-backed tidy rows are available for this comparison.")
+                    _details = {
+                        "Evidence": mo.ui.table(
+                            pl.DataFrame(
+                                [
+                                    {"field": "source plot", "value": _source_plot_name},
+                                    {"field": "compare by", "value": _active_comparison_group},
+                                    {"field": "rows", "value": len(_comparison_rows)},
+                                ]
+                            ),
+                            page_size=12,
+                        ),
+                        "Plot inventory": mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12),
+                    }
+                else:
+                    _choice = select_notebook_plot_scope(
+                        selected_visual_choice,
+                        str(plot_scope_ui.value) if plot_scope_ui is not None else None,
+                    )
+                    _visual = _plot_image(_choice)
+                    _method_sections = build_notebook_plot_method_sections(_choice)
+                    _details = {
+                        **{label: mo.md(text) for label, text in _method_sections.items()},
+                        "Evidence": mo.ui.table(
+                            pl.DataFrame(build_notebook_plot_card_rows(_choice)),
+                            page_size=12,
+                        ),
+                        "Plot inventory": mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12),
+                    }
                 plot_panel = mo.vstack(
                     [
-                        *_visual_items,
-                        mo.accordion(
-                            {
-                                **{label: mo.md(text) for label, text in _method_sections.items()},
-                                "Evidence": mo.ui.table(
-                                    pl.DataFrame(build_notebook_plot_card_rows(_choice)),
-                                    page_size=12,
-                                ),
-                                "Plot inventory": mo.ui.table(
-                                    pl.DataFrame(plot_inventory_rows),
-                                    page_size=12,
-                                ),
-                            },
-                            multiple=True,
-                        ),
+                        _controls,
+                        _visual,
+                        mo.accordion(_details, multiple=True),
                     ],
                     gap=0.45,
                 )

@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from .loader import load_config  # noqa: F401
 from .types import (  # noqa: F401
+    CandidateScope,
     LabelsBlock,
     LabelSourceCampaignHistory,
     LabelSourceUSRSidecar,
@@ -22,6 +23,7 @@ from .types import (  # noqa: F401
 __all__ = [
     "load_config",
     "RootConfig",
+    "CandidateScope",
     "LocationLocal",
     "LocationUSR",
     "LabelsBlock",

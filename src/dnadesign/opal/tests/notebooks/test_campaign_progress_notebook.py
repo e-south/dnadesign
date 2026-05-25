@@ -54,10 +54,14 @@ def test_campaign_progress_uses_tables_for_contract_and_record_status() -> None:
 
 def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "build_campaign_set_round_options" in text
-    assert "selected_round_selector = str(round_ui.value)" in text
+    assert "build_campaign_set_round_options" not in text
+    assert 'label="Round"' not in text
+    assert 'selected_round_selector = "all"' in text
     assert 'label="Campaign"' in text
     assert 'label="Visual surface"' in text
+    assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
+    assert "on_change=set_visual_label_memory" in text
+    assert "build_notebook_campaign_set_visual_choices" in text
 
 
 def test_campaign_progress_keeps_lateral_tools_out_of_opal_surface() -> None:

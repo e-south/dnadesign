@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping, Sequence
 
 import polars as pl
 
@@ -20,6 +20,7 @@ def load_predictions_with_setpoint(
     *,
     round_selector: RoundSelector | None = None,
     run_id: str | None = None,
+    row_filters: Sequence[Mapping[str, Any]] | None = None,
     require_run_id: bool = True,
 ) -> pl.DataFrame:
     """
@@ -39,6 +40,7 @@ def load_predictions_with_setpoint(
         round_selector=round_selector,
         run_id=run_id,
         runs_df=runs_df,
+        row_filters=row_filters,
         require_run_id=require_run_id,
     )
     if df.is_empty():

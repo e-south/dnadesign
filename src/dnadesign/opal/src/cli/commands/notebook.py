@@ -27,6 +27,7 @@ from ...core.pretty import console_out
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.notebook import smoke_check_notebook
+from ...reporting.notebook_set import build_campaign_set_notebook_view_model
 from ..registry import cli_group
 from ..tui import tui_enabled
 from ._common import internal_error, json_error, json_out, opal_error, print_config_context, prompt_confirm
@@ -137,6 +138,20 @@ def _resolve_notebook_name(name: Optional[str], default_name: str) -> str:
     return raw if suffix else f"{raw}.py"
 
 
+def _parse_notebook_round_selector(round_value: str | None, *, allow_all: bool) -> str:
+    raw = (round_value or "latest").strip().lower()
+    if raw in ("", "latest"):
+        return "latest"
+    if allow_all and raw == "all":
+        return "all"
+    try:
+        round_index = int(raw)
+    except Exception as exc:
+        accepted = "an integer, 'latest', or 'all'" if allow_all else "an integer or 'latest'"
+        raise OpalError(f"Invalid --round: must be {accepted}.", ExitCodes.BAD_ARGS) from exc
+    return str(round_index)
+
+
 @notebook_app.callback(invoke_without_command=True)
 def notebook_root(
     ctx: typer.Context,
@@ -232,12 +247,17 @@ def cmd_notebook_generate(
         "latest",
         "--round",
         "-r",
-        help="Default round selector (int or 'latest').",
+        help="Default round selector (int or 'latest'; campaign-set notebooks also support 'all').",
     ),
     run_id: Optional[str] = typer.Option(
         None,
         "--run-id",
         help="Pin the generated single-campaign notebook to a run_id from outputs/ledger/runs.parquet.",
+    ),
+    collection: Optional[Path] = typer.Option(
+        None,
+        "--collection",
+        help="Optional opal.campaign_collection.v1 manifest for campaign-set relationship lenses.",
     ),
     out: Optional[Path] = typer.Option(
         None,
@@ -274,11 +294,15 @@ def cmd_notebook_generate(
                 round=round,
                 out=out,
                 name=name,
+                collection=collection,
                 force=force,
                 validate=validate,
                 json=json,
             )
             return
+
+        if collection is not None:
+            raise OpalError("--collection is only supported for campaign-set notebook generation.", ExitCodes.BAD_ARGS)
 
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
         cfg = analysis.config
@@ -289,15 +313,7 @@ def cmd_notebook_generate(
         if out is not None and name is not None:
             raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
 
-        round_sel_raw = (round or "latest").strip().lower()
-        if round_sel_raw in ("", "latest"):
-            round_sel = "latest"
-        else:
-            try:
-                round_val = int(round_sel_raw)
-            except Exception as e:
-                raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
-            round_sel = str(round_val)
+        round_sel = _parse_notebook_round_selector(round, allow_all=False)
 
         if run_id is not None:
             round_sel, resolved_run_id = resolve_generation_run_scope(
@@ -403,6 +419,7 @@ def _generate_campaign_set_notebook(
     round: Optional[str],
     out: Optional[Path],
     name: Optional[str],
+    collection: Optional[Path],
     force: bool,
     validate: bool,
     json: bool,
@@ -421,22 +438,21 @@ def _generate_campaign_set_notebook(
         raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
 
     analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
-    round_sel_raw = (round or "latest").strip().lower()
-    if round_sel_raw in ("", "latest"):
-        round_sel = "latest"
-    else:
-        try:
-            round_val = int(round_sel_raw)
-        except Exception as e:
-            raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
-        round_sel = str(round_val)
+    round_sel = _parse_notebook_round_selector(round, allow_all=True)
 
     for analysis in analyses:
         store = analysis.records_store()
         if not store.records_path.exists():
             raise OpalError(f"records.parquet not found: {store.records_path}", ExitCodes.BAD_ARGS)
-        if validate and analysis.workspace.ledger_runs_path.exists():
+        if validate and round_sel != "all" and analysis.workspace.ledger_runs_path.exists():
             resolve_round_index_from_runs(analysis.read_runs(), round_sel)
+
+    if collection is not None:
+        build_campaign_set_notebook_view_model(
+            [analysis.config_path for analysis in analyses],
+            round_selector=round_sel,
+            collection_manifest_path=collection,
+        )
 
     default_name = "opal_campaign_set_analysis.py"
     notebook_name = _resolve_notebook_name(name, default_name)
@@ -463,7 +479,11 @@ def _generate_campaign_set_notebook(
                 print_stdout("Aborted.")
             return
 
-    content = render_campaign_set_notebook([analysis.config_path for analysis in analyses], round_selector=round_sel)
+    content = render_campaign_set_notebook(
+        [analysis.config_path for analysis in analyses],
+        round_selector=round_sel,
+        collection_manifest_path=collection,
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
     smoke_check_notebook(out_path, run_marimo_check=True)
@@ -478,6 +498,7 @@ def _generate_campaign_set_notebook(
                 force=force,
                 overwritten=overwritten,
                 analyses=analyses,
+                collection_manifest_path=collection,
             )
         )
         return
@@ -489,6 +510,7 @@ def _generate_campaign_set_notebook(
                 "Campaigns": len(analyses),
                 "Notebook": out_path,
                 "Round": round_sel,
+                "Collection": collection or "",
             },
         )
         if _print_rich(table):

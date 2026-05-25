@@ -180,6 +180,9 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
   - params: `metric`, `cohorts`, `summaries`, `top_k`, `threshold`,
     `reference_lines`, `highlight_round`, `figsize_in`
+  - `band: iqr` is a within-campaign cohort distribution band, not a
+    multi-seed confidence interval; campaign-set notebooks derive separate
+    relationship-level bands from the optional campaign collection manifest
   - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, and
     `value`
 - **`percent_high_activity_over_rounds`**: thresholded scalar distribution plus
@@ -193,9 +196,9 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
     `aggregation`, `top_k`, `figsize_in`, `cmap`
   - writes tidy CSV columns `row_type`, `round`, `cohort`, `channel`, and
     `value`
-  - use `reference_vector` for vec8 baselines. Objective `setpoint_vector`
-    remains the length-4 SFXI logic setpoint and should not be used as a
-    length-8 plot baseline.
+  - use `reference_vector` for any explicit vector baseline. Its length must
+    match the plotted vector, whether the campaign uses a four-channel logic
+    vector, a count vector, or a measured SFXI vector.
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
@@ -234,8 +237,8 @@ with `round_variants: [all, each]` and single-round SFXI diagnostics with
 declared scope; the notebook will only expose scopes present in
 `plot_manifest.json`.
 
-For round-history plots, `params.highlight_round: latest` overlays the current
-round on the full history without changing data selection. Use this for the
+For round-history plots, `params.highlight_round: latest` marks current-round
+points on the full history without changing data selection. Use this for the
 "whole population, highlight current round" case. Use plot-level
 `round_selector: latest` only when the primitive itself requires a single round.
 

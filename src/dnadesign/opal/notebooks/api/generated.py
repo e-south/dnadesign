@@ -27,6 +27,7 @@ from ...src.analysis.notebook_components import (
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_group_options,
     build_notebook_campaign_set_metric_comparison_rows,
+    build_notebook_campaign_set_visual_choices,
     build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -59,6 +60,7 @@ from ...src.analysis.notebook_components import (
     select_notebook_plot_scope,
 )
 from ...src.plots.config import list_configured_plot_specs, load_plot_config, parse_enabled, parse_tags
+from ...src.reporting.campaign_collection import load_campaign_collection_manifest
 from ...src.reporting.notebook import build_notebook_view_model
 from ...src.reporting.notebook_set import build_campaign_set_notebook_view_model, build_campaign_set_round_options
 
@@ -81,6 +83,7 @@ __all__ = [
     "build_notebook_campaign_summary_row",
     "build_notebook_campaign_set_group_options",
     "build_notebook_campaign_set_metric_comparison_rows",
+    "build_notebook_campaign_set_visual_choices",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",
@@ -110,6 +113,7 @@ __all__ = [
     "latest_round",
     "latest_run_id",
     "list_notebook_campaign_paths",
+    "load_campaign_collection_manifest",
     "load_notebook_baserender_record_row",
     "load_plot_config",
     "list_configured_plot_specs",

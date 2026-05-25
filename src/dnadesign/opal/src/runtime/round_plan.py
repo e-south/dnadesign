@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from ..core.leakage import assert_no_leakage_violations, build_train_eval_leakage_report
+from ..storage.candidate_scope import apply_candidate_scope
 from ..storage.data_access import RecordsStore
 from ..storage.label_sources import CampaignHistoryLabelSource, TrainingLabelSource
 
@@ -55,7 +56,7 @@ def plan_round(
         dedup_policy=dedup_policy,
     )
 
-    cand_df = store.candidate_universe(df, int(as_of_round))
+    cand_df = apply_candidate_scope(store.candidate_universe(df, int(as_of_round)), cfg.data.candidate_scope)
     total_before = int(len(cand_df))
 
     sel_params = dict(cfg.selection.selection.params)

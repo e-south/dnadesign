@@ -10,6 +10,8 @@ Source modules:
 
 - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
 - `src/dnadesign/opal/src/objectives/scalar_identity_v1.py`
+- `src/dnadesign/opal/src/objectives/vector_channel_v1.py`
+- `src/dnadesign/opal/src/objectives/vector_target_similarity_v1.py`
 
 ### Channel reference format
 
@@ -39,6 +41,24 @@ Use when the model output is already a single scalar objective.
 
 - Score channels:
   - `scalar_identity_v1/scalar` (maximize)
+- Uncertainty channels:
+  - none
+
+### `vector_channel_v1`
+
+Use when a vector target should select on one declared channel.
+
+- Score channels:
+  - configured as `vector_channel_v1/<channel_name>` (mode from params)
+- Uncertainty channels:
+  - none
+
+### `vector_target_similarity_v1`
+
+Use when a vector target should select by closeness to a declared target vector.
+
+- Score channels:
+  - `vector_target_similarity_v1/negative_mse` (maximize)
 - Uncertainty channels:
   - none
 

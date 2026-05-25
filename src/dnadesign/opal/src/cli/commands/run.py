@@ -24,6 +24,7 @@ from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...runtime.memory_guard import enforce_x_matrix_memory_budget
 from ...runtime.run_round import RunRoundRequest, run_round
 from ...storage.artifacts import append_round_log_event
+from ...storage.candidate_scope import load_candidate_scope_ids
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
 from ...storage.workspace import CampaignWorkspace
@@ -170,11 +171,16 @@ def cmd_run(
         if sbatch <= 0:
             raise OpalError("score_batch_size must be a positive integer.", ExitCodes.BAD_ARGS)
         materializes_prediction_records = str(cfg.writeback.prediction_records) == "label_history"
+        scoped_candidate_rows = (
+            len(load_candidate_scope_ids(cfg.data.candidate_scope))
+            if cfg.data.candidate_scope is not None
+            else int(x_contract.row_count)
+        )
         memory_guard_rows = (
-            int(x_contract.row_count)
+            int(scoped_candidate_rows)
             if materializes_prediction_records
             else min(
-                int(x_contract.row_count),
+                int(scoped_candidate_rows),
                 int(sbatch),
             )
         )
@@ -198,7 +204,7 @@ def cmd_run(
             attempt_id=attempt_id,
             status="ok",
             scope="full_records" if materializes_prediction_records else "streaming_score_batch",
-            candidate_rows=int(x_contract.row_count),
+            candidate_rows=int(scoped_candidate_rows),
             score_batch_size=int(sbatch),
             rows=int(memory_estimate.row_count),
             x_dim=int(memory_estimate.x_dim),

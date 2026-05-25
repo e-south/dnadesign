@@ -181,11 +181,7 @@ def _round_progress(ws: CampaignWorkspace, round_index: int, *, run_id: str | No
         "last_stage": last_event.get("stage"),
         "elapsed_sec": elapsed_sec,
         "events": summary.get("events"),
-        "predict": {
-            "batch": last_predict.get("batch"),
-            "of": last_predict.get("of"),
-            "rows": last_predict.get("rows"),
-        },
+        "predict": _predict_progress(last_predict),
         "summary": summary,
         "path": str(log_path.resolve()),
     }
@@ -197,6 +193,27 @@ def _parse_round_dir_name(name: str) -> int | None:
     try:
         return int(name.removeprefix("round_"))
     except ValueError:
+        return None
+
+
+def _predict_progress(event: dict[str, Any]) -> dict[str, Any]:
+    batch = _int_or_none(event.get("batch"))
+    total = _int_or_none(event.get("of"))
+    if batch is not None and total is not None and total < batch:
+        total = batch
+    return {
+        "batch": batch,
+        "of": total,
+        "rows": _int_or_none(event.get("rows")),
+    }
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
         return None
 
 

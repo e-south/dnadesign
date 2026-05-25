@@ -13,7 +13,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Set, Union
 
 from ..analysis.ledger import (
     load_predictions_with_setpoint,
@@ -41,6 +41,7 @@ def load_events_with_setpoint(
     round_selector: Optional[Union[str, int, List[int]]] = None,
     *,
     run_id: Optional[str] = None,
+    row_filters: Optional[Iterable[Mapping[str, Any]]] = None,
 ) -> pd.DataFrame:
     """
     Read the minimum columns needed for a plot **from the ledger** and join
@@ -50,7 +51,13 @@ def load_events_with_setpoint(
     """
     maybe_install_pyarrow_sysctl_filter()
     want: Set[str] = set(map(str, base_columns)) | {"run_id"}
-    df = load_predictions_with_setpoint(outputs_dir, want, round_selector=round_selector, run_id=run_id)
+    df = load_predictions_with_setpoint(
+        outputs_dir,
+        want,
+        round_selector=round_selector,
+        run_id=run_id,
+        row_filters=list(row_filters or []),
+    )
     return df.to_pandas()
 
 
@@ -60,6 +67,7 @@ def load_events(
     round_selector: Optional[Union[str, int, List[int]]] = None,
     *,
     run_id: Optional[str] = None,
+    row_filters: Optional[Iterable[Mapping[str, Any]]] = None,
     allow_missing: bool = False,
 ) -> pd.DataFrame:
     """
@@ -77,6 +85,7 @@ def load_events(
         round_selector=round_selector,
         run_id=run_id,
         runs_df=runs_df,
+        row_filters=list(row_filters or []),
         allow_missing=allow_missing,
     )
     return df.to_pandas()

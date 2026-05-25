@@ -30,6 +30,10 @@ class PredictionBundle:
     y_pred_std: np.ndarray | None
 
 
+def _predict_batch_total(estimated_batches: int, batch_index: int) -> int:
+    return max(int(estimated_batches), int(batch_index))
+
+
 def fit_and_predict(
     *,
     inputs: RoundInputs,
@@ -113,7 +117,9 @@ def fit_and_predict(
                     "run_id": run_id,
                     "stage": "predict_batch",
                     "batch": int(bi + 1),
-                    "of": int(num_batches),
+                    # Parquet batch filtering can yield more chunks than the
+                    # selected-id lower bound; never log an impossible total.
+                    "of": _predict_batch_total(num_batches, bi + 1),
                     "rows": int(batch_X.shape[0]),
                 },
             )
