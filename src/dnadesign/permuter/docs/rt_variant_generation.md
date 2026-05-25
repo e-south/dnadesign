@@ -1,8 +1,12 @@
 ## RT variant generation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-24
 
+This is the current workspace-backed `combine_aa` workflow note for RT coding
+DNA. Use it after a single-codon DMS workspace has produced canonical observed
+metric columns; use the public `dnadesign.permuter` API for programmatic
+single-site DMS generation from another study or tool.
 
 Builds multi‑mutation RT variants from **single‑amino‑acid** DMS results and quantifies interaction effects:
 
@@ -47,7 +51,7 @@ Builds multi‑mutation RT variants from **single‑amino‑acid** DMS results a
 
 * **Additive expectation:** `permuter__expected__llr_mean = sum(single scores)`
 * **Observed (after evaluation of the mutli-site seqeunce):** `permuter__observed__llr_mean`.
-* **Epistasis (post‑eval):** `epistasis = permuter__observed__llr_mean − permuter__expected__llr_mean`.
+* **Epistasis (post‑eval):** `permuter__interaction__epistasis__llr_mean = permuter__observed__llr_mean − permuter__expected__llr_mean`.
 * Also emitted per row: `sequence`, `aa_combo_str` (position‑sorted), `aa_pos_list`, `aa_wt_list`, `aa_alt_list`, `mut_count`, `proposal_score`, `round=2`, and `modifications`.
 
 

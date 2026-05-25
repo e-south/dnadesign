@@ -82,6 +82,10 @@ from .utils import (
 
 _LOG = logging.getLogger("permuter.protocol.multisite_select")
 
+DEFAULT_CLUSTER_COLUMN = "cluster__perm_v1"
+SINGLE_CLUSTER_COLUMN = "__permuter__cluster_id"
+SINGLE_CLUSTER_ID = "all"
+
 
 # ---------------------------------------------------------------------------
 # Knobs (YAML → dataclass)
@@ -106,6 +110,7 @@ class Knobs:
     pool_factor: float  # f_pool ≥ 1
 
     # clusters
+    cluster_col: str | None
     picks_per_cluster: int | None  # None → no cap
     location_stat: str  # "mean" | "median" | "trimmed_mean"
     trimmed_mean_frac: float
@@ -140,6 +145,10 @@ class Knobs:
 
     # reproducibility
     rng_seed: int
+
+    @property
+    def effective_cluster_col(self) -> str:
+        return self.cluster_col or SINGLE_CLUSTER_COLUMN
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +212,7 @@ def _greedy_select_with_diversity(
             f"(emb rows={U_pool.shape[0]}, df rows={len(df_pool)})"
         )
 
-    clusters = df_pool["cluster__perm_v1"].to_numpy()
+    clusters = df_pool[knobs.effective_cluster_col].to_numpy()
     row_indices = df_pool.index.to_numpy()
 
     picks: List[int] = []
@@ -293,7 +302,7 @@ def _greedy_select_with_diversity(
 
 class MSel(Protocol):
     """
-    Multi-site selection protocol driven by job.permute.params.select.
+    Multi-site selection protocol driven by scope.permute.params.select.
 
     Artifacts written into params._artifact_dir:
 
@@ -361,6 +370,7 @@ class MSel(Protocol):
                 )
 
         cl_cfg = sel.get("clusters") or {}
+        cluster_col = cl_cfg.get("column", DEFAULT_CLUSTER_COLUMN)
         picks_per_cluster = cl_cfg.get("picks_per_cluster", None)
         if picks_per_cluster is not None:
             k = int(picks_per_cluster)
@@ -368,6 +378,32 @@ class MSel(Protocol):
                 raise ValueError(
                     "multisite_select: select.clusters.picks_per_cluster must be ≥ 1 or omitted/Null to disable caps"
                 )
+        if cluster_col is None:
+            filters = cl_cfg.get("filters") or {}
+            active_cluster_filters = [
+                key
+                for key in (
+                    "min_cluster_mean_z_llr",
+                    "min_cluster_pos_epistasis_fraction",
+                )
+                if filters.get(key) is not None
+            ]
+            if picks_per_cluster is not None:
+                raise ValueError(
+                    "multisite_select: select.clusters.column is null, so "
+                    "select.clusters.picks_per_cluster must also be null. "
+                    "Provide an upstream cluster column to enable per-cluster caps."
+                )
+            if active_cluster_filters:
+                raise ValueError(
+                    "multisite_select: select.clusters.column is null, so cluster quality "
+                    f"filters must be disabled; active filters: {active_cluster_filters}"
+                )
+        elif not isinstance(cluster_col, str) or not cluster_col.strip():
+            raise ValueError(
+                "multisite_select: select.clusters.column must be a non-empty column name "
+                "or null for explicit no-cluster mode"
+            )
 
         if not params.get("_artifact_dir"):
             raise ValueError("multisite_select: _artifact_dir missing (internal); invoke via 'permuter run'")
@@ -389,6 +425,10 @@ class MSel(Protocol):
         src = read_source_records(params["from_dataset"])
         src_path = Path(str(params["from_dataset"])).expanduser().resolve()
         src_dir = src_path if src_path.is_dir() else src_path.parent
+        cluster_col = knobs.effective_cluster_col
+        if knobs.cluster_col is None:
+            src = src.copy()
+            src[cluster_col] = SINGLE_CLUSTER_ID
 
         # Infer the canonical observed/expected metric pair
         exp_cols = [c for c in src.columns if c.startswith("permuter__expected__")]
@@ -433,11 +473,18 @@ class MSel(Protocol):
             knobs.embedding_col,
             "permuter__aa_pos_list",
             "permuter__mut_count",
-            "cluster__perm_v1",
+            cluster_col,
         ]
         missing = [c for c in required_cols if c not in src.columns]
         if missing:
-            raise ValueError(f"multisite_select: source dataset missing columns: {missing}")
+            cluster_hint = ""
+            if knobs.cluster_col and knobs.cluster_col in missing:
+                cluster_hint = (
+                    f" Configured cluster column {knobs.cluster_col!r} is absent. "
+                    "Provide that upstream column, or set select.clusters.column: null "
+                    "with cluster caps and quality filters disabled."
+                )
+            raise ValueError(f"multisite_select: source dataset missing columns: {missing}.{cluster_hint}")
 
         df_raw, finfo = filter_valid_source_rows(
             src,
@@ -547,7 +594,7 @@ class MSel(Protocol):
         # cluster‑level filters (optional)
         kept_cluster_ids = self._apply_cluster_filters(clust_df, knobs)
         if kept_cluster_ids is not None:
-            mask = df_pool["cluster__perm_v1"].isin(kept_cluster_ids)
+            mask = df_pool[knobs.effective_cluster_col].isin(kept_cluster_ids)
             df_pool = df_pool[mask].copy()
             U_pool = U_pool[mask.to_numpy()]
             clust_df = clust_df[clust_df["cluster_id"].isin(kept_cluster_ids)].copy()
@@ -573,6 +620,7 @@ class MSel(Protocol):
             emb=emb,
             clust_df=clust_df,
             selected_row_indices=selected_row_indices,
+            cluster_col=knobs.effective_cluster_col,
         )
 
         # --- 7. Cluster summary artifact -----------------------------------
@@ -749,6 +797,9 @@ class MSel(Protocol):
         if picks_per_cluster is not None:
             picks_per_cluster = int(picks_per_cluster)
 
+        cluster_col_raw = cl.get("column", DEFAULT_CLUSTER_COLUMN)
+        cluster_col = None if cluster_col_raw is None else str(cluster_col_raw).strip()
+
         return Knobs(
             normalize_method=method,
             gaussian_consistent=gaussian,
@@ -759,6 +810,7 @@ class MSel(Protocol):
             l2_normalize_embeddings=bool(emb.get("l2_normalize", True)),
             total_variants=total_variants,
             pool_factor=pool_factor,
+            cluster_col=cluster_col,
             picks_per_cluster=picks_per_cluster,
             location_stat=str(filt.get("location_stat", "mean")).lower(),
             trimmed_mean_frac=float(filt.get("trimmed_mean_frac", 0.10)),
@@ -802,9 +854,10 @@ class MSel(Protocol):
         emb: np.ndarray,
         knobs: Knobs,
     ) -> pd.DataFrame:
-        groups = list(df_pool.groupby("cluster__perm_v1", sort=False))
+        cluster_col = knobs.effective_cluster_col
+        groups = list(df_pool.groupby(cluster_col, sort=False))
         if not groups:
-            raise RuntimeError("multisite_select: no clusters present in 'cluster__perm_v1'")
+            raise RuntimeError(f"multisite_select: no clusters present in {cluster_col!r}")
 
         cluster_meta: List[Dict] = []
         for lab, sub in groups:
@@ -890,13 +943,14 @@ class MSel(Protocol):
         emb: np.ndarray,
         clust_df: pd.DataFrame,
         selected_row_indices: List[int],
+        cluster_col: str,
     ) -> Tuple[pd.DataFrame, List]:
         med_row_by_cid = {row["cluster_id"]: int(row["medoid_row"]) for _, row in clust_df.iterrows()}
 
         sel_rows: List[Dict] = []
         for idx in selected_row_indices:
             r = df.loc[idx]
-            cid = r["cluster__perm_v1"]
+            cid = r[cluster_col]
             aa_list = list(map(int, r["__aa_list"]))
 
             angle_deg = None
@@ -1282,7 +1336,12 @@ class MSel(Protocol):
             ),
             f"weights: llr={knobs.w_llr} epi={knobs.w_epi}",
             (f"embedding: col={knobs.embedding_col} l2={knobs.l2_normalize_embeddings} dist=angular repr=medoid"),
-            (f"clusters: unique_clusters={len(chosen_cluster_ids)} picks_per_cluster={knobs.picks_per_cluster}"),
+            (
+                "clusters: "
+                f"column={knobs.cluster_col or '<none>'} "
+                f"unique_clusters={len(chosen_cluster_ids)} "
+                f"picks_per_cluster={knobs.picks_per_cluster}"
+            ),
             (f"budget: total_variants={knobs.total_variants} pool_factor={knobs.pool_factor:.2f}"),
             (
                 "diversity: "

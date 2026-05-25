@@ -40,6 +40,7 @@ controlled_values:
     - crawford_reference
     - khan_reference
     - rt_control
+    - in_silico_rt_cds_dms
     - manual_control
   construct_projection_status:
     - pending
@@ -62,4 +63,5 @@ validation_notes:
   - Copy candidate_id to id only when exporting rt_lnrna_sponging_construct_triage_opal_training_examples_v1.
   - Keep study metadata namespaced or in companion sidecars for OPAL export.
   - "source_basis: lab_anchor is a source-history label, not a Construct part role."
+  - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
   - "Use candidate_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."

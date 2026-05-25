@@ -2,8 +2,12 @@
 ### Multi‑site mutant variant selection
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-24
 
+This is a historical RT multi-site selection note refreshed for the current
+workspace and metric-column contracts. Treat the concrete embedding sizes and
+cluster labels below as workflow-specific inputs, not Permuter core API
+requirements.
 
 From ~16k multi‑mutant RT variants (mutated at $k = 2,\dots,14$ positions) scored with Evo‑2 $LLR$ and embedded as mean‑pooled logits ($V=512$), we want to pick a subset to synthesize such that:
 
@@ -33,7 +37,7 @@ From the source multi‑mutant dataset (`records.parquet`, e.g. from a `combine_
   * `permuter__expected__llr_mean`
 * **Epistasis (synergy)**
 
-  * `epistasis` (computed upstream as observed − expected)
+  * `permuter__interaction__epistasis__<metric>` (computed upstream as observed − expected)
 * **Logits embedding**
 
   * `permuter__observed__logits_mean` → `list<item: double>` (length 512)
@@ -45,7 +49,8 @@ From the source multi‑mutant dataset (`records.parquet`, e.g. from a `combine_
   * `permuter__mut_count`: `int64` (alias (k))
 * **Cluster labels**
 
-  * `cluster__perm_v1` (integer or string cluster id)
+  * `select.clusters.column` names the upstream cluster-id column.
+  * Use `column: null` only for explicit no-cluster selection; cluster caps and cluster quality filters must be disabled in that mode.
 * **Proposal info**
 
   * `permuter__proposal_score` (optional scalar)
@@ -73,8 +78,8 @@ with $\mathrm{LLR}_\text{obs}(\text{ref}) \approx 0$ by construction.
 Upstream (e.g. in `combine_aa`), we define an additive baseline by summing single‑mutant effects over the $k$ mutated positions:
 
 $$
-\mathrm{LLR}*\text{exp}(v)
-= \sum*{i \in \text{mutated sites of } v} \mathrm{LLR}_{\text{single}, i}.
+\mathrm{LLR}_\text{exp}(v)
+= \sum_{i \in \text{mutated sites of } v} \mathrm{LLR}_{\text{single}, i}.
 $$
 
 This is stored as `permuter__expected__<metric>`.
@@ -82,13 +87,15 @@ This is stored as `permuter__expected__<metric>`.
 ### Epistasis (synergy)
 
 $$
-\Delta(v) = \mathrm{LLR}*\text{obs}(v) - \mathrm{LLR}*\text{exp}(v).
+\Delta(v) = \mathrm{LLR}_\text{obs}(v) - \mathrm{LLR}_\text{exp}(v).
 $$
 
 * $\Delta > 0$: **synergistic** (higher than additive expectation).
 * $\Delta < 0$: **antagonistic** (worse than additive).
 
 For multi‑site selection, we only consider **non‑negative** epistasis and then favor variants with **large positive** $\Delta$.
+Permuter stores this as `permuter__interaction__epistasis__<metric>`, not as a
+bare `epistasis` column.
 
 ### Embedding geometry (angular distance)
 
@@ -125,7 +132,7 @@ We put LLR and epistasis on comparable scales via robust median/MAD normalizatio
 Let:
 
 * $\mathrm{LLR}_\text{obs}(v)$ be observed fitness.
-* $\Delta(v)$ be epistasis (from the `epistasis` column).
+* $\Delta(v)$ be epistasis (from `permuter__interaction__epistasis__<metric>`).
 
 In MAD mode (`normalize.method: mad`):
 
@@ -133,7 +140,7 @@ $$
 z_{\text{epi}}(v)
 = \frac{\Delta(v) - \operatorname{median}(\Delta)}{\operatorname{MAD}(\Delta)},\qquad
 z_{\text{llr}}(v)
-= \frac{\mathrm{LLR}*\text{obs}(v) - \operatorname{median}(\mathrm{LLR}*\text{obs})}
+= \frac{\mathrm{LLR}_\text{obs}(v) - \operatorname{median}(\mathrm{LLR}_\text{obs})}
 {\operatorname{MAD}(\mathrm{LLR}_\text{obs})}.
 $$
 
@@ -164,7 +171,7 @@ where:
 * $\alpha = \texttt{select.scoring.weights.llr}$,
 * $\beta = \texttt{select.scoring.weights.epi}$.
 
-For example, in the the reverse transcriptase selection job:
+For example, in the the reverse transcriptase selection scope:
 
 * $(\alpha,\beta) = (0.0, 1.0)$, i.e. **pure epistasis‑driven score**.
 
@@ -229,7 +236,8 @@ All later diversity decisions are restricted to `df_pool`. This guarantees:
 
 ### Cluster representation & quality filters
 
-Clusters provide a coarse semantic grouping derived from upstream leiden clustering in `cluster__perm_v1`.
+Clusters provide a coarse semantic grouping derived from an upstream column named by `select.clusters.column`.
+The historical RT workflow used `cluster__perm_v1`; the workspace-backed `combine_aa` output has no cluster labels, so `rt_multisite_select` declares `column: null`.
 
 For each cluster $c$, we compute:
 
@@ -261,10 +269,12 @@ For each cluster $c$, we compute:
    ```yaml
    select:
      clusters:
+       column: cluster__perm_v1
        picks_per_cluster: K  # e.g. 1 or 2
    ```
 
-   acts as a **soft cap**: at most **K** selected variants from any single `cluster__perm_v1`.
+   acts as a **soft cap**: at most **K** selected variants from any single configured cluster.
+   This requires a real upstream cluster column; it is rejected when `column: null`.
 
 ### Diversity‑aware selection within the high‑score pool
 
@@ -318,7 +328,7 @@ We iterate over `df_pool` **in descending score order** and build the selected s
 
    a. If `len(selected) == total_variants`: **stop** (budget filled).
 
-   b. Let `cluster_id = df_pool["cluster__perm_v1"][i]`.
+   b. Let `cluster_id = df_pool[select.clusters.column][i]`, or `all` when `select.clusters.column: null`.
 
    * If `picks_per_cluster` is set and
      `selected_clusters.get(cluster_id, 0) >= picks_per_cluster`, **skip** this candidate
@@ -365,7 +375,7 @@ The selection step returns:
 
   * `source_id` (original `id` from the input dataset),
   * `sequence` (canonical sequence; for `MULTISITE_SELECT.*` we may also include a decorated version with mutated codons uppercased),
-  * `cluster_id` (`cluster__perm_v1`),
+  * `cluster_id` (from `select.clusters.column`, or `all` in explicit no-cluster mode),
   * `k` (`permuter__mut_count`),
   * `llr_obs`, `llr_exp`, `delta` (= epistasis),
   * `z_llr`, `z_epi`, `score`,
@@ -457,7 +467,7 @@ Putting it all together:
 2. **Robust scaling & composite score**
 
    * Compute robust z‑scores `z_llr`, `z_epi`, optionally k‑aware.
-   * Compute composite `score = α z_llr + β z_epi` using YAML weights (RT job: α=0, β=1).
+   * Compute composite `score = α z_llr + β z_epi` using YAML weights (RT scope: α=0, β=1).
 
 3. **High‑epistasis pool (score gating)**
 
@@ -466,7 +476,7 @@ Putting it all together:
 
 4. **Cluster summarization & filters**
 
-   * For each cluster in `cluster__perm_v1` present in `df_pool`:
+   * For each configured cluster present in `df_pool`:
 
      * compute medoid, `mean_z_llr`, `mean_z_epi`, `mean_composite`,
        `pos_epi_fraction`, and `loc_stat`;
@@ -508,7 +518,7 @@ Example invocation:
 
 ```bash
 permuter run \
-  --job jobs/rt_multisite_select.yaml \
+  --workspace rt_multisite_select \
   --ref retron_Eco1_RT_wt
 ```
 

@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage
 surface: study-root
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-23
+last_verified: 2026-05-24
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -12,7 +12,7 @@ preflight_surface: planned-contract-checks
 ## RT-lnRNA Sponging Construct Triage Study
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-23
+**Last verified:** 2026-05-24
 
 This study is the checked-in Phase 0/1 record for synthetic RT-lnRNA expression
 construct triage. It owns study framing, candidate-row semantics, source overlay
@@ -63,3 +63,11 @@ rt_lnrna_sponging_construct_triage/
 
 Generated construct, Infer, LatentDNA, OPAL, and large candidate-table outputs
 belong in explicit runtime workspaces, not in this record root.
+
+### Candidate Expansion Contract
+
+Study-owned candidate expansion emits Construct-compatible rows with
+`candidate__lnrna_sequence` and `candidate__rt_cds_sequence`. In silico RT-CDS
+DMS expansion must call the public `dnadesign.permuter` surface and keep
+Permuter provenance in the study-owned `candidate__*` overlay fields. Construct
+still consumes only the named `lnrna` and `rt_cds` slots.

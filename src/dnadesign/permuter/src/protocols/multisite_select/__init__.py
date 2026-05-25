@@ -22,11 +22,13 @@ combine_aa + evaluate, with:
   • expected baseline:   permuter__expected__<metric_id>
   • epistasis:           permuter__interaction__epistasis__<metric_id>
   • logits embedding:    permuter__observed__logits_mean (list<item: double>)
+  • cluster ids:         configured by select.clusters.column; use null only
+                         for explicit no-cluster selection without cluster caps
 
 Run via:
 
     permuter run \
-      --job jobs/rt_multisite_select.yaml \
+      --workspace rt_multisite_select \
       --ref retron_Eco1_RT_wt
 
 Module Author(s): Eric J. South

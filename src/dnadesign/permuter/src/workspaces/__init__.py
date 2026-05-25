@@ -7,20 +7,14 @@ Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.permuter.src.workspaces.contracts import (
-    WorkspaceConfig,
-    WorkspaceMeta,
-    WorkspaceRun,
-)
+from dnadesign.permuter.src.workspaces.contracts import PermuterWorkspace
 from dnadesign.permuter.src.workspaces.loader import (
     find_workspaces,
     load_workspace,
 )
 
 __all__ = [
-    "WorkspaceConfig",
-    "WorkspaceMeta",
-    "WorkspaceRun",
+    "PermuterWorkspace",
     "find_workspaces",
     "load_workspace",
 ]

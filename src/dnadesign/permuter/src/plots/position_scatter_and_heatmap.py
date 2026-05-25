@@ -347,7 +347,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,
     ref_aa_sequence: Optional[str] = None,
     metric_id: Optional[str] = None,
@@ -360,7 +360,7 @@ def plot(
     df_all = all_df.copy()
     df1 = df_all[df_all["permuter__round"] == 1].copy()
     if df1.empty:
-        raise RuntimeError(f"{job_name}: no round-1 variants to plot")
+        raise RuntimeError(f"{scope_name}: no round-1 variants to plot")
 
     y1, y_label = _series_for_metric(df1, metric_id)
     y_label = _pretty_metric(metric_id, y_label)
@@ -402,7 +402,7 @@ def plot(
     df1 = df1[df1["position"] > 0]  # drop seeds/invalids
 
     if df1.empty:
-        raise RuntimeError(f"{job_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot")
+        raise RuntimeError(f"{scope_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot")
 
     stats = df1.groupby("position")["_y"].agg(mean="mean", sd="std").reset_index().sort_values("position")
 
@@ -432,10 +432,10 @@ def plot(
         elif ref_dna:
             ref_strip = _translate_dna(ref_dna)
         else:
-            raise RuntimeError(f"{job_name}: no reference DNA or protein available.")
+            raise RuntimeError(f"{scope_name}: no reference DNA or protein available.")
     else:
         if not ref_dna:
-            raise RuntimeError(f"{job_name}: reference DNA unavailable.")
+            raise RuntimeError(f"{scope_name}: reference DNA unavailable.")
         ref_strip = ref_dna
 
     # If we’re in AA mode, verify positions fit within the reference protein.
@@ -443,8 +443,8 @@ def plot(
         max_pos = int(pd.to_numeric(df_all["permuter__aa_pos"], errors="coerce").max())
         if max_pos > len(ref_strip):
             raise RuntimeError(
-                f"{job_name}: aa positions (max={max_pos}) exceed reference protein length ({len(ref_strip)}). "
-                "Provide an authoritative protein via (a) job.input.aa_col in your job YAML, or (b) a "
+                f"{scope_name}: aa positions (max={max_pos}) exceed reference protein length ({len(ref_strip)}). "
+                "Provide an authoritative protein via (a) input.aa_col in the workspace config, or (b) a "
                 "REF_AA.fa sidecar in the dataset directory."
             )
 
@@ -521,7 +521,7 @@ def plot(
 
     if not records:
         raise RuntimeError(
-            f"{job_name}: no {'amino-acid' if aa_mode else 'single-nucleotide'} edits recognized. "
+            f"{scope_name}: no {'amino-acid' if aa_mode else 'single-nucleotide'} edits recognized. "
             f"Expected {'K12D or aa pos=.. wt=X alt=Y' if aa_mode else 'A12T or nt pos=.. wt=X alt=Y'}."
         )
 
@@ -637,7 +637,7 @@ def plot(
 
     ref_name = df1["permuter__ref"].iloc[0] if "permuter__ref" in df1.columns and not df1.empty else ""
 
-    title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
+    title = f"{scope_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(12 * fs * TITLE_BOOST)), y=0.94)
 
     if evaluators:

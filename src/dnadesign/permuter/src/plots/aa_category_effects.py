@@ -85,7 +85,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
@@ -209,7 +209,7 @@ def plot(
     # Title & subtitle
     ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
     fig.suptitle(
-        f"{job_name}{f' ({ref_name})' if ref_name else ''}",
+        f"{scope_name}{f' ({ref_name})' if ref_name else ''}",
         fontsize=int(round(12 * fs * TITLE_BOOST)),
         y=0.995,
     )

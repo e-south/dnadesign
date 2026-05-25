@@ -7,18 +7,38 @@ Module Author(s): OpenAI Codex
 --------------------------------------------------------------------------------
 """
 
+from dnadesign.permuter.src.api.codon_tables import default_codon_table_path
 from dnadesign.permuter.src.api.contracts import (
+    CodingDnaDmsRequest,
+    CodingDnaDmsVariantMetadata,
+    DatasetRef,
+    EvaluatorPlan,
+    MetricSpec,
     NucleotideDmsRequest,
     PermuterResult,
     ProteinDmsRequest,
+    ValidationReport,
     VariantRecord,
 )
+from dnadesign.permuter.src.api.evaluate import evaluate_variants
 from dnadesign.permuter.src.api.generate import generate_variants
+from dnadesign.permuter.src.api.materialize import materialize_result
+from dnadesign.permuter.src.api.validate import validate_dataset
 
 __all__ = [
+    "CodingDnaDmsRequest",
+    "CodingDnaDmsVariantMetadata",
+    "DatasetRef",
+    "EvaluatorPlan",
+    "MetricSpec",
     "NucleotideDmsRequest",
     "PermuterResult",
     "ProteinDmsRequest",
+    "ValidationReport",
     "VariantRecord",
+    "default_codon_table_path",
+    "evaluate_variants",
     "generate_variants",
+    "materialize_result",
+    "validate_dataset",
 ]

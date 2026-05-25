@@ -370,6 +370,7 @@ AGENTS.md
 !src/dnadesign/cruncher/AGENTS.md
 !src/dnadesign/latentdna/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
+!src/dnadesign/permuter/AGENTS.md
 src/dnadesign/notify/.secrets/
 
 # Marimo

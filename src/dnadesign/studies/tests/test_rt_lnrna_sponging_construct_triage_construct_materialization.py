@@ -20,6 +20,7 @@ from Bio.Seq import Seq
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization import (
     MaterializationContractError,
     materialize_control_construct_contexts,
+    materialize_rt_cds_dms_construct_contexts,
     materialize_variant_construct_contexts,
 )
 from dnadesign.usr import Dataset, load_sequence_views
@@ -151,6 +152,46 @@ def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_
         "rt_cds_span_in_construct_anchor_mean",
         "rt_cds_span_in_construct_reverse_complement_anchor_mean",
     }
+
+
+def test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api(tmp_path: Path) -> None:
+    report = materialize_rt_cds_dms_construct_contexts(
+        repo_root=_repo_root(),
+        work_root=tmp_path,
+        base_candidate_id="rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO",
+        rt_cds_positions=(1,),
+    )
+
+    assert report.input_dataset == "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
+    assert report.output_dataset == "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1"
+    assert report.permuter_request_id
+    assert len(report.input_ids_by_candidate_id) == 19
+    assert all("__rt_cds_dms__" in candidate_id for candidate_id in report.input_ids_by_candidate_id)
+
+    inputs = Dataset(report.usr_root, report.input_dataset).head(n=25)
+    assert set(inputs["candidate__dms_slot"]) == {"rt_cds"}
+    assert set(inputs["candidate__study_id"]) == {"rt_lnrna_sponging_construct_triage"}
+    assert set(inputs["candidate__construct_contract"]) == {"dual_cassette_rt_lnrna_expression_v1"}
+    assert set(inputs["candidate__representation_contract"]) == {"dual_cassette_construct_context_embedding_v1"}
+    assert set(inputs["candidate__payload_program_id"]) == {"tetO_sponging_v1"}
+    assert set(inputs["candidate__source_basis"]) == {"in_silico_rt_cds_dms"}
+    assert set(inputs["candidate__variant_derivation"]) == {"rt_cds_dms_top_codon_policy_v1"}
+    assert set(inputs["candidate__construct_projection_status"]) == {"representable"}
+    assert set(inputs["candidate__candidate_role"]) == {"candidate"}
+    assert set(inputs["candidate__parent_candidate_id"]) == {"rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"}
+    assert set(inputs["candidate__permuter_request_id"]) == {report.permuter_request_id}
+    assert set(inputs["candidate__rt_cds_dms_aa_pos"]) == {1}
+    assert inputs["candidate__lnrna_sequence"].nunique() == 1
+    assert inputs["candidate__rt_cds_sequence"].nunique() == 19
+
+    output = Dataset(report.usr_root, report.output_dataset).head(n=100)
+    assert output.shape[0] == 38
+    assert {
+        slot["slot_id"]
+        for slots in output["construct__slots"]
+        for slot in slots
+        if slot["slot_id"] in {"lnrna", "rt_cds"}
+    } == {"lnrna", "rt_cds"}
 
 
 def test_rt_lnrna_materialization_rejects_swapped_candidate_slot_sequences(tmp_path: Path) -> None:

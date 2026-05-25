@@ -10,29 +10,21 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-import numbers
-import os
 import shlex
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-import yaml
 from rich.console import Console
 
+from dnadesign.permuter.src.cli.output import emit_json
 from dnadesign.permuter.src.contracts.metrics import (
     interaction_metric_column,
     observed_metric_column,
-    observed_metric_subcolumn,
 )
-from dnadesign.permuter.src.core.config import JobConfig
-from dnadesign.permuter.src.core.paths import (
-    normalize_data_path,
-    resolve,
-    resolve_job_hint,
-)
+from dnadesign.permuter.src.core.paths import normalize_data_path, resolve_workspace_config_hint
 from dnadesign.permuter.src.core.registry import get_evaluator
 from dnadesign.permuter.src.core.storage import (
     append_record_md,
@@ -40,24 +32,22 @@ from dnadesign.permuter.src.core.storage import (
     read_parquet,
     read_ref_fasta,
 )
+from dnadesign.permuter.src.evaluators.results import normalize_scores
+from dnadesign.permuter.src.workspaces.datasets import resolve_workspace_dataset_path
+from dnadesign.permuter.src.workspaces.loader import load_workspace
 
 console = Console()
 _LOG = logging.getLogger("permuter.evaluate")
 
 
-def _load_job_metrics(job_hint: Optional[Union[str, Path]]) -> List[Dict]:
-    """
-    Load evaluate.metrics[] from a job YAML given either a path or a PRESET name.
-    Uses resolve_job_hint() so this works from any working directory.
-    """
-    if not job_hint:
+def _load_workspace_metrics(workspace_hint: Optional[Union[str, Path]]) -> List[Dict]:
+    if not workspace_hint:
         return []
-    job_path = resolve_job_hint(job_hint)
-    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
-    cfg = JobConfig.model_validate(data)
+    config_path = resolve_workspace_config_hint(workspace_hint)
+    cfg = load_workspace(config_path).config
     metrics: List[Dict] = []
-    if cfg.job.evaluate and cfg.job.evaluate.metrics:
-        for m in cfg.job.evaluate.metrics:
+    if cfg.scope.evaluate and cfg.scope.evaluate.metrics:
+        for m in cfg.scope.evaluate.metrics:
             metrics.append(
                 {
                     "id": m.id,
@@ -82,65 +72,8 @@ def _parse_cli_with(args: List[str]) -> List[Dict]:
     return out
 
 
-def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
-    if desired:
-        sub = df[df[name_col] == desired]
-        if sub.empty:
-            raise ValueError(f"Reference '{desired}' not found in '{name_col}'")
-        if len(sub) > 1:
-            raise ValueError(f"Reference '{desired}' not unique in CSV")
-        row = sub.iloc[0]
-        return str(row[name_col]), str(row[seq_col])
-    if len(df) == 1:
-        row = df.iloc[0]
-        return str(row[name_col]), str(row[seq_col])
-    raise ValueError("--ref is required because the refs CSV has multiple rows")
-
-
-def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Path]) -> Path:
-    """
-    Resolve the dataset path from a job preset/path and an optional ref.
-    Tries nested, flat-job, then flat-jobref.
-    """
-    job_path = resolve_job_hint(job_hint)
-    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
-    cfg = JobConfig.model_validate(data)
-    # First resolve refs CSV relative to the job
-    jp0 = resolve(
-        job_yaml=job_path,
-        refs=cfg.job.input.refs,
-        output_dir=cfg.job.output.dir,
-        ref_name="__PENDING__",
-        out_override=out,
-    )
-    # 1) flat-job: <output_root>/records.parquet (preferred when it already exists)
-    flat_job = (jp0.output_root / "records.parquet").resolve()
-    if flat_job.exists():
-        return flat_job
-
-    # Need a ref name for the other layouts
-    df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
-    desired = ref or getattr(cfg.job.input, "reference_sequence", None)
-    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired)
-    # 2) nested: <output_root>/<ref>/records.parquet
-    jp = resolve(
-        job_yaml=job_path,
-        refs=cfg.job.input.refs,
-        output_dir=cfg.job.output.dir,
-        ref_name=ref_name,
-        out_override=out,
-    )
-    nested = jp.records_parquet
-    if nested.exists():
-        return nested
-
-    # 3) flat-jobref: <parent>/<output_root.name>__<ref>/records.parquet
-    flat_jobref = (jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet").resolve()
-    if flat_jobref.exists():
-        return flat_jobref
-
-    # Fall back to nested path (caller will raise a helpful error)
-    return nested
+def _derive_records_from_workspace(workspace_hint: str, ref: Optional[str], out: Optional[Path]) -> Path:
+    return resolve_workspace_dataset_path(workspace_hint=workspace_hint, ref=ref, out=out).records
 
 
 def _argv() -> str:
@@ -209,30 +142,32 @@ def evaluate(
     data: Path | None,
     metric_ids: List[str] | None = None,
     with_spec: List[str] | None = None,
-    job: Optional[str] = None,
+    workspace: Optional[str] = None,
     ref: Optional[str] = None,
     out: Optional[Path] = None,
-):
-    # Resolve records path from either --data or --job/--ref
+    as_json: bool = False,
+) -> dict[str, object]:
+    # Resolve records path from either --data or --workspace/--ref
     if data is not None:
         records = normalize_data_path(data)
-    elif job:
+    elif workspace:
         try:
-            records = _derive_records_from_job(job, ref, out)
+            records = _derive_records_from_workspace(workspace, ref, out)
         except Exception as e:
             raise ValueError(
-                f"Unable to derive dataset from --job. {e}\nHint: supply --ref if your refs CSV has multiple rows."
+                f"Unable to derive dataset from --workspace. {e}\n"
+                "Hint: supply --ref if your refs CSV has multiple rows."
             ) from e
     else:
-        raise ValueError("Provide either --data (file or dataset dir) or --job/--ref.")
+        raise ValueError("Provide either --data (file or dataset dir) or --workspace/--ref.")
 
     if not records.exists():
         # Primary, actionable hint
-        job_hint = f"--job {job} --ref {ref}" if job else "(your job preset)"
+        workspace_hint = f"--workspace {workspace} --ref {ref}" if workspace else "(your workspace)"
         raise FileNotFoundError(
             f"Dataset not found: {records}\n"
             f"Generate it first with:\n"
-            f"  permuter run {job_hint}\n"
+            f"  permuter run {workspace_hint}\n"
             f"Then re-run:\n"
             f"  permuter evaluate --data {records.parent}\n"
         )
@@ -241,8 +176,9 @@ def evaluate(
     if "sequence" not in df.columns or "bio_type" not in df.columns:
         raise ValueError("records.parquet missing USR core columns (sequence, bio_type)")
 
-    # gather metrics
-    metrics = _load_job_metrics(job)
+    # Explicit CLI metrics replace workspace defaults so smoke/adversarial probes
+    # do not accidentally invoke closed-loop evaluators from config.
+    metrics = [] if (with_spec or metric_ids) else _load_workspace_metrics(workspace)
     if with_spec:
         metrics.extend(_parse_cli_with(with_spec))
     if metric_ids:
@@ -251,9 +187,9 @@ def evaluate(
             metrics.append({"id": mid, "evaluator": "placeholder", "metric": mid, "params": {}})
     if not metrics:
         raise ValueError(
-            "No metrics specified. Use --with id:evaluator[:metric] or provide a job YAML with evaluate.metrics"
+            "No metrics specified. Use --with id:evaluator[:metric] or provide a workspace config with evaluate.metrics"
         )
-    # De-duplicate by id (last one wins, so CLI overrides job YAML)
+    # De-duplicate by id (last one wins, so CLI overrides workspace config)
     uniq: Dict[str, Dict] = {}
     for m in metrics:
         mid = m.get("id")
@@ -291,12 +227,12 @@ def evaluate(
                     "This evaluator requires a reference sequence (REF.fa).\n"
                     f"Missing sidecar: {records.parent / 'REF.fa'}\n"
                     "Generate the dataset with:\n"
-                    f"  permuter run --job {job or '<job>'} --ref {ref or '<ref>'}\n"
+                    f"  permuter run --workspace {workspace or '<workspace>'} --ref {ref or '<ref>'}\n"
                 ) from e
             raise
 
         # Normalize evaluator output directly into the canonical observed namespace.
-        cols = _normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
+        cols = normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
         cols_df = pd.DataFrame(cols)  # aligns on RangeIndex 0..n-1
         new_metric_frames.append(cols_df)
         # Log quick stats for the first column (without mutating df yet)
@@ -332,7 +268,7 @@ def evaluate(
 
     # Single concat to add all metric columns at once (zero/low-copy when possible)
     if new_metric_frames:
-        df = pd.concat([df] + new_metric_frames, axis=1, copy=False)
+        df = pd.concat([df] + new_metric_frames, axis=1)
         # Defragment once so downstream ops (parquet write / slicing) stay fast
         df = df.copy()
 
@@ -365,110 +301,17 @@ def evaluate(
         )
 
     atomic_write_parquet(df, records)
-    console.print(f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}")
+    summary: dict[str, object] = {
+        "schema": "permuter.evaluate.v1",
+        "records": records,
+        "dataset_dir": records.parent,
+        "row_count": len(df),
+        "metrics": [str(m["id"]) for m in metrics],
+        "observed_columns": sorted(c for c in df.columns if str(c).startswith("permuter__observed__")),
+    }
+    if as_json:
+        emit_json(summary)
+    else:
+        console.print(f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}")
     append_record_md(records.parent, "evaluate", _argv())
-
-
-def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Series]:
-    """
-    Accept one record per sequence. Each record may be:
-      - scalar number → single column
-      - dict[str, number] (flat) → one column per key, stable order by key
-      - list/tuple/np.ndarray of numbers with constant length K → __0..__K-1
-    Return mapping of column_name → Series[n].
-    """
-
-    def _err(msg: str) -> ValueError:
-        return ValueError(f"Evaluator output for metric '{metric_id}' invalid: {msg}")
-
-    if not isinstance(scores, (list, tuple)):
-        raise _err(f"expected a list/tuple of length {n}, got {type(scores).__name__}")
-    if len(scores) != n:
-        raise _err(f"expected length {n}, got {len(scores)}")
-
-    # determine record shape
-    if n == 0:
-        return {observed_metric_column(metric_id): pd.Series([], dtype="float64")}
-
-    first = scores[0]
-    # Scalar case
-    if isinstance(first, numbers.Number):
-        try:
-            ser = pd.Series(
-                [float(x) if x is not None else float("nan") for x in scores],
-                dtype="float64",
-            )
-        except Exception as e:
-            raise _err(f"unable to coerce scalars to float: {e}") from e
-        return {observed_metric_column(metric_id): ser}
-
-    # Dict-of-scalars case
-    if isinstance(first, dict):
-        # collect keys and validate
-        keys = sorted(first.keys())
-        if not keys:
-            raise _err("empty dict records")
-        for i, rec in enumerate(scores):
-            if not isinstance(rec, dict) or set(rec.keys()) != set(keys):
-                raise _err(f"record {i} has keys {sorted(getattr(rec, 'keys', lambda: [])())}, expected {keys}")
-            for k, v in rec.items():
-                if not (v is None or isinstance(v, numbers.Number)):
-                    raise _err(f"record {i} key '{k}' has non-numeric value {type(v).__name__}")
-        out: Dict[str, pd.Series] = {}
-        for k in keys:
-            ser = pd.Series(
-                [float(rec[k]) if rec[k] is not None else float("nan") for rec in scores],
-                dtype="float64",
-            )
-            out[observed_metric_subcolumn(metric_id, k)] = ser
-        return out
-
-    # Fixed-length sequence of numbers case
-    if isinstance(first, (list, tuple, pd.Series)) or hasattr(first, "__array__"):
-        try:
-            # normalize inner records to Python lists once
-            def _to_list(x):
-                if isinstance(x, (list, tuple, pd.Series)):
-                    return list(x)
-                tolist = getattr(x, "tolist", None)
-                return list(tolist()) if callable(tolist) else list(x)
-
-            seqs = [_to_list(x) for x in scores]
-            lens = [len(x) for x in seqs]
-        except Exception:
-            raise _err("variable records must be sized sequences of numbers")
-        if len(set(lens)) != 1:
-            raise _err(f"inconsistent inner lengths {sorted(set(lens))}")
-        # Decide representation:
-        #  • Keep 'logits*' metrics as a single Arrow list column (default).
-        #  • Or force globally with PERMUTER_VECTOR_AS_LIST=1.
-        keep_as_list = "logits" in str(metric_id).lower() or os.environ.get(
-            "PERMUTER_VECTOR_AS_LIST", ""
-        ).strip().lower() in {"1", "true", "yes"}
-        if keep_as_list:
-            cleaned = []
-            for i, rec in enumerate(seqs):
-                row = []
-                for j, v in enumerate(rec):
-                    if not (v is None or isinstance(v, numbers.Number)):
-                        raise _err(f"record {i}[{j}] has non-numeric value {type(v).__name__}")
-                    row.append(float(v) if v is not None else float("nan"))
-                cleaned.append(row)
-            # Pandas→PyArrow will write this as list<item: double>
-            ser = pd.Series(cleaned, dtype="object")
-            return {observed_metric_column(metric_id): ser}
-
-        # Expand into __0..__K-1 scalar columns
-        k = lens[0]
-        out: Dict[str, pd.Series] = {}
-        for j in range(k):
-            col = []
-            for i, rec in enumerate(seqs):
-                v = rec[j]
-                if not (v is None or isinstance(v, numbers.Number)):
-                    raise _err(f"record {i}[{j}] has non-numeric value {type(v).__name__}")
-                col.append(float(v) if v is not None else float("nan"))
-            out[observed_metric_subcolumn(metric_id, j)] = pd.Series(col, dtype="float64")
-        return out
-
-    raise _err(f"unsupported record type: {type(first).__name__}")
+    return summary

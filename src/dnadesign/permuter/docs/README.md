@@ -8,8 +8,8 @@ multi-site variants with attached model or heuristic scores.
 
 ## Start Here
 
-- [CLI and data contracts](cli-and-data-contracts.md): command surface, job
-  files, dataset layout, evaluators, and output columns.
+- [CLI and data contracts](cli-and-data-contracts.md): command surface, workspace
+  scopes, dataset layout, evaluators, and output columns.
 - [Modernization plan](modernization-plan.md): living dev spec for contract,
   workspace, and public API hardening.
 - [RT variant generation](rt_variant_generation.md): multi-mutation RT variant

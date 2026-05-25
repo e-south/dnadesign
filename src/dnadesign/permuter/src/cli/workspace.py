@@ -18,6 +18,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from dnadesign.permuter.src.core.paths import resolve_workspace_config_hint
 from dnadesign.permuter.src.workspaces.loader import find_workspaces, load_workspace
 
 app = typer.Typer(
@@ -32,25 +33,26 @@ console = Console()
 def validate(
     workspace: Path = typer.Option(..., "--workspace", "-w", help="Workspace directory or config.yaml path."),
 ):
-    cfg = _load_or_exit(workspace)
-    run_word = "run" if len(cfg.runs) == 1 else "runs"
-    console.print(f"[green]✔[/green] workspace {cfg.workspace.id}: {len(cfg.runs)} {run_word}")
+    workspace_cfg = _load_or_exit(workspace)
+    console.print(
+        f"[green]✔[/green] workspace {workspace_cfg.scope_id}: "
+        f"{workspace_cfg.config.scope.permute.protocol} -> {workspace_cfg.config.scope.output.dir}"
+    )
 
 
 @app.command("inspect", help="Print a compact workspace summary.")
 def inspect(
     workspace: Path = typer.Option(..., "--workspace", "-w", help="Workspace directory or config.yaml path."),
 ):
-    cfg = _load_or_exit(workspace)
-    table = Table(title=f"Permuter workspace: {cfg.workspace.id}")
-    table.add_column("Run")
-    table.add_column("Kind")
-    table.add_column("Target")
-    for run in cfg.runs:
-        if run.job:
-            table.add_row(run.id, "job", run.job)
-        else:
-            table.add_row(run.id, "protocol", str(run.protocol))
+    workspace_cfg = _load_or_exit(workspace)
+    config = workspace_cfg.config
+    table = Table(title=f"Permuter workspace: {workspace_cfg.scope_id}")
+    table.add_column("Field")
+    table.add_column("Value")
+    table.add_row("config", str(workspace_cfg.config_path))
+    table.add_row("protocol", config.scope.permute.protocol)
+    table.add_row("refs", config.scope.input.refs)
+    table.add_row("outputs", config.scope.output.dir)
     console.print(table)
 
 
@@ -69,23 +71,30 @@ def list_(
             if strict:
                 raise typer.BadParameter(str(exc)) from exc
             continue
-        rows.append({"id": cfg.workspace.id, "path": str(path.parent), "runs": len(cfg.runs)})
+        rows.append(
+            {
+                "id": cfg.scope_id,
+                "path": str(path.parent),
+                "protocol": cfg.config.scope.permute.protocol,
+                "output": cfg.config.scope.output.dir,
+            }
+        )
     if as_json:
-        console.print(json_lib.dumps(rows, indent=2, sort_keys=True))
+        typer.echo(json_lib.dumps(rows, indent=2, sort_keys=True))
         return
     table = Table(title="Permuter workspaces")
     table.add_column("Workspace")
-    table.add_column("Runs")
+    table.add_column("Protocol")
     table.add_column("Path")
     for row in rows:
-        table.add_row(str(row["id"]), str(row["runs"]), str(row["path"]))
+        table.add_row(str(row["id"]), str(row["protocol"]), str(row["path"]))
     console.print(table)
 
 
 def _load_or_exit(path: Path):
     try:
-        return load_workspace(path)
-    except ValueError as exc:
+        return load_workspace(resolve_workspace_config_hint(path))
+    except (FileNotFoundError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
 
 

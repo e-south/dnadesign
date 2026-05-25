@@ -129,7 +129,7 @@ def _extract_aa_events(df: pd.DataFrame, ycol: str) -> pd.DataFrame:
 def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int = 20) -> pd.DataFrame:
     """
     Core computation (no I/O). Returns tidy DF with:
-      ['direction','rank','canon','wt','pos','to_res','delta','metric_id','job','ref']
+      ['direction','rank','canon','wt','pos','to_res','delta','metric_id','scope','ref']
     'direction' ∈ {'top','bottom'}, rank 1..K in each direction.
     """
     if "sequence" not in all_df.columns or "permuter__round" not in all_df.columns:
@@ -164,11 +164,11 @@ def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int =
     top.insert(1, "rank", range(1, len(top) + 1))
     bot.insert(1, "rank", range(1, len(bot) + 1))
 
-    job = str(df.get("permuter__job", pd.Series(["job"])).iloc[0])
+    scope = str(df.get("permuter__scope", pd.Series(["scope"])).iloc[0])
     ref = str(df.get("permuter__ref", pd.Series(["ref"])).iloc[0])
     for frame in (top, bot):
         frame["metric_id"] = str(metric_id)
-        frame["job"] = job
+        frame["scope"] = scope
         frame["ref"] = ref
 
     out = pd.concat([top, bot], ignore_index=True)
@@ -183,7 +183,7 @@ def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int =
             "to_res",
             "delta",
             "metric_id",
-            "job",
+            "scope",
             "ref",
         ]
     ]

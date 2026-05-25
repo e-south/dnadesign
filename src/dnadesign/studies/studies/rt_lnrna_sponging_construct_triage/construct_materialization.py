@@ -20,6 +20,13 @@ import pyarrow as pa
 import yaml
 
 from dnadesign.construct import RunResult, run_from_config
+from dnadesign.permuter import (
+    CodingDnaDmsRequest,
+    CodingDnaDmsVariantMetadata,
+    PermuterResult,
+    default_codon_table_path,
+    generate_variants,
+)
 from dnadesign.usr import BiopythonGenBankParser, Dataset, ensure_sequence_contract_namespaces
 
 from .construct_projection import validate_projection_manifest_payload
@@ -32,9 +39,12 @@ from .variant_genbank_catalog import (
 
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
 _PROJECTION_MANIFEST_PATH = _STUDY_DIR / "operations/contract/fixtures/construct/construct-projection-manifest.yaml"
+_STUDY_ID = "rt_lnrna_sponging_construct_triage"
 _INPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
 _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1"
 _MATERIALIZATION_SOURCE = "rt_lnrna_sponging_construct_triage construct materialization"
+_PAYLOAD_PROGRAM_ID = "tetO_sponging_v1"
+_RT_CDS_DMS_SOURCE_BASIS = "in_silico_rt_cds_dms"
 _REQUIRED_SLOT_IDS = ("lnrna", "rt_cds")
 _BASE_TEMPLATE_LNRNA_SPAN_0 = (186, 359)
 _TARGET_CONTEXT_START_0 = 56
@@ -62,6 +72,12 @@ class ControlConstructMaterializationReport:
     template_sequence: str
     template_context_sequence: str
     expected_sequences: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RtCdsDmsConstructMaterializationReport(ControlConstructMaterializationReport):
+    base_candidate_id: str
+    permuter_request_id: str
 
 
 @dataclass(frozen=True)
@@ -275,6 +291,117 @@ def materialize_variant_construct_contexts(
     )
 
 
+def materialize_rt_cds_dms_construct_contexts(
+    *,
+    repo_root: Path | None = None,
+    work_root: Path,
+    base_candidate_id: str,
+    rt_cds_positions: tuple[int, ...],
+    max_variants: int = 500,
+) -> RtCdsDmsConstructMaterializationReport:
+    """Materialize RT-CDS in silico DMS variants via the public Permuter API."""
+    root = _resolve_repo_root(repo_root)
+    manifest = _load_projection_manifest(root)
+    _require_valid_projection_manifest(manifest)
+    authority = _require_genbank_authority(root)
+    template_sequence = _template_sequence(manifest=manifest, authority=authority)
+    target_start, target_end = _target_context_bounds(manifest)
+    template_context_sequence = template_sequence[target_start:target_end]
+
+    parent_rows, _expected_control_sequences = _candidate_rows(
+        manifest=manifest,
+        authority=authority,
+        template_sequence=template_sequence,
+        target_start=target_start,
+        target_end=target_end,
+        candidate_sequence_overrides={},
+        omitted_candidate_fields=set(),
+    )
+    parent = _candidate_row_by_id(parent_rows, candidate_id=base_candidate_id)
+    request = CodingDnaDmsRequest(
+        ref_name=f"{base_candidate_id}__rt_cds",
+        sequence=_required_candidate_sequence(parent, "candidate__rt_cds_sequence"),
+        codon_table=default_codon_table_path("ecoli"),
+        positions=rt_cds_positions,
+        max_variants=max_variants,
+        metadata={
+            "study_id": str(manifest["study_id"]),
+            "construct_contract": str(manifest["construct_contract"]),
+            "representation_contract": str(manifest["representation_contract"]),
+            "payload_program_id": _PAYLOAD_PROGRAM_ID,
+            "source_basis": _RT_CDS_DMS_SOURCE_BASIS,
+            "parent_candidate_id": base_candidate_id,
+            "slot_id": "rt_cds",
+        },
+    )
+    result = generate_variants(request)
+    if len(result.records) > max_variants:
+        raise MaterializationContractError(
+            f"RT-CDS DMS request produced {len(result.records)} variants, above max_variants={max_variants}."
+        )
+    rows = _rt_cds_dms_candidate_rows(
+        parent_candidate_id=base_candidate_id,
+        lnrna_sequence=_required_candidate_sequence(parent, "candidate__lnrna_sequence"),
+        result=result,
+    )
+    slots = tuple(_mapping(slot, label="slots[]") for slot in _list(manifest["slots"], label="slots"))
+    expected_sequences = {
+        str(row["id"]): _expected_context_sequence(
+            template_sequence=template_sequence,
+            slots=slots,
+            row=row,
+            target_start=target_start,
+            target_end=target_end,
+        )
+        for row in rows
+    }
+
+    work = Path(work_root).resolve()
+    usr_root = work / "usr"
+    config_dir = work / "construct_configs"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    config_dir.mkdir(parents=True, exist_ok=True)
+    input_ids_by_candidate_id = _write_candidate_dataset(usr_root=usr_root, rows=rows)
+
+    context_config = _construct_config(
+        manifest=manifest,
+        template_sequence=template_sequence,
+        usr_root=usr_root,
+        input_ids_by_candidate_id=input_ids_by_candidate_id,
+        job_id="rt_lnrna_rt_cds_dms_context_views",
+        output_on_conflict="error",
+        output_variants=_context_output_variants(),
+        candidate_ids=tuple(str(row["id"]) for row in rows),
+    )
+    slot_anchor_config = _construct_config(
+        manifest=manifest,
+        template_sequence=template_sequence,
+        usr_root=usr_root,
+        input_ids_by_candidate_id=input_ids_by_candidate_id,
+        job_id="rt_lnrna_rt_cds_dms_slot_anchor_views",
+        output_on_conflict="ignore",
+        output_variants=_slot_anchor_output_variants(),
+        candidate_ids=tuple(str(row["id"]) for row in rows),
+    )
+    context_path = _write_config(config_dir / "construct-rt-cds-dms-context-views.yaml", context_config)
+    slot_anchor_path = _write_config(config_dir / "construct-rt-cds-dms-slot-anchor-views.yaml", slot_anchor_config)
+    context_result = run_from_config(context_path)
+    slot_anchor_result = run_from_config(slot_anchor_path)
+    return RtCdsDmsConstructMaterializationReport(
+        usr_root=usr_root,
+        input_dataset=_INPUT_DATASET,
+        output_dataset=_OUTPUT_DATASET,
+        input_ids_by_candidate_id=input_ids_by_candidate_id,
+        config_paths=(context_path, slot_anchor_path),
+        run_results=(context_result, slot_anchor_result),
+        template_sequence=template_sequence,
+        template_context_sequence=template_context_sequence,
+        expected_sequences=expected_sequences,
+        base_candidate_id=base_candidate_id,
+        permuter_request_id=result.request_id,
+    )
+
+
 def _load_projection_manifest(repo_root: Path) -> dict[str, object]:
     payload = yaml.safe_load((repo_root / _PROJECTION_MANIFEST_PATH).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -446,6 +573,89 @@ def _catalog_candidate_rows(
     return rows, expected_sequences
 
 
+def _candidate_row_by_id(rows: list[dict[str, object]], *, candidate_id: str) -> dict[str, object]:
+    matches = [row for row in rows if str(row.get("id")) == candidate_id]
+    if not matches:
+        raise MaterializationContractError(f"Base candidate is absent from the projection manifest: {candidate_id}")
+    if len(matches) > 1:
+        raise MaterializationContractError(f"Base candidate is not unique in the projection manifest: {candidate_id}")
+    return matches[0]
+
+
+def _required_candidate_sequence(row: Mapping[str, object], field_name: str) -> str:
+    value = row.get(field_name)
+    if value is None:
+        raise MaterializationContractError(f"{row.get('id')}: {field_name} is required.")
+    sequence = str(value)
+    if not sequence:
+        raise MaterializationContractError(f"{row.get('id')}: {field_name} must be non-empty.")
+    return sequence
+
+
+def _rt_cds_dms_candidate_rows(
+    *,
+    parent_candidate_id: str,
+    lnrna_sequence: str,
+    result: PermuterResult,
+) -> list[dict[str, object]]:
+    request_id = str(result.request_id)
+    study_id = _required_result_metadata(result, "study_id")
+    construct_contract = _required_result_metadata(result, "construct_contract")
+    representation_contract = _required_result_metadata(result, "representation_contract")
+    payload_program_id = _required_result_metadata(result, "payload_program_id")
+    source_basis = _required_result_metadata(result, "source_basis")
+    rows: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+    for index, record in enumerate(result.records, start=1):
+        permuter_meta = CodingDnaDmsVariantMetadata.from_record(record)
+        aa_pos = permuter_meta.aa_pos
+        aa_wt = permuter_meta.aa_wt
+        aa_alt = permuter_meta.aa_alt
+        candidate_id = f"{parent_candidate_id}__rt_cds_dms__{aa_wt}{aa_pos}{aa_alt}"
+        if candidate_id in seen_ids:
+            raise MaterializationContractError(f"Duplicate RT-CDS DMS candidate id: {candidate_id}")
+        seen_ids.add(candidate_id)
+        rows.append(
+            {
+                "id": candidate_id,
+                "sequence": "A" * index,
+                "source": _MATERIALIZATION_SOURCE,
+                "candidate__lnrna_sequence": lnrna_sequence,
+                "candidate__rt_cds_sequence": record.sequence,
+                "candidate__study_id": study_id,
+                "candidate__construct_contract": construct_contract,
+                "candidate__representation_contract": representation_contract,
+                "candidate__payload_program_id": payload_program_id,
+                "candidate__source_basis": source_basis,
+                "candidate__variant_derivation": "rt_cds_dms_top_codon_policy_v1",
+                "candidate__construct_projection_status": "representable",
+                "candidate__candidate_role": "candidate",
+                "candidate__parent_candidate_id": parent_candidate_id,
+                "candidate__dms_slot": "rt_cds",
+                "candidate__permuter_request_id": request_id,
+                "candidate__permuter_variant_id": record.id,
+                "candidate__permuter_modifications": list(record.modifications),
+                "candidate__rt_cds_dms_aa_pos": aa_pos,
+                "candidate__rt_cds_dms_aa_wt": aa_wt,
+                "candidate__rt_cds_dms_aa_alt": aa_alt,
+                "candidate__rt_cds_dms_codon_index": permuter_meta.codon_index,
+                "candidate__rt_cds_dms_codon_wt": permuter_meta.codon_wt,
+                "candidate__rt_cds_dms_codon_new": permuter_meta.codon_new,
+                "candidate__rt_cds_dms_codon_policy": permuter_meta.codon_policy,
+            }
+        )
+    if not rows:
+        raise MaterializationContractError("Permuter RT-CDS DMS result contained no records.")
+    return rows
+
+
+def _required_result_metadata(result: PermuterResult, field_name: str) -> str:
+    value = result.metadata.get(field_name)
+    if value is None or str(value).strip() == "":
+        raise MaterializationContractError(f"Permuter result metadata missing required field: {field_name}")
+    return str(value)
+
+
 def _catalog_authority_sequence(
     *,
     repo_root: Path,
@@ -588,7 +798,8 @@ def _slice_expected_context(
 
 
 def _write_candidate_dataset(*, usr_root: Path, rows: list[dict[str, object]]) -> dict[str, str]:
-    _ensure_candidate_overlay_namespace(usr_root)
+    field_names = _candidate_overlay_fields(rows)
+    _ensure_candidate_overlay_namespace(usr_root, field_names=field_names)
     dataset = Dataset(usr_root, _INPUT_DATASET)
     dataset.init(source=_MATERIALIZATION_SOURCE, notes="Temp RT-lnRNA Construct materialization inputs.")
     add_result = dataset.add_sequences(
@@ -598,14 +809,13 @@ def _write_candidate_dataset(*, usr_root: Path, rows: list[dict[str, object]]) -
         source=_MATERIALIZATION_SOURCE,
     )
     input_ids_by_candidate_id = {str(row["id"]): input_id for row, input_id in zip(rows, add_result.ids, strict=True)}
-    field_names = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
     input_ids = [input_ids_by_candidate_id[str(row["id"])] for row in rows]
     columns: dict[str, pa.Array] = {
         "id": pa.array(input_ids, type=pa.string()),
         "candidate__candidate_id": pa.array([str(row["id"]) for row in rows], type=pa.string()),
     }
     for field_name in field_names:
-        columns[field_name] = pa.array([row.get(field_name) for row in rows], type=pa.string())
+        columns[field_name] = pa.array([row.get(field_name) for row in rows])
     dataset.write_overlay("candidate", pa.table(columns), key="id", overwrite=True)
     dataset.write_overlay(
         "usr_label",
@@ -622,7 +832,22 @@ def _write_candidate_dataset(*, usr_root: Path, rows: list[dict[str, object]]) -
     return input_ids_by_candidate_id
 
 
-def _ensure_candidate_overlay_namespace(usr_root: Path) -> None:
+def _candidate_overlay_fields(rows: list[dict[str, object]]) -> tuple[str, ...]:
+    required = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
+    extras = tuple(
+        sorted(
+            {
+                key
+                for row in rows
+                for key in row
+                if key.startswith("candidate__") and key not in {*required, "candidate__candidate_id"}
+            }
+        )
+    )
+    return (*required, *extras)
+
+
+def _ensure_candidate_overlay_namespace(usr_root: Path, *, field_names: tuple[str, ...]) -> None:
     ensure_sequence_contract_namespaces(usr_root)
     registry_path = usr_root / "registry.yaml"
     payload = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
@@ -634,13 +859,22 @@ def _ensure_candidate_overlay_namespace(usr_root: Path) -> None:
     namespaces["candidate"] = {
         "owner": "study",
         "description": "RT-lnRNA candidate slot sequences.",
-        "columns": [
-            {"name": "candidate__candidate_id", "type": "string"},
-            {"name": "candidate__lnrna_sequence", "type": "string"},
-            {"name": "candidate__rt_cds_sequence", "type": "string"},
-        ],
+        "columns": [{"name": "candidate__candidate_id", "type": "string"}]
+        + [{"name": field_name, "type": _candidate_field_type(field_name)} for field_name in field_names],
     }
     registry_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+
+def _candidate_field_type(field_name: str) -> str:
+    int_fields = {
+        "candidate__rt_cds_dms_aa_pos",
+        "candidate__rt_cds_dms_codon_index",
+    }
+    if field_name in int_fields:
+        return "int64"
+    if field_name == "candidate__permuter_modifications":
+        return "list<string>"
+    return "string"
 
 
 def _context_output_variants() -> list[dict[str, object]]:

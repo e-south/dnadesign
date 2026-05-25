@@ -166,6 +166,38 @@ datasets:
       USR input dataset for Construct realization. Base row ids remain
       canonical sequence ids; the paired RT-lnRNA candidate id and slot
       sequences live in the candidate overlay.
+    derived_lanes:
+      - lane_id: rt_cds_in_silico_dms
+        owner_tool: study
+        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
+        dependency_surface: dnadesign.permuter
+        source_basis: in_silico_rt_cds_dms
+        expected_overlay_columns:
+          - candidate__study_id
+          - candidate__construct_contract
+          - candidate__representation_contract
+          - candidate__payload_program_id
+          - candidate__source_basis
+          - candidate__variant_derivation
+          - candidate__construct_projection_status
+          - candidate__candidate_role
+          - candidate__parent_candidate_id
+          - candidate__dms_slot
+          - candidate__permuter_request_id
+          - candidate__permuter_variant_id
+          - candidate__permuter_modifications
+          - candidate__rt_cds_dms_aa_pos
+          - candidate__rt_cds_dms_aa_wt
+          - candidate__rt_cds_dms_aa_alt
+          - candidate__rt_cds_dms_codon_index
+          - candidate__rt_cds_dms_codon_wt
+          - candidate__rt_cds_dms_codon_new
+          - candidate__rt_cds_dms_codon_policy
+        notes: >-
+          Study-owned RT-CDS in silico DMS lane. It calls only the public
+          `dnadesign.permuter` facade, then writes construct-slot input rows
+          with explicit study, construct, representation, parent, and Permuter
+          provenance in the candidate overlay.
   - role: construct_contexts_1600bp_usr_dataset
     owner_tool: construct
     lifecycle: construct_materialization_output
