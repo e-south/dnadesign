@@ -14,6 +14,8 @@ from ..decision import (
     gate_results_from_metrics,
     metric_definitions,
     metric_quality_from_metrics,
+    round_dynamics_summary,
+    trajectory_qa_summary,
 )
 
 
@@ -43,11 +45,14 @@ def _enriched_metrics_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     decision = payload.get("decision")
     if isinstance(decision, str) and decision:
         out["decision"] = decision
-    out["gate_results"] = gate_results_from_metrics(out["runs"], safety)
+    out["round_dynamics"] = round_dynamics_summary(out["rounds"])
+    out["trajectory_qa"] = trajectory_qa_summary(out["runs"], out["rounds"])
+    out["gate_results"] = gate_results_from_metrics(out["runs"], safety, round_metrics=out["rounds"])
     out["decision_reasons"] = decision_reasons_from_metrics(
         out["runs"],
         safety,
         decision=str(decision) if decision else None,
+        round_metrics=out["rounds"],
     )
     out["metric_quality"] = metric_quality_from_metrics(out["runs"])
     out["metric_definitions"] = metric_definitions()
@@ -59,7 +64,12 @@ def _review_decision(metrics_payload: Mapping[str, Any]) -> str:
     runs = metrics_payload.get("runs")
     if not isinstance(safety, Mapping) or not isinstance(runs, list):
         raise RuntimeError("metrics.json is missing safety/runs contract fields")
-    return _decision_from_metrics([dict(row) for row in runs if isinstance(row, Mapping)], safety)
+    rounds = metrics_payload.get("rounds") or []
+    return _decision_from_metrics(
+        [dict(row) for row in runs if isinstance(row, Mapping)],
+        safety,
+        round_metrics=[dict(row) for row in rounds if isinstance(row, Mapping)],
+    )
 
 
 def _review_problems(*, audit, review_decision: str | None) -> list[str]:

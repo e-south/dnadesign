@@ -34,16 +34,24 @@ def _gate_observed(row: Mapping[str, Any]) -> Any:
     gate = row.get("gate")
     if gate == "H-NULL-CONTROL":
         return row.get("null_lift")
+    if gate == "H-NULL-ROUND-DYNAMICS":
+        return row.get("max_lift")
     if gate == "H-POSITIVE-SEPARATION":
         return row.get("positive_minus_null_lift")
+    if gate == "H-TRAJECTORY-SEPARATION":
+        return row.get("paired_auc_delta")
     return row.get("observed", "")
 
 
 def _gate_threshold(row: Mapping[str, Any]) -> Any:
     gate = row.get("gate")
     if gate == "H-NULL-CONTROL":
-        return row.get("null_lift_threshold")
+        return row.get("null_lift_attention_baseline")
+    if gate == "H-NULL-ROUND-DYNAMICS":
+        return row.get("threshold")
     if gate == "H-POSITIVE-SEPARATION":
+        return 0.0
+    if gate == "H-TRAJECTORY-SEPARATION":
         return 0.0
     return row.get("threshold", "")
 

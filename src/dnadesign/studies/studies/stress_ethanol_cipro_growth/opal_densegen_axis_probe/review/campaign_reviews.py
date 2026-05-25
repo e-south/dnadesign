@@ -47,6 +47,8 @@ def _build_campaign_reviews(
                 "plot_paths": [str(path) for path in result.plot_paths],
                 "round_index": result.manifest["review_scope"]["round_index"],
                 "run_id": result.manifest["review_scope"]["run_id"],
+                "warnings": result.manifest.get("warnings") or [],
+                "stale_artifacts": result.manifest.get("stale_artifacts") or [],
             }
         )
     return reviewed

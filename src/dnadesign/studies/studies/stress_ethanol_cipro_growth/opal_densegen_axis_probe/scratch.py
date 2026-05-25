@@ -205,6 +205,8 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
             "probe_target_class": run.target_class,
             "probe_oracle_kind": "positive" if run.oracle_id == ORACLE_ID else "null",
             "probe_oracle_id": run.oracle_id,
+            "probe_label_family_id": run.label_family_id,
+            "probe_seed": run.seed,
             "probe_split_id": run.split_id,
             "probe_run_key": run.run_key,
         }

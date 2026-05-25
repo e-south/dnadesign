@@ -18,6 +18,9 @@ def materialize_probe_inputs(
     labels: Any,
     null_labels: Any,
     split_metadata: Mapping[str, Mapping[str, Any]],
+    label_family_manifest: Mapping[str, Any] | None = None,
+    null_provenance: Mapping[str, Any] | None = None,
+    suite_manifest: Mapping[str, Any] | None = None,
 ) -> None:
     import pandas as pd
 
@@ -36,6 +39,12 @@ def materialize_probe_inputs(
         path.mkdir(parents=True, exist_ok=True)
     _write_parquet(layout.densegen_labels_path, labels)
     _write_parquet(layout.null_labels_path, null_labels)
+    if label_family_manifest is not None:
+        _write_json(layout.label_family_manifest_path, label_family_manifest)
+    if null_provenance is not None:
+        _write_json(layout.null_provenance_path, null_provenance)
+    if suite_manifest is not None:
+        _write_json(layout.suite_manifest_path, suite_manifest)
     _write_json(layout.split_metadata_path, _persisted_split_metadata(split_metadata))
     for split_id, metadata in split_metadata.items():
         _write_parquet(layout.train_ids_path(split_id), pd.DataFrame({"id": list(metadata["train_ids"])}))

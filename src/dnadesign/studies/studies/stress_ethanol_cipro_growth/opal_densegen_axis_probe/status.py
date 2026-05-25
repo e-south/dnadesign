@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from .artifacts import ProbeArtifactLayout, RunRootAudit
 from .constants import CANDIDATE_RECORDS, SFXI_INTENSITY_COLUMNS, SFXI_STATE_COLUMNS, SHARED_OBSERVED_LABEL_SIDECAR
@@ -80,6 +80,14 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
         problems.append("decision_value_invalid")
     if metrics_present:
         problems.extend(_metrics_problems(metrics_path))
+    problems.extend(
+        _scored_plan_completion_problems(
+            layout,
+            metrics_present=metrics_present,
+            decision_present=decision_present,
+            decision=decision,
+        )
+    )
     source_records = _resolve_repo_path(repo_root, CANDIDATE_RECORDS)
     if split_records_paths:
         for path in split_records_paths:
@@ -111,6 +119,88 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
         shared_sidecar_present=shared_sidecar_present,
         problems=tuple(problems),
     )
+
+
+def _scored_plan_completion_problems(
+    layout: ProbeArtifactLayout,
+    *,
+    metrics_present: bool,
+    decision_present: bool,
+    decision: str | None,
+) -> list[str]:
+    """Reject scored probe roots that were only materialized or partially scored."""
+    if not layout.probe_plan_path.exists():
+        return []
+    try:
+        payload = json.loads(layout.probe_plan_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ["probe_plan_json_malformed"]
+    if not isinstance(payload, Mapping):
+        return ["probe_plan_json_not_mapping"]
+    plan = payload.get("plan")
+    if not isinstance(plan, Mapping):
+        return ["probe_plan_missing_plan"]
+    if not _plan_requires_scored_outputs(plan):
+        return []
+
+    problems: list[str] = []
+    if not metrics_present:
+        problems.append("metrics_missing_for_scored_plan")
+    if not decision_present:
+        problems.append("decision_missing_for_scored_plan")
+    if decision == "PENDING":
+        problems.append("decision_pending_for_scored_plan")
+    if not metrics_present:
+        return problems
+    try:
+        metrics = json.loads(layout.metrics_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return problems
+    if not isinstance(metrics, Mapping):
+        return problems
+
+    expected_runs = _positive_int(plan.get("planned_runs"))
+    expected_rounds = _positive_int(plan.get("rounds"))
+    run_rows = metrics.get("runs")
+    if expected_runs is not None and isinstance(run_rows, list):
+        observed_run_keys = {
+            str(row.get("run_key"))
+            for row in run_rows
+            if isinstance(row, Mapping) and str(row.get("run_key") or "").strip()
+        }
+        if len(observed_run_keys) != expected_runs:
+            problems.append(f"metrics_run_count_{len(observed_run_keys)}_expected_{expected_runs}")
+        if expected_rounds is not None:
+            final_round = expected_rounds - 1
+            for run in run_rows:
+                if not isinstance(run, Mapping):
+                    continue
+                if int(run.get("as_of_round", -1)) != final_round:
+                    problems.append(f"metrics_run_{run.get('run_key', 'unknown')}_final_round_not_{final_round}")
+    round_rows = metrics.get("rounds")
+    if expected_runs is not None and expected_rounds is not None and isinstance(round_rows, list):
+        expected_round_row_count = expected_runs * expected_rounds
+        if len(round_rows) != expected_round_row_count:
+            problems.append(f"metrics_round_count_{len(round_rows)}_expected_{expected_round_row_count}")
+    return problems
+
+
+def _plan_requires_scored_outputs(plan: Mapping[str, Any]) -> bool:
+    if _positive_int(plan.get("planned_runs")) in (None, 0):
+        return False
+    stop_after = str(plan.get("stop_after") or "").strip().lower()
+    if stop_after in {"", "materialize", "validate", "init", "ingest"}:
+        return False
+    gate = str(plan.get("gate") or "").strip().lower()
+    return gate != "source"
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        integer = int(value)
+    except (TypeError, ValueError):
+        return None
+    return integer if integer > 0 else None
 
 
 def _format_status_text(audit: RunRootAudit) -> str:

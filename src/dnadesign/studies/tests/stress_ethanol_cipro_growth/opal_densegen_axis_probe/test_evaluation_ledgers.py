@@ -41,6 +41,7 @@ def test_evaluate_run_rejects_partial_prediction_ledgers(tmp_path: Path) -> None
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     with pytest.raises(RuntimeError, match="missing eval id"):
@@ -82,6 +83,7 @@ def test_evaluate_run_respects_split_eval_ids(tmp_path: Path) -> None:
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     metrics = _evaluate_run(
@@ -185,6 +187,7 @@ def test_evaluate_run_requires_prediction_schema(tmp_path: Path) -> None:
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     with pytest.raises(RuntimeError, match="missing column"):
@@ -228,6 +231,7 @@ def test_evaluate_run_rejects_duplicate_prediction_ids(tmp_path: Path) -> None:
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     with pytest.raises(RuntimeError, match="duplicate prediction id"):
@@ -274,6 +278,7 @@ def test_evaluate_run_scores_actual_selected_rows_not_highest_unselected_score(t
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     metrics = _evaluate_run(

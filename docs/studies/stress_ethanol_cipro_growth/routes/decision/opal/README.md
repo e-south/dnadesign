@@ -38,7 +38,9 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Candidate table and label-source semantics:
   `../../../contexts/opal/candidate-table.md`
-- Scratch synthetic-oracle probe:
+- Current motif-composition QA plan:
+  `../../../contexts/opal/densegen-motif-qa-k12-s3-v1.md`
+- Historical scratch synthetic-oracle probe:
   `../../../contexts/opal/densegen-axis-probe-v0.md`
 - Campaign configs and commands: `campaign-commands.md`
 

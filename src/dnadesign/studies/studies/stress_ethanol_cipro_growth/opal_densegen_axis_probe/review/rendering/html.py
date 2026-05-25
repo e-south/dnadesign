@@ -25,6 +25,10 @@ def render_probe_review_html(
     decision_reasons = review_manifest.get("decision_reasons") or []
     gate_results = review_manifest.get("gate_results") or []
     metric_quality = review_manifest.get("metric_quality") or {}
+    round_dynamics_payload = review_manifest.get("round_dynamics") or metrics_payload.get("round_dynamics") or []
+    trajectory_qa = review_manifest.get("trajectory_qa") or metrics_payload.get("trajectory_qa") or {}
+    trajectory_pairs = trajectory_qa.get("pairs") if isinstance(trajectory_qa, Mapping) else []
+    seed_summaries = trajectory_qa.get("seed_summaries") if isinstance(trajectory_qa, Mapping) else []
     definitions = review_manifest.get("metric_definitions") or metrics_payload.get("metric_definitions") or {}
     next_steps = review_manifest.get("next_steps") or {}
     plot_cards = []
@@ -159,6 +163,61 @@ def render_probe_review_html(
     round_rows_html = (
         "".join(round_rows) if round_rows else '<tr><td colspan="7">No round-level metrics recorded.</td></tr>'
     )
+    round_dynamics_rows = []
+    for row in round_dynamics_payload:
+        status = (
+            "final null above threshold"
+            if row.get("null_final_threshold_exceeded")
+            else "transient null spike"
+            if row.get("null_transient_spike")
+            else "ok"
+        )
+        round_dynamics_rows.append(
+            "<tr>"
+            f"<td><code>{_e(row.get('run_key'))}</code></td>"
+            f"<td>{_e(row.get('oracle_id'))}</td>"
+            f"<td>{_e(_fmt(row.get('first_lift')))}</td>"
+            f"<td>{_e(_fmt(row.get('final_lift')))}</td>"
+            f"<td>{_e(_fmt(row.get('max_lift')))}</td>"
+            f"<td>{_e(row.get('max_round'))}</td>"
+            f"<td>{_e(status)}</td>"
+            "</tr>"
+        )
+    round_dynamics_html = (
+        "".join(round_dynamics_rows)
+        if round_dynamics_rows
+        else '<tr><td colspan="7">No round-dynamics summary recorded.</td></tr>'
+    )
+    trajectory_rows = []
+    for row in trajectory_pairs or []:
+        trajectory_rows.append(
+            "<tr>"
+            f"<td>{_e(row.get('seed', ''))}</td>"
+            f"<td>{_e(row.get('campaign'))}</td>"
+            f"<td>{_e(row.get('split_id'))}</td>"
+            f"<td>{_e(_fmt(row.get('positive_lift_auc')))}</td>"
+            f"<td>{_e(_fmt(row.get('null_lift_auc')))}</td>"
+            f"<td>{_e(_fmt(row.get('paired_auc_delta')))}</td>"
+            f"<td>{_e(_fmt(row.get('final_positive_minus_null_lift')))}</td>"
+            f"<td><code>{_e(row.get('status'))}</code></td>"
+            "</tr>"
+        )
+    trajectory_html = (
+        "".join(trajectory_rows) if trajectory_rows else '<tr><td colspan="8">No trajectory QA recorded.</td></tr>'
+    )
+    seed_rows = []
+    for row in seed_summaries or []:
+        seed_rows.append(
+            "<tr>"
+            f"<td>{_e(row.get('seed', ''))}</td>"
+            f"<td>{_e(row.get('pair_count'))}</td>"
+            f"<td>{_e(_fmt(row.get('paired_auc_delta_mean')))}</td>"
+            f"<td>{_e(_fmt(row.get('paired_auc_delta_min')))}</td>"
+            f"<td>{_e(_fmt(row.get('final_delta_mean')))}</td>"
+            f"<td><code>{_e(row.get('status'))}</code></td>"
+            "</tr>"
+        )
+    seed_html = "".join(seed_rows) if seed_rows else '<tr><td colspan="6">No seed summaries recorded.</td></tr>'
     body = f"""
     <header>
       <p>DenseGen axis probe review</p>
@@ -211,7 +270,10 @@ def render_probe_review_html(
             <dt>Lift</dt><dd>{_e(definitions.get("lift", ""))}</dd>
             <dt>Binomial p&gt;=k</dt><dd>{_e(definitions.get("binomial_tail_p", ""))}</dd>
             <dt>Null lift</dt><dd>{_e(definitions.get("null_lift", ""))}</dd>
+            <dt>Trajectory AUC</dt><dd>{_e(definitions.get("trajectory_auc", ""))}</dd>
+            <dt>Paired AUC delta</dt><dd>{_e(definitions.get("paired_auc_delta", ""))}</dd>
             <dt>Round metrics</dt><dd>{_e(definitions.get("round", ""))}</dd>
+            <dt>Round dynamics</dt><dd>{_e(definitions.get("round_dynamics", ""))}</dd>
           </dl>
         </details>
       </section>
@@ -254,6 +316,39 @@ def render_probe_review_html(
             </tr>
           </thead>
           <tbody>{round_rows_html}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Round Dynamics</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th><th>Oracle</th><th>First Lift</th><th>Final Lift</th>
+              <th>Max Lift</th><th>Max Round</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>{round_dynamics_html}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Trajectory QA</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Seed</th><th>Campaign</th><th>Split</th><th>Positive AUC</th>
+              <th>Null AUC</th><th>AUC Delta</th><th>Final Delta</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>{trajectory_html}</tbody>
+        </table>
+        <table>
+          <thead>
+            <tr>
+              <th>Seed</th><th>Pairs</th><th>AUC Delta Mean</th><th>AUC Delta Min</th>
+              <th>Final Delta Mean</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>{seed_html}</tbody>
         </table>
       </section>
       <section>

@@ -151,8 +151,10 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
     assert manifest["plot_quality"]["problem_count"] == 0
     assert manifest["decision_reasons"]
     assert manifest["gate_results"]
+    assert manifest["round_dynamics"][0]["run_key"] == "cipro_positive_random_id"
     status_payload = json.loads((run_root / "reports" / "status.json").read_text(encoding="utf-8"))
     assert status_payload["decision_reasons"]
+    assert status_payload["round_dynamics"]
     assert probe_main(["report", "--run-root", str(run_root), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["decision"] == "DEBUG"
 

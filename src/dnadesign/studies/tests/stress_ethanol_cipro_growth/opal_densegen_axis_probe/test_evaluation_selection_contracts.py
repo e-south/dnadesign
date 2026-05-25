@@ -42,6 +42,7 @@ def test_evaluate_run_rejects_less_than_six_evaluable_selected_ids(tmp_path: Pat
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     with pytest.raises(RuntimeError, match="expected 6 evaluable selected"):
@@ -85,6 +86,7 @@ def test_evaluate_run_rejects_more_than_six_evaluable_selected_ids(tmp_path: Pat
         config_path=config_path,
         label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
+        selection_k=6,
     )
 
     with pytest.raises(RuntimeError, match="expected 6 evaluable selected"):

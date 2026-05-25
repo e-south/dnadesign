@@ -9,9 +9,13 @@ STUDY_ID = "stress_ethanol_cipro_growth"
 ORACLE_ID = "densegen_part_axis_vec8_v0"
 NULL_ORACLE_ID = "permuted_densegen_part_axis_vec8_v0"
 DEFAULT_SEED = 7
-DEFAULT_INITIAL_LABELS = 6
-DEFAULT_TOP_K = 6
+DEFAULT_SUITE_ID = "densegen_motif_qa_k12_s3_v1"
+DEFAULT_SUITE_SEEDS = (7, 17, 29)
+DEFAULT_INITIAL_LABELS = 12
+DEFAULT_TOP_K = 12
 RUN_STAGES = ("materialize", "validate", "init", "ingest", "run", "status")
+ACTIVE_LABEL_FAMILY_ID = "sfxi_axis_vec8"
+PASSIVE_LABEL_FAMILY_IDS = ("tf_family_presence", "tf_family_count", "densegen_plan_class")
 
 STATE_ORDER = ("baseline_or_no_stress", "ethanol", "ciprofloxacin", "ethanol_plus_ciprofloxacin")
 SFXI_STATE_COLUMNS = ("v00", "v10", "v01", "v11")
@@ -29,6 +33,12 @@ PLAN_TO_AXIS_CLASS: dict[str, str] = {
     "ethanol": "ethanol_only",
     "ciprofloxacin": "cipro_only",
     "ethanol_ciprofloxacin": "dual_axis_and",
+}
+AXIS_CLASS_TO_DENSEGEN_PLAN_CLASS: dict[str, str] = {
+    "background_only": "background_only",
+    "ethanol_only": "ethanol",
+    "cipro_only": "ciprofloxacin",
+    "dual_axis_and": "ethanol_ciprofloxacin",
 }
 
 CAMPAIGNS: dict[str, dict[str, Any]] = {

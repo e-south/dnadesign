@@ -40,6 +40,8 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
     decision_reasons_from_metrics,
     enrich_metric_rows,
     gate_results_from_metrics,
+    round_dynamics_summary,
+    trajectory_qa_summary,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.decision_evaluation import (
     _evaluate_run,
@@ -55,6 +57,13 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
     run_opal_rounds_for_probe,
     selected_ids_from_round,
     write_followup_label_input,
+)
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.label_families import (
+    label_family_manifest,
+    require_label_family_columns,
+)
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.nulls import (
+    null_provenance_payload,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.paths import (
     validate_run_root_policy,
@@ -87,6 +96,13 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.status import (
     audit_run_root,
+)
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.suite_manifest import (
+    suite_manifest_payload,
+)
+from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.trajectory_metrics import (
+    trajectory_gate_results_from_metrics,
+    trajectory_metric_payload,
 )
 
 
@@ -185,8 +201,10 @@ __all__ = [
     "gate_results_from_metrics",
     "importlib",
     "json",
+    "label_family_manifest",
     "make_permuted_labels",
     "materialize_probe_inputs",
+    "null_provenance_payload",
     "pa",
     "parse_sigma35_variant",
     "pd",
@@ -195,11 +213,17 @@ __all__ = [
     "prepare_probe_run_root",
     "pytest",
     "records_manifest_problems",
+    "require_label_family_columns",
+    "round_dynamics_summary",
     "run_opal_rounds_for_probe",
     "selected_ids_from_round",
     "subprocess",
     "summarize_probe_progress",
+    "suite_manifest_payload",
     "sys",
+    "trajectory_gate_results_from_metrics",
+    "trajectory_metric_payload",
+    "trajectory_qa_summary",
     "validate_candidate_x_surface",
     "validate_run_root_policy",
     "validate_scratch_paths",

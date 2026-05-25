@@ -5,12 +5,16 @@
 LatentDNA/Evo2 X surface lets the three existing RF + SFXI + top-n stress
 campaigns recover DenseGen part-derived stress-axis grammar.
 
+This is now a historical K6/single-seed probe. The current planned benchmark is
+`densegen_motif_qa_k12_s3_v1`, documented in
+`densegen-motif-qa-k12-s3-v1.md`.
+
 The positive oracle is a binary SFXI-compatible vec8 from
 `densegen__used_tfbs_detail`: LexA defines cipro, CpxR/BaeR define ethanol, and
 both axes define dual/AND. `densegen__plan`,
 `densegen__required_regulators`, `sigma35_variant`, and
 `densegen__sampling_library_hash` are audit/split fields, not primary label
-sources. A distribution-preserving permuted null must fail.
+sources. A distribution-preserving permuted null is a paired diagnostic control.
 
 ### Boundary
 
@@ -72,14 +76,35 @@ The full matrix is 12 runs. Gates allow narrower execution: `source`,
 `cipro-random`, `random-all`, `leave-sigma35`, and `all`. `source` validates
 DenseGen source, candidate-table X schema/dimension, and label generation only.
 
+### Historical Dogfood Evidence
+
+Latest inspected K6 scratch run before removal:
+
+```text
+.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/20260523T220954Z_seed7_initial6_k6
+```
+
+That run was mechanically complete: 12 campaigns finished, 144 prediction ledgers
+exist, 12 campaign reviews exist, 12 plot manifests exist, 1,782 configured
+OPAL PNG plots are referenced, and the review audit found 0 missing, zero-byte,
+bad, or undersized media references. The aggregate review manifest was generated
+at `2026-05-24T18:53:46+00:00`.
+
+The K6 scientific decision used the now-retired hard `null_lift > 1.25` STOP
+threshold. That threshold is no longer the v1 QA criterion. The retained
+interpretation is narrower: K6 validated end-to-end OPAL mechanics and showed
+recoverable synthetic DenseGen signal, but it did not support a biological
+conclusion or assay-readiness claim. Synthetic labels remain scratch-only and no
+shared observed-label sidecar is written.
+
 ### CLI
 
 Dry-run is the default:
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --initial-labels 6 \
-  --selection-k 6 \
+  --initial-labels 12 \
+  --selection-k 12 \
   --seed 7 \
   --splits random_id,leave_sigma35_variant
 ```
@@ -88,7 +113,7 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_dens
 
 ```bash
 uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --initial-labels 6 --selection-k 6 --seed 7 --rounds 12 \
+  --initial-labels 12 --selection-k 12 --seed 7 --rounds 12 \
   --splits random_id,leave_sigma35_variant --score-batch-size 512 --apply
 ```
 
@@ -99,7 +124,8 @@ labels still never enter the shared observed-label sidecar.
 
 Metrics are written for the final scored round and every available round in
 `reports/round_metrics.csv` and `reports/round_metrics.jsonl`. Reviews cover
-`precision@K`, prevalence, lift, binomial tail p-values, and null lift.
+`precision@K`, prevalence, lift, binomial tail p-values, null lift diagnostics,
+round dynamics, and paired positive-vs-null trajectory AUC.
 
 The probe inherits OPAL's `safety.max_x_matrix_gib` guard and uses
 `writeback.prediction_records: ledger_only`. OPAL validates the 8192-D X

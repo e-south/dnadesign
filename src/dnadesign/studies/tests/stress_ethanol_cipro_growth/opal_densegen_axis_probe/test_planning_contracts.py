@@ -198,6 +198,16 @@ def test_build_plan_separates_initial_labels_from_selection_k(tmp_path: Path) ->
     assert {run.selection_k for run in plan.runs} == {6}
 
 
+def test_build_plan_records_k12_suite_contract_by_default(tmp_path: Path) -> None:
+    plan = build_plan(run_root=tmp_path / "probe", initial_label_count=12, seed=7, gate="source", splits=())
+
+    assert plan.suite_id == "densegen_motif_qa_k12_s3_v1"
+    assert plan.suite_seeds == (7, 17, 29)
+    assert plan.selection_k == 12
+    assert plan.active_label_family == "sfxi_axis_vec8"
+    assert plan.passive_label_families == ("tf_family_presence", "tf_family_count", "densegen_plan_class")
+
+
 def test_build_plan_rejects_unknown_stop_stage(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unsupported stop_after"):
         build_plan(

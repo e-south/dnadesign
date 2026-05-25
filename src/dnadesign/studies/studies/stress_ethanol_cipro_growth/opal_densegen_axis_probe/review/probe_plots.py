@@ -27,13 +27,13 @@ def _write_probe_plots(
         layout.review_plots_dir / "selected_class_composition.png",
         layout.review_plots_dir / "positive_null_lift_delta.png",
         layout.review_plots_dir / "evaluable_selected_count.png",
-        layout.review_plots_dir / "stop_decision_matrix.png",
+        layout.review_plots_dir / "trajectory_qa_matrix.png",
     ]
     _plot_lift_and_precision(frame, paths[0])
     _plot_class_composition(frame, paths[1])
     _plot_positive_null_lift_delta(frame, paths[2])
     _plot_evaluable_selected_count(frame, paths[3])
-    _plot_stop_decision_matrix(frame, paths[4])
+    _plot_trajectory_qa_matrix(frame, metrics_payload.get("trajectory_qa") or {}, paths[4])
     round_rows = [row for row in metrics_payload.get("rounds") or [] if isinstance(row, Mapping)]
     if round_rows:
         round_path = layout.review_plots_dir / "round_target_lift_and_precision.png"
@@ -190,7 +190,7 @@ def _plot_evaluable_selected_count(frame: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def _plot_stop_decision_matrix(frame: pd.DataFrame, path: Path) -> None:
+def _plot_trajectory_qa_matrix(frame: pd.DataFrame, trajectory_qa: Mapping[str, Any], path: Path) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -206,10 +206,17 @@ def _plot_stop_decision_matrix(frame: pd.DataFrame, path: Path) -> None:
             "positive_lift": positive,
             "null_lift": null,
             "positive_minus_null": positive - null,
-            "null_gt_1.25": (null > 1.25).astype(float),
         },
         index=pivot.index,
     )
+    trajectory_pairs = trajectory_qa.get("pairs") if isinstance(trajectory_qa, Mapping) else []
+    if trajectory_pairs:
+        auc_delta = {
+            f"{row.get('campaign')}/{row.get('split_id')}": row.get("paired_auc_delta")
+            for row in trajectory_pairs
+            if isinstance(row, Mapping)
+        }
+        matrix["paired_auc_delta"] = pd.Series(auc_delta, dtype=float)
     values = matrix.to_numpy(dtype=float)
     fig, ax = plt.subplots(figsize=(7.5, max(3.5, 0.45 * len(matrix))), constrained_layout=True)
     im = ax.imshow(values, aspect="auto", cmap="coolwarm", interpolation="nearest")
@@ -217,7 +224,7 @@ def _plot_stop_decision_matrix(frame: pd.DataFrame, path: Path) -> None:
     ax.set_xticklabels(matrix.columns, rotation=25, ha="right")
     ax.set_yticks(range(len(matrix.index)))
     ax.set_yticklabels(matrix.index.tolist())
-    ax.set_title("STOP decision matrix")
+    ax.set_title("Trajectory QA matrix")
     for row_index in range(values.shape[0]):
         for col_index in range(values.shape[1]):
             value = values[row_index, col_index]

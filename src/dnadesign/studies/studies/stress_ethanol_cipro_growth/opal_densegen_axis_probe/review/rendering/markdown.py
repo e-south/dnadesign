@@ -20,6 +20,10 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     decision_reasons = review_manifest.get("decision_reasons") or []
     gate_results = review_manifest.get("gate_results") or []
     metric_quality = review_manifest.get("metric_quality") or {}
+    round_dynamics = review_manifest.get("round_dynamics") or metrics_payload.get("round_dynamics") or []
+    trajectory_qa = review_manifest.get("trajectory_qa") or metrics_payload.get("trajectory_qa") or {}
+    trajectory_pairs = trajectory_qa.get("pairs") if isinstance(trajectory_qa, Mapping) else []
+    seed_summaries = trajectory_qa.get("seed_summaries") if isinstance(trajectory_qa, Mapping) else []
     definitions = review_manifest.get("metric_definitions") or metrics_payload.get("metric_definitions") or {}
     next_steps = review_manifest.get("next_steps") or {}
     lines = [
@@ -92,7 +96,10 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
             f"- lift: {definitions.get('lift', '')}",
             f"- binomial p>=k: {definitions.get('binomial_tail_p', '')}",
             f"- null lift: {definitions.get('null_lift', '')}",
+            f"- trajectory AUC: {definitions.get('trajectory_auc', '')}",
+            f"- paired AUC delta: {definitions.get('paired_auc_delta', '')}",
             f"- round metrics: {definitions.get('round', '')}",
+            f"- round dynamics: {definitions.get('round_dynamics', '')}",
             "",
             "## Metrics",
             "",
@@ -149,6 +156,80 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
             )
     else:
         lines.append("No round-level OPAL metrics were recorded.")
+    lines.extend(["", "## Round Dynamics", ""])
+    if round_dynamics:
+        lines.extend(
+            [
+                "| run_key | oracle | first lift | final lift | max lift | max round | status |",
+                "|---|---|---:|---:|---:|---:|---|",
+            ]
+        )
+        for row in round_dynamics:
+            status = (
+                "final null above threshold"
+                if row.get("null_final_threshold_exceeded")
+                else "transient null spike"
+                if row.get("null_transient_spike")
+                else "ok"
+            )
+            lines.append(
+                "| `{run_key}` | `{oracle}` | {first} | {final} | {max_lift} | {max_round} | {status} |".format(
+                    run_key=row.get("run_key"),
+                    oracle=row.get("oracle_id"),
+                    first=_fmt(row.get("first_lift")),
+                    final=_fmt(row.get("final_lift")),
+                    max_lift=_fmt(row.get("max_lift")),
+                    max_round=row.get("max_round"),
+                    status=status,
+                )
+            )
+    else:
+        lines.append("No round-dynamics summary was recorded.")
+    lines.extend(["", "## Trajectory QA", ""])
+    if trajectory_pairs:
+        lines.extend(
+            [
+                "| seed | campaign | split | positive AUC | null AUC | AUC delta | final delta | status |",
+                "|---:|---|---|---:|---:|---:|---:|---|",
+            ]
+        )
+        for row in trajectory_pairs:
+            lines.append(
+                (
+                    "| {seed} | `{campaign}` | `{split}` | {pos_auc} | {null_auc} | "
+                    "{auc_delta} | {final_delta} | `{status}` |"
+                ).format(
+                    seed="" if row.get("seed") is None else row.get("seed"),
+                    campaign=row.get("campaign"),
+                    split=row.get("split_id"),
+                    pos_auc=_fmt(row.get("positive_lift_auc")),
+                    null_auc=_fmt(row.get("null_lift_auc")),
+                    auc_delta=_fmt(row.get("paired_auc_delta")),
+                    final_delta=_fmt(row.get("final_positive_minus_null_lift")),
+                    status=row.get("status"),
+                )
+            )
+    else:
+        lines.append("No trajectory QA summary was recorded.")
+    if seed_summaries:
+        lines.extend(["", "Seed-level summaries:", ""])
+        lines.extend(
+            [
+                "| seed | pairs | AUC delta mean | AUC delta min | final delta mean | status |",
+                "|---:|---:|---:|---:|---:|---|",
+            ]
+        )
+        for row in seed_summaries:
+            lines.append(
+                "| {seed} | {pairs} | {auc_mean} | {auc_min} | {final_mean} | `{status}` |".format(
+                    seed="" if row.get("seed") is None else row.get("seed"),
+                    pairs=row.get("pair_count"),
+                    auc_mean=_fmt(row.get("paired_auc_delta_mean")),
+                    auc_min=_fmt(row.get("paired_auc_delta_min")),
+                    final_mean=_fmt(row.get("final_delta_mean")),
+                    status=row.get("status"),
+                )
+            )
     lines.extend(["", "## OPAL Campaign Reviews", ""])
     if campaign_reviews:
         for review in campaign_reviews:

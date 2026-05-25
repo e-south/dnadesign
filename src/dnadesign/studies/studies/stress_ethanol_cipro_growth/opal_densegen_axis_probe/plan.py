@@ -7,6 +7,7 @@ from typing import Iterable
 
 from .artifacts import ProbeArtifactLayout, ProbePlan, RunSpec
 from .constants import CAMPAIGNS, DEFAULT_TOP_K, ORACLE_ID, ORACLES, RUN_STAGES, SHARED_OBSERVED_LABEL_SIDECAR, SPLITS
+from .suite_manifest import default_probe_suite
 
 
 def _validate_rounds(rounds: int) -> int:
@@ -123,7 +124,9 @@ def build_plan(
     rounds: int = 1,
     apply: bool = False,
     stop_after: str = "status",
+    suite_id: str | None = None,
 ) -> ProbePlan:
+    suite = default_probe_suite()
     stop = _validate_stop_after(stop_after)
     round_count = _validate_rounds(rounds)
     initial_count = int(initial_label_count)
@@ -166,6 +169,8 @@ def build_plan(
                 label_input_path=label_input_path,
                 sidecar_path=sidecar_path,
                 selection_k=batch_size,
+                seed=int(seed),
+                label_family_id=suite.active_label_family,
                 max_x_matrix_gib=memory_budget,
                 score_batch_size=score_batch,
             )
@@ -183,6 +188,10 @@ def build_plan(
         splits=split_tuple,
         apply=bool(apply),
         stop_after=stop,
+        suite_id=str(suite_id or suite.suite_id),
+        suite_seeds=tuple(int(value) for value in suite.seeds),
+        active_label_family=suite.active_label_family,
+        passive_label_families=suite.passive_label_families,
         runs=runs,
         commands=commands,
     )

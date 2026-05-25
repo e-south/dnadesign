@@ -23,6 +23,7 @@ class AxisLabel:
     background_count: int = 0
     cipro_axis: bool = False
     ethanol_axis: bool = False
+    densegen_plan_class: str | None = None
     sigma35_variant: str | None = None
     densegen_plan: str | None = None
     expected_axis_class_from_plan: str | None = None
@@ -40,6 +41,8 @@ class RunSpec:
     label_input_path: Path
     sidecar_path: Path
     selection_k: int = DEFAULT_TOP_K
+    seed: int = 7
+    label_family_id: str = "sfxi_axis_vec8"
     max_x_matrix_gib: float | None = None
     score_batch_size: int | None = None
 
@@ -57,6 +60,10 @@ class ProbePlan:
     max_x_matrix_gib: float | None = None
     score_batch_size: int | None = None
     stop_after: str = "status"
+    suite_id: str = "densegen_motif_qa_k12_s3_v1"
+    suite_seeds: tuple[int, ...] = (7, 17, 29)
+    active_label_family: str = "sfxi_axis_vec8"
+    passive_label_families: tuple[str, ...] = ("tf_family_presence", "tf_family_count", "densegen_plan_class")
     runs: list[RunSpec] = field(default_factory=list)
     commands: list[list[str]] = field(default_factory=list)
 
@@ -110,6 +117,14 @@ class ProbeArtifactLayout:
         return self.labels_dir / "permuted_densegen_part_axis_vec8.parquet"
 
     @property
+    def label_family_manifest_path(self) -> Path:
+        return self.labels_dir / "label_families.json"
+
+    @property
+    def null_provenance_path(self) -> Path:
+        return self.labels_dir / "null_provenance.json"
+
+    @property
     def splits_dir(self) -> Path:
         return self.run_root / "splits"
 
@@ -120,6 +135,10 @@ class ProbeArtifactLayout:
     @property
     def probe_plan_path(self) -> Path:
         return self.run_root / "probe_plan.json"
+
+    @property
+    def suite_manifest_path(self) -> Path:
+        return self.run_root / "probe_suite.json"
 
     def train_ids_path(self, split_id: str) -> Path:
         return self.splits_dir / f"{split_id}_train_ids.parquet"

@@ -9,13 +9,22 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from .constants import NULL_ORACLE_ID, ORACLE_ID
+from .round_dynamics import (
+    round_dynamics_from_metrics,
+    round_gate_results_from_metrics,
+)
+from .trajectory_metrics import (
+    has_trajectory_separation_failure,
+    trajectory_gate_results_from_metrics,
+    trajectory_metric_payload,
+)
 
 PASS_CIPRO_RANDOM_GATE = "PASS_CIPRO_RANDOM_GATE"
 PASS_RANDOM_ALL_GATE = "PASS_RANDOM_ALL_GATE"
 PASS_LEAVE_SIGMA35_GATE = "PASS_LEAVE_SIGMA35_GATE"
 PASS_FULL_MATRIX_GATE = "PASS_FULL_MATRIX_GATE"
 PASS_SCOPED_GATE = "PASS_SCOPED_GATE"
-NULL_LIFT_STOP_THRESHOLD = 1.25
+NULL_LIFT_ATTENTION_BASELINE = 1.0
 
 
 def metric_definitions() -> dict[str, str]:
@@ -30,12 +39,21 @@ def metric_definitions() -> dict[str, str]:
         ),
         "null_lift": (
             "The same lift calculation for a campaign trained on permuted labels, still evaluated against the true "
-            "target class. High null lift means the null run enriched true targets and the positive signal is not "
-            "clean."
+            "target class. Null lift is diagnostic; paired positive-vs-null separation decides QA status."
+        ),
+        "trajectory_auc": (
+            "Round-normalized area under the target-lift trajectory. With one scored point, the AUC is that point."
+        ),
+        "paired_auc_delta": (
+            "positive trajectory AUC minus paired null trajectory AUC for the same campaign/split/seed."
         ),
         "round": (
             "Round metrics are computed retroactively from each OPAL prediction ledger. Round 0 uses the initial "
             "labels; later rounds include the previous round's selected labels."
+        ),
+        "round_dynamics": (
+            "Per-run first/final/max lift over OPAL rounds. Null-control spikes above random-baseline lift are "
+            "non-blocking attention signals."
         ),
     }
 
@@ -65,7 +83,12 @@ def _binomial_tail_ge(successes: int, trials: int, probability: float | None) ->
     )
 
 
-def _decision_from_metrics(metrics: list[dict[str, Any]], safety: Mapping[str, Any]) -> str:
+def _decision_from_metrics(
+    metrics: list[dict[str, Any]],
+    safety: Mapping[str, Any],
+    *,
+    round_metrics: Sequence[Mapping[str, Any]] | None = None,
+) -> str:
     if not safety.get("path_safety_pass") or not safety.get("forbidden_input_pass") or not safety.get("x_surface_pass"):
         return "STOP"
     if not metrics:
@@ -76,15 +99,6 @@ def _decision_from_metrics(metrics: list[dict[str, Any]], safety: Mapping[str, A
     if not evaluable:
         return "DEBUG"
 
-    null_lifts = [
-        value
-        for row in evaluable
-        if row.get("oracle_id") == NULL_ORACLE_ID
-        for value in [_finite_metric(row, "target_lift_at_k_true")]
-        if value is not None
-    ]
-    if null_lifts and max(null_lifts) > NULL_LIFT_STOP_THRESHOLD:
-        return "STOP"
     pair_keys = sorted({(str(row.get("campaign")), str(row.get("split_id"))) for row in evaluable})
     if not pair_keys:
         return "DEBUG"
@@ -109,6 +123,8 @@ def _decision_from_metrics(metrics: list[dict[str, Any]], safety: Mapping[str, A
             return "DEBUG"
         if max(positive) <= max(null):
             return "DEBUG"
+    if round_metrics and has_trajectory_separation_failure(run_metrics=evaluable, round_metrics=round_metrics):
+        return "DEBUG"
     return _pass_decision_for_coverage(evaluable)
 
 
@@ -147,7 +163,12 @@ def enrich_metric_rows(metrics: Sequence[Mapping[str, Any]]) -> list[dict[str, A
     return enriched
 
 
-def gate_results_from_metrics(metrics: Sequence[Mapping[str, Any]], safety: Mapping[str, Any]) -> list[dict[str, Any]]:
+def gate_results_from_metrics(
+    metrics: Sequence[Mapping[str, Any]],
+    safety: Mapping[str, Any],
+    *,
+    round_metrics: Sequence[Mapping[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     """Build operator-facing gate rows without changing decision semantics."""
     rows: list[dict[str, Any]] = []
     for key, label in (
@@ -199,8 +220,8 @@ def gate_results_from_metrics(metrics: Sequence[Mapping[str, Any]], safety: Mapp
                 "status": (
                     "debug"
                     if null is None
-                    else "fail"
-                    if null_lift is not None and null_lift > NULL_LIFT_STOP_THRESHOLD
+                    else "attention"
+                    if null_lift is not None and null_lift > NULL_LIFT_ATTENTION_BASELINE
                     else "pass"
                 ),
                 "campaign": campaign,
@@ -210,13 +231,13 @@ def gate_results_from_metrics(metrics: Sequence[Mapping[str, Any]], safety: Mapp
                 "positive_lift": positive_lift,
                 "null_lift": null_lift,
                 "positive_minus_null_lift": delta,
-                "null_lift_threshold": NULL_LIFT_STOP_THRESHOLD,
+                "null_lift_attention_baseline": NULL_LIFT_ATTENTION_BASELINE,
                 "reason": (
                     "positive/null pair incomplete"
                     if null is None
-                    else f"null lift exceeds {NULL_LIFT_STOP_THRESHOLD:g}"
-                    if null_lift is not None and null_lift > NULL_LIFT_STOP_THRESHOLD
-                    else "null lift within threshold"
+                    else "null lift exceeds random-baseline lift; diagnostic only"
+                    if null_lift is not None and null_lift > NULL_LIFT_ATTENTION_BASELINE
+                    else "null lift recorded for paired QA comparison"
                 ),
             }
         )
@@ -246,6 +267,9 @@ def gate_results_from_metrics(metrics: Sequence[Mapping[str, Any]], safety: Mapp
                 ),
             }
         )
+    if round_metrics:
+        rows.extend(round_gate_results_from_metrics(round_metrics, null_lift_threshold=NULL_LIFT_ATTENTION_BASELINE))
+        rows.extend(trajectory_gate_results_from_metrics(run_metrics=evaluable, round_metrics=round_metrics))
     return rows
 
 
@@ -254,8 +278,9 @@ def decision_reasons_from_metrics(
     safety: Mapping[str, Any],
     *,
     decision: str | None = None,
+    round_metrics: Sequence[Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    gate_results = gate_results_from_metrics(metrics, safety)
+    gate_results = gate_results_from_metrics(metrics, safety, round_metrics=round_metrics)
     reasons = [row for row in gate_results if row.get("status") in {"fail", "debug", "pending"}]
     if decision is not None and not reasons:
         reasons.append(
@@ -294,6 +319,17 @@ def metric_quality_from_metrics(metrics: Sequence[Mapping[str, Any]]) -> dict[st
         "weak_count_approx_binomial_p_gt_0_05": len(weak_runs),
         "weak_runs": weak_runs,
     }
+
+
+def round_dynamics_summary(round_metrics: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return round_dynamics_from_metrics(round_metrics, null_lift_threshold=NULL_LIFT_ATTENTION_BASELINE)
+
+
+def trajectory_qa_summary(
+    metrics: Sequence[Mapping[str, Any]],
+    round_metrics: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return trajectory_metric_payload(run_metrics=metrics, round_metrics=round_metrics)
 
 
 def _int_or_none(value: Any) -> int | None:

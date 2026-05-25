@@ -5,11 +5,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-import pandas as pd
+import yaml
 
-from dnadesign.opal import load_plot_artifact_manifest, load_plot_manifest_index
+from dnadesign.opal import (
+    list_configured_plot_specs,
+    load_plot_artifact_manifest,
+    load_plot_config,
+    load_plot_manifest_index,
+)
 
 from ..artifacts import ProbeArtifactLayout
+from .configured_plot_files import (
+    _expected_tidy_rounds_for_plot,
+    _image_quality_problems,
+    _plot_requires_tidy_csv,
+    _tidy_csv_quality_problems,
+)
+from .configured_plot_scopes import _configured_spec_coverage_problems, _round_scope_coverage_problems
 
 
 def _build_configured_plot_reviews(
@@ -31,13 +43,17 @@ def _build_configured_plot_reviews(
         if not run_key or run_key in seen:
             continue
         seen.add(run_key)
-        plots_dir = layout.campaign_workdir(run_key) / "outputs" / "plots"
+        workdir = layout.campaign_workdir(run_key)
+        plot_config = _load_current_plot_config(workdir)
+        plots_dir = workdir / "outputs" / "plots"
         index_path = plots_dir / "plot_manifest.json"
         entry: dict[str, Any] = {
             "run_key": run_key,
             "plots_dir": str(plots_dir),
             "index_path": str(index_path),
             "expected_final_round": expected_rounds.get(run_key),
+            "configured_plot_config": {key: value for key, value in plot_config.items() if key != "specs"},
+            "expected_configured_plot_specs": plot_config.get("specs") or [],
             "status": "missing_index",
             "plot_count": 0,
             "plots": [],
@@ -95,6 +111,7 @@ def _configured_plot_entry(row: Mapping[str, Any]) -> dict[str, Any]:
         "params": manifest.get("params") or {},
         "metadata": manifest.get("metadata") or {},
         "quality": manifest.get("quality") or {},
+        "freshness": manifest.get("freshness"),
         "warnings": manifest.get("warnings") or [],
         "error": manifest.get("error"),
     }
@@ -104,6 +121,21 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
     problems: list[str] = []
     expected_final_round = entry.get("expected_final_round")
     expected_rounds = set(range(int(expected_final_round) + 1)) if expected_final_round is not None else set()
+    plot_config = (
+        entry.get("configured_plot_config") if isinstance(entry.get("configured_plot_config"), Mapping) else {}
+    )
+    if plot_config.get("status") == "error":
+        problems.append(
+            "configured_plot_config_error:"
+            f"{plot_config.get('error_type', 'unknown')}:{plot_config.get('error_message', '')}"
+        )
+    problems.extend(
+        _configured_spec_coverage_problems(
+            entry.get("plots") or [],
+            entry.get("expected_configured_plot_specs") or [],
+            expected_final_round=expected_final_round,
+        )
+    )
     problems.extend(_round_scope_coverage_problems(entry.get("plots") or [], expected_final_round=expected_final_round))
     for plot in entry.get("plots") or []:
         if not isinstance(plot, Mapping):
@@ -112,6 +144,9 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
         name = str(plot.get("name") or "unknown")
         if plot.get("status") != "written":
             problems.append(f"{name}:status_not_written")
+        freshness = plot.get("freshness")
+        if isinstance(freshness, Mapping) and freshness.get("status") != "fresh":
+            problems.append(f"{name}:freshness_not_fresh:{freshness.get('status', 'unknown')}")
         media_paths = [Path(str(path)) for path in plot.get("media_paths") or []]
         if not media_paths:
             problems.append(f"{name}:media_missing")
@@ -141,47 +176,54 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
     }
 
 
-def _round_scope_coverage_problems(plots: Any, *, expected_final_round: Any) -> list[str]:
-    if expected_final_round is None:
-        return []
-    final_round = int(expected_final_round)
-    grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
-    for plot in plots:
-        if not isinstance(plot, Mapping):
-            continue
-        key = (str(plot.get("name") or "unknown"), str(plot.get("kind") or "unknown"))
-        grouped.setdefault(key, []).append(plot)
+def _load_current_plot_config(workdir: Path) -> dict[str, Any]:
+    campaign_yaml = workdir / "configs" / "campaign.yaml"
+    if not campaign_yaml.exists():
+        return {
+            "status": "missing_campaign_yaml",
+            "campaign_yaml": str(campaign_yaml),
+            "specs": [],
+        }
+    try:
+        raw = yaml.safe_load(campaign_yaml.read_text(encoding="utf-8")) or {}
+        if not isinstance(raw, dict):
+            raise ValueError(f"campaign YAML did not parse to a mapping: {campaign_yaml}")
+        if not _campaign_declares_plot_config(raw):
+            return {
+                "status": "not_configured",
+                "campaign_yaml": str(campaign_yaml),
+                "specs": [],
+            }
+        plot_config = load_plot_config(
+            campaign_cfg=raw,
+            campaign_yaml=campaign_yaml,
+            campaign_dir=workdir,
+            plot_config_opt=None,
+        )
+        specs = list_configured_plot_specs(
+            plots_cfg=plot_config.plots,
+            plot_presets=plot_config.plot_presets,
+        )
+    except Exception as exc:
+        return {
+            "status": "error",
+            "campaign_yaml": str(campaign_yaml),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+            "specs": [],
+        }
+    return {
+        "status": "loaded",
+        "campaign_yaml": str(campaign_yaml),
+        "source_path": str(plot_config.source_path),
+        "source_label": plot_config.source_label,
+        "spec_count": len(specs),
+        "specs": [dict(spec) for spec in specs if spec.get("enabled") is not False],
+    }
 
-    problems: list[str] = []
-    for (name, _kind), group in grouped.items():
-        if not _expects_final_round_coverage(group):
-            continue
-        if any(_round_scope_covers_final(plot.get("rounds"), final_round=final_round) for plot in group):
-            continue
-        problems.append(f"{name}:round_scope_missing_final_round:{final_round}")
-    return problems
 
-
-def _expects_final_round_coverage(group: list[Mapping[str, Any]]) -> bool:
-    for plot in group:
-        rounds = plot.get("rounds")
-        metadata = plot.get("metadata") if isinstance(plot.get("metadata"), Mapping) else {}
-        capability = metadata.get("capability") if isinstance(metadata.get("capability"), Mapping) else {}
-        round_scope = str(capability.get("round_scope") or "")
-        name = str(plot.get("name") or "").lower()
-        if name.endswith("_latest") or round_scope in {"single_round", "single_or_round_history"}:
-            return True
-        if isinstance(rounds, list):
-            return True
-    return False
-
-
-def _round_scope_covers_final(rounds: Any, *, final_round: int) -> bool:
-    if isinstance(rounds, str) and rounds in {"all", "latest"}:
-        return True
-    if isinstance(rounds, list):
-        return final_round in {int(value) for value in rounds if value is not None}
-    return False
+def _campaign_declares_plot_config(raw: Mapping[str, Any]) -> bool:
+    return any(key in raw for key in ("plots", "plot_defaults", "plot_presets", "plot_config"))
 
 
 def _plot_quality_summary(entries: list[dict[str, Any]]) -> dict[str, Any]:
@@ -210,83 +252,3 @@ def _review_next_steps(*, layout: ProbeArtifactLayout, plot_quality: Mapping[str
         "configured_plot_refresh_command": (f"uv run python -m {module} plot --run-root {run_root} --round all --json"),
         "rerun_report_command": f"uv run python -m {module} report --run-root {run_root} --plots --json",
     }
-
-
-def _plot_requires_tidy_csv(plot: Mapping[str, Any]) -> bool:
-    metadata = plot.get("metadata") if isinstance(plot.get("metadata"), Mapping) else {}
-    quality = plot.get("quality") if isinstance(plot.get("quality"), Mapping) else {}
-    capability = metadata.get("capability") if isinstance(metadata.get("capability"), Mapping) else {}
-    return bool(capability.get("tidy_available") or metadata.get("tidy_schema") or quality.get("tidy_schema_declared"))
-
-
-def _expected_tidy_rounds_for_plot(rounds: Any, *, expected_final_round: Any) -> set[int] | None:
-    if expected_final_round is None:
-        return None
-    final_round = int(expected_final_round)
-    if rounds == "all":
-        return set(range(final_round + 1))
-    if rounds == "latest":
-        return {final_round}
-    if isinstance(rounds, list):
-        resolved: set[int] = set()
-        for value in rounds:
-            if value is None:
-                continue
-            resolved.add(int(value))
-        return resolved
-    return None
-
-
-def _image_quality_problems(path: Path, *, label: str) -> list[str]:
-    if not path.exists():
-        return [f"{label}:media_file_missing:{path.name}"]
-    if path.stat().st_size <= 0:
-        return [f"{label}:media_file_empty:{path.name}"]
-    try:
-        from PIL import Image
-
-        with Image.open(path) as image:
-            width, height = image.size
-            extrema = image.convert("RGB").getextrema()
-    except Exception as exc:
-        return [f"{label}:media_unreadable:{type(exc).__name__}:{path.name}"]
-    problems = []
-    if width < 200 or height < 160:
-        problems.append(f"{label}:media_too_small:{width}x{height}")
-    if all(low == high for low, high in extrema):
-        problems.append(f"{label}:media_blank:{path.name}")
-    return problems
-
-
-def _tidy_csv_quality_problems(
-    path: Path,
-    *,
-    label: str,
-    kind: str,
-    expected_rounds: set[int],
-) -> list[str]:
-    if not path.exists():
-        return [f"{label}:tidy_csv_file_missing:{path.name}"]
-    if path.stat().st_size <= 0:
-        return [f"{label}:tidy_csv_file_empty:{path.name}"]
-    try:
-        frame = pd.read_csv(path)
-    except Exception as exc:
-        return [f"{label}:tidy_csv_unreadable:{type(exc).__name__}:{path.name}"]
-    problems = []
-    if frame.empty:
-        problems.append(f"{label}:tidy_csv_empty")
-        return problems
-    if expected_rounds and "round" in frame.columns:
-        rounds = {int(value) for value in pd.to_numeric(frame["round"], errors="coerce").dropna().astype(int).tolist()}
-        missing = sorted(expected_rounds - rounds)
-        if missing:
-            problems.append(f"{label}:tidy_csv_missing_rounds:{','.join(map(str, missing))}")
-    if kind == "vector_summary_heatmap" and "row_type" in frame.columns:
-        row_types = set(frame["row_type"].astype(str))
-        if not ({"reference_vector", "setpoint"} & row_types):
-            problems.append(f"{label}:tidy_csv_missing_reference_vector")
-    if kind == "feature_importance_heatmap" and "feature_id" in frame.columns:
-        if frame["feature_id"].nunique(dropna=True) <= 0:
-            problems.append(f"{label}:tidy_csv_no_features")
-    return problems

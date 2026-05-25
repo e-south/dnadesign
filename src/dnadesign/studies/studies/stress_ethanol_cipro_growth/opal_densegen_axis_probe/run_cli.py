@@ -12,7 +12,7 @@ import pandas as pd
 
 from .artifacts import ProbeArtifactLayout
 from .axis_oracle import build_axis_oracle, make_permuted_labels
-from .constants import NULL_ORACLE_ID, ORACLE_ID, RUN_STAGES
+from .constants import DEFAULT_SUITE_ID, NULL_ORACLE_ID, ORACLE_ID, RUN_STAGES
 from .decision import (
     _decision_from_metrics,
     _write_decision,
@@ -21,6 +21,8 @@ from .decision import (
     gate_results_from_metrics,
     metric_definitions,
     metric_quality_from_metrics,
+    round_dynamics_summary,
+    trajectory_qa_summary,
 )
 from .decision_evaluation import _evaluate_run, _evaluate_run_rounds
 from .decision_inputs import (
@@ -30,12 +32,15 @@ from .decision_inputs import (
     _split_metadata_for_all,
 )
 from .execution import materialize_probe_inputs, run_opal_rounds_for_probe
+from .label_families import label_family_manifest
+from .nulls import null_provenance_payload
 from .paths import _default_run_root, _repo_root_from, _resolve_repo_path, validate_run_root_policy
 from .plan import build_plan
 from .plan_fingerprint import build_plan_record, prepare_probe_run_root
 from .scratch import _load_candidate_inputs, _write_json
 from .source_contract import validate_candidate_x_surface
 from .status import _format_status_text, audit_run_root
+from .suite_manifest import suite_manifest_payload
 
 
 def _run_probe(args: argparse.Namespace) -> int:
@@ -65,10 +70,16 @@ def _run_probe(args: argparse.Namespace) -> int:
         splits=splits,
         apply=bool(args.apply),
         stop_after=str(args.stop_after),
+        suite_id=str(getattr(args, "suite", DEFAULT_SUITE_ID)),
     )
 
     candidates, densegen_sidecar = _load_candidate_inputs(repo_root)
     labels = build_axis_oracle(candidates, densegen_sidecar=densegen_sidecar)
+    family_manifest = label_family_manifest(
+        labels,
+        active_label_family=plan.active_label_family,
+        passive_label_families=plan.passive_label_families,
+    )
     x_surface = validate_candidate_x_surface(repo_root, expected_rows=len(labels))
     safety = _source_summary(labels, run_root=run_root, x_surface=x_surface)
     split_metadata = _split_metadata_for_all(labels, plan=plan)
@@ -77,10 +88,14 @@ def _run_probe(args: argparse.Namespace) -> int:
     plan_payload = {
         "source_summary": safety,
         "run_root": str(run_root),
+        "suite_id": plan.suite_id,
+        "suite": suite_manifest_payload(),
+        "label_families": family_manifest,
         "planned_runs": len(plan.runs),
         "gate": plan.gate,
         "stop_after": plan.stop_after,
         "seed": plan.seed,
+        "suite_seeds": list(plan.suite_seeds),
         "split_ids": list(plan.splits),
         "rounds": plan.rounds,
         "initial_label_count": plan.initial_label_count,
@@ -122,12 +137,21 @@ def _run_probe(args: argparse.Namespace) -> int:
         replace_run_root=bool(args.replace_run_root),
     )
     null_labels = make_permuted_labels(labels, seed=int(args.seed))
+    null_provenance = null_provenance_payload(
+        labels,
+        null_labels,
+        seed=int(args.seed),
+        label_family_id=plan.active_label_family,
+    )
     materialize_probe_inputs(
         repo_root=repo_root,
         plan=plan,
         labels=labels,
         null_labels=null_labels,
         split_metadata=split_metadata,
+        label_family_manifest=family_manifest,
+        null_provenance=null_provenance,
+        suite_manifest=suite_manifest_payload(),
     )
 
     metrics: list[dict[str, Any]] = []
@@ -208,11 +232,16 @@ def _write_run_outputs(
     metrics: list[dict[str, Any]],
     round_metrics: list[dict[str, Any]],
 ) -> int:
-    decision = _decision_from_metrics(metrics, safety)
     enriched_metrics = enrich_metric_rows(metrics)
     round_metric_rows = enrich_metric_rows(round_metrics)
-    gate_results = gate_results_from_metrics(enriched_metrics, safety)
-    decision_reasons = decision_reasons_from_metrics(enriched_metrics, safety, decision=decision)
+    decision = _decision_from_metrics(enriched_metrics, safety, round_metrics=round_metric_rows)
+    gate_results = gate_results_from_metrics(enriched_metrics, safety, round_metrics=round_metric_rows)
+    decision_reasons = decision_reasons_from_metrics(
+        enriched_metrics,
+        safety,
+        decision=decision,
+        round_metrics=round_metric_rows,
+    )
     metric_quality = metric_quality_from_metrics(enriched_metrics)
     _write_metrics(
         layout,
@@ -236,6 +265,8 @@ def _write_run_outputs(
     status_payload["decision_reasons"] = decision_reasons
     status_payload["gate_results"] = gate_results
     status_payload["metric_quality"] = metric_quality
+    status_payload["round_dynamics"] = round_dynamics_summary(round_metric_rows)
+    status_payload["trajectory_qa"] = trajectory_qa_summary(enriched_metrics, round_metric_rows)
     _write_json(layout.status_path, status_payload)
     if args.json:
         print(
@@ -271,6 +302,7 @@ def _write_metrics(
     gate_results: list[dict[str, Any]],
     metric_quality: dict[str, Any],
 ) -> None:
+    trajectory_qa = trajectory_qa_summary(enriched_metrics, round_metric_rows)
     _write_json(
         layout.metrics_path,
         {
@@ -282,6 +314,8 @@ def _write_metrics(
             "decision_reasons": decision_reasons,
             "gate_results": gate_results,
             "metric_quality": metric_quality,
+            "round_dynamics": round_dynamics_summary(round_metric_rows),
+            "trajectory_qa": trajectory_qa,
         },
     )
     if enriched_metrics:

@@ -136,6 +136,54 @@ def test_configured_plot_quality_rejects_stale_image_only_final_round(tmp_path: 
     assert quality["problems"] == ["sfxi_uncertainty_latest:round_scope_missing_final_round:2"]
 
 
+def test_configured_plot_quality_rejects_missing_round_variant_artifacts(tmp_path: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.review.configured_plots import (
+        _quality_for_configured_plot_entry,
+    )
+
+    media_path = tmp_path / "stale_uncertainty.png"
+    image = Image.new("RGB", (320, 240), "white")
+    draw = ImageDraw.Draw(image)
+    draw.line((20, 220, 300, 20), fill="black", width=3)
+    image.save(media_path)
+    entry = {
+        "expected_final_round": 2,
+        "expected_configured_plot_specs": [
+            {
+                "name": "sfxi_uncertainty_latest",
+                "kind": "sfxi_uncertainty",
+                "enabled": True,
+                "round_selector": "latest",
+                "round_variants": "each",
+            }
+        ],
+        "plots": [
+            {
+                "name": "sfxi_uncertainty_latest",
+                "kind": "sfxi_uncertainty",
+                "status": "written",
+                "rounds": "latest",
+                "media_paths": [str(media_path)],
+                "tidy_csv_paths": [],
+                "metadata": {
+                    "capability": {"round_scope": "single_round", "tidy_available": False},
+                    "tidy_schema": [],
+                },
+            }
+        ],
+    }
+
+    quality = _quality_for_configured_plot_entry(entry)
+
+    assert quality["status"] == "attention"
+    assert quality["problems"] == [
+        "sfxi_uncertainty_latest:configured_plot_missing_scopes:r0,r1,r2",
+        "sfxi_uncertainty_latest:configured_plot_unexpected_scopes:latest",
+    ]
+
+
 def test_configured_plot_quality_requires_tidy_csv_only_when_declared(tmp_path: Path) -> None:
     from PIL import Image, ImageDraw
 
@@ -170,3 +218,37 @@ def test_configured_plot_quality_requires_tidy_csv_only_when_declared(tmp_path: 
 
     assert quality["status"] == "attention"
     assert quality["problems"] == ["score_selected_over_rounds:tidy_csv_missing"]
+
+
+def test_configured_plot_quality_rejects_stale_manifest_freshness(tmp_path: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.review.configured_plots import (
+        _quality_for_configured_plot_entry,
+    )
+
+    media_path = tmp_path / "score.png"
+    image = Image.new("RGB", (320, 240), "white")
+    draw = ImageDraw.Draw(image)
+    draw.line((20, 220, 300, 20), fill="black", width=3)
+    image.save(media_path)
+    entry = {
+        "expected_final_round": 2,
+        "plots": [
+            {
+                "name": "score_selected_over_rounds",
+                "kind": "metric_over_rounds",
+                "status": "written",
+                "freshness": {"status": "stale"},
+                "rounds": "all",
+                "media_paths": [str(media_path)],
+                "tidy_csv_paths": [],
+                "metadata": {"capability": {"tidy_available": False}, "tidy_schema": []},
+            }
+        ],
+    }
+
+    quality = _quality_for_configured_plot_entry(entry)
+
+    assert quality["status"] == "attention"
+    assert quality["problems"] == ["score_selected_over_rounds:freshness_not_fresh:stale"]

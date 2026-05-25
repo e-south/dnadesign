@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .constants import DEFAULT_INITIAL_LABELS, DEFAULT_SEED, DEFAULT_TOP_K, RUN_STAGES
+from .constants import DEFAULT_INITIAL_LABELS, DEFAULT_SEED, DEFAULT_SUITE_ID, DEFAULT_TOP_K, RUN_STAGES
 from .paths import _repo_root_from, _resolve_repo_path
 from .status import _format_status_text, audit_run_root
 
@@ -22,7 +22,7 @@ def _status_probe(args: argparse.Namespace) -> int:
         print(json.dumps(audit.to_dict(), indent=2, sort_keys=True))
     else:
         print(_format_status_text(audit))
-    return 1 if audit.status in {"missing", "attention"} else 0
+    return 0 if audit.status == "ok" else 1
 
 
 def _report_probe(args: argparse.Namespace) -> int:
@@ -82,6 +82,24 @@ def _plot_probe(args: argparse.Namespace) -> int:
     return 1 if payload["any_fail"] else 0
 
 
+def _suite_probe(args: argparse.Namespace) -> int:
+    from .suite_review import build_probe_suite_review
+
+    repo_root = _repo_root_from(Path.cwd())
+    run_roots = [_resolve_repo_path(repo_root, Path(root)) for root in args.run_roots]
+    out_dir = _resolve_repo_path(repo_root, Path(args.out_dir)) if args.out_dir else None
+    payload = build_probe_suite_review(run_roots, out_dir=out_dir)
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("opal_densegen_axis_probe_v0 suite review")
+        print(f"status={payload['status']}")
+        if payload.get("artifacts"):
+            print(f"review={payload['artifacts']['suite_review_markdown']}")
+            print(f"manifest={payload['artifacts']['suite_review']}")
+    return 0 if payload["status"] == "ok" else 1
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the stress ethanol/cipro DenseGen axis OPAL probe.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -111,6 +129,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="OPAL scoring batch size for scratch campaigns. Lower this on memory-constrained hosts.",
     )
     run.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    run.add_argument(
+        "--suite",
+        default=DEFAULT_SUITE_ID,
+        help="Study-owned probe suite manifest id recorded with generated scratch artifacts.",
+    )
     run.add_argument(
         "--rounds",
         type=int,
@@ -157,6 +180,10 @@ def _build_parser() -> argparse.ArgumentParser:
     plot.add_argument("--run-root", required=True)
     plot.add_argument("--round", default="all", help="Round selector passed to OPAL plot generation.")
     plot.add_argument("--json", action="store_true", help="Emit machine-readable JSON plot summary.")
+    suite = subparsers.add_parser("suite", help="Verify and summarize a complete three-seed probe suite.")
+    suite.add_argument("--run-root", dest="run_roots", action="append", required=True)
+    suite.add_argument("--out-dir", default=None, help="Optional directory for suite_review.json and suite_review.md.")
+    suite.add_argument("--json", action="store_true", help="Emit machine-readable JSON suite summary.")
     return parser
 
 
@@ -176,6 +203,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _progress_probe(args)
         if args.command == "plot":
             return _plot_probe(args)
+        if args.command == "suite":
+            return _suite_probe(args)
     except (ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")
     parser.error(f"unsupported command: {args.command}")

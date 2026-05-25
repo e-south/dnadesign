@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from dnadesign.opal import build_campaign_progress, render_campaign_progress_text
 
@@ -15,14 +16,17 @@ def summarize_probe_progress(run_root: Path, *, include_opal_progress: bool = Fa
     layout = ProbeArtifactLayout(Path(run_root).resolve())
     if not layout.run_root.exists():
         raise RuntimeError(f"run root not found: {layout.run_root}")
+    expected_round_count = _planned_round_count(layout)
     campaigns = [
-        _campaign_progress(path, include_opal_progress=include_opal_progress) for path in _campaign_config_paths(layout)
+        _campaign_progress(path, include_opal_progress=include_opal_progress, expected_round_count=expected_round_count)
+        for path in _campaign_config_paths(layout)
     ]
     return {
         "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.progress.v1",
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "run_root": str(layout.run_root),
         "detail": "full" if include_opal_progress else "compact",
+        "expected_round_count": expected_round_count,
         "campaign_count": len(campaigns),
         "status": "no_campaigns" if not campaigns else _aggregate_status(campaigns),
         "campaigns": campaigns,
@@ -61,15 +65,26 @@ def _campaign_config_paths(layout: ProbeArtifactLayout) -> list[Path]:
     return sorted(layout.scratch_campaigns_dir.glob("*/configs/campaign.yaml"))
 
 
-def _campaign_progress(config_path: Path, *, include_opal_progress: bool) -> dict[str, Any]:
+def _campaign_progress(
+    config_path: Path,
+    *,
+    include_opal_progress: bool,
+    expected_round_count: int | None,
+) -> dict[str, Any]:
     opal_progress = build_campaign_progress(config_path, round_selector="all")
     rounds = list(opal_progress.get("rounds") or [])
     latest = rounds[-1] if rounds else {}
+    round_count = int(opal_progress.get("round_count") or 0)
     payload = {
         "run_key": config_path.parents[1].name,
         "config_path": str(config_path),
-        "status": opal_progress.get("status"),
-        "round_count": opal_progress.get("round_count"),
+        "status": _scoped_campaign_status(
+            status=str(opal_progress.get("status") or ""),
+            round_count=round_count,
+            expected_round_count=expected_round_count,
+        ),
+        "round_count": round_count,
+        "expected_round_count": expected_round_count,
         "round_index": latest.get("round_index"),
         "last_stage": latest.get("last_stage"),
         "elapsed_sec": latest.get("elapsed_sec"),
@@ -85,6 +100,34 @@ def _campaign_progress(config_path: Path, *, include_opal_progress: bool) -> dic
 
 def _aggregate_status(campaigns: list[dict[str, Any]]) -> str:
     if all(campaign.get("status") == "done" for campaign in campaigns):
+        return "done"
+    return "running_or_incomplete"
+
+
+def _planned_round_count(layout: ProbeArtifactLayout) -> int | None:
+    if not layout.probe_plan_path.exists():
+        return None
+    try:
+        payload = json.loads(layout.probe_plan_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    plan = payload.get("plan")
+    if not isinstance(plan, Mapping):
+        return None
+    rounds = plan.get("rounds")
+    try:
+        value = int(rounds)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _scoped_campaign_status(*, status: str, round_count: int, expected_round_count: int | None) -> str:
+    if status == "not_started" or expected_round_count is None:
+        return status
+    if status == "done" and round_count >= expected_round_count:
         return "done"
     return "running_or_incomplete"
 

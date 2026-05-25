@@ -10,6 +10,7 @@ import pandas as pd
 from .artifacts import ProbePlan
 from .axis_oracle import build_train_ids
 from .constants import AXIS_CLASS_TO_LOGIC4, ORACLE_ID, QUALITY_FLAGS, STATE_ORDER
+from .label_families import label_family_manifest
 
 
 def _quality_counts(labels: pd.DataFrame) -> dict[str, int]:
@@ -30,6 +31,7 @@ def _source_summary(labels: pd.DataFrame, *, run_root: Path, x_surface: Mapping[
         "quality_ok_fraction": float(ok / total) if total else 0.0,
         "quality_counts": counts,
         "axis_class_counts": {str(key): int(value) for key, value in class_counts.items()},
+        "label_families": label_family_manifest(labels),
         "run_root": str(run_root),
         "oracle_id": ORACLE_ID,
         "state_order": list(STATE_ORDER),
@@ -46,11 +48,15 @@ def _format_plan_text(
         "opal_densegen_axis_probe_v0",
         f"mode: {'apply' if plan.apply else 'dry-run'}",
         f"run_root: {plan.run_root}",
+        f"suite_id: {plan.suite_id}",
         f"gate: {plan.gate or 'all'}",
         f"stop_after: {plan.stop_after}",
         f"rounds: {plan.rounds}",
         f"initial_label_count: {plan.initial_label_count}",
         f"selection_k: {plan.selection_k}",
+        f"suite_seeds: {', '.join(map(str, plan.suite_seeds))}",
+        f"active_label_family: {plan.active_label_family}",
+        f"passive_label_families: {', '.join(plan.passive_label_families)}",
         f"max_x_matrix_gib: {plan.max_x_matrix_gib or 'opal_default'}",
         f"score_batch_size: {plan.score_batch_size or 'opal_default'}",
         f"planned_runs: {len(plan.runs)}",

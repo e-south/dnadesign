@@ -59,6 +59,49 @@ def test_audit_run_root_reports_pending_source_gate(tmp_path: Path) -> None:
     assert audit.problems == ()
 
 
+def test_audit_run_root_rejects_materialized_scored_plan_without_metrics(tmp_path: Path) -> None:
+    from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.cli import main as probe_main
+
+    run_root = tmp_path / "probe"
+    (run_root / "labels").mkdir(parents=True)
+    (run_root / "splits").mkdir(parents=True)
+    label_frame = pd.DataFrame(
+        {
+            "oracle_id": [ORACLE_ID],
+            "id": ["id-1"],
+            "sequence": ["AAAA"],
+            "axis_class": ["background_only"],
+            "quality_flag": ["ok"],
+            "vec8": [[0, 0, 0, 0, 0, 0, 0, 0]],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [0.0],
+            "y00_star": [0.0],
+            "y10_star": [0.0],
+            "y01_star": [0.0],
+            "y11_star": [0.0],
+        }
+    )
+    label_frame.to_parquet(run_root / "labels" / "densegen_part_axis_vec8.parquet", index=False)
+    label_frame.assign(oracle_id=NULL_ORACLE_ID).to_parquet(
+        run_root / "labels" / "permuted_densegen_part_axis_vec8.parquet",
+        index=False,
+    )
+    (run_root / "splits" / "split_metadata.json").write_text("{}", encoding="utf-8")
+    (run_root / "probe_plan.json").write_text(
+        json.dumps({"plan": {"planned_runs": 2, "rounds": 12, "gate": "cipro-random", "stop_after": "status"}}),
+        encoding="utf-8",
+    )
+
+    audit = audit_run_root(run_root)
+
+    assert audit.status == "attention"
+    assert "metrics_missing_for_scored_plan" in audit.problems
+    assert "decision_missing_for_scored_plan" in audit.problems
+    assert probe_main(["status", "--run-root", str(run_root), "--json"]) == 1
+
+
 def test_audit_run_root_rejects_corrupt_label_artifacts(tmp_path: Path) -> None:
     run_root = tmp_path / "probe"
     (run_root / "labels").mkdir(parents=True)

@@ -19,6 +19,7 @@ from .constants import (
     SFXI_INTENSITY_COLUMNS,
     SFXI_STATE_COLUMNS,
 )
+from .label_families import densegen_plan_class_from_axis_class, tf_family_columns
 
 
 def _is_missing(value: Any) -> bool:
@@ -162,6 +163,7 @@ def derive_axis_label(row: Mapping[str, Any]) -> AxisLabel:
     logic4 = list(AXIS_CLASS_TO_LOGIC4[axis_class])
     effect4 = list(logic4)
     vec8 = [*logic4, *effect4]
+    densegen_plan_class = densegen_plan_class_from_axis_class(axis_class)
 
     if unsupported_plan:
         flag = "unsupported_plan"
@@ -185,6 +187,7 @@ def derive_axis_label(row: Mapping[str, Any]) -> AxisLabel:
         background_count=background,
         cipro_axis=cipro_axis,
         ethanol_axis=ethanol_axis,
+        densegen_plan_class=densegen_plan_class,
         sigma35_variant=sigma35_variant,
         densegen_plan=plan,
         expected_axis_class_from_plan=expected,
@@ -271,11 +274,19 @@ def build_axis_oracle(candidates: pd.DataFrame, *, densegen_sidecar: pd.DataFram
             "background_count": label.background_count,
             "cipro_axis": label.cipro_axis,
             "ethanol_axis": label.ethanol_axis,
+            "densegen_plan_class": label.densegen_plan_class,
             "sigma35_variant": label.sigma35_variant,
             "densegen__plan": label.densegen_plan,
             "expected_axis_class_from_plan": label.expected_axis_class_from_plan,
             "densegen__sampling_library_hash": record.get("densegen__sampling_library_hash"),
         }
+        row.update(
+            tf_family_columns(
+                lex_a=label.lexA_count,
+                cpx_r=label.cpxR_count,
+                bae_r=label.baeR_count,
+            )
+        )
         if logic is not None and effect is not None:
             for column, value in zip(SFXI_STATE_COLUMNS, logic, strict=True):
                 row[column] = int(value)

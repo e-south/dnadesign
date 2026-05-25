@@ -38,6 +38,7 @@ def test_derive_axis_label_uses_part_detail_not_plan(
     assert label.axis_class == expected_class
     assert label.logic4 == AXIS_CLASS_TO_LOGIC4[expected_class]
     assert label.vec8 == expected_vec8
+    assert label.densegen_plan_class is not None
 
 
 def test_plan_axis_mismatch_is_flagged_without_coercing_label() -> None:
@@ -136,6 +137,10 @@ def test_build_axis_oracle_prefers_sidecar_detail_by_id() -> None:
 
     row_a = labels.set_index("id").loc["a"]
     assert row_a["axis_class"] == "ethanol_only"
+    assert row_a["densegen_plan_class"] == "ethanol"
+    assert row_a["tf_family__cpxR__presence"] == 1
+    assert row_a["tf_family__cpxR__count"] == 1
+    assert row_a["tf_family__lexA__presence"] == 0
     assert row_a["quality_flag"] == "ok"
     assert row_a["sigma35_variant"] == "f"
     assert row_a["densegen__sampling_library_hash"] == "hash-a"

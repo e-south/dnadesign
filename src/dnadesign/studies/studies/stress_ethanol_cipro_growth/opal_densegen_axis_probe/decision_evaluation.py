@@ -124,6 +124,8 @@ def _evaluate_prediction_frame(
         "campaign": run.campaign_key,
         "oracle_id": run.oracle_id,
         "split_id": run.split_id,
+        "seed": run.seed,
+        "label_family_id": run.label_family_id,
         "target_class": run.target_class,
         "train_count": int(len(train_ids)),
         "eval_count": int(len(eval_ids)),
