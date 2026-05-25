@@ -84,11 +84,11 @@ def test_configured_plot_quality_respects_artifact_round_scope_and_optional_tidy
                 "metadata": tidy_metadata,
             },
             {
-                "name": "sfxi_uncertainty_latest",
-                "kind": "sfxi_uncertainty",
+                "name": "single_round_uncertainty_latest",
+                "kind": "uncertainty_over_rounds",
                 "status": "written",
                 "rounds": [2],
-                "media_paths": [_png(tmp_path / "sfxi_uncertainty.png")],
+                "media_paths": [_png(tmp_path / "uncertainty_over_rounds.png")],
                 "tidy_csv_paths": [],
                 "metadata": image_only_metadata,
             },
@@ -116,8 +116,8 @@ def test_configured_plot_quality_rejects_stale_image_only_final_round(tmp_path: 
         "expected_final_round": 2,
         "plots": [
             {
-                "name": "sfxi_uncertainty_latest",
-                "kind": "sfxi_uncertainty",
+                "name": "single_round_uncertainty_latest",
+                "kind": "uncertainty_over_rounds",
                 "status": "written",
                 "rounds": [1],
                 "media_paths": [str(media_path)],
@@ -133,7 +133,7 @@ def test_configured_plot_quality_rejects_stale_image_only_final_round(tmp_path: 
     quality = _quality_for_configured_plot_entry(entry)
 
     assert quality["status"] == "attention"
-    assert quality["problems"] == ["sfxi_uncertainty_latest:round_scope_missing_final_round:2"]
+    assert quality["problems"] == ["single_round_uncertainty_latest:round_scope_missing_final_round:2"]
 
 
 def test_configured_plot_quality_rejects_missing_round_variant_artifacts(tmp_path: Path) -> None:
@@ -152,8 +152,8 @@ def test_configured_plot_quality_rejects_missing_round_variant_artifacts(tmp_pat
         "expected_final_round": 2,
         "expected_configured_plot_specs": [
             {
-                "name": "sfxi_uncertainty_latest",
-                "kind": "sfxi_uncertainty",
+                "name": "single_round_uncertainty_latest",
+                "kind": "uncertainty_over_rounds",
                 "enabled": True,
                 "round_selector": "latest",
                 "round_variants": "each",
@@ -161,8 +161,8 @@ def test_configured_plot_quality_rejects_missing_round_variant_artifacts(tmp_pat
         ],
         "plots": [
             {
-                "name": "sfxi_uncertainty_latest",
-                "kind": "sfxi_uncertainty",
+                "name": "single_round_uncertainty_latest",
+                "kind": "uncertainty_over_rounds",
                 "status": "written",
                 "rounds": "latest",
                 "media_paths": [str(media_path)],
@@ -179,8 +179,8 @@ def test_configured_plot_quality_rejects_missing_round_variant_artifacts(tmp_pat
 
     assert quality["status"] == "attention"
     assert quality["problems"] == [
-        "sfxi_uncertainty_latest:configured_plot_missing_scopes:r0,r1,r2",
-        "sfxi_uncertainty_latest:configured_plot_unexpected_scopes:latest",
+        "single_round_uncertainty_latest:configured_plot_missing_scopes:r0,r1,r2",
+        "single_round_uncertainty_latest:configured_plot_unexpected_scopes:latest",
     ]
 
 

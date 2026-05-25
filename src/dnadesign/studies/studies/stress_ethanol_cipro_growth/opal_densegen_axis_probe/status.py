@@ -7,12 +7,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .artifacts import ProbeArtifactLayout, RunRootAudit
-from .constants import CANDIDATE_RECORDS, SFXI_INTENSITY_COLUMNS, SFXI_STATE_COLUMNS, SHARED_OBSERVED_LABEL_SIDECAR
+from .constants import DENSEGEN_PLAN_LOGIC4_COLUMNS, SHARED_OBSERVED_LABEL_SIDECAR
 from .paths import _repo_root_from, _resolve_repo_path
-from .records_manifest import records_manifest_problems
 from .status_metrics import _metrics_problems
 
-_LABEL_COLUMNS = ("oracle_id", "id", "sequence", "axis_class", "quality_flag", "vec8")
+_LABEL_COLUMNS = ("oracle_id", "id", "sequence", "axis_class", "quality_flag", "logic4")
 _SPLIT_COLUMNS = ("id",)
 _PASS_DECISIONS = {
     "PASS_CIPRO_RANDOM_GATE",
@@ -37,6 +36,8 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
     split_ids = _split_ids_from_metadata(layout) if splits_present else []
     split_records_paths = [layout.split_records_path(split_id) for split_id in split_ids]
     scratch_records_present = bool(split_records_paths) and all(path.exists() for path in split_records_paths)
+    candidate_scope_paths = [layout.split_candidate_scope_path(split_id) for split_id in split_ids]
+    candidate_scope_present = bool(candidate_scope_paths) and all(path.exists() for path in candidate_scope_paths)
     shared_sidecar_present = _resolve_repo_path(repo_root, SHARED_OBSERVED_LABEL_SIDECAR).exists()
     planned_campaign_count = (
         len(list(layout.scratch_campaigns_dir.glob("*"))) if layout.scratch_campaigns_dir.exists() else 0
@@ -59,14 +60,14 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
         problems.extend(
             _parquet_schema_problems(
                 layout.densegen_labels_path,
-                required_columns=(*_LABEL_COLUMNS, *SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS),
+                required_columns=(*_LABEL_COLUMNS, *DENSEGEN_PLAN_LOGIC4_COLUMNS),
                 problem_prefix="densegen_labels",
             )
         )
         problems.extend(
             _parquet_schema_problems(
                 layout.null_labels_path,
-                required_columns=(*_LABEL_COLUMNS, *SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS),
+                required_columns=(*_LABEL_COLUMNS, *DENSEGEN_PLAN_LOGIC4_COLUMNS),
                 problem_prefix="null_labels",
             )
         )
@@ -88,12 +89,14 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
             decision=decision,
         )
     )
-    source_records = _resolve_repo_path(repo_root, CANDIDATE_RECORDS)
     if split_records_paths:
         for path in split_records_paths:
-            problems.extend(records_manifest_problems(path, source_records))
+            if path.exists() and not path.is_symlink():
+                problems.append(f"split_records_{path.parent.name}_not_symlink")
     if planned_campaign_count > 0 and not scratch_records_present:
-        problems.append("scratch_records_missing_for_planned_campaigns")
+        problems.append("scratch_record_symlink_missing_for_planned_campaigns")
+    if planned_campaign_count > 0 and not candidate_scope_present:
+        problems.append("candidate_scope_missing_for_planned_campaigns")
     if not root.exists():
         status = "missing"
     elif problems:
@@ -115,6 +118,7 @@ def audit_run_root(run_root: Path) -> RunRootAudit:
         metrics_present=metrics_present,
         decision_present=decision_present,
         scratch_records_present=scratch_records_present,
+        candidate_scope_present=candidate_scope_present,
         planned_campaign_count=int(planned_campaign_count),
         shared_sidecar_present=shared_sidecar_present,
         problems=tuple(problems),
@@ -215,6 +219,7 @@ def _format_status_text(audit: RunRootAudit) -> str:
         f"metrics_present: {data['metrics_present']}",
         f"decision_present: {data['decision_present']}",
         f"scratch_records_present: {data['scratch_records_present']}",
+        f"candidate_scope_present: {data['candidate_scope_present']}",
         f"planned_campaign_count: {data['planned_campaign_count']}",
         f"shared_sidecar_present: {data['shared_sidecar_present']}",
     ]

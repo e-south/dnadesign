@@ -7,6 +7,7 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from .active_targets import active_target_spec, target_values_for_labels
 from .artifacts import RunSpec
 from .axis_oracle import _ok_labels
 from .constants import AXIS_CLASS_TO_LOGIC4
@@ -110,8 +111,6 @@ def _evaluate_prediction_frame(
     split_metadata: Mapping[str, Any],
     train_ids: set[str],
 ) -> dict[str, Any]:
-    true_labels = label_lookup(positive_labels)
-    oracle_labels = label_lookup(run_labels)
     if "eval_ids" in split_metadata:
         eval_ids = set(map(str, split_metadata["eval_ids"])) - train_ids
     elif run.split_id == "leave_sigma35_variant":
@@ -137,6 +136,18 @@ def _evaluate_prediction_frame(
     validate_prediction_selection_contract(predictions)
 
     frame = predictions.loc[predictions["id"].astype(str).isin(eval_ids)].copy()
+    if run.label_family_id == "tf_family_count":
+        _append_count_selection_metrics(
+            row=row,
+            run=run,
+            frame=frame,
+            positive_labels=positive_labels,
+            run_labels=run_labels,
+        )
+        return row
+
+    true_labels = label_lookup(positive_labels)
+    oracle_labels = label_lookup(run_labels)
     frame["pred_axis_class"] = predicted_axis_classes(frame["pred__y_hat_model"].tolist())
     frame["true_axis_class"] = frame["id"].astype(str).map(true_labels)
     frame["oracle_axis_class"] = frame["id"].astype(str).map(oracle_labels)
@@ -146,6 +157,91 @@ def _evaluate_prediction_frame(
     )
     _append_selection_metrics(row=row, run=run, frame=frame, true_labels=true_labels, oracle_labels=oracle_labels)
     return row
+
+
+def _append_count_selection_metrics(
+    *,
+    row: dict[str, Any],
+    run: RunSpec,
+    frame: pd.DataFrame,
+    positive_labels: pd.DataFrame,
+    run_labels: pd.DataFrame,
+) -> None:
+    selection_k = int(run.selection_k)
+    selected_mask = selected_bool_mask(frame)
+    row["selected_count_in_eval"] = int(selected_mask.sum())
+    row["selection_k"] = selection_k
+    target = active_target_spec(run.label_family_id, run.campaign_key)
+    row["target_channel"] = target.target_channel
+    row["target_description"] = target.target_description
+    if int(row["selected_count_in_eval"]) != selection_k:
+        raise RuntimeError(
+            f"scored run {run.run_key} expected {selection_k} evaluable selected id(s) "
+            f"inside split {run.split_id}, got {row['selected_count_in_eval']}."
+        )
+    selected_ids = top_ids_from_prediction_frame(frame, k=selection_k)
+    if len(selected_ids) != selection_k:
+        raise RuntimeError(
+            f"scored run {run.run_key} could not resolve {selection_k} selected id(s) "
+            f"inside split {run.split_id}, got {len(selected_ids)}."
+        )
+
+    true_values = target_values_for_labels(
+        positive_labels,
+        label_family_id=run.label_family_id,
+        campaign_key=run.campaign_key,
+    )
+    oracle_values = target_values_for_labels(
+        run_labels,
+        label_family_id=run.label_family_id,
+        campaign_key=run.campaign_key,
+    )
+    eval_ids = frame["id"].astype(str).tolist()
+    true_eval = _reindexed_numeric(true_values, eval_ids, label="true target values", run_key=run.run_key)
+    oracle_eval = _reindexed_numeric(oracle_values, eval_ids, label="oracle target values", run_key=run.run_key)
+    selected_true = _reindexed_numeric(
+        true_values, selected_ids, label="selected true target values", run_key=run.run_key
+    )
+    selected_oracle = _reindexed_numeric(
+        oracle_values,
+        selected_ids,
+        label="selected oracle target values",
+        run_key=run.run_key,
+    )
+    true_metrics = _continuous_lift(true_eval, selected_true)
+    oracle_metrics = _continuous_lift(oracle_eval, selected_oracle)
+    row.update(
+        {
+            "selected_ids": selected_ids,
+            "axis4_macro_f1_true": None,
+            "axis4_macro_f1_oracle": None,
+            "selected_target_count_true": true_metrics["selected_nonzero_count"],
+            "selected_target_count_oracle": oracle_metrics["selected_nonzero_count"],
+            "selected_target_count_label_true": f"{true_metrics['selected_nonzero_count']}/{selection_k}",
+            "selected_target_count_label_oracle": f"{oracle_metrics['selected_nonzero_count']}/{selection_k}",
+            "target_class_prevalence_true": true_metrics["eval_nonzero_fraction"],
+            "selected_target_precision_at_k_true": true_metrics["selected_nonzero_fraction"],
+            "target_lift_at_k_true": true_metrics["mean_lift"],
+            "selected_target_binomial_tail_p_true": _binomial_tail_ge(
+                true_metrics["selected_nonzero_count"],
+                selection_k,
+                true_metrics["eval_nonzero_fraction"],
+            ),
+            "target_class_prevalence_oracle": oracle_metrics["eval_nonzero_fraction"],
+            "selected_target_precision_at_k_oracle": oracle_metrics["selected_nonzero_fraction"],
+            "target_lift_at_k_oracle": oracle_metrics["mean_lift"],
+            "selected_target_binomial_tail_p_oracle": _binomial_tail_ge(
+                oracle_metrics["selected_nonzero_count"],
+                selection_k,
+                oracle_metrics["eval_nonzero_fraction"],
+            ),
+            "target_mean_eval_true": true_metrics["eval_mean"],
+            "selected_target_mean_true": true_metrics["selected_mean"],
+            "target_mean_eval_oracle": oracle_metrics["eval_mean"],
+            "selected_target_mean_oracle": oracle_metrics["selected_mean"],
+            "off_target_class_distribution_true": {},
+        }
+    )
 
 
 def _validate_prediction_scope(*, run: RunSpec, predictions: pd.DataFrame, row: dict[str, Any]) -> None:
@@ -230,3 +326,29 @@ def _lift(target_class: str, classes: Sequence[str], selected_classes: Sequence[
     prevalence = float(pd.Series(classes).eq(target_class).mean())
     precision = float(pd.Series(selected_classes).eq(target_class).mean())
     return prevalence, precision, float("nan") if prevalence == 0.0 else precision / prevalence
+
+
+def _reindexed_numeric(series: pd.Series, ids: Sequence[str], *, label: str, run_key: str) -> pd.Series:
+    values = pd.to_numeric(series.reindex(list(map(str, ids))), errors="coerce")
+    if values.isna().any():
+        missing = values.loc[values.isna()].index.astype(str).tolist()
+        preview = ", ".join(missing[:5])
+        suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
+        raise RuntimeError(f"{label} missing for scored run {run_key}: {preview}{suffix}")
+    return values.astype(float)
+
+
+def _continuous_lift(eval_values: pd.Series, selected_values: pd.Series) -> dict[str, Any]:
+    eval_mean = float(eval_values.mean()) if len(eval_values) else float("nan")
+    selected_mean = float(selected_values.mean()) if len(selected_values) else float("nan")
+    selected_nonzero_count = int(selected_values.gt(0.0).sum())
+    eval_nonzero_fraction = float(eval_values.gt(0.0).mean()) if len(eval_values) else float("nan")
+    selected_nonzero_fraction = float(selected_values.gt(0.0).mean()) if len(selected_values) else float("nan")
+    return {
+        "eval_mean": eval_mean,
+        "selected_mean": selected_mean,
+        "selected_nonzero_count": selected_nonzero_count,
+        "eval_nonzero_fraction": eval_nonzero_fraction,
+        "selected_nonzero_fraction": selected_nonzero_fraction,
+        "mean_lift": float("nan") if eval_mean == 0.0 else float(selected_mean / eval_mean),
+    }

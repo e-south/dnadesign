@@ -1,4 +1,4 @@
-"""Study-owned DenseGen axis OPAL probe package."""
+"""Study-owned DenseGen plan-logic OPAL probe package."""
 
 from __future__ import annotations
 
@@ -6,20 +6,20 @@ from pathlib import Path
 from typing import Any
 
 STUDY_ID = "stress_ethanol_cipro_growth"
-ORACLE_ID = "densegen_part_axis_vec8_v0"
-NULL_ORACLE_ID = "permuted_densegen_part_axis_vec8_v0"
+ORACLE_ID = "densegen_plan_logic4_v1"
+NULL_ORACLE_ID = "permuted_densegen_plan_logic4_v1"
 DEFAULT_SEED = 7
 DEFAULT_SUITE_ID = "densegen_motif_qa_k12_s3_v1"
 DEFAULT_SUITE_SEEDS = (7, 17, 29)
 DEFAULT_INITIAL_LABELS = 12
 DEFAULT_TOP_K = 12
 RUN_STAGES = ("materialize", "validate", "init", "ingest", "run", "status")
-ACTIVE_LABEL_FAMILY_ID = "sfxi_axis_vec8"
-PASSIVE_LABEL_FAMILY_IDS = ("tf_family_presence", "tf_family_count", "densegen_plan_class")
+ACTIVE_LABEL_FAMILY_ID = "densegen_plan_logic4"
+ACTIVE_LABEL_FAMILY_IDS = ("densegen_plan_logic4", "tf_family_count")
+PASSIVE_LABEL_FAMILY_IDS = ("tf_family_presence", "densegen_plan_class")
 
 STATE_ORDER = ("baseline_or_no_stress", "ethanol", "ciprofloxacin", "ethanol_plus_ciprofloxacin")
-SFXI_STATE_COLUMNS = ("v00", "v10", "v01", "v11")
-SFXI_INTENSITY_COLUMNS = ("y00_star", "y10_star", "y01_star", "y11_star")
+DENSEGEN_PLAN_LOGIC4_COLUMNS = ("v00", "v10", "v01", "v11")
 
 AXIS_CLASS_TO_LOGIC4: dict[str, list[int]] = {
     "background_only": [0, 0, 0, 0],
@@ -44,21 +44,18 @@ AXIS_CLASS_TO_DENSEGEN_PLAN_CLASS: dict[str, str] = {
 CAMPAIGNS: dict[str, dict[str, Any]] = {
     "cipro": {
         "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml",
-        "base_slug": "stress_eth_cip_cipro_rf_sfxi_topn",
         "target_class": "cipro_only",
-        "target_vec8": [0, 0, 1, 1, 0, 0, 1, 1],
+        "target_logic4": [0, 0, 1, 1],
     },
     "ethanol": {
         "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml",
-        "base_slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
         "target_class": "ethanol_only",
-        "target_vec8": [0, 1, 0, 1, 0, 1, 0, 1],
+        "target_logic4": [0, 1, 0, 1],
     },
     "dual": {
         "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml",
-        "base_slug": "stress_eth_cip_and_rf_sfxi_topn",
         "target_class": "dual_axis_and",
-        "target_vec8": [0, 0, 0, 1, 0, 0, 0, 1],
+        "target_logic4": [0, 0, 0, 1],
     },
 }
 

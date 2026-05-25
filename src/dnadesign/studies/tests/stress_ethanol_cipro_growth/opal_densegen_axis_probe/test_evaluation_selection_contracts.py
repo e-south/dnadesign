@@ -18,7 +18,7 @@ def test_evaluate_run_rejects_less_than_six_evaluable_selected_ids(tmp_path: Pat
         pd.DataFrame(
             {
                 "id": ["eval-1"],
-                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]],
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]],
                 "pred__score_selected": [1.0],
                 "sel__is_selected": [True],
                 "sel__rank_competition": [1],
@@ -40,7 +40,7 @@ def test_evaluate_run_rejects_less_than_six_evaluable_selected_ids(tmp_path: Pat
         target_class="cipro_only",
         workdir=workdir,
         config_path=config_path,
-        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        label_input_path=workdir / "inputs" / "r0" / "labels-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
         selection_k=6,
     )
@@ -62,7 +62,7 @@ def test_evaluate_run_rejects_more_than_six_evaluable_selected_ids(tmp_path: Pat
         pd.DataFrame(
             {
                 "id": eval_ids,
-                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
                 "pred__score_selected": [1.0] * len(eval_ids),
                 "sel__is_selected": [True] * len(eval_ids),
                 "sel__rank_competition": [1] * len(eval_ids),
@@ -84,7 +84,7 @@ def test_evaluate_run_rejects_more_than_six_evaluable_selected_ids(tmp_path: Pat
         target_class="cipro_only",
         workdir=workdir,
         config_path=config_path,
-        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        label_input_path=workdir / "inputs" / "r0" / "labels-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
         selection_k=6,
     )
@@ -105,7 +105,7 @@ def test_evaluate_run_rejects_string_selection_flags(tmp_path: Path) -> None:
         pd.DataFrame(
             {
                 "id": ["eval-1"],
-                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0]],
+                "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]],
                 "pred__score_selected": [0.99],
                 "sel__is_selected": ["False"],
                 "sel__rank_competition": [1],
@@ -127,7 +127,7 @@ def test_evaluate_run_rejects_string_selection_flags(tmp_path: Path) -> None:
         target_class="cipro_only",
         workdir=workdir,
         config_path=config_path,
-        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        label_input_path=workdir / "inputs" / "r0" / "labels-b0.parquet",
         sidecar_path=workdir / "sidecar.parquet",
     )
 

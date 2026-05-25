@@ -45,6 +45,7 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
         "## Coverage",
         "",
         f"- campaigns: `{', '.join(coverage.get('campaigns') or []) or 'none'}`",
+        f"- label families: `{', '.join(coverage.get('label_families') or []) or 'none'}`",
         f"- splits: `{', '.join(coverage.get('splits') or []) or 'none'}`",
         f"- positive/null pairs complete: `{coverage.get('positive_null_pairs_complete')}`",
         f"- omitted scored gates: `{', '.join(coverage.get('omitted_scored_gates') or []) or 'none'}`",
@@ -67,15 +68,19 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     if gate_results:
         lines.extend(
             [
-                "| gate | status | campaign | split | observed | threshold | reason |",
-                "|---|---|---|---|---:|---:|---|",
+                "| gate | status | family | campaign | split | observed | threshold | reason |",
+                "|---|---|---|---|---|---:|---:|---|",
             ]
         )
         for row in gate_results:
             lines.append(
-                "| `{gate}` | `{status}` | `{campaign}` | `{split}` | {observed} | {threshold} | {reason} |".format(
+                (
+                    "| `{gate}` | `{status}` | `{family}` | `{campaign}` | `{split}` | "
+                    "{observed} | {threshold} | {reason} |"
+                ).format(
                     gate=row.get("gate", ""),
                     status=row.get("status", ""),
+                    family=row.get("label_family_id", ""),
                     campaign=row.get("campaign", ""),
                     split=row.get("split_id", ""),
                     observed=_fmt(_gate_observed(row)),
@@ -108,9 +113,9 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     if runs:
         lines.extend(
             [
-                "| run_key | oracle | split | selected target | prevalence | precision@K | "
+                "| run_key | family | oracle | split | selected target | prevalence | precision@K | "
                 "lift | binom p>=k | selected classes |",
-                "|---|---|---|---:|---:|---:|---:|---:|---|",
+                "|---|---|---|---|---:|---:|---:|---:|---:|---|",
             ]
         )
         for row in runs:
@@ -118,10 +123,11 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
             class_text = ", ".join(f"{key}:{value}" for key, value in classes.items())
             lines.append(
                 (
-                    "| `{run_key}` | `{oracle}` | `{split}` | {selected_count} | {prevalence} | "
+                    "| `{run_key}` | `{family}` | `{oracle}` | `{split}` | {selected_count} | {prevalence} | "
                     "{precision} | {lift} | {p_value} | {classes} |"
                 ).format(
                     run_key=row.get("run_key"),
+                    family=row.get("label_family_id", ""),
                     oracle=row.get("oracle_id"),
                     split=row.get("split_id"),
                     selected_count=row.get("selected_target_count_label_true", ""),
@@ -138,14 +144,18 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     if round_rows:
         lines.extend(
             [
-                "| run_key | round | selected target | prevalence | precision@K | lift | binom p>=k |",
-                "|---|---:|---:|---:|---:|---:|---:|",
+                "| run_key | family | round | selected target | prevalence | precision@K | lift | binom p>=k |",
+                "|---|---|---:|---:|---:|---:|---:|---:|",
             ]
         )
         for row in round_rows:
             lines.append(
-                "| `{run_key}` | {round} | {selected_count} | {prevalence} | {precision} | {lift} | {p_value} |".format(
+                (
+                    "| `{run_key}` | `{family}` | {round} | {selected_count} | {prevalence} | "
+                    "{precision} | {lift} | {p_value} |"
+                ).format(
                     run_key=row.get("run_key"),
+                    family=row.get("label_family_id", ""),
                     round=row.get("as_of_round"),
                     selected_count=row.get("selected_target_count_label_true", ""),
                     prevalence=_fmt(row.get("target_class_prevalence_true")),
@@ -189,17 +199,18 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     if trajectory_pairs:
         lines.extend(
             [
-                "| seed | campaign | split | positive AUC | null AUC | AUC delta | final delta | status |",
-                "|---:|---|---|---:|---:|---:|---:|---|",
+                "| seed | family | campaign | split | positive AUC | null AUC | AUC delta | final delta | status |",
+                "|---:|---|---|---|---:|---:|---:|---:|---|",
             ]
         )
         for row in trajectory_pairs:
             lines.append(
                 (
-                    "| {seed} | `{campaign}` | `{split}` | {pos_auc} | {null_auc} | "
+                    "| {seed} | `{family}` | `{campaign}` | `{split}` | {pos_auc} | {null_auc} | "
                     "{auc_delta} | {final_delta} | `{status}` |"
                 ).format(
                     seed="" if row.get("seed") is None else row.get("seed"),
+                    family=row.get("label_family_id", ""),
                     campaign=row.get("campaign"),
                     split=row.get("split_id"),
                     pos_auc=_fmt(row.get("positive_lift_auc")),

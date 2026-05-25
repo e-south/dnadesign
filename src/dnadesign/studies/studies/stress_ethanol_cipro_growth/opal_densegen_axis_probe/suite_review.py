@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from .constants import CAMPAIGNS, DEFAULT_SUITE_ID, DEFAULT_SUITE_SEEDS, ORACLES, SPLITS
+from .constants import ACTIVE_LABEL_FAMILY_IDS, CAMPAIGNS, DEFAULT_SUITE_ID, DEFAULT_SUITE_SEEDS, ORACLES, SPLITS
 
 
 def build_probe_suite_review(
@@ -66,6 +66,7 @@ def _root_summary(root: Path) -> dict[str, Any]:
     review = _read_json(root / "reports" / "review_manifest.json")
     metrics = _read_json(root / "reports" / "metrics.json")
     plan = _read_json(root / "probe_plan.json")
+    plan_payload = plan.get("plan") if isinstance(plan.get("plan"), Mapping) else {}
     runs = metrics.get("runs") if isinstance(metrics.get("runs"), list) else []
     rounds = metrics.get("rounds") if isinstance(metrics.get("rounds"), list) else []
     seed = _seed_from_metrics(runs) or _seed_from_plan(plan)
@@ -84,8 +85,8 @@ def _root_summary(root: Path) -> dict[str, Any]:
         "problems": list(status.get("problems") or []) + list(review.get("problems") or []),
         "metrics_run_count": len(runs),
         "round_metric_count": len(rounds),
-        "expected_run_count": len(CAMPAIGNS) * len(ORACLES) * len(SPLITS),
-        "expected_round_metric_count": len(CAMPAIGNS) * len(ORACLES) * len(SPLITS) * 12,
+        "expected_run_count": _expected_run_count(plan_payload),
+        "expected_round_metric_count": _expected_run_count(plan_payload) * _expected_round_count(plan_payload),
         "final_rounds": sorted(
             {
                 int(row.get("as_of_round"))
@@ -134,6 +135,29 @@ def _root_completion_problems(row: Mapping[str, Any]) -> list[str]:
     return problems
 
 
+def _expected_run_count(plan: Mapping[str, Any]) -> int:
+    planned_runs = _positive_int(plan.get("planned_runs"))
+    if planned_runs is not None:
+        return planned_runs
+    active_families = plan.get("active_label_families")
+    family_count = (
+        len(active_families) if isinstance(active_families, list) and active_families else len(ACTIVE_LABEL_FAMILY_IDS)
+    )
+    return family_count * len(CAMPAIGNS) * len(ORACLES) * len(SPLITS)
+
+
+def _expected_round_count(plan: Mapping[str, Any]) -> int:
+    return _positive_int(plan.get("rounds")) or 12
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        integer = int(value)
+    except (TypeError, ValueError):
+        return None
+    return integer if integer > 0 else None
+
+
 def _trajectory_summary(pairs: list[Mapping[str, Any]]) -> dict[str, Any]:
     deltas = [float(pair["paired_auc_delta"]) for pair in pairs if pair.get("paired_auc_delta") is not None]
     final_deltas = [
@@ -175,6 +199,7 @@ def _null_attention_rows(*, seed: int | None, rows: list[Any]) -> list[dict[str,
                     "seed": seed,
                     "run_key": row.get("run_key"),
                     "campaign": row.get("campaign"),
+                    "label_family_id": row.get("label_family_id"),
                     "split_id": row.get("split_id"),
                     "max_round": row.get("max_round"),
                     "max_lift": row.get("max_lift"),

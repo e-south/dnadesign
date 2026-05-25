@@ -29,10 +29,19 @@ NULL_LIFT_ATTENTION_BASELINE = 1.0
 
 def metric_definitions() -> dict[str, str]:
     return {
-        "selected_target_count": "How many of OPAL's selected K candidates match the run target class.",
+        "selected_target_count": (
+            "For DenseGen plan-logic4, how many selected candidates match the run target class. For TF-count "
+            "probes, how many selected candidates have a nonzero value for the active count objective."
+        ),
         "precision_at_k": "selected_target_count divided by K.",
-        "target_prevalence": "Fraction of evaluable candidates in the current split pool that match the target class.",
-        "lift": "lift = precision@K / target prevalence; values above 1 mean enrichment over random selection.",
+        "target_prevalence": (
+            "For DenseGen plan-logic4, fraction of evaluable candidates in the split pool that match the target "
+            "class. For TF-count probes, fraction with nonzero target count."
+        ),
+        "lift": (
+            "For DenseGen plan-logic4, lift = precision@K / target prevalence. For TF-count probes, lift = "
+            "selected mean count / evaluable-pool mean count. Values above 1 mean enrichment over random selection."
+        ),
         "binomial_tail_p": (
             "Approximate probability of seeing at least the observed selected_target_count under random selection "
             "from a pool with the same target prevalence."
@@ -99,21 +108,30 @@ def _decision_from_metrics(
     if not evaluable:
         return "DEBUG"
 
-    pair_keys = sorted({(str(row.get("campaign")), str(row.get("split_id"))) for row in evaluable})
+    pair_keys = sorted(
+        {
+            (str(row.get("label_family_id") or "unknown"), str(row.get("campaign")), str(row.get("split_id")))
+            for row in evaluable
+        }
+    )
     if not pair_keys:
         return "DEBUG"
-    for campaign, split_id in pair_keys:
+    for label_family_id, campaign, split_id in pair_keys:
         positive = [
             value
             for row in evaluable
-            if row.get("campaign") == campaign and row.get("split_id") == split_id and row.get("oracle_id") == ORACLE_ID
+            if str(row.get("label_family_id") or "unknown") == label_family_id
+            and row.get("campaign") == campaign
+            and row.get("split_id") == split_id
+            and row.get("oracle_id") == ORACLE_ID
             for value in [_finite_metric(row, "target_lift_at_k_true")]
             if value is not None
         ]
         null = [
             value
             for row in evaluable
-            if row.get("campaign") == campaign
+            if str(row.get("label_family_id") or "unknown") == label_family_id
+            and row.get("campaign") == campaign
             and row.get("split_id") == split_id
             and row.get("oracle_id") == NULL_ORACLE_ID
             for value in [_finite_metric(row, "target_lift_at_k_true")]
@@ -200,15 +218,16 @@ def gate_results_from_metrics(
         rows.append({"gate": "H-SCORED", "status": "pending", "reason": "no scored OPAL run metrics"})
         return rows
 
-    by_pair: dict[tuple[str, str], dict[str, Mapping[str, Any]]] = {}
+    by_pair: dict[tuple[str, str, str], dict[str, Mapping[str, Any]]] = {}
     for row in evaluable:
+        label_family_id = str(row.get("label_family_id") or "unknown")
         campaign = str(row.get("campaign") or "")
         split_id = str(row.get("split_id") or "")
         if not campaign or not split_id:
             continue
         oracle_kind = "null" if row.get("oracle_id") == NULL_ORACLE_ID else "positive"
-        by_pair.setdefault((campaign, split_id), {})[oracle_kind] = row
-    for (campaign, split_id), pair in sorted(by_pair.items()):
+        by_pair.setdefault((label_family_id, campaign, split_id), {})[oracle_kind] = row
+    for (label_family_id, campaign, split_id), pair in sorted(by_pair.items()):
         positive = pair.get("positive")
         null = pair.get("null")
         positive_lift = _finite_metric(positive or {}, "target_lift_at_k_true")
@@ -225,6 +244,7 @@ def gate_results_from_metrics(
                     else "pass"
                 ),
                 "campaign": campaign,
+                "label_family_id": label_family_id,
                 "split_id": split_id,
                 "positive_run_key": positive.get("run_key") if positive else None,
                 "null_run_key": null.get("run_key") if null else None,
@@ -252,6 +272,7 @@ def gate_results_from_metrics(
                     else "pass"
                 ),
                 "campaign": campaign,
+                "label_family_id": label_family_id,
                 "split_id": split_id,
                 "positive_run_key": positive.get("run_key") if positive else None,
                 "null_run_key": null.get("run_key") if null else None,
@@ -344,7 +365,11 @@ def _int_or_none(value: Any) -> int | None:
 def _pass_decision_for_coverage(metrics: Sequence[Mapping[str, Any]]) -> str:
     campaigns = {str(row.get("campaign")) for row in metrics}
     splits = {str(row.get("split_id")) for row in metrics}
-    pairs = {(str(row.get("campaign")), str(row.get("split_id"))) for row in metrics}
+    families = {str(row.get("label_family_id") or "unknown") for row in metrics}
+    pairs = {
+        (str(row.get("label_family_id") or "unknown"), str(row.get("campaign")), str(row.get("split_id")))
+        for row in metrics
+    }
     all_campaigns = {"cipro", "ethanol", "dual"}
     if campaigns == {"cipro"} and splits == {"random_id"}:
         return PASS_CIPRO_RANDOM_GATE
@@ -353,7 +378,9 @@ def _pass_decision_for_coverage(metrics: Sequence[Mapping[str, Any]]) -> str:
     if all_campaigns.issubset(campaigns) and splits == {"leave_sigma35_variant"}:
         return PASS_LEAVE_SIGMA35_GATE
     gate_splits = ("random_id", "leave_sigma35_variant")
-    required_pairs = {(campaign, split_id) for campaign in all_campaigns for split_id in gate_splits}
+    required_pairs = {
+        (family, campaign, split_id) for family in families for campaign in all_campaigns for split_id in gate_splits
+    }
     if required_pairs.issubset(pairs):
         return PASS_FULL_MATRIX_GATE
     return PASS_SCOPED_GATE
@@ -404,7 +431,7 @@ def _write_decision(
     }
     for row in metrics:
         oracle_kind = "null" if row.get("oracle_id") == NULL_ORACLE_ID else "positive"
-        key = f"{row.get('campaign')}_{oracle_kind}_{row.get('split_id')}_target_lift"
+        key = f"{row.get('label_family_id')}_{row.get('campaign')}_{oracle_kind}_{row.get('split_id')}_target_lift"
         key_numbers[key] = row.get("target_lift_at_k_true")
     claims_heading = "Claims tracked" if decision == "PENDING" else "Claims tested"
     claim_statuses = _claim_statuses(metrics, decision=decision)

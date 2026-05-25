@@ -1,8 +1,8 @@
-# OPAL DenseGen Axis Probe
+# OPAL DenseGen Plan-Logic Probe
 
-This package owns the study-local scratch probe that checks whether the current OPAL X surface can recover DenseGen part-derived stress-axis grammar. It is organized by contract boundary rather than as a root-level study script.
+This package owns the study-local scratch probe that checks whether the current OPAL X surface can recover DenseGen part-derived plan logic and TF-count structure. It is organized by contract boundary rather than as a root-level study script.
 
-- `axis_oracle.py`: DenseGen metadata parsing and vec8 label construction.
+- `axis_oracle.py`: DenseGen metadata parsing and four-channel plan-logic label construction.
 - `artifacts.py`: run specs, run-root audit DTOs, and artifact-path layout semantics.
 - `label_families.py`: study-owned active/passive synthetic label-family registry.
 - `suite_manifest.py`: K12/S3 suite contract and manifest payload.
@@ -23,7 +23,8 @@ uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_dens
 ```
 
 The default suite is `densegen_motif_qa_k12_s3_v1`: K12, initial labels 12,
-seeds 7/17/29, and 12 planned rounds. A single `run` invocation executes one
+seeds 7/17/29, 12 planned rounds, and active `densegen_plan_logic4` plus
+`tf_family_count` campaign matrices. A single `run` invocation executes one
 seed; repeat with `--seed 17` and `--seed 29` after the seed-7 burn-in is clean.
 
 Use `--rounds N` to run a synthetic multi-round OPAL loop in scratch space.

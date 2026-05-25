@@ -29,20 +29,16 @@ def test_audit_run_root_reports_pending_source_gate(tmp_path: Path) -> None:
             "sequence": ["AAAA"],
             "axis_class": ["background_only"],
             "quality_flag": ["ok"],
-            "vec8": [[0, 0, 0, 0, 0, 0, 0, 0]],
+            "logic4": [[0, 0, 0, 0]],
             "v00": [0.0],
             "v10": [0.0],
             "v01": [0.0],
             "v11": [0.0],
-            "y00_star": [0.0],
-            "y10_star": [0.0],
-            "y01_star": [0.0],
-            "y11_star": [0.0],
         }
     )
-    label_frame.to_parquet(run_root / "labels" / "densegen_part_axis_vec8.parquet", index=False)
+    label_frame.to_parquet(run_root / "labels" / "densegen_plan_logic4.parquet", index=False)
     label_frame.assign(oracle_id=NULL_ORACLE_ID).to_parquet(
-        run_root / "labels" / "permuted_densegen_part_axis_vec8.parquet",
+        run_root / "labels" / "permuted_densegen_plan_logic4.parquet",
         index=False,
     )
     (run_root / "splits" / "split_metadata.json").write_text("{}", encoding="utf-8")
@@ -72,20 +68,16 @@ def test_audit_run_root_rejects_materialized_scored_plan_without_metrics(tmp_pat
             "sequence": ["AAAA"],
             "axis_class": ["background_only"],
             "quality_flag": ["ok"],
-            "vec8": [[0, 0, 0, 0, 0, 0, 0, 0]],
+            "logic4": [[0, 0, 0, 0]],
             "v00": [0.0],
             "v10": [0.0],
             "v01": [0.0],
             "v11": [0.0],
-            "y00_star": [0.0],
-            "y10_star": [0.0],
-            "y01_star": [0.0],
-            "y11_star": [0.0],
         }
     )
-    label_frame.to_parquet(run_root / "labels" / "densegen_part_axis_vec8.parquet", index=False)
+    label_frame.to_parquet(run_root / "labels" / "densegen_plan_logic4.parquet", index=False)
     label_frame.assign(oracle_id=NULL_ORACLE_ID).to_parquet(
-        run_root / "labels" / "permuted_densegen_part_axis_vec8.parquet",
+        run_root / "labels" / "permuted_densegen_plan_logic4.parquet",
         index=False,
     )
     (run_root / "splits" / "split_metadata.json").write_text("{}", encoding="utf-8")
@@ -107,8 +99,8 @@ def test_audit_run_root_rejects_corrupt_label_artifacts(tmp_path: Path) -> None:
     (run_root / "labels").mkdir(parents=True)
     (run_root / "splits").mkdir(parents=True)
     (run_root / "reports").mkdir(parents=True)
-    (run_root / "labels" / "densegen_part_axis_vec8.parquet").write_bytes(b"placeholder")
-    (run_root / "labels" / "permuted_densegen_part_axis_vec8.parquet").write_bytes(b"placeholder")
+    (run_root / "labels" / "densegen_plan_logic4.parquet").write_bytes(b"placeholder")
+    (run_root / "labels" / "permuted_densegen_plan_logic4.parquet").write_bytes(b"placeholder")
     (run_root / "splits" / "split_metadata.json").write_text("{}", encoding="utf-8")
     (run_root / "reports" / "metrics.json").write_text(json.dumps(_valid_metrics_payload()), encoding="utf-8")
     (run_root / "reports" / "decision.md").write_text(
@@ -178,7 +170,7 @@ def test_audit_run_root_rejects_invalid_decision_value(tmp_path: Path) -> None:
     assert "decision_value_invalid" in audit.problems
 
 
-def test_audit_run_root_requires_scratch_records_for_planned_campaigns(tmp_path: Path) -> None:
+def test_audit_run_root_requires_candidate_scope_for_planned_campaigns(tmp_path: Path) -> None:
     run_root = tmp_path / "probe"
     (run_root / "labels").mkdir(parents=True)
     (run_root / "splits").mkdir(parents=True)
@@ -191,20 +183,16 @@ def test_audit_run_root_requires_scratch_records_for_planned_campaigns(tmp_path:
             "sequence": ["AAAA"],
             "axis_class": ["background_only"],
             "quality_flag": ["ok"],
-            "vec8": [[0, 0, 0, 0, 0, 0, 0, 0]],
+            "logic4": [[0, 0, 0, 0]],
             "v00": [0.0],
             "v10": [0.0],
             "v01": [0.0],
             "v11": [0.0],
-            "y00_star": [0.0],
-            "y10_star": [0.0],
-            "y01_star": [0.0],
-            "y11_star": [0.0],
         }
     )
-    label_frame.to_parquet(run_root / "labels" / "densegen_part_axis_vec8.parquet", index=False)
+    label_frame.to_parquet(run_root / "labels" / "densegen_plan_logic4.parquet", index=False)
     label_frame.assign(oracle_id=NULL_ORACLE_ID).to_parquet(
-        run_root / "labels" / "permuted_densegen_part_axis_vec8.parquet",
+        run_root / "labels" / "permuted_densegen_plan_logic4.parquet",
         index=False,
     )
     (run_root / "splits" / "split_metadata.json").write_text("{}", encoding="utf-8")
@@ -217,7 +205,8 @@ def test_audit_run_root_requires_scratch_records_for_planned_campaigns(tmp_path:
     audit = audit_run_root(run_root)
 
     assert audit.status == "attention"
-    assert "scratch_records_missing_for_planned_campaigns" in audit.problems
+    assert "scratch_record_symlink_missing_for_planned_campaigns" in audit.problems
+    assert "candidate_scope_missing_for_planned_campaigns" in audit.problems
 
 
 def test_validate_candidate_x_surface_checks_schema_and_row_count(tmp_path: Path) -> None:

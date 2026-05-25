@@ -81,10 +81,15 @@ def _review_problems(*, audit, review_decision: str | None) -> list[str]:
 
 def _gate_coverage(runs: list[dict[str, Any]]) -> dict[str, Any]:
     campaigns = sorted({str(row.get("campaign")) for row in runs if row.get("campaign")})
+    label_families = sorted({str(row.get("label_family_id")) for row in runs if row.get("label_family_id")})
     splits = sorted({str(row.get("split_id")) for row in runs if row.get("split_id")})
-    pair_counts: dict[tuple[str, str], set[str]] = {}
+    pair_counts: dict[tuple[str, str, str], set[str]] = {}
     for row in runs:
-        key = (str(row.get("campaign")), str(row.get("split_id")))
+        key = (
+            str(row.get("label_family_id") or "unknown"),
+            str(row.get("campaign")),
+            str(row.get("split_id")),
+        )
         pair_counts.setdefault(key, set()).add(str(row.get("oracle_id")))
     positive_null_pairs_complete = all({ORACLE_ID, NULL_ORACLE_ID}.issubset(values) for values in pair_counts.values())
     omitted: list[str] = []
@@ -96,6 +101,7 @@ def _gate_coverage(runs: list[dict[str, Any]]) -> dict[str, Any]:
         omitted.append("leave_sigma35_variant")
     return {
         "campaigns": campaigns,
+        "label_families": label_families,
         "splits": splits,
         "positive_null_pairs_complete": bool(positive_null_pairs_complete) if runs else False,
         "omitted_scored_gates": omitted,

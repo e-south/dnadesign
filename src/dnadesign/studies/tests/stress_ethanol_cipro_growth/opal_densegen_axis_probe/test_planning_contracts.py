@@ -158,7 +158,7 @@ def test_build_plan_stop_after_validate_avoids_scoring_commands(tmp_path: Path) 
     )
 
     rendered = [" ".join(command) for command in plan.commands]
-    assert len(rendered) == 2
+    assert len(rendered) == 4
     assert all("opal validate" in command for command in rendered)
     assert all("opal run" not in command for command in rendered)
 
@@ -176,10 +176,10 @@ def test_build_plan_multi_round_commands_include_followup_ingest_and_run(tmp_pat
 
     rendered = [" ".join(command) for command in plan.commands]
     assert plan.rounds == 3
-    assert len(rendered) == 18
-    assert sum("opal ingest-y" in command for command in rendered) == 6
-    assert sum("opal run" in command for command in rendered) == 6
-    assert any("--round 2" in command and "vec8-b2.parquet" in command for command in rendered)
+    assert len(rendered) == 36
+    assert sum("opal ingest-y" in command for command in rendered) == 12
+    assert sum("opal run" in command for command in rendered) == 12
+    assert any("--round 2" in command and "labels-b2.parquet" in command for command in rendered)
 
 
 def test_build_plan_separates_initial_labels_from_selection_k(tmp_path: Path) -> None:
@@ -204,8 +204,42 @@ def test_build_plan_records_k12_suite_contract_by_default(tmp_path: Path) -> Non
     assert plan.suite_id == "densegen_motif_qa_k12_s3_v1"
     assert plan.suite_seeds == (7, 17, 29)
     assert plan.selection_k == 12
-    assert plan.active_label_family == "sfxi_axis_vec8"
-    assert plan.passive_label_families == ("tf_family_presence", "tf_family_count", "densegen_plan_class")
+    assert plan.active_label_family == "densegen_plan_logic4"
+    assert plan.active_label_families == ("densegen_plan_logic4", "tf_family_count")
+    assert plan.passive_label_families == ("tf_family_presence", "densegen_plan_class")
+
+
+def test_build_plan_all_gate_prepares_plan_logic4_and_tf_count_matrices(tmp_path: Path) -> None:
+    plan = build_plan(
+        run_root=tmp_path / "probe",
+        initial_label_count=12,
+        seed=7,
+        gate="all",
+        splits=("random_id", "leave_sigma35_variant"),
+        stop_after="validate",
+    )
+
+    assert len(plan.runs) == 24
+    assert {run.label_family_id for run in plan.runs} == {"densegen_plan_logic4", "tf_family_count"}
+    assert sum(run.label_family_id == "densegen_plan_logic4" for run in plan.runs) == 12
+    assert sum(run.label_family_id == "tf_family_count" for run in plan.runs) == 12
+    assert any(run.run_key == "tf_count_cipro_positive_random_id" for run in plan.runs)
+    assert any(run.run_key == "plan_logic4_cipro_positive_random_id" for run in plan.runs)
+
+
+def test_build_plan_can_scope_active_label_families_for_burn_in(tmp_path: Path) -> None:
+    plan = build_plan(
+        run_root=tmp_path / "probe",
+        initial_label_count=12,
+        seed=7,
+        gate="all",
+        splits=("random_id", "leave_sigma35_variant"),
+        active_label_families=("densegen_plan_logic4",),
+        stop_after="validate",
+    )
+
+    assert len(plan.runs) == 12
+    assert plan.active_label_families == ("densegen_plan_logic4",)
 
 
 def test_build_plan_rejects_unknown_stop_stage(tmp_path: Path) -> None:

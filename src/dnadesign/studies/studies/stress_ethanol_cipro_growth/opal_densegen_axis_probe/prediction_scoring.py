@@ -79,14 +79,14 @@ def top_ids_from_prediction_frame(frame: pd.DataFrame, *, k: int) -> list[str]:
 
 def predicted_axis_classes(values: Sequence[Any]) -> list[str]:
     vectors = [np.asarray(value, dtype=float).ravel() for value in values]
-    bad_dims = sorted({int(vector.size) for vector in vectors if vector.size != 8})
+    bad_dims = sorted({int(vector.size) for vector in vectors if vector.size != 4})
     if bad_dims:
-        raise RuntimeError(f"OPAL prediction pred__y_hat_model must be vec8, got dimension(s): {bad_dims}")
+        raise RuntimeError(f"OPAL prediction pred__y_hat_model must be logic4, got dimension(s): {bad_dims}")
     if not vectors:
         return []
     matrix = np.vstack(vectors)
     if not np.isfinite(matrix).all():
         raise RuntimeError("OPAL prediction pred__y_hat_model contains non-finite values")
-    distances = np.linalg.norm(matrix[:, None, :4] - _AXIS_LOGIC4_MATRIX[None, :, :], axis=2)
+    distances = np.linalg.norm(matrix[:, None, :] - _AXIS_LOGIC4_MATRIX[None, :, :], axis=2)
     best = np.argmin(distances, axis=1)
     return [_AXIS_CLASS_NAMES[int(index)] for index in best]

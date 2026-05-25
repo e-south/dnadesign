@@ -29,14 +29,14 @@ def test_label_family_manifest_records_active_and_passive_readouts() -> None:
 
     require_label_family_columns(
         labels,
-        ["sfxi_axis_vec8", "tf_family_presence", "tf_family_count", "densegen_plan_class"],
+        ["densegen_plan_logic4", "tf_family_presence", "tf_family_count", "densegen_plan_class"],
     )
     manifest = label_family_manifest(labels)
 
-    assert manifest["active_label_family"] == "sfxi_axis_vec8"
+    assert manifest["active_label_family"] == "densegen_plan_logic4"
+    assert manifest["active_label_families"] == ["densegen_plan_logic4", "tf_family_count"]
     assert manifest["passive_label_families"] == [
         "tf_family_presence",
-        "tf_family_count",
         "densegen_plan_class",
     ]
     assert manifest["summaries"]["tf_family_presence"]["column_sums"]["tf_family__lexA__presence"] == 1
@@ -49,9 +49,7 @@ def test_null_provenance_records_seed_universe_and_balance() -> None:
     labels = pd.DataFrame(
         {
             "id": [f"id-{idx}" for idx in range(8)],
-            "vec8": [
-                [*AXIS_CLASS_TO_LOGIC4[axis_class], *AXIS_CLASS_TO_LOGIC4[axis_class]] for axis_class in axis_classes
-            ],
+            "logic4": [AXIS_CLASS_TO_LOGIC4[axis_class] for axis_class in axis_classes],
             "axis_class": axis_classes,
             "quality_flag": ["ok"] * 8,
         }
@@ -74,10 +72,10 @@ def test_default_suite_manifest_is_k12_three_seed_and_study_owned() -> None:
     assert manifest["selection_k"] == 12
     assert manifest["initial_label_count"] == 12
     assert manifest["seeds"] == [7, 17, 29]
-    assert manifest["active_label_family"] == "sfxi_axis_vec8"
+    assert manifest["active_label_family"] == "densegen_plan_logic4"
+    assert manifest["active_label_families"] == ["densegen_plan_logic4", "tf_family_count"]
     assert manifest["passive_label_families"] == [
         "tf_family_presence",
-        "tf_family_count",
         "densegen_plan_class",
     ]
     assert "OPAL notebooks" in manifest["notebook_boundary"]

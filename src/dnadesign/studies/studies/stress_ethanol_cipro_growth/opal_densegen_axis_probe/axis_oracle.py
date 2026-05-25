@@ -13,13 +13,18 @@ from .artifacts import AxisLabel
 from .constants import (
     AXIS_CLASS_TO_LOGIC4,
     DEFAULT_SEED,
+    DENSEGEN_PLAN_LOGIC4_COLUMNS,
     NULL_ORACLE_ID,
     ORACLE_ID,
     PLAN_TO_AXIS_CLASS,
-    SFXI_INTENSITY_COLUMNS,
-    SFXI_STATE_COLUMNS,
 )
-from .label_families import densegen_plan_class_from_axis_class, tf_family_columns
+from .label_families import (
+    DENSEGEN_PLAN_CLASS_COLUMN,
+    TF_FAMILY_COUNT_COLUMNS,
+    TF_FAMILY_PRESENCE_COLUMNS,
+    densegen_plan_class_from_axis_class,
+    tf_family_columns,
+)
 
 
 def _is_missing(value: Any) -> bool:
@@ -142,8 +147,6 @@ def derive_axis_label(row: Mapping[str, Any]) -> AxisLabel:
             id=candidate_id,
             axis_class=None,
             logic4=None,
-            effect4=None,
-            vec8=None,
             quality_flag=flag,
             sigma35_variant=sigma35_variant,
             densegen_plan=plan,
@@ -161,8 +164,6 @@ def derive_axis_label(row: Mapping[str, Any]) -> AxisLabel:
     else:
         axis_class = "background_only"
     logic4 = list(AXIS_CLASS_TO_LOGIC4[axis_class])
-    effect4 = list(logic4)
-    vec8 = [*logic4, *effect4]
     densegen_plan_class = densegen_plan_class_from_axis_class(axis_class)
 
     if unsupported_plan:
@@ -178,8 +179,6 @@ def derive_axis_label(row: Mapping[str, Any]) -> AxisLabel:
         id=candidate_id,
         axis_class=axis_class,
         logic4=logic4,
-        effect4=effect4,
-        vec8=vec8,
         quality_flag=flag,
         lexA_count=lex_a,
         cpxR_count=cpx_r,
@@ -258,15 +257,12 @@ def build_axis_oracle(candidates: pd.DataFrame, *, densegen_sidecar: pd.DataFram
     for record in frame.to_dict(orient="records"):
         label = derive_axis_label(record)
         logic = label.logic4
-        effect = label.effect4
         row = {
             "oracle_id": ORACLE_ID,
             "id": label.id,
             "sequence": record.get("sequence"),
             "axis_class": label.axis_class,
             "logic4": logic,
-            "effect4": effect,
-            "vec8": label.vec8,
             "quality_flag": label.quality_flag,
             "lexA_count": label.lexA_count,
             "cpxR_count": label.cpxR_count,
@@ -287,16 +283,12 @@ def build_axis_oracle(candidates: pd.DataFrame, *, densegen_sidecar: pd.DataFram
                 bae_r=label.baeR_count,
             )
         )
-        if logic is not None and effect is not None:
-            for column, value in zip(SFXI_STATE_COLUMNS, logic, strict=True):
+        if logic is not None:
+            for column, value in zip(DENSEGEN_PLAN_LOGIC4_COLUMNS, logic, strict=True):
                 row[column] = int(value)
-            for column, value in zip(SFXI_INTENSITY_COLUMNS, effect, strict=True):
-                row[column] = float(value)
-            row["intensity_log2_offset_delta"] = 0.0
         else:
-            for column in (*SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS):
+            for column in DENSEGEN_PLAN_LOGIC4_COLUMNS:
                 row[column] = np.nan
-            row["intensity_log2_offset_delta"] = np.nan
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -318,8 +310,8 @@ def class_from_logic4(logic4: Sequence[float]) -> str:
 
 
 def make_permuted_labels(labels: pd.DataFrame, *, seed: int = DEFAULT_SEED) -> pd.DataFrame:
-    if "vec8" not in labels.columns or "id" not in labels.columns:
-        raise ValueError("labels must include id and vec8")
+    if "logic4" not in labels.columns or "id" not in labels.columns:
+        raise ValueError("labels must include id and logic4")
     rng = np.random.default_rng(int(seed))
     out = labels.copy()
     permutation_mask = (
@@ -333,29 +325,48 @@ def make_permuted_labels(labels: pd.DataFrame, *, seed: int = DEFAULT_SEED) -> p
     if n_permuted > 1 and np.array_equal(order, np.arange(n_permuted)):
         order = np.roll(order, 1)
 
-    original_vec8 = out["vec8"].tolist()
+    original_logic4 = out["logic4"].tolist()
     original_class = out["axis_class"].tolist() if "axis_class" in out.columns else [None] * int(len(out))
-    permuted_vec8 = list(original_vec8)
-    for dest_position, source_order_position in zip(permutation_positions, order, strict=True):
-        source_position = int(permutation_positions[int(source_order_position)])
-        permuted_vec8[int(dest_position)] = original_vec8[source_position]
+    source_positions_by_dest = {
+        int(dest_position): int(permutation_positions[int(source_order_position)])
+        for dest_position, source_order_position in zip(permutation_positions, order, strict=True)
+    }
+    permuted_logic4 = _permuted_column_values(original_logic4, source_positions_by_dest)
     out["oracle_id"] = NULL_ORACLE_ID
-    out["true_vec8"] = original_vec8
+    out["true_logic4"] = original_logic4
     out["true_axis_class"] = original_class
-    out["vec8"] = permuted_vec8
+    out["logic4"] = permuted_logic4
     out["axis_class"] = [
-        class_from_logic4(vec[:4]) if isinstance(vec, (list, tuple, np.ndarray)) and len(vec) >= 4 else None
-        for vec in permuted_vec8
+        class_from_logic4(vec) if isinstance(vec, (list, tuple, np.ndarray)) and len(vec) == 4 else None
+        for vec in permuted_logic4
     ]
-    for column, idx in zip(SFXI_STATE_COLUMNS, range(4), strict=True):
+    for column, idx in zip(DENSEGEN_PLAN_LOGIC4_COLUMNS, range(4), strict=True):
         out[column] = [
-            float(vec[idx]) if isinstance(vec, (list, tuple, np.ndarray)) else np.nan for vec in permuted_vec8
+            float(vec[idx]) if isinstance(vec, (list, tuple, np.ndarray)) else np.nan for vec in permuted_logic4
         ]
-    for column, idx in zip(SFXI_INTENSITY_COLUMNS, range(4, 8), strict=True):
-        out[column] = [
-            float(vec[idx]) if isinstance(vec, (list, tuple, np.ndarray)) else np.nan for vec in permuted_vec8
-        ]
+    for column in _joint_permutation_columns(out):
+        original_values = out[column].tolist()
+        out[f"true_{column}"] = original_values
+        out[column] = _permuted_column_values(original_values, source_positions_by_dest)
     out["permutation_seed"] = int(seed)
+    return out
+
+
+def _joint_permutation_columns(labels: pd.DataFrame) -> list[str]:
+    candidates = [
+        *TF_FAMILY_COUNT_COLUMNS,
+        *TF_FAMILY_PRESENCE_COLUMNS,
+        DENSEGEN_PLAN_CLASS_COLUMN,
+        "densegen__plan",
+        "expected_axis_class_from_plan",
+    ]
+    return [column for column in candidates if column in labels.columns]
+
+
+def _permuted_column_values(values: Sequence[Any], source_positions_by_dest: Mapping[int, int]) -> list[Any]:
+    out = list(values)
+    for dest_position, source_position in source_positions_by_dest.items():
+        out[int(dest_position)] = values[int(source_position)]
     return out
 
 

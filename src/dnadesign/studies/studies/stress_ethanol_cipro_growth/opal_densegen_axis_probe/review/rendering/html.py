@@ -61,6 +61,7 @@ def render_probe_review_html(
         metric_rows.append(
             "<tr>"
             f"<td><code>{_e(row.get('run_key'))}</code></td>"
+            f"<td>{_e(row.get('label_family_id'))}</td>"
             f"<td>{_e(row.get('oracle_id'))}</td>"
             f"<td>{_e(row.get('split_id'))}</td>"
             f"<td>{_e(row.get('selected_target_count_label_true'))}</td>"
@@ -76,6 +77,7 @@ def render_probe_review_html(
         round_rows.append(
             "<tr>"
             f"<td><code>{_e(row.get('run_key'))}</code></td>"
+            f"<td>{_e(row.get('label_family_id'))}</td>"
             f"<td>{_e(row.get('as_of_round'))}</td>"
             f"<td>{_e(row.get('selected_target_count_label_true'))}</td>"
             f"<td>{_e(_fmt(row.get('target_class_prevalence_true')))}</td>"
@@ -98,6 +100,7 @@ def render_probe_review_html(
             "<tr>"
             f"<td><code>{_e(row.get('gate'))}</code></td>"
             f"<td><code>{_e(row.get('status'))}</code></td>"
+            f"<td>{_e(row.get('label_family_id', ''))}</td>"
             f"<td>{_e(row.get('campaign', ''))}</td>"
             f"<td>{_e(row.get('split_id', ''))}</td>"
             f"<td>{_e(_fmt(_gate_observed(row)))}</td>"
@@ -147,12 +150,9 @@ def render_probe_review_html(
             f'<div class="plot-thumb-grid">{"".join(plot_thumbs)}</div>'
             "</article>"
         )
-    plot_index_text = (
-        f"{plot_quality.get('campaigns_with_plot_index', 0)} / {plot_quality.get('campaigns_expected', 0)}"
-    )
-    configured_plot_cards_html = (
-        "".join(configured_plot_cards) if configured_plot_cards else "<p>No configured OPAL plot indexes found.</p>"
-    )
+    plot_index_text = f"{plot_quality.get('campaigns_with_plot_index', 0)} / "
+    plot_index_text += f"{plot_quality.get('campaigns_expected', 0)}"
+    configured_plot_cards_html = "".join(configured_plot_cards) or "<p>No configured OPAL plot indexes found.</p>"
     configured_plot_next_step_html = ""
     if next_steps.get("configured_plot_refresh_command"):
         configured_plot_next_step_html = (
@@ -160,9 +160,7 @@ def render_probe_review_html(
             f"<code>{_e(next_steps.get('configured_plot_refresh_command'))}</code>, then rerun "
             f"<code>{_e(next_steps.get('rerun_report_command'))}</code>.</p>"
         )
-    round_rows_html = (
-        "".join(round_rows) if round_rows else '<tr><td colspan="7">No round-level metrics recorded.</td></tr>'
-    )
+    round_rows_html = "".join(round_rows) or '<tr><td colspan="8">No round-level metrics recorded.</td></tr>'
     round_dynamics_rows = []
     for row in round_dynamics_payload:
         status = (
@@ -175,6 +173,7 @@ def render_probe_review_html(
         round_dynamics_rows.append(
             "<tr>"
             f"<td><code>{_e(row.get('run_key'))}</code></td>"
+            f"<td>{_e(row.get('label_family_id'))}</td>"
             f"<td>{_e(row.get('oracle_id'))}</td>"
             f"<td>{_e(_fmt(row.get('first_lift')))}</td>"
             f"<td>{_e(_fmt(row.get('final_lift')))}</td>"
@@ -186,13 +185,14 @@ def render_probe_review_html(
     round_dynamics_html = (
         "".join(round_dynamics_rows)
         if round_dynamics_rows
-        else '<tr><td colspan="7">No round-dynamics summary recorded.</td></tr>'
+        else '<tr><td colspan="8">No round-dynamics summary recorded.</td></tr>'
     )
     trajectory_rows = []
     for row in trajectory_pairs or []:
         trajectory_rows.append(
             "<tr>"
             f"<td>{_e(row.get('seed', ''))}</td>"
+            f"<td>{_e(row.get('label_family_id', ''))}</td>"
             f"<td>{_e(row.get('campaign'))}</td>"
             f"<td>{_e(row.get('split_id'))}</td>"
             f"<td>{_e(_fmt(row.get('positive_lift_auc')))}</td>"
@@ -202,9 +202,7 @@ def render_probe_review_html(
             f"<td><code>{_e(row.get('status'))}</code></td>"
             "</tr>"
         )
-    trajectory_html = (
-        "".join(trajectory_rows) if trajectory_rows else '<tr><td colspan="8">No trajectory QA recorded.</td></tr>'
-    )
+    trajectory_html = "".join(trajectory_rows) or '<tr><td colspan="9">No trajectory QA recorded.</td></tr>'
     seed_rows = []
     for row in seed_summaries or []:
         seed_rows.append(
@@ -233,6 +231,7 @@ def render_probe_review_html(
         {_metric_card("Persisted decision", review_manifest.get("persisted_decision"))}
         {_metric_card("Runs", len(runs))}
         {_metric_card("Campaigns", ", ".join(coverage.get("campaigns") or []) or "none")}
+        {_metric_card("Families", ", ".join(coverage.get("label_families") or []) or "none")}
         {_metric_card("Splits", ", ".join(coverage.get("splits") or []) or "none")}
         {_metric_card("Omitted gates", ", ".join(coverage.get("omitted_scored_gates") or []) or "none")}
       </section>
@@ -253,7 +252,7 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Gate</th><th>Status</th><th>Campaign</th><th>Split</th><th>Observed</th><th>Threshold</th><th>Reason</th>
+              <th>Gate</th><th>Status</th><th>Family</th><th>Campaign</th><th>Split</th><th>Observed</th><th>Threshold</th><th>Reason</th>
             </tr>
           </thead>
           <tbody>{"".join(gate_rows)}</tbody>
@@ -297,7 +296,7 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Run</th><th>Oracle</th><th>Split</th><th>Selected Target</th>
+              <th>Run</th><th>Family</th><th>Oracle</th><th>Split</th><th>Selected Target</th>
               <th>Prevalence</th><th>Precision@K</th><th>Lift@K</th>
               <th>Binom p&gt;=k</th><th>Selected Classes</th>
             </tr>
@@ -310,7 +309,7 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Run</th><th>Round</th><th>Selected Target</th>
+              <th>Run</th><th>Family</th><th>Round</th><th>Selected Target</th>
               <th>Prevalence</th><th>Precision@K</th><th>Lift@K</th>
               <th>Binom p&gt;=k</th>
             </tr>
@@ -323,7 +322,7 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Run</th><th>Oracle</th><th>First Lift</th><th>Final Lift</th>
+              <th>Run</th><th>Family</th><th>Oracle</th><th>First Lift</th><th>Final Lift</th>
               <th>Max Lift</th><th>Max Round</th><th>Status</th>
             </tr>
           </thead>
@@ -335,7 +334,7 @@ def render_probe_review_html(
         <table>
           <thead>
             <tr>
-              <th>Seed</th><th>Campaign</th><th>Split</th><th>Positive AUC</th>
+              <th>Seed</th><th>Family</th><th>Campaign</th><th>Split</th><th>Positive AUC</th>
               <th>Null AUC</th><th>AUC Delta</th><th>Final Delta</th><th>Status</th>
             </tr>
           </thead>

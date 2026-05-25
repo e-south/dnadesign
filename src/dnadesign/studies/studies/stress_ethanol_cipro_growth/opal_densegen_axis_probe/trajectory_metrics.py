@@ -33,18 +33,21 @@ def trajectory_summaries_from_metrics(
     if not rows:
         rows = [row for row in run_metrics if _finite_metric(row, "target_lift_at_k_true") is not None]
         metric_source = "final_metrics"
-    grouped: dict[tuple[str, str, str], dict[str, list[Mapping[str, Any]]]] = defaultdict(lambda: defaultdict(list))
+    grouped: dict[tuple[str, str, str, str], dict[str, list[Mapping[str, Any]]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for row in rows:
         campaign = str(row.get("campaign") or "")
+        label_family_id = str(row.get("label_family_id") or "unknown")
         split_id = str(row.get("split_id") or "")
         seed = str(row.get("seed") if row.get("seed") is not None else "unknown")
         if not campaign or not split_id:
             continue
         oracle_kind = "null" if row.get("oracle_id") == NULL_ORACLE_ID else "positive"
-        grouped[(seed, campaign, split_id)][oracle_kind].append(row)
+        grouped[(seed, label_family_id, campaign, split_id)][oracle_kind].append(row)
 
     out: list[dict[str, Any]] = []
-    for (seed, campaign, split_id), pair in sorted(grouped.items()):
+    for (seed, label_family_id, campaign, split_id), pair in sorted(grouped.items()):
         positive_curve = _curve(pair.get("positive") or [], metric_source=metric_source)
         null_curve = _curve(pair.get("null") or [], metric_source=metric_source)
         positive_auc = _normalized_auc(positive_curve)
@@ -62,6 +65,7 @@ def trajectory_summaries_from_metrics(
         out.append(
             {
                 "seed": None if seed == "unknown" else int(seed),
+                "label_family_id": None if label_family_id == "unknown" else label_family_id,
                 "campaign": campaign,
                 "split_id": split_id,
                 "metric_source": metric_source,
@@ -96,6 +100,7 @@ def trajectory_gate_results_from_metrics(
                 "gate": "H-TRAJECTORY-SEPARATION",
                 "status": summary["status"],
                 "campaign": summary.get("campaign"),
+                "label_family_id": summary.get("label_family_id"),
                 "split_id": summary.get("split_id"),
                 "seed": summary.get("seed"),
                 "observed": summary.get("paired_auc_delta"),

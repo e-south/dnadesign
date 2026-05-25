@@ -81,15 +81,13 @@ from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_pr
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.progress import (
     summarize_probe_progress,
 )
-from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.records_manifest import (
-    records_manifest_problems,
-)
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.review import build_probe_review
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.scratch import (
     _make_training_input,
+    _make_training_input_for_run,
     _run_command,
+    _write_campaign_config,
     _write_campaign_plot_config,
-    _write_records_subset,
 )
 from dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe.source_contract import (
     validate_candidate_x_surface,
@@ -181,13 +179,14 @@ __all__ = [
     "_evaluate_run",
     "_evaluate_run_rounds",
     "_make_training_input",
+    "_make_training_input_for_run",
     "_persisted_split_metadata",
     "_run_command",
     "_split_metadata_for_all",
     "_valid_metrics_payload",
     "_write_campaign_plot_config",
+    "_write_campaign_config",
     "_write_probe_prediction_campaign",
-    "_write_records_subset",
     "annotations",
     "audit_run_root",
     "build_axis_oracle",
@@ -212,7 +211,6 @@ __all__ = [
     "predicted_axis_classes",
     "prepare_probe_run_root",
     "pytest",
-    "records_manifest_problems",
     "require_label_family_columns",
     "round_dynamics_summary",
     "run_opal_rounds_for_probe",

@@ -32,14 +32,7 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
         "score_threshold_over_rounds",
         "feature_importance_heatmap",
         "feature_importance_bars",
-        "selected_vec8_summary",
-        "fold_change_vs_logic_fidelity_latest",
-        "sfxi_observed_logic_closeness_over_rounds",
-        "sfxi_factorial_effects_latest",
-        "sfxi_setpoint_sweep_latest",
-        "sfxi_support_diagnostics_latest",
-        "sfxi_uncertainty_latest",
-        "sfxi_intensity_scaling_latest",
+        "selected_target_vector_summary",
     }
     assert {plot["kind"] for plot in payload["plots"]} == {
         "metric_over_rounds",
@@ -48,18 +41,11 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
         "feature_importance_heatmap",
         "feature_importance_bars",
         "vector_summary_heatmap",
-        "fold_change_vs_logic_fidelity",
-        "sfxi_logic_fidelity_closeness",
-        "sfxi_factorial_effects",
-        "sfxi_setpoint_sweep",
-        "sfxi_support_diagnostics",
-        "sfxi_uncertainty",
-        "sfxi_intensity_scaling",
     }
     assert plots_by_name["score_selected_over_rounds"]["params"]["cohort"] == "selected"
     assert plots_by_name["score_selected_over_rounds"]["params"]["summaries"] == ["median", "q25", "q75", "count"]
     assert plots_by_name["score_selected_over_rounds"]["params"]["band"] == "iqr"
-    assert plots_by_name["score_selected_over_rounds"]["params"]["highlight_round"] == "latest"
+    assert "highlight_round" not in plots_by_name["score_selected_over_rounds"]["params"]
     assert plots_by_name["score_vs_rank_over_rounds"]["round_selector"] == "all"
     assert plots_by_name["score_vs_rank_over_rounds"]["params"]["rank_mode"] == "competition"
     assert plots_by_name["score_threshold_over_rounds"]["params"]["metric"] == "pred__score_selected"
@@ -79,19 +65,15 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
     assert plots_by_name["feature_importance_bars"]["params"]["order_policy"] == "sort_index"
     assert plots_by_name["feature_importance_bars"]["params"]["figsize_in"] == [14.0, 4.4]
     assert plots_by_name["feature_importance_bars"]["params"]["cmap"] == "round_progression"
-    assert plots_by_name["selected_vec8_summary"]["params"]["reference_vector"] == [0, 0, 1, 1, 0, 0, 1, 1]
-    assert plots_by_name["selected_vec8_summary"]["params"]["reference_label"] == "Target vec8"
-    assert plots_by_name["selected_vec8_summary"]["params"]["reference_mse_panel"] is True
-    assert plots_by_name["selected_vec8_summary"]["params"]["cmap"] == "opal_seafoam"
-    assert plots_by_name["selected_vec8_summary"]["params"]["channel_labels"] == [
+    assert plots_by_name["selected_target_vector_summary"]["params"]["reference_vector"] == [0, 0, 1, 1]
+    assert plots_by_name["selected_target_vector_summary"]["params"]["reference_label"] == "Target vector"
+    assert plots_by_name["selected_target_vector_summary"]["params"]["reference_mse_panel"] is True
+    assert plots_by_name["selected_target_vector_summary"]["params"]["cmap"] == "opal_seafoam"
+    assert plots_by_name["selected_target_vector_summary"]["params"]["channel_labels"] == [
         "v00",
         "v10",
         "v01",
         "v11",
-        "y00_star",
-        "y10_star",
-        "y01_star",
-        "y11_star",
     ]
     for name in plot_names:
         if name.endswith("_latest"):

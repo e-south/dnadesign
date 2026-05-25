@@ -56,6 +56,7 @@ def _format_plan_text(
         f"selection_k: {plan.selection_k}",
         f"suite_seeds: {', '.join(map(str, plan.suite_seeds))}",
         f"active_label_family: {plan.active_label_family}",
+        f"active_label_families: {', '.join(plan.active_label_families)}",
         f"passive_label_families: {', '.join(plan.passive_label_families)}",
         f"max_x_matrix_gib: {plan.max_x_matrix_gib or 'opal_default'}",
         f"score_batch_size: {plan.score_batch_size or 'opal_default'}",

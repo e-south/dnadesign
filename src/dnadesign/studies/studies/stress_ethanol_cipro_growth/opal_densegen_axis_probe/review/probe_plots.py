@@ -24,34 +24,45 @@ def _write_probe_plots(
     frame = pd.DataFrame(runs)
     paths = [
         layout.review_plots_dir / "target_lift_and_precision.png",
-        layout.review_plots_dir / "selected_class_composition.png",
         layout.review_plots_dir / "positive_null_lift_delta.png",
         layout.review_plots_dir / "evaluable_selected_count.png",
         layout.review_plots_dir / "trajectory_qa_matrix.png",
     ]
     _plot_lift_and_precision(frame, paths[0])
-    _plot_class_composition(frame, paths[1])
-    _plot_positive_null_lift_delta(frame, paths[2])
-    _plot_evaluable_selected_count(frame, paths[3])
-    _plot_trajectory_qa_matrix(frame, metrics_payload.get("trajectory_qa") or {}, paths[4])
+    if _has_class_composition(frame):
+        class_path = layout.review_plots_dir / "selected_class_composition.png"
+        _plot_class_composition(frame, class_path)
+        paths.append(class_path)
+    _plot_positive_null_lift_delta(frame, paths[1])
+    _plot_evaluable_selected_count(frame, paths[2])
+    _plot_trajectory_qa_matrix(frame, metrics_payload.get("trajectory_qa") or {}, paths[3])
     round_rows = [row for row in metrics_payload.get("rounds") or [] if isinstance(row, Mapping)]
     if round_rows:
         round_path = layout.review_plots_dir / "round_target_lift_and_precision.png"
         _plot_round_lift_and_precision(pd.DataFrame(round_rows), round_path)
         paths.append(round_path)
     optional_paths = [
-        (layout.review_plots_dir / "vec8_distance_to_setpoint_over_rounds.png", _vec8_distance_rows(configured_plots)),
+        (
+            layout.review_plots_dir / "vector_distance_to_reference_over_rounds.png",
+            _vector_reference_distance_rows(configured_plots),
+        ),
         (layout.review_plots_dir / "feature_stability_over_rounds.png", _feature_stability_rows(configured_plots)),
     ]
     for path, rows in optional_paths:
         if not rows:
             continue
-        if path.name.startswith("vec8"):
-            _plot_vec8_distance(pd.DataFrame(rows), path)
+        if path.name.startswith("vector"):
+            _plot_vector_reference_distance(pd.DataFrame(rows), path)
         else:
             _plot_feature_stability(pd.DataFrame(rows), path)
         paths.append(path)
     return paths
+
+
+def _has_class_composition(frame: pd.DataFrame) -> bool:
+    if "off_target_class_distribution_true" not in frame.columns:
+        return False
+    return any(isinstance(value, Mapping) and bool(value) for value in frame["off_target_class_distribution_true"])
 
 
 def _plot_lift_and_precision(frame: pd.DataFrame, path: Path) -> None:
@@ -117,6 +128,8 @@ def _plot_class_composition(frame: pd.DataFrame, path: Path) -> None:
         dist = row.get("off_target_class_distribution_true") or {}
         if not isinstance(dist, Mapping):
             continue
+        if not dist:
+            continue
         out = {"run_key": str(row.get("run_key"))}
         out.update({str(key): int(value) for key, value in dist.items()})
         rows.append(out)
@@ -144,7 +157,7 @@ def _plot_positive_null_lift_delta(frame: pd.DataFrame, path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     df = frame.copy()
-    df["pair"] = df["campaign"].astype(str) + "/" + df["split_id"].astype(str)
+    df["pair"] = _pair_label(df)
     df["lift"] = pd.to_numeric(df["target_lift_at_k_true"], errors="coerce")
     pivot = df.pivot_table(index="pair", columns="oracle_id", values="lift", aggfunc="max")
     positive = pivot.get(ORACLE_ID, pd.Series(index=pivot.index, dtype=float))
@@ -158,7 +171,7 @@ def _plot_positive_null_lift_delta(frame: pd.DataFrame, path: Path) -> None:
     ax.set_xticks(list(x))
     ax.set_xticklabels(delta.index.tolist(), rotation=30, ha="right")
     ax.set_ylabel("positive lift - null lift")
-    ax.set_title("Positive/null lift separation by campaign and split")
+    ax.set_title("Positive/null lift separation by label family, campaign, and split")
     fig.savefig(path, dpi=160)
     plt.close(fig)
 
@@ -196,7 +209,7 @@ def _plot_trajectory_qa_matrix(frame: pd.DataFrame, trajectory_qa: Mapping[str, 
 
     path.parent.mkdir(parents=True, exist_ok=True)
     df = frame.copy()
-    df["pair"] = df["campaign"].astype(str) + "/" + df["split_id"].astype(str)
+    df["pair"] = _pair_label(df)
     df["lift"] = pd.to_numeric(df["target_lift_at_k_true"], errors="coerce")
     pivot = df.pivot_table(index="pair", columns="oracle_id", values="lift", aggfunc="max")
     positive = pivot.get(ORACLE_ID, pd.Series(index=pivot.index, dtype=float))
@@ -212,7 +225,7 @@ def _plot_trajectory_qa_matrix(frame: pd.DataFrame, trajectory_qa: Mapping[str, 
     trajectory_pairs = trajectory_qa.get("pairs") if isinstance(trajectory_qa, Mapping) else []
     if trajectory_pairs:
         auc_delta = {
-            f"{row.get('campaign')}/{row.get('split_id')}": row.get("paired_auc_delta")
+            _pair_label_from_mapping(row): row.get("paired_auc_delta")
             for row in trajectory_pairs
             if isinstance(row, Mapping)
         }
@@ -235,7 +248,16 @@ def _plot_trajectory_qa_matrix(frame: pd.DataFrame, trajectory_qa: Mapping[str, 
     plt.close(fig)
 
 
-def _vec8_distance_rows(configured_plots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _pair_label(frame: pd.DataFrame) -> pd.Series:
+    family = frame.get("label_family_id", pd.Series(["unknown"] * len(frame), index=frame.index)).astype(str)
+    return family + "/" + frame["campaign"].astype(str) + "/" + frame["split_id"].astype(str)
+
+
+def _pair_label_from_mapping(row: Mapping[str, Any]) -> str:
+    return f"{row.get('label_family_id', 'unknown')}/{row.get('campaign')}/{row.get('split_id')}"
+
+
+def _vector_reference_distance_rows(configured_plots: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for entry in configured_plots:
         run_key = str(entry.get("run_key") or "")
@@ -299,7 +321,7 @@ def _feature_stability_rows(configured_plots: list[dict[str, Any]]) -> list[dict
     return rows
 
 
-def _plot_vec8_distance(frame: pd.DataFrame, path: Path) -> None:
+def _plot_vector_reference_distance(frame: pd.DataFrame, path: Path) -> None:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(9, 4.8), constrained_layout=True)
@@ -307,7 +329,7 @@ def _plot_vec8_distance(frame: pd.DataFrame, path: Path) -> None:
         ax.plot(sub["round"], sub["distance"], marker="o", linewidth=1.2, label=str(run_key))
     ax.set_xlabel("round")
     ax.set_ylabel("Euclidean distance to reference")
-    ax.set_title("Selected vec8 distance to configured reference")
+    ax.set_title("Selected vector distance to configured reference")
     ax.legend(frameon=False, fontsize=7, ncols=2)
     fig.savefig(path, dpi=160)
     plt.close(fig)

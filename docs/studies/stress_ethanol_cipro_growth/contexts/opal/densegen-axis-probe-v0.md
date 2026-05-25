@@ -5,9 +5,12 @@
 LatentDNA/Evo2 X surface lets the three existing RF + SFXI + top-n stress
 campaigns recover DenseGen part-derived stress-axis grammar.
 
-This is now a historical K6/single-seed probe. The current planned benchmark is
+This is now a historical K6/single-seed probe. Its SFXI-compatible vec8 naming
+is superseded for synthetic controls because the current probe label is
+DenseGen plan logic, not measured SFXI. The current planned benchmark is
 `densegen_motif_qa_k12_s3_v1`, documented in
-`densegen-motif-qa-k12-s3-v1.md`.
+`densegen-motif-qa-k12-s3-v1.md`, with active `densegen_plan_logic4` and
+`tf_family_count` families.
 
 The positive oracle is a binary SFXI-compatible vec8 from
 `densegen__used_tfbs_detail`: LexA defines cipro, CpxR/BaeR define ethanol, and

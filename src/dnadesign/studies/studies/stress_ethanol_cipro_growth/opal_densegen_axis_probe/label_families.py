@@ -9,10 +9,10 @@ import pandas as pd
 
 from .constants import (
     ACTIVE_LABEL_FAMILY_ID,
+    ACTIVE_LABEL_FAMILY_IDS,
     AXIS_CLASS_TO_DENSEGEN_PLAN_CLASS,
+    DENSEGEN_PLAN_LOGIC4_COLUMNS,
     PASSIVE_LABEL_FAMILY_IDS,
-    SFXI_INTENSITY_COLUMNS,
-    SFXI_STATE_COLUMNS,
 )
 
 TF_FAMILIES = ("lexA", "cpxR", "baeR")
@@ -31,6 +31,7 @@ class LabelFamilySpec:
     columns: tuple[str, ...]
     source: str
     description: str
+    opal_adapter: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -43,12 +44,19 @@ def label_family_specs() -> tuple[LabelFamilySpec, ...]:
         LabelFamilySpec(
             label_family_id=ACTIVE_LABEL_FAMILY_ID,
             role="active",
-            target_type="sfxi_vec8",
-            columns=(*SFXI_STATE_COLUMNS, *SFXI_INTENSITY_COLUMNS, "vec8", "axis_class"),
+            target_type="logic4_vector",
+            columns=(*DENSEGEN_PLAN_LOGIC4_COLUMNS, "logic4", "axis_class"),
             source="densegen__used_tfbs_detail",
             description=(
-                "Binary SFXI-compatible vec8 derived from DenseGen TFBS composition; used by OPAL scratch campaigns."
+                "Four-channel DenseGen plan-logic vector derived from TFBS composition. This is a synthetic "
+                "control label, not a measured SFXI assay or SFXI projection."
             ),
+            opal_adapter={
+                "transform_y": "vector_from_table_v1",
+                "objective": "vector_target_similarity_v1",
+                "channel_columns": list(DENSEGEN_PLAN_LOGIC4_COLUMNS),
+                "plot_family": "generic_numeric_vector",
+            },
         ),
         LabelFamilySpec(
             label_family_id="tf_family_presence",
@@ -57,14 +65,36 @@ def label_family_specs() -> tuple[LabelFamilySpec, ...]:
             columns=TF_FAMILY_PRESENCE_COLUMNS,
             source="densegen__used_tfbs_detail",
             description="Per-candidate LexA/CpxR/BaeR presence indicators derived from TFBS detail.",
+            opal_adapter={
+                "status": "active_variant_supported",
+                "transform_y": "vector_from_table_v1",
+                "objective": "vector_channel_v1",
+                "channel_columns": list(TF_FAMILY_PRESENCE_COLUMNS),
+                "plot_family": "generic_numeric_vector",
+            },
         ),
         LabelFamilySpec(
             label_family_id="tf_family_count",
-            role="passive_readout",
+            role="active",
             target_type="count_vector",
             columns=TF_FAMILY_COUNT_COLUMNS,
             source="densegen__used_tfbs_detail",
-            description="Per-candidate LexA/CpxR/BaeR motif counts derived from TFBS detail.",
+            description=(
+                "Per-candidate LexA/CpxR/BaeR motif counts derived from TFBS detail. The active probe uses compact "
+                "LexA, CpxR+BaeR, and LexA+CpxR+BaeR count objectives."
+            ),
+            opal_adapter={
+                "status": "active_variant_default",
+                "transform_y": "vector_from_table_v1",
+                "objective": "vector_channel_v1",
+                "channel_columns": list(TF_FAMILY_COUNT_COLUMNS),
+                "active_objective_columns": [
+                    "tf_count__lexA",
+                    "tf_count__cpxR_plus_baeR",
+                    "tf_count__lexA_plus_cpxR_plus_baeR",
+                ],
+                "plot_family": "generic_numeric_vector",
+            },
         ),
         LabelFamilySpec(
             label_family_id="densegen_plan_class",
@@ -76,6 +106,13 @@ def label_family_specs() -> tuple[LabelFamilySpec, ...]:
                 "Part-derived DenseGen plan-class proxy. The raw densegen__plan string remains audit metadata, "
                 "not the label source."
             ),
+            opal_adapter={
+                "status": "planned_one_vs_rest",
+                "transform_y": "vector_from_table_v1",
+                "objective": "vector_channel_v1",
+                "plot_family": "generic_numeric_vector",
+                "note": "encode plan class as explicit one-vs-rest numeric columns before active OPAL training",
+            },
         ),
     )
 
@@ -112,16 +149,21 @@ def label_family_manifest(
     labels: pd.DataFrame | None = None,
     *,
     active_label_family: str = ACTIVE_LABEL_FAMILY_ID,
+    active_label_families: Sequence[str] = ACTIVE_LABEL_FAMILY_IDS,
     passive_label_families: Sequence[str] = PASSIVE_LABEL_FAMILY_IDS,
 ) -> dict[str, Any]:
     specs = label_family_specs()
     spec_by_id = {spec.label_family_id: spec for spec in specs}
-    unknown = sorted({active_label_family, *map(str, passive_label_families)} - set(spec_by_id))
+    active_list = tuple(dict.fromkeys(str(value) for value in active_label_families))
+    if active_label_family not in active_list:
+        active_list = (str(active_label_family), *active_list)
+    unknown = sorted({*active_list, *map(str, passive_label_families)} - set(spec_by_id))
     if unknown:
         raise ValueError(f"unknown label family id(s): {unknown}")
     payload: dict[str, Any] = {
         "schema_version": "stress_ethanol_cipro_growth.densegen_label_families.v1",
         "active_label_family": active_label_family,
+        "active_label_families": list(active_list),
         "passive_label_families": list(map(str, passive_label_families)),
         "families": [spec.to_dict() for spec in specs],
     }

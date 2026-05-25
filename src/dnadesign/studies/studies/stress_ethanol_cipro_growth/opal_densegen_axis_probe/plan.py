@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
+from .active_targets import active_target_spec, validate_active_label_families
 from .artifacts import ProbeArtifactLayout, ProbePlan, RunSpec
 from .constants import CAMPAIGNS, DEFAULT_TOP_K, ORACLE_ID, ORACLES, RUN_STAGES, SHARED_OBSERVED_LABEL_SIDECAR, SPLITS
 from .suite_manifest import default_probe_suite
@@ -33,9 +34,13 @@ def _gate_matrix(gate: str | None, splits: tuple[str, ...]) -> list[tuple[str, s
     return [(campaign, oracle, split) for campaign in CAMPAIGNS for oracle in ORACLES for split in requested_splits]
 
 
-def _run_key(campaign_key: str, oracle_id: str, split_id: str) -> str:
+def _run_key(campaign_key: str, oracle_id: str, split_id: str, label_family_id: str) -> str:
     oracle_short = "positive" if oracle_id == ORACLE_ID else "null"
-    return f"{campaign_key}_{oracle_short}_{split_id}"
+    family_slug = {
+        "densegen_plan_logic4": "plan_logic4",
+        "tf_family_count": "tf_count",
+    }.get(str(label_family_id), str(label_family_id))
+    return f"{family_slug}_{campaign_key}_{oracle_short}_{split_id}"
 
 
 def _validate_stop_after(stop_after: str) -> str:
@@ -46,7 +51,7 @@ def _validate_stop_after(stop_after: str) -> str:
 
 
 def _label_input_path(config_path: Path, round_index: int) -> Path:
-    return config_path.parent.parent / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
+    return config_path.parent.parent / "inputs" / f"r{int(round_index)}" / f"labels-b{int(round_index)}.parquet"
 
 
 def _opal_validate_command(config_path: Path) -> list[str]:
@@ -125,6 +130,7 @@ def build_plan(
     apply: bool = False,
     stop_after: str = "status",
     suite_id: str | None = None,
+    active_label_families: Iterable[str] | None = None,
 ) -> ProbePlan:
     suite = default_probe_suite()
     stop = _validate_stop_after(stop_after)
@@ -147,35 +153,39 @@ def build_plan(
     invalid_splits = sorted(set(split_tuple) - set(SPLITS))
     if invalid_splits:
         raise ValueError(f"unsupported split(s): {invalid_splits}")
+    family_tuple = validate_active_label_families(active_label_families or suite.active_label_families)
 
     layout = ProbeArtifactLayout(run_root)
     runs: list[RunSpec] = []
     commands: list[list[str]] = []
-    for campaign_key, oracle_id, split_id in _gate_matrix(gate, split_tuple):
-        run_key = _run_key(campaign_key, oracle_id, split_id)
-        workdir = layout.campaign_workdir(run_key)
-        config_path = layout.campaign_config_path(run_key)
-        label_input_path = layout.campaign_label_input_path(run_key)
-        sidecar_path = layout.campaign_sidecar_path(run_key, split_id)
-        runs.append(
-            RunSpec(
-                campaign_key=campaign_key,
-                oracle_id=oracle_id,
-                split_id=split_id,
-                run_key=run_key,
-                target_class=str(CAMPAIGNS[campaign_key]["target_class"]),
-                workdir=workdir,
-                config_path=config_path,
-                label_input_path=label_input_path,
-                sidecar_path=sidecar_path,
-                selection_k=batch_size,
-                seed=int(seed),
-                label_family_id=suite.active_label_family,
-                max_x_matrix_gib=memory_budget,
-                score_batch_size=score_batch,
+    for label_family_id in family_tuple:
+        for campaign_key, oracle_id, split_id in _gate_matrix(gate, split_tuple):
+            target = active_target_spec(label_family_id, campaign_key)
+            run_key = _run_key(campaign_key, oracle_id, split_id, label_family_id)
+            workdir = layout.campaign_workdir(run_key)
+            config_path = layout.campaign_config_path(run_key)
+            label_input_path = layout.campaign_label_input_path(run_key)
+            sidecar_path = layout.campaign_sidecar_path(run_key, split_id)
+            runs.append(
+                RunSpec(
+                    campaign_key=campaign_key,
+                    oracle_id=oracle_id,
+                    split_id=split_id,
+                    run_key=run_key,
+                    target_class=target.target_key,
+                    workdir=workdir,
+                    config_path=config_path,
+                    label_input_path=label_input_path,
+                    sidecar_path=sidecar_path,
+                    selection_k=batch_size,
+                    seed=int(seed),
+                    label_family_id=label_family_id,
+                    target_channel=target.target_channel,
+                    max_x_matrix_gib=memory_budget,
+                    score_batch_size=score_batch,
+                )
             )
-        )
-        commands.extend(_opal_commands(config_path, stop_after=stop, rounds=round_count))
+            commands.extend(_opal_commands(config_path, stop_after=stop, rounds=round_count))
     return ProbePlan(
         run_root=run_root,
         initial_label_count=initial_count,
@@ -191,6 +201,7 @@ def build_plan(
         suite_id=str(suite_id or suite.suite_id),
         suite_seeds=tuple(int(value) for value in suite.seeds),
         active_label_family=suite.active_label_family,
+        active_label_families=family_tuple,
         passive_label_families=suite.passive_label_families,
         runs=runs,
         commands=commands,

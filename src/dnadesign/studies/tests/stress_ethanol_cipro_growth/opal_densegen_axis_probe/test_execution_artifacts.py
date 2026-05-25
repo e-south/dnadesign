@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from .helpers import (
     CANDIDATE_RECORDS,
     NULL_ORACLE_ID,
@@ -10,18 +12,18 @@ from .helpers import (
     ProbePlan,
     RunSpec,
     _make_training_input,
-    _write_records_subset,
     materialize_probe_inputs,
     pd,
     pytest,
-    records_manifest_problems,
     run_opal_rounds_for_probe,
     selected_ids_from_round,
     write_followup_label_input,
 )
 
 
-def test_materialize_probe_inputs_writes_split_scoped_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_materialize_probe_inputs_writes_shared_records_symlink_and_candidate_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source_records = tmp_path / CANDIDATE_RECORDS
     source_records.parent.mkdir(parents=True)
     ids = ["random-train", "random-eval", "leave-train", "leave-eval"]
@@ -45,6 +47,17 @@ def test_materialize_probe_inputs_writes_split_scoped_records(tmp_path: Path, mo
             config_path=layout.campaign_config_path("cipro_positive_random_id"),
             label_input_path=layout.campaign_label_input_path("cipro_positive_random_id"),
             sidecar_path=layout.campaign_sidecar_path("cipro_positive_random_id", "random_id"),
+        ),
+        RunSpec(
+            campaign_key="cipro",
+            oracle_id=NULL_ORACLE_ID,
+            split_id="random_id",
+            run_key="cipro_null_random_id",
+            target_class="cipro_only",
+            workdir=layout.campaign_workdir("cipro_null_random_id"),
+            config_path=layout.campaign_config_path("cipro_null_random_id"),
+            label_input_path=layout.campaign_label_input_path("cipro_null_random_id"),
+            sidecar_path=layout.campaign_sidecar_path("cipro_null_random_id", "random_id"),
         ),
         RunSpec(
             campaign_key="cipro",
@@ -76,16 +89,11 @@ def test_materialize_probe_inputs_writes_split_scoped_records(tmp_path: Path, mo
             "sequence": ["AAAA", "CCCC", "GGGG", "TTTT"],
             "axis_class": ["cipro_only"] * len(ids),
             "quality_flag": ["ok"] * len(ids),
-            "vec8": [[0, 0, 1, 1, 0, 0, 1, 1]] * len(ids),
+            "logic4": [[0, 0, 1, 1]] * len(ids),
             "v00": [0.0] * len(ids),
             "v10": [0.0] * len(ids),
             "v01": [1.0] * len(ids),
             "v11": [1.0] * len(ids),
-            "y00_star": [0.0] * len(ids),
-            "y10_star": [0.0] * len(ids),
-            "y01_star": [1.0] * len(ids),
-            "y11_star": [1.0] * len(ids),
-            "intensity_log2_offset_delta": [0.0] * len(ids),
         }
     )
 
@@ -104,10 +112,26 @@ def test_materialize_probe_inputs_writes_split_scoped_records(tmp_path: Path, mo
         },
     )
 
-    random_records = pd.read_parquet(layout.split_records_path("random_id"))
-    leave_records = pd.read_parquet(layout.split_records_path("leave_sigma35_variant"))
-    assert sorted(random_records["id"].astype(str).tolist()) == ["random-eval", "random-train"]
-    assert sorted(leave_records["id"].astype(str).tolist()) == ["leave-eval", "leave-train"]
+    assert layout.split_records_path("random_id").is_symlink()
+    assert layout.split_records_path("leave_sigma35_variant").is_symlink()
+    assert layout.split_records_path("random_id").resolve() == source_records.resolve()
+    assert layout.split_records_path("leave_sigma35_variant").resolve() == source_records.resolve()
+    random_scope = pd.read_parquet(layout.split_candidate_scope_path("random_id"))
+    leave_scope = pd.read_parquet(layout.split_candidate_scope_path("leave_sigma35_variant"))
+    assert sorted(random_scope["id"].astype(str).tolist()) == ["random-eval", "random-train"]
+    assert sorted(leave_scope["id"].astype(str).tolist()) == ["leave-eval", "leave-train"]
+    collection = json.loads(layout.campaign_collection_manifest_path.read_text(encoding="utf-8"))
+    assert collection["schema_version"] == "opal.campaign_collection.v1"
+    assert collection["dimensions"] == ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"]
+    assert collection["relationships"] == [
+        {
+            "kind": "control_pair",
+            "left_role": "positive",
+            "right_role": "null",
+            "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+            "replicate_on": ["seed"],
+        }
+    ]
 
 
 def test_selected_ids_from_round_rejects_duplicate_selection_ids(tmp_path: Path) -> None:
@@ -157,11 +181,22 @@ def test_followup_label_input_rejects_duplicate_selected_ids(tmp_path: Path) -> 
             "intensity_log2_offset_delta": [0.0],
         }
     )
+    run = RunSpec(
+        campaign_key="cipro",
+        oracle_id=ORACLE_ID,
+        split_id="random_id",
+        run_key="cipro_positive_random_id",
+        target_class="cipro_only",
+        workdir=tmp_path / "workdir",
+        config_path=tmp_path / "workdir" / "configs" / "campaign.yaml",
+        label_input_path=tmp_path / "workdir" / "inputs" / "r0" / "labels-b0.parquet",
+        sidecar_path=tmp_path / "workdir" / "observed_labels.parquet",
+    )
 
     with pytest.raises(RuntimeError, match="duplicate ids"):
         write_followup_label_input(
             layout=ProbeArtifactLayout(tmp_path / "probe"),
-            run_key="cipro_positive_random_id",
+            run=run,
             labels=labels,
             selected_ids=["candidate-1", "candidate-1"],
             already_labeled=set(),
@@ -183,7 +218,7 @@ def test_run_opal_rounds_reuses_existing_ingest_and_selection_outputs(
         target_class="cipro_only",
         workdir=workdir,
         config_path=workdir / "configs" / "campaign.yaml",
-        label_input_path=workdir / "inputs" / "r0" / "vec8-b0.parquet",
+        label_input_path=workdir / "inputs" / "r0" / "labels-b0.parquet",
         sidecar_path=workdir / "observed_labels.parquet",
         selection_k=1,
     )
@@ -234,24 +269,6 @@ def test_run_opal_rounds_reuses_existing_ingest_and_selection_outputs(
     assert "run" not in opal_subcommands
     assert {"validate", "status"}.issubset(opal_subcommands)
     assert labeled_ids_by_run["cipro_positive_random_id"] == {"train-1", "selected-r0"}
-
-
-def test_write_records_subset_has_manifest_without_source_size_mismatch(tmp_path: Path) -> None:
-    src = tmp_path / "source.parquet"
-    dst = tmp_path / "scratch" / "records.parquet"
-    pd.DataFrame(
-        {
-            "id": ["a", "b", "c"],
-            "sequence": ["AAAA", "CCCC", "GGGG"],
-            "x": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
-        }
-    ).to_parquet(src, index=False)
-
-    _write_records_subset(src, dst, ids=["a", "c"])
-
-    subset = pd.read_parquet(dst)
-    assert sorted(subset["id"].tolist()) == ["a", "c"]
-    assert records_manifest_problems(dst, src) == []
 
 
 def test_make_training_input_requires_all_train_ids() -> None:

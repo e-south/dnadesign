@@ -58,6 +58,9 @@ def _run_probe(args: argparse.Namespace) -> int:
             allow_custom=bool(args.allow_custom_run_root),
         )
     splits = tuple(str(args.splits).split(",")) if args.splits else ()
+    active_label_families = (
+        tuple(str(args.active_label_families).split(",")) if getattr(args, "active_label_families", None) else None
+    )
     plan = build_plan(
         run_root=run_root,
         initial_label_count=int(args.initial_labels),
@@ -71,6 +74,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         apply=bool(args.apply),
         stop_after=str(args.stop_after),
         suite_id=str(getattr(args, "suite", DEFAULT_SUITE_ID)),
+        active_label_families=active_label_families,
     )
 
     candidates, densegen_sidecar = _load_candidate_inputs(repo_root)
@@ -78,6 +82,7 @@ def _run_probe(args: argparse.Namespace) -> int:
     family_manifest = label_family_manifest(
         labels,
         active_label_family=plan.active_label_family,
+        active_label_families=plan.active_label_families,
         passive_label_families=plan.passive_label_families,
     )
     x_surface = validate_candidate_x_surface(repo_root, expected_rows=len(labels))
@@ -96,6 +101,9 @@ def _run_probe(args: argparse.Namespace) -> int:
         "stop_after": plan.stop_after,
         "seed": plan.seed,
         "suite_seeds": list(plan.suite_seeds),
+        "active_label_family": plan.active_label_family,
+        "active_label_families": list(plan.active_label_families),
+        "passive_label_families": list(plan.passive_label_families),
         "split_ids": list(plan.splits),
         "rounds": plan.rounds,
         "initial_label_count": plan.initial_label_count,
@@ -142,6 +150,7 @@ def _run_probe(args: argparse.Namespace) -> int:
         null_labels,
         seed=int(args.seed),
         label_family_id=plan.active_label_family,
+        active_label_families=plan.active_label_families,
     )
     materialize_probe_inputs(
         repo_root=repo_root,

@@ -9,7 +9,14 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .constants import DEFAULT_INITIAL_LABELS, DEFAULT_SEED, DEFAULT_SUITE_ID, DEFAULT_TOP_K, RUN_STAGES
+from .constants import (
+    ACTIVE_LABEL_FAMILY_IDS,
+    DEFAULT_INITIAL_LABELS,
+    DEFAULT_SEED,
+    DEFAULT_SUITE_ID,
+    DEFAULT_TOP_K,
+    RUN_STAGES,
+)
 from .paths import _repo_root_from, _resolve_repo_path
 from .status import _format_status_text, audit_run_root
 
@@ -129,6 +136,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="OPAL scoring batch size for scratch campaigns. Lower this on memory-constrained hosts.",
     )
     run.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    run.add_argument(
+        "--active-label-families",
+        default=",".join(ACTIVE_LABEL_FAMILY_IDS),
+        help=(
+            "Comma-separated active label-family ids to materialize as OPAL campaigns. "
+            "Default prepares the DenseGen plan-logic4 and compact TF-count matrices."
+        ),
+    )
     run.add_argument(
         "--suite",
         default=DEFAULT_SUITE_ID,

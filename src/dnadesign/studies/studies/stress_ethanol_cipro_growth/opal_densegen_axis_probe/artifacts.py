@@ -1,4 +1,4 @@
-"""Study-owned DenseGen axis OPAL probe package."""
+"""Study-owned DenseGen plan-logic OPAL probe package."""
 
 from __future__ import annotations
 
@@ -14,8 +14,6 @@ class AxisLabel:
     id: str
     axis_class: str | None
     logic4: list[int] | None
-    effect4: list[int] | None
-    vec8: list[int] | None
     quality_flag: str
     lexA_count: int = 0
     cpxR_count: int = 0
@@ -42,7 +40,8 @@ class RunSpec:
     sidecar_path: Path
     selection_k: int = DEFAULT_TOP_K
     seed: int = 7
-    label_family_id: str = "sfxi_axis_vec8"
+    label_family_id: str = "densegen_plan_logic4"
+    target_channel: str = ""
     max_x_matrix_gib: float | None = None
     score_batch_size: int | None = None
 
@@ -62,8 +61,9 @@ class ProbePlan:
     stop_after: str = "status"
     suite_id: str = "densegen_motif_qa_k12_s3_v1"
     suite_seeds: tuple[int, ...] = (7, 17, 29)
-    active_label_family: str = "sfxi_axis_vec8"
-    passive_label_families: tuple[str, ...] = ("tf_family_presence", "tf_family_count", "densegen_plan_class")
+    active_label_family: str = "densegen_plan_logic4"
+    active_label_families: tuple[str, ...] = ("densegen_plan_logic4", "tf_family_count")
+    passive_label_families: tuple[str, ...] = ("tf_family_presence", "densegen_plan_class")
     runs: list[RunSpec] = field(default_factory=list)
     commands: list[list[str]] = field(default_factory=list)
 
@@ -79,6 +79,7 @@ class RunRootAudit:
     metrics_present: bool
     decision_present: bool
     scratch_records_present: bool
+    candidate_scope_present: bool
     planned_campaign_count: int
     shared_sidecar_present: bool
     problems: tuple[str, ...] = ()
@@ -94,6 +95,7 @@ class RunRootAudit:
             "metrics_present": self.metrics_present,
             "decision_present": self.decision_present,
             "scratch_records_present": self.scratch_records_present,
+            "candidate_scope_present": self.candidate_scope_present,
             "planned_campaign_count": self.planned_campaign_count,
             "shared_sidecar_present": self.shared_sidecar_present,
             "problems": list(self.problems),
@@ -110,11 +112,11 @@ class ProbeArtifactLayout:
 
     @property
     def densegen_labels_path(self) -> Path:
-        return self.labels_dir / "densegen_part_axis_vec8.parquet"
+        return self.labels_dir / "densegen_plan_logic4.parquet"
 
     @property
     def null_labels_path(self) -> Path:
-        return self.labels_dir / "permuted_densegen_part_axis_vec8.parquet"
+        return self.labels_dir / "permuted_densegen_plan_logic4.parquet"
 
     @property
     def label_family_manifest_path(self) -> Path:
@@ -139,6 +141,10 @@ class ProbeArtifactLayout:
     @property
     def suite_manifest_path(self) -> Path:
         return self.run_root / "probe_suite.json"
+
+    @property
+    def campaign_collection_manifest_path(self) -> Path:
+        return self.run_root / "campaign_collection.json"
 
     def train_ids_path(self, split_id: str) -> Path:
         return self.splits_dir / f"{split_id}_train_ids.parquet"
@@ -203,6 +209,9 @@ class ProbeArtifactLayout:
     def split_records_path(self, split_id: str) -> Path:
         return self.split_dataset_dir(split_id) / "records.parquet"
 
+    def split_candidate_scope_path(self, split_id: str) -> Path:
+        return self.split_dataset_dir(split_id) / "candidate_scope_ids.parquet"
+
     def campaign_workdir(self, run_key: str) -> Path:
         return self.scratch_campaigns_dir / run_key
 
@@ -210,7 +219,9 @@ class ProbeArtifactLayout:
         return self.campaign_workdir(run_key) / "configs" / "campaign.yaml"
 
     def campaign_label_input_path(self, run_key: str, round_index: int = 0) -> Path:
-        return self.campaign_workdir(run_key) / "inputs" / f"r{int(round_index)}" / f"vec8-b{int(round_index)}.parquet"
+        return (
+            self.campaign_workdir(run_key) / "inputs" / f"r{int(round_index)}" / f"labels-b{int(round_index)}.parquet"
+        )
 
     def campaign_sidecar_path(self, run_key: str, split_id: str) -> Path:
         return self.split_dataset_dir(split_id) / "_opal" / run_key / "observed_labels.parquet"

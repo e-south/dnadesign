@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -27,11 +27,12 @@ def materialize_probe_inputs(
     from .decision_inputs import _persisted_split_metadata
     from .plan import validate_scratch_paths
     from .scratch import (
-        _make_training_input,
+        _make_training_input_for_run,
         _write_campaign_config,
+        _write_candidate_scope,
         _write_json,
         _write_parquet,
-        _write_records_subset,
+        _write_records_reference,
     )
 
     layout = ProbeArtifactLayout(plan.run_root)
@@ -57,15 +58,47 @@ def materialize_probe_inputs(
                 *map(str, metadata.get("train_ids", [])),
                 *map(str, metadata.get("eval_ids", [])),
             }
-            _write_records_subset(source_records, layout.split_records_path(split_id), ids=sorted(split_ids))
+            _write_records_reference(source_records, layout.split_records_path(split_id))
+            _write_candidate_scope(layout.split_candidate_scope_path(split_id), ids=sorted(split_ids))
 
     labels_by_oracle = {ORACLE_ID: labels, NULL_ORACLE_ID: null_labels}
+    _write_campaign_collection_manifest(layout=layout, plan=plan)
     for run in plan.runs:
         validate_scratch_paths(run_root=plan.run_root, label_sidecar_path=run.sidecar_path)
         _write_campaign_config(repo_root, run, plan.run_root)
         train_ids = split_metadata[run.split_id]["train_ids"]
-        training_input = _make_training_input(labels_by_oracle[run.oracle_id], train_ids)
+        training_input = _make_training_input_for_run(labels_by_oracle[run.oracle_id], train_ids, run)
         _write_parquet(layout.campaign_label_input_path(run.run_key, 0), training_input)
+
+
+def _write_campaign_collection_manifest(*, layout: ProbeArtifactLayout, plan: ProbePlan) -> None:
+    grouped_roles: dict[tuple[str, str, str, int], set[str]] = defaultdict(set)
+    for run in plan.runs:
+        grouped_roles[(run.campaign_key, run.label_family_id, run.split_id, int(run.seed))].add(
+            "positive" if run.oracle_id == ORACLE_ID else "null"
+        )
+    has_pair = any({"positive", "null"}.issubset(roles) for roles in grouped_roles.values())
+    relationships = []
+    if has_pair:
+        relationships.append(
+            {
+                "kind": "control_pair",
+                "left_role": "positive",
+                "right_role": "null",
+                "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+                "replicate_on": ["seed"],
+            }
+        )
+    from .scratch import _write_json
+
+    _write_json(
+        layout.campaign_collection_manifest_path,
+        {
+            "schema_version": "opal.campaign_collection.v1",
+            "dimensions": ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"],
+            "relationships": relationships,
+        },
+    )
 
 
 def selected_ids_from_round(
@@ -141,13 +174,15 @@ def _campaign_has_mutable_state(run: Any) -> bool:
 def write_followup_label_input(
     *,
     layout: ProbeArtifactLayout,
-    run_key: str,
+    run,
     labels: Any,
     selected_ids: Sequence[str],
     already_labeled: set[str],
     round_index: int,
 ) -> list[str]:
-    from .scratch import _make_training_input, _write_parquet
+    from .scratch import _make_training_input_for_run, _write_parquet
+
+    run_key = str(run.run_key)
 
     raw_selected = list(selected_ids)
     if any(candidate_id is None for candidate_id in raw_selected):
@@ -165,7 +200,7 @@ def write_followup_label_input(
     new_ids = [candidate_id for candidate_id in selected if candidate_id not in already_labeled]
     if not new_ids:
         raise RuntimeError(f"round {int(round_index)} follow-up labels for {run_key} had no newly selected ids")
-    label_input = _make_training_input(labels, new_ids)
+    label_input = _make_training_input_for_run(labels, new_ids, run)
     _write_parquet(layout.campaign_label_input_path(run_key, int(round_index)), label_input)
     already_labeled.update(new_ids)
     return new_ids
@@ -227,7 +262,7 @@ def run_opal_rounds_for_probe(
                     )
                     write_followup_label_input(
                         layout=layout,
-                        run_key=run.run_key,
+                        run=run,
                         labels=run_labels,
                         selected_ids=selected_ids,
                         already_labeled=labeled_ids,

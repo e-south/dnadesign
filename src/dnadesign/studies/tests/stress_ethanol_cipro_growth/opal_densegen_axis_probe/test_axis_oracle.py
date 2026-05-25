@@ -16,16 +16,16 @@ from .helpers import (
 
 
 @pytest.mark.parametrize(
-    ("detail", "expected_class", "expected_vec8"),
+    ("detail", "expected_class", "expected_logic4"),
     [
-        (_detail("background", "background", "background"), "background_only", [0, 0, 0, 0, 0, 0, 0, 0]),
-        (_detail("cpxR", "background", "background"), "ethanol_only", [0, 1, 0, 1, 0, 1, 0, 1]),
-        (_detail("lexA_CTGTATAWAWWHACA", "background", "background"), "cipro_only", [0, 0, 1, 1, 0, 0, 1, 1]),
-        (_detail("baeR", "lexA_CTGTATAWAWWHACA", "background"), "dual_axis_and", [0, 0, 0, 1, 0, 0, 0, 1]),
+        (_detail("background", "background", "background"), "background_only", [0, 0, 0, 0]),
+        (_detail("cpxR", "background", "background"), "ethanol_only", [0, 1, 0, 1]),
+        (_detail("lexA_CTGTATAWAWWHACA", "background", "background"), "cipro_only", [0, 0, 1, 1]),
+        (_detail("baeR", "lexA_CTGTATAWAWWHACA", "background"), "dual_axis_and", [0, 0, 0, 1]),
     ],
 )
 def test_derive_axis_label_uses_part_detail_not_plan(
-    detail: list[dict[str, object]], expected_class: str, expected_vec8: list[int]
+    detail: list[dict[str, object]], expected_class: str, expected_logic4: list[int]
 ) -> None:
     label = derive_axis_label(
         {
@@ -37,7 +37,7 @@ def test_derive_axis_label_uses_part_detail_not_plan(
 
     assert label.axis_class == expected_class
     assert label.logic4 == AXIS_CLASS_TO_LOGIC4[expected_class]
-    assert label.vec8 == expected_vec8
+    assert label.logic4 == expected_logic4
     assert label.densegen_plan_class is not None
 
 
@@ -98,16 +98,16 @@ def test_parse_sigma35_variant_from_densegen_plan_suffix() -> None:
     assert parse_sigma35_variant("ethanol") is None
 
 
-def test_vectorized_prediction_axis_classes_preserve_vec8_contract() -> None:
+def test_vectorized_prediction_axis_classes_preserve_logic4_contract() -> None:
     values = [
-        [0.0, 0.0, 0.9, 1.0, 0.0, 0.0, 0.9, 1.0],
-        [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 0.9, 1.0],
+        [0.0, 1.0, 0.0, 1.0],
     ]
 
     assert predicted_axis_classes(values) == ["cipro_only", "ethanol_only"]
 
-    with pytest.raises(RuntimeError, match="vec8"):
-        predicted_axis_classes([[0.0, 1.0, 0.0, 1.0]])
+    with pytest.raises(RuntimeError, match="logic4"):
+        predicted_axis_classes([[0.0, 1.0, 0.0]])
 
 
 def test_build_axis_oracle_prefers_sidecar_detail_by_id() -> None:
@@ -278,7 +278,7 @@ def test_make_permuted_labels_preserves_distribution_and_changes_alignment() -> 
     labels = pd.DataFrame(
         {
             "id": [f"id-{idx}" for idx in range(8)],
-            "vec8": [[idx % 2] * 8 for idx in range(8)],
+            "logic4": [[idx % 2] * 4 for idx in range(8)],
             "axis_class": ["background_only", "ethanol_only", "cipro_only", "dual_axis_and"] * 2,
             "quality_flag": ["ok"] * 8,
         }
@@ -286,17 +286,42 @@ def test_make_permuted_labels_preserves_distribution_and_changes_alignment() -> 
 
     permuted = make_permuted_labels(labels, seed=7)
 
-    assert sorted(map(tuple, permuted["vec8"])) == sorted(map(tuple, labels["vec8"]))
-    assert not permuted.set_index("id")["vec8"].equals(labels.set_index("id")["vec8"])
+    assert sorted(map(tuple, permuted["logic4"])) == sorted(map(tuple, labels["logic4"]))
+    assert not permuted.set_index("id")["logic4"].equals(labels.set_index("id")["logic4"])
+
+
+def test_make_permuted_labels_jointly_scrambles_tf_count_labels() -> None:
+    labels = pd.DataFrame(
+        {
+            "id": [f"id-{idx}" for idx in range(8)],
+            "logic4": [[idx % 2] * 4 for idx in range(8)],
+            "axis_class": ["background_only", "ethanol_only", "cipro_only", "dual_axis_and"] * 2,
+            "quality_flag": ["ok"] * 8,
+            "tf_family__lexA__count": list(range(8)),
+            "tf_family__cpxR__count": [value + 10 for value in range(8)],
+            "tf_family__baeR__count": [value + 20 for value in range(8)],
+            "tf_family__lexA__presence": [1] * 8,
+            "tf_family__cpxR__presence": [1] * 8,
+            "tf_family__baeR__presence": [1] * 8,
+            "densegen_plan_class": ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"] * 2,
+        }
+    )
+
+    permuted = make_permuted_labels(labels, seed=7)
+
+    for column in ("tf_family__lexA__count", "tf_family__cpxR__count", "tf_family__baeR__count"):
+        assert sorted(permuted[column].tolist()) == sorted(labels[column].tolist())
+        assert not permuted.set_index("id")[column].equals(labels.set_index("id")[column])
+        assert permuted[f"true_{column}"].tolist() == labels[column].tolist()
 
 
 def test_make_permuted_labels_keeps_non_ok_rows_unassigned() -> None:
     labels = pd.DataFrame(
         {
             "id": ["ok-a", "ok-b", "bad"],
-            "vec8": [
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 1, 0, 1, 0, 1, 0, 1],
+            "logic4": [
+                [0, 0, 0, 0],
+                [0, 1, 0, 1],
                 None,
             ],
             "axis_class": ["background_only", "ethanol_only", None],
@@ -305,17 +330,13 @@ def test_make_permuted_labels_keeps_non_ok_rows_unassigned() -> None:
             "v10": [0.0, 1.0, pd.NA],
             "v01": [0.0, 0.0, pd.NA],
             "v11": [0.0, 1.0, pd.NA],
-            "y00_star": [0.0, 0.0, pd.NA],
-            "y10_star": [0.0, 1.0, pd.NA],
-            "y01_star": [0.0, 0.0, pd.NA],
-            "y11_star": [0.0, 1.0, pd.NA],
         }
     )
 
     permuted = make_permuted_labels(labels, seed=7)
 
     bad = permuted.set_index("id").loc["bad"]
-    assert bad["vec8"] is None
+    assert bad["logic4"] is None
     assert pd.isna(bad["v00"])
     assert pd.isna(bad["axis_class"])
 

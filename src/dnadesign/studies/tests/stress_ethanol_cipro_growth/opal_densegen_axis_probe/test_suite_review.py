@@ -14,7 +14,7 @@ def test_suite_review_accepts_complete_three_seed_roots(tmp_path: Path) -> None:
 
     assert payload["status"] == "ok"
     assert payload["problems"] == []
-    assert payload["trajectory_summary"]["pair_count"] == 18
+    assert payload["trajectory_summary"]["pair_count"] == 36
     assert payload["null_attention"]["count"] == 3
     assert (tmp_path / "suite" / "suite_review.json").exists()
     assert (tmp_path / "suite" / "suite_review.md").exists()
@@ -36,7 +36,7 @@ def test_suite_review_rejects_missing_seed_and_partial_root(tmp_path: Path) -> N
     assert any(problem.endswith(":round_metric_count:132") for problem in payload["problems"])
 
 
-def _write_complete_root(tmp_path: Path, seed: int, *, run_count: int = 12, round_count: int = 144) -> Path:
+def _write_complete_root(tmp_path: Path, seed: int, *, run_count: int = 24, round_count: int = 288) -> Path:
     root = tmp_path / f"densegen_motif_qa_k12_s3_v1_seed{seed}_all_r12"
     reports = root / "reports"
     reports.mkdir(parents=True)
@@ -51,11 +51,13 @@ def _write_complete_root(tmp_path: Path, seed: int, *, run_count: int = 12, roun
     trajectory_pairs = [
         {
             "campaign": campaign,
+            "label_family_id": label_family_id,
             "split_id": split_id,
             "seed": seed,
             "paired_auc_delta": 2.0,
             "final_positive_minus_null_lift": 1.0,
         }
+        for label_family_id in ("densegen_plan_logic4", "tf_family_count")
         for campaign in ("cipro", "ethanol", "dual")
         for split_id in ("random_id", "leave_sigma35_variant")
     ]

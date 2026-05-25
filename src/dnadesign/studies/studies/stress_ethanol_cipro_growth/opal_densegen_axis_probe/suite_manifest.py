@@ -7,6 +7,7 @@ from typing import Any
 
 from .constants import (
     ACTIVE_LABEL_FAMILY_ID,
+    ACTIVE_LABEL_FAMILY_IDS,
     DEFAULT_INITIAL_LABELS,
     DEFAULT_SUITE_ID,
     DEFAULT_SUITE_SEEDS,
@@ -26,6 +27,7 @@ class ProbeSuiteSpec:
     rounds: int
     splits: tuple[str, ...]
     active_label_family: str
+    active_label_families: tuple[str, ...]
     passive_label_families: tuple[str, ...]
     active_tasks: tuple[str, ...]
     null_strategy: str
@@ -33,7 +35,7 @@ class ProbeSuiteSpec:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        for key in ("seeds", "splits", "passive_label_families", "active_tasks"):
+        for key in ("seeds", "splits", "active_label_families", "passive_label_families", "active_tasks"):
             payload[key] = list(payload[key])
         return payload
 
@@ -47,6 +49,7 @@ def default_probe_suite() -> ProbeSuiteSpec:
         rounds=12,
         splits=SPLITS,
         active_label_family=ACTIVE_LABEL_FAMILY_ID,
+        active_label_families=ACTIVE_LABEL_FAMILY_IDS,
         passive_label_families=PASSIVE_LABEL_FAMILY_IDS,
         active_tasks=("cipro", "ethanol", "dual"),
         null_strategy="global_quality_ok_permutation",
