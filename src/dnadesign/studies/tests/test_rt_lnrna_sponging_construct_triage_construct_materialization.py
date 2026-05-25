@@ -18,12 +18,15 @@ import pytest
 from Bio.Seq import Seq
 
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization import (
+    ControlConstructMaterializationReport,
     MaterializationContractError,
     materialize_control_construct_contexts,
     materialize_rt_cds_dms_construct_contexts,
     materialize_variant_construct_contexts,
 )
 from dnadesign.usr import Dataset, load_sequence_views
+
+_CANDIDATE_ENVELOPE_FIELDS = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
 
 
 def _repo_root() -> Path:
@@ -34,11 +37,20 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
+def _assert_candidate_envelope_inputs(report: ControlConstructMaterializationReport) -> None:
+    inputs = Dataset(report.usr_root, report.input_dataset).head(n=len(report.input_ids_by_candidate_id) + 5)
+
+    assert set(inputs["candidate__record_kind"]) == {"candidate_envelope"}
+    assert set(inputs["candidate__sequence_authority"]) == {"overlay_only"}
+    assert {tuple(fields) for fields in inputs["candidate__biological_sequence_fields"]} == {_CANDIDATE_ENVELOPE_FIELDS}
+
+
 def test_rt_lnrna_controls_materialize_real_1600bp_construct_context_views(tmp_path: Path) -> None:
     report = materialize_control_construct_contexts(repo_root=_repo_root(), work_root=tmp_path)
 
     assert report.input_dataset == "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
     assert report.output_dataset == "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1"
+    _assert_candidate_envelope_inputs(report)
     output = Dataset(report.usr_root, report.output_dataset).head(n=10)
     assert {result.records_total for result in report.run_results} == {4, 8}
     assert output.shape[0] == 4
@@ -122,6 +134,7 @@ def test_rt_lnrna_controls_materialize_real_1600bp_construct_context_views(tmp_p
 def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_path: Path) -> None:
     report = materialize_variant_construct_contexts(repo_root=_repo_root(), work_root=tmp_path)
 
+    _assert_candidate_envelope_inputs(report)
     assert len(report.input_ids_by_candidate_id) == 36
     output = Dataset(report.usr_root, report.output_dataset).head(n=100)
     assert output.shape[0] == 72
@@ -175,6 +188,7 @@ def test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api(tm
     assert set(inputs["candidate__representation_contract"]) == {"dual_cassette_construct_context_embedding_v1"}
     assert set(inputs["candidate__payload_program_id"]) == {"tetO_sponging_v1"}
     assert set(inputs["candidate__source_basis"]) == {"in_silico_rt_cds_dms"}
+    _assert_candidate_envelope_inputs(report)
     assert set(inputs["candidate__variant_derivation"]) == {"rt_cds_dms_top_codon_policy_v1"}
     assert set(inputs["candidate__construct_projection_status"]) == {"representable"}
     assert set(inputs["candidate__candidate_role"]) == {"candidate"}

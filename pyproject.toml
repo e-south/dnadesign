@@ -63,7 +63,7 @@ construct  = "dnadesign.construct:main"
 folding    = "dnadesign.folding.cli:main"
 cluster    = "dnadesign.cluster.cli:main"
 latentdna  = "dnadesign.latentdna.src:main"
-permuter   = "dnadesign.permuter.cli:main"
+permuter   = "dnadesign.permuter:main"
 baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 ops        = "dnadesign.ops.cli:main"
@@ -138,6 +138,11 @@ where = ["src"]
 ]
 "dnadesign.opal" = [
   "src/ops/status.registry.yaml",
+]
+"dnadesign.permuter" = [
+  "src/resources/codon_tables/*.csv",
+  "workspaces/_shared/inputs/*.csv",
+  "workspaces/*/config.yaml",
 ]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",

@@ -167,6 +167,8 @@ def plot(
         "--emit-summaries/--no-emit-summaries",
         help="Emit analysis summaries (e.g., AA LLR Top/Bottom CSV) during plotting (default: on).",
     ),
+    list_plots: bool = typer.Option(False, "--list", help="List supported plot contracts."),
+    describe: str = typer.Option(None, "--describe", help="Describe one supported plot contract."),
     as_json: bool = typer.Option(False, "--json", help="Emit a single machine-readable JSON result."),
 ):
     try:
@@ -181,6 +183,8 @@ def plot(
             height=height,
             font_scale=font_scale,
             emit_summaries=emit_summaries,
+            list_plots=list_plots,
+            describe=describe,
             as_json=as_json,
         )
     except ValueError as exc:

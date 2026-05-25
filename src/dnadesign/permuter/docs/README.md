@@ -8,8 +8,13 @@ multi-site variants with attached model or heuristic scores.
 
 ## Start Here
 
+- [Architecture](architecture.md): ownership boundary, identity semantics, and
+  fail-fast rules for complementary use with USR, Construct, Infer, studies,
+  and Ops.
 - [CLI and data contracts](cli-and-data-contracts.md): command surface, workspace
   scopes, dataset layout, evaluators, and output columns.
+- [Handoffs](handoffs.md): USR materialization, non-executing Infer feature
+  requests, and study-owned candidate promotion boundaries.
 - [Modernization plan](modernization-plan.md): living dev spec for contract,
   workspace, and public API hardening.
 - [RT variant generation](rt_variant_generation.md): multi-mutation RT variant

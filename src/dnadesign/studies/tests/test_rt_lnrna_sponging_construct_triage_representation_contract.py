@@ -40,6 +40,19 @@ def _infer_fixture_payload() -> dict[str, object]:
     return payload
 
 
+def _permuter_plan_path() -> Path:
+    return (
+        _repo_root()
+        / "docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/permuter/rt-cds-dms-plan.yaml"
+    )
+
+
+def _permuter_plan_payload() -> dict[str, object]:
+    payload = yaml.safe_load(_permuter_plan_path().read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
 def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_inputs() -> None:
     audit = validate_registered_representation_table_contract(repo_root=_repo_root())
 
@@ -73,6 +86,32 @@ def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_i
 def test_rt_lnrna_infer_feature_bundle_fixture_selects_every_view_by_explicit_view_name() -> None:
     audit = validate_infer_feature_bundle_payload(_infer_fixture_payload())
 
+    assert audit.ok, "\n".join(audit.errors)
+    assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
+
+
+def test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_infer_handoff() -> None:
+    payload = _permuter_plan_payload()
+    candidate_envelope = payload["candidate_envelope"]
+    infer_handoff = payload["infer_handoff"]
+    feature_bundle_path = (_permuter_plan_path().parent / str(infer_handoff["feature_bundle_ref"])).resolve()
+    feature_bundle_payload = yaml.safe_load(feature_bundle_path.read_text(encoding="utf-8"))
+    assert isinstance(feature_bundle_payload, dict)
+
+    assert payload["kind"] == "permuter_rt_cds_dms_plan_v1"
+    assert payload["owner_boundary"] == "study"
+    assert payload["variant_owner"] == "permuter"
+    assert payload["construct_owner"] == "construct"
+    assert payload["infer_owner"] == "infer"
+    assert candidate_envelope == {
+        "record_kind": "candidate_envelope",
+        "sequence_authority": "overlay_only",
+        "biological_sequence_fields": ["candidate__lnrna_sequence", "candidate__rt_cds_sequence"],
+        "semantic_identity": "candidate__candidate_id",
+        "usr_row_identity": "canonical_sequence_id",
+    }
+    assert tuple(infer_handoff["required_view_names"]) == REQUIRED_SOURCE_VIEW_NAMES
+    audit = validate_infer_feature_bundle_payload(feature_bundle_payload)
     assert audit.ok, "\n".join(audit.errors)
     assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
 

@@ -165,7 +165,10 @@ datasets:
     notes: >-
       USR input dataset for Construct realization. Base row ids remain
       canonical sequence ids; the paired RT-lnRNA candidate id and slot
-      sequences live in the candidate overlay.
+      sequences live in the candidate overlay. Candidate-envelope rows mark
+      `candidate__sequence_authority=overlay_only`; consumers must read the
+      fields named in `candidate__biological_sequence_fields` before treating a
+      row as biological sequence authority.
     derived_lanes:
       - lane_id: rt_cds_in_silico_dms
         owner_tool: study
@@ -173,6 +176,9 @@ datasets:
         dependency_surface: dnadesign.permuter
         source_basis: in_silico_rt_cds_dms
         expected_overlay_columns:
+          - candidate__record_kind
+          - candidate__sequence_authority
+          - candidate__biological_sequence_fields
           - candidate__study_id
           - candidate__construct_contract
           - candidate__representation_contract

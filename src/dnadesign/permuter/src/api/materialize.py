@@ -19,7 +19,6 @@ import pandas as pd
 
 from dnadesign.permuter.src.api.contracts import DatasetRef, PermuterResult, VariantRecord
 from dnadesign.permuter.src.contracts.metrics import observed_metric_column, observed_metric_subcolumn
-from dnadesign.permuter.src.core.ids import variant_id
 from dnadesign.permuter.src.core.storage import (
     append_record_event,
     atomic_write_parquet,
@@ -86,22 +85,15 @@ def _record_to_usr_row(result: PermuterResult, record: VariantRecord) -> dict[st
         bio_type=record.bio_type,
         source=f"permuter api {result.request_id}",
     )
-    if row["id"] != record.id:
-        raise ValueError(f"{record.id}: record.id does not match canonical USR id for sequence")
     permuter = _permuter_payload(record)
     protocol = str(permuter.get("protocol") or _result_protocol(result) or "api")
+    record_var_id = _record_variant_id(record)
     row.update(
         {
             "permuter__scope": result.request_id,
             "permuter__ref": record.ref_name,
             "permuter__protocol": protocol,
-            "permuter__var_id": variant_id(
-                scope=result.request_id,
-                ref=record.ref_name,
-                protocol=protocol,
-                sequence=record.sequence,
-                modifications=list(record.modifications),
-            ),
+            "permuter__var_id": record_var_id,
             "permuter__modifications": list(record.modifications),
             "permuter__round": 1,
         }
@@ -112,9 +104,22 @@ def _record_to_usr_row(result: PermuterResult, record: VariantRecord) -> dict[st
     for key, value in permuter.items():
         if key in {"protocol", "observed"}:
             continue
+        if key == "var_id":
+            if str(value) != record_var_id:
+                raise ValueError(f"{record.id}: metadata.permuter.var_id conflicts with VariantRecord.id")
+            continue
+        if key == "variant_id":
+            raise ValueError(f"{record.id}: metadata.permuter.variant_id is not supported; use VariantRecord.id")
         row[f"permuter__{key}"] = _column_value(value)
     _attach_observed_columns(row, permuter.get("observed"))
     return row
+
+
+def _record_variant_id(record: VariantRecord) -> str:
+    value = str(record.id or "").strip()
+    if not value:
+        raise ValueError("VariantRecord.id is required as the Permuter variant identity")
+    return value
 
 
 def _permuter_payload(record: VariantRecord) -> Mapping[str, object]:

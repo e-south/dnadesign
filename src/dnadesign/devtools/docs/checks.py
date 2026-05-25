@@ -351,6 +351,11 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
+    "src/dnadesign/usr/docs/operations/assembly/permuter-construct-infer-shared-dataset.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
     "src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md": {
         "type": "runbook",
         "plane": "data-plane",

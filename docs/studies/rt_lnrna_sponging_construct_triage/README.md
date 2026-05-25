@@ -52,6 +52,7 @@ rt_lnrna_sponging_construct_triage/
     README.md
   contexts/
     construct-contract.md
+    permuter-onboarding.md
     representation-contract.md
     source-overlays.md
     opal-handoff.md
@@ -70,4 +71,6 @@ Study-owned candidate expansion emits Construct-compatible rows with
 `candidate__lnrna_sequence` and `candidate__rt_cds_sequence`. In silico RT-CDS
 DMS expansion must call the public `dnadesign.permuter` surface and keep
 Permuter provenance in the study-owned `candidate__*` overlay fields. Construct
-still consumes only the named `lnrna` and `rt_cds` slots.
+still consumes only the named `lnrna` and `rt_cds` slots. See
+`contexts/permuter-onboarding.md` for the Permuter boundary and candidate
+envelope rules.

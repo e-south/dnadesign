@@ -45,6 +45,7 @@ _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_
 _MATERIALIZATION_SOURCE = "rt_lnrna_sponging_construct_triage construct materialization"
 _PAYLOAD_PROGRAM_ID = "tetO_sponging_v1"
 _RT_CDS_DMS_SOURCE_BASIS = "in_silico_rt_cds_dms"
+_CANDIDATE_BIOLOGICAL_SEQUENCE_FIELDS = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
 _REQUIRED_SLOT_IDS = ("lnrna", "rt_cds")
 _BASE_TEMPLATE_LNRNA_SPAN_0 = (186, 359)
 _TARGET_CONTEXT_START_0 = 56
@@ -468,6 +469,7 @@ def _candidate_rows(
             # travels through the candidate overlay and usr_label namespace.
             "sequence": "A" * (index + 1),
             "source": _MATERIALIZATION_SOURCE,
+            **_candidate_envelope_overlay(),
         }
         for slot in slots:
             slot_id = str(slot["slot_id"])
@@ -559,6 +561,7 @@ def _catalog_candidate_rows(
             "id": candidate.candidate_id,
             "sequence": "A" * (index + 1),
             "source": _MATERIALIZATION_SOURCE,
+            **_candidate_envelope_overlay(),
             "candidate__lnrna_sequence": candidate.lnrna_sequence,
             "candidate__rt_cds_sequence": candidate.rt_cds_sequence,
         }
@@ -620,6 +623,7 @@ def _rt_cds_dms_candidate_rows(
                 "id": candidate_id,
                 "sequence": "A" * index,
                 "source": _MATERIALIZATION_SOURCE,
+                **_candidate_envelope_overlay(),
                 "candidate__lnrna_sequence": lnrna_sequence,
                 "candidate__rt_cds_sequence": record.sequence,
                 "candidate__study_id": study_id,
@@ -647,6 +651,14 @@ def _rt_cds_dms_candidate_rows(
     if not rows:
         raise MaterializationContractError("Permuter RT-CDS DMS result contained no records.")
     return rows
+
+
+def _candidate_envelope_overlay() -> dict[str, object]:
+    return {
+        "candidate__record_kind": "candidate_envelope",
+        "candidate__sequence_authority": "overlay_only",
+        "candidate__biological_sequence_fields": list(_CANDIDATE_BIOLOGICAL_SEQUENCE_FIELDS),
+    }
 
 
 def _required_result_metadata(result: PermuterResult, field_name: str) -> str:
@@ -833,7 +845,7 @@ def _write_candidate_dataset(*, usr_root: Path, rows: list[dict[str, object]]) -
 
 
 def _candidate_overlay_fields(rows: list[dict[str, object]]) -> tuple[str, ...]:
-    required = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
+    required = _CANDIDATE_BIOLOGICAL_SEQUENCE_FIELDS
     extras = tuple(
         sorted(
             {
@@ -872,7 +884,7 @@ def _candidate_field_type(field_name: str) -> str:
     }
     if field_name in int_fields:
         return "int64"
-    if field_name == "candidate__permuter_modifications":
+    if field_name in {"candidate__biological_sequence_fields", "candidate__permuter_modifications"}:
         return "list<string>"
     return "string"
 

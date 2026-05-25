@@ -47,6 +47,8 @@ def _validate_frame(df, *, strict: bool) -> None:
         raise ValueError(f"{bad} row(s) have incorrect id for (bio_type|sequence)")
     if strict:
         reject_legacy_metric_columns(df, context="validate")
+        if "permuter__variant_id" in df.columns:
+            raise ValueError("permuter__variant_id is not supported; use permuter__var_id")
     for column in df.columns:
         if column in _CORE:
             continue

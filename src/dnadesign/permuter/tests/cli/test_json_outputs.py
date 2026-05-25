@@ -111,6 +111,26 @@ def test_plot_rejects_unsupported_ids_without_traceback(tmp_path: Path) -> None:
     assert "Traceback" not in bad.output
 
 
+def test_plot_registry_list_and_describe_emit_json() -> None:
+    runner = CliRunner()
+
+    listed = runner.invoke(app, ["plot", "--list", "--json"])
+    assert listed.exit_code == 0, listed.output
+    listed_payload = json.loads(listed.output)
+    assert listed_payload["schema"] == "permuter.plot_registry.v1"
+    by_id = {plot["id"]: plot for plot in listed_payload["plots"]}
+    assert "metric_by_mutation_count" in by_id
+    assert by_id["metric_by_mutation_count"]["requires"]
+    assert by_id["metric_by_mutation_count"]["capability"]["data_layer"] == "permuter_records"
+
+    described = runner.invoke(app, ["plot", "--describe", "metric_by_mutation_count", "--json"])
+    assert described.exit_code == 0, described.output
+    described_payload = json.loads(described.output)
+    assert described_payload["schema"] == "permuter.plot_description.v1"
+    assert described_payload["plot"]["id"] == "metric_by_mutation_count"
+    assert described_payload["plot"]["failure_modes"]
+
+
 def _toy_workspace(tmp_path: Path) -> Path:
     workspace = tmp_path / "toy"
     workspace.mkdir(parents=True)

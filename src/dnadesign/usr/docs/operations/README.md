@@ -7,7 +7,7 @@
 **Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-05-24
 
 Use this index to pick the next dataset, sync, or handoff step.
 
@@ -31,6 +31,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | --- | --- |
 | Combine multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md) |
 | Build one construct-backed dataset, then hand it to infer | [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md) |
+| Route Permuter variants through study-owned promotion, Construct context realization, and Infer sidecars | [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md) |
 
 ## Promoter study workflows
 
@@ -64,7 +65,8 @@ Use this index to pick the next dataset, sync, or handoff step.
    [chained-densegen-infer-sync-runbook.md](sync/chained-densegen-infer-runbook.md)
 3. Shared dataset assembly:
    [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md),
-   [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md)
+   [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md),
+   [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md)
 4. Promoter study workflows:
    [promoter-evo2-journey.md](promoter/evo2-journey.md),
    [status contract](../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md),

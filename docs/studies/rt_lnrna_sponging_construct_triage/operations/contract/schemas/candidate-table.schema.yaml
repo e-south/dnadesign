@@ -25,6 +25,12 @@ required_columns:
   sponging_assay_observation_ids: list_or_empty
   candidate_role: controlled_string_or_null
   candidate_note: string_or_null
+usr_candidate_envelope_overlay_required_columns:
+  candidate__record_kind: candidate_envelope
+  candidate__sequence_authority: overlay_only
+  candidate__biological_sequence_fields:
+    - candidate__lnrna_sequence
+    - candidate__rt_cds_sequence
 controlled_values:
   study_id:
     - rt_lnrna_sponging_construct_triage
@@ -60,8 +66,10 @@ forbidden_core_fields:
   - cloning_constraint_set
   - representation_result
 validation_notes:
-  - Copy candidate_id to id only when exporting rt_lnrna_sponging_construct_triage_opal_training_examples_v1.
+  - Do not copy candidate_id into canonical USR id for sequence datasets; keep candidate identity in candidate__candidate_id or study-owned table keys.
+  - If an OPAL export is not a canonical USR sequence dataset, document that explicitly before using candidate_id as row id.
   - Keep study metadata namespaced or in companion sidecars for OPAL export.
+  - "USR candidate-envelope overlays must include candidate__record_kind, candidate__sequence_authority, and candidate__biological_sequence_fields before consumers read records.parquet.sequence as biological authority."
   - "source_basis: lab_anchor is a source-history label, not a Construct part role."
   - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
   - "Use candidate_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."

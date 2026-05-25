@@ -203,6 +203,71 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_ed
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_studies_to_permuter_public_api(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "candidate_expansion.py",
+        "from dnadesign.permuter import CodingDnaDmsRequest, generate_variants\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "permuter" / "__init__.py",
+        "class CodingDnaDmsRequest:\n    pass\n\ndef generate_variants(_request):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_allows_permuter_to_infer_public_facade(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "permuter" / "evaluator.py",
+        "from dnadesign.infer import run_extract\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "infer" / "__init__.py",
+        "def run_extract():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_permuter_to_infer_non_facade(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "permuter" / "evaluator.py",
+        "from dnadesign.infer.runtime import run_extract\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "infer" / "runtime.py",
+        "def run_extract():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "permuter"
+    assert violations[0].imported_tool == "infer"
+    assert violations[0].import_target == "dnadesign.infer.runtime"
+
+
+def test_find_undeclared_cross_tool_imports_rejects_studies_to_permuter_internal_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "candidate_expansion.py",
+        "from dnadesign.permuter.src.api.generate import generate_variants\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "permuter" / "src" / "api" / "generate.py",
+        "def generate_variants(_request):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "permuter"
+
+
 def test_find_undeclared_cross_tool_imports_rejects_studies_to_densegen_non_facade(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "status" / "surface.py",

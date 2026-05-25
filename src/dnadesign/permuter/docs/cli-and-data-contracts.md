@@ -93,6 +93,16 @@ The Parquet table contains USR core columns plus canonical Permuter columns such
 as `permuter__scope`, `permuter__var_id`, `permuter__ref`, `permuter__protocol`,
 `permuter__modifications`, and `permuter__observed__<metric_id>`.
 
+Materialized row identity is split deliberately:
+
+- `id` is the canonical USR sequence id derived from `(bio_type, sequence)`.
+- `permuter__var_id` is the Permuter variant/provenance id carried by the
+  public `VariantRecord.id`.
+
+Do not add a duplicate `permuter__variant_id` column. If a future schema needs a
+different variant identifier, version the materialization contract rather than
+carrying both names.
+
 ## Public API
 
 Sibling tools and studies import from `dnadesign.permuter`, never
@@ -129,3 +139,7 @@ rt_result = generate_variants(
 The public API is filesystem-free and returns typed in-memory records for
 nucleotide, protein, and coding-DNA-backed DMS requests. Coding-DNA requests can
 set `max_variants` to fail before materializing oversized scans.
+
+`materialize_result(...)` writes canonical USR ids even when an in-memory
+`VariantRecord.id` is a Permuter variant id. The variant id is preserved as
+`permuter__var_id`.

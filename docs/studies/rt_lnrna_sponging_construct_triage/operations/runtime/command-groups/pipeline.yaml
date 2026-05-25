@@ -13,6 +13,14 @@ command_groups:
     purpose: Materialize dual-cassette construct contexts from the multi-slot projection manifest.
     blockers:
       - overlay_resolver_not_implemented
+  - id: permuter_rt_cds_dms
+    status: active
+    purpose: Generate RT-CDS DMS variants through the public Permuter API and promote them into study-owned candidate envelopes before Construct realization.
+    commands:
+      - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids
+      - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_infer_handoff
   - id: infer_handoff
     status: blocked
     purpose: Extract feature aliases from declared construct-context views.

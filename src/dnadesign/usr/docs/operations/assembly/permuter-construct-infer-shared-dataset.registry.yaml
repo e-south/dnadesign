@@ -1,0 +1,27 @@
+schema_version: 1
+catalog_order: 52
+registry_id: usr.data-plane.permuter-construct-infer-handoff
+type: runbook
+plane: data-plane
+owner_boundary: usr
+entry_artifact: Permuter variant dataset or study-owned candidate envelope plus explicit Construct target
+exit_artifact: construct-backed USR dataset ready for Infer sequence-view feature sidecars
+summary: Route Permuter-originated variants through study-owned promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals.
+execution_kind: staged
+status_kind: usr-dataset-state
+related_tools:
+  - permuter
+  - construct
+  - infer
+related_tool_routes:
+  - tool: permuter
+    route: handoffs
+  - tool: construct
+    route: template-contexts
+  - tool: infer
+    route: evo2-sequence-features
+relations:
+  - type: see-also
+    target: usr.data-plane.construct-infer-source-of-truth
+  - type: handoff-to
+    target: ops.control-plane.orchestration

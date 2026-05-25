@@ -203,6 +203,9 @@ Current implementation note:
 - The public scoring path shares evaluator output normalization with the CLI:
   scalar, dict, and fixed-vector evaluator outputs become canonical
   `permuter__observed__*` columns when materialized.
+- Public API materialization now keeps USR sequence identity and Permuter
+  variant identity separate: materialized `id` is the canonical USR sequence id,
+  while `VariantRecord.id` is preserved as `permuter__var_id`.
 - This API is still not a substitute for the future Infer feature-bundle/USR
   sidecar bridge. Evo2 feature bundles should use Infer directly until Permuter
   has an explicit sidecar-native evaluator mode.
@@ -225,8 +228,8 @@ Current implementation note:
 
 Permuter's next high-value slice is an explicit Infer bridge:
 
-- Add an evaluator mode that accepts an Infer workspace or feature-bundle plan
-  instead of an ad hoc Evo2 output spec.
+- Add a non-executing handoff manifest that references an Infer workspace or
+  feature-bundle plan instead of an ad hoc Evo2 output spec.
 - Preserve Infer-owned sidecar contracts rather than copying private
   implementation details into Permuter.
 - Decide whether Permuter writes a USR overlay namespace directly or returns a

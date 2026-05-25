@@ -1,0 +1,49 @@
+plan_id: rt_lnrna_sponging_construct_triage_rt_cds_dms_permuter_plan_v1
+kind: permuter_rt_cds_dms_plan_v1
+study_id: rt_lnrna_sponging_construct_triage
+owner_boundary: study
+execution_owner: study
+variant_owner: permuter
+construct_owner: construct
+infer_owner: infer
+base_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+source_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+output_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+permuter_request:
+  request_type: CodingDnaDmsRequest
+  ref_name_suffix: __rt_cds
+  codon_table: ecoli
+  codon_policy: top
+  positions: [1]
+  max_variants: 500
+candidate_envelope:
+  record_kind: candidate_envelope
+  sequence_authority: overlay_only
+  biological_sequence_fields:
+    - candidate__lnrna_sequence
+    - candidate__rt_cds_sequence
+  semantic_identity: candidate__candidate_id
+  usr_row_identity: canonical_sequence_id
+construct_context:
+  contract: dual_cassette_rt_lnrna_expression_v1
+  representation_contract: dual_cassette_construct_context_embedding_v1
+  context_id: dual_cassette_1600bp_context_v1
+  required_slots:
+    - lnrna
+    - rt_cds
+infer_handoff:
+  execution_owner: infer
+  writeback_owner: infer
+  feature_bundle_ref: ../infer/evo2-7b-six-view-feature-bundle.yaml
+  required_view_names:
+    - dual_cassette_1600bp_seq_mean
+    - dual_cassette_1600bp_fwd_rc_concat
+    - lnrna_span_in_construct_anchor_mean
+    - lnrna_span_in_construct_reverse_complement_anchor_mean
+    - rt_cds_span_in_construct_anchor_mean
+    - rt_cds_span_in_construct_reverse_complement_anchor_mean
+rejected_patterns:
+  - permuter_writes_derived_infer
+  - candidate_id_copied_to_usr_id
+  - infer_selects_by_product_kind_only
+  - rt_lnrna_semantics_added_to_permuter

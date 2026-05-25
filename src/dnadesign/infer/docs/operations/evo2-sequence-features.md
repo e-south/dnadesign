@@ -1,7 +1,7 @@
 ## Evo2 Sequence-Feature Runbook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-05-24
 
 Use this runbook when you want the infer-owned part of an Evo2 sequence-feature flow.
 The examples use anchor-only and template-context DNA records because those are
@@ -20,6 +20,7 @@ This page does not own:
 - multi-source study dataset assembly
 - template realization with `construct`
 - downstream OPAL round logic
+- Permuter variant generation or candidate-promotion semantics
 
 ### DNA case contract
 
@@ -52,6 +53,8 @@ that specific checked-in study:
 - keep contexts explicit as separate jobs
 - let `construct` supply template-backed resolved sequences and anchor coordinates
 - let `feature_bundle` decide which feature groups and pooling modes are collected
+- accept Permuter-originated candidates only after they are materialized into a
+  USR/Construct-owned dataset with explicit sequence views
 
 Minimal example:
 
@@ -106,6 +109,18 @@ For each job, the bundle writes:
 The persisted USR columns still follow the generic infer contract:
 
 - `infer__<model_id>__<job_id>__<out_id>`
+
+### Permuter handoff boundary
+
+Permuter may emit a non-executing feature request that points at a USR dataset
+and this Infer feature-bundle surface. Infer remains the execution and writeback
+owner: it validates selectors, executes the model, writes `_derived/infer`
+sidecars, and classifies reusable, stale, or missing vector/scalar payloads.
+
+For multi-view Construct outputs such as RT-lnRNA, handoff configs must select
+explicit `view_name` values or stable aliases. Do not rely on broad selectors
+such as `product_kind: realized_context` plus orientation when the dataset
+contains several semantically distinct views.
 
 ### OPAL handoff
 

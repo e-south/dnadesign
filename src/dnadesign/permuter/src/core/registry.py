@@ -73,7 +73,6 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.protocols.multisite_select.main import MSel
 
             out["multisite_select"] = MSel
-            out["rt_select"] = MSel
         except Exception as e:
             _LOG.debug(
                 "[registry] optional builtin protocol 'multisite_select' not available: %s",
@@ -117,6 +116,8 @@ def _builtins(group: str) -> dict[str, Type]:
 
 
 def get_protocol(name: str) -> Type:
+    if name == "rt_select":
+        raise ValueError("Protocol 'rt_select' is retired; use 'multisite_select' in workspace configs.")
     if not _PROTO:
         # Load plugins then ensure built-ins (core guaranteed or raise).
         _PROTO.update(_load("protocols"))

@@ -13,4 +13,5 @@ rules:
   - Reject unknown payload_program_id values.
   - Reject candidate core fields named perturbation_class, cloning_constraint_set, or representation_result.
   - Require sequence authorities to resolve through GenBank source authority or remain paired with explicit blockers.
+  - Require USR candidate-envelope overlays to declare candidate__record_kind, candidate__sequence_authority, and candidate__biological_sequence_fields.
   - Require abundance_prior_overlay_ids and sponging_assay_observation_ids to remain separate.

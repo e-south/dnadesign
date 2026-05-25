@@ -41,7 +41,12 @@ from dnadesign.permuter.src.plots.metric_by_mutation_count import plot as plot_m
 from dnadesign.permuter.src.plots.mutation_summary import emit_aa_mutation_llr_summary
 from dnadesign.permuter.src.plots.position_scatter_and_heatmap import plot as plot_psh
 from dnadesign.permuter.src.plots.ranked_variants import plot as plot_ranked
-from dnadesign.permuter.src.plots.registry import assert_supported_plot_id, supported_plot_ids
+from dnadesign.permuter.src.plots.registry import (
+    assert_supported_plot_id,
+    plot_description_payload,
+    plot_registry_payload,
+    supported_plot_ids,
+)
 from dnadesign.permuter.src.plots.synergy_scatter import plot as plot_syn
 from dnadesign.permuter.src.workspaces.datasets import resolve_workspace_dataset_path
 
@@ -117,8 +122,31 @@ def plot(
     height: Optional[float] = None,
     font_scale: Optional[float] = None,
     emit_summaries: Optional[bool] = None,
+    list_plots: bool = False,
+    describe: Optional[str] = None,
     as_json: bool = False,
 ) -> dict[str, object]:
+    if list_plots and describe:
+        raise ValueError("Use either --list or --describe, not both.")
+    if list_plots:
+        payload = plot_registry_payload()
+        if as_json:
+            emit_json(payload)
+        else:
+            for item in payload["plots"]:
+                console.print(f"{item['id']}: {item['summary']}")
+        return payload
+    if describe:
+        payload = plot_description_payload(describe)
+        if as_json:
+            emit_json(payload)
+        else:
+            plot_meta = payload["plot"]
+            console.print(f"[bold]{plot_meta['id']}[/bold]")
+            console.print(str(plot_meta["summary"]))
+            console.print("Requires: " + ", ".join(str(item) for item in plot_meta["requires"]))
+        return payload
+
     # Resolve dataset path and load workspace config if provided.
     cfg: Optional[ScopeConfig] = None
     config_path: Optional[Path] = None

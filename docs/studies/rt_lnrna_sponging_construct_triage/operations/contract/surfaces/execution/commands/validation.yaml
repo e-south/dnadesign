@@ -12,6 +12,9 @@ commands:
   construct_projection:
     status: active
     command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_projection.py
+  permuter_rt_cds_dms:
+    status: active
+    command: uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_infer_handoff
   representation_contract:
     status: active
     command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py

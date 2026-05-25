@@ -30,6 +30,8 @@ registered yet.
 | Variant GenBank catalog | `../workbench/provenance/retron-variant-genbank-catalog.yaml` |
 | Parsed feature-offset audit | `../workbench/provenance/genbank-feature-offset-audit.md` |
 | Construct projection manifest | `../operations/contract/fixtures/construct/construct-projection-manifest.yaml` |
+| Permuter RT-CDS DMS onboarding | `../contexts/permuter-onboarding.md` |
+| Permuter RT-CDS DMS fixture | `../operations/contract/fixtures/permuter/rt-cds-dms-plan.yaml` |
 | Representation table contract | `../operations/contract/schemas/representation-table.schema.yaml` |
 | Infer feature-bundle fixture | `../operations/contract/fixtures/infer/evo2-7b-six-view-feature-bundle.yaml` |
 | LatentDNA workspace config | `../../../../src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml` |
@@ -46,6 +48,7 @@ registered yet.
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
 | Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 36 cataloged sources: 35 retron whole-plasmid variants plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
 | Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
+| RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned candidate-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
 | Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture and planned health/ordinal/UMAP gallery config present; sidecars absent |
 | Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | planned materializer present; labels not materialized |
@@ -54,6 +57,8 @@ registered yet.
 ### Boundary Rules
 
 - Candidate rows are paired RT plus lnRNA constructs, not RT-only catalog rows.
+- RT-CDS DMS generation uses public Permuter APIs; promotion into paired
+  candidates stays study-owned.
 - The working/failed `lab_anchor` names are source-history labels, not
   Construct placement roles; Construct sees `lnrna` and `rt_cds` slots.
 - Literature abundance priors are not TF-sponging labels.
