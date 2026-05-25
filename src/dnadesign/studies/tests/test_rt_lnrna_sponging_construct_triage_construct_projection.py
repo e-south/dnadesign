@@ -49,7 +49,7 @@ def test_construct_projection_manifest_uses_public_multi_slot_construct_strategy
     assert audit.construct_template_id == "dual_cassette_rt_lnrna_expression_template_v1"
     assert audit.required_view_names == (
         "dual_cassette_2000bp_seq_mean",
-        "dual_cassette_2000bp_fwd_rc_concat",
+        "dual_cassette_2000bp_reverse_complement_seq_mean",
         "lnrna_span_in_construct_anchor_mean",
         "lnrna_span_in_construct_reverse_complement_anchor_mean",
         "rt_cds_span_in_construct_anchor_mean",
@@ -107,13 +107,23 @@ def test_construct_projection_manifest_rejects_oversized_required_slot() -> None
 
 def test_construct_projection_manifest_rejects_missing_reverse_complement_view() -> None:
     payload = copy.deepcopy(_manifest_payload())
-    payload["representation_views"][1]["required_orientations"] = ["forward"]
+    payload["representation_views"][1]["orientation"] = "forward"
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert "dual_cassette_2000bp_reverse_complement_seq_mean: orientation must be reverse_complement" in audit.errors
+
+
+def test_construct_projection_manifest_rejects_pre_infer_concat_transform() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    payload["representation_views"][1]["downstream_transform"] = "block_normalized_concatenate"
 
     audit = validate_projection_manifest_payload(payload)
 
     assert not audit.ok
     assert (
-        "dual_cassette_2000bp_fwd_rc_concat: required_orientations must be forward, reverse_complement"
+        "dual_cassette_2000bp_reverse_complement_seq_mean: downstream_transform must be empty; concat is post-inference"
     ) in audit.errors
 
 

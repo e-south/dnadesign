@@ -28,3 +28,7 @@ controlled_values:
 validation_notes:
   - This schema owns cloning and design feasibility details.
   - Do not create a separate construct-level cloning_constraint_set object.
+  - rt_lnrna_msd_variant_pool_spec_v1 is the RT-lnRNA study-owned pool contract for compiling MSD primitive combinations into lnRNA variants.
+  - The pool contract must declare template_lnrna, template_msd_design, placement flanks, compiler_inputs, expected_variant_count, max_variant_count, dedupe_policy, and primitive source_refs.
+  - The RT-lnRNA pool patcher inserts reverse_complement(msd_product_sequence_5to3) into the template lnRNA after exact unique template MSD and 5-prime/3-prime flank checks.
+  - Pool rows do not define a pre-Infer concat. Construct receives explicit lnRNA and RT CDS slot sequences; any lnRNA-plus-view concat is a post-Infer LatentDNA concern.

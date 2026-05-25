@@ -17,7 +17,7 @@ the two controls:
 | View | Required source | Pooling |
 | --- | --- | --- |
 | `dual_cassette_2000bp_seq_mean` | One forward `realized_context` sequence view with `context_kind=template_custom`. | `seq_mean` over the full 2,000 bp context. |
-| `dual_cassette_2000bp_fwd_rc_concat` | One reverse-complement `realized_context` companion row with `context_kind=template_custom`. | `seq_mean` over the full RC context; downstream concat pairs it with the forward row. |
+| `dual_cassette_2000bp_reverse_complement_seq_mean` | One reverse-complement `realized_context` companion row with `context_kind=template_custom`. | `seq_mean` over the full RC context. |
 | `lnrna_span_in_construct_anchor_mean` | Forward full construct context with lnRNA span bounds. | `anchor_mean` over the `lnrna` slot. |
 | `lnrna_span_in_construct_reverse_complement_anchor_mean` | Reverse-complement full construct context with orientation-aware lnRNA span bounds. | `anchor_mean` over the `lnrna` slot. |
 | `rt_cds_span_in_construct_anchor_mean` | Forward full construct context with RT CDS span bounds. | `anchor_mean` over the `rt_cds` slot. |
@@ -27,6 +27,12 @@ The views are study representation names, not new USR `product_kind` values.
 Persist them through sequence-view names, aliases, and view semantics. Infer
 must consume declared sequence views and must not reverse-complement, pad,
 window, or infer missing spans implicitly.
+
+Construct provides raw source views only. It must not formalize a pre-Infer
+forward/reverse-complement concat view or attach a `downstream_transform` to the
+Construct projection manifest. Infer extracts sidecars independently for the
+declared forward and reverse-complement sequence views; LatentDNA owns any
+post-inference block-normalized concat after those sidecars exist.
 
 Construct provides the coordinate authority through named slots. Every emitted
 context must carry auditable `construct__slots` spans for both `lnrna` and
@@ -38,11 +44,12 @@ map `construct_output_anchor_part: rt_cds`. Row-level
 single-span consumers, not the authority for every slot in this dual-cassette
 study.
 
-The forward sequence-view row for `dual_cassette_2000bp_seq_mean` is the forward
-member of the forward/reverse-complement concat contract. Do not duplicate the
-same forward emitted sequence merely to attach a second view name; the concat
-feature layer should reference that forward row plus the declared
-reverse-complement row.
+The forward sequence-view row for `dual_cassette_2000bp_seq_mean` and the
+reverse-complement sequence-view row for
+`dual_cassette_2000bp_reverse_complement_seq_mean` are separate Infer inputs.
+Do not duplicate either emitted sequence merely to imply a concat. Derived
+bidirectional aliases may reference both post-Infer vectors, but that is a
+LatentDNA representation step rather than a Construct sequence-view contract.
 The full 2,000 bp context is `2000bp-region.gb`, which maps to pES-retron-26
 `[56,2056)` in zero-based half-open vector coordinates. In the retron26 control
 row the region-relative anchors are `lnrna: [130,303)` and `rt_cds: [468,1431)`.
@@ -123,7 +130,8 @@ controls before Infer runs. Overlay-only rows must not be passed to Infer.
 - Any focal lnRNA span, lnRNA slot, or RT CDS slot clipping fails before Infer.
   Prefix/suffix flank truncation or extension is allowed only when the catalog
   can still emit full lnRNA and RT slot spans inside the 2,000 bp context.
-- Missing reverse-complement view fails the concat alias.
+- Missing reverse-complement source view blocks the downstream bidirectional
+  derived aliases.
 - Missing lnRNA or RT CDS slot span fails the matching anchor-mean view.
 
 The slot anchor views run Evo2 over the full construct context and pool the

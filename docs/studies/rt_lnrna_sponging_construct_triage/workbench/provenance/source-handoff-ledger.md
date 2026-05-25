@@ -20,6 +20,7 @@
 | MSD design registry | `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` | C26/C43 source labels and cap provenance. |
 | MSD cap source lookup | `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml` | C26/C43 cap sequences and source labels. |
 | Scar-nick profile panel | `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml` | Finite engineered variant rationale and MsdDesignSpec provenance. |
+| Compiler MSD lnRNA pool fixture | `docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml` | Bounded study-owned MSD primitive pool that emits compiler-generated lnRNA variants with reverse-complement insertion into the retron26 template lnRNA. |
 | RT-lnRNA variant GenBank metadata | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml` | User-supplied variant comments, Benchling links, and expected RT/lnRNA class. |
 | RT-lnRNA variant GenBank catalog | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml` | Parsed lnRNA and RT slot source authority for 36 Construct-representable variants: 35 whole-plasmid GenBank sources plus the BL21 lnRNA-only source paired with Eco1 WT RT. |
 
@@ -63,6 +64,10 @@ Parsed offsets and SHA-256 values are pinned in
 - 129 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
   CDS DNA, translation-exact RT CDS validation, and the current
   lnRNA-centered 2,000 bp construct-window preflight.
+- 1 compiler-generated MSD lnRNA fixture row compiles from Retron MSD primitive
+  provenance, inserts the reverse complement of the 5-prime-to-3-prime MSD
+  product into the retron26 lnRNA template after exact flank checks, and pairs
+  with fixed Eco1 WT RT.
 - 6,080 RT-CDS in silico DMS construct subjects are generated through the
   public `dnadesign.permuter` coding-DNA DMS API.
 
@@ -71,9 +76,12 @@ Parsed offsets and SHA-256 values are pinned in
 - Khan source rows outside the current Construct window. The sequence-authority
   table resolves 169 RT CDS sequences, but 40 otherwise sequence-authorized rows
   exceed the current lnRNA-centered 2,000 bp geometry.
+  Under the same placement policy, a 2.1 kb context would still block 33 rows,
+  2.2 kb would block 15, 2.3 kb would block 5, 2.5 kb would block 1, and
+  2.626 kb would block 0. The checked-in lane remains fixed at 2,000 bp.
 - Evo2 Infer sidecars for the six declared Construct sequence views.
 - OPAL-ready fixed-size feature table with real sponging labels.
 
-The live consolidated Construct workspace now materializes 10,411 construct
-subjects into 20,822 realized 2,000 bp contexts with 62,466 sequence-view
+The live consolidated Construct workspace now materializes 10,412 construct
+subjects into 20,824 realized 2,000 bp contexts with 62,472 sequence-view
 declarations.

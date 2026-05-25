@@ -1,0 +1,47 @@
+contract: rt_lnrna_msd_variant_pool_spec_v1
+schema_version: 1
+pool_id: rt_lnrna_sponging_construct_triage_compiler_msd_variant_pool_v1
+study_id: rt_lnrna_sponging_construct_triage
+payload_program_id: tetO_sponging_v1
+max_variant_count: 4
+expected_variant_count: 1
+dedupe_policy: fail
+template_lnrna:
+  sequence_ref: genbank:pes-retron-26-a1-a2.gb#a1-a2
+  genbank_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
+  sequence_span_0: [0, 173]
+template_msd_design:
+  construct_id: rt-lnrna-template-retron26
+  payload_id: TetR
+  cap_id: C26
+  left_base: CGGG
+  right_base: ACAG
+  profile_s3s2s1s0: MXMX
+placement:
+  expected_5p_flank: TCCTGCATTGAA
+  expected_3p_flank: GTAAGGGTGCGC
+compiler_inputs:
+  payload_sequences:
+    TetR:
+      sequence: TCCCTATCAGTGATAGAGA
+  cap_sequences:
+    C26:
+      sequence: AGGC
+    C172:
+      sequence: GAGAGACTC
+design_space:
+  construct_id_prefix: rt-lnrna-compiler
+  payload_ids:
+    - TetR
+  cap_ids:
+    - C172
+  stem_bases:
+    - stem_base_id: lagtg_rcaat
+      left_base: AGTG
+      right_base: CAAT
+      profile_s3s2s1s0: MXMM
+      source_ref: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+source_refs:
+  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179

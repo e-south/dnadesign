@@ -8,7 +8,7 @@ source_dataset:
 feature_bundle_ref: ../infer/evo2-7b-six-view-feature-bundle.yaml
 sequence_view_selectors:
   - view_name: dual_cassette_2000bp_seq_mean
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
   - view_name: lnrna_span_in_construct_anchor_mean
   - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
   - view_name: rt_cds_span_in_construct_anchor_mean

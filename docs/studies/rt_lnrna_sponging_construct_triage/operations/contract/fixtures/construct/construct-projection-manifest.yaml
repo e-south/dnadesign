@@ -60,11 +60,10 @@ representation_views:
     pooling_operation: seq_mean
     construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     product_kind: realized_context
-    required_orientations: [forward, reverse_complement]
+    orientation: reverse_complement
     pooling_operation: seq_mean
-    downstream_transform: block_normalized_concatenate
     construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
   - view_name: lnrna_span_in_construct_anchor_mean
@@ -113,7 +112,7 @@ candidates:
       rt_cds: [468, 1431]
     construct_context_view_declarations:
       - dual_cassette_2000bp_seq_mean
-      - dual_cassette_2000bp_fwd_rc_concat
+      - dual_cassette_2000bp_reverse_complement_seq_mean
       - lnrna_span_in_construct_anchor_mean
       - lnrna_span_in_construct_reverse_complement_anchor_mean
       - rt_cds_span_in_construct_anchor_mean
@@ -135,7 +134,7 @@ candidates:
       rt_cds: [475, 1438]
     construct_context_view_declarations:
       - dual_cassette_2000bp_seq_mean
-      - dual_cassette_2000bp_fwd_rc_concat
+      - dual_cassette_2000bp_reverse_complement_seq_mean
       - lnrna_span_in_construct_anchor_mean
       - lnrna_span_in_construct_reverse_complement_anchor_mean
       - rt_cds_span_in_construct_anchor_mean

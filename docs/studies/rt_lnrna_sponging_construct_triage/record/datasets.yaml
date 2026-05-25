@@ -206,6 +206,18 @@ datasets:
           CDS DNA sequence, and translation-exact RT CDS validation from the
           Mestre locus authority path. Rows that exceed the current fixed 2,000
           bp Construct window remain blocked before Construct runtime.
+      - lane_id: compiler_generated_msd_lnrna_variant
+        owner_tool: study
+        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions.resolve_msd_compiler_promotions
+        dependency_surface: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml
+        source_basis: compiler_generated_msd_lnrna_variant
+        notes: >-
+          Compiles bounded Retron MSD primitive combinations into 5-prime to
+          3-prime MSD products, inserts their reverse complements into the
+          retron26 template lnRNA after exact template MSD and flank checks,
+          and pairs the generated lnRNA with fixed Eco1 WT RT. This lane is a
+          study-owned sequence/design-reference source and does not create a
+          pre-Infer concat.
       - lane_id: rt_cds_in_silico_dms
         owner_tool: study
         generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
@@ -249,7 +261,7 @@ datasets:
     row_identity: usr_canonical_emitted_sequence_id
     expected_sequence_views:
       - dual_cassette_2000bp_seq_mean
-      - dual_cassette_2000bp_fwd_rc_concat
+      - dual_cassette_2000bp_reverse_complement_seq_mean
       - lnrna_span_in_construct_anchor_mean
       - lnrna_span_in_construct_reverse_complement_anchor_mean
       - rt_cds_span_in_construct_anchor_mean

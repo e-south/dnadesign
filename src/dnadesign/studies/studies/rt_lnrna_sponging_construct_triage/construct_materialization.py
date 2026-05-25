@@ -36,6 +36,7 @@ from .source_promotions import (
     ConstructWindowPolicy,
     SourceConstructSubjectPromotion,
     SourcePromotionReport,
+    resolve_msd_compiler_promotions,
     resolve_source_construct_subject_promotions,
 )
 from .variant_genbank_catalog import (
@@ -46,6 +47,7 @@ from .variant_genbank_catalog import (
 
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
 _PROJECTION_MANIFEST_PATH = _STUDY_DIR / "operations/contract/fixtures/construct/construct-projection-manifest.yaml"
+_DEFAULT_MSD_COMPILER_POOL_SPEC = _STUDY_DIR / "operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml"
 _STUDY_ID = "rt_lnrna_sponging_construct_triage"
 _INPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
 _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1"
@@ -62,6 +64,7 @@ _CONSTRUCT_SUBJECT_BIOLOGICAL_SEQUENCE_FIELDS = (
     "construct_subject__rt_cds_sequence",
 )
 _CONSTRUCT_SUBJECT_INT_FIELDS = {
+    "construct_subject__msd_product_length_nt",
     "construct_subject__rt_cds_dms_aa_pos",
     "construct_subject__rt_cds_dms_codon_index",
     "construct_subject__source_record_count",
@@ -108,6 +111,7 @@ class UnifiedConstructSubjectMaterializationReport(ControlConstructMaterializati
     genbank_construct_subject_count: int
     crawford_construct_subject_count: int
     khan_construct_subject_count: int
+    msd_compiler_construct_subject_count: int
     rt_cds_dms_construct_subject_count: int
     permuter_request_id: str | None
     source_promotion_report: SourcePromotionReport | None
@@ -187,7 +191,7 @@ def materialize_control_construct_contexts(
                 "context_kind": "template_custom",
                 "orientation": "reverse_complement",
                 "recommended_pooling": "seq_mean",
-                "view_name": "dual_cassette_2000bp_fwd_rc_concat",
+                "view_name": "dual_cassette_2000bp_reverse_complement_seq_mean",
             },
         ],
     )
@@ -465,8 +469,10 @@ def materialize_unified_construct_subject_contexts(
     work_root: Path,
     include_genbank_catalog: bool = True,
     include_source_promotions: bool = True,
+    include_msd_compiler_promotions: bool = True,
     include_rt_cds_dms: bool = True,
     dnadesign_data_root: Path | None = None,
+    msd_variant_pool_spec_paths: tuple[Path, ...] | None = None,
     dms_base_construct_subject_id: str = _DEFAULT_DMS_BASE_CONSTRUCT_SUBJECT_ID,
     rt_cds_positions: tuple[int, ...] = (),
     max_dms_variants: int | None = None,
@@ -487,6 +493,7 @@ def materialize_unified_construct_subject_contexts(
     genbank_construct_subject_count = 0
     crawford_construct_subject_count = 0
     khan_construct_subject_count = 0
+    msd_compiler_construct_subject_count = 0
     rt_cds_dms_construct_subject_count = 0
     permuter_request_id: str | None = None
     source_promotion_report: SourcePromotionReport | None = None
@@ -541,9 +548,14 @@ def materialize_unified_construct_subject_contexts(
                 construct_subject_sequence_overrides={},
                 omitted_construct_subject_fields=set(),
             )
-        wt_parent = _construct_subject_row_by_id(
+        wt_parent = _construct_subject_row_by_id_or_control(
             source_rows,
             construct_subject_id=_DEFAULT_DMS_BASE_CONSTRUCT_SUBJECT_ID,
+            manifest=manifest,
+            authority=authority,
+            template_sequence=template_sequence,
+            target_start=target_start,
+            target_end=target_end,
         )
         source_promotion_report = resolve_source_construct_subject_promotions(
             dnadesign_data_root=(root / (dnadesign_data_root or _DEFAULT_DNADESIGN_DATA_ROOT)).resolve(),
@@ -576,6 +588,62 @@ def materialize_unified_construct_subject_contexts(
                         window_offset_bp=None,
                     )
                 )
+
+    if include_msd_compiler_promotions:
+        source_rows = rows
+        if not source_rows:
+            source_rows, _expected_control_sequences = _candidate_rows(
+                manifest=manifest,
+                authority=authority,
+                template_sequence=template_sequence,
+                target_start=target_start,
+                target_end=target_end,
+                construct_subject_sequence_overrides={},
+                omitted_construct_subject_fields=set(),
+            )
+        wt_parent = _construct_subject_row_by_id_or_control(
+            source_rows,
+            construct_subject_id=_DEFAULT_DMS_BASE_CONSTRUCT_SUBJECT_ID,
+            manifest=manifest,
+            authority=authority,
+            template_sequence=template_sequence,
+            target_start=target_start,
+            target_end=target_end,
+        )
+        pool_spec_paths = msd_variant_pool_spec_paths or (_DEFAULT_MSD_COMPILER_POOL_SPEC,)
+        msd_promotions: list[SourceConstructSubjectPromotion] = []
+        for pool_spec_path in pool_spec_paths:
+            msd_promotions.extend(
+                resolve_msd_compiler_promotions(
+                    repo_root=root,
+                    pool_spec_path=root / pool_spec_path,
+                    wt_rt_cds_sequence=_required_candidate_sequence(wt_parent, "construct_subject__rt_cds_sequence"),
+                    window_policy=_source_promotion_window_policy(
+                        manifest=manifest,
+                        template_sequence=template_sequence,
+                        target_start=target_start,
+                        target_end=target_end,
+                    ),
+                )
+            )
+        msd_rows, msd_expected = _source_promotion_rows(
+            manifest=manifest,
+            template_sequence=template_sequence,
+            target_start=target_start,
+            target_end=target_end,
+            promotions=tuple(msd_promotions),
+        )
+        if msd_rows:
+            _extend_construct_subject_rows(rows, msd_rows)
+            expected_sequences.update(msd_expected)
+            msd_compiler_construct_subject_count = len(msd_rows)
+            run_groups.append(
+                _ConstructSubjectRunGroup(
+                    name="compiler_generated_msd_lnrna_variant",
+                    subject_ids=tuple(str(row["id"]) for row in msd_rows),
+                    window_offset_bp=None,
+                )
+            )
 
     if include_rt_cds_dms:
         source_rows = rows
@@ -692,6 +760,7 @@ def materialize_unified_construct_subject_contexts(
         genbank_construct_subject_count=genbank_construct_subject_count,
         crawford_construct_subject_count=crawford_construct_subject_count,
         khan_construct_subject_count=khan_construct_subject_count,
+        msd_compiler_construct_subject_count=msd_compiler_construct_subject_count,
         rt_cds_dms_construct_subject_count=rt_cds_dms_construct_subject_count,
         permuter_request_id=permuter_request_id,
         source_promotion_report=source_promotion_report,
@@ -988,6 +1057,30 @@ def _construct_subject_row_by_id(rows: list[dict[str, object]], *, construct_sub
             f"Base construct subject is not unique in selected sequence authority: {construct_subject_id}"
         )
     return matches[0]
+
+
+def _construct_subject_row_by_id_or_control(
+    rows: list[dict[str, object]],
+    *,
+    construct_subject_id: str,
+    manifest: dict[str, object],
+    authority: GenBankAuthorityAudit,
+    template_sequence: str,
+    target_start: int,
+    target_end: int,
+) -> dict[str, object]:
+    if any(str(row.get("id")) == construct_subject_id for row in rows):
+        return _construct_subject_row_by_id(rows, construct_subject_id=construct_subject_id)
+    control_rows, _expected_control_sequences = _candidate_rows(
+        manifest=manifest,
+        authority=authority,
+        template_sequence=template_sequence,
+        target_start=target_start,
+        target_end=target_end,
+        construct_subject_sequence_overrides={},
+        omitted_construct_subject_fields=set(),
+    )
+    return _construct_subject_row_by_id(control_rows, construct_subject_id=construct_subject_id)
 
 
 def _required_candidate_sequence(row: Mapping[str, object], field_name: str) -> str:
@@ -1429,7 +1522,7 @@ def _context_output_variants() -> list[dict[str, object]]:
             "context_kind": "template_custom",
             "orientation": "reverse_complement",
             "recommended_pooling": "seq_mean",
-            "view_name": "dual_cassette_2000bp_fwd_rc_concat",
+            "view_name": "dual_cassette_2000bp_reverse_complement_seq_mean",
         },
     ]
 

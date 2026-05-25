@@ -17,7 +17,7 @@ source_sequence_views:
     context_kind: template_custom
     orientation: forward
     pooling_operation: seq_mean
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: reverse_complement
@@ -72,7 +72,7 @@ infer_feature_outputs:
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__mean_per_token
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     output_kind: vector
     model_name: evo2_7b
     representation_kind: intermediate_embedding
@@ -81,7 +81,7 @@ infer_feature_outputs:
     dimension: 4096
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     output_kind: vector
     model_name: evo2_7b
     representation_kind: output_layer_mean
@@ -89,11 +89,11 @@ infer_feature_outputs:
     dimension: 512
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__total
-  - view_name: dual_cassette_2000bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_reverse_complement_seq_mean
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__mean_per_token
@@ -275,7 +275,7 @@ construct_subject_promotion:
     - construct_subject__rt_cds_sequence
   required_construct_views:
     - dual_cassette_2000bp_seq_mean
-    - dual_cassette_2000bp_fwd_rc_concat
+    - dual_cassette_2000bp_reverse_complement_seq_mean
     - lnrna_span_in_construct_anchor_mean
     - lnrna_span_in_construct_reverse_complement_anchor_mean
     - rt_cds_span_in_construct_anchor_mean

@@ -11,6 +11,7 @@ from .contracts import (
     SourcePromotionIssue,
     SourcePromotionReport,
 )
+from .msd_compiler import resolve_msd_compiler_promotions
 from .resolver import resolve_source_construct_subject_promotions
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "SourcePromotionContractError",
     "SourcePromotionIssue",
     "SourcePromotionReport",
+    "resolve_msd_compiler_promotions",
     "resolve_source_construct_subject_promotions",
 ]

@@ -16,6 +16,7 @@ from .contracts import (
 )
 from .crawford import resolve_crawford_promotions
 from .khan import resolve_khan_promotions
+from .msd_compiler import resolve_msd_compiler_promotions
 
 
 def resolve_source_construct_subject_promotions(
@@ -23,12 +24,16 @@ def resolve_source_construct_subject_promotions(
     dnadesign_data_root: Path,
     wt_rt_cds_sequence: str,
     window_policy: ConstructWindowPolicy,
+    repo_root: Path | None = None,
+    msd_variant_pool_spec_paths: tuple[Path, ...] = (),
 ) -> SourcePromotionReport:
     """Resolve literature sources into Construct-ready RT-lnRNA subjects.
 
     Crawford is an Eco1-local lnRNA/MSD source, so promoted rows use fixed WT
     Eco1 RT. Khan rows are promoted only when the source table carries explicit
-    ncRNA DNA and translation-exact RT CDS authority.
+    ncRNA DNA and translation-exact RT CDS authority. Compiler-generated MSD
+    pool specs are optional and explicit because they are study-owned sequence
+    design references, not literature abundance priors.
     """
 
     data_root = Path(dnadesign_data_root).resolve()
@@ -58,6 +63,19 @@ def resolve_source_construct_subject_promotions(
             issues=issues,
         )
     )
+    if msd_variant_pool_spec_paths and repo_root is None:
+        raise SourcePromotionContractError("repo_root is required when resolving MSD compiler pool spec paths.")
+    if repo_root is not None:
+        root = Path(repo_root).resolve()
+        for spec_path in msd_variant_pool_spec_paths:
+            promotions = resolve_msd_compiler_promotions(
+                repo_root=root,
+                pool_spec_path=spec_path,
+                wt_rt_cds_sequence=wt_rt,
+                window_policy=window_policy,
+            )
+            source_row_counts[str(Path(spec_path))] = len(promotions)
+            candidates.extend(promotions)
 
     duplicate_ids = duplicates(candidate.construct_subject_id for candidate in candidates)
     if duplicate_ids:

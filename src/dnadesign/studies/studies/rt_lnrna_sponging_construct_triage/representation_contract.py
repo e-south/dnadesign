@@ -28,7 +28,7 @@ _EXPECTED_INTERMEDIATE_DIMENSION = 4096
 _EXPECTED_OUTPUT_LAYER_DIMENSION = 512
 REQUIRED_SOURCE_VIEW_NAMES = (
     "dual_cassette_2000bp_seq_mean",
-    "dual_cassette_2000bp_fwd_rc_concat",
+    "dual_cassette_2000bp_reverse_complement_seq_mean",
     "lnrna_span_in_construct_anchor_mean",
     "lnrna_span_in_construct_reverse_complement_anchor_mean",
     "rt_cds_span_in_construct_anchor_mean",
@@ -36,7 +36,7 @@ REQUIRED_SOURCE_VIEW_NAMES = (
 )
 _VIEW_POOLING = {
     "dual_cassette_2000bp_seq_mean": ("seq_mean", None),
-    "dual_cassette_2000bp_fwd_rc_concat": ("seq_mean", None),
+    "dual_cassette_2000bp_reverse_complement_seq_mean": ("seq_mean", None),
     "lnrna_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
     "lnrna_span_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
     "rt_cds_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),

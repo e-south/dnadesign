@@ -36,6 +36,20 @@ abundance-observation row, or both. They are not asserted to recreate the exact
 Crawford synthetic expression context, and their A1/A2 extension geometry is
 not assumed to match the dnadesign A1/A2=20 convention.
 
+### Compiler-Generated MSD
+
+Compiler-generated MSD rows are study-owned sequence/design references derived
+from bounded Retron MSD primitive combinations. They are Crawford-like only in
+the sense that they contribute lnRNA variant sequence authority. They are not
+literature abundance priors, not OPAL `Y`, and not a pre-Infer concat lane.
+
+The promotion gate compiles a pure MSD unit, records the cap, stem-base, payload,
+and primitive provenance, then patches the template lnRNA only when the insert
+equals the reverse complement of the 5-prime-to-3-prime MSD product. The template
+must contain exactly one reverse-complemented template MSD span and the declared
+5-prime and 3-prime flanks. Duplicate generated lnRNA sequences and Construct
+window violations fail before USR/Construct materialization.
+
 ### Join Rule
 
 Source rows can become overlays or provenance records. They are not construct
@@ -43,8 +57,8 @@ views and are not lab TF-sponging labels. A source row becomes a construct subje
 only after the study names a construct-compatible RT plus lnRNA pairing and it
 passes representability checks.
 
-When a Khan or Crawford source row is promoted, it must move through the same
-Construct and Infer path as the controls: write both
+When a Khan, Crawford, or compiler-generated MSD source row is promoted, it must
+move through the same Construct and Infer path as the controls: write both
 `construct_subject__lnrna_sequence` and `construct_subject__rt_cds_sequence` into
 `rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1`, emit the
 realized 2,000 bp contexts into

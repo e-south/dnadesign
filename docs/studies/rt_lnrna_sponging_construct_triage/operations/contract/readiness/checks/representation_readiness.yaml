@@ -11,7 +11,7 @@ rules:
   - Use Construct named slots for lnRNA and RT CDS; do not precompose them into one hidden anchor.
   - Validate product_kind remains realized_context for emitted construct contexts.
   - Validate context_kind is template_custom for the 2,000 bp construct views.
-  - Validate forward and reverse-complement views are explicitly declared before concat.
+  - Validate forward and reverse-complement source views are explicitly declared before LatentDNA derives post-inference concat aliases.
   - Validate lnRNA and RT CDS anchor_mean pooling bounds before Infer.
   - Reject RT-lnRNA Infer configs that select by product_kind plus orientation without explicit view_name.
   - Collect intermediate_embedding block26_mlp_out means, output_layer_mean vectors, log_likelihood total, and log_likelihood mean_per_token per selected view.

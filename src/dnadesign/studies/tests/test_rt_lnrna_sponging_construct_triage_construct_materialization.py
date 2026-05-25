@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from Bio import SeqIO
 from Bio.Seq import Seq
 
 from dnadesign.permuter import (
@@ -33,6 +34,8 @@ from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_mate
 )
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions import (
     ConstructWindowPolicy,
+    SourcePromotionContractError,
+    resolve_msd_compiler_promotions,
     resolve_source_construct_subject_promotions,
 )
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions.common import (
@@ -42,6 +45,8 @@ from dnadesign.usr import Dataset, load_sequence_views
 
 _CONSTRUCT_SUBJECT_SEQUENCE_FIELDS = ("construct_subject__lnrna_sequence", "construct_subject__rt_cds_sequence")
 _WT_RT_CDS_SEQUENCE = "ATG" * 320 + "TAA"
+_TETO_PAYLOAD = "tccctatcagtgatagaga"
+_SNAPBACK_FOLDBACK = "GAGAGACTC"
 
 
 def _repo_root() -> Path:
@@ -207,6 +212,79 @@ def _write_source_promotion_fixture(data_root: Path) -> None:
     )
 
 
+def _write_msd_compiler_pool_spec(
+    path: Path,
+    *,
+    cap_ids: tuple[str, ...] = ("C172",),
+    expected_5p_flank: str = "TCCTGCATTGAA",
+    expected_3p_flank: str = "GTAAGGGTGCGC",
+    max_variant_count: int = 4,
+    expected_variant_count: int | None = 1,
+    extra_cap_sequences: dict[str, str] | None = None,
+) -> Path:
+    cap_sequences = {
+        "C26": "AGGC",
+        "C172": _SNAPBACK_FOLDBACK,
+        **(extra_cap_sequences or {}),
+    }
+    expected_line = "" if expected_variant_count is None else f"expected_variant_count: {expected_variant_count}\n"
+    cap_sequence_lines = "\n".join(
+        f"    {cap_id}:\n      sequence: {sequence}" for cap_id, sequence in cap_sequences.items()
+    )
+    cap_id_lines = "\n".join(f"    - {cap_id}" for cap_id in cap_ids)
+    source_ref = (
+        "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179"
+    )
+    path.write_text(
+        f"""contract: rt_lnrna_msd_variant_pool_spec_v1
+schema_version: 1
+pool_id: test_compiler_msd_pool_v1
+study_id: rt_lnrna_sponging_construct_triage
+payload_program_id: tetO_sponging_v1
+max_variant_count: {max_variant_count}
+{expected_line}dedupe_policy: fail
+template_lnrna:
+  sequence_ref: genbank:pes-retron-26-a1-a2.gb#a1-a2
+  genbank_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
+  sequence_span_0: [0, 173]
+template_msd_design:
+  construct_id: rt-lnrna-template-retron26
+  payload_id: TetR
+  cap_id: C26
+  left_base: CGGG
+  right_base: ACAG
+  profile_s3s2s1s0: MXMX
+placement:
+  expected_5p_flank: {expected_5p_flank}
+  expected_3p_flank: {expected_3p_flank}
+compiler_inputs:
+  payload_sequences:
+    TetR:
+      sequence: {_TETO_PAYLOAD.upper()}
+  cap_sequences:
+{cap_sequence_lines}
+design_space:
+  construct_id_prefix: rt-lnrna-compiler
+  payload_ids:
+    - TetR
+  cap_ids:
+{cap_id_lines}
+  stem_bases:
+    - stem_base_id: lagtg_rcaat
+      left_base: AGTG
+      right_base: CAAT
+      profile_s3s2s1s0: MXMM
+      source_ref: {source_ref}
+      nick_orientation: bottom
+      nickase: Nb.BtsI
+source_refs:
+  - {source_ref}
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1].upper()
 
@@ -285,7 +363,7 @@ def test_rt_lnrna_controls_materialize_real_2000bp_construct_context_views(tmp_p
     for view in views:
         views_by_name.setdefault(view.view_name, []).append(view)
     assert sorted(views_by_name) == [
-        "dual_cassette_2000bp_fwd_rc_concat",
+        "dual_cassette_2000bp_reverse_complement_seq_mean",
         "dual_cassette_2000bp_seq_mean",
         "lnrna_span_in_construct_anchor_mean",
         "lnrna_span_in_construct_reverse_complement_anchor_mean",
@@ -294,7 +372,9 @@ def test_rt_lnrna_controls_materialize_real_2000bp_construct_context_views(tmp_p
     ]
     assert all(len(view_rows) == 2 for view_rows in views_by_name.values())
     assert {view.orientation for view in views_by_name["dual_cassette_2000bp_seq_mean"]} == {"forward"}
-    assert {view.orientation for view in views_by_name["dual_cassette_2000bp_fwd_rc_concat"]} == {"reverse_complement"}
+    assert {view.orientation for view in views_by_name["dual_cassette_2000bp_reverse_complement_seq_mean"]} == {
+        "reverse_complement"
+    }
     assert {
         (view.anchor_start_0, view.anchor_end_0) for view in views_by_name["lnrna_span_in_construct_anchor_mean"]
     } == {(130, 303), (123, 310)}
@@ -344,7 +424,7 @@ def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_
     assert len(views) == 216
     assert {view.view_name for view in views if view.parent_sequence_id == input_id and view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
-        "dual_cassette_2000bp_fwd_rc_concat",
+        "dual_cassette_2000bp_reverse_complement_seq_mean",
         "lnrna_span_in_construct_anchor_mean",
         "lnrna_span_in_construct_reverse_complement_anchor_mean",
         "rt_cds_span_in_construct_anchor_mean",
@@ -437,6 +517,7 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
         repo_root=_repo_root(),
         work_root=tmp_path,
         include_source_promotions=False,
+        include_msd_compiler_promotions=False,
         rt_cds_positions=(1,),
     )
 
@@ -466,7 +547,7 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
     assert len(views) == 330
     assert {view.view_name for view in views if view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
-        "dual_cassette_2000bp_fwd_rc_concat",
+        "dual_cassette_2000bp_reverse_complement_seq_mean",
         "lnrna_span_in_construct_anchor_mean",
         "lnrna_span_in_construct_reverse_complement_anchor_mean",
         "rt_cds_span_in_construct_anchor_mean",
@@ -486,12 +567,14 @@ def test_rt_lnrna_unified_construct_subjects_promote_crawford_and_block_khan_wit
         include_genbank_catalog=False,
         include_rt_cds_dms=False,
         include_source_promotions=True,
+        include_msd_compiler_promotions=False,
         dnadesign_data_root=data_root,
     )
 
     assert report.genbank_construct_subject_count == 0
     assert report.crawford_construct_subject_count == 2
     assert report.khan_construct_subject_count == 0
+    assert report.msd_compiler_construct_subject_count == 0
     assert report.rt_cds_dms_construct_subject_count == 0
     assert report.source_promotion_report is not None
     assert report.source_promotion_report.issues_by_reason == {"missing_source_rt_cds_sequence": 1}
@@ -521,6 +604,146 @@ def test_rt_lnrna_unified_construct_subjects_promote_crawford_and_block_khan_wit
     assert set(output["construct_subject__source_basis"]) == {"crawford_eco1_lnrna_fixed_wt_rt"}
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
     assert len(views) == 12
+
+
+def test_rt_lnrna_msd_compiler_promotes_reverse_complement_inserted_lnrna(tmp_path: Path) -> None:
+    spec_path = _write_msd_compiler_pool_spec(tmp_path / "msd-pool.yaml")
+
+    promotions = resolve_msd_compiler_promotions(
+        repo_root=_repo_root(),
+        pool_spec_path=spec_path,
+        wt_rt_cds_sequence=_WT_RT_CDS_SEQUENCE,
+        window_policy=_source_window_policy(),
+    )
+
+    assert len(promotions) == 1
+    promotion = promotions[0]
+    variant_product_5to3 = (
+        "GTCAGAAAAAA"
+        + "AGTG"
+        + _TETO_PAYLOAD.upper()
+        + _SNAPBACK_FOLDBACK.upper()
+        + _reverse_complement(_TETO_PAYLOAD)
+        + "CAAT"
+        + "ACAGTAACTCAGA"
+    )
+    template_product_5to3 = (
+        "GTCAGAAAAAA"
+        + "CGGG"
+        + _TETO_PAYLOAD.upper()
+        + "AGGC"
+        + _reverse_complement(_TETO_PAYLOAD)
+        + "ACAG"
+        + "ACAGTAACTCAGA"
+    )
+    template_sequence = str(
+        SeqIO.read(
+            _repo_root()
+            / "docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb",
+            "genbank",
+        ).seq
+    ).upper()
+    template_insert = _reverse_complement(template_product_5to3)
+    insert_start = template_sequence.index(template_insert)
+    expected_lnrna = (
+        template_sequence[:insert_start]
+        + _reverse_complement(variant_product_5to3)
+        + template_sequence[insert_start + len(template_insert) :]
+    )
+
+    assert promotion.lnrna_sequence == expected_lnrna
+    assert promotion.lnrna_sequence != template_sequence
+    assert variant_product_5to3 not in promotion.lnrna_sequence
+    assert _reverse_complement(variant_product_5to3) in promotion.lnrna_sequence
+    assert promotion.rt_cds_sequence == _WT_RT_CDS_SEQUENCE
+    assert promotion.source_basis == "compiler_generated_msd_lnrna_variant"
+    assert promotion.lnrna_authority_kind == "compiler_generated_lnrna_sequence"
+    assert promotion.rt_cds_authority_kind == "fixed_eco1_wt_rt"
+    assert promotion.overlay_fields["construct_subject__role"] == "compiler_lnrna_variant"
+    assert promotion.overlay_fields["construct_subject__msd_cap_id"] == "C172"
+    assert promotion.overlay_fields["construct_subject__msd_stem_base_left"] == "AGTG"
+    assert promotion.overlay_fields["construct_subject__msd_stem_base_right"] == "CAAT"
+    assert promotion.overlay_fields["construct_subject__msd_insert_orientation"] == "reverse_complement"
+
+
+def test_rt_lnrna_msd_compiler_rejects_template_flank_mismatch(tmp_path: Path) -> None:
+    spec_path = _write_msd_compiler_pool_spec(tmp_path / "msd-pool.yaml", expected_5p_flank="AAAAAAAAAAAA")
+
+    with pytest.raises(SourcePromotionContractError, match="5' flank"):
+        resolve_msd_compiler_promotions(
+            repo_root=_repo_root(),
+            pool_spec_path=spec_path,
+            wt_rt_cds_sequence=_WT_RT_CDS_SEQUENCE,
+            window_policy=_source_window_policy(),
+        )
+
+
+def test_rt_lnrna_msd_compiler_rejects_over_budget_combinatorics(tmp_path: Path) -> None:
+    spec_path = _write_msd_compiler_pool_spec(
+        tmp_path / "msd-pool.yaml",
+        cap_ids=("C172", "C173"),
+        max_variant_count=1,
+        expected_variant_count=None,
+        extra_cap_sequences={"C173": "GGAAGATCC"},
+    )
+
+    with pytest.raises(SourcePromotionContractError, match="exceeds max_variant_count"):
+        resolve_msd_compiler_promotions(
+            repo_root=_repo_root(),
+            pool_spec_path=spec_path,
+            wt_rt_cds_sequence=_WT_RT_CDS_SEQUENCE,
+            window_policy=_source_window_policy(),
+        )
+
+
+def test_rt_lnrna_msd_compiler_rejects_duplicate_generated_lnrna(tmp_path: Path) -> None:
+    spec_path = _write_msd_compiler_pool_spec(
+        tmp_path / "msd-pool.yaml",
+        cap_ids=("C172", "C172dup"),
+        expected_variant_count=2,
+        extra_cap_sequences={"C172dup": _SNAPBACK_FOLDBACK},
+    )
+
+    with pytest.raises(SourcePromotionContractError, match="Duplicate compiler-generated lnRNA sequence"):
+        resolve_msd_compiler_promotions(
+            repo_root=_repo_root(),
+            pool_spec_path=spec_path,
+            wt_rt_cds_sequence=_WT_RT_CDS_SEQUENCE,
+            window_policy=_source_window_policy(),
+        )
+
+
+def test_rt_lnrna_unified_construct_subjects_include_msd_compiler_pool(tmp_path: Path) -> None:
+    report = materialize_unified_construct_subject_contexts(
+        repo_root=_repo_root(),
+        work_root=tmp_path,
+        include_genbank_catalog=False,
+        include_source_promotions=False,
+        include_msd_compiler_promotions=True,
+        include_rt_cds_dms=False,
+        msd_variant_pool_spec_paths=(_write_msd_compiler_pool_spec(tmp_path / "msd-pool.yaml"),),
+    )
+
+    assert report.genbank_construct_subject_count == 0
+    assert report.crawford_construct_subject_count == 0
+    assert report.khan_construct_subject_count == 0
+    assert report.msd_compiler_construct_subject_count == 1
+    assert report.rt_cds_dms_construct_subject_count == 0
+    assert len(report.input_ids_by_subject_id) == 1
+    _assert_construct_subject_envelope_inputs(report)
+    _assert_construct_output_subject_bridge(report)
+    _assert_usr_contracts_strictly_validate(report)
+
+    inputs = Dataset(report.usr_root, report.input_dataset).head(n=5)
+    assert set(inputs["construct_subject__source_basis"]) == {"compiler_generated_msd_lnrna_variant"}
+    assert set(inputs["construct_subject__role"]) == {"compiler_lnrna_variant"}
+    assert set(inputs["construct_subject__msd_insert_orientation"]) == {"reverse_complement"}
+
+    output = Dataset(report.usr_root, report.output_dataset).head(n=10)
+    assert output.shape[0] == 2
+    assert set(output["construct_subject__source_basis"]) == {"compiler_generated_msd_lnrna_variant"}
+    views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
+    assert len(views) == 6
 
 
 def test_rt_lnrna_source_promotions_include_validated_khan_rt_lnrna_rows(

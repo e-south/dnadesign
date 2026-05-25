@@ -13,10 +13,11 @@
 The study has checked-in Phase 0/1 contracts, a consolidated Construct
 materialization path for GenBank-authorized retrons, Crawford source-sequence
 promotions, Khan source RT-lnRNA rows that fit the current 2,000 bp construct
-geometry, and RT-CDS in silico DMS variants, plus a fixed-size
-representation-table contract for the next Infer/LatentDNA handoff. It is not
-ready for OPAL training because Evo2 feature sidecars and materialized
-`SpongingAssayObservation` labels are still absent.
+geometry, a bounded compiler-generated MSD lnRNA variant fixture pool, and
+RT-CDS in silico DMS variants, plus a fixed-size representation-table contract
+for the next Infer/LatentDNA handoff. It is not ready for OPAL training because
+Evo2 feature sidecars and materialized `SpongingAssayObservation` labels are
+still absent.
 
 ### Current Evidence
 
@@ -81,13 +82,20 @@ ready for OPAL training because Evo2 feature sidecars and materialized
   rows, but still leaves 40 otherwise sequence-authorized Khan rows blocked. It
   is therefore a normalized Eco1-sized lane, not a complete cross-retron
   coverage lane.
-- The live consolidated Construct input dogfood contains 10,411 construct
+- The compiler-generated MSD lnRNA fixture pool lives at
+  `../operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml`.
+  It compiles bounded Retron MSD primitive combinations through the pure
+  compiler API, requires `lnrna_insert_sequence_5to3` to equal the reverse
+  complement of the MSD product, exact-matches the retron26 template MSD plus
+  5-prime/3-prime flanks, and writes ordinary Construct subject rows with fixed
+  Eco1 WT RT. It does not formalize or materialize a pre-Infer concat.
+- The live consolidated Construct input dogfood contains 10,412 construct
   subjects: 36 GenBank-authorized subjects, 4,166 Crawford source-sequence
-  subjects paired with fixed WT Eco1 RT, 129 Khan source RT-lnRNA subjects, and
-  6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
-  API.
-- The live Construct output dogfood validates strictly with 20,822 realized
-  context rows and 62,466 explicit sequence-view declarations. Each construct
+  subjects paired with fixed WT Eco1 RT, 129 Khan source RT-lnRNA subjects, 1
+  compiler-generated MSD lnRNA variant subject, and 6,080 RT-CDS DMS subjects
+  generated through the public `dnadesign.permuter` API.
+- The live Construct output dogfood validates strictly with 20,824 realized
+  context rows and 62,472 explicit sequence-view declarations. Each construct
   subject has all six required view names.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
   fixed-size representation-table contract, including expected Evo2 7B vector
@@ -132,6 +140,10 @@ ready for OPAL training because Evo2 feature sidecars and materialized
   their source ncRNA. Complete coverage needs either a larger context or an
   alternate windowing contract before those rows can enter the six-view Infer
   lane.
+  The current over-window pressure test gives this coverage curve under the same
+  placement policy: 2.1 kb still blocks 33 rows, 2.2 kb blocks 15, 2.3 kb
+  blocks 5, 2.5 kb blocks 1, and 2.626 kb blocks 0. The active lane remains
+  fixed at 2,000 bp until a separate larger-context contract is chosen.
 - Crawford source-context equivalence. Promoted Crawford source lnRNA sequences
   are projected into the dnadesign dual-cassette context and explicitly
   annotated as not native/exact Crawford expression-context recreations; A1/A2

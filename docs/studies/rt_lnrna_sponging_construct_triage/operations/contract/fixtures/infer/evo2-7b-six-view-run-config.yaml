@@ -27,7 +27,7 @@ jobs:
         - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
           root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
           view_selector:
-            view_name: dual_cassette_2000bp_fwd_rc_concat
+            view_name: dual_cassette_2000bp_reverse_complement_seq_mean
           pooling:
             operation: seq_mean
         - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1

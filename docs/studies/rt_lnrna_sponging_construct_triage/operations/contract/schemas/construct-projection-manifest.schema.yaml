@@ -46,13 +46,15 @@ representation_view_contract:
   required_fields:
     view_name: string
     product_kind: realized_context
+    orientation: controlled_string
     pooling_operation: controlled_string
     required_slots: list_string
     construct_output_anchor_part: string_or_null
   slot_pooling_rule: The lnRNA and RT CDS anchor-mean views map pooling_slot to Construct output_variants[].anchor_part for the same named slot.
+  transform_rule: Construct source views must not declare pre-Infer concat transforms; LatentDNA owns post-inference derived concat aliases.
   required_view_names:
     - dual_cassette_2000bp_seq_mean
-    - dual_cassette_2000bp_fwd_rc_concat
+    - dual_cassette_2000bp_reverse_complement_seq_mean
     - lnrna_span_in_construct_anchor_mean
     - lnrna_span_in_construct_reverse_complement_anchor_mean
     - rt_cds_span_in_construct_anchor_mean

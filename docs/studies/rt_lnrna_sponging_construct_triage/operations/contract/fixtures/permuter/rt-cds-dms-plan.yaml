@@ -44,7 +44,7 @@ infer_handoff:
   feature_bundle_ref: ../infer/evo2-7b-six-view-feature-bundle.yaml
   required_view_names:
     - dual_cassette_2000bp_seq_mean
-    - dual_cassette_2000bp_fwd_rc_concat
+    - dual_cassette_2000bp_reverse_complement_seq_mean
     - lnrna_span_in_construct_anchor_mean
     - lnrna_span_in_construct_reverse_complement_anchor_mean
     - rt_cds_span_in_construct_anchor_mean

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -178,6 +178,24 @@ def load_msd_compiler_spec(
 ) -> ResolvedMsdCompilerSpec:
     spec_path = Path(path).expanduser().resolve()
     payload = load_compiler_spec_mapping(spec_path)
+    return resolve_msd_compiler_spec_payload(
+        payload,
+        spec_path=spec_path,
+        study_dir=study_dir,
+        allow_non_ligatable_s0=allow_non_ligatable_s0,
+    )
+
+
+def resolve_msd_compiler_spec_payload(
+    payload: Mapping[str, Any],
+    *,
+    study_dir: str | Path,
+    spec_path: str | Path | None = None,
+    allow_non_ligatable_s0: bool = False,
+) -> ResolvedMsdCompilerSpec:
+    if not isinstance(payload, Mapping):
+        raise MsdCompilerSpecError("Compiler spec payload must be a mapping.")
+    resolved_spec_path = Path(spec_path).expanduser().resolve() if spec_path is not None else Path("<inline>")
     spec = RetronMsdCompilerSpecV1.model_validate(payload)
     registry = load_retron_msd_registry(study_dir)
 
@@ -221,7 +239,7 @@ def load_msd_compiler_spec(
     _reject_duplicate_design_ids(records)
     _validate_cap_topology_bounds(records, cap_sequences=cap_sequences)
     return ResolvedMsdCompilerSpec(
-        spec_path=spec_path,
+        spec_path=resolved_spec_path,
         catalog=MsdDesignCatalogV1(records=records),
         payload_sequences=payload_sequences,
         cap_sequences=cap_sequences,
@@ -415,4 +433,5 @@ __all__ = [
     "ResolvedMsdCompilerSpec",
     "RetronMsdCompilerSpecV1",
     "load_msd_compiler_spec",
+    "resolve_msd_compiler_spec_payload",
 ]

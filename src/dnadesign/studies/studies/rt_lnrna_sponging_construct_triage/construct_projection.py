@@ -40,7 +40,7 @@ _EXPECTED_SLOT_CONTRACTS = {
 }
 _REQUIRED_VIEW_NAMES = (
     "dual_cassette_2000bp_seq_mean",
-    "dual_cassette_2000bp_fwd_rc_concat",
+    "dual_cassette_2000bp_reverse_complement_seq_mean",
     "lnrna_span_in_construct_anchor_mean",
     "lnrna_span_in_construct_reverse_complement_anchor_mean",
     "rt_cds_span_in_construct_anchor_mean",
@@ -464,19 +464,13 @@ def _validate_view_shape(*, view_name: str, view: dict[str, object], errors: lis
             errors.append(f"{view_name}: pooling_operation must be seq_mean")
         if _string(view.get("construct_output_anchor_part")):
             errors.append(f"{view_name}: construct_output_anchor_part must be empty")
-    if view_name == "dual_cassette_2000bp_fwd_rc_concat":
-        required_orientations = tuple(
-            str(value)
-            for value in _list(
-                view.get("required_orientations"),
-                label=f"{view_name}.required_orientations",
-                errors=errors,
-            )
-        )
-        if required_orientations != ("forward", "reverse_complement"):
-            errors.append(f"{view_name}: required_orientations must be forward, reverse_complement")
-        if _string(view.get("downstream_transform")) != "block_normalized_concatenate":
-            errors.append(f"{view_name}: downstream_transform must be block_normalized_concatenate")
+    if view_name == "dual_cassette_2000bp_reverse_complement_seq_mean":
+        if _string(view.get("orientation")) != "reverse_complement":
+            errors.append(f"{view_name}: orientation must be reverse_complement")
+        if _string(view.get("pooling_operation")) != "seq_mean":
+            errors.append(f"{view_name}: pooling_operation must be seq_mean")
+        if _string(view.get("downstream_transform")):
+            errors.append(f"{view_name}: downstream_transform must be empty; concat is post-inference")
         if _string(view.get("construct_output_anchor_part")):
             errors.append(f"{view_name}: construct_output_anchor_part must be empty")
     if view_name in _ANCHOR_VIEW_CONTRACTS:

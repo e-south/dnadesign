@@ -45,6 +45,7 @@ controlled_values:
     - genbank_variant_catalog
     - crawford_eco1_lnrna_fixed_wt_rt
     - khan_source_rt_lnrna_reference
+    - compiler_generated_msd_lnrna_variant
     - in_silico_rt_cds_dms
     - manual_control
   construct_projection_status:
@@ -61,6 +62,7 @@ controlled_values:
     - construct_subject
     - literature_lnrna_reference
     - literature_rt_lnrna_reference
+    - compiler_lnrna_variant
     - in_silico_rt_cds_dms_variant
     - null
 forbidden_core_fields:
@@ -75,4 +77,6 @@ validation_notes:
   - "source_basis: lab_anchor is a source-history label, not a Construct part role."
   - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
   - "source_basis: crawford_eco1_lnrna_fixed_wt_rt promotes the Crawford design-reference plus abundance-observation sequence union with fixed Eco1 WT RT when the lnRNA sequence passes Eco1 forward k-mer orientation QC; exact MSD/flank matches are QC annotations, not required authority."
+  - "source_basis: compiler_generated_msd_lnrna_variant marks study-owned MSD primitive combinatorics patched into lnRNA sequence authority with fixed Eco1 WT RT; it is a sequence/design-reference source, not an abundance prior."
+  - "compiler_lnrna_variant rows must carry construct_subject__msd_insert_orientation=reverse_complement and exact template flank placement provenance."
   - "Use construct_subject_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."
