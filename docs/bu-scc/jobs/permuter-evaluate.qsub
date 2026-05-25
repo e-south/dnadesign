@@ -1,0 +1,127 @@
+#!/bin/bash -l
+#$ -N dnadesign_permuter_evaluate
+#$ -l h_rt=04:00:00
+#$ -pe omp 4
+#$ -l mem_per_core=8G
+#$ -l gpus=1
+#$ -l gpu_c=8.9
+#$ -j y
+#$ -o /dev/null
+
+set -euo pipefail
+
+# Permuter closed-loop evaluate wrapper.
+# Required:
+#   PERMUTER_WORKSPACE: workspace dir, config.yaml path, or registered scope id
+#   PERMUTER_REF:       reference row name from refs.csv
+# Optional:
+#   PERMUTER_RUN_FIRST=1
+#   PERMUTER_OUT=<output root>
+#   PERMUTER_RUN_ARGS='--overwrite'
+#   PERMUTER_EVALUATE_ARGS='--with llr:evo2_llr:log_likelihood_ratio'
+#   PERMUTER_TRACE_ROOT=<explicit runtime trace dir>
+
+if [[ -z "${PERMUTER_WORKSPACE:-}" ]]; then
+  echo "PERMUTER_WORKSPACE is required." >&2
+  exit 2
+fi
+if [[ -z "${PERMUTER_REF:-}" ]]; then
+  echo "PERMUTER_REF is required so SCC jobs do not guess among refs.csv rows." >&2
+  exit 2
+fi
+
+if [[ -n "${PERMUTER_TRACE_ROOT:-}" ]]; then
+  trace_root="$PERMUTER_TRACE_ROOT"
+elif [[ -f "$PERMUTER_WORKSPACE" ]]; then
+  trace_root="$(cd "$(dirname "$PERMUTER_WORKSPACE")" && pwd)/outputs/logs/ops/runtime"
+elif [[ -d "$PERMUTER_WORKSPACE" ]]; then
+  trace_root="$(cd "$PERMUTER_WORKSPACE" && pwd)/outputs/logs/ops/runtime"
+else
+  trace_root="$(pwd)/outputs/logs/ops/runtime/permuter"
+fi
+mkdir -p "$trace_root"
+job_id_value="${JOB_ID:-manual}"
+task_id_value="${SGE_TASK_ID:-}"
+trace_suffix="$job_id_value"
+if [[ -n "$task_id_value" && "$task_id_value" != "undefined" && "$task_id_value" != "NONE" ]]; then
+  trace_suffix="$trace_suffix.$task_id_value"
+fi
+trace_log="$trace_root/dnadesign_permuter_evaluate.$trace_suffix.trace.log"
+exec > >(tee -a "$trace_log") 2>&1
+
+echo "trace_log=$trace_log"
+
+if command -v module >/dev/null 2>&1; then
+  module purge || true
+  if [[ -n "${CUDA_MODULE:-}" ]]; then
+    module load "$CUDA_MODULE"
+  fi
+  if [[ -n "${GCC_MODULE:-}" ]]; then
+    module load "$GCC_MODULE"
+  fi
+fi
+
+if command -v gcc >/dev/null 2>&1; then
+  export CC="${CC:-$(which gcc)}"
+  export CXX="${CXX:-$(which g++)}"
+  export CUDAHOSTCXX="${CUDAHOSTCXX:-$(which g++)}"
+fi
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
+export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-permuter}"
+export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$trace_suffix}"
+
+out_args=()
+if [[ -n "${PERMUTER_OUT:-}" ]]; then
+  out_args=(--out "$PERMUTER_OUT")
+fi
+
+run_args=()
+if [[ -n "${PERMUTER_RUN_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  run_args=($PERMUTER_RUN_ARGS)
+fi
+
+evaluate_args=()
+if [[ -n "${PERMUTER_EVALUATE_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  evaluate_args=($PERMUTER_EVALUATE_ARGS)
+fi
+
+set +e
+uv run permuter workspace validate --workspace "$PERMUTER_WORKSPACE"
+validate_rc=$?
+set -e
+if [[ "$validate_rc" -ne 0 ]]; then
+  echo "permuter workspace validate failed (exit=$validate_rc)" >&2
+  exit "$validate_rc"
+fi
+
+if [[ "${PERMUTER_RUN_FIRST:-0}" == "1" ]]; then
+  set +e
+  uv run permuter run \
+    --workspace "$PERMUTER_WORKSPACE" \
+    --ref "$PERMUTER_REF" \
+    "${out_args[@]}" \
+    "${run_args[@]}" \
+    --json
+  run_rc=$?
+  set -e
+  if [[ "$run_rc" -ne 0 ]]; then
+    echo "permuter run failed (exit=$run_rc)" >&2
+    exit "$run_rc"
+  fi
+fi
+
+set +e
+uv run permuter evaluate \
+  --workspace "$PERMUTER_WORKSPACE" \
+  --ref "$PERMUTER_REF" \
+  "${out_args[@]}" \
+  "${evaluate_args[@]}" \
+  --json
+evaluate_rc=$?
+set -e
+if [[ "$evaluate_rc" -ne 0 ]]; then
+  echo "permuter evaluate failed (exit=$evaluate_rc)" >&2
+  exit "$evaluate_rc"
+fi

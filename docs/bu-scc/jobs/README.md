@@ -5,6 +5,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
+- `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ### Quick start
@@ -23,6 +24,9 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
+  docs/bu-scc/jobs/permuter-evaluate.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -128,6 +132,25 @@ Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
 - [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
+### Permuter evaluate submissions
+
+```bash
+qsub -P <project> \
+  -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with llr:evo2_llr:log_likelihood_ratio' \
+  docs/bu-scc/jobs/permuter-evaluate.qsub
+```
+
+`permuter-evaluate.qsub` command defaults:
+- fail-fast gates: `PERMUTER_WORKSPACE` and `PERMUTER_REF` are required
+- preflight: `uv run permuter workspace validate --workspace "$PERMUTER_WORKSPACE"`
+- optional generation: set `PERMUTER_RUN_FIRST=1` to run `permuter run --json` before evaluation
+- evaluation: `uv run permuter evaluate --json`; pass explicit metrics with `PERMUTER_EVALUATE_ARGS` or define `evaluate.metrics[]` in the workspace config
+- actor tags: `USR_ACTOR_TOOL=permuter`, `USR_ACTOR_RUN_ID=${JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
+- runtime trace: `<PERMUTER_WORKSPACE directory>/outputs/logs/ops/runtime/dnadesign_permuter_evaluate.$JOB_ID.trace.log` when `PERMUTER_WORKSPACE` is a path; pass `PERMUTER_TRACE_ROOT` for registered scope ids
+- output override: pass `PERMUTER_OUT=<output root>` to mirror local `permuter run/evaluate --out`
+
+This wrapper is intentionally a Permuter surface, not an Infer workaround. Evo2 evaluators still call through Permuter's evaluator registry; feature-bundle or USR-sidecar Infer jobs should use the Infer runbook/template directly until the Permuter sidecar-native bridge lands.
+
 ### Notify watcher submissions
 
 Preferred mode (profile-driven, secure by default):
@@ -212,10 +235,13 @@ What it does:
 
 ### Logs
 
-Each script writes logs to:
+Scheduler stdout and runtime traces:
 
-- `outputs/logs/$JOB_NAME.$JOB_ID.out`
+- most templates write scheduler stdout to `outputs/logs/$JOB_NAME.$JOB_ID.out`
+- `permuter-evaluate.qsub` sets scheduler stdout to `/dev/null` and tees its
+  own runtime trace after it resolves the workspace
 - DenseGen runtime traces: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
+- Permuter runtime traces: `<PERMUTER_WORKSPACE directory>/outputs/logs/ops/runtime/dnadesign_permuter_evaluate.$JOB_ID.trace.log`
 
 Tail logs:
 

@@ -34,6 +34,7 @@ Use this with:
 | Notify watcher | batch CPU | `-l h_rt=24:00:00 -pe omp 1 -l mem_per_core=2G` | Low-footprint long-running watcher. |
 | Evo2 7B inference/smoke | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Default SCC lane for `evo2_7b`. |
 | Evo2 20B inference | batch GPU | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=9.0` | Model-fit floor for `evo2_20b`. If the current `.venv` is family-pinned, also pass an exact selector such as `-l gpu_t=RTXP6000 -l gpu_c=12.0` for the visible SCC Blackwell lane. |
+| Permuter closed-loop evaluate | batch GPU when using Evo2 evaluators | `-l h_rt=04:00:00 -pe omp 4 -l mem_per_core=8G -l gpus=1 -l gpu_c=8.9` | Use `permuter-evaluate.qsub`; omit GPU requests only for placeholder or CPU-only evaluators. |
 | Large downloads / model prefetch / dataset transfer | transfer-node | `-l download -l h_rt=24:00:00 -pe omp 1` | Do not run compute-heavy tasks here. |
 
 ### Copy/paste commands
@@ -66,13 +67,23 @@ uv run dense inspect config --probe-solver -c <config.yaml>
 
 ```bash
 qsub -P <project> \
-  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
 For `evo2_20b`, prefer the ops runbook path so the resource declaration stays attached to the run config. If you submit directly, add `-l gpus=1 -l gpu_c=9.0` for the generic model floor, or `-l gpus=1 -l gpu_c=12.0 -l gpu_t=RTXP6000` for the current SCC Blackwell lane.
 
-#### 5) Notify profile setup + watcher submit
+#### 5) Permuter closed-loop evaluate submit
+
+```bash
+qsub -P <project> \
+  -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with llr:evo2_llr:log_likelihood_ratio' \
+  docs/bu-scc/jobs/permuter-evaluate.qsub
+```
+
+Use the GPU defaults above for Evo2-backed evaluators. For placeholder or CPU-only evaluators, submit the same wrapper with CPU resources and omit `-l gpus`.
+
+#### 6) Notify profile setup + watcher submit
 
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
@@ -105,7 +116,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-#### 6) Transfer-node job for large artifacts
+#### 7) Transfer-node job for large artifacts
 
 ```bash
 qsub -l download <<'QSUB'

@@ -83,6 +83,7 @@ set -euo pipefail
 Use versioned templates from [BU SCC jobs README](../jobs/README.md):
 - [DenseGen CPU batch template](../jobs/densegen-cpu.qsub)
 - [Evo2 GPU template](../jobs/evo2-gpu-infer.qsub)
+- [Permuter evaluate template](../jobs/permuter-evaluate.qsub)
 - [Notify watcher template](../jobs/notify-watch.qsub)
 
 Before first Evo2 submit on a host, run:
@@ -98,6 +99,9 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
+  docs/bu-scc/jobs/permuter-evaluate.qsub
 qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
