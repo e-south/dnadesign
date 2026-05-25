@@ -4,9 +4,9 @@ registry_id: usr.data-plane.permuter-construct-infer-handoff
 type: runbook
 plane: data-plane
 owner_boundary: usr
-entry_artifact: Permuter variant dataset or study-owned candidate envelope plus explicit Construct target
+entry_artifact: Permuter variant dataset or study-owned construct-subject envelope plus explicit Construct target
 exit_artifact: construct-backed USR dataset ready for Infer sequence-view feature sidecars
-summary: Route Permuter-originated variants through study-owned promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals.
+summary: Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals.
 execution_kind: staged
 status_kind: usr-dataset-state
 related_tools:

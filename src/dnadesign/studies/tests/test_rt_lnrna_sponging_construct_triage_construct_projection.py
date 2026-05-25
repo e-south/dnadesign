@@ -48,19 +48,19 @@ def test_construct_projection_manifest_uses_public_multi_slot_construct_strategy
     assert audit.strategy_id == "construct_multi_slot_assembly_v1"
     assert audit.construct_template_id == "dual_cassette_rt_lnrna_expression_template_v1"
     assert audit.required_view_names == (
-        "dual_cassette_1600bp_seq_mean",
-        "dual_cassette_1600bp_fwd_rc_concat",
+        "dual_cassette_2000bp_seq_mean",
+        "dual_cassette_2000bp_fwd_rc_concat",
         "lnrna_span_in_construct_anchor_mean",
         "lnrna_span_in_construct_reverse_complement_anchor_mean",
         "rt_cds_span_in_construct_anchor_mean",
         "rt_cds_span_in_construct_reverse_complement_anchor_mean",
     )
-    assert audit.candidate_count == 2
-    assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"] == {
+    assert audit.construct_subject_count == 2
+    assert audit.construct_subject_spans["rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"] == {
         "lnrna": (130, 303),
         "rt_cds": (468, 1431),
     }
-    assert audit.candidate_spans["rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO"] == {
+    assert audit.construct_subject_spans["rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO"] == {
         "lnrna": (123, 310),
         "rt_cds": (475, 1438),
     }
@@ -113,7 +113,7 @@ def test_construct_projection_manifest_rejects_missing_reverse_complement_view()
 
     assert not audit.ok
     assert (
-        "dual_cassette_1600bp_fwd_rc_concat: required_orientations must be forward, reverse_complement"
+        "dual_cassette_2000bp_fwd_rc_concat: required_orientations must be forward, reverse_complement"
     ) in audit.errors
 
 
@@ -139,11 +139,13 @@ def test_construct_projection_manifest_rejects_missing_rt_cds_anchor_part_mappin
 
 def test_construct_projection_manifest_rejects_swapped_slot_sequence_fields() -> None:
     payload = copy.deepcopy(_manifest_payload())
-    payload["slots"][0]["sequence_field"] = "candidate__rt_cds_sequence"
-    payload["slots"][1]["sequence_field"] = "candidate__lnrna_sequence"
+    payload["slots"][0]["sequence_field"] = "construct_subject__rt_cds_sequence"
+    payload["slots"][1]["sequence_field"] = "construct_subject__lnrna_sequence"
 
     audit = validate_projection_manifest_payload(payload)
 
     assert not audit.ok
-    assert "slot lnrna must use role=lnrna_cassette and sequence_field=candidate__lnrna_sequence" in audit.errors
-    assert "slot rt_cds must use role=rt_cds and sequence_field=candidate__rt_cds_sequence" in audit.errors
+    assert (
+        "slot lnrna must use role=lnrna_cassette and sequence_field=construct_subject__lnrna_sequence" in audit.errors
+    )
+    assert "slot rt_cds must use role=rt_cds and sequence_field=construct_subject__rt_cds_sequence" in audit.errors

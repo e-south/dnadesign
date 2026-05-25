@@ -1,0 +1,78 @@
+schema_id: synthetic_rt_lnrna_sponging_construct_subject_table_v1
+study_id: rt_lnrna_sponging_construct_triage
+row_kind: SyntheticRtLnrnaSpongingConstruct
+required_columns:
+  construct_subject_id: string
+  study_id: string
+  construct_contract: string
+  representation_contract: string
+  payload_program_id: string
+  rt_cds_sequence_id: string
+  rt_source: string
+  rt_variant: string
+  rt_protein_provenance_id: string
+  lnrna_sequence_id: string
+  lnrna_source: string
+  lnrna_design_id: string
+  lnrna_provenance_id: string
+  msd_design_spec_id: string_or_null
+  variant_derivation: string_or_null
+  source_basis: controlled_string
+  construct_projection_status: controlled_string
+  construct_id: string_or_null
+  construct_context_view_ids: list_or_empty
+  abundance_prior_overlay_ids: list_or_empty
+  sponging_assay_observation_ids: list_or_empty
+  construct_subject_role: controlled_string_or_null
+  construct_subject_note: string_or_null
+usr_construct_subject_envelope_overlay_required_columns:
+  construct_subject__record_kind: construct_subject_envelope
+  construct_subject__sequence_authority: overlay_only
+  construct_subject__biological_sequence_fields:
+    - construct_subject__lnrna_sequence
+    - construct_subject__rt_cds_sequence
+controlled_values:
+  study_id:
+    - rt_lnrna_sponging_construct_triage
+  construct_contract:
+    - dual_cassette_rt_lnrna_expression_v1
+  representation_contract:
+    - dual_cassette_construct_context_embedding_v1
+  payload_program_id:
+    - tetO_sponging_v1
+  source_basis:
+    - lab_anchor
+    - genbank_variant_catalog
+    - crawford_eco1_lnrna_fixed_wt_rt
+    - khan_source_rt_lnrna_reference
+    - in_silico_rt_cds_dms
+    - manual_control
+  construct_projection_status:
+    - pending
+    - representable
+    - not_representable
+    - excluded
+  construct_subject_role:
+    - working_control
+    - failed_control
+    - weak_rescue_control
+    - negative_control
+    - reference_overlay
+    - construct_subject
+    - literature_lnrna_reference
+    - literature_rt_lnrna_reference
+    - in_silico_rt_cds_dms_variant
+    - null
+forbidden_core_fields:
+  - perturbation_class
+  - cloning_constraint_set
+  - representation_result
+validation_notes:
+  - Do not copy construct_subject_id into canonical USR id for sequence datasets; keep construct-subject identity in construct_subject__id or study-owned table keys.
+  - If an OPAL export is not a canonical USR sequence dataset, document that explicitly before using construct_subject_id as row id.
+  - Keep study metadata namespaced or in companion sidecars for OPAL export.
+  - "USR construct-subject-envelope overlays must include construct_subject__record_kind, construct_subject__sequence_authority, and construct_subject__biological_sequence_fields before consumers read records.parquet.sequence as biological authority."
+  - "source_basis: lab_anchor is a source-history label, not a Construct part role."
+  - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
+  - "source_basis: crawford_eco1_lnrna_fixed_wt_rt promotes the Crawford design-reference plus abundance-observation sequence union with fixed Eco1 WT RT when the lnRNA sequence passes Eco1 forward k-mer orientation QC; exact MSD/flank matches are QC annotations, not required authority."
+  - "Use construct_subject_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."

@@ -31,7 +31,7 @@ Use this index to pick the next dataset, sync, or handoff step.
 | --- | --- |
 | Combine multiple USR-backed producer datasets before construct and infer share one downstream dataset | [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md) |
 | Build one construct-backed dataset, then hand it to infer | [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md) |
-| Route Permuter variants through study-owned promotion, Construct context realization, and Infer sidecars | [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md) |
+| Route Permuter RT-lnRNA (`rt_lnrna`) variants through study-owned construct-subject promotion, Construct context realization, and Infer sidecars | [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md) |
 
 ## Promoter study workflows
 

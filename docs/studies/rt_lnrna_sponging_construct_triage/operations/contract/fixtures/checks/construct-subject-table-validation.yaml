@@ -1,11 +1,11 @@
-fixture_id: candidate-table-validation
+fixture_id: construct-subject-table-validation
 expected_status: pass_with_genbank_source_authority_and_construct_representability_manifest
 source_authority_registry: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
 construct_projection_manifest: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct/construct-projection-manifest.yaml
 candidate_fixture_paths:
-  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/candidates/retron26-working-anchor.yaml
-  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/candidates/retron43-failed-anchor.yaml
-expected_candidate_ids:
+  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron26-working-anchor.yaml
+  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
+expected_construct_subject_ids:
   - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
   - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
 expected_blockers:

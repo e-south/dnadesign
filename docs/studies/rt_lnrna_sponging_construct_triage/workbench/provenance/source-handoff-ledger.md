@@ -1,6 +1,6 @@
 ## Source Handoff Ledger
 
-- Last verified: 2026-05-24
+- Last verified: 2026-05-25
 - Owner: dnadesign-maintainers
 
 ### Live Inventories
@@ -9,6 +9,7 @@
 | --- | --- | ---: | --- |
 | Khan abundance prior overlay | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/overlays/abundance_prior_overlay.tsv` | 99 | Numeric RT-DNA abundance prior. |
 | Khan RT/ncRNA references | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_references.tsv` | 171 | Cross-retron provenance bridge. |
+| Khan RT/ncRNA sequence authority | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_sequence_authority.tsv` | 171 | Terminal-keyed ncRNA plus explicit RT CDS authority contract. |
 | Crawford abundance observations | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/overlays/eco1_ncrna_abundance_observations.tsv` | 4174 | Eco1-local msDNA abundance prior. |
 | Crawford lnRNA/MSD references | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/references/eco1_lnrna_msd_designs.tsv` | 2578 | Eco1-local sequence/design references. |
 
@@ -27,7 +28,7 @@
 | Source | Path | Record | Length | Use |
 | --- | --- | --- | ---: | --- |
 | pES retron-26 expression vector | `genbank/pes-retron-26.gb` | `pES-retron-26` | 4956 | Working-anchor vector constants, lnRNA offsets, and RT in vector context. |
-| Dual-cassette 1,600 bp region | `genbank/1600bp-region.gb` | `1600bp-region` | 1600 | Target context authority; maps to pES retron-26 `[56,1656)` in zero-based half-open coordinates. |
+| Dual-cassette 2,000 bp region | `genbank/2000bp-region.gb` | `2000bp-region` | 2000 | Target context authority; maps to pES retron-26 `[56,2056)` in zero-based half-open coordinates. |
 | pES retron-26 a1-a2 | `genbank/pes-retron-26-a1-a2.gb` | `pES-retron-26-a1-a2` | 173 | Working-anchor lnRNA/a1-a2 subcomponent offsets. |
 | Eco1 WT RT | `genbank/retron-eco1-rt.gb` | `retron-Eco1-rt` | 963 | Canonical Eco1 WT RT CDS and translation reference. |
 | pES retron-43 expression vector | `genbank/pes-retron-43.gb` | `pES-retron-43` | 4970 | Failed-anchor vector constants, lnRNA offsets, and RT in vector context. |
@@ -48,15 +49,31 @@ Parsed offsets and SHA-256 values are pinned in
 - Exact retron43 lnRNA cassette source:
   `genbank:pes-retron-43.gb#a1-a2`.
 - Exact pES retron-26 and pES retron-43 vector constants in source records.
-- Exact 1,600 bp target context:
-  `genbank:1600bp-region.gb#record`, contained in pES retron-26 at `[56,1656)`.
+- Exact 2,000 bp target context:
+  `genbank:2000bp-region.gb#record`, contained in pES retron-26 at `[56,2056)`.
+- 36 GenBank-authorized RT-lnRNA construct subjects resolve to explicit lnRNA
+  and RT CDS slot sequences.
+- 4,166 Crawford Eco1-local source lnRNA sequences from the design-reference
+  plus abundance-observation union pass DNA4 validation, Eco1 forward k-mer
+  orientation QC, and reverse-complement rejection, then project with fixed WT
+  Eco1 RT. Exact MSD and short-flank matches are retained as QC annotations
+  because source variants can intentionally alter those regions. These rows are
+  annotated as dnadesign-context projections, not exact Crawford expression
+  context recreations.
+- 129 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
+  CDS DNA, translation-exact RT CDS validation, and the current
+  lnRNA-centered 2,000 bp construct-window preflight.
+- 6,080 RT-CDS in silico DMS construct subjects are generated through the
+  public `dnadesign.permuter` coding-DNA DMS API.
 
 ### Remaining Blockers
 
-- Construct context view materialization from the audited offsets and the
-  checked multi-slot projection manifest.
+- Khan source rows outside the current Construct window. The sequence-authority
+  table resolves 169 RT CDS sequences, but 40 otherwise sequence-authorized rows
+  exceed the current lnRNA-centered 2,000 bp geometry.
+- Evo2 Infer sidecars for the six declared Construct sequence views.
 - OPAL-ready fixed-size feature table with real sponging labels.
 
-The two lab-anchor-derived candidate rows are source-authority resolved and
-construct-representable under `construct_multi_slot_assembly_v1`, but
-materialized context views have not been written yet.
+The live consolidated Construct workspace now materializes 10,411 construct
+subjects into 20,822 realized 2,000 bp contexts with 62,466 sequence-view
+declarations.

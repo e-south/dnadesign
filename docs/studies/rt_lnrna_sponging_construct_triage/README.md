@@ -62,15 +62,15 @@ rt_lnrna_sponging_construct_triage/
     provenance/
 ```
 
-Generated construct, Infer, LatentDNA, OPAL, and large candidate-table outputs
+Generated construct, Infer, LatentDNA, OPAL, and large construct-subject-table outputs
 belong in explicit runtime workspaces, not in this record root.
 
 ### Candidate Expansion Contract
 
 Study-owned candidate expansion emits Construct-compatible rows with
-`candidate__lnrna_sequence` and `candidate__rt_cds_sequence`. In silico RT-CDS
+`construct_subject__lnrna_sequence` and `construct_subject__rt_cds_sequence`. In silico RT-CDS
 DMS expansion must call the public `dnadesign.permuter` surface and keep
-Permuter provenance in the study-owned `candidate__*` overlay fields. Construct
+Permuter provenance in the study-owned `construct_subject__*` overlay fields. Construct
 still consumes only the named `lnrna` and `rt_cds` slots. See
 `contexts/permuter-onboarding.md` for the Permuter boundary and candidate
 envelope rules.

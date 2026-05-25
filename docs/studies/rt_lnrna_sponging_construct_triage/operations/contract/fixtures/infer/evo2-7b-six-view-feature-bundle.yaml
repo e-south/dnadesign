@@ -4,40 +4,40 @@ collect_log_likelihood: true
 collect_output_layer_mean: true
 collect_intermediate_embedding: true
 sequence_view_inputs:
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: dual_cassette_1600bp_seq_mean
+      view_name: dual_cassette_2000bp_seq_mean
     pooling:
       operation: seq_mean
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: dual_cassette_1600bp_fwd_rc_concat
+      view_name: dual_cassette_2000bp_fwd_rc_concat
     pooling:
       operation: seq_mean
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
       view_name: lnrna_span_in_construct_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
       view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
       view_name: rt_cds_span_in_construct_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
-  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
       view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean

@@ -32,23 +32,24 @@ registered yet.
 | Construct projection manifest | `../operations/contract/fixtures/construct/construct-projection-manifest.yaml` |
 | Permuter RT-CDS DMS onboarding | `../contexts/permuter-onboarding.md` |
 | Permuter RT-CDS DMS fixture | `../operations/contract/fixtures/permuter/rt-cds-dms-plan.yaml` |
+| Permuter-to-Infer request fixture | `../operations/contract/fixtures/permuter/rt-cds-dms-infer-handoff.yaml` |
 | Representation table contract | `../operations/contract/schemas/representation-table.schema.yaml` |
 | Infer feature-bundle fixture | `../operations/contract/fixtures/infer/evo2-7b-six-view-feature-bundle.yaml` |
 | LatentDNA workspace config | `../../../../src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml` |
 | Machine-readable contract index | `../operations/ops.study.yaml` |
 | Candidate/table schemas | `../operations/contract/schemas/` |
-| Minimal candidate fixtures | `../operations/contract/fixtures/candidates/` |
+| Minimal construct-subject fixtures | `../operations/contract/fixtures/construct-subjects/` |
 
 ### Owner Routes
 
 | Need | First owner surface | State |
 | --- | --- | --- |
 | Biological scope | this page and `../workbench/ontology/vocabulary.md` | Phase 0 planned |
-| Candidate universe | `../workbench/design_sets/v1-candidate-scope.md` | Phase 0 planned |
+| Construct subject universe | `../workbench/design_sets/v1-construct-subject-scope.md` | Phase 0 planned |
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
 | Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 36 cataloged sources: 35 retron whole-plasmid variants plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
 | Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
-| RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned candidate-envelope promotion through public Permuter API |
+| RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned construct-subject-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
 | Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture and planned health/ordinal/UMAP gallery config present; sidecars absent |
 | Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | planned materializer present; labels not materialized |
@@ -56,16 +57,16 @@ registered yet.
 
 ### Boundary Rules
 
-- Candidate rows are paired RT plus lnRNA constructs, not RT-only catalog rows.
+- Construct subject rows are paired RT plus lnRNA constructs, not RT-only catalog rows.
 - RT-CDS DMS generation uses public Permuter APIs; promotion into paired
   candidates stays study-owned.
 - The working/failed `lab_anchor` names are source-history labels, not
   Construct placement roles; Construct sees `lnrna` and `rt_cds` slots.
 - Literature abundance priors are not TF-sponging labels.
 - Reader SPOP labels are assay evidence. They do not create Construct-backed
-  candidate ids unless explicit RT plus lnRNA sequence authority exists.
+  construct subject ids unless explicit RT plus lnRNA sequence authority exists.
 - Construct owns named-slot assembly and realized sequence projection.
 - Infer owns feature aliases and vector sidecars.
 - LatentDNA may review geometry after Infer sidecars exist.
-- OPAL starts only after one candidate table has one fixed-size vector `X` and
+- OPAL starts only after one construct subject table has one fixed-size vector `X` and
   real `SpongingAssayObservation` labels exist.

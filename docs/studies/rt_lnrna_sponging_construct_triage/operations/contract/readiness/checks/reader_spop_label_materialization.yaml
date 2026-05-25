@@ -19,10 +19,10 @@ rules:
   - Require zero-inducer baseline, aTc positive control, OD600 baseline, and at least one nonzero IPTG dose.
   - Reject labels when the configured endpoint is absent, except for named single-point Reader artifact overrides that record the artifact row time, inferred elapsed endpoint, configured report time, and caveat metadata.
   - Reject labels when the aTc positive control is not above the zero-inducer baseline, unless the assay subject is a named no-strain/no-call exclusion that must be omitted with warning severity.
-  - Emit assay_subject_key, reader_design_id, proposed_candidate_id, construct_candidate_id, and candidate_bridge_status separately.
+  - Emit assay_subject_key, reader_design_id, proposed_construct_subject_id, construct_subject_id, and construct_subject_bridge_status separately.
   - Treat 20251105_retron_Eco1_RT_variants as a single-point mid-log read at approximately 10 h after seeding; do not interpret artifact time 0 h as a true biological endpoint.
   - Omit retron176 from 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark because no actual strain was present in those wells.
-  - Keep unresolved retron variants out of Construct-backed candidate ids until explicit RT plus lnRNA sequence authority exists.
+  - Keep unresolved retron variants out of Construct-backed construct subject ids until explicit RT plus lnRNA sequence authority exists.
   - Export the scalar as reader_spop_endpoint_auc_v1 for OPAL scalar_identity_v1/scalar only.
 validation:
   command: uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_reader_spop_plan.py

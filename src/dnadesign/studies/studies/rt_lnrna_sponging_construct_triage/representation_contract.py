@@ -20,23 +20,23 @@ import yaml
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
 _REPRESENTATION_TABLE_CONTRACT_PATH = _STUDY_DIR / "operations/contract/schemas/representation-table.schema.yaml"
 _INPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1"
-_OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1"
+_OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1"
 _EXPECTED_MODEL = "evo2_7b"
 _EXPECTED_INTERMEDIATE_BLOCK = 26
 _EXPECTED_INTERMEDIATE_SELECTOR = "block26_mlp_out"
 _EXPECTED_INTERMEDIATE_DIMENSION = 4096
 _EXPECTED_OUTPUT_LAYER_DIMENSION = 512
 REQUIRED_SOURCE_VIEW_NAMES = (
-    "dual_cassette_1600bp_seq_mean",
-    "dual_cassette_1600bp_fwd_rc_concat",
+    "dual_cassette_2000bp_seq_mean",
+    "dual_cassette_2000bp_fwd_rc_concat",
     "lnrna_span_in_construct_anchor_mean",
     "lnrna_span_in_construct_reverse_complement_anchor_mean",
     "rt_cds_span_in_construct_anchor_mean",
     "rt_cds_span_in_construct_reverse_complement_anchor_mean",
 )
 _VIEW_POOLING = {
-    "dual_cassette_1600bp_seq_mean": ("seq_mean", None),
-    "dual_cassette_1600bp_fwd_rc_concat": ("seq_mean", None),
+    "dual_cassette_2000bp_seq_mean": ("seq_mean", None),
+    "dual_cassette_2000bp_fwd_rc_concat": ("seq_mean", None),
     "lnrna_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
     "lnrna_span_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
     "rt_cds_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
@@ -48,13 +48,16 @@ _EXPECTED_OVERLAY_REFERENCE_IDS = (
     "crawford_eco1_lnrna_msd_design_reference_v1",
 )
 _EXPECTED_FIXED_SIZE_VECTORS = {
-    "intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat": ("float32", 8192),
+    "intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat": ("float32", 8192),
     "intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat": ("float32", 8192),
     "intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat": ("float32", 8192),
     "intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat": ("float32", 16384),
 }
 _EXPECTED_SCALAR_KINDS = ("log_likelihood__total", "log_likelihood__mean_per_token")
-_EXPECTED_CANDIDATE_SEQUENCE_FIELDS = ("candidate__lnrna_sequence", "candidate__rt_cds_sequence")
+_EXPECTED_CONSTRUCT_SUBJECT_SEQUENCE_FIELDS = (
+    "construct_subject__lnrna_sequence",
+    "construct_subject__rt_cds_sequence",
+)
 
 
 @dataclass(frozen=True)
@@ -63,7 +66,8 @@ class RepresentationTableContractAudit:
     source_view_names: tuple[str, ...] = ()
     fixed_size_vectors: dict[str, tuple[str, int]] = field(default_factory=dict)
     overlay_reference_ids: tuple[str, ...] = ()
-    construct_candidate_promotion: dict[str, object] = field(default_factory=dict)
+    row_key_source: dict[str, str] = field(default_factory=dict)
+    construct_subject_promotion: dict[str, object] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -95,8 +99,8 @@ def validate_representation_table_contract_payload(payload: object) -> Represent
         return RepresentationTableContractAudit(errors=("representation table contract must be a mapping",))
     if _string(payload.get("schema_id")) != "rt_lnrna_sponging_construct_triage_representation_table_v1":
         errors.append("schema_id must be rt_lnrna_sponging_construct_triage_representation_table_v1")
-    if _string(payload.get("row_key")) != "candidate__candidate_id":
-        errors.append("row_key must be candidate__candidate_id")
+    if _string(payload.get("row_key")) != "construct_subject__id":
+        errors.append("row_key must be construct_subject__id")
 
     source_views = _list(payload.get("source_sequence_views"), label="source_sequence_views", errors=errors)
     source_view_names = tuple(
@@ -128,16 +132,18 @@ def validate_representation_table_contract_payload(payload: object) -> Represent
         errors.append(
             "source_overlay_inputs must declare Khan abundance, Crawford abundance, and Crawford design references"
         )
-    construct_candidate_promotion = _parse_construct_candidate_promotion(
-        payload.get("construct_candidate_promotion"),
+    construct_subject_promotion = _parse_construct_subject_promotion(
+        payload.get("construct_subject_promotion"),
         errors=errors,
     )
+    row_key_source = _parse_row_key_source(payload.get("row_key_source"), errors=errors)
     return RepresentationTableContractAudit(
         errors=tuple(errors),
         source_view_names=source_view_names,
         fixed_size_vectors=fixed_size_vectors,
         overlay_reference_ids=overlay_reference_ids,
-        construct_candidate_promotion=construct_candidate_promotion,
+        row_key_source=row_key_source,
+        construct_subject_promotion=construct_subject_promotion,
     )
 
 
@@ -288,15 +294,15 @@ def _parse_fixed_size_vectors(payload: object, *, errors: list[str]) -> dict[str
     return parsed
 
 
-def _parse_construct_candidate_promotion(value: object, *, errors: list[str]) -> dict[str, object]:
-    payload = _mapping(value, label="construct_candidate_promotion", errors=errors)
+def _parse_construct_subject_promotion(value: object, *, errors: list[str]) -> dict[str, object]:
+    payload = _mapping(value, label="construct_subject_promotion", errors=errors)
     source_dataset = _string(payload.get("source_dataset"))
     consolidated_construct_dataset = _string(payload.get("consolidated_construct_dataset"))
     sequence_fields = tuple(
         _string(field)
         for field in _list(
             payload.get("required_sequence_fields"),
-            label="construct_candidate_promotion.required_sequence_fields",
+            label="construct_subject_promotion.required_sequence_fields",
             errors=errors,
         )
     )
@@ -304,30 +310,65 @@ def _parse_construct_candidate_promotion(value: object, *, errors: list[str]) ->
         _string(view)
         for view in _list(
             payload.get("required_construct_views"),
-            label="construct_candidate_promotion.required_construct_views",
+            label="construct_subject_promotion.required_construct_views",
             errors=errors,
         )
     )
     if source_dataset != _INPUT_DATASET:
-        errors.append(f"construct_candidate_promotion.source_dataset must be {_INPUT_DATASET}")
+        errors.append(f"construct_subject_promotion.source_dataset must be {_INPUT_DATASET}")
     if consolidated_construct_dataset != _OUTPUT_DATASET:
-        errors.append(f"construct_candidate_promotion.consolidated_construct_dataset must be {_OUTPUT_DATASET}")
-    if sequence_fields != _EXPECTED_CANDIDATE_SEQUENCE_FIELDS:
+        errors.append(f"construct_subject_promotion.consolidated_construct_dataset must be {_OUTPUT_DATASET}")
+    if sequence_fields != _EXPECTED_CONSTRUCT_SUBJECT_SEQUENCE_FIELDS:
         errors.append(
-            "construct_candidate_promotion.required_sequence_fields must be candidate__lnrna_sequence, "
-            "candidate__rt_cds_sequence"
+            "construct_subject_promotion.required_sequence_fields must be construct_subject__lnrna_sequence, "
+            "construct_subject__rt_cds_sequence"
         )
     if construct_views != REQUIRED_SOURCE_VIEW_NAMES:
-        errors.append("construct_candidate_promotion.required_construct_views must match the six source views")
+        errors.append("construct_subject_promotion.required_construct_views must match the six source views")
     if payload.get("requires_explicit_rt_plus_lnrna_authority") is not True:
-        errors.append("construct_candidate_promotion.requires_explicit_rt_plus_lnrna_authority must be true")
+        errors.append("construct_subject_promotion.requires_explicit_rt_plus_lnrna_authority must be true")
     if payload.get("forbid_overlay_only_infer_rows") is not True:
-        errors.append("construct_candidate_promotion.forbid_overlay_only_infer_rows must be true")
+        errors.append("construct_subject_promotion.forbid_overlay_only_infer_rows must be true")
     return {
         "source_dataset": source_dataset,
         "consolidated_construct_dataset": consolidated_construct_dataset,
         "required_sequence_fields": sequence_fields,
         "required_construct_views": construct_views,
+    }
+
+
+def _parse_row_key_source(value: object, *, errors: list[str]) -> dict[str, str]:
+    payload = _mapping(value, label="row_key_source", errors=errors)
+    dataset = _string(payload.get("dataset"))
+    namespace = _string(payload.get("namespace"))
+    column = _string(payload.get("column"))
+    materialized_by = _string(payload.get("materialized_by"))
+    output_join_field = _string(payload.get("output_join_field"))
+    input_dataset = _string(payload.get("input_dataset"))
+    input_construct_subject_field = _string(payload.get("input_construct_subject_field"))
+
+    if dataset != _OUTPUT_DATASET:
+        errors.append(f"row_key_source.dataset must be {_OUTPUT_DATASET}")
+    if namespace != "construct_subject":
+        errors.append("row_key_source.namespace must be construct_subject")
+    if column != "construct_subject__id":
+        errors.append("row_key_source.column must be construct_subject__id")
+    if materialized_by != "construct_output_subject_bridge":
+        errors.append("row_key_source.materialized_by must be construct_output_subject_bridge")
+    if output_join_field != "construct__input_id":
+        errors.append("row_key_source.output_join_field must be construct__input_id")
+    if input_dataset != _INPUT_DATASET:
+        errors.append(f"row_key_source.input_dataset must be {_INPUT_DATASET}")
+    if input_construct_subject_field != "construct_subject__id":
+        errors.append("row_key_source.input_construct_subject_field must be construct_subject__id")
+    return {
+        "dataset": dataset,
+        "namespace": namespace,
+        "column": column,
+        "materialized_by": materialized_by,
+        "output_join_field": output_join_field,
+        "input_dataset": input_dataset,
+        "input_construct_subject_field": input_construct_subject_field,
     }
 
 

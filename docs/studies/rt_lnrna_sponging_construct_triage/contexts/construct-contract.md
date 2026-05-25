@@ -10,7 +10,7 @@ last_verified: 2026-05-23
 
 The construct contract is `dual_cassette_rt_lnrna_expression_v1`.
 
-One candidate row means one lnRNA/msr-msd-payload cassette followed by one RT
+One construct subject row means one lnRNA/msr-msd-payload cassette followed by one RT
 CDS cassette in a fixed synthetic plasmid regional context:
 
 ```text
@@ -42,8 +42,8 @@ Construct realization for the runtime sequence-emission step, and construct
 context view materialization for the USR sequence-view rows written after
 realization.
 Candidate pairing ids remain study identity. USR base row ids remain canonical
-sequence ids; candidate ids are carried through study overlays and labels when
-temporary candidate rows are passed to Construct.
+sequence ids; construct subject ids are carried through study overlays and labels when
+temporary construct subject rows are passed to Construct.
 
 ### Required Before Projection
 
@@ -55,13 +55,13 @@ temporary candidate rows are passed to Construct.
   as the study-side projection manifest for named slots and expected spans.
 - Materialize construct context views from audited offsets and slot spans, not
   arbitrary padding.
-- The 1,600 bp context is the dedicated `1600bp-region.gb` target region,
+- The 2,000 bp context is the dedicated `2000bp-region.gb` target region,
   contained in pES retron-26 at zero-based half-open vector coordinates
-  `[56,1656)`, not the first 1,600 bp of the circular pES-retron-26 record.
+  `[56,2056)`, not the first 2,000 bp of the circular pES-retron-26 record.
 - Region-relative retron26 control spans are `lnrna: [130,303)` and
   `rt_cds: [468,1431)`. Candidate-specific lnRNA or RT length deltas keep the
   165 bp interstitial constant and adjust only the outer prefix/suffix flanks
-  until the emitted context is exactly 1,600 bp. Positive deltas truncate those
+  until the emitted context is exactly 2,000 bp. Positive deltas truncate those
   flanks symmetrically; negative deltas extend them symmetrically. Odd deltas
   use the unavoidable 1 bp left/right imbalance recorded in catalog QC flags.
   Retron43 therefore emits `lnrna: [123,310)` and `rt_cds: [475,1438)`;

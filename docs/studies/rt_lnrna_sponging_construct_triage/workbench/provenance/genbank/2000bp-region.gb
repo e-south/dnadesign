@@ -1,17 +1,29 @@
-LOCUS       1600bp-region           1600 bp ds-DNA     linear       22-MAY-2026
-DEFINITION  .
+LOCUS       2000bp-region           2000 bp    ds-DNA  linear   UNK 25-MAY-2026
+DEFINITION  pES-retron-26 dual-cassette 2000 bp target context [56,2056).
+ACCESSION   2000bp-region
+VERSION     2000bp-region
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
 FEATURES             Location/Qualifiers
      protein_bind    59..75
                      /label="lac operator"
                      /ApEinfo_revcolor="#d6b295"
                      /ApEinfo_fwdcolor="#d6b295"
-                     /note="The lac repressor binds to the lac operator to inhibit transcription in E. coli. This inhibition can be relieved by adding lactose or isopropyl-beta-D-thiogalactopyranoside (IPTG)."
+                     /note="The lac repressor binds to the lac operator to
+                     inhibit transcription in E. coli. This inhibition can be
+                     relieved by adding lactose or
+                     isopropyl-beta-D-thiogalactopyranoside (IPTG)."
                      /bound_moiety="lac repressor encoded by lacI"
      protein_bind    82..98
                      /label="lac operator"
                      /ApEinfo_revcolor="#d59687"
                      /ApEinfo_fwdcolor="#d59687"
-                     /note="The lac repressor binds to the lac operator to inhibit transcription in E. coli. This inhibition can be relieved by adding lactose or isopropyl-beta-D-thiogalactopyranoside (IPTG)."
+                     /note="The lac repressor binds to the lac operator to
+                     inhibit transcription in E. coli. This inhibition can be
+                     relieved by adding lactose or
+                     isopropyl-beta-D-thiogalactopyranoside (IPTG)."
                      /bound_moiety="lac repressor encoded by lacI"
      misc_feature    131..138
                      /label="a1(12) + 8bps"
@@ -29,7 +41,7 @@ FEATURES             Location/Qualifiers
                      /label="msr"
                      /ApEinfo_revcolor="#85dae9"
                      /ApEinfo_fwdcolor="#85dae9"
-     misc_feature    151..151
+     misc_feature    151
                      /label="Branched G"
                      /ApEinfo_revcolor="#b4abac"
                      /ApEinfo_fwdcolor="#b4abac"
@@ -101,42 +113,78 @@ FEATURES             Location/Qualifiers
                      /ApEinfo_fwdcolor="#c7b0e3"
                      /codon_start=1
                      /transl_table=11
-                     /product="retron EC86 RNA-directed DNA polymerase-likeprotein"
+                     /product="retron EC86 RNA-directed DNA
+                     polymerase-likeprotein"
      CDS             469..1431
                      /ApEinfo_revcolor="#84b0dc"
                      /ApEinfo_fwdcolor="#84b0dc"
-                     /translation="MKSAEYLNTFRLRNLGLPVMNNLHDMSKATRISVETLRLLIYTADFRYRIYTVEKKGPEKRMRTIYQPSRELKALQGWVLRNILDKLSSSPFSIGFEKHQSILNNATPHIGANFILNIDLEDFFPSLTANKVFGVFHSLGYNRLISSVLTKICCYKNLLPQGAPSSPKLANLICSKLDYRIQGYAGSRGLIYTRYADDLTLSAQSMKKVVKARDFLFSIIPSEGLVINSKKTCISGPRSQRKVTGLVISQEKVGIGREKYKEIRAKIHHIFCGKSSEIEHVRGWLSFILSVDSKSHRRLITYISKLEKKYGKNPLNKAKT*"
+                     /translation="MKSAEYLNTFRLRNLGLPVMNNLHDMSKATRISVETLRLLIYTAD
+                     FRYRIYTVEKKGPEKRMRTIYQPSRELKALQGWVLRNILDKLSSSPFSIGFEKHQSILN
+                     NATPHIGANFILNIDLEDFFPSLTANKVFGVFHSLGYNRLISSVLTKICCYKNLLPQGA
+                     PSSPKLANLICSKLDYRIQGYAGSRGLIYTRYADDLTLSAQSMKKVVKARDFLFSIIPS
+                     EGLVINSKKTCISGPRSQRKVTGLVISQEKVGIGREKYKEIRAKIHHIFCGKSSEIEHV
+                     RGWLSFILSVDSKSHRRLITYISKLEKKYGKNPLNKAKT*"
+     primer          complement(657..678)
+                     /label="oES368; sequencing: downstream msr/msd (internal
+                     RT); REV"
+                     /note="sequence: tcgagaaggttggtaaatggtt"
+                     /ApEinfo_revcolor="#f58a5e"
+                     /ApEinfo_fwdcolor="#f58a5e"
+     primer          complement(784..801)
+                     /label="oES876; Sequencing; Internal RT; REV"
+                     /note="sequence: cccaatatgcggggtagc"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
      misc_feature    1051..1062
                      /label="YXDD motif"
                      /ApEinfo_revcolor="#d6b295"
                      /ApEinfo_fwdcolor="#d6b295"
-     misc_feature    1058..1058
+     misc_feature    1058
                      /label="A->C"
                      /ApEinfo_revcolor="#c7b0e3"
                      /ApEinfo_fwdcolor="#c7b0e3"
-     misc_feature    1061..1061
+     misc_feature    1061
                      /label="A->C"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     misc_feature    1252
+                     /label="G->T?"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+     misc_feature    1252..1254
+                     /label="STOP?"
                      /ApEinfo_revcolor="#84b0dc"
                      /ApEinfo_fwdcolor="#84b0dc"
      terminator      1464..1535
                      /label="rrnB T1 terminator"
                      /ApEinfo_revcolor="#faac61"
                      /ApEinfo_fwdcolor="#faac61"
-                     /note="transcription terminator T1 from the E. coli rrnB gene"
+                     /note="transcription terminator T1 from the E. coli rrnB
+                     gene"
      terminator      1551..1578
                      /label="T7Te terminator"
                      /ApEinfo_revcolor="#b4abac"
                      /ApEinfo_fwdcolor="#b4abac"
                      /note="phage T7 early transcription terminator"
+     primer_bind     complement(1606..1623)
+                     /label="L4440"
+                     /ApEinfo_revcolor="#c6c9d1"
+                     /ApEinfo_fwdcolor="#c6c9d1"
+                     /note="L4440 vector, forward primer"
+     primer_bind     complement(1820..1839)
+                     /label="pBR322ori-F"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+                     /note="pBR322 origin, forward primer"
 ORIGIN
         1 ccgcacctgt ggcgccggtg atgccggcca cgatgcgtcc ggcgtagagg atcgagaatt
        61 gtgagcggat aacaattgac attgtgagcg gataacaaga tactgagcac atcagcagga
-      121 cgcactgacc ATTCCGTAtg cgcaccctta gcgagaggtt tatcattaag gtcaacctct
-      181 ggatgttgGt tcggcatcct gcattgaatc tgagttactg tctgttccct atcagtgata
-      241 gagaGCCTtc tctatcactg atagggaccc gttttttctg acgtaagggt gcgcaTACGG
-      301 AATacctcTA GCATAACCCC TTGGGGCCTC TAAACGGGTC TTGAGGGGTT TTTTGCTGAG
-      361 CAAAGTTAAA CAAACGCTAG TGCAATTAGT CGAGCTCTAC GAAACGttga cagctagctc
-      421 agtcctaggg actatgctag cAAGATCTTT TAAGAAGGAG ATATACATat gaaatccgct
+      121 cgcactgacc attccgtatg cgcaccctta gcgagaggtt tatcattaag gtcaacctct
+      181 ggatgttggt tcggcatcct gcattgaatc tgagttactg tctgttccct atcagtgata
+      241 gagagccttc tctatcactg atagggaccc gttttttctg acgtaagggt gcgcatacgg
+      301 aatacctcta gcataacccc ttggggcctc taaacgggtc ttgaggggtt ttttgctgag
+      361 caaagttaaa caaacgctag tgcaattagt cgagctctac gaaacgttga cagctagctc
+      421 agtcctaggg actatgctag caagatcttt taagaaggag atatacatat gaaatccgct
       481 gaatatttga acacttttag attgagaaat ctcggcctac ctgtcatgaa caatttgcat
       541 gacatgtcta aggcgactcg catatctgtt gaaacacttc ggttgttaat ctatacagct
       601 gattttcgct ataggatcta cactgtagaa aagaaaggcc cagagaagag aatgagaacc
@@ -155,5 +203,12 @@ ORIGIN
      1381 aaattagaaa aaaaatatgg aaagaaccct ttaaataaag cgaagaccta aggatccaaa
      1441 ctcgagtaag gatctccagg catcaaataa aacgaaaggc tcagtcgaaa gactgggcct
      1501 ttcgttttat ctgttgtttg tcggtgaacg ctctctacta gagtcacact ggctcacctt
-     1561 cgggtgggcc tttctgcgtt tatacctagg gatatattcc
+     1561 cgggtgggcc tttctgcgtt tatacctagg gatatattcc gcttcctcgc tcactgactc
+     1621 gctacgctcg gtcgttcgac tgcggcgagc ggaaatggct tacgaacggg gcggagattt
+     1681 cctggaagat gccaggaaga tacttaacag ggaagtgaga gggccgcggc aaagccgttt
+     1741 ttccataggc tccgcccccc tgacaagcat cacgaaatct gacgctcaaa tcagtggtgg
+     1801 cgaaacccga caggactata aagataccag gcgtttcccc ctggcggctc cctcgtgcgc
+     1861 tctcctgttc ctgcctttcg gtttaccggt gtcattccgc tgttatggcc gcgtttgtct
+     1921 cattccacgc ctgacactca gttccgggta ggcagttcgc tccaagctgg actgtatgca
+     1981 cgaacccccc gttcagtccg
 //

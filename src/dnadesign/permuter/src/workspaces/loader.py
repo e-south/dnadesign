@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 from dnadesign.permuter.src.core.config import ScopeConfig
@@ -43,12 +44,15 @@ def load_workspace(workspace: Path | str) -> PermuterWorkspace:
         raise ValueError(
             f"workspace scope id must match scope.name: scope={scope_id!r} scope.name={config.scope.name!r}"
         )
+    _validate_input_refs(config=config, workspace_root=workspace_root)
     output_root = expand_for_workspace(config.scope.output.dir, workspace_dir=workspace_root)
+    outputs_root = (workspace_root / "outputs").resolve()
     try:
-        output_root.relative_to(workspace_root)
+        output_root.relative_to(outputs_root)
     except ValueError as exc:
         raise ValueError(
-            f"workspace output.dir must resolve inside the workspace root: {config.scope.output.dir!r} -> {output_root}"
+            "workspace output.dir must resolve inside the workspace outputs/ tree: "
+            f"{config.scope.output.dir!r} -> {output_root}"
         ) from exc
     return PermuterWorkspace(
         scope_id=scope_id,
@@ -68,3 +72,21 @@ def find_workspaces(root: Path | str) -> list[Path]:
     if direct.exists():
         return [direct]
     return sorted(path for path in base.glob(f"*/{CONFIG_NAME}") if path.is_file())
+
+
+def _validate_input_refs(*, config: ScopeConfig, workspace_root: Path) -> None:
+    refs_path = expand_for_workspace(config.scope.input.refs, workspace_dir=workspace_root)
+    if refs_path.is_dir():
+        raise IsADirectoryError(f"workspace input.refs must be a CSV file, not a directory: {refs_path}")
+    if not refs_path.exists():
+        raise FileNotFoundError(f"workspace input.refs not found: {refs_path}")
+    try:
+        columns = set(pd.read_csv(refs_path, dtype=str, nrows=0).columns)
+    except Exception as exc:
+        raise ValueError(f"workspace input.refs is not a readable CSV: {refs_path}: {exc}") from exc
+    required = {config.scope.input.name_col, config.scope.input.seq_col}
+    if config.scope.input.aa_col:
+        required.add(config.scope.input.aa_col)
+    missing = sorted(required - columns)
+    if missing:
+        raise ValueError(f"workspace input.refs missing required column(s): {missing}")

@@ -1,7 +1,7 @@
 fixture_id: retron26-working-anchor
 fixture_status: source_resolved_construct_representable_not_materialized
 candidate:
-  candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
   study_id: rt_lnrna_sponging_construct_triage
   construct_contract: dual_cassette_rt_lnrna_expression_v1
   representation_contract: dual_cassette_construct_context_embedding_v1
@@ -22,12 +22,12 @@ candidate:
   construct_context_view_ids: []
   abundance_prior_overlay_ids: []
   sponging_assay_observation_ids: []
-  candidate_role: working_control
+  construct_subject_role: working_control
   source_authority_status: resolved_by_genbank_source_authority
   blockers:
     - evo2_7b_feature_sidecars_absent
     - real_sponging_assay_observations_absent
-  candidate_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 1,600 bp source view lanes are test-backed, while Infer sidecars and real labels remain absent.
+  construct_subject_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 2,000 bp source view lanes are test-backed, while Infer sidecars and real labels remain absent.
 msd_design_spec:
   msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
   schema_version: msd_design_spec_v1

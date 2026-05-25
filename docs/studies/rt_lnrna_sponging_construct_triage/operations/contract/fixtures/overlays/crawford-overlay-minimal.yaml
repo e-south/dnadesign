@@ -13,4 +13,4 @@ required_fields:
 rules:
   - Preserve raw_value and normalized_value from source.
   - Treat these rows as abundance priors, not TF-sponging labels.
-  - Require construct projection before any row is promoted to a construct candidate.
+  - Require construct projection before any row is promoted to a construct subject.

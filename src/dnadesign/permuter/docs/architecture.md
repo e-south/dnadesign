@@ -71,8 +71,8 @@ not proof that a dataset has modern Infer sidecar coverage.
 ## Study Boundary
 
 Study-specific terms stay out of Permuter. For RT-lnRNA, that means Permuter
-does not know the 1,600 bp dual-cassette construct, `lnrna` and `rt_cds` slots,
-Khan/Crawford overlays, Reader labels, OPAL candidate tables, or any future
+does not know the 2,000 bp dual-cassette construct, `lnrna` and `rt_cds` slots,
+Khan/Crawford overlays, Reader labels, OPAL training tables, or any future
 100 bp view contract. The RT study owns those semantics and calls Permuter only
 for generic variant generation.
 

@@ -178,9 +178,9 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
     assert len(plan.observations) == 2
     by_key = {row.candidate_key: row for row in plan.observations}
     assert by_key["retron26"].assay_subject_key == "retron26"
-    assert by_key["retron26"].construct_candidate_id == "rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"
-    assert by_key["retron26"].proposed_candidate_id == by_key["retron26"].construct_candidate_id
-    assert by_key["retron26"].candidate_bridge_status == "resolved_construct_sequence_authority"
+    assert by_key["retron26"].construct_subject_id == "rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"
+    assert by_key["retron26"].proposed_construct_subject_id == by_key["retron26"].construct_subject_id
+    assert by_key["retron26"].construct_subject_bridge_status == "resolved_construct_sequence_authority"
     assert by_key["retron26"].reader_artifact_record_id == "ratio_reporter_normalizer/df"
     assert by_key["retron26"].reader_artifact_content_digest == "sha256:test-ratio"
     assert by_key["retron26"].metric_id == "reader_spop_endpoint_auc_v1"
@@ -194,9 +194,9 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
     assert by_key["retron26"].spop_score_calibrated is None
     assert {
         "assay_subject_key",
-        "proposed_candidate_id",
-        "construct_candidate_id",
-        "candidate_bridge_status",
+        "proposed_construct_subject_id",
+        "construct_subject_id",
+        "construct_subject_bridge_status",
         "reader_artifact_ref",
         "payload_program_id",
         "batch_id",
@@ -239,9 +239,9 @@ def test_reader_spop_plan_marks_unresolved_variant_sequence_authority(tmp_path: 
     observation = plan.observations[0]
     assert observation.candidate_key == "retron176"
     assert observation.construct_promotable is True
-    assert observation.candidate_bridge_status == "resolved_construct_sequence_authority"
-    assert observation.construct_candidate_id == "rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO"
-    assert observation.proposed_candidate_id == observation.construct_candidate_id
+    assert observation.construct_subject_bridge_status == "resolved_construct_sequence_authority"
+    assert observation.construct_subject_id == "rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO"
+    assert observation.proposed_construct_subject_id == observation.construct_subject_id
     assert "construct_sequence_authority_missing" not in observation.qc_flags
 
 
@@ -410,7 +410,7 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     assert "spop_score_raw" in schema["derived_fields"]
     assert "spop_score_calibrated" in schema["derived_fields"]
     assert "reader_design_id" in schema["required_fields"]
-    assert "candidate_bridge_status" in schema["required_fields"]
+    assert "construct_subject_bridge_status" in schema["required_fields"]
 
     contract_doc = repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md"
     assert contract_doc.exists()

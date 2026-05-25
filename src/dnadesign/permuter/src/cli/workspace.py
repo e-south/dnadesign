@@ -67,7 +67,7 @@ def list_(
     for path in paths:
         try:
             cfg = load_workspace(path)
-        except ValueError as exc:
+        except (OSError, ValueError) as exc:
             if strict:
                 raise typer.BadParameter(str(exc)) from exc
             continue
@@ -94,7 +94,7 @@ def list_(
 def _load_or_exit(path: Path):
     try:
         return load_workspace(resolve_workspace_config_hint(path))
-    except (FileNotFoundError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
 
 

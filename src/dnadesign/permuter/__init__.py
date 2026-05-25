@@ -14,6 +14,9 @@ from dnadesign.permuter.src.api import (
     CodingDnaDmsVariantMetadata,
     DatasetRef,
     EvaluatorPlan,
+    InferFeatureRequest,
+    InferFeatureSourceDataset,
+    InferSequenceViewSelector,
     MetricSpec,
     NucleotideDmsRequest,
     PermuterResult,
@@ -23,8 +26,11 @@ from dnadesign.permuter.src.api import (
     default_codon_table_path,
     evaluate_variants,
     generate_variants,
+    infer_feature_request_from_mapping,
     materialize_result,
+    read_infer_feature_request_manifest,
     validate_dataset,
+    write_infer_feature_request_manifest,
 )
 
 __version__ = "0.5.0"
@@ -34,6 +40,9 @@ __all__ = [
     "CodingDnaDmsVariantMetadata",
     "DatasetRef",
     "EvaluatorPlan",
+    "InferFeatureRequest",
+    "InferFeatureSourceDataset",
+    "InferSequenceViewSelector",
     "MetricSpec",
     "NucleotideDmsRequest",
     "PermuterResult",
@@ -43,8 +52,11 @@ __all__ = [
     "default_codon_table_path",
     "evaluate_variants",
     "generate_variants",
+    "infer_feature_request_from_mapping",
     "materialize_result",
+    "read_infer_feature_request_manifest",
     "validate_dataset",
+    "write_infer_feature_request_manifest",
     "main",
 ]
 

@@ -61,7 +61,7 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     assert retron47.construct_projection_status == "representable"
     assert retron47.construct_spans_0["lnrna"] == (27, 200)
     assert retron47.construct_spans_0["rt_cds"] == (365, 1535)
-    assert "context_flanks_truncated_to_1600bp" in retron47.qc_flags
+    assert "context_flanks_truncated_to_2000bp" in retron47.qc_flags
 
     retron48 = catalog.record("retron48")
     assert retron48.construct_projection_status == "representable"
@@ -91,7 +91,7 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     assert bl21.lnrna.span_0 == (0, 170)
     assert bl21.lnrna.length_nt == 170
     assert bl21.rt_cds.authority_kind == "wt_eco1_rt"
-    assert bl21.construct_candidate_id == "rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native"
+    assert bl21.construct_subject_id == "rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native"
 
 
 def test_variant_genbank_catalog_source_files_are_study_owned_and_complete() -> None:

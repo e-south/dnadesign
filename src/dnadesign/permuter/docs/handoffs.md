@@ -49,8 +49,31 @@ variant identity in `permuter__var_id`.
 ## Permuter To Infer
 
 Permuter does not execute modern Infer feature bundles. A Permuter-to-Infer
-handoff should be a non-executing request that names the already materialized
-dataset and the Infer-owned feature-bundle config.
+handoff is a non-executing request that names the already materialized dataset
+and the Infer-owned feature-bundle config. The public `InferFeatureRequest`
+contract can write and read this manifest without importing Infer internals.
+
+```python
+from dnadesign.permuter import (
+    InferFeatureRequest,
+    InferFeatureSourceDataset,
+    InferSequenceViewSelector,
+    write_infer_feature_request_manifest,
+)
+
+request = InferFeatureRequest(
+    source_dataset=InferFeatureSourceDataset(
+        usr_root="workspaces/studies/<study-id>/usr",
+        dataset_id="<study-prefixed-dataset-id>",
+    ),
+    feature_bundle_ref="docs/studies/<study-id>/operations/contract/fixtures/infer/<bundle>.yaml",
+    sequence_view_selectors=(
+        InferSequenceViewSelector(view_name="dual_cassette_2000bp_seq_mean"),
+    ),
+    requested_outputs=("log_likelihood", "output_layer_mean", "intermediate_embedding"),
+)
+write_infer_feature_request_manifest(request, "outputs/permuter-infer-handoff.yaml")
+```
 
 ```yaml
 kind: permuter_infer_feature_request_v1
@@ -62,12 +85,22 @@ source_dataset:
   dataset_id: <study-prefixed-dataset-id>
 feature_bundle_ref: docs/studies/<study-id>/operations/contract/fixtures/infer/<bundle>.yaml
 sequence_view_selectors:
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
 requested_outputs:
   - log_likelihood
   - output_layer_mean
   - intermediate_embedding
 ```
+
+`source_owner` names the owner of `source_dataset`, not the tool that created
+the variant intent. Use `permuter` when Infer will read a Permuter-owned
+variant dataset, and `construct` when a study has promoted variants into
+realized Construct context rows.
+
+`sequence_view_selectors[]` must set exactly one of `view_name` or `alias`.
+Broad selectors such as `product_kind` plus `orientation` are rejected at the
+Permuter handoff boundary so Infer cannot silently score the wrong Construct
+view.
 
 Infer owns validation, run, resume, stale detection, alias tables, vector/scalar
 payloads, and `_derived/infer`. Run the Infer completion planner before long
@@ -78,8 +111,7 @@ uv run infer validate sequence-view-completion --config <config.yaml> --mode inv
 ```
 
 For multi-view Construct outputs, selectors must use explicit `view_name` or a
-stable alias. Broad selectors such as product kind plus orientation are not
-sufficient for RT-lnRNA six-view handoffs.
+stable alias.
 
 ## Permuter To Studies
 
@@ -87,16 +119,16 @@ Studies may call the public Permuter API to create candidate perturbations, then
 write study-owned overlays. For RT-lnRNA, the study-owned lane promotes
 RT-CDS DMS variants into Construct slot-input rows with:
 
-- `candidate__candidate_id`
-- `candidate__record_kind`
-- `candidate__sequence_authority`
-- `candidate__biological_sequence_fields`
-- `candidate__lnrna_sequence`
-- `candidate__rt_cds_sequence`
-- `candidate__permuter_request_id`
-- `candidate__permuter_variant_id`
+- `construct_subject__id`
+- `construct_subject__record_kind`
+- `construct_subject__sequence_authority`
+- `construct_subject__biological_sequence_fields`
+- `construct_subject__lnrna_sequence`
+- `construct_subject__rt_cds_sequence`
+- `construct_subject__permuter_request_id`
+- `construct_subject__permuter_variant_id`
 
-The `candidate__permuter_variant_id` field is study overlay provenance. It is
+The `construct_subject__permuter_variant_id` field is study overlay provenance. It is
 not a replacement for the canonical USR `id` column.
 
 ## Rejected Patterns

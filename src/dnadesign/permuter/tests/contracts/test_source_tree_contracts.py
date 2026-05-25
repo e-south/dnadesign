@@ -17,6 +17,7 @@ import pytest
 import yaml
 
 from dnadesign.permuter.src.core.registry import get_protocol
+from dnadesign.permuter.src.workspaces.loader import load_workspace
 
 
 def _permuter_root() -> Path:
@@ -51,6 +52,7 @@ def test_packaged_workspace_scopes_are_directory_scoped_configs() -> None:
         assert payload["scope"]["name"] == config_path.parent.name
         assert payload["scope"]["output"]["dir"] == "${WORKSPACE_DIR}/outputs"
         assert "${JOB_DIR}" not in config_path.read_text(encoding="utf-8")
+        assert load_workspace(config_path).scope_id == config_path.parent.name
 
 
 def test_retired_rt_select_protocol_alias_fails_fast() -> None:

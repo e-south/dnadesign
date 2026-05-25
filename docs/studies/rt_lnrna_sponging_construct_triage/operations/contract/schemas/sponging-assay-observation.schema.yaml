@@ -27,9 +27,9 @@ label_contract:
 required_fields:
   observation_id: string
   assay_subject_key: string
-  proposed_candidate_id: string
-  construct_candidate_id: string_or_null
-  candidate_bridge_status: string
+  proposed_construct_subject_id: string
+  construct_subject_id: string_or_null
+  construct_subject_bridge_status: string
   reader_design_id: string
   reader_experiment_id: string
   reader_artifact_ref: string
@@ -60,7 +60,7 @@ derived_fields:
   rfp_over_od600_baseline: numeric
   rfp_over_od600_positive: numeric
   qc_flags: string_list
-candidate_bridge_status_values:
+construct_subject_bridge_status_values:
   - resolved_construct_sequence_authority
   - missing_construct_sequence_authority
   - unresolved_reader_design_id

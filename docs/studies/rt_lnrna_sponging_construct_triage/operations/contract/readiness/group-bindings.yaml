@@ -2,9 +2,9 @@ groups:
   genbank_source_authority:
     owner: study
     phase: phase_0_contracts
-  candidate_contract:
+  construct_subject_contract:
     owner: study
-    phase: phase_1_candidate_table
+    phase: phase_1_construct_subject_table
   representation_readiness:
     owner: construct_usr_infer
     phase: phase_2_construct_projection

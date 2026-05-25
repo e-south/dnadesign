@@ -19,7 +19,7 @@ parts:
     - contract/readiness/group-bindings.yaml
     - contract/readiness/next-scope.yaml
     - contract/readiness/checks/genbank_source_authority.yaml
-    - contract/readiness/checks/candidate_contract.yaml
+    - contract/readiness/checks/construct_subject_contract.yaml
     - contract/readiness/checks/representation_readiness.yaml
     - contract/readiness/checks/overlay_linkage.yaml
     - contract/readiness/checks/reader_spop_label_materialization.yaml

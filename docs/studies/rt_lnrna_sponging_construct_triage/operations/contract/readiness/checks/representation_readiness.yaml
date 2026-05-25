@@ -6,17 +6,17 @@ blocked_by:
   - evo2_7b_feature_sidecars_absent
   - latentdna_gallery_views_not_materialized
 rules:
-  - Use the GenBank offset audit as the source for cassette boundaries and the 1,600 bp target context.
-  - Treat `1600bp-region.gb` as pES-retron-26 `[56,1656)`, with candidate-specific lnRNA or RT length deltas handled by symmetric prefix/suffix flank adjustment until the emitted view is exactly 1,600 bp.
+  - Use the GenBank offset audit as the source for cassette boundaries and the 2,000 bp target context.
+  - Treat `2000bp-region.gb` as pES-retron-26 `[56,2056)`, with candidate-specific lnRNA or RT length deltas handled by symmetric prefix/suffix flank adjustment until the emitted view is exactly 2,000 bp.
   - Use Construct named slots for lnRNA and RT CDS; do not precompose them into one hidden anchor.
   - Validate product_kind remains realized_context for emitted construct contexts.
-  - Validate context_kind is template_custom for the 1,600 bp construct views.
+  - Validate context_kind is template_custom for the 2,000 bp construct views.
   - Validate forward and reverse-complement views are explicitly declared before concat.
   - Validate lnRNA and RT CDS anchor_mean pooling bounds before Infer.
   - Reject RT-lnRNA Infer configs that select by product_kind plus orientation without explicit view_name.
   - Collect intermediate_embedding block26_mlp_out means, output_layer_mean vectors, log_likelihood total, and log_likelihood mean_per_token per selected view.
   - Validate LatentDNA PCA health, PCA scree, Khan/Crawford ordinal-audit, and appendix UMAP recipe surfaces before treating the gallery as materialized.
-  - Require Khan/Crawford source rows to be construct-promoted through the consolidated 1,600 bp Construct output dataset before they can appear in Infer-backed LatentDNA overlays.
+  - Require Khan/Crawford source rows to be construct-promoted through the consolidated 2,000 bp Construct output dataset before they can appear in Infer-backed LatentDNA overlays.
   - Export OPAL X candidates as Arrow fixed-size-list float32 columns only after LatentDNA gallery health review selects one view.
   - Fail on lnRNA or RT slot clipping, arbitrary filler padding, invalid alphabet, or missing constants; prefix/suffix flank truncation is allowed only when full biological slots remain inside the emitted view.
 contracts:

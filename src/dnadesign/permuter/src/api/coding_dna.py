@@ -30,6 +30,7 @@ from dnadesign.permuter.src.protocols.combine.codon_utils import (
 
 _CODON_LENGTH = 3
 _PROTEIN_ALPHABET = tuple("ACDEFGHIKLMNPQRSTVWY")
+_STOP_CODONS = frozenset({"TAA", "TAG", "TGA"})
 
 
 def generate_coding_dna_dms(request: CodingDnaDmsRequest) -> PermuterResult:
@@ -42,9 +43,9 @@ def generate_coding_dna_dms(request: CodingDnaDmsRequest) -> PermuterResult:
         raise ValueError(f"Unsupported codon_policy: {request.codon_policy!r}")
     codon_table_path = _require_codon_table(request.codon_table)
     table = load_codon_table(codon_table_path)
-    positions = _normalize_positions(len(sequence) // _CODON_LENGTH, request.positions)
-    alternates = _normalize_alternates(request.alternate_amino_acids, available=table.aa2codons.keys())
     sequence_upper = sequence.upper()
+    positions, excluded_positions = _normalize_positions(sequence_upper, table, request.positions)
+    alternates = _normalize_alternates(request.alternate_amino_acids, available=table.aa2codons.keys())
     expected_count = _expected_variant_count(
         sequence_upper=sequence_upper,
         positions=positions,
@@ -113,6 +114,7 @@ def generate_coding_dna_dms(request: CodingDnaDmsRequest) -> PermuterResult:
                 "codon_policy": request.codon_policy,
                 "codon_table": str(codon_table_path),
                 "positions": positions,
+                "excluded_codon_positions": excluded_positions,
                 "alternate_amino_acids": alternates,
             },
         ),
@@ -136,16 +138,61 @@ def _require_codon_table(value: str | Path) -> Path:
     return path
 
 
-def _normalize_positions(codon_count: int, raw: tuple[int, ...]) -> tuple[int, ...]:
+def _normalize_positions(
+    sequence_upper: str,
+    table: CodonTable,
+    raw: tuple[int, ...],
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    codon_count = len(sequence_upper) // _CODON_LENGTH
     if not raw:
-        return tuple(range(1, codon_count + 1))
+        excluded = (codon_count,) if _has_terminal_stop(sequence_upper) else ()
+        positions = tuple(pos for pos in range(1, codon_count + 1) if pos not in excluded)
+        _require_supported_reference_codons(sequence_upper=sequence_upper, table=table, positions=positions)
+        if not positions:
+            raise ValueError("Coding DNA DMS request has no sense codons present in the codon table")
+        return positions, excluded
     positions = tuple(int(pos) for pos in raw)
     bad = [pos for pos in positions if pos < 1 or pos > codon_count]
     if bad:
         raise ValueError(f"Coding DNA position(s) out of bounds for {codon_count} codons: {bad}")
     if len(set(positions)) != len(positions):
         raise ValueError(f"Duplicate coding DNA positions are not allowed: {positions}")
-    return positions
+    unsupported = [
+        (pos, sequence_upper[(pos - 1) * _CODON_LENGTH : pos * _CODON_LENGTH])
+        for pos in positions
+        if sequence_upper[(pos - 1) * _CODON_LENGTH : pos * _CODON_LENGTH] not in table.codon2aa
+    ]
+    if unsupported:
+        formatted = ", ".join(f"{codon} at AA position {pos}" for pos, codon in unsupported)
+        raise ValueError(f"Reference codon(s) absent from the codon table: {formatted}")
+    return positions, ()
+
+
+def _has_terminal_stop(sequence_upper: str) -> bool:
+    return sequence_upper[-_CODON_LENGTH:] in _STOP_CODONS
+
+
+def _require_supported_reference_codons(
+    *,
+    sequence_upper: str,
+    table: CodonTable,
+    positions: tuple[int, ...],
+) -> None:
+    internal_stop_positions = [
+        pos for pos in positions if sequence_upper[(pos - 1) * _CODON_LENGTH : pos * _CODON_LENGTH] in _STOP_CODONS
+    ]
+    if internal_stop_positions:
+        raise ValueError(
+            f"Reference coding DNA contains internal stop codon(s) at AA position(s): {internal_stop_positions}"
+        )
+    unsupported = [
+        (pos, sequence_upper[(pos - 1) * _CODON_LENGTH : pos * _CODON_LENGTH])
+        for pos in positions
+        if sequence_upper[(pos - 1) * _CODON_LENGTH : pos * _CODON_LENGTH] not in table.codon2aa
+    ]
+    if unsupported:
+        formatted = ", ".join(f"{codon} at AA position {pos}" for pos, codon in unsupported)
+        raise ValueError(f"Reference codon(s) absent from the codon table: {formatted}")
 
 
 def _normalize_alternates(raw: tuple[str, ...], *, available: Iterable[str]) -> tuple[str, ...]:

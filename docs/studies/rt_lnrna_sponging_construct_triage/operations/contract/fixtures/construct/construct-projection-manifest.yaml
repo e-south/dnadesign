@@ -15,26 +15,26 @@ strategy:
 construct_template:
   construct_template_id: dual_cassette_rt_lnrna_expression_template_v1
   plasmid_context_source_id: genbank:pes-retron-26.gb#record
-  target_context_source_id: genbank:1600bp-region.gb#record
+  target_context_source_id: genbank:2000bp-region.gb#record
   source_authority_id: pes_retron_26_vector
-  target_context_source_authority_id: dual_cassette_1600bp_region
+  target_context_source_authority_id: dual_cassette_2000bp_region
   source_sequence_length_nt: 4956
   topology: circular
   target_context:
-    context_id: dual_cassette_1600bp_context_v1
-    length_nt: 1600
+    context_id: dual_cassette_2000bp_context_v1
+    length_nt: 2000
     coordinate_basis: zero_based_half_open
     window_start_0: 56
-    window_end_0: 1656
+    window_end_0: 2056
     padding_policy: real_plasmid_sequence_only
     truncation_policy: fail
     slot_truncation_policy: fail
-    variable_length_policy: symmetric_prefix_suffix_flank_adjustment_to_fixed_1600bp
+    variable_length_policy: symmetric_prefix_suffix_flank_adjustment_to_fixed_2000bp
 slots:
   - slot_id: lnrna
     construct_part_name: lnrna
     role: lnrna_cassette
-    sequence_field: candidate__lnrna_sequence
+    sequence_field: construct_subject__lnrna_sequence
     required: true
     template_span_0: [186, 359]
     placement_kind: replace
@@ -45,7 +45,7 @@ slots:
   - slot_id: rt_cds
     construct_part_name: rt_cds
     role: rt_cds
-    sequence_field: candidate__rt_cds_sequence
+    sequence_field: construct_subject__rt_cds_sequence
     required: true
     template_span_0: [524, 1487]
     placement_kind: replace
@@ -54,13 +54,13 @@ slots:
       source_feature: genbank:pes-retron-26.gb#ECD_00831
       replaced_span_bp: 963
 representation_views:
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
     product_kind: realized_context
     orientation: forward
     pooling_operation: seq_mean
     construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
     product_kind: realized_context
     required_orientations: [forward, reverse_complement]
     pooling_operation: seq_mean
@@ -96,8 +96,8 @@ representation_views:
     construct_output_anchor_part: rt_cds
     required_slots: [lnrna, rt_cds]
 candidates:
-  - candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
-    fixture_ref: operations/contract/fixtures/candidates/retron26-working-anchor.yaml
+  - construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    fixture_ref: operations/contract/fixtures/construct-subjects/retron26-working-anchor.yaml
     construct_projection_status: representable
     slot_bindings:
       lnrna:
@@ -112,14 +112,14 @@ candidates:
       lnrna: [130, 303]
       rt_cds: [468, 1431]
     construct_context_view_declarations:
-      - dual_cassette_1600bp_seq_mean
-      - dual_cassette_1600bp_fwd_rc_concat
+      - dual_cassette_2000bp_seq_mean
+      - dual_cassette_2000bp_fwd_rc_concat
       - lnrna_span_in_construct_anchor_mean
       - lnrna_span_in_construct_reverse_complement_anchor_mean
       - rt_cds_span_in_construct_anchor_mean
       - rt_cds_span_in_construct_reverse_complement_anchor_mean
-  - candidate_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
-    fixture_ref: operations/contract/fixtures/candidates/retron43-failed-anchor.yaml
+  - construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    fixture_ref: operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
     construct_projection_status: representable
     slot_bindings:
       lnrna:
@@ -134,8 +134,8 @@ candidates:
       lnrna: [123, 310]
       rt_cds: [475, 1438]
     construct_context_view_declarations:
-      - dual_cassette_1600bp_seq_mean
-      - dual_cassette_1600bp_fwd_rc_concat
+      - dual_cassette_2000bp_seq_mean
+      - dual_cassette_2000bp_fwd_rc_concat
       - lnrna_span_in_construct_anchor_mean
       - lnrna_span_in_construct_reverse_complement_anchor_mean
       - rt_cds_span_in_construct_anchor_mean

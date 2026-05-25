@@ -8,7 +8,7 @@
 | Term | Meaning |
 | --- | --- |
 | `SyntheticRtLnrnaSpongingConstruct` | One paired lnRNA/msr-msd-payload cassette plus one RT CDS cassette in the fixed dual-expression context. |
-| `RtCds` | DNA coding sequence for the reverse transcriptase in the candidate row. |
+| `RtCds` | DNA coding sequence for the reverse transcriptase in the construct subject row. |
 | `LnrnaSequence` | DNA representation of the lnRNA cassette used in the construct context. |
 | `MsdDesignSpec` | Study/compiler design metadata for the MSD, hairpin, payload, and feasibility details. |
 | `ConstructSlot` | Named placement slot owned by Construct, for example `lnrna` or `rt_cds`, with template span, source field, emitted span, and orientation-aware bounds. |

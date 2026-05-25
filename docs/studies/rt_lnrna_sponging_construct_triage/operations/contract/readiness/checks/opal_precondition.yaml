@@ -7,7 +7,7 @@ blocked_by:
   - fixed_size_vector_x_absent
   - sponging_assay_observations_absent
 rules:
-  - Candidate table must expose id, bio_type, sequence, alphabet, and length.
+  - OPAL training-example rows must expose id, bio_type, sequence, alphabet, and length.
   - X column must be one explicit Arrow fixed-size-list float vector.
   - OPAL run and explain are blocked before real SpongingAssayObservation labels exist.
   - Shared labels should use usr_sidecar plus ledger_only prediction writeback.

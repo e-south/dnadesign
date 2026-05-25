@@ -11,7 +11,7 @@ artifacts:
     - repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
   generated_not_checked_in_by_default:
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
-    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/infer
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/analysis
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_opal_training_examples_v1

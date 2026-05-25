@@ -49,7 +49,7 @@ _TREATMENT_RE = re.compile(
     r"(?P<iptg>[0-9]+(?:\.[0-9]+)?)\s*[uµ]M\s*IPTG\s*$",
     flags=re.IGNORECASE,
 )
-_BASE_RESOLVED_CONSTRUCT_CANDIDATES = {
+_BASE_RESOLVED_CONSTRUCT_SUBJECTS = {
     "retron26": "rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO",
     "retron43": "rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO",
 }
@@ -114,9 +114,9 @@ class ReaderSpopObservation:
     observation_id: str
     candidate_key: str
     assay_subject_key: str
-    proposed_candidate_id: str
-    construct_candidate_id: str | None
-    candidate_bridge_status: str
+    proposed_construct_subject_id: str
+    construct_subject_id: str | None
+    construct_subject_bridge_status: str
     reader_design_id: str
     reader_experiment_id: str
     reader_artifact_ref: str
@@ -161,10 +161,10 @@ class ReaderSpopObservation:
 class ReaderSpopCandidateSummary:
     candidate_key: str
     assay_subject_key: str
-    proposed_candidate_id: str
-    construct_candidate_id: str | None
+    proposed_construct_subject_id: str
+    construct_subject_id: str | None
     construct_promotable: bool
-    candidate_bridge_status: str
+    construct_subject_bridge_status: str
     observation_count: int
     experiment_ids: tuple[str, ...]
     spop_score_median: float
@@ -399,11 +399,11 @@ def _score_design(
     viability_mean = statistics.fmean(viability_values)
     raw_score = raw_potency * ((1.0 - lambda_viability) + (lambda_viability * viability_mean))
     score = potency * ((1.0 - lambda_viability) + (lambda_viability * viability_mean))
-    resolved_construct_candidates = _resolved_construct_candidates()
-    proposed_candidate_id = _proposed_candidate_id_for_key(candidate_key)
-    construct_candidate_id = resolved_construct_candidates.get(candidate_key)
-    construct_promotable = construct_candidate_id is not None
-    candidate_bridge_status = (
+    resolved_construct_subjects = _resolved_construct_subjects()
+    proposed_construct_subject_id = _proposed_construct_subject_id_for_key(candidate_key)
+    construct_subject_id = resolved_construct_subjects.get(candidate_key)
+    construct_promotable = construct_subject_id is not None
+    construct_subject_bridge_status = (
         "resolved_construct_sequence_authority" if construct_promotable else "missing_construct_sequence_authority"
     )
     if not construct_promotable:
@@ -418,9 +418,9 @@ def _score_design(
         observation_id=f"reader:{experiment_id}:{candidate_key}:{SPOP_METRIC_ID}",
         candidate_key=candidate_key,
         assay_subject_key=candidate_key,
-        proposed_candidate_id=proposed_candidate_id,
-        construct_candidate_id=construct_candidate_id,
-        candidate_bridge_status=candidate_bridge_status,
+        proposed_construct_subject_id=proposed_construct_subject_id,
+        construct_subject_id=construct_subject_id,
+        construct_subject_bridge_status=construct_subject_bridge_status,
         reader_design_id=reader_design_id,
         reader_experiment_id=experiment_id,
         reader_artifact_ref=ratio_artifact.ref,
@@ -473,10 +473,10 @@ def _candidate_summaries(observations: Iterable[ReaderSpopObservation]) -> tuple
             ReaderSpopCandidateSummary(
                 candidate_key=candidate_key,
                 assay_subject_key=first.assay_subject_key,
-                proposed_candidate_id=first.proposed_candidate_id,
-                construct_candidate_id=first.construct_candidate_id,
+                proposed_construct_subject_id=first.proposed_construct_subject_id,
+                construct_subject_id=first.construct_subject_id,
                 construct_promotable=first.construct_promotable,
-                candidate_bridge_status=first.candidate_bridge_status,
+                construct_subject_bridge_status=first.construct_subject_bridge_status,
                 observation_count=len(rows),
                 experiment_ids=tuple(sorted(row.experiment_id for row in rows)),
                 spop_score_median=float(statistics.median(scores)),
@@ -684,15 +684,15 @@ def _candidate_key_for_design(value: object) -> str | None:
 
 
 @cache
-def _resolved_construct_candidates() -> dict[str, str]:
+def _resolved_construct_subjects() -> dict[str, str]:
     catalog = build_variant_genbank_catalog()
     if not catalog.ok:
         joined = "; ".join(catalog.errors)
         raise ReaderSpopContractError(f"Variant GenBank catalog is invalid: {joined}")
-    resolved = dict(_BASE_RESOLVED_CONSTRUCT_CANDIDATES)
+    resolved = dict(_BASE_RESOLVED_CONSTRUCT_SUBJECTS)
     resolved.update(
         {
-            record.variant_id: record.construct_candidate_id
+            record.variant_id: record.construct_subject_id
             for record in catalog.records
             if record.variant_id.startswith("retron") and record.construct_projection_status == "representable"
         }
@@ -700,10 +700,10 @@ def _resolved_construct_candidates() -> dict[str, str]:
     return resolved
 
 
-def _proposed_candidate_id_for_key(candidate_key: str) -> str:
-    resolved_construct_candidates = _resolved_construct_candidates()
-    if candidate_key in resolved_construct_candidates:
-        return resolved_construct_candidates[candidate_key]
+def _proposed_construct_subject_id_for_key(candidate_key: str) -> str:
+    resolved_construct_subjects = _resolved_construct_subjects()
+    if candidate_key in resolved_construct_subjects:
+        return resolved_construct_subjects[candidate_key]
     suffix = candidate_key.removeprefix("retron")
     return f"rt_lnrna_pair__unresolved_rt__retron{suffix}_lnrna__tetO"
 

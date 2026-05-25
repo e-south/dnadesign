@@ -6,7 +6,7 @@ scope:
     refs: "${WORKSPACES_DIR}/_shared/inputs/refs.csv"
     name_col: "ref_name"
     seq_col: "sequence"
-    aa_col: "protein_seq"          # optional: REF_AA.fa if present
+    aa_col: "protein"              # optional: REF_AA.fa if present
 
   permute:
     protocol: "multisite_select"

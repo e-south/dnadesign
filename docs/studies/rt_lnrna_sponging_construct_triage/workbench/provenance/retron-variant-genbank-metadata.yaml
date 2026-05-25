@@ -342,6 +342,6 @@ records:
     rt_mode: wt_eco1_rt
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: record
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native
     reader_design_id: msrmsdwt-bl21; pBbS2c-rfp
     comment: Wild-type Eco1 msr/msd lnRNA found in Escherichia coli BL21; GenBank source is the a1-through-a2 lnRNA only, paired with the Eco1 WT RT reference for Construct projection.

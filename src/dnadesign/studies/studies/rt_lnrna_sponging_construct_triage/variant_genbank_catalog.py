@@ -28,11 +28,11 @@ _DEFAULT_CATALOG_PATH = _STUDY_DIR / "workbench/provenance/retron-variant-genban
 _BASE_TEMPLATE_LNRNA_SPAN_0 = (186, 359)
 _BASE_TEMPLATE_RT_SPAN_0 = (524, 1487)
 _TARGET_CONTEXT_START_0 = 56
-_TARGET_CONTEXT_LENGTH_NT = 1600
+_TARGET_CONTEXT_LENGTH_NT = 2000
 _BASE_CONTEXT_END_0 = _TARGET_CONTEXT_START_0 + _TARGET_CONTEXT_LENGTH_NT
 _ANCILLARY_GENBANK_FILES = frozenset(
     {
-        "1600bp-region.gb",
+        "2000bp-region.gb",
         "pes-retron-26-a1-a2.gb",
         "retron-179-a1-a2.gb",
         "retron-eco1-rt.gb",
@@ -86,7 +86,7 @@ class VariantGenBankCatalogRecord:
     comment: str
     lnrna: ExtractedSequenceAuthority
     rt_cds: ExtractedSequenceAuthority
-    construct_candidate_id: str
+    construct_subject_id: str
     construct_spans_0: dict[str, tuple[int, int]]
     construct_projection_status: str
     qc_flags: tuple[str, ...] = ()
@@ -265,7 +265,7 @@ def _build_record(
     construct_status = (
         "representable"
         if not any(flag.endswith("_flank_exhausted") for flag in qc_flags)
-        else "blocked_full_slot_set_outside_1600bp_context"
+        else "blocked_full_slot_set_outside_2000bp_context"
     )
     return VariantGenBankCatalogRecord(
         variant_id=variant_id,
@@ -286,7 +286,7 @@ def _build_record(
         comment=_string(item.get("comment"), label=f"{variant_id}.comment"),
         lnrna=lnrna,
         rt_cds=rt_cds,
-        construct_candidate_id=_construct_candidate_id(
+        construct_subject_id=_construct_subject_id(
             variant_id=variant_id,
             rt_authority_kind=rt_cds.authority_kind,
             item=item,
@@ -451,9 +451,9 @@ def _construct_spans(*, lnrna_length: int, rt_length: int) -> tuple[dict[str, tu
     }
     qc_flags: list[str] = []
     if length_delta > 0:
-        qc_flags.append("context_flanks_truncated_to_1600bp")
+        qc_flags.append("context_flanks_truncated_to_2000bp")
     elif length_delta < 0:
-        qc_flags.append("context_flanks_extended_to_1600bp")
+        qc_flags.append("context_flanks_extended_to_2000bp")
     if abs(length_delta) % 2:
         qc_flags.append("context_flank_adjustment_1bp_asymmetry")
     if prefix_length < 0:
@@ -555,8 +555,8 @@ def _single_record(
     return records[0]
 
 
-def _construct_candidate_id(*, variant_id: str, rt_authority_kind: str, item: Mapping[str, object]) -> str:
-    explicit = str(item.get("construct_candidate_id") or "").strip()
+def _construct_subject_id(*, variant_id: str, rt_authority_kind: str, item: Mapping[str, object]) -> str:
+    explicit = str(item.get("construct_subject_id") or "").strip()
     if explicit:
         return explicit
     if rt_authority_kind == "wt_eco1_rt":

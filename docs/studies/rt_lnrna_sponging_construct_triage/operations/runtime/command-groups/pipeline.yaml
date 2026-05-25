@@ -10,17 +10,17 @@ command_groups:
       - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
   - id: construct_projection
     status: active
-    purpose: Materialize dual-cassette construct contexts from the multi-slot projection manifest.
+    purpose: Materialize dual-cassette construct contexts from GenBank, source-promotion, and Permuter construct subjects.
     blockers:
-      - overlay_resolver_not_implemented
+      - khan_source_rows_exceeding_current_2000bp_construct_window
   - id: permuter_rt_cds_dms
     status: active
-    purpose: Generate RT-CDS DMS variants through the public Permuter API and promote them into study-owned candidate envelopes before Construct realization.
+    purpose: Generate RT-CDS DMS variants through the public Permuter API and promote them into study-owned construct subject envelopes before Construct realization.
     commands:
       - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids
       - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias
       - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_infer_handoff
+      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
   - id: infer_handoff
     status: blocked
     purpose: Extract feature aliases from declared construct-context views.
@@ -29,7 +29,7 @@ command_groups:
       - infer_sequence_view_completion_not_run
     commands:
       - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py
-      - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-stale-vectors 0 --max-stale-scalars 0
+      - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-missing-vectors 0 --max-missing-scalars 0 --max-stale-vectors 0 --max-stale-scalars 0
   - id: latentdna_gallery
     status: blocked
     purpose: Validate and materialize the RT-lnRNA PCA health, scree, ordinal-audit, and UMAP gallery surfaces from Infer sidecars.

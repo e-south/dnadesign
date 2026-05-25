@@ -15,7 +15,7 @@ records:
     source_file: msrmsdwt-bl21.gb
     source_kind: lnrna_only
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/msrmsdwt-bl21.gb
-    source_sha256: 5e15c83476779d43302b6215c32f2a3d92cca057ed35c8db690836ef8a10d57e  # pragma: allowlist secret
+    source_sha256: 878f51fbf6cd839ccf45a67cb97d3df29de48cc2760bca141c7223927c59faa1
     record_id: CP010816.1
     record_name: msr/msd(wt)_BL21
     sequence_length_bp: 170
@@ -38,7 +38,7 @@ records:
       - 170
       strand: 1
       length_nt: 170
-      sequence_sha256: dea6f7f1a168d83f78a8860a6fb0c548fc0a2b49d63ec53df31d365f9b56057c  # pragma: allowlist secret
+      sequence_sha256: dea6f7f1a168d83f78a8860a6fb0c548fc0a2b49d63ec53df31d365f9b56057c
       authority_kind: record
       mutation_labels: []
       fusion_part_labels: []
@@ -53,11 +53,11 @@ records:
       - 963
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__msrmsdwt_bl21_lnrna__native
     construct_spans_0:
       lnrna:
       - 132
@@ -67,7 +67,7 @@ records:
       - 1430
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_extended_to_1600bp
+    - context_flanks_extended_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron18:
     variant_id: retron18
@@ -76,7 +76,7 @@ records:
     source_file: pes-retron-18.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-18.gb
-    source_sha256: 89c9081679bf9077b56b07c746efec8a8b76b0fb995dd535b3111e65e3a3a825  # pragma: allowlist secret
+    source_sha256: d12cc8f2602322d2b9c7c8d8dcdd453fd47de1f4bf9733fe62d422abe9ff98f2
     record_id: pES-retron-18
     record_name: pES-retron-18
     sequence_length_bp: 4941
@@ -98,7 +98,7 @@ records:
       - 344
       strand: 1
       length_nt: 158
-      sequence_sha256: 37190e4d432b7357af48cde960ed7ac7804a50d7ae315b9a5f40d055110ed8ba  # pragma: allowlist secret
+      sequence_sha256: 37190e4d432b7357af48cde960ed7ac7804a50d7ae315b9a5f40d055110ed8ba
       authority_kind: legacy_msr_to_a2
       mutation_labels: []
       fusion_part_labels: []
@@ -113,11 +113,11 @@ records:
       - 1472
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron18_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron18_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 138
@@ -127,7 +127,7 @@ records:
       - 1424
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_extended_to_1600bp
+    - context_flanks_extended_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron24:
     variant_id: retron24
@@ -136,7 +136,7 @@ records:
     source_file: pes-retron-24.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-24.gb
-    source_sha256: ded5e4098b5903192bfc222f3edb0d889a61345c94a73329d48d944a609a880f  # pragma: allowlist secret
+    source_sha256: fb810bd8e10e9d1f71ff7a301e7ea697e2c225899358a8a80af3d2df5a69c923
     record_id: pES-retron-24
     record_name: pES-retron-24
     sequence_length_bp: 4956
@@ -158,7 +158,7 @@ records:
       - 359
       strand: 1
       length_nt: 173
-      sequence_sha256: c161b93cd268499167d3ba8fafe8b6b0d8a7691fd14ed4c15a0a9c5ecfd70fcf  # pragma: allowlist secret
+      sequence_sha256: c161b93cd268499167d3ba8fafe8b6b0d8a7691fd14ed4c15a0a9c5ecfd70fcf
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -173,11 +173,11 @@ records:
       - 1487
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron24_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron24_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 130
@@ -194,7 +194,7 @@ records:
     source_file: pes-retron-25.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-25.gb
-    source_sha256: b5e044efa0a2d7a274d879f702459f2488149463a1bd01234fc2238e91506e82  # pragma: allowlist secret
+    source_sha256: 5cb5e2b79a70da835738b8caa5b9b2738364e4ef222ed65b2dcf97d51f3238e9
     record_id: pES-retron-25
     record_name: pES-retron-25
     sequence_length_bp: 4972
@@ -216,7 +216,7 @@ records:
       - 375
       strand: 1
       length_nt: 189
-      sequence_sha256: 5a0d79571e5251a5ce0e197117140d8b1d5d72dd4fd1e1e2694f4619fd29543b  # pragma: allowlist secret
+      sequence_sha256: 5a0d79571e5251a5ce0e197117140d8b1d5d72dd4fd1e1e2694f4619fd29543b
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -231,11 +231,11 @@ records:
       - 1503
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron25_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron25_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 122
@@ -245,7 +245,7 @@ records:
       - 1439
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron26:
     variant_id: retron26
     retron_number: 26
@@ -253,7 +253,7 @@ records:
     source_file: pes-retron-26.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
-    source_sha256: eb76e50add545bdba31b0ad2a6dacf9e85de22862f52ca5d61960e65f4ab5c39  # pragma: allowlist secret
+    source_sha256: b45c4c750e3be81242e5a469f2adc5207fb27baf467bab04559d6f9162c6fb71
     record_id: pES-retron-26
     record_name: pES-retron-26
     sequence_length_bp: 4956
@@ -276,7 +276,7 @@ records:
       - 359
       strand: 1
       length_nt: 173
-      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -291,11 +291,11 @@ records:
       - 1487
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 130
@@ -312,7 +312,7 @@ records:
     source_file: pes-retron-27.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-27.gb
-    source_sha256: 5b27fdba96c3d203168720de1126a72a58da577a7abe9c2982deae881b56c2a1  # pragma: allowlist secret
+    source_sha256: 993880c9e11649cde7af6c62c724b687b26f572d7c45db446b095d5d124f1655
     record_id: pES-retron-27
     record_name: pES-retron-27
     sequence_length_bp: 4972
@@ -335,7 +335,7 @@ records:
       - 375
       strand: 1
       length_nt: 189
-      sequence_sha256: fcd7a4b3c653c9d62fcbfdd09223aa19ab3e56bf60f77fea5c8d4923716a2c14  # pragma: allowlist secret
+      sequence_sha256: fcd7a4b3c653c9d62fcbfdd09223aa19ab3e56bf60f77fea5c8d4923716a2c14
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -350,11 +350,11 @@ records:
       - 1503
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron27_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron27_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 122
@@ -364,7 +364,7 @@ records:
       - 1439
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron43:
     variant_id: retron43
     retron_number: 43
@@ -372,7 +372,7 @@ records:
     source_file: pes-retron-43.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-43.gb
-    source_sha256: a438d7cb8ef1e846be3ad2a84e5ecc948358b535585757a0487457c6ef7c4a18  # pragma: allowlist secret
+    source_sha256: da39df66b26d810a8f5735e060bbc95b6c8dab3757a2ffdd6328cd892e641c99
     record_id: pES-retron-43
     record_name: pES-retron-43
     sequence_length_bp: 4970
@@ -396,7 +396,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -411,11 +411,11 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -425,7 +425,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron45:
     variant_id: retron45
     retron_number: 45
@@ -433,7 +433,7 @@ records:
     source_file: pes-retron-45.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-45.gb
-    source_sha256: 608163ef5cbd4242ba191f11f6e39b42a169e8850ff98e61ef0336b473305d56  # pragma: allowlist secret
+    source_sha256: bc1db97820c6c643cc54a96310f3f058dc2b86644a2043176058f481ea7b1141
     record_id: pES-retron-45
     record_name: pES-retron-45
     sequence_length_bp: 4986
@@ -456,7 +456,7 @@ records:
       - 389
       strand: 1
       length_nt: 203
-      sequence_sha256: 3d4b933f265049ec2a2074adfb7a0f7db45467a75fe312f58e44efa60fc99351  # pragma: allowlist secret
+      sequence_sha256: 3d4b933f265049ec2a2074adfb7a0f7db45467a75fe312f58e44efa60fc99351
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -471,11 +471,11 @@ records:
       - 1517
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 115
@@ -485,7 +485,7 @@ records:
       - 1446
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron46:
     variant_id: retron46
     retron_number: 46
@@ -493,7 +493,7 @@ records:
     source_file: pes-retron-46.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-46.gb
-    source_sha256: 2aec3172d13cf23d4cc3ba548794295ded34d3e49adae67460e1479e2f24834c  # pragma: allowlist secret
+    source_sha256: 2ad629aaf770c88d99971153e88fe57cb999b07fc840050582990ce4100c6bfa
     record_id: pES-retron-46
     record_name: pES-retron-46
     sequence_length_bp: 4994
@@ -516,7 +516,7 @@ records:
       - 397
       strand: 1
       length_nt: 211
-      sequence_sha256: 8e15a9d65ad0d12177f6b6ded6564ef0316f435830202440925760c2300c2d21  # pragma: allowlist secret
+      sequence_sha256: 8e15a9d65ad0d12177f6b6ded6564ef0316f435830202440925760c2300c2d21
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -531,11 +531,11 @@ records:
       - 1525
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 111
@@ -545,7 +545,7 @@ records:
       - 1450
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron47:
     variant_id: retron47
     retron_number: 47
@@ -553,7 +553,7 @@ records:
     source_file: pes-retron-47.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-47.gb
-    source_sha256: 04e9155834d4da632dff34d741a3648431ee8ee9e6fa61c475eef2775ed14863  # pragma: allowlist secret
+    source_sha256: ac755cbd7d7d7096dcd0506b2610c47f5566ed1e4e7d46ef43c9f4bd56a0220e
     record_id: pES-retron-47
     record_name: pES-retron-47
     sequence_length_bp: 5163
@@ -575,7 +575,7 @@ records:
       - 359
       strand: 1
       length_nt: 173
-      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -590,14 +590,14 @@ records:
       - 1694
       strand: 1
       length_nt: 1170
-      sequence_sha256: 4d4b556420966727314548c68afac6b190bdd2e5a9ae981b28c17c00be5d4400  # pragma: allowlist secret
+      sequence_sha256: 4d4b556420966727314548c68afac6b190bdd2e5a9ae981b28c17c00be5d4400
       authority_kind: rt_translational_fusion
       mutation_labels: []
       fusion_part_labels:
       - Sso7d
       - GGS_2
       - ECD_00831
-    construct_candidate_id: rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 27
@@ -607,7 +607,7 @@ records:
       - 1535
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron48:
     variant_id: retron48
@@ -616,7 +616,7 @@ records:
     source_file: pes-retron-48.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-48.gb
-    source_sha256: e076ff5c74c729289a384ed8c0327aec3d1ea05830ff29137383762d006a7b13  # pragma: allowlist secret
+    source_sha256: d00e349f585d014f48b71006e321f4edc7b16ed590215239c0c4e291a2496800
     record_id: pES-retron-48
     record_name: pES-retron-48
     sequence_length_bp: 5163
@@ -638,7 +638,7 @@ records:
       - 359
       strand: 1
       length_nt: 173
-      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23  # pragma: allowlist secret
+      sequence_sha256: 03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -653,14 +653,14 @@ records:
       - 1694
       strand: 1
       length_nt: 1170
-      sequence_sha256: 309b7b72a7a84403ce32d985d57b1bf386682e767624e0eeee8af13d39c46041  # pragma: allowlist secret
+      sequence_sha256: 309b7b72a7a84403ce32d985d57b1bf386682e767624e0eeee8af13d39c46041
       authority_kind: rt_translational_fusion
       mutation_labels: []
       fusion_part_labels:
       - ECD_00831
       - GGS_2
       - Sso7d
-    construct_candidate_id: rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 27
@@ -670,7 +670,7 @@ records:
       - 1535
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron49:
     variant_id: retron49
@@ -679,7 +679,7 @@ records:
     source_file: pes-retron-49.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-49.gb
-    source_sha256: cd08469fb4f4471a040c3b785494b24745179d7fc3d6b369594d7550b5c76063  # pragma: allowlist secret
+    source_sha256: d9da237a3f66f12323ab75e427931e8080350661e5abb204b1e52c173781ca9e
     record_id: pES-retron-49
     record_name: pES-retron-49
     sequence_length_bp: 4970
@@ -700,7 +700,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -715,12 +715,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: ce5a0829bc825fead4e8ba806c150588bd0129ed17eb3ffb9308815aadc5a3a3  # pragma: allowlist secret
+      sequence_sha256: ce5a0829bc825fead4e8ba806c150588bd0129ed17eb3ffb9308815aadc5a3a3
       authority_kind: rt_point_mutation
       mutation_labels:
       - R38Y
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron49_rt_variant__retron49_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron49_rt_variant__retron49_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -730,7 +730,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron50:
     variant_id: retron50
     retron_number: 50
@@ -738,7 +738,7 @@ records:
     source_file: pes-retron-50.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-50.gb
-    source_sha256: 65f6907dc255fa514f110cbd048fee4b2c8239d5ec8197d3d884967a322d66e2  # pragma: allowlist secret
+    source_sha256: f56bdb64711e3a6fc54e760bcbce0302753df6a4a2cd26f6f8e22985ff8f1137
     record_id: pES-retron-50
     record_name: pES-retron-50
     sequence_length_bp: 4970
@@ -759,7 +759,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -774,12 +774,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: 459a0150ce39fa17e72f550ae7f303c713f0315d0f4eb378687919959502ed3b  # pragma: allowlist secret
+      sequence_sha256: 459a0150ce39fa17e72f550ae7f303c713f0315d0f4eb378687919959502ed3b
       authority_kind: rt_point_mutation
       mutation_labels:
       - L39R
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron50_rt_variant__retron50_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron50_rt_variant__retron50_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -789,7 +789,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron51:
     variant_id: retron51
     retron_number: 51
@@ -797,7 +797,7 @@ records:
     source_file: pes-retron-51.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-51.gb
-    source_sha256: 52533bec5a72ec60141a1323e4e64602a4f664d8f72522f5e21b8969bae50694  # pragma: allowlist secret
+    source_sha256: 51f2a83d530607054f7a75b9797c90e81ec7cfd9fe8ce85f7bddfce78cceed56
     record_id: pES-retron-51
     record_name: pES-retron-51
     sequence_length_bp: 4970
@@ -818,7 +818,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -833,12 +833,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: 1b70ba5666a02cc5585374b28ce15c84166bb6bc1ef831510c3effa7c078a00f  # pragma: allowlist secret
+      sequence_sha256: 1b70ba5666a02cc5585374b28ce15c84166bb6bc1ef831510c3effa7c078a00f
       authority_kind: rt_point_mutation
       mutation_labels:
       - L40G
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron51_rt_variant__retron51_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron51_rt_variant__retron51_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -848,7 +848,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron52:
     variant_id: retron52
     retron_number: 52
@@ -856,7 +856,7 @@ records:
     source_file: pes-retron-52.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-52.gb
-    source_sha256: ae383c78c968acba438df4742f07d38338864867ffc218807557091954752ef1  # pragma: allowlist secret
+    source_sha256: 975046e52f15b2fd0936515be8bee18337e55f235e1f2b1b5d5147f88c62b5f2
     record_id: pES-retron-52
     record_name: pES-retron-52
     sequence_length_bp: 4970
@@ -877,7 +877,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -892,12 +892,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: d38a08f57d2681a40f7f4c10349f145862596131b6f9570df7de208c3b608af9  # pragma: allowlist secret
+      sequence_sha256: d38a08f57d2681a40f7f4c10349f145862596131b6f9570df7de208c3b608af9
       authority_kind: rt_point_mutation
       mutation_labels:
       - I41G
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron52_rt_variant__retron52_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron52_rt_variant__retron52_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -907,7 +907,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron53:
     variant_id: retron53
     retron_number: 53
@@ -915,7 +915,7 @@ records:
     source_file: pes-retron-53.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-53.gb
-    source_sha256: 9242cae1f3b9e26591518e66adc0289cd6f93887be64c8161a2b0612ab9c4209  # pragma: allowlist secret
+    source_sha256: 8b4f052e686ca4963758aa8a0acd82f361eec26f5754affa8f601d61fe906cba
     record_id: pES-retron-53
     record_name: pES-retron-53
     sequence_length_bp: 4970
@@ -936,7 +936,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -951,12 +951,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: 2ef0e969499d48f22c46e8f5f49d70261d8cc48549fd6ed4ea4bf433bd92012e  # pragma: allowlist secret
+      sequence_sha256: 2ef0e969499d48f22c46e8f5f49d70261d8cc48549fd6ed4ea4bf433bd92012e
       authority_kind: rt_point_mutation
       mutation_labels:
       - T43E
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron53_rt_variant__retron53_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron53_rt_variant__retron53_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -966,7 +966,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron54:
     variant_id: retron54
     retron_number: 54
@@ -974,7 +974,7 @@ records:
     source_file: pes-retron-54.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-54.gb
-    source_sha256: 8a7d3b46315d447404fa638c9556a4a47d540113f95b6d5340f282973f21938c  # pragma: allowlist secret
+    source_sha256: 656425872a6844b85023b3eb5880862d4900fcae4ba68818f6259d8b99a13efa
     record_id: pES-retron-54
     record_name: pES-retron-54
     sequence_length_bp: 4970
@@ -995,7 +995,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1010,12 +1010,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: dd8798e7ea7f1f0ddfaf8d23d3bf3181c3bfaeca0fdeb7d06cc4a753f32b2bfb  # pragma: allowlist secret
+      sequence_sha256: dd8798e7ea7f1f0ddfaf8d23d3bf3181c3bfaeca0fdeb7d06cc4a753f32b2bfb
       authority_kind: rt_point_mutation
       mutation_labels:
       - R49E
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron54_rt_variant__retron54_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron54_rt_variant__retron54_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -1025,7 +1025,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron55:
     variant_id: retron55
     retron_number: 55
@@ -1033,7 +1033,7 @@ records:
     source_file: pes-retron-55.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-55.gb
-    source_sha256: 17c26ba38bcf79383ba35e637f14ff2e07719d8496aba867e50a1ae203ed0214  # pragma: allowlist secret
+    source_sha256: 04676e75fc8d8e660fcefd6af7ef3eaadb907a469b46b18e99bcba056cae2dfa
     record_id: pES-retron-55
     record_name: pES-retron-55
     sequence_length_bp: 4970
@@ -1054,7 +1054,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1069,12 +1069,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: e8b4de35cd547028a7d0809052fd90448ff5cb572315d4b6efdfbdb35e8f7aa0  # pragma: allowlist secret
+      sequence_sha256: e8b4de35cd547028a7d0809052fd90448ff5cb572315d4b6efdfbdb35e8f7aa0
       authority_kind: rt_point_mutation
       mutation_labels:
       - E54P
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron55_rt_variant__retron55_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron55_rt_variant__retron55_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -1084,7 +1084,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron56:
     variant_id: retron56
     retron_number: 56
@@ -1092,7 +1092,7 @@ records:
     source_file: pes-retron-56.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-56.gb
-    source_sha256: 85305bfe99a5f4ae8fc701ecb98c952d485e9fa03140cbb1e21b7c003d5822dc  # pragma: allowlist secret
+    source_sha256: fec3e65a959fb0aaa1f23c30fcc4e32320d23678ba94b6e7a1f8fea242ed0afa
     record_id: pES-retron-56
     record_name: pES-retron-56
     sequence_length_bp: 4970
@@ -1113,7 +1113,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f  # pragma: allowlist secret
+      sequence_sha256: ba5ec7b09b50d9d242dfc14fd96bb4feb5a9b05ae7fb83b0fd235090d7c3ee2f
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1128,12 +1128,12 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: 085a2e0e39f8d2e8f875e8fbe4b1c8450e5fb307ef5afdff5b612a84c4edbf84  # pragma: allowlist secret
+      sequence_sha256: 085a2e0e39f8d2e8f875e8fbe4b1c8450e5fb307ef5afdff5b612a84c4edbf84
       authority_kind: rt_point_mutation
       mutation_labels:
       - P58G
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__retron56_rt_variant__retron56_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__retron56_rt_variant__retron56_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -1143,7 +1143,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron170:
     variant_id: retron170
     retron_number: 170
@@ -1151,7 +1151,7 @@ records:
     source_file: pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-170-msdtetr-teto2-wt-as9taas10ca.gb
-    source_sha256: 30f9f81e1c14c65e1df454852bd1a69c139f69358aa148000cfb15d908596032  # pragma: allowlist secret
+    source_sha256: 6b50c2119044a236bada4bce319c1b692ba37fc5664659b34e6235d92ef73c13
     record_id: pES-retron-170-msd[TetR
     record_name: pES-retron-170-msd[TetR
     sequence_length_bp: 4970
@@ -1173,7 +1173,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: 7114d789e033f05c704237d9068cab11870435e60aeff26fb07dd34203b02d0c  # pragma: allowlist secret
+      sequence_sha256: 7114d789e033f05c704237d9068cab11870435e60aeff26fb07dd34203b02d0c
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1188,11 +1188,11 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -1202,7 +1202,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron171:
     variant_id: retron171
     retron_number: 171
@@ -1210,7 +1210,7 @@ records:
     source_file: pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-171-msdtetr-teto2-cr-2x-as10acas11ca.gb
-    source_sha256: c5dfbe0f72a70fdc79d2f2dddc6d1d64272c1c023fb85db5b544a27fff276f22  # pragma: allowlist secret
+    source_sha256: 80ced64db739ea4515849f40e32435b4e03e6b0fb9ea6b8bea3743897ab98581
     record_id: pES-retron-171-msd[TetR
     record_name: pES-retron-171-msd[TetR
     sequence_length_bp: 4970
@@ -1232,7 +1232,7 @@ records:
       - 373
       strand: 1
       length_nt: 187
-      sequence_sha256: 57f61959c758ee8f5550106320f641deed36286fe3ebe5dfdef500a8362fcf15  # pragma: allowlist secret
+      sequence_sha256: 57f61959c758ee8f5550106320f641deed36286fe3ebe5dfdef500a8362fcf15
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1247,11 +1247,11 @@ records:
       - 1501
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 123
@@ -1261,7 +1261,7 @@ records:
       - 1438
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
   retron172:
     variant_id: retron172
     retron_number: 172
@@ -1269,7 +1269,7 @@ records:
     source_file: pes-retron-172-msdtetr-033-gag-aga-ctc.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-172-msdtetr-033-gag-aga-ctc.gb
-    source_sha256: ad18630814154906e05db146d6f3bc90a0f0218e3190718e2c95be3f6c21efdc  # pragma: allowlist secret
+    source_sha256: 04d7448aa2aa2a6dfbbc12cfab9be56461cf51417db041b366a3d854bb3aaa78
     record_id: pES-retron-172-msd[TetR
     record_name: pES-retron-172-msd[TetR
     sequence_length_bp: 4961
@@ -1291,7 +1291,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 7913c92a8367b5ddd3a5576d3524682153710a2150a69c40fbd6674bace3ff52  # pragma: allowlist secret
+      sequence_sha256: 7913c92a8367b5ddd3a5576d3524682153710a2150a69c40fbd6674bace3ff52
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1306,11 +1306,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1320,7 +1320,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron173:
     variant_id: retron173
@@ -1329,7 +1329,7 @@ records:
     source_file: pes-retron-173-msdtetr-033-gga-aga-tcc.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-173-msdtetr-033-gga-aga-tcc.gb
-    source_sha256: ce148a42c71c49700a66131b7d80a34ff195458053266aa5dfe9a8ffbaa3946f  # pragma: allowlist secret
+    source_sha256: d3158035ff7a58b432b32d22328ec49973e280d8cdfcb16017a16c7c2b7b17a0
     record_id: pES-retron-173-msd[TetR
     record_name: pES-retron-173-msd[TetR
     sequence_length_bp: 4961
@@ -1351,7 +1351,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 58eb33f3d0c2ea84c2c6626e8b98dd7906c11bd472ff9453769c3c5906ae50d9  # pragma: allowlist secret
+      sequence_sha256: 58eb33f3d0c2ea84c2c6626e8b98dd7906c11bd472ff9453769c3c5906ae50d9
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1366,11 +1366,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1380,7 +1380,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron174:
     variant_id: retron174
@@ -1389,7 +1389,7 @@ records:
     source_file: pes-retron-174-msdtetr-033-aga-gac-tct.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-174-msdtetr-033-aga-gac-tct.gb
-    source_sha256: 57146ba62ffcb45419b473f219319974369e2166f994465f26af37122e4ee64c  # pragma: allowlist secret
+    source_sha256: e00b553dd8016201e57f94e859dcf5a86882efdd2a6d3cda0e837f909719a99f
     record_id: pES-retron-174-msd[TetR
     record_name: pES-retron-174-msd[TetR
     sequence_length_bp: 4961
@@ -1411,7 +1411,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 8a6afb2db0aca14732aca407d68eb96541a8aa0ae548cc73d0cb1e4a87573c90  # pragma: allowlist secret
+      sequence_sha256: 8a6afb2db0aca14732aca407d68eb96541a8aa0ae548cc73d0cb1e4a87573c90
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1426,11 +1426,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1440,7 +1440,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron175:
     variant_id: retron175
@@ -1449,7 +1449,7 @@ records:
     source_file: pes-retron-175-msdtetr-033-gta-acg-tac.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-175-msdtetr-033-gta-acg-tac.gb
-    source_sha256: ca5f829815f0468baa8276df60c8b0b9550eeae0aa1f4217093129027364e953  # pragma: allowlist secret
+    source_sha256: e48aa7b7ba1a75f827e6157054794b4999f8eec1db1e186faab799265063b1e2
     record_id: pES-retron-175-msd[TetR
     record_name: pES-retron-175-msd[TetR
     sequence_length_bp: 4961
@@ -1471,7 +1471,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 771679f9d2a8e2801fc46a63cf1cff16c6180c6f59db00233e77e8ae2a8c28fb  # pragma: allowlist secret
+      sequence_sha256: 771679f9d2a8e2801fc46a63cf1cff16c6180c6f59db00233e77e8ae2a8c28fb
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1486,11 +1486,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1500,7 +1500,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron176:
     variant_id: retron176
@@ -1509,7 +1509,7 @@ records:
     source_file: pes-retron-176-msdtetr-033-gtg-acg-cac.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-176-msdtetr-033-gtg-acg-cac.gb
-    source_sha256: c71212f8e934f9f6a8a42ad495aa9ac69f63baf80514b25cc10bc2674feacbfc  # pragma: allowlist secret
+    source_sha256: b9dcde3727c79cfcced866cf24c90686596130b34f56d7c17d6f69d6f234002f
     record_id: pES-retron-176-msd[TetR
     record_name: pES-retron-176-msd[TetR
     sequence_length_bp: 4961
@@ -1531,7 +1531,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 5be6e8a9ce2b95f76412773137c465250b56a4ae19cf3b95d9727256fe1a8d72  # pragma: allowlist secret
+      sequence_sha256: 5be6e8a9ce2b95f76412773137c465250b56a4ae19cf3b95d9727256fe1a8d72
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1546,11 +1546,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1560,7 +1560,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron177:
     variant_id: retron177
@@ -1569,7 +1569,7 @@ records:
     source_file: pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-177-msdtetr-c172-lcggg-racag-mxmm.gb
-    source_sha256: b4113ead01d2f219f14855c6b10077e366c2a9d7d7270a4fdec233656f4efad6  # pragma: allowlist secret
+    source_sha256: e5e5f3e635bc394be9e5665f4f46c9fba60ba06067c0b2f6a12d0f3b347668de
     record_id: pES-retron-177-msd[TetR
     record_name: pES-retron-177-msd[TetR
     sequence_length_bp: 4961
@@ -1590,7 +1590,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: de506208fdca6570ae2d68266a978effb01f54b17714d7c315348e254e60a597  # pragma: allowlist secret
+      sequence_sha256: de506208fdca6570ae2d68266a978effb01f54b17714d7c315348e254e60a597
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1605,11 +1605,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1619,7 +1619,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron178:
     variant_id: retron178
@@ -1628,7 +1628,7 @@ records:
     source_file: pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-178-msdtetr-c26-lcaag-rctcg-mxmm.gb
-    source_sha256: 268738a03436b9d6206543384cec6b9fac69ca55244692a990ef8bce9c297c86  # pragma: allowlist secret
+    source_sha256: 45ac16d51265ddfb930127debe2d780351e538ee709a006855d46ae3f9158816
     record_id: pES-retron-178-msd[TetR
     record_name: pES-retron-178-msd[TetR
     sequence_length_bp: 4956
@@ -1650,7 +1650,7 @@ records:
       - 359
       strand: 1
       length_nt: 173
-      sequence_sha256: bcc68d0bcfdc1479c287308c93ee15ada6df3c5a4b029335930bf36d840ef231  # pragma: allowlist secret
+      sequence_sha256: bcc68d0bcfdc1479c287308c93ee15ada6df3c5a4b029335930bf36d840ef231
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1665,11 +1665,11 @@ records:
       - 1487
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 130
@@ -1686,7 +1686,7 @@ records:
     source_file: pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-179-msdtetr-c172-lagtg-rcaat-mxmm.gb
-    source_sha256: 3122c125757194586abc7202615d8ba0657cee7951d755cc5d5c5dc4d35b1b83  # pragma: allowlist secret
+    source_sha256: 88ae6fcb8e8efd2d39c6b8f46733b3b11a6fa256ddddb08103307e6116319400
     record_id: pES-retron-179-msd[TetR
     record_name: pES-retron-179-msd[TetR
     sequence_length_bp: 4961
@@ -1707,7 +1707,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 930c806fe85c125218e1270ccae888a11bce045451f352533fc089a60fdb03c9  # pragma: allowlist secret
+      sequence_sha256: 930c806fe85c125218e1270ccae888a11bce045451f352533fc089a60fdb03c9
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1722,11 +1722,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1736,7 +1736,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron180:
     variant_id: retron180
@@ -1745,7 +1745,7 @@ records:
     source_file: pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb
-    source_sha256: da2266398d4627f246f3720ab692644d817f1c16557d9ac8a2b09fabf69d9b07  # pragma: allowlist secret
+    source_sha256: a0dc8573afb886995013fe37bdef2a7623773ab6fee8dd5c187d0e3df6bb86fd
     record_id: pES-retron-180-msd[TetR
     record_name: pES-retron-180-msd[TetR
     sequence_length_bp: 4961
@@ -1766,7 +1766,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 3e858e80ddb5b5a1c3b6616245e9953628deedee6f871b086871df90cb7c415c  # pragma: allowlist secret
+      sequence_sha256: 3e858e80ddb5b5a1c3b6616245e9953628deedee6f871b086871df90cb7c415c
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1781,11 +1781,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1795,7 +1795,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron181:
     variant_id: retron181
@@ -1804,7 +1804,7 @@ records:
     source_file: pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-181-msdtetr-c172-lagtg-rcttt-mwxm.gb
-    source_sha256: 885bb8ee097ea6f5da0ac90cc5a514b17cac56aecf72387537025dbac5764592  # pragma: allowlist secret
+    source_sha256: a18b5eca9a48d7b3cd8b08c82a49be1493743172659f5f4838a73a30e45a277d
     record_id: pES-retron-181-msd[TetR
     record_name: pES-retron-181-msd[TetR
     sequence_length_bp: 4961
@@ -1825,7 +1825,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: a4169904007413eb9af1969c5431c69a72cd5e2128fd893aee7c42c809a5d1da  # pragma: allowlist secret
+      sequence_sha256: a4169904007413eb9af1969c5431c69a72cd5e2128fd893aee7c42c809a5d1da
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1840,11 +1840,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1854,7 +1854,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron182:
     variant_id: retron182
@@ -1863,7 +1863,7 @@ records:
     source_file: pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-182-msdtetr-c172-lagtg-rcgat-mxwm.gb
-    source_sha256: 98f9b7132b25f70ae6075f70c1b098060893759fc09b4a843373ae4f93da8840  # pragma: allowlist secret
+    source_sha256: 5ade065e9e979919d7d82d43973af389976fb9057adf4db25c3a03ada8eabfb9
     record_id: pES-retron-182-msd[TetR
     record_name: pES-retron-182-msd[TetR
     sequence_length_bp: 4961
@@ -1884,7 +1884,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 6ed327991b74bef8989d6b67367181ac604935499587099faded26678514aca5  # pragma: allowlist secret
+      sequence_sha256: 6ed327991b74bef8989d6b67367181ac604935499587099faded26678514aca5
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1899,11 +1899,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1913,7 +1913,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron183:
     variant_id: retron183
@@ -1922,7 +1922,7 @@ records:
     source_file: pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-183-msdtetr-c172-laatg-rcgtg-xmwm.gb
-    source_sha256: 106cc7cb1954c0dc3d345a6d7457491321a718f82fd77fea160864a75fcacdad  # pragma: allowlist secret
+    source_sha256: c16df390de6e8bcc892e60ea005e5dce1822219750a11e5d98c14cadf85d5750
     record_id: pES-retron-183-msd[TetR
     record_name: pES-retron-183-msd[TetR
     sequence_length_bp: 4961
@@ -1943,7 +1943,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 38b7da1c65a8665c18829882b551d1959f6327c607820730472335e2f16ba286  # pragma: allowlist secret
+      sequence_sha256: 38b7da1c65a8665c18829882b551d1959f6327c607820730472335e2f16ba286
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -1958,11 +1958,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -1972,7 +1972,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron184:
     variant_id: retron184
@@ -1981,7 +1981,7 @@ records:
     source_file: pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-184-msdtetr-c172-lagtg-rcatt-mwmm.gb
-    source_sha256: 7ab30088e881863a79f56d41182e363b6dde74f6522cfad92af1f4582899bceb  # pragma: allowlist secret
+    source_sha256: ca4d7ba56e9f65ad102c6d228128a63f913eabe05f70f7398e7350d7f9b59563
     record_id: pES-retron-184-msd[TetR
     record_name: pES-retron-184-msd[TetR
     sequence_length_bp: 4961
@@ -2002,7 +2002,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 2b32f7c73c25affa71e492176484c814649636749d29f9908707d3a779ad24dc  # pragma: allowlist secret
+      sequence_sha256: 2b32f7c73c25affa71e492176484c814649636749d29f9908707d3a779ad24dc
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -2017,11 +2017,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -2031,7 +2031,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron185:
     variant_id: retron185
@@ -2040,7 +2040,7 @@ records:
     source_file: pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-185-msdtetr-c172-laatg-rcgtt-mmwm.gb
-    source_sha256: 35765f1fc92cc205b034625ac6182148813f837ad77c8805ad12bbdc766f92f3  # pragma: allowlist secret
+    source_sha256: 5f76c2d18ad903551372cf86c61bb5327add7b36bcde9c05f79d645ad5f57414
     record_id: pES-retron-185-msd[TetR
     record_name: pES-retron-185-msd[TetR
     sequence_length_bp: 4961
@@ -2061,7 +2061,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: 4f25f0fa3861e6b54a7a359a8129957efe7cafd2b112d12b6765fb5774ff0248  # pragma: allowlist secret
+      sequence_sha256: 4f25f0fa3861e6b54a7a359a8129957efe7cafd2b112d12b6765fb5774ff0248
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -2076,11 +2076,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -2090,7 +2090,7 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry
   retron186:
     variant_id: retron186
@@ -2099,7 +2099,7 @@ records:
     source_file: pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb
     source_kind: whole_plasmid
     source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-186-msdtetr-c172-lagtg-rcgtt-mwwm.gb
-    source_sha256: e3ca4f123cf36e5a0617ba35f6bebbd9ca049c1830aacf737dcc55305b1276d0  # pragma: allowlist secret
+    source_sha256: fc2c2dd69f9bdc341ee7984b71a043a723453be5533c445300ce52a3bc4bfeac
     record_id: pES-retron-186-msd[TetR
     record_name: pES-retron-186-msd[TetR
     sequence_length_bp: 4961
@@ -2120,7 +2120,7 @@ records:
       - 364
       strand: 1
       length_nt: 178
-      sequence_sha256: b4a444e5c3f793201661069af8f2bbf93db2f2ad17f682141834188414b4775d  # pragma: allowlist secret
+      sequence_sha256: b4a444e5c3f793201661069af8f2bbf93db2f2ad17f682141834188414b4775d
       authority_kind: a1_20_to_a2_20
       mutation_labels: []
       fusion_part_labels: []
@@ -2135,11 +2135,11 @@ records:
       - 1492
       strand: 1
       length_nt: 963
-      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
       authority_kind: wt_eco1_rt
       mutation_labels: []
       fusion_part_labels: []
-    construct_candidate_id: rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 128
@@ -2149,5 +2149,5 @@ records:
       - 1434
     construct_projection_status: representable
     qc_flags:
-    - context_flanks_truncated_to_1600bp
+    - context_flanks_truncated_to_2000bp
     - context_flank_adjustment_1bp_asymmetry

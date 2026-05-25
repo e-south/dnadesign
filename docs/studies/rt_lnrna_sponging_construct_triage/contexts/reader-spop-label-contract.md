@@ -39,18 +39,18 @@ Do not collapse assay identity into construct identity.
 | --- | --- |
 | `assay_subject_key` | Reader-local subject such as `retron26` or `retron176`. |
 | `reader_design_id` | Raw Reader design id, for example `pES-retron-26; pBbS2c-rfp`. |
-| `proposed_candidate_id` | Study proposal for the eventual RT plus lnRNA candidate row. |
-| `construct_candidate_id` | Real Construct-backed candidate id; null until sequence authority exists. |
-| `candidate_bridge_status` | Whether this row has resolved Construct sequence authority. |
+| `proposed_construct_subject_id` | Study proposal for the eventual RT plus lnRNA construct subject row. |
+| `construct_subject_id` | Real Construct-backed subject id; null until sequence authority exists. |
+| `construct_subject_bridge_status` | Whether this row has resolved Construct sequence authority. |
 
 Reader retron numbers resolve through the variant GenBank catalog when explicit
-RT plus lnRNA sequence authority exists and the candidate is
+RT plus lnRNA sequence authority exists and the construct subject is
 Construct-representable. Rows without catalog authority may carry assay labels,
 but they must remain `missing_construct_sequence_authority` until promoted
 through Construct.
 
 As of 2026-05-24, the live Reader dry run resolves the observed catalog-backed
-retron rows to Construct candidate ids, including retron47/retron48 and
+retron rows to Construct subject ids, including retron47/retron48 and
 retron49-56. The 2025-11-05 RT-variant experiment is a single-point mid-log
 read, not a time course; the Reader artifact stores row time as 0 h, but the
 study planner records the endpoint as approximately 10 h after seeding and

@@ -41,18 +41,20 @@ cluster runs, and other `dnadesign` tools.
 Verified on 2026-05-24:
 
 - `uv run permuter --help` passed.
-- `uv run pytest -q src/dnadesign/permuter/tests` passed with 94 tests after
-  the public API/JSON/plot-manifest/SCC wrapper slice.
+- `uv run pytest -q src/dnadesign/permuter/tests` passed after the public
+  API/JSON/plot-manifest/SCC wrapper slice and the non-executing Infer handoff
+  request slice.
 - All 9 checked-in workspace scope configs validated with `ScopeConfig`.
 - Scratch dogfood `run -> evaluate -> validate -> plot` passed and rendered
   PNG/PDF plot artifacts.
 
 Primary findings:
 
-- High: Permuter no longer reaches into stale Infer internals, but its Evo2
-  evaluators still use the ad hoc evaluator path. They do not yet opt into
-  Infer's current feature-bundle, sequence-view alias, scalar/vector sidecar,
-  `_derived/infer`, or USR overlay contracts.
+- High: Permuter no longer reaches into stale Infer internals and now has a
+  non-executing public Infer feature-request manifest. Its Evo2 evaluators still
+  use the ad hoc evaluator path and do not yet opt into Infer's current
+  feature-bundle, sequence-view alias, scalar/vector sidecar, `_derived/infer`,
+  or USR overlay contracts.
 - Medium: generated datasets remain workspace-Parquet-native. They are
   USR-shaped rows, but not overlay-native sidecars with `.events.log`,
   sync/diff semantics, or Infer sidecar reuse.
@@ -209,6 +211,9 @@ Current implementation note:
 - This API is still not a substitute for the future Infer feature-bundle/USR
   sidecar bridge. Evo2 feature bundles should use Infer directly until Permuter
   has an explicit sidecar-native evaluator mode.
+- `InferFeatureRequest` is the public non-executing handoff manifest for
+  requesting Infer feature work. It requires explicit `view_name` or `alias`
+  selectors and keeps `execution_owner` / `writeback_owner` pinned to Infer.
 
 ### Machine and Batch Surface
 
@@ -315,8 +320,8 @@ Done when:
 
 - workspace validation fails fast on missing inputs, scope/config name mismatch,
   and invalid layouts
-- workspace output paths stay under workspace `outputs/` unless an explicit
-  external root is configured
+- workspace output paths stay under the workspace `outputs/` tree unless an
+  explicit external root is configured with `--out` or `PERMUTER_OUTPUT_ROOT`
 - workspace CLI resolves scope ids, workspace directories, and `config.yaml`
   paths
 
@@ -352,8 +357,8 @@ Done when:
 
 ## Provisional Sprint Contract
 
-Recommended next execution slice: **Infer feature-bundle and USR-sidecar
-bridge**.
+Recommended next execution slice: **Infer execution bridge and USR-sidecar
+handoff**.
 
 Goal:
 
@@ -362,8 +367,8 @@ Goal:
 
 In-scope work:
 
-- public `InferScoringPlan` or equivalent handoff contract owned by Permuter's
-  facade
+- a public `InferScoringPlan` or equivalent execution plan that consumes the
+  existing non-executing `InferFeatureRequest` manifest
 - an implementation path that calls Infer public APIs only
 - feature alias and sequence-view contract tests against an Infer smoke
   workspace

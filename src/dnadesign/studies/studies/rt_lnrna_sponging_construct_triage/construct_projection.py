@@ -22,25 +22,25 @@ _DEFAULT_MANIFEST_PATH = _STUDY_DIR / "operations/contract/fixtures/construct/co
 _EXPECTED_STRATEGY_ID = "construct_multi_slot_assembly_v1"
 _EXPECTED_CONSTRUCT_CONTRACT = "dual_cassette_rt_lnrna_expression_v1"
 _EXPECTED_REPRESENTATION_CONTRACT = "dual_cassette_construct_context_embedding_v1"
-_EXPECTED_TARGET_LENGTH_NT = 1600
+_EXPECTED_TARGET_LENGTH_NT = 2000
 _EXPECTED_TARGET_START_0 = 56
 _EXPECTED_TARGET_END_0 = _EXPECTED_TARGET_START_0 + _EXPECTED_TARGET_LENGTH_NT
-_EXPECTED_TARGET_CONTEXT_SOURCE_ID = "genbank:1600bp-region.gb#record"
-_EXPECTED_TARGET_CONTEXT_AUTHORITY_ID = "dual_cassette_1600bp_region"
+_EXPECTED_TARGET_CONTEXT_SOURCE_ID = "genbank:2000bp-region.gb#record"
+_EXPECTED_TARGET_CONTEXT_AUTHORITY_ID = "dual_cassette_2000bp_region"
 _EXPECTED_REQUIRED_SLOTS = ("lnrna", "rt_cds")
 _EXPECTED_SLOT_CONTRACTS = {
     "lnrna": {
         "role": "lnrna_cassette",
-        "sequence_field": "candidate__lnrna_sequence",
+        "sequence_field": "construct_subject__lnrna_sequence",
     },
     "rt_cds": {
         "role": "rt_cds",
-        "sequence_field": "candidate__rt_cds_sequence",
+        "sequence_field": "construct_subject__rt_cds_sequence",
     },
 }
 _REQUIRED_VIEW_NAMES = (
-    "dual_cassette_1600bp_seq_mean",
-    "dual_cassette_1600bp_fwd_rc_concat",
+    "dual_cassette_2000bp_seq_mean",
+    "dual_cassette_2000bp_fwd_rc_concat",
     "lnrna_span_in_construct_anchor_mean",
     "lnrna_span_in_construct_reverse_complement_anchor_mean",
     "rt_cds_span_in_construct_anchor_mean",
@@ -72,8 +72,8 @@ class ProjectionManifestAudit:
     strategy_id: str = ""
     construct_template_id: str = ""
     required_view_names: tuple[str, ...] = ()
-    candidate_count: int = 0
-    candidate_spans: dict[str, dict[str, tuple[int, int]]] = field(default_factory=dict)
+    construct_subject_count: int = 0
+    construct_subject_spans: dict[str, dict[str, tuple[int, int]]] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -151,44 +151,50 @@ def validate_projection_manifest_payload(payload: object) -> ProjectionManifestA
     if view_names != _REQUIRED_VIEW_NAMES:
         errors.append("representation_views must declare the six v1 RT-lnRNA construct views in order")
 
-    candidate_spans: dict[str, dict[str, tuple[int, int]]] = {}
+    construct_subject_spans: dict[str, dict[str, tuple[int, int]]] = {}
     candidates = _list(payload.get("candidates"), label="candidates", errors=errors)
     for index, candidate in enumerate(candidates, start=1):
         if not isinstance(candidate, dict):
             errors.append(f"candidates[{index}] must be a mapping")
             continue
-        candidate_id = _string(candidate.get("candidate_id"))
-        if not candidate_id:
-            errors.append(f"candidates[{index}].candidate_id is required")
+        construct_subject_id = _string(candidate.get("construct_subject_id"))
+        if not construct_subject_id:
+            errors.append(f"candidates[{index}].construct_subject_id is required")
             continue
         if _string(candidate.get("construct_projection_status")) != "representable":
-            errors.append(f"{candidate_id}: construct_projection_status must be representable for this fixture")
-        slot_bindings = _mapping(candidate.get("slot_bindings"), label=f"{candidate_id}.slot_bindings", errors=errors)
+            errors.append(f"{construct_subject_id}: construct_projection_status must be representable for this fixture")
+        slot_bindings = _mapping(
+            candidate.get("slot_bindings"),
+            label=f"{construct_subject_id}.slot_bindings",
+            errors=errors,
+        )
         declared_spans = _mapping(
             candidate.get("emitted_slot_spans_0"),
-            label=f"{candidate_id}.emitted_slot_spans_0",
+            label=f"{construct_subject_id}.emitted_slot_spans_0",
             errors=errors,
         )
         view_declarations = tuple(
             str(value)
             for value in _list(
                 candidate.get("construct_context_view_declarations"),
-                label=f"{candidate_id}.construct_context_view_declarations",
+                label=f"{construct_subject_id}.construct_context_view_declarations",
                 errors=errors,
             )
         )
         if view_declarations != _REQUIRED_VIEW_NAMES:
-            errors.append(f"{candidate_id}: construct_context_view_declarations must match representation_views")
+            errors.append(
+                f"{construct_subject_id}: construct_context_view_declarations must match representation_views"
+            )
         if slot_bindings is None or declared_spans is None:
             continue
         _validate_candidate_slot_bindings(
-            candidate_id=candidate_id,
+            construct_subject_id=construct_subject_id,
             slots=slots,
             slot_bindings=slot_bindings,
             errors=errors,
         )
         computed = _computed_candidate_spans(
-            candidate_id=candidate_id,
+            construct_subject_id=construct_subject_id,
             slots=slots,
             slot_bindings=slot_bindings,
             target_length=target_length,
@@ -198,22 +204,25 @@ def validate_projection_manifest_payload(payload: object) -> ProjectionManifestA
         )
         if not computed:
             continue
-        candidate_spans[candidate_id] = computed
+        construct_subject_spans[construct_subject_id] = computed
         for slot_id, span in computed.items():
-            declared = _span_0(declared_spans.get(slot_id), label=f"{candidate_id}.emitted_slot_spans_0.{slot_id}")
+            declared = _span_0(
+                declared_spans.get(slot_id),
+                label=f"{construct_subject_id}.emitted_slot_spans_0.{slot_id}",
+            )
             if declared is None:
-                errors.append(f"{candidate_id}: emitted_slot_spans_0.{slot_id} must be [start, end]")
+                errors.append(f"{construct_subject_id}: emitted_slot_spans_0.{slot_id} must be [start, end]")
                 continue
             if declared != span:
-                errors.append(f"{candidate_id}: emitted_slot_spans_0.{slot_id} is {declared}, expected {span}")
+                errors.append(f"{construct_subject_id}: emitted_slot_spans_0.{slot_id} is {declared}, expected {span}")
 
     return ProjectionManifestAudit(
         errors=tuple(errors),
         strategy_id=strategy_id,
         construct_template_id=template_id,
         required_view_names=view_names,
-        candidate_count=len(candidates),
-        candidate_spans=candidate_spans,
+        construct_subject_count=len(candidates),
+        construct_subject_spans=construct_subject_spans,
     )
 
 
@@ -259,8 +268,8 @@ def _validate_template(template: dict[str, object], *, errors: list[str]) -> Non
     )
     if target_context is None:
         return
-    if _string(target_context.get("context_id")) != "dual_cassette_1600bp_context_v1":
-        errors.append("construct_template.target_context.context_id must be dual_cassette_1600bp_context_v1")
+    if _string(target_context.get("context_id")) != "dual_cassette_2000bp_context_v1":
+        errors.append("construct_template.target_context.context_id must be dual_cassette_2000bp_context_v1")
     if _string(target_context.get("coordinate_basis")) != "zero_based_half_open":
         errors.append("construct_template.target_context.coordinate_basis must be zero_based_half_open")
     if _nonnegative_int(target_context.get("window_start_0")) != _EXPECTED_TARGET_START_0:
@@ -275,7 +284,7 @@ def _validate_template(template: dict[str, object], *, errors: list[str]) -> Non
 
 def _validate_candidate_slot_bindings(
     *,
-    candidate_id: str,
+    construct_subject_id: str,
     slots: tuple[_ProjectionSlot, ...],
     slot_bindings: dict[str, object],
     errors: list[str],
@@ -283,34 +292,36 @@ def _validate_candidate_slot_bindings(
     for slot in slots:
         binding = _mapping(
             slot_bindings.get(slot.slot_id),
-            label=f"{candidate_id}.slot_bindings.{slot.slot_id}",
+            label=f"{construct_subject_id}.slot_bindings.{slot.slot_id}",
             errors=errors,
         )
         if binding is None:
             continue
         if not _string(binding.get("sequence_id")):
-            errors.append(f"{candidate_id}.slot_bindings.{slot.slot_id}.sequence_id is required")
+            errors.append(f"{construct_subject_id}.slot_bindings.{slot.slot_id}.sequence_id is required")
         sequence_length = _positive_int(
             binding.get("sequence_length_nt"),
-            label=f"{candidate_id}.slot_bindings.{slot.slot_id}.sequence_length_nt",
+            label=f"{construct_subject_id}.slot_bindings.{slot.slot_id}.sequence_length_nt",
             errors=errors,
         )
         source_span = _span_0(
             binding.get("source_sequence_span_0"),
-            label=f"{candidate_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0",
+            label=f"{construct_subject_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0",
         )
         if source_span is None:
-            errors.append(f"{candidate_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0 must be [start, end]")
+            errors.append(
+                f"{construct_subject_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0 must be [start, end]"
+            )
         elif sequence_length is not None and source_span[1] - source_span[0] != sequence_length:
             errors.append(
-                f"{candidate_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0 length "
+                f"{construct_subject_id}.slot_bindings.{slot.slot_id}.source_sequence_span_0 length "
                 f"must equal sequence_length_nt"
             )
 
 
 def _computed_candidate_spans(
     *,
-    candidate_id: str,
+    construct_subject_id: str,
     slots: tuple[_ProjectionSlot, ...],
     slot_bindings: dict[str, object],
     target_length: int | None,
@@ -324,20 +335,20 @@ def _computed_candidate_spans(
     for slot in slots:
         binding = _mapping(
             slot_bindings.get(slot.slot_id),
-            label=f"{candidate_id}.slot_bindings.{slot.slot_id}",
+            label=f"{construct_subject_id}.slot_bindings.{slot.slot_id}",
             errors=errors,
         )
         if binding is None:
             continue
         sequence_length = _positive_int(
             binding.get("sequence_length_nt"),
-            label=f"{candidate_id}.slot_bindings.{slot.slot_id}.sequence_length_nt",
+            label=f"{construct_subject_id}.slot_bindings.{slot.slot_id}.sequence_length_nt",
             errors=errors,
         )
         if sequence_length is None:
             continue
         if slot.template_start_0 < cursor:
-            errors.append(f"{candidate_id}: slot {slot.slot_id} overlaps a prior template slot")
+            errors.append(f"{construct_subject_id}: slot {slot.slot_id} overlaps a prior template slot")
             continue
         out_len += slot.template_start_0 - cursor
         start = out_len
@@ -348,7 +359,7 @@ def _computed_candidate_spans(
     if target_length is None or target_start is None or target_end is None:
         return {}
     if target_end - target_start != target_length:
-        errors.append(f"{candidate_id}: target context span must equal target_context.length_nt")
+        errors.append(f"{construct_subject_id}: target context span must equal target_context.length_nt")
         return {}
     window_start = _candidate_window_start(slots=slots, full_spans=full_spans, target_start=target_start)
     spans: dict[str, tuple[int, int]] = {}
@@ -357,7 +368,7 @@ def _computed_candidate_spans(
         spans[slot_id] = relative
         if relative[0] < 0 or relative[1] > target_length:
             errors.append(
-                f"{candidate_id}: required slot {slot_id} resolves to {relative}, "
+                f"{construct_subject_id}: required slot {slot_id} resolves to {relative}, "
                 f"outside target context length {target_length}"
             )
     return spans
@@ -446,14 +457,14 @@ def _parse_view_names(payload: object, *, errors: list[str]) -> tuple[str, ...]:
 
 
 def _validate_view_shape(*, view_name: str, view: dict[str, object], errors: list[str]) -> None:
-    if view_name == "dual_cassette_1600bp_seq_mean":
+    if view_name == "dual_cassette_2000bp_seq_mean":
         if _string(view.get("orientation")) != "forward":
             errors.append(f"{view_name}: orientation must be forward")
         if _string(view.get("pooling_operation")) != "seq_mean":
             errors.append(f"{view_name}: pooling_operation must be seq_mean")
         if _string(view.get("construct_output_anchor_part")):
             errors.append(f"{view_name}: construct_output_anchor_part must be empty")
-    if view_name == "dual_cassette_1600bp_fwd_rc_concat":
+    if view_name == "dual_cassette_2000bp_fwd_rc_concat":
         required_orientations = tuple(
             str(value)
             for value in _list(

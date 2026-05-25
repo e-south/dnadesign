@@ -15,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.permuter import read_infer_feature_request_manifest
 from dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.representation_contract import (
     REQUIRED_SOURCE_VIEW_NAMES,
     validate_infer_feature_bundle_payload,
@@ -47,6 +48,19 @@ def _permuter_plan_path() -> Path:
     )
 
 
+def _permuter_infer_handoff_path() -> Path:
+    return (
+        _repo_root() / "docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/permuter/"
+        "rt-cds-dms-infer-handoff.yaml"
+    )
+
+
+def _pipeline_path() -> Path:
+    return (
+        _repo_root() / "docs/studies/rt_lnrna_sponging_construct_triage/operations/runtime/command-groups/pipeline.yaml"
+    )
+
+
 def _permuter_plan_payload() -> dict[str, object]:
     payload = yaml.safe_load(_permuter_plan_path().read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
@@ -75,10 +89,19 @@ def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_i
         "float32",
         16384,
     )
-    assert audit.construct_candidate_promotion == {
+    assert audit.row_key_source == {
+        "dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1",
+        "namespace": "construct_subject",
+        "column": "construct_subject__id",
+        "materialized_by": "construct_output_subject_bridge",
+        "output_join_field": "construct__input_id",
+        "input_dataset": "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1",
+        "input_construct_subject_field": "construct_subject__id",
+    }
+    assert audit.construct_subject_promotion == {
         "source_dataset": "rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1",
-        "consolidated_construct_dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1",
-        "required_sequence_fields": ("candidate__lnrna_sequence", "candidate__rt_cds_sequence"),
+        "consolidated_construct_dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1",
+        "required_sequence_fields": ("construct_subject__lnrna_sequence", "construct_subject__rt_cds_sequence"),
         "required_construct_views": REQUIRED_SOURCE_VIEW_NAMES,
     }
 
@@ -90,9 +113,9 @@ def test_rt_lnrna_infer_feature_bundle_fixture_selects_every_view_by_explicit_vi
     assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
 
 
-def test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_infer_handoff() -> None:
+def test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff() -> None:
     payload = _permuter_plan_payload()
-    candidate_envelope = payload["candidate_envelope"]
+    construct_subject_envelope = payload["construct_subject_envelope"]
     infer_handoff = payload["infer_handoff"]
     feature_bundle_path = (_permuter_plan_path().parent / str(infer_handoff["feature_bundle_ref"])).resolve()
     feature_bundle_payload = yaml.safe_load(feature_bundle_path.read_text(encoding="utf-8"))
@@ -103,17 +126,29 @@ def test_rt_lnrna_permuter_plan_fixture_links_candidate_envelope_to_six_view_inf
     assert payload["variant_owner"] == "permuter"
     assert payload["construct_owner"] == "construct"
     assert payload["infer_owner"] == "infer"
-    assert candidate_envelope == {
-        "record_kind": "candidate_envelope",
+    assert construct_subject_envelope == {
+        "record_kind": "construct_subject_envelope",
         "sequence_authority": "overlay_only",
-        "biological_sequence_fields": ["candidate__lnrna_sequence", "candidate__rt_cds_sequence"],
-        "semantic_identity": "candidate__candidate_id",
+        "biological_sequence_fields": ["construct_subject__lnrna_sequence", "construct_subject__rt_cds_sequence"],
+        "semantic_identity": "construct_subject__id",
         "usr_row_identity": "canonical_sequence_id",
     }
+    assert infer_handoff["source_owner"] == "construct"
     assert tuple(infer_handoff["required_view_names"]) == REQUIRED_SOURCE_VIEW_NAMES
     audit = validate_infer_feature_bundle_payload(feature_bundle_payload)
     assert audit.ok, "\n".join(audit.errors)
     assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
+
+
+def test_rt_lnrna_permuter_infer_handoff_fixture_uses_public_manifest_contract() -> None:
+    request = read_infer_feature_request_manifest(_permuter_infer_handoff_path())
+
+    assert request.source_owner == "construct"
+    assert request.source_dataset.dataset_id == "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1"
+    assert request.execution_owner == "infer"
+    assert request.writeback_owner == "infer"
+    assert tuple(selector.view_name for selector in request.sequence_view_selectors) == REQUIRED_SOURCE_VIEW_NAMES
+    assert request.requested_outputs == ("log_likelihood", "output_layer_mean", "intermediate_embedding")
 
 
 def test_rt_lnrna_infer_feature_bundle_rejects_product_kind_orientation_only_selectors() -> None:
@@ -125,7 +160,7 @@ def test_rt_lnrna_infer_feature_bundle_rejects_product_kind_orientation_only_sel
         "collect_intermediate_embedding": True,
         "sequence_view_inputs": [
             {
-                "dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1",
+                "dataset": "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1",
                 "view_selector": {
                     "product_kind": "realized_context",
                     "orientation": "forward",
@@ -141,3 +176,16 @@ def test_rt_lnrna_infer_feature_bundle_rejects_product_kind_orientation_only_sel
 
     assert not audit.ok
     assert any("must select by explicit view_name" in error for error in audit.errors)
+
+
+def test_rt_lnrna_infer_inventory_command_is_a_hard_missing_sidecar_gate() -> None:
+    payload = yaml.safe_load(_pipeline_path().read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    groups = {group["id"]: group for group in payload["command_groups"]}
+    commands = "\n".join(groups["infer_handoff"]["commands"])
+
+    assert "--max-missing-products 0" in commands
+    assert "--max-missing-vectors 0" in commands
+    assert "--max-missing-scalars 0" in commands
+    assert "--max-stale-vectors 0" in commands
+    assert "--max-stale-scalars 0" in commands

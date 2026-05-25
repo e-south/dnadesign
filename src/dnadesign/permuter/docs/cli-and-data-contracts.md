@@ -28,7 +28,9 @@ configs.
 ## Workspace Contract
 
 Each scope is a directory with a single `config.yaml`. The directory name must
-match `scope.name`, and `output.dir` must resolve inside the workspace root.
+match `scope.name`, `input.refs` must resolve to a readable CSV with the
+declared name and sequence columns, and `output.dir` must resolve inside the
+workspace `outputs/` tree.
 Supported output layouts are `flat` and `nested`; retired layout names are
 contract errors rather than compatibility aliases.
 
@@ -143,3 +145,29 @@ set `max_variants` to fail before materializing oversized scans.
 `materialize_result(...)` writes canonical USR ids even when an in-memory
 `VariantRecord.id` is a Permuter variant id. The variant id is preserved as
 `permuter__var_id`.
+
+For Infer-bound feature extraction, use a non-executing handoff request instead
+of making Permuter run Infer:
+
+```python
+from dnadesign.permuter import (
+    InferFeatureRequest,
+    InferFeatureSourceDataset,
+    InferSequenceViewSelector,
+)
+
+request = InferFeatureRequest(
+    source_dataset=InferFeatureSourceDataset(
+        usr_root="workspaces/studies/example/usr",
+        dataset_id="example_construct_contexts_v1",
+    ),
+    feature_bundle_ref="docs/studies/example/fixtures/infer/evo2-feature-bundle.yaml",
+    sequence_view_selectors=(
+        InferSequenceViewSelector(view_name="dual_cassette_2000bp_seq_mean"),
+    ),
+    requested_outputs=("log_likelihood", "output_layer_mean"),
+)
+```
+
+The request is a manifest contract only. Infer owns validation, execution,
+resume planning, stale detection, and `_derived/infer` sidecars.

@@ -1,45 +1,53 @@
 schema_id: rt_lnrna_sponging_construct_triage_representation_table_v1
 study_id: rt_lnrna_sponging_construct_triage
 representation_contract: dual_cassette_construct_context_embedding_v1
-row_key: candidate__candidate_id
-source_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+row_key: construct_subject__id
+row_key_source:
+  dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+  namespace: construct_subject
+  column: construct_subject__id
+  materialized_by: construct_output_subject_bridge
+  output_join_field: construct__input_id
+  input_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+  input_construct_subject_field: construct_subject__id
+source_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
 source_sequence_views:
-  - view_name: dual_cassette_1600bp_seq_mean
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - view_name: dual_cassette_2000bp_seq_mean
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: forward
     pooling_operation: seq_mean
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: reverse_complement
     pooling_operation: seq_mean
   - view_name: lnrna_span_in_construct_anchor_mean
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: forward
     pooling_operation: anchor_mean
     pooling_slot: lnrna
   - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: reverse_complement
     pooling_operation: anchor_mean
     pooling_slot: lnrna
   - view_name: rt_cds_span_in_construct_anchor_mean
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: forward
     pooling_operation: anchor_mean
     pooling_slot: rt_cds
   - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     context_kind: template_custom
     orientation: reverse_complement
     pooling_operation: anchor_mean
     pooling_slot: rt_cds
 infer_feature_outputs:
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
     output_kind: vector
     model_name: evo2_7b
     representation_kind: intermediate_embedding
@@ -48,7 +56,7 @@ infer_feature_outputs:
     dimension: 4096
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
     output_kind: vector
     model_name: evo2_7b
     representation_kind: output_layer_mean
@@ -56,15 +64,15 @@ infer_feature_outputs:
     dimension: 512
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__total
-  - view_name: dual_cassette_1600bp_seq_mean
+  - view_name: dual_cassette_2000bp_seq_mean
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__mean_per_token
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
     output_kind: vector
     model_name: evo2_7b
     representation_kind: intermediate_embedding
@@ -73,7 +81,7 @@ infer_feature_outputs:
     dimension: 4096
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
     output_kind: vector
     model_name: evo2_7b
     representation_kind: output_layer_mean
@@ -81,11 +89,11 @@ infer_feature_outputs:
     dimension: 512
     sidecar_value_dtype: float64_list
     fixed_size_export_dtype: float32
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__total
-  - view_name: dual_cassette_1600bp_fwd_rc_concat
+  - view_name: dual_cassette_2000bp_fwd_rc_concat
     output_kind: scalar
     model_name: evo2_7b
     scalar_kind: log_likelihood__mean_per_token
@@ -190,11 +198,11 @@ infer_feature_outputs:
     model_name: evo2_7b
     scalar_kind: log_likelihood__mean_per_token
 fixed_size_vector_exports:
-  - view_id: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+  - view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
     derive: block_normalized_concatenate
     inputs:
-      - intermediate_embedding_7b_dual_cassette_1600bp_seq_mean
-      - intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean
+      - intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+      - intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
     dtype: float32
     dimension: 8192
     physical_type: fixed_size_list<float32, 8192>
@@ -224,8 +232,8 @@ fixed_size_vector_exports:
     physical_type: fixed_size_list<float32, 16384>
 opal_x_selection:
   status: deferred_until_latentdna_gallery_health_review
-  candidate_columns:
-    - latentdna__evo2_7b__dual_cassette_1600bp_fwd_rc_concat
+  construct_subject_columns:
+    - latentdna__evo2_7b__dual_cassette_2000bp_fwd_rc_concat
     - latentdna__evo2_7b__lnrna_span_in_construct_anchor_mean_bidir_concat
     - latentdna__evo2_7b__rt_cds_span_in_construct_anchor_mean_bidir_concat
     - latentdna__evo2_7b__lnrna_rt_slot_pair_anchor_mean_concat
@@ -259,15 +267,15 @@ source_overlay_inputs:
       - msr_sequence
       - msd_sequence
     notes: Rows require explicit RT plus lnRNA authority before construct projection.
-construct_candidate_promotion:
+construct_subject_promotion:
   source_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
-  consolidated_construct_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+  consolidated_construct_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
   required_sequence_fields:
-    - candidate__lnrna_sequence
-    - candidate__rt_cds_sequence
+    - construct_subject__lnrna_sequence
+    - construct_subject__rt_cds_sequence
   required_construct_views:
-    - dual_cassette_1600bp_seq_mean
-    - dual_cassette_1600bp_fwd_rc_concat
+    - dual_cassette_2000bp_seq_mean
+    - dual_cassette_2000bp_fwd_rc_concat
     - lnrna_span_in_construct_anchor_mean
     - lnrna_span_in_construct_reverse_complement_anchor_mean
     - rt_cds_span_in_construct_anchor_mean
@@ -276,15 +284,18 @@ construct_candidate_promotion:
   forbid_overlay_only_infer_rows: true
   notes: >-
     Khan and Crawford rows may color or ordinally audit latent views only after
-    a resolver promotes them to construct-compatible candidate rows with both
-    lnRNA and RT CDS sequences. Promoted rows must enter the same Construct
-    input dataset, consolidated 1,600 bp Construct output dataset, and six
-    Infer source-view lanes as the retron26/retron43 controls.
+    a resolver promotes them to construct-compatible construct subject rows
+    with both lnRNA and RT CDS sequences. Crawford promotion can use the
+    design-reference plus abundance-observation sequence union when orientation
+    QC passes; Khan promotion requires explicit RT CDS DNA sequence authority.
+    Promoted rows must enter the same Construct input dataset, consolidated
+    2,000 bp Construct output dataset, and six Infer source-view lanes as the
+    retron26/retron43 controls.
 p4_stem_appendix_gate:
-  status: blocked_until_candidate_owned_subspan_table
-  required_schema: candidate_owned_lnrna_subspan_table_v1
+  status: blocked_until_construct_subject_owned_subspan_table
+  required_schema: construct_subject_owned_lnrna_subspan_table_v1
   required_fields:
-    - candidate_id
+    - construct_subject_id
     - parent_view_name
     - subspan_id
     - subspan_kind

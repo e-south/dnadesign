@@ -1,6 +1,6 @@
 schema_id: construct_projection_manifest_v1
 study_id: rt_lnrna_sponging_construct_triage
-purpose: Bind source-authority RT/lnRNA candidate rows to Construct named slots before runtime materialization.
+purpose: Bind source-authority RT/lnRNA construct subject rows to Construct named slots before runtime materialization.
 required_top_level_fields:
   manifest_id: string
   study_id: rt_lnrna_sponging_construct_triage
@@ -13,7 +13,7 @@ required_top_level_fields:
   construct_template.target_context.length_nt: integer
   construct_template.target_context.coordinate_basis: zero_based_half_open
   construct_template.target_context.window_start_0: 56
-  construct_template.target_context.window_end_0: 1656
+  construct_template.target_context.window_end_0: 2056
   slots: list
   representation_views: list
   candidates: list
@@ -33,7 +33,7 @@ slot_contract:
     guard.replaced_span_bp: integer
 candidate_slot_binding_contract:
   required_fields:
-    candidate_id: string
+    construct_subject_id: string
     construct_projection_status: controlled_string
     slot_bindings.lnrna.sequence_id: string
     slot_bindings.lnrna.sequence_length_nt: integer
@@ -51,8 +51,8 @@ representation_view_contract:
     construct_output_anchor_part: string_or_null
   slot_pooling_rule: The lnRNA and RT CDS anchor-mean views map pooling_slot to Construct output_variants[].anchor_part for the same named slot.
   required_view_names:
-    - dual_cassette_1600bp_seq_mean
-    - dual_cassette_1600bp_fwd_rc_concat
+    - dual_cassette_2000bp_seq_mean
+    - dual_cassette_2000bp_fwd_rc_concat
     - lnrna_span_in_construct_anchor_mean
     - lnrna_span_in_construct_reverse_complement_anchor_mean
     - rt_cds_span_in_construct_anchor_mean
@@ -80,10 +80,10 @@ future_input_normalization:
   khan_rows: Remain abundance/provenance overlays unless both RT and lnRNA sequence authority are named.
 validation_notes:
   - Reject precomposed single-anchor strategy ids.
-  - Use `1600bp-region.gb`, mapped to pES-retron-26 `[56,1656)`, as the
+  - Use `2000bp-region.gb`, mapped to pES-retron-26 `[56,2056)`, as the
     target context authority.
   - "Retron26 control region-relative spans are `lnrna: [130,303)` and `rt_cds: [468,1431)`."
-  - Candidate lnRNA and RT length deltas shift the 1,600 bp window by
+  - Candidate lnRNA and RT length deltas shift the 2,000 bp window by
     symmetric prefix/suffix flank adjustment, preserving the constant
     interstitial between slots.
   - Reject arbitrary filler padding and any biological lnRNA or RT slot that
