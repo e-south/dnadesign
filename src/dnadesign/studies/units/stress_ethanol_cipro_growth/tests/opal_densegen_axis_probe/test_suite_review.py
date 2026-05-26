@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from .helpers import Path, json
+from .helpers import Path, json, pytest
+
+
+def test_numeric_summary_uses_student_t_ci_for_small_seed_replicates() -> None:
+    from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe.suite_replicates import (
+        numeric_mean_ci_summary,
+    )
+
+    summary = numeric_mean_ci_summary([1.0, 2.0, 3.0])
+
+    assert summary["mean"] == 2.0
+    assert summary["sem"] == pytest.approx(1.0 / (3.0**0.5))
+    assert summary["ci95_low"] == pytest.approx(-0.484137711719546)
+    assert summary["ci95_high"] == pytest.approx(4.484137711719546)
 
 
 def test_suite_review_accepts_complete_three_seed_roots(tmp_path: Path) -> None:
@@ -15,9 +28,21 @@ def test_suite_review_accepts_complete_three_seed_roots(tmp_path: Path) -> None:
     assert payload["status"] == "ok"
     assert payload["problems"] == []
     assert payload["trajectory_summary"]["pair_count"] == 36
+    assert payload["trajectory_summary"]["paired_auc_delta"]["ci95_low"] == 2.0
+    assert payload["replicate_summary"]["replicate_unit"] == "seed"
+    assert payload["replicate_summary"]["interval_kind"] == "student_t_mean_ci"
+    assert payload["replicate_summary"]["group_count"] == 12
+    first_group = payload["replicate_summary"]["groups"][0]
+    assert first_group["seed_count"] == 3
+    assert first_group["paired_auc_delta"]["mean"] == 2.0
+    assert first_group["paired_auc_delta"]["ci95_low"] == 2.0
+    assert first_group["paired_auc_delta"]["ci95_high"] == 2.0
     assert payload["null_attention"]["count"] == 3
     assert (tmp_path / "suite" / "suite_review.json").exists()
     assert (tmp_path / "suite" / "suite_review.md").exists()
+    assert (tmp_path / "suite" / "replicate_seed_mean_ci.csv").exists()
+    assert (tmp_path / "suite" / "paired_auc_delta_mean_ci.png").exists()
+    assert (tmp_path / "suite" / "final_positive_minus_null_lift_mean_ci.png").exists()
 
 
 def test_suite_review_rejects_missing_seed_and_partial_root(tmp_path: Path) -> None:
@@ -34,6 +59,47 @@ def test_suite_review_rejects_missing_seed_and_partial_root(tmp_path: Path) -> N
     assert "expected_seed_missing:29" in payload["problems"]
     assert any(problem.endswith(":metrics_run_count:11") for problem in payload["problems"])
     assert any(problem.endswith(":round_metric_count:132") for problem in payload["problems"])
+
+
+def test_suite_opal_notebook_writes_combined_seed_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe import suite_notebook as mod
+
+    roots = []
+    for seed in (7, 17, 29):
+        root = tmp_path / f"seed{seed}"
+        cfg = root / "scratch_campaigns" / f"campaign_s{seed}" / "configs" / "campaign.yaml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("campaign: {}\n", encoding="utf-8")
+        roots.append(root)
+
+    monkeypatch.setattr(
+        mod,
+        "build_campaign_set_notebook_view_model",
+        lambda paths, **kwargs: {
+            "campaigns": [{"campaign": {"slug": str(path)}} for path in paths],
+            "collection": {"collection_id": "fixture", "comparison_views": []},
+        },
+    )
+    monkeypatch.setattr(
+        mod,
+        "materialize_campaign_set_collection_visuals",
+        lambda campaigns, *, collection, output_dir: {
+            "output_dir": str(output_dir),
+            "visual_count": 1,
+            "comparison_set_count": 1,
+        },
+    )
+    monkeypatch.setattr(mod, "render_campaign_set_notebook", lambda paths, **kwargs: "import marimo\n")
+    monkeypatch.setattr(mod, "smoke_check_notebook", lambda path, *, run_marimo_check: None)
+
+    payload = mod.build_probe_suite_opal_notebook(roots, out_dir=tmp_path / "suite_notebook")
+
+    assert payload["campaign_count"] == 3
+    assert payload["collection_visual_count"] == 1
+    collection = json.loads(Path(payload["collection_manifest"]).read_text(encoding="utf-8"))
+    assert collection["collection_id"] == "densegen_motif_qa_k12_s3_v1_all_seed_replicates"
+    assert collection["relationships"][0]["replicate_on"] == ["seed"]
+    assert Path(payload["notebook"]).exists()
 
 
 def _write_complete_root(tmp_path: Path, seed: int, *, run_count: int = 24, round_count: int = 288) -> Path:

@@ -220,6 +220,54 @@ def test_configured_plot_quality_requires_tidy_csv_only_when_declared(tmp_path: 
     assert quality["problems"] == ["score_selected_over_rounds:tidy_csv_missing"]
 
 
+def test_configured_plot_quality_requires_vector_reference_only_when_configured(tmp_path: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe.review.configured_plots import (
+        _quality_for_configured_plot_entry,
+    )
+
+    media_path = tmp_path / "vector_summary.png"
+    image = Image.new("RGB", (320, 240), "white")
+    draw = ImageDraw.Draw(image)
+    draw.line((20, 220, 300, 20), fill="black", width=3)
+    image.save(media_path)
+    tidy_path = tmp_path / "vector_summary.csv"
+    pd.DataFrame(
+        {
+            "row_type": ["cohort_mean", "cohort_mean"],
+            "round": [0, 0],
+            "cohort": ["selected", "selected"],
+            "channel": ["tf_count__lexA", "tf_count__cpxR_plus_baeR"],
+            "value": [0.25, 0.75],
+            "n": [12, 12],
+        }
+    ).to_csv(tidy_path, index=False)
+    plot = {
+        "name": "selected_target_vector_summary",
+        "kind": "vector_summary_heatmap",
+        "status": "written",
+        "rounds": "all",
+        "media_paths": [str(media_path)],
+        "tidy_csv_paths": [str(tidy_path)],
+        "metadata": {
+            "capability": {"tidy_available": True},
+            "tidy_schema": ["row_type", "round", "cohort", "channel", "value", "n"],
+        },
+    }
+
+    optional_quality = _quality_for_configured_plot_entry(
+        {"expected_final_round": 0, "plots": [{**plot, "params": {"include_reference_vector": False}}]}
+    )
+    required_quality = _quality_for_configured_plot_entry(
+        {"expected_final_round": 0, "plots": [{**plot, "params": {"include_reference_vector": True}}]}
+    )
+
+    assert optional_quality == {"status": "ok", "problems": []}
+    assert required_quality["status"] == "attention"
+    assert required_quality["problems"] == ["selected_target_vector_summary:tidy_csv_missing_reference_vector"]
+
+
 def test_configured_plot_quality_rejects_stale_manifest_freshness(tmp_path: Path) -> None:
     from PIL import Image, ImageDraw
 

@@ -182,11 +182,14 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
             "label_split_id": run.split_id,
             "seed": run.seed,
             "target": run.campaign_key,
+            "target_label": target.target_display,
             "target_class": run.target_class,
             "target_channel": target.target_channel,
             "target_description": target.target_description,
+            "label_family_label": target.label_family_display,
             "probe_family": "opal_densegen_learnability_probe",
             "probe_target": run.campaign_key,
+            "probe_target_label": target.target_display,
             "probe_target_class": run.target_class,
             "probe_target_channel": target.target_channel,
             "probe_oracle_kind": "positive" if run.oracle_id == ORACLE_ID else "null",
@@ -242,11 +245,18 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
     cfg["plot_config"] = "plots.yaml"
     run.config_path.parent.mkdir(parents=True, exist_ok=True)
     run.config_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
-    _write_campaign_plot_config(run)
+    write_campaign_plot_config(run)
 
 
-def _write_campaign_plot_config(run: RunSpec) -> None:
+def write_campaign_plot_config(run: RunSpec) -> None:
     target = active_target_spec(run.label_family_id, run.campaign_key)
+    score_params = {
+        "metric_label": target.score_label,
+        "legend_metric_label": target.score_short_label,
+        "metric_expression": target.score_expression,
+        "collection_visual_label": target.collection_visual_label,
+        "y_axis": dict(target.score_axis),
+    }
     plots = [
         {
             "name": "score_selected_over_rounds",
@@ -256,9 +266,18 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             "params": {
                 "metric": "pred__score_selected",
                 "cohort": "selected",
-                "summaries": ["median", "q25", "q75", "count"],
+                "summaries": ["mean", "count"],
                 "band": "iqr",
-                "title": "RF top-N selected score over rounds",
+                "title": "Selected objective score over rounds",
+                "surface_label": f"Selected objective score: {target.score_title_label}",
+                "caption": (
+                    f"Selected-candidate mean {target.score_short_label} by OPAL round. {target.score_expression}."
+                ),
+                "review_purpose": (
+                    "Check whether the active learner improves the configured objective for selected candidates "
+                    "without treating objective-scale score as a biological effect size."
+                ),
+                **score_params,
             },
         },
         {
@@ -267,12 +286,15 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
             "round_selector": "all",
             "tags": ["rounds", "dogfood", "selection"],
             "params": {
+                "score_field": "pred__score_selected",
                 "rank_mode": "competition",
                 "alpha": 0.45,
                 "multi_round_alpha": 0.24,
                 "round_cmap": "round_progression",
                 "rasterize_at": 20000,
-                "title": "RF score vs selection rank by round",
+                "title": "Objective score vs selection rank",
+                "surface_label": f"Objective score vs selection rank: {target.score_title_label}",
+                **score_params,
             },
         },
         {
@@ -284,7 +306,9 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "metric": "pred__score_selected",
                 "threshold_quantile": 0.9,
                 "mode": "line",
-                "title": "RF score enrichment above fixed P90 over rounds",
+                "title": "Objective score enrichment above fixed P90",
+                "surface_label": f"Objective score enrichment above fixed P90: {target.score_title_label}",
+                **score_params,
             },
         },
         {
@@ -327,7 +351,10 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
         "channel_labels": list(target.channel_labels),
         "cmap": "opal_seafoam",
         "value_label": "Mean predicted value",
-        "title": f"Selected predicted {target.label_family_id} vector",
+        "title": f"Selected predicted {target.label_family_display} vector",
+        "figsize_in": [10.8, 5.2],
+        "font_size": 13,
+        "channel_axis_label": "",
     }
     if target.reference_vector:
         vector_params.update(
@@ -335,6 +362,13 @@ def _write_campaign_plot_config(run: RunSpec) -> None:
                 "reference_vector": list(target.reference_vector),
                 "reference_label": "Target vector",
                 "reference_mse_panel": True,
+                "reference_mse_title": "Target-vector loss",
+                "reference_mse_metric_label": ("Target-vector MSE\n$d^{-1}\\sum_c(\\bar{\\hat{y}}_c - t_c)^2$"),
+                "reference_mse_legend_label": "target-vector MSE",
+                "reference_mse_expression": ("MSE = d^-1 sum_c((mean selected y_hat_c - target_c)^2); lower is better"),
+                "reference_mse_scale_class": "densegen_plan_logic4_reference_mse",
+                "reference_mse_y_limits": [0.0, 0.25],
+                "reference_mse_include_zero_tick": True,
             }
         )
     plots.append(

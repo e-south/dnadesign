@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import json
-import statistics
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
 from .constants import ACTIVE_LABEL_FAMILY_IDS, CAMPAIGNS, DEFAULT_SUITE_ID, DEFAULT_SUITE_SEEDS, ORACLES, SPLITS
+from .suite_replicates import (
+    numeric_mean_ci_summary,
+    replicate_summary,
+    write_replicate_ci_plot,
+    write_replicate_summary_csv,
+)
 
 
 def build_probe_suite_review(
@@ -32,6 +37,7 @@ def build_probe_suite_review(
 
     trajectory_pairs = [pair for row in root_rows for pair in row.get("trajectory_pairs", [])]
     null_attention_rows = [row for root in root_rows for row in root.get("null_attention_rows", [])]
+    seed_replicates = replicate_summary(trajectory_pairs)
     payload = {
         "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.suite_review.v1",
         "suite_id": DEFAULT_SUITE_ID,
@@ -42,6 +48,7 @@ def build_probe_suite_review(
         "root_count": len(root_rows),
         "roots": root_rows,
         "trajectory_summary": _trajectory_summary(trajectory_pairs),
+        "replicate_summary": seed_replicates,
         "null_attention": {
             "count": len(null_attention_rows),
             "rows": null_attention_rows,
@@ -52,12 +59,33 @@ def build_probe_suite_review(
         out_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = out_dir / "suite_review.json"
         markdown_path = out_dir / "suite_review.md"
-        manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        markdown_path.write_text(_render_suite_markdown(payload), encoding="utf-8")
+        replicate_csv_path = out_dir / "replicate_seed_mean_ci.csv"
+        auc_plot_path = out_dir / "paired_auc_delta_mean_ci.png"
+        final_plot_path = out_dir / "final_positive_minus_null_lift_mean_ci.png"
+        write_replicate_summary_csv(seed_replicates, replicate_csv_path)
+        write_replicate_ci_plot(
+            seed_replicates,
+            metric="paired_auc_delta",
+            path=auc_plot_path,
+            title="Paired AUC Delta Across Seed Replicates",
+            ylabel="Mean positive - null AUC delta",
+        )
+        write_replicate_ci_plot(
+            seed_replicates,
+            metric="final_positive_minus_null_lift",
+            path=final_plot_path,
+            title="Final Lift Delta Across Seed Replicates",
+            ylabel="Mean final positive - null lift",
+        )
         payload["artifacts"] = {
             "suite_review": str(manifest_path),
             "suite_review_markdown": str(markdown_path),
+            "replicate_seed_mean_ci_csv": str(replicate_csv_path),
+            "paired_auc_delta_mean_ci_plot": str(auc_plot_path),
+            "final_positive_minus_null_lift_mean_ci_plot": str(final_plot_path),
         }
+        manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        markdown_path.write_text(_render_suite_markdown(payload), encoding="utf-8")
     return payload
 
 
@@ -167,8 +195,8 @@ def _trajectory_summary(pairs: list[Mapping[str, Any]]) -> dict[str, Any]:
     ]
     return {
         "pair_count": len(pairs),
-        "paired_auc_delta": _numeric_summary(deltas),
-        "final_positive_minus_null_lift": _numeric_summary(final_deltas),
+        "paired_auc_delta": numeric_mean_ci_summary(deltas),
+        "final_positive_minus_null_lift": numeric_mean_ci_summary(final_deltas),
     }
 
 
@@ -180,12 +208,6 @@ def _plot_quality_summary(root_rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "plot_count": sum(int(row.get("plot_count") or 0) for row in qualities),
         "problem_count": sum(int(row.get("problem_count") or 0) for row in qualities),
     }
-
-
-def _numeric_summary(values: list[float]) -> dict[str, float | int | None]:
-    if not values:
-        return {"count": 0, "min": None, "mean": None, "max": None}
-    return {"count": len(values), "min": min(values), "mean": statistics.fmean(values), "max": max(values)}
 
 
 def _null_attention_rows(*, seed: int | None, rows: list[Any]) -> list[dict[str, Any]]:
@@ -262,5 +284,28 @@ def _render_suite_markdown(payload: Mapping[str, Any]) -> str:
             )
         )
     lines.extend(["", "## Trajectory", f"```json\n{json.dumps(payload.get('trajectory_summary'), indent=2)}\n```"])
+    replicate_summary = (
+        payload.get("replicate_summary") if isinstance(payload.get("replicate_summary"), Mapping) else {}
+    )
+    lines.extend(
+        [
+            "",
+            "## Seed Replicate Means",
+            "",
+            f"- replicate_unit: `{replicate_summary.get('replicate_unit', 'seed')}`",
+            f"- interval: `{replicate_summary.get('interval_kind', 'student_t_mean_ci')}` "
+            f"`{replicate_summary.get('confidence_level', 0.95)}`",
+            f"- groups: `{replicate_summary.get('group_count', 0)}`",
+        ]
+    )
+    artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), Mapping) else {}
+    if artifacts:
+        for key in (
+            "replicate_seed_mean_ci_csv",
+            "paired_auc_delta_mean_ci_plot",
+            "final_positive_minus_null_lift_mean_ci_plot",
+        ):
+            if artifacts.get(key):
+                lines.append(f"- {key}: `{artifacts[key]}`")
     lines.extend(["", "## Null Attention", f"- count: `{(payload.get('null_attention') or {}).get('count')}`"])
     return "\n".join(lines) + "\n"

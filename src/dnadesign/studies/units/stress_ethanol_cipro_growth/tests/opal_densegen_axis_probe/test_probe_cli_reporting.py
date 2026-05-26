@@ -105,21 +105,43 @@ def test_probe_plot_json_redirects_noisy_generation_stdout(
     from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe import plotting
     from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe.cli import main as probe_main
 
-    def noisy_plot(run_root: Path, *, round_selector: str, quiet: bool = False) -> dict[str, object]:
+    def noisy_plot(
+        run_root: Path,
+        *,
+        round_selector: str,
+        name: str | None = None,
+        tags: list[str] | None = None,
+        quiet: bool = False,
+    ) -> dict[str, object]:
         print("accidental plot stdout")
         return {
             "schema_version": "stress_ethanol_cipro_growth.opal_densegen_axis_probe.plot.v1",
             "run_root": str(run_root),
             "round_selector": round_selector,
+            "name": name,
+            "tags": tags or [],
             "quiet": quiet,
             "any_fail": False,
         }
 
     monkeypatch.setattr(plotting, "generate_probe_campaign_plots", noisy_plot)
 
-    assert probe_main(["plot", "--run-root", str(tmp_path / "probe"), "--json"]) == 0
+    assert (
+        probe_main(
+            [
+                "plot",
+                "--run-root",
+                str(tmp_path / "probe"),
+                "--name",
+                "score_selected_over_rounds",
+                "--json",
+            ]
+        )
+        == 0
+    )
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
+    assert payload["name"] == "score_selected_over_rounds"
     assert payload["quiet"] is True
     assert "accidental plot stdout" not in captured.out
     assert "accidental plot stdout" in captured.err

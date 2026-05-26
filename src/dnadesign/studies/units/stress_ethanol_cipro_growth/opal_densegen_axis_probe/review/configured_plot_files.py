@@ -15,6 +15,16 @@ def _plot_requires_tidy_csv(plot: Mapping[str, Any]) -> bool:
     return bool(capability.get("tidy_available") or metadata.get("tidy_schema") or quality.get("tidy_schema_declared"))
 
 
+def _plot_requires_reference_vector(plot: Mapping[str, Any]) -> bool:
+    params = plot.get("params") if isinstance(plot.get("params"), Mapping) else {}
+    include_reference_vector = params.get("include_reference_vector")
+    if isinstance(include_reference_vector, bool):
+        return include_reference_vector
+    if isinstance(include_reference_vector, str):
+        return include_reference_vector.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(include_reference_vector)
+
+
 def _expected_tidy_rounds_for_plot(rounds: Any, *, expected_final_round: Any) -> set[int] | None:
     if expected_final_round is None:
         return None
@@ -60,6 +70,7 @@ def _tidy_csv_quality_problems(
     label: str,
     kind: str,
     expected_rounds: set[int],
+    reference_vector_required: bool = False,
 ) -> list[str]:
     if not path.exists():
         return [f"{label}:tidy_csv_file_missing:{path.name}"]
@@ -78,7 +89,7 @@ def _tidy_csv_quality_problems(
         missing = sorted(expected_rounds - rounds)
         if missing:
             problems.append(f"{label}:tidy_csv_missing_rounds:{','.join(map(str, missing))}")
-    if kind == "vector_summary_heatmap" and "row_type" in frame.columns:
+    if kind == "vector_summary_heatmap" and reference_vector_required and "row_type" in frame.columns:
         row_types = set(frame["row_type"].astype(str))
         if not ({"reference_vector", "setpoint"} & row_types):
             problems.append(f"{label}:tidy_csv_missing_reference_vector")

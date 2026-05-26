@@ -18,6 +18,7 @@ from ..artifacts import ProbeArtifactLayout
 from .configured_plot_files import (
     _expected_tidy_rounds_for_plot,
     _image_quality_problems,
+    _plot_requires_reference_vector,
     _plot_requires_tidy_csv,
     _tidy_csv_quality_problems,
 )
@@ -168,6 +169,7 @@ def _quality_for_configured_plot_entry(entry: Mapping[str, Any]) -> dict[str, An
                     label=name,
                     kind=str(plot.get("kind") or ""),
                     expected_rounds=plot_expected_rounds if plot_expected_rounds is not None else expected_rounds,
+                    reference_vector_required=_plot_requires_reference_vector(plot),
                 )
             )
     return {

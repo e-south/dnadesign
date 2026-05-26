@@ -75,9 +75,20 @@ def _plot_probe(args: argparse.Namespace) -> int:
     run_root = _resolve_repo_path(repo_root, Path(args.run_root))
     if args.json:
         with contextlib.redirect_stdout(sys.stderr):
-            payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round), quiet=True)
+            payload = generate_probe_campaign_plots(
+                run_root,
+                round_selector=str(args.round),
+                name=args.name,
+                tags=args.tag,
+                quiet=True,
+            )
     else:
-        payload = generate_probe_campaign_plots(run_root, round_selector=str(args.round))
+        payload = generate_probe_campaign_plots(
+            run_root,
+            round_selector=str(args.round),
+            name=args.name,
+            tags=args.tag,
+        )
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -96,6 +107,16 @@ def _suite_probe(args: argparse.Namespace) -> int:
     run_roots = [_resolve_repo_path(repo_root, Path(root)) for root in args.run_roots]
     out_dir = _resolve_repo_path(repo_root, Path(args.out_dir)) if args.out_dir else None
     payload = build_probe_suite_review(run_roots, out_dir=out_dir)
+    if args.opal_notebook:
+        if out_dir is None:
+            raise RuntimeError("--opal-notebook requires --out-dir so the suite notebook has a stable artifact root")
+        from .suite_notebook import build_probe_suite_opal_notebook
+
+        payload["opal_notebook"] = build_probe_suite_opal_notebook(
+            run_roots,
+            out_dir=out_dir / "opal_campaign_set",
+            round_selector=str(args.round),
+        )
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -104,6 +125,8 @@ def _suite_probe(args: argparse.Namespace) -> int:
         if payload.get("artifacts"):
             print(f"review={payload['artifacts']['suite_review_markdown']}")
             print(f"manifest={payload['artifacts']['suite_review']}")
+        if payload.get("opal_notebook"):
+            print(f"opal_notebook={payload['opal_notebook']['notebook']}")
     return 0 if payload["status"] == "ok" else 1
 
 
@@ -194,10 +217,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     plot.add_argument("--run-root", required=True)
     plot.add_argument("--round", default="all", help="Round selector passed to OPAL plot generation.")
+    plot.add_argument("--name", default=None, help="Run one configured plot by name across scratch campaigns.")
+    plot.add_argument("--tag", action="append", default=[], help="Run configured plots with this tag; repeatable.")
     plot.add_argument("--json", action="store_true", help="Emit machine-readable JSON plot summary.")
     suite = subparsers.add_parser("suite", help="Verify and summarize a complete three-seed probe suite.")
     suite.add_argument("--run-root", dest="run_roots", action="append", required=True)
     suite.add_argument("--out-dir", default=None, help="Optional directory for suite_review.json and suite_review.md.")
+    suite.add_argument(
+        "--opal-notebook",
+        action="store_true",
+        help="Also write a suite-scope OPAL campaign-set notebook with seed-replicate collection visuals.",
+    )
+    suite.add_argument("--round", default="all", help="Round selector for the optional OPAL notebook.")
     suite.add_argument("--json", action="store_true", help="Emit machine-readable JSON suite summary.")
     return parser
 

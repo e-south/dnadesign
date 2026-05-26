@@ -12,6 +12,7 @@ from .constants import (
     ACTIVE_LABEL_FAMILY_ID,
     CAMPAIGNS,
     DENSEGEN_PLAN_LOGIC4_COLUMNS,
+    DENSEGEN_PLAN_LOGIC4_DISPLAY_LABELS,
 )
 from .label_families import TF_FAMILY_COUNT_COLUMNS
 
@@ -20,6 +21,7 @@ TF_COUNT_OBJECTIVE_COLUMNS = (
     "tf_count__cpxR_plus_baeR",
     "tf_count__lexA_plus_cpxR_plus_baeR",
 )
+TF_COUNT_DISPLAY_LABELS = ("LexA", "CpxR + BaeR", "LexA + CpxR + BaeR")
 
 _TF_COUNT_TARGET_BY_CAMPAIGN: dict[str, tuple[int, str, str]] = {
     "cipro": (0, "tf_count__lexA", "LexA count"),
@@ -44,8 +46,16 @@ class ActiveTargetSpec:
     objectives: tuple[Mapping[str, Any], ...]
     score_ref: str
     objective_mode: str
+    score_label: str
+    score_title_label: str
+    score_short_label: str
+    score_expression: str
+    score_axis: Mapping[str, Any]
+    collection_visual_label: str
     plot_family: str
     channel_labels: tuple[str, ...]
+    label_family_display: str
+    target_display: str
     reference_vector: tuple[float, ...] = ()
 
 
@@ -119,6 +129,8 @@ def target_values_for_labels(
 def _plan_logic4_target_spec(campaign_key: str) -> ActiveTargetSpec:
     campaign = CAMPAIGNS[campaign_key]
     target_logic4 = tuple(float(value) for value in campaign["target_logic4"])
+    target_text = _format_vector(target_logic4)
+    target_display = _target_display(campaign_key)
     return ActiveTargetSpec(
         label_family_id=ACTIVE_LABEL_FAMILY_ID,
         campaign_key=campaign_key,
@@ -146,14 +158,29 @@ def _plan_logic4_target_spec(campaign_key: str) -> ActiveTargetSpec:
         ),
         score_ref="vector_target_similarity_v1/negative_mse",
         objective_mode="maximize",
+        score_label=f"Score = -MSE(y_hat, {target_text})",
+        score_title_label="Score = -MSE(y_hat, target)",
+        score_short_label="negative MSE score",
+        score_expression=(
+            f"score = -MSE(y_hat, target); MSE = d^-1 sum_c((y_hat_c - target_c)^2); target={target_text}"
+        ),
+        score_axis={
+            "scale_class": "densegen_plan_logic4_negative_mse",
+            "limits": [-0.25, 0.0],
+            "include_zero_tick": True,
+        },
+        collection_visual_label="Score trajectory: negative MSE to logic4 target",
         plot_family="generic_numeric_vector",
-        channel_labels=DENSEGEN_PLAN_LOGIC4_COLUMNS,
+        channel_labels=DENSEGEN_PLAN_LOGIC4_DISPLAY_LABELS,
+        label_family_display="DenseGen plan logic4",
+        target_display=target_display,
         reference_vector=target_logic4,
     )
 
 
 def _tf_count_target_spec(campaign_key: str) -> ActiveTargetSpec:
     channel_index, channel_name, description = _TF_COUNT_TARGET_BY_CAMPAIGN[campaign_key]
+    description_lower = description[:1].lower() + description[1:]
     return ActiveTargetSpec(
         label_family_id="tf_family_count",
         campaign_key=campaign_key,
@@ -183,8 +210,21 @@ def _tf_count_target_spec(campaign_key: str) -> ActiveTargetSpec:
         ),
         score_ref=f"vector_channel_v1/{channel_name}",
         objective_mode="maximize",
+        score_label=f"Score = predicted {description_lower}",
+        score_title_label=f"Score = predicted {description_lower}",
+        score_short_label=f"predicted {description_lower}",
+        score_expression=f"score = predicted {description_lower}",
+        score_axis={
+            "scale_class": "tf_family_count_predicted_count",
+            "limits": [0.0, None],
+            "reference_lines": [{"value": 0.0, "label": "zero predicted count"}],
+            "include_zero_tick": True,
+        },
+        collection_visual_label=f"Score trajectory: predicted {description_lower}",
         plot_family="generic_numeric_vector",
-        channel_labels=TF_COUNT_OBJECTIVE_COLUMNS,
+        channel_labels=TF_COUNT_DISPLAY_LABELS,
+        label_family_display="TF family count",
+        target_display=description,
     )
 
 
@@ -193,3 +233,24 @@ def _finite_numeric(series: pd.Series, *, column: str) -> np.ndarray:
     if not np.all(np.isfinite(values)):
         raise ValueError(f"label column contains non-finite value(s): {column}")
     return values
+
+
+def _format_vector(values: Sequence[float]) -> str:
+    tokens = []
+    for value in values:
+        number = float(value)
+        if number.is_integer():
+            tokens.append(str(int(number)))
+        else:
+            tokens.append(f"{number:g}")
+    return "[" + ", ".join(tokens) + "]"
+
+
+def _target_display(campaign_key: str) -> str:
+    if campaign_key == "cipro":
+        return "Cipro"
+    if campaign_key == "ethanol":
+        return "Ethanol"
+    if campaign_key == "dual":
+        return "Ethanol + Cipro"
+    return str(campaign_key)

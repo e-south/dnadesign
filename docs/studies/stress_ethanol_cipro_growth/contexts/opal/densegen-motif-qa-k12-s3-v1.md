@@ -74,9 +74,12 @@ This keeps the review endpoints unchanged while avoiding tens of GiB of
 duplicated input parquet across the three-seed suite.
 
 Configured selected/top-k plots should rely on OPAL's lazy ledger filters. In
-particular, selected score trajectories and selected vector heatmaps must not
+particular, objective trajectories and selected vector heatmaps must not
 collect all candidate-round vector predictions only to discard non-selected
-rows in pandas.
+rows in pandas. The objective trajectory is not shown as a generic "selected
+score": the campaign plot config must surface the actual objective expression,
+for example `Score = -MSE(y_hat, [0, 0, 1, 1])` and
+`MSE = d^-1 sum_c((y_hat_c - target_c)^2)`.
 
 ### Label Families
 
@@ -84,7 +87,8 @@ rows in pandas.
 derived from `densegen__used_tfbs_detail`: LexA contributes the cipro axis,
 CpxR/BaeR contribute the ethanol axis, and both axes form the dual/AND target.
 The label is a four-channel DenseGen plan-logic vector in state order
-`v00`, `v10`, `v01`, `v11`. It is not a measured SFXI assay, not an SFXI
+`v00`, `v10`, `v01`, `v11`, rendered in review plots as No stress, Ethanol,
+Cipro, and Ethanol + Cipro. It is not a measured SFXI assay, not an SFXI
 projection diagnostic, and not a separate biological claim from the DenseGen
 plan class. OPAL sees it through the generic `vector_from_table_v1` transform
 and the generic `vector_target_similarity_v1` objective.
@@ -182,14 +186,60 @@ normal plot manifests.
 ### Campaign Collection Semantics
 
 Positive/null review is collection-level, not a campaign-local appendix. The
-study emits an optional `opal.campaign_collection.v1` manifest with
-relationship roles and match dimensions. OPAL renders generic paired comparison
-surfaces from that manifest and does not infer controls from campaign names.
+study emits a strict `opal.campaign_collection.v2` manifest with dimensions,
+positive/null relationship roles, match dimensions, replicate dimensions, and
+declared `comparison_views`. OPAL materializes generic paired comparison CSV,
+PNG, and manifest artifacts from that manifest and does not infer controls from
+campaign names.
 
-For multi-seed interval bands, seed must be declared as replicate structure in
-the collection relationship. Until then, notebook comparison bands are labeled
-as IQR across validated campaign-set comparison units, not statistical
-confidence intervals.
+The current notebook collection views use `comparison_scope: comparison_set`:
+one selected-score trajectory per positive/null set, one predicted-vector
+gallery per set, and one reference-MSE trajectory for `densegen_plan_logic4`
+sets where the source vector-summary tidy data contains reference-MSE rows.
+`tf_family_count` sets do not expose the MSE view because those source plots do
+not declare reference-MSE rows. Collection trajectory views request
+`interval_kind: iqr`, but a per-seed notebook has only one relationship pair per
+matched set, so the materialized caption must say that no band is drawn when
+fewer than two comparison units contribute. The suite-scope OPAL notebook
+combines seeds 7, 17, and 29, so matched campaign sets have seed-replicate
+relationship pairs and can show IQR bands. The study-owned suite review is
+where seed-replicate Student-t confidence intervals over paired AUC/lift deltas
+are computed and interpreted.
+
+The collection selected-score y-axis is intentionally objective-scale, not a
+shared biological effect-size axis. For `densegen_plan_logic4`,
+`pred__score_selected` is predicted negative MSE to the target logic4 vector, so
+larger values approach zero as the predicted vector approaches the target. For
+`tf_family_count`, `pred__score_selected` is the predicted raw target-count
+channel, so values sit in count units and can be positive. Those two scales must
+not be compared directly across label families. Use selected-score plots to
+debug within a matched positive/null campaign set; use target lift, paired AUC
+delta, final positive-minus-null lift, and seed-replicate CIs for the
+learnability claim.
+
+DenseGen plot configs declare axis scale classes instead of leaving the viewer
+to infer scale from autoscaled panels. `densegen_plan_logic4_negative_mse`
+uses y-limits `[-0.25, 0]`, which preserves a shared operating scale for the
+current K12/S3 logic4 probe without squashing all observed values against a
+theoretical `[-1, 0]` bound. `densegen_plan_logic4_reference_mse` uses
+`[0, 0.25]` for the same reason. Zero remains a tick where the axis includes
+it; OPAL only draws reference-line annotations when the plot contract declares
+one. `tf_family_count_predicted_count` starts at zero, but it remains a count
+objective, not an MSE loss.
+
+The reference-MSE collection view is also a model-output diagnostic. It is the
+MSE between the selected cohort's mean predicted logic4 vector and the declared
+target vector. Lower is better. It is not assay uncertainty and it is not the
+same as a seed-replicate confidence interval.
+
+The compound predicted-vector/MSE collection view must put that premise on the
+visible plot surface. Its title names the matched target/family comparison, its
+heatmap x-ticks use the stress-state display labels, and the MSE panel y-axis
+shows the expression `MSE = d^-1 sum_c((mean selected y_hat_c - target_c)^2)`.
+Positive and null trajectories share one MSE axis. The heatmap panels use
+unit-square channel-by-round cells with white cell borders and no background
+grid, so the gray plotting frame does not compete with the encoded vector
+values.
 
 ### QA Metrics
 
@@ -282,6 +332,7 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_denseg
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_motif_qa_k12_s3_v1_seed17_all_r12 \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_motif_qa_k12_s3_v1_seed29_all_r12 \
   --out-dir .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/_suite_reviews/densegen_motif_qa_k12_s3_v1_all_r12 \
+  --opal-notebook \
   --json
 ```
 

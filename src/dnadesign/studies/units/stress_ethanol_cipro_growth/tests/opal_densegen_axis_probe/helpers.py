@@ -89,7 +89,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_prob
     _make_training_input_for_run,
     _run_command,
     _write_campaign_config,
-    _write_campaign_plot_config,
+    write_campaign_plot_config,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe.source_contract import (
     validate_candidate_x_surface,
@@ -190,7 +190,6 @@ __all__ = [
     "_run_command",
     "_split_metadata_for_all",
     "_valid_metrics_payload",
-    "_write_campaign_plot_config",
     "_write_campaign_config",
     "_write_probe_prediction_campaign",
     "annotations",
@@ -233,6 +232,7 @@ __all__ = [
     "validate_candidate_x_surface",
     "validate_run_root_policy",
     "validate_scratch_paths",
+    "write_campaign_plot_config",
     "write_campaign_yaml",
     "write_followup_label_input",
     "write_records",

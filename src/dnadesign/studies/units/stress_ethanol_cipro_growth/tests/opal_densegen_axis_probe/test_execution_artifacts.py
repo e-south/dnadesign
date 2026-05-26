@@ -21,9 +21,7 @@ from .helpers import (
 )
 
 
-def test_materialize_probe_inputs_writes_shared_records_symlink_and_candidate_scope(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_materialize_probe_inputs_writes_shared_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_records = tmp_path / CANDIDATE_RECORDS
     source_records.parent.mkdir(parents=True)
     ids = ["random-train", "random-eval", "leave-train", "leave-eval"]
@@ -121,16 +119,85 @@ def test_materialize_probe_inputs_writes_shared_records_symlink_and_candidate_sc
     assert sorted(random_scope["id"].astype(str).tolist()) == ["random-eval", "random-train"]
     assert sorted(leave_scope["id"].astype(str).tolist()) == ["leave-eval", "leave-train"]
     collection = json.loads(layout.campaign_collection_manifest_path.read_text(encoding="utf-8"))
-    assert collection["schema_version"] == "opal.campaign_collection.v1"
-    assert collection["dimensions"] == ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"]
+    assert collection["schema_version"] == "opal.campaign_collection.v2"
+    assert collection["collection_id"] == "densegen_motif_qa_k12_s3_v1_seed7"
+    assert [row["id"] for row in collection["dimensions"]] == [
+        "target",
+        "label_oracle_kind",
+        "label_family_id",
+        "label_split_id",
+        "seed",
+    ]
     assert collection["relationships"] == [
         {
+            "id": "positive_vs_null",
             "kind": "control_pair",
+            "label": "Positive vs null oracle control",
+            "role_dimension": "label_oracle_kind",
             "left_role": "positive",
             "right_role": "null",
             "match_on": ["target", "label_family_id", "label_split_id", "seed"],
             "replicate_on": ["seed"],
         }
+    ]
+    assert collection["comparison_views"] == [
+        {
+            "id": "objective_score_positive_vs_null",
+            "label": "Objective score positive/null trajectory",
+            "kind": "metric_over_rounds_comparison",
+            "relationship_id": "positive_vs_null",
+            "source_plot_name": "score_selected_over_rounds",
+            "source_plot_kind": "metric_over_rounds",
+            "comparison_scope": "comparison_set",
+            "group_key": "label_oracle_kind",
+            "metric": "pred__score_selected",
+            "cohort": "selected",
+            "summary": "mean",
+            "interval_kind": "iqr",
+            "interpretation_note": (
+                "Objective score is campaign-scale: densegen_plan_logic4 uses predicted negative MSE to the "
+                "target logic4 vector, while tf_family_count uses the predicted raw target-count channel. "
+                "Use it within a campaign set, not as a cross-family effect size."
+            ),
+        },
+        {
+            "id": "selected_vector_reference_mse_positive_vs_null",
+            "label": "Selected vector reference MSE positive/null trajectory",
+            "kind": "vector_reference_mse_over_rounds_comparison",
+            "relationship_id": "positive_vs_null",
+            "source_plot_name": "selected_target_vector_summary",
+            "source_plot_kind": "vector_summary_heatmap",
+            "comparison_scope": "comparison_set",
+            "match_filters": {"label_family_id": "densegen_plan_logic4"},
+            "group_key": "label_oracle_kind",
+            "metric": "reference_mse",
+            "cohort": "selected",
+            "summary": "mean",
+            "interval_kind": "iqr",
+            "interpretation_note": (
+                "Reference MSE is computed between the selected cohort mean predicted logic4 vector and the "
+                "declared target vector; lower is better."
+            ),
+        },
+        {
+            "id": "selected_vector_heatmap_positive_vs_null",
+            "label": "Selected predicted vector and MSE positive/null",
+            "kind": "vector_heatmap_comparison",
+            "relationship_id": "positive_vs_null",
+            "source_plot_name": "selected_target_vector_summary",
+            "source_plot_kind": "vector_summary_heatmap",
+            "comparison_scope": "comparison_set",
+            "match_filters": {"label_family_id": "densegen_plan_logic4"},
+            "group_key": "label_oracle_kind",
+            "metric": "selected_predicted_vector",
+            "cohort": "selected",
+            "summary": "mean",
+            "interval_kind": "iqr",
+            "interpretation_note": (
+                "Heatmaps compare selected mean predicted logic4 vectors by oracle role; the MSE panel compares "
+                "target-vector loss on a shared axis."
+            ),
+        },
     ]
 
 
@@ -246,11 +313,11 @@ def test_run_opal_rounds_reuses_existing_ingest_and_selection_outputs(
         stop_after="status",
         runs=[run],
     )
-    commands: list[list[str]] = []
 
     def fake_run_command(command: list[str], **_: object) -> None:
         commands.append(command)
 
+    commands: list[list[str]] = []
     import dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe.scratch as scratch
 
     monkeypatch.setattr(scratch, "_run_command", fake_run_command)

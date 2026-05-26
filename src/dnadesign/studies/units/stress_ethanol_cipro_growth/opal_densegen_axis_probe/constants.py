@@ -20,6 +20,7 @@ PASSIVE_LABEL_FAMILY_IDS = ("tf_family_presence", "densegen_plan_class")
 
 STATE_ORDER = ("baseline_or_no_stress", "ethanol", "ciprofloxacin", "ethanol_plus_ciprofloxacin")
 DENSEGEN_PLAN_LOGIC4_COLUMNS = ("v00", "v10", "v01", "v11")
+DENSEGEN_PLAN_LOGIC4_DISPLAY_LABELS = ("No stress", "Ethanol", "Cipro", "Ethanol + Cipro")
 
 AXIS_CLASS_TO_LOGIC4: dict[str, list[int]] = {
     "background_only": [0, 0, 0, 0],

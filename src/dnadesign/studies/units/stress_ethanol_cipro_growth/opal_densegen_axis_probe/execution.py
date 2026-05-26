@@ -82,7 +82,10 @@ def _write_campaign_collection_manifest(*, layout: ProbeArtifactLayout, plan: Pr
     if has_pair:
         relationships.append(
             {
+                "id": "positive_vs_null",
                 "kind": "control_pair",
+                "label": "Positive vs null oracle control",
+                "role_dimension": "label_oracle_kind",
                 "left_role": "positive",
                 "right_role": "null",
                 "match_on": ["target", "label_family_id", "label_split_id", "seed"],
@@ -93,12 +96,93 @@ def _write_campaign_collection_manifest(*, layout: ProbeArtifactLayout, plan: Pr
 
     _write_json(
         layout.campaign_collection_manifest_path,
-        {
-            "schema_version": "opal.campaign_collection.v1",
-            "dimensions": ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"],
-            "relationships": relationships,
-        },
+        probe_campaign_collection_manifest_payload(
+            collection_id=f"{plan.suite_id}_seed{int(plan.seed)}",
+            relationships=relationships,
+        ),
     )
+
+
+def probe_campaign_collection_manifest_payload(
+    *,
+    collection_id: str,
+    relationships: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Return the OPAL collection manifest for DenseGen positive/null probe campaigns."""
+
+    return {
+        "schema_version": "opal.campaign_collection.v2",
+        "collection_id": collection_id,
+        "dimensions": [
+            {"id": "target", "label": "Probe target"},
+            {"id": "label_oracle_kind", "label": "Label oracle kind"},
+            {"id": "label_family_id", "label": "Label family"},
+            {"id": "label_split_id", "label": "Label split"},
+            {"id": "seed", "label": "Seed"},
+        ],
+        "relationships": relationships,
+        "comparison_views": [
+            {
+                "id": "objective_score_positive_vs_null",
+                "label": "Objective score positive/null trajectory",
+                "kind": "metric_over_rounds_comparison",
+                "relationship_id": "positive_vs_null",
+                "source_plot_name": "score_selected_over_rounds",
+                "source_plot_kind": "metric_over_rounds",
+                "comparison_scope": "comparison_set",
+                "group_key": "label_oracle_kind",
+                "metric": "pred__score_selected",
+                "cohort": "selected",
+                "summary": "mean",
+                "interval_kind": "iqr",
+                "interpretation_note": (
+                    "Objective score is campaign-scale: densegen_plan_logic4 uses predicted negative MSE to the "
+                    "target logic4 vector, while tf_family_count uses the predicted raw target-count channel. "
+                    "Use it within a campaign set, not as a cross-family effect size."
+                ),
+            },
+            {
+                "id": "selected_vector_reference_mse_positive_vs_null",
+                "label": "Selected vector reference MSE positive/null trajectory",
+                "kind": "vector_reference_mse_over_rounds_comparison",
+                "relationship_id": "positive_vs_null",
+                "source_plot_name": "selected_target_vector_summary",
+                "source_plot_kind": "vector_summary_heatmap",
+                "comparison_scope": "comparison_set",
+                "match_filters": {"label_family_id": "densegen_plan_logic4"},
+                "group_key": "label_oracle_kind",
+                "metric": "reference_mse",
+                "cohort": "selected",
+                "summary": "mean",
+                "interval_kind": "iqr",
+                "interpretation_note": (
+                    "Reference MSE is computed between the selected cohort mean predicted logic4 vector and the "
+                    "declared target vector; lower is better."
+                ),
+            },
+            {
+                "id": "selected_vector_heatmap_positive_vs_null",
+                "label": "Selected predicted vector and MSE positive/null",
+                "kind": "vector_heatmap_comparison",
+                "relationship_id": "positive_vs_null",
+                "source_plot_name": "selected_target_vector_summary",
+                "source_plot_kind": "vector_summary_heatmap",
+                "comparison_scope": "comparison_set",
+                "match_filters": {"label_family_id": "densegen_plan_logic4"},
+                "group_key": "label_oracle_kind",
+                "metric": "selected_predicted_vector",
+                "cohort": "selected",
+                "summary": "mean",
+                "interval_kind": "iqr",
+                "interpretation_note": (
+                    "Heatmaps compare selected mean predicted logic4 vectors by oracle role; the MSE panel compares "
+                    "target-vector loss on a shared axis."
+                ),
+            },
+        ]
+        if relationships
+        else [],
+    }
 
 
 def selected_ids_from_round(
