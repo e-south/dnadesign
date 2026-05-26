@@ -43,8 +43,11 @@ still absent.
 - Multi-slot Construct projection is declared in
   `../operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
 - `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py`
-  converts the manifest and GenBank authority into Construct configs for the
-  two controls and emits the six source sequence-view lanes.
+  orchestrates Construct materialization. Its support modules keep contracts,
+  manifest loading, Construct view config, Construct-subject row building, and
+  USR overlay writes in the `materialization/` package, so the study
+  no longer depends on one all-purpose source file for the six source
+  sequence-view lanes.
 - USR dataset ids are registered in `../record/datasets.yaml`:
   `rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1`,
   `rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1`, and

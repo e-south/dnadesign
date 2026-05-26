@@ -74,6 +74,23 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
+def test_rt_lnrna_materialization_source_is_split_by_contract_domain() -> None:
+    unit_root = _repo_root() / "src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage"
+    max_lines_by_module = {
+        "construct_materialization.py": 800,
+        "materialization/subjects.py": 650,
+        "materialization/usr_io.py": 350,
+        "materialization/views.py": 350,
+        "materialization/contracts.py": 180,
+        "materialization/manifest.py": 180,
+        "materialization/common.py": 80,
+    }
+
+    for module_name, max_lines in max_lines_by_module.items():
+        line_count = len((unit_root / module_name).read_text(encoding="utf-8").splitlines())
+        assert line_count <= max_lines, f"{module_name} has {line_count} lines; expected <= {max_lines}"
+
+
 def _source_window_policy() -> ConstructWindowPolicy:
     return ConstructWindowPolicy(
         context_id="dual_cassette_2000bp_context_v1",
