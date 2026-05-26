@@ -30,8 +30,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
-- Batch-0 selector: `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/`
-- Candidate provenance audit: `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/opal_batch0/provenance.py`
+- Batch-0 selector: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/`
+- Candidate provenance audit: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/provenance.py`
 - Primary doc: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
 
 ### Detail Surfaces
@@ -69,8 +69,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   with `data.location.kind: local`.
 - If pruning shared USR records, use campaign-scoped pruning only. Broad OPAL
   namespace cleanup can delete other campaign columns.
-- The OPAL notebook is the campaign-specific artifact viewer for records,
-  rounds, ledgers, labels, predictions, selected records, and plots.
+- The OPAL notebook is the campaign-specific artifact viewer for record
+  contract status, rounds, ledgers, label and prediction summaries, selection
+  summaries, and plots. Per-record lineage and batch-0 provenance remain in the
+  study-owned provenance CLI/API.
 - Plot visibility is manifest-backed. Stress bundles and DenseGen scratch
   probes should use configured OPAL plot primitives plus `round_variants` for
   per-round notebook scopes; study-specific visuals only enter OPAL notebooks

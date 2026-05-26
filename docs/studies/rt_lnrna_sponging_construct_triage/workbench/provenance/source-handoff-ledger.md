@@ -5,13 +5,13 @@
 
 ### Live Inventories
 
-| Source | Path | Rows | Use |
-| --- | --- | ---: | --- |
-| Khan abundance prior overlay | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/overlays/abundance_prior_overlay.tsv` | 99 | Numeric RT-DNA abundance prior. |
-| Khan RT/ncRNA references | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_references.tsv` | 171 | Cross-retron provenance bridge. |
-| Khan RT/ncRNA sequence authority | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_sequence_authority.tsv` | 171 | Terminal-keyed ncRNA plus explicit RT CDS authority contract. |
-| Crawford abundance observations | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/overlays/eco1_ncrna_abundance_observations.tsv` | 4174 | Eco1-local msDNA abundance prior. |
-| Crawford lnRNA/MSD references | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/references/eco1_lnrna_msd_designs.tsv` | 2578 | Eco1-local sequence/design references. |
+| Source | dnadesign-data source ID | Path | Rows | Use |
+| --- | --- | --- | ---: | --- |
+| Khan abundance prior overlay | `khan_2024_retron_census_abundance_prior_overlay_tsv` | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/overlays/abundance_prior_overlay.tsv` | 99 | Numeric RT-DNA abundance prior. |
+| Khan RT/ncRNA references | `khan_2024_retron_census_rt_lnrna_references_tsv` | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_references.tsv` | 171 | Cross-retron provenance bridge. |
+| Khan RT/ncRNA sequence authority | `khan_2024_retron_census_rt_lnrna_sequence_authority_tsv` | `../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_sequence_authority.tsv` | 171 | Terminal-keyed ncRNA plus explicit RT CDS authority contract. |
+| Crawford abundance observations | `crawford_2025_retron_ncrna_ml_eco1_ncrna_abundance_observations_tsv` | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/overlays/eco1_ncrna_abundance_observations.tsv` | 4174 | Eco1-local msDNA abundance prior. |
+| Crawford lnRNA/MSD references | `crawford_2025_retron_ncrna_ml_eco1_lnrna_msd_designs_tsv` | `../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/references/eco1_lnrna_msd_designs.tsv` | 2578 | Eco1-local sequence/design references. |
 
 ### Study-Owned References
 

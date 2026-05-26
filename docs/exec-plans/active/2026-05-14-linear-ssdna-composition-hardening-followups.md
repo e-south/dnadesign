@@ -86,6 +86,6 @@ For source-ref dogfood, require real producer artifacts:
 
 - `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
 - `uv run python -m dnadesign.devtools.docs.checks`
-- `uv run pytest -q src/dnadesign/contracts/tests src/dnadesign/folding/tests src/dnadesign/construct/tests src/dnadesign/studies/tests`
+- `uv run pytest -q src/dnadesign/contracts/tests src/dnadesign/folding/tests src/dnadesign/construct/tests src/dnadesign/studies`
 - Targeted CLI smoke tests for `construct compose`, `folding preflight/run/plot`,
   and the Retron MSD compiler.

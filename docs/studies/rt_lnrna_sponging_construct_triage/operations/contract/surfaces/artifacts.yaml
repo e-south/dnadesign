@@ -6,8 +6,8 @@ artifacts:
     - repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures
     - repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
     - repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
-    - repo:src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/genbank_authority.py
-    - repo:src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/representation_contract.py
+    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/genbank_authority.py
+    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/representation_contract.py
     - repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
   generated_not_checked_in_by_default:
     - repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1

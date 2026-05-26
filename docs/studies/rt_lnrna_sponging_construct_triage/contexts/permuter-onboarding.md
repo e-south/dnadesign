@@ -58,7 +58,7 @@ assuming that `records.parquet.sequence` is the biological design sequence.
 The study-owned materialization helper is:
 
 ```python
-dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
+dnadesign.studies.units.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
 ```
 
 It calls the public `dnadesign.permuter` facade, promotes RT-CDS variants into

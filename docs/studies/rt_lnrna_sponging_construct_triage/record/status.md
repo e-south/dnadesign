@@ -42,7 +42,7 @@ still absent.
   lnRNA and RT slot source authority for 36 Construct-representable rows.
 - Multi-slot Construct projection is declared in
   `../operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
-- `src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/construct_materialization.py`
+- `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py`
   converts the manifest and GenBank authority into Construct configs for the
   two controls and emits the six source sequence-view lanes.
 - USR dataset ids are registered in `../record/datasets.yaml`:
@@ -97,6 +97,15 @@ still absent.
 - The live Construct output dogfood validates strictly with 20,824 realized
   context rows and 62,472 explicit sequence-view declarations. Each construct
   subject has all six required view names.
+- The executable Infer-readiness gate at
+  `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
+  now runs as a Construct materialization postcondition. It requires one
+  forward context row, one reverse-complement context row, and exactly the six
+  declared source sequence-view names per construct subject before the study can
+  hand the dataset to Infer. A full temp dogfood through public dnadesign-data
+  source IDs passed with 10,412 subjects, 20,824 Construct output rows, and
+  62,472 sequence-view rows; the only source-promotion issues remained the
+  expected 2 missing RT CDS rows and 40 over-window Khan rows.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
   fixed-size representation-table contract, including expected Evo2 7B vector
   dimensions and Khan/Crawford overlay integration boundaries.
@@ -112,7 +121,7 @@ still absent.
   `reader_spop_endpoint_auc_v1` to OPAL as `scalar_identity_v1/scalar`.
 - Current Reader SPOP dry-run evidence is label-planner clean with one explicit
   no-call warning:
-  `uv run python -m dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan`
+  `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan`
   reports 30 observations across 20 candidate summaries. The
   `20251105_retron_Eco1_RT_variants` Reader artifact is treated as a
   single-point mid-log read at approximately 10 h after seeding, even though the
@@ -131,7 +140,10 @@ still absent.
 
 ### Remaining Blockers
 
-- Evo2 7B Infer sidecars for the six explicit `view_name` lanes.
+- Evo2 7B Infer sidecars for the six explicit `view_name` lanes. The current
+  inventory gate resolves all 62,472 required source views with
+  `missing_products=0`, but sidecars remain absent:
+  `missing_vectors=124944` and `missing_scalars=124944`.
 - LatentDNA materialization of the declared representation-health, ordinal
   overlay, scree, and UMAP gallery views after sidecars exist.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The

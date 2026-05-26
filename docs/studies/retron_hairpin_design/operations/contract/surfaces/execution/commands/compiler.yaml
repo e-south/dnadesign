@@ -6,7 +6,7 @@ msd_design_reference_lint:
   - run
   - python
   - -m
-  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
   - lint
   - --id
   - pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX
@@ -21,7 +21,7 @@ msd_design_reference_compile:
   - run
   - python
   - -m
-  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
   - compile
   - --input
   - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt

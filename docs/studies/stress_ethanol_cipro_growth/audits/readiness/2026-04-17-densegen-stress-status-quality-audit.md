@@ -50,7 +50,7 @@ Out of scope:
 Severity: high
 
 At the time of this audit,
-`src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py`
+`src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py`
 imported DenseGen plot registry internals directly, even though the repo-wide
 rule forbids cross-tool internal imports. The current implementation consumes
 DenseGen through the public `dnadesign.densegen.inspect_analysis_surface`
@@ -67,7 +67,7 @@ Evidence:
 
 - `DESIGN.md:54-60`
 - `ARCHITECTURE.md:76-80`
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:294-299`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:294-299`
 - `src/dnadesign/densegen/__init__.py:14-29`
 - `src/dnadesign/densegen/tests/config/test_public_api_module_layout.py:20-34`
 
@@ -90,8 +90,8 @@ Evidence:
 
 - `RELIABILITY.md:18-31`
 - `DESIGN.md:20-23`
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:83-85`
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:294-312`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:83-85`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:294-312`
 
 #### 3. DenseGen default plot surface has multiple sources of truth
 
@@ -165,8 +165,8 @@ Why this matters:
 
 Evidence:
 
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:87-92`
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:95-120`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:87-92`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:95-120`
 
 #### 6. Study-owned route/status docs drift from repo doc-model rules
 
@@ -211,7 +211,7 @@ Why this matters:
 Evidence:
 
 - `src/dnadesign/densegen/contracts.py:1-212`
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/analysis_surfaces.py:56-120`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/analysis_surfaces.py:56-120`
 
 ### Pragmatic-Principles Readout
 
@@ -263,7 +263,7 @@ Principles currently not met cleanly:
 Verified during this audit:
 
 - `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
-- `uv run pytest -q src/dnadesign/studies/tests/test_stress_ethanol_cipro_status_snapshot.py src/dnadesign/studies/tests/test_stress_ethanol_cipro_status_latentdna.py src/dnadesign/densegen/tests/config/test_public_api_module_layout.py src/dnadesign/usr/tests/test_usr_docs_contract.py`
+- `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/status/test_snapshot.py src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/status/test_latentdna.py src/dnadesign/densegen/tests/config/test_public_api_module_layout.py src/dnadesign/usr/tests/test_usr_docs_contract.py`
 
 Result:
 

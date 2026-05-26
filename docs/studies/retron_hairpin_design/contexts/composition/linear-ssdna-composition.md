@@ -27,7 +27,7 @@ dogfooding links. It does not own the generic assembler.
 | Question | Owner |
 | --- | --- |
 | Which payload, stem-base pair, cap, flank, and output artifact route are selected? | Retron study record |
-| How is a lab-facing MSD shorthand label normalized and linted? | Retron study `compiler/catalog/msd_design_registry.yaml` plus `dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app` |
+| How is a lab-facing MSD shorthand label normalized and linted? | Retron study `compiler/catalog/msd_design_registry.yaml` plus `dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app` |
 | How are ordered ssDNA segments concatenated and spans emitted? | Construct |
 | Which snapback/cap candidates exist? | Cruncher Snapback |
 | Which four-base stem bases are Type IIS scar plus terminal nick feasible? | Cruncher scar_nick |
@@ -129,7 +129,7 @@ that agents need before opening the full spec:
 - The Retron study owns MSD shorthand parsing and selected-hit metadata through
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` and the
   study-local module
-  `dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app`. Do not expose this as a
+  `dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app`. Do not expose this as a
   top-level `retron-msd` tool.
 - Snapback and scar-nick remain Cruncher primitive lanes.
 - Physical sequence pieces are `segment_spans`; overlapping interpretations are
@@ -240,7 +240,7 @@ When returning to this work:
   creation.
 - Benchling handoff should start with GenBank plus FASTA/CSV sidecars.
 - Naive sequence-artifact Retron MSD requests should start with
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize`
+  `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app materialize`
   rather than manually creating Construct workspaces. For the checked-in
   177-194 cohort, start from
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`.

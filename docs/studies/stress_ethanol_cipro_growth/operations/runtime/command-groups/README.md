@@ -14,8 +14,8 @@ canonical_payload: pipeline.yaml
 **Last verified:** 2026-05-18
 
 Use this page when an agent needs runtime command-group orientation without
-opening the full `pipeline.yaml` first. The full YAML remains the compatibility
-payload consumed by status, preflight, OPAL, LatentDNA, and docs-contract checks.
+opening the full `pipeline.yaml` first. The full YAML is the canonical payload
+consumed by status, preflight, OPAL, LatentDNA, and docs-contract checks.
 
 ### Lane Index
 

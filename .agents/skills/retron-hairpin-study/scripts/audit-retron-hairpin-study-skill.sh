@@ -160,23 +160,23 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/contract/readiness/checks/msd_single_unit_materialize.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/catalog_bundle.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/inputs.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/io.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/messages.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/msd_ids.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/registry.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/catalog/sequence_inputs.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/composition_payload.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/output_guards.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/materialized_outputs.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/manifests.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/outputs/layout.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/compiler/references.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/compiler/catalog_bundle.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/compiler/materialization.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/compiler/exceptions.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/app.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/inputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/io.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/messages.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/msd_ids.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/registry.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/sequence_inputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/composition_payload.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/output_guards.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/materialized_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/manifests.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/layout.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
@@ -201,7 +201,7 @@ for ref in "$REFERENCE_DIR"/*.md; do
 done
 
 for stale_surface in cli.py compiler.py errors.py; do
-  if [[ -e "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design/$stale_surface" ]]; then
+  if [[ -e "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/$stale_surface" ]]; then
     fail "root Retron study Python surface removed: $stale_surface"
   else
     pass "root Retron study Python surface removed: $stale_surface"
@@ -296,7 +296,7 @@ require_section "## Trigger Tests"
 require_line_budget "$SKILL_FILE" "$SIZE_BUDGET_LINES"
 require_frontmatter_yaml
 
-if uv run python - "$REPO_ROOT/src/dnadesign/studies/studies/retron_hairpin_design" <<'PY'
+if uv run python - "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design" <<'PY'
 from pathlib import Path
 import sys
 

@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage
 surface: study-root
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-24
+last_verified: 2026-05-25
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -12,7 +12,7 @@ preflight_surface: planned-contract-checks
 ## RT-lnRNA Sponging Construct Triage Study
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-05-25
 
 This study is the checked-in Phase 0/1 record for synthetic RT-lnRNA expression
 construct triage. It owns study framing, candidate-row semantics, source overlay
@@ -74,3 +74,10 @@ Permuter provenance in the study-owned `construct_subject__*` overlay fields. Co
 still consumes only the named `lnrna` and `rt_cds` slots. See
 `contexts/permuter-onboarding.md` for the Permuter boundary and candidate
 envelope rules.
+
+Construct materialization is not considered Infer-ready until the executable
+readiness gate in
+`src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
+passes: every construct subject must have one forward context, one
+reverse-complement context, and the six explicit source sequence-view names
+declared by `contexts/representation-contract.md`.

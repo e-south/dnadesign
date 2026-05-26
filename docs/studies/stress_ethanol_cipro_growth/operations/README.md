@@ -15,8 +15,8 @@ stress/ethanol/cipro growth study.
   `contract/readiness/checks/infer_batch_preparation/`.
 - `runtime/command-groups/README.md`: progressive-disclosure entrypoint for
   runtime command groups.
-- `runtime/command-groups/pipeline.yaml`: compatibility payload for command
-  groups and downstream surface bindings.
+- `runtime/command-groups/pipeline.yaml`: canonical payload for command groups
+  and downstream surface bindings.
 - `runtime/command-groups/lanes/`: DenseGen, Infer, LatentDNA, Cluster, and
   OPAL navigation sidecars for agents that need one owner lane at a time.
 

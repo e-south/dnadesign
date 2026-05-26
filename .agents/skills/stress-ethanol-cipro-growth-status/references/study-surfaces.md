@@ -23,7 +23,7 @@ Keep ownership boundaries clear.
   config, and downstream surface bindings that complement
   `operations/ops.study.yaml`, including any study-bound exploratory-analysis
   route inventory surfaced through snapshot `analysis_surfaces`; keep this as
-  the compatibility payload loaded by status and docs-contract checks
+  the canonical machine payload loaded by status and docs-contract checks
 - `docs/studies/<study-id>/record/campaign.yaml`: tracked procedure set for
   `ops progress campaign`
 
@@ -52,16 +52,16 @@ Keep ownership boundaries clear.
 
 ## Study-Owned Source Routing
 
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/service.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/service.py`:
   OPS service orchestration and contract binding.
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/snapshot.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/snapshot.py`:
   record-backed status assembly.
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/preflight.py`:
   preflight context resolution and check coordination.
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/probes/`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/probes/`:
   semantic completeness, sequence-view, and runtime probes. Deep Infer feature
   completion stays under preflight command checks.
-- `src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/ops/`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/ops/`:
   OPS provider entrypoints and checked-in status registry metadata.
 
 ## Router rule

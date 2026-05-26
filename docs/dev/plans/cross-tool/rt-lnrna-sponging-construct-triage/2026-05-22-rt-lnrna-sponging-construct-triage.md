@@ -6,6 +6,13 @@
 **Study id:** `rt_lnrna_sponging_construct_triage`
 **Primary study surface:** planned
 
+> Supersession note, 2026-05-26: this is a historical proposal. The active
+> checked-in study contract now uses the GenBank-backed 2,000 bp target context
+> under `docs/studies/rt_lnrna_sponging_construct_triage/` and concrete study
+> code under `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/`.
+> Treat remaining 1,600 bp examples in this proposal as superseded unless a
+> newer active contract explicitly reopens that lane.
+
 This proposal defines a contract-first implementation path for a synthetic
 RT-lnRNA expression construct representation workbench. It is a cross-tool
 proposal because the durable boundary crosses study records, Construct, USR,
@@ -175,7 +182,7 @@ docs/studies/rt_lnrna_sponging_construct_triage/
 Study implementation helpers, if needed, should live under:
 
 ```text
-src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/
 ```
 
 Those helpers should stay narrow: schema parsing, candidate-table validation,
@@ -1052,7 +1059,7 @@ non-representable candidates rather than truncating.
 
 Current slice: the two checked-in controls can be materialized through the study
 helper in
-`src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/construct_materialization.py`.
+`src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py`.
 The next Phase 3 step is Infer sequence-view completion validation and Evo2 7B
 sidecar generation for the six explicit `view_name` selectors.
 

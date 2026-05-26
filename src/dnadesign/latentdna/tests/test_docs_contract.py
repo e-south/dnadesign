@@ -211,7 +211,7 @@ def test_latentdna_docs_remove_legacy_promoter_surface_names() -> None:
     scan_roots = [
         repo_root / "src/dnadesign/latentdna",
         repo_root / "docs/studies/stress_ethanol_cipro_growth",
-        repo_root / "src/dnadesign/studies/studies/stress_ethanol_cipro_growth",
+        repo_root / "src/dnadesign/studies/units/stress_ethanol_cipro_growth",
     ]
     forbidden_tokens = [
         "".join(["atlas", "_2x2_intermediate_main"]),

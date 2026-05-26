@@ -75,7 +75,7 @@ Ownership boundaries are fixed:
 | Snapback/released-product geometry candidates | `Cruncher.snapback` |
 | Type IIS scar plus terminal nick feasibility | `Cruncher.scar_nick` |
 | Retron-specific selection/rationale | study records, and only later study-owned selector code |
-| Retron MSD shorthand parsing and design-reference catalogs | `dnadesign.studies.studies.retron_hairpin_design` plus study registry |
+| Retron MSD shorthand parsing and design-reference catalogs | `dnadesign.studies.units.retron_hairpin_design` plus study registry |
 | Folding execution | separate folding/backend layer |
 | Rendering | `BaseRender`, consuming contracts only |
 | Durable sequence persistence | local artifact bundle first; optional USR later |

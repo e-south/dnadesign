@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-representation-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-23
+last_verified: 2026-05-25
 ---
 
 ## Representation Contract
@@ -27,6 +27,14 @@ The views are study representation names, not new USR `product_kind` values.
 Persist them through sequence-view names, aliases, and view semantics. Infer
 must consume declared sequence views and must not reverse-complement, pad,
 window, or infer missing spans implicitly.
+
+`src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
+is the executable post-Construct readiness gate. A materialized construct
+subject is Infer-ready only when its input envelope carries explicit lnRNA and
+RT CDS slot sequences, its consolidated output has exactly one forward and one
+reverse-complement 2,000 bp context row, and its output dataset carries exactly
+the six source sequence-view names above. Missing, duplicate, or unsupported
+view names fail before Infer sequence-view completion or Evo2 execution.
 
 Construct provides raw source views only. It must not formalize a pre-Infer
 forward/reverse-complement concat view or attach a `downstream_transform` to the
@@ -133,6 +141,9 @@ controls before Infer runs. Overlay-only rows must not be passed to Infer.
 - Missing reverse-complement source view blocks the downstream bidirectional
   derived aliases.
 - Missing lnRNA or RT CDS slot span fails the matching anchor-mean view.
+- Missing construct-subject bridge metadata on output rows, missing explicit
+  `view_name`, or fewer/more than the six required source sequence views fails
+  the materializer postcondition before Infer runs.
 
 The slot anchor views run Evo2 over the full construct context and pool the
 declared slot span. They are not naked lnRNA-only or RT-only embeddings.

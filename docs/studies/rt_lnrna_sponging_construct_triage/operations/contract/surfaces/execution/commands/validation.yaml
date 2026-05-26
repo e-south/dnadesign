@@ -8,16 +8,16 @@ commands:
     command: uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .
   genbank_source_authority:
     status: active
-    command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py
+    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py
   construct_projection:
     status: active
-    command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_projection.py
+    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_projection.py
   permuter_rt_cds_dms:
     status: active
-    command: uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
+    command: uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
   representation_contract:
     status: active
-    command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py
+    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
   infer_execution:
     status: blocked
     blocked_by: evo2_7b_feature_sidecars_absent

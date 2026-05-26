@@ -46,15 +46,15 @@ command_groups:
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" --allow-non-ligatable-s0 --format json
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint --spec path/to/retron_msd_compiler_spec.yaml --format json
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json
+      - uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" --allow-non-ligatable-s0 --format json
+      - uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint --spec path/to/retron_msd_compiler_spec.yaml --format json
+      - uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json
   - id: msd_single_unit_materialize
     purpose: Materialize scar-compatible or explicitly declared non-ligatable-S0 Retron MSD labels into transient single-unit GenBank, FASTA/CSV, native secondary-structure PNG, composition-review SVG, and high-resolution composition-review PNG bundles from typed specs or explicit payload/cap sequence inputs.
     workspace_ref: repo:.
     mutates_outputs: true
     commands:
-      - uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json
+      - uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json
   - id: snapback_released_probe
     purpose: Confirm the allowed-policy exact-hit versus near-hit posture for the released-product 0/3/3 lane against the real release-enzyme catalog with the Type IIS release enzyme pinned to BspQI before any mutating solve run.
     workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033

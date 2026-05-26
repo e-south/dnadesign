@@ -773,7 +773,7 @@ approves.
    Add plot semantics YAML for each new plot under
    `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/plot_semantics/`.
    Add or update study deliverable markdown under
-   `src/dnadesign/studies/studies/regulondb_native_promoter_panel/deliverables/`.
+   `src/dnadesign/studies/units/regulondb_native_promoter_panel/deliverables/`.
 
 9. Update `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/config.yaml`
    without broad churn:

@@ -145,9 +145,9 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/studies/families"),
     Path("src/dnadesign/studies/promoter"),
     Path("docs/studies/promoter"),
-    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_infer.py"),
-    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_orchestration.py"),
-    Path("src/dnadesign/studies/studies/stress_ethanol_cipro_growth/status/preflight_upstream.py"),
+    Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/preflight_infer.py"),
+    Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/preflight_orchestration.py"),
+    Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/preflight_upstream.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_infer.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_orchestration.py"),
     Path("src/dnadesign/studies/tests/test_promoter_preflight_upstream.py"),
@@ -155,9 +155,10 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
 _ALLOWED_OPS_ROOT_CLI_PATHS = {
     Path("src/dnadesign/ops/cli"),
 }
-_ALLOWED_STUDIES_ROOT_DIRECTORIES = {"assets", "core", "studies", "tests"}
+_ALLOWED_STUDIES_ROOT_DIRECTORIES = {"assets", "core", "tests", "units"}
 _ALLOWED_STUDIES_ROOT_FILES = {"README.md", "__init__.py"}
 _ALLOWED_CACHE_FILE_SUFFIXES = {".pyc", ".pyo"}
+_CONCRETE_STUDIES_PACKAGE_NAME = "units"
 
 
 @dataclass(frozen=True)
@@ -396,7 +397,7 @@ def find_review_surface_private_imports(*, repo_root: Path) -> list[ImportViolat
                 owner_tool in {"ops", "devtools"}
                 and imported_tool == "studies"
                 and len(parts) >= 4
-                and parts[2] == "studies"
+                and parts[2] == _CONCRETE_STUDIES_PACKAGE_NAME
             ):
                 violations.append(
                     ImportViolation(
@@ -490,6 +491,49 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
     return violations
 
 
+def _discover_concrete_study_ids(studies_root: Path) -> tuple[str, ...]:
+    study_units_root = studies_root / _CONCRETE_STUDIES_PACKAGE_NAME
+    if not study_units_root.is_dir():
+        return ()
+    return tuple(
+        candidate.name
+        for candidate in sorted(study_units_root.iterdir())
+        if candidate.is_dir() and not candidate.name.startswith(".") and candidate.name != "__pycache__"
+    )
+
+
+def _study_test_filename_prefixes(study_id: str) -> tuple[str, ...]:
+    parts = tuple(part for part in study_id.split("_") if part)
+    prefixes = {f"test_{study_id}"}
+    if len(parts) >= 2:
+        prefixes.add(f"test_{parts[0]}_{parts[1]}")
+    if parts and len(parts[0]) >= 5:
+        prefixes.add(f"test_{parts[0]}")
+    return tuple(sorted(prefixes, key=lambda item: (len(item), item)))
+
+
+def _root_test_imports_concrete_study(test_path: Path, *, study_id: str) -> bool:
+    source = test_path.read_text(encoding="utf-8")
+    try:
+        module = ast.parse(source, filename=str(test_path))
+    except SyntaxError as exc:
+        raise ValueError(f"Unable to parse Python file for studies layout checks: {test_path}: {exc.msg}") from exc
+
+    import_prefix = f"dnadesign.studies.units.{study_id}"
+    for target in _iter_import_targets(module, package_parts=("dnadesign", "studies", "tests")):
+        if target == import_prefix or target.startswith(f"{import_prefix}."):
+            return True
+    return False
+
+
+def _root_test_matches_concrete_study(test_path: Path, *, study_id: str) -> bool:
+    stem = test_path.stem
+    return stem.startswith(_study_test_filename_prefixes(study_id)) or _root_test_imports_concrete_study(
+        test_path,
+        study_id=study_id,
+    )
+
+
 def find_studies_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutViolation]:
     resolved_repo_root = repo_root.expanduser().resolve()
     studies_root = resolved_repo_root / "src" / "dnadesign" / "studies"
@@ -505,7 +549,7 @@ def find_studies_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutVio
                 violations.append(
                     TopLevelLayoutViolation(
                         path=candidate,
-                        reason="concrete study package must live under src/dnadesign/studies/studies",
+                        reason="concrete study package must live under src/dnadesign/studies/units",
                     )
                 )
             continue
@@ -516,6 +560,49 @@ def find_studies_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutVio
                     reason="unexpected studies package root file",
                 )
             )
+
+    concrete_study_ids = _discover_concrete_study_ids(studies_root)
+    tests_root = studies_root / "tests"
+    study_units_root = studies_root / _CONCRETE_STUDIES_PACKAGE_NAME
+    for study_id in concrete_study_ids:
+        study_tests_root = study_units_root / study_id / "tests"
+        if not study_tests_root.is_dir():
+            violations.append(
+                TopLevelLayoutViolation(
+                    path=study_tests_root,
+                    reason="concrete study tests must live inside the owning study unit",
+                )
+            )
+            continue
+        if not (study_tests_root / "__init__.py").is_file():
+            violations.append(
+                TopLevelLayoutViolation(
+                    path=study_tests_root / "__init__.py",
+                    reason="concrete study tests package missing __init__.py",
+                )
+            )
+
+    if tests_root.is_dir():
+        for candidate in sorted(tests_root.iterdir()):
+            if candidate.is_dir() and candidate.name in concrete_study_ids:
+                violations.append(
+                    TopLevelLayoutViolation(
+                        path=candidate,
+                        reason=(
+                            f"study-specific tests must live under src/dnadesign/studies/units/{candidate.name}/tests"
+                        ),
+                    )
+                )
+        for test_path in sorted(tests_root.glob("test_*.py")):
+            for study_id in concrete_study_ids:
+                if _root_test_matches_concrete_study(test_path, study_id=study_id):
+                    violations.append(
+                        TopLevelLayoutViolation(
+                            path=test_path,
+                            reason=f"study-specific test must live under src/dnadesign/studies/units/{study_id}/tests",
+                        )
+                    )
+                    break
     return violations
 
 

@@ -74,31 +74,31 @@ base-junction scar-nick work.
   owns the completed implementation checklist and validation evidence.
 - `docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md`
   owns remaining USR/source-ref/module-split follow-up work.
-- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/references.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/compiler/references.py` owns
   label-to-reference compilation.
-- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/catalog_bundle.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/compiler/catalog_bundle.py` owns
   catalog/reference bundle writing.
-- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/materialization.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/compiler/materialization.py` owns
   Construct-backed sequence-bundle orchestration.
-- `src/dnadesign/studies/studies/retron_hairpin_design/compiler/exceptions.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/compiler/exceptions.py` owns
   the fail-fast compiler exception type.
-- `src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec.py` owns typed
+- `src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec.py` owns typed
   `retron_msd_compiler_spec_v1` parsing, explicit part normalization, and
   public primitive-source selector checks.
-- `src/dnadesign/studies/studies/retron_hairpin_design/catalog/compiler_spec_io.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec_io.py` owns
   fail-fast compiler-spec file loading, including duplicate JSON/YAML mapping-key
   rejection before typed parsing.
-- `src/dnadesign/studies/studies/retron_hairpin_design/outputs/composition_payload.py`
+- `src/dnadesign/studies/units/retron_hairpin_design/outputs/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.
-- `src/dnadesign/studies/studies/retron_hairpin_design/outputs/output_guards.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/outputs/output_guards.py` owns
   fail-fast stale-output guards for the shallow output-bundle layout.
-- `src/dnadesign/studies/studies/retron_hairpin_design/outputs/materialized_outputs.py`
+- `src/dnadesign/studies/units/retron_hairpin_design/outputs/materialized_outputs.py`
   owns GenBank/plot/manifest artifact publication from Construct output.
-- `src/dnadesign/studies/studies/retron_hairpin_design/outputs/manifests.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/outputs/manifests.py` owns
   catalog, index, manifest, and bundle README writers for that shallow
   output-bundle layout.
-- `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py` is the thin Typer
+- `src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/app.py` is the thin Typer
   command service for `msd_design_reference_v1` / `msd_design_catalog_v1`
   records plus the `materialize` GenBank/native-structure-PNG/review-PNG
   route.

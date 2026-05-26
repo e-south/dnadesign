@@ -8,8 +8,8 @@ inputs:
   variant_metadata: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
   variant_catalog: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
   tests:
-    - repo:src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py
-    - repo:src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
+    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py
+    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
 rules:
   - Parse registered GenBank files through dnadesign.usr.BiopythonGenBankParser.
   - Fail when required labels are missing or ambiguous.
@@ -21,4 +21,4 @@ rules:
   - Require every variant GenBank source to have metadata with source kind, expected RT mode, and preserved user comment; whole-plasmid rows also carry antibiotic marker and available Benchling URL.
   - Extract lnRNA and RT slot spans from variant GenBanks before Construct promotion; require full biological slots to fit after symmetric prefix/suffix flank adjustment inside the 2,000 bp context.
 validation:
-  command: uv run pytest src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
+  command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py

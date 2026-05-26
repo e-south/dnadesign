@@ -49,7 +49,7 @@ note. Keep first-hop routing in `../../routes/README.md` and current state in
   `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`.
 
 Study-owned MSD design-reference compilation is available through
-`uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app`. It
+`uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app`. It
 consumes user-provided labels plus study registry metadata, emits a shallow
 design-reference bundle with `README.md`, `manifest.json`,
 `reference_index.tsv`, `msd_design_catalog_v1.json`, and flat per-design

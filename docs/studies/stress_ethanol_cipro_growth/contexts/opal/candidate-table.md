@@ -49,6 +49,6 @@ materialization; missing, duplicate, or null sidecar rows are hard failures.
 - Write contract: campaign runs write predictions, scores, selections, and
   batch ledgers to campaign-local outputs. They should not rewrite the shared
   candidate universe or duplicate observed labels unless explicitly configured.
-- Materialization contract: dashboard-friendly summaries may be regenerated
-  from the shared label store plus campaign ledgers; they are cache artifacts,
-  not primary truth.
+- Materialization contract: operator-facing notebook and review summaries may
+  be regenerated from the shared label store plus campaign ledgers; they are
+  cache artifacts, not primary truth.

@@ -41,7 +41,7 @@ design-set provenance.
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml`
 - Full cohort materialization spec:
   `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`
-- Public module: `src/dnadesign/studies/studies/retron_hairpin_design/interfaces/cli/app.py`
+- Public module: `src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/app.py`
 - Typed compiler spec: `retron_msd_compiler_spec_v1`
 
 ### Commands
@@ -49,7 +49,7 @@ design-set provenance.
 Lint one label:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
+uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint \
   --id "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX" \
   --allow-non-ligatable-s0
 ```
@@ -57,7 +57,7 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
 Lint a typed spec:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint \
+uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint \
   --spec path/to/retron_msd_compiler_spec.yaml \
   --format json
 ```
@@ -65,7 +65,7 @@ uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.
 Compile the current workbench-backed label input:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile \
+uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app compile \
   --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt \
   --allow-non-ligatable-s0 \
   --out-dir /tmp/dnadesign_retron_msd_design_references \
@@ -77,7 +77,7 @@ segments. This is a named study fixture, not a substitute for arbitrary
 user-provided labels:
 
 ```bash
-uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize \
+uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app materialize \
   --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml \
   --out-dir /tmp/dnadesign_retron_msd_sequences \
   --render-format png \

@@ -6,8 +6,8 @@ command_groups:
     purpose: Validate checked-in docs and contract fixtures.
     commands:
       - uv run python -m dnadesign.devtools.docs.checks --repo-root .
-      - uv run python -m dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.variant_genbank_catalog --json
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_genbank_authority.py src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_variant_genbank_catalog.py
+      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.variant_genbank_catalog --json
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
   - id: construct_projection
     status: active
     purpose: Materialize dual-cassette construct contexts from GenBank, source-promotion, and Permuter construct subjects.
@@ -19,8 +19,8 @@ command_groups:
     commands:
       - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids
       - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_construct_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
   - id: infer_handoff
     status: blocked
     purpose: Extract feature aliases from declared construct-context views.
@@ -28,7 +28,7 @@ command_groups:
       - evo2_7b_feature_sidecars_absent
       - infer_sequence_view_completion_not_run
     commands:
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_representation_contract.py
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
       - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-missing-vectors 0 --max-missing-scalars 0 --max-stale-vectors 0 --max-stale-scalars 0
   - id: latentdna_gallery
     status: blocked
@@ -45,8 +45,8 @@ command_groups:
       - unresolved_variant_sequence_authority_for_construct_promotion
       - reader_spop_labels_not_materialized
     commands:
-      - uv run python -m dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --json
-      - uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_reader_spop_plan.py
+      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --json
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
   - id: opal_readiness
     status: blocked
     purpose: Validate candidate records with one fixed-size vector X and real labels.

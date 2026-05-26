@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.13
+  version: 0.7.14
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -95,7 +95,7 @@ Out of scope:
 - Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
 3. Execute or report the route.
-- For complete reference inputs, run `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app lint|compile`.
+- For complete reference inputs, run `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint|compile`.
 - For GenBank/structure-review output, run the same module's `materialize` command with
   `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
 - If the user asked to open outputs in Finder, do not stop after `compile`;

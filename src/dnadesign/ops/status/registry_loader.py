@@ -215,7 +215,7 @@ def _expected_provider_ref_prefix(*, fragment_path: Path, dnadesign_root: Path) 
         and relative_parts[3] == "status"
         and relative_parts[4] == "ops"
     ):
-        return f"dnadesign.studies.studies.{relative_parts[2]}.status.ops."
+        return f"dnadesign.studies.units.{relative_parts[2]}.status.ops."
     if len(relative_parts) >= 4 and relative_parts[1] == "src" and relative_parts[2] == "ops":
         return f"dnadesign.{relative_parts[0]}.src.ops."
     if len(relative_parts) >= 3 and relative_parts[1] == "ops":

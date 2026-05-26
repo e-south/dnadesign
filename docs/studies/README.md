@@ -97,10 +97,18 @@ Each checked-in live study keeps these artifacts:
 - `audits/`: optional machine-readable sync/readiness evidence
 
 Keep the code boundary clear: concrete study status and preflight
-implementation lives under `src/dnadesign/studies/studies/<study-id>/`, not under
+implementation lives under `src/dnadesign/studies/units/<study-id>/`, not under
 `src/dnadesign/ops/` and not in a generic cross-study status bucket. Ops reads
 checked-in records and dispatches providers, but snapshot/preflight logic and
 study-specific parsers stay with the owning study package.
+
+Treat each concrete study as a study unit with three durable shelves:
+`docs/studies/<study-id>/` for the checked-in record and route map,
+`src/dnadesign/studies/units/<study-id>/` for study-owned implementation, and
+`src/dnadesign/studies/units/<study-id>/tests/` for study-owned tests. The
+`src/dnadesign/studies/tests/` root is reserved for shared `studies.core` and
+package-level contracts; concrete study tests must stay inside their owning
+study unit.
 
 ### Declared layout
 
@@ -152,7 +160,8 @@ docs/studies/<study-id>/
 Study-specific implementation helpers, when needed, live under:
 
 ```text
-src/dnadesign/studies/studies/<study-id>/
+src/dnadesign/studies/units/<study-id>/
+src/dnadesign/studies/units/<study-id>/tests/
 ```
 
 Those helpers must stay narrow. If behavior becomes reusable outside one study,

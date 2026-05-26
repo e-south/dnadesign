@@ -78,5 +78,5 @@ validation_notes:
   - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
   - "source_basis: crawford_eco1_lnrna_fixed_wt_rt promotes the Crawford design-reference plus abundance-observation sequence union with fixed Eco1 WT RT when the lnRNA sequence passes Eco1 forward k-mer orientation QC; exact MSD/flank matches are QC annotations, not required authority."
   - "source_basis: compiler_generated_msd_lnrna_variant marks study-owned MSD primitive combinatorics patched into lnRNA sequence authority with fixed Eco1 WT RT; it is a sequence/design-reference source, not an abundance prior."
-  - "compiler_lnrna_variant rows must carry construct_subject__msd_insert_orientation=reverse_complement and exact template flank placement provenance."
+  - "compiler_lnrna_variant rows must carry construct_subject__msd_insert_orientation=reverse_complement, exact template flank placement provenance, scar-nick route status, route note, nick orientation, and nickase when declared by the pool contract."
   - "Use construct_subject_role for working_control, failed_control, weak_rescue_control, reference_overlay, and similar study roles."

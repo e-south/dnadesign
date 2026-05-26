@@ -16,7 +16,7 @@ These YAML fragments are loaded by `../ops.study.yaml`.
   labels.
 
 The checked-in Python helper under
-`src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/` validates
+`src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/` validates
 the GenBank source-authority registry, validates the multi-slot Construct
 projection manifest, and can run a temporary Construct materialization proof
 for the two control candidates or RT-CDS DMS variants generated through the

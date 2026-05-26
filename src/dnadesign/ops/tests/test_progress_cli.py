@@ -33,9 +33,7 @@ from dnadesign.usr import (
     write_sequence_views,
 )
 
-STRESS_ETHANOL_CIPRO_GROWTH_STATUS_SERVICE_MODULE = (
-    "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service"
-)
+STRESS_ETHANOL_CIPRO_GROWTH_STATUS_SERVICE_MODULE = "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service"
 STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF = (
     f"{STRESS_ETHANOL_CIPRO_GROWTH_STATUS_SERVICE_MODULE}.run_preflight_command"
 )
@@ -1499,7 +1497,7 @@ def test_stress_ethanol_cipro_study_preflight_reports_command_and_dataset_blocke
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1516,7 +1514,7 @@ def test_stress_ethanol_cipro_study_preflight_reports_command_and_dataset_blocke
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -1639,11 +1637,11 @@ def test_stress_ethanol_cipro_study_preflight_reports_sequence_view_contract_hea
             lambda argv, *, cwd, timeout_seconds=180: CommandExecution(tuple(argv), str(cwd), 0, "ok", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
@@ -1860,11 +1858,11 @@ def test_stress_ethanol_cipro_study_preflight_reports_infer_sequence_view_comple
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: CommandExecution((), str(repo_root), 0, "{}", "", False),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [], "probe_error": None},
         )
 
@@ -1962,7 +1960,7 @@ def test_stress_ethanol_cipro_study_preflight_blocks_stale_construct_inputs_in_n
         monkeypatch.setenv("SSL_CERT_FILE", "/tmp/cert.pem")
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -1979,7 +1977,7 @@ def test_stress_ethanol_cipro_study_preflight_blocks_stale_construct_inputs_in_n
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2090,7 +2088,7 @@ def test_stress_ethanol_cipro_study_preflight_demotes_construct_runtime_attentio
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2107,7 +2105,7 @@ def test_stress_ethanol_cipro_study_preflight_demotes_construct_runtime_attentio
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 1, "devices": [{"id": 0, "name": "GPU"}], "probe_error": None},
         )
         state, summary, evidence = _stress_ethanol_cipro_growth_preflight(None, repo_root=repo_root, scope="full")
@@ -2199,7 +2197,7 @@ def test_stress_ethanol_cipro_study_preflight_scope_next_defers_later_lane_block
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2216,7 +2214,7 @@ def test_stress_ethanol_cipro_study_preflight_scope_next_defers_later_lane_block
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2339,7 +2337,7 @@ def test_stress_ethanol_cipro_study_preflight_lane_scope_keeps_notify_env_and_se
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2356,7 +2354,7 @@ def test_stress_ethanol_cipro_study_preflight_lane_scope_keeps_notify_env_and_se
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2479,7 +2477,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_completed_infer
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2496,7 +2494,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_completed_infer
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(
@@ -2606,7 +2604,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_parallel_option
 
         monkeypatch.setattr(STRESS_ETHANOL_CIPRO_GROWTH_RUN_PREFLIGHT_COMMAND_REF, _fake_run)
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.execute_runbook_plan",
             lambda *, runbook_path, repo_root: _fake_run(
                 (
                     "uv",
@@ -2623,7 +2621,7 @@ def test_stress_ethanol_cipro_study_preflight_full_scope_demotes_parallel_option
             ),
         )
         monkeypatch.setattr(
-            "dnadesign.studies.studies.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
+            "dnadesign.studies.units.stress_ethanol_cipro_growth.status.service.inspect_local_infer_gpu_inventory",
             lambda: {"count": 0, "devices": [], "probe_error": None},
         )
         monkeypatch.setattr(

@@ -760,16 +760,16 @@ def test_find_review_surface_private_imports_rejects_ops_tests_importing_concret
 ) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "tests" / "test_status.py",
-        "from dnadesign.studies.studies.demo_study.status.service import STUDY_STATUS_SERVICE\n",
+        "from dnadesign.studies.units.demo_study.status.service import STUDY_STATUS_SERVICE\n",
     )
-    _write(tmp_path / "src" / "dnadesign" / "studies" / "studies" / "demo_study" / "__init__.py", "")
+    _write(tmp_path / "src" / "dnadesign" / "studies" / "units" / "demo_study" / "__init__.py", "")
 
     violations = find_review_surface_private_imports(repo_root=tmp_path)
 
     assert len(violations) == 1
     assert violations[0].owner_tool == "ops"
     assert violations[0].imported_tool == "studies"
-    assert violations[0].import_target == "dnadesign.studies.studies.demo_study.status.service"
+    assert violations[0].import_target == "dnadesign.studies.units.demo_study.status.service"
 
 
 def test_find_review_surface_private_imports_allows_public_cross_tool_review_imports(tmp_path: Path) -> None:
@@ -977,9 +977,10 @@ def test_find_studies_layout_violations_accepts_progressive_disclosure_layout(tm
     studies_root = tmp_path / "src" / "dnadesign" / "studies"
     _write(studies_root / "__init__.py", "")
     _write(studies_root / "README.md", "# studies\n")
-    for name in ("assets", "core", "studies", "tests"):
+    for name in ("assets", "core", "tests", "units"):
         (studies_root / name).mkdir(parents=True, exist_ok=True)
-    (studies_root / "studies" / "demo_study").mkdir(parents=True, exist_ok=True)
+    (studies_root / "units" / "demo_study").mkdir(parents=True, exist_ok=True)
+    _write(studies_root / "units" / "demo_study" / "tests" / "__init__.py", "")
 
     violations = find_studies_layout_violations(repo_root=tmp_path)
 
@@ -990,16 +991,76 @@ def test_find_studies_layout_violations_rejects_flat_concrete_study_package(tmp_
     studies_root = tmp_path / "src" / "dnadesign" / "studies"
     _write(studies_root / "__init__.py", "")
     _write(studies_root / "README.md", "# studies\n")
-    for name in ("assets", "core", "studies", "tests"):
+    for name in ("assets", "core", "tests", "units"):
         (studies_root / name).mkdir(parents=True, exist_ok=True)
     (studies_root / "demo_study").mkdir(parents=True, exist_ok=True)
+    _write(studies_root / "units" / "existing_study" / "tests" / "__init__.py", "")
 
     violations = find_studies_layout_violations(repo_root=tmp_path)
 
     assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
         (
-            "concrete study package must live under src/dnadesign/studies/studies",
+            "concrete study package must live under src/dnadesign/studies/units",
             "src/dnadesign/studies/demo_study",
+        )
+    ]
+
+
+def test_find_studies_layout_violations_rejects_missing_concrete_study_test_package(tmp_path: Path) -> None:
+    studies_root = tmp_path / "src" / "dnadesign" / "studies"
+    _write(studies_root / "__init__.py", "")
+    _write(studies_root / "README.md", "# studies\n")
+    for name in ("assets", "core", "tests", "units"):
+        (studies_root / name).mkdir(parents=True, exist_ok=True)
+    (studies_root / "units" / "demo_study").mkdir(parents=True, exist_ok=True)
+
+    violations = find_studies_layout_violations(repo_root=tmp_path)
+
+    assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
+        (
+            "concrete study tests must live inside the owning study unit",
+            "src/dnadesign/studies/units/demo_study/tests",
+        )
+    ]
+
+
+def test_find_studies_layout_violations_rejects_unscoped_concrete_study_test(tmp_path: Path) -> None:
+    studies_root = tmp_path / "src" / "dnadesign" / "studies"
+    _write(studies_root / "__init__.py", "")
+    _write(studies_root / "README.md", "# studies\n")
+    for name in ("assets", "core", "tests", "units"):
+        (studies_root / name).mkdir(parents=True, exist_ok=True)
+    _write(studies_root / "units" / "demo_study" / "tests" / "__init__.py", "")
+    _write(
+        studies_root / "tests" / "test_demo_study_status.py",
+        "from dnadesign.studies.units.demo_study.status import service\n",
+    )
+
+    violations = find_studies_layout_violations(repo_root=tmp_path)
+
+    assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
+        (
+            "study-specific test must live under src/dnadesign/studies/units/demo_study/tests",
+            "src/dnadesign/studies/tests/test_demo_study_status.py",
+        )
+    ]
+
+
+def test_find_studies_layout_violations_rejects_separate_concrete_study_test_package(tmp_path: Path) -> None:
+    studies_root = tmp_path / "src" / "dnadesign" / "studies"
+    _write(studies_root / "__init__.py", "")
+    _write(studies_root / "README.md", "# studies\n")
+    for name in ("assets", "core", "tests", "units"):
+        (studies_root / name).mkdir(parents=True, exist_ok=True)
+    _write(studies_root / "units" / "demo_study" / "tests" / "__init__.py", "")
+    _write(studies_root / "tests" / "demo_study" / "__init__.py", "")
+
+    violations = find_studies_layout_violations(repo_root=tmp_path)
+
+    assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
+        (
+            "study-specific tests must live under src/dnadesign/studies/units/demo_study/tests",
+            "src/dnadesign/studies/tests/demo_study",
         )
     ]
 

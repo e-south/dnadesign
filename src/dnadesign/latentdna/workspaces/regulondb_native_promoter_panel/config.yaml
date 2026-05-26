@@ -18,7 +18,7 @@ defaults:
 study_binding:
   study_id: regulondb_native_promoter_panel
   record_root: docs/studies/regulondb_native_promoter_panel
-  deliverable_docs_root: src/dnadesign/studies/studies/regulondb_native_promoter_panel
+  deliverable_docs_root: src/dnadesign/studies/units/regulondb_native_promoter_panel
 sources:
   native_records:
     kind: usr

@@ -6,7 +6,7 @@ msd_single_unit_materialize_lint:
   - run
   - python
   - -m
-  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
   - lint
   - --spec
   - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
@@ -20,7 +20,7 @@ msd_single_unit_materialize:
   - run
   - python
   - -m
-  - dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app
+  - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
   - materialize
   - --spec
   - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml

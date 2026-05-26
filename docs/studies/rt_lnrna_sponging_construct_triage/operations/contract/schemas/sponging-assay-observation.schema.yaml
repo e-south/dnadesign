@@ -9,7 +9,7 @@ label_contract:
   allowed_as_opal_y: true
   opal_objective: scalar_identity_v1/scalar
   source_owner: reader
-  materializer: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan
+  materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
   reporter_plasmid_id: pBbS2c-RFP
   reporter_design_id: pBbS2c-rfp
   reporter_readout: RFP/OD600

@@ -5,28 +5,29 @@
 LatentDNA/Evo2 X surface lets the three existing RF + SFXI + top-n stress
 campaigns recover DenseGen part-derived stress-axis grammar.
 
-This is now a historical K6/single-seed probe. Its SFXI-compatible vec8 naming
-is superseded for synthetic controls because the current probe label is
-DenseGen plan logic, not measured SFXI. The current planned benchmark is
+This is now a historical K6/single-seed probe. The current benchmark is
 `densegen_motif_qa_k12_s3_v1`, documented in
 `densegen-motif-qa-k12-s3-v1.md`, with active `densegen_plan_logic4` and
-`tf_family_count` families.
+`tf_family_count` families. Treat V0 vec8 names as historical artifact labels,
+not as current probe ontology.
 
-The positive oracle is a binary SFXI-compatible vec8 from
-`densegen__used_tfbs_detail`: LexA defines cipro, CpxR/BaeR define ethanol, and
-both axes define dual/AND. `densegen__plan`,
+The positive oracle is a binary 8-channel synthetic vector from
+`densegen__used_tfbs_detail`, arranged in the old SFXI state order: LexA defines
+cipro, CpxR/BaeR define ethanol, and both axes define dual/AND. `densegen__plan`,
 `densegen__required_regulators`, `sigma35_variant`, and
 `densegen__sampling_library_hash` are audit/split fields, not primary label
 sources. A distribution-preserving permuted null is a paired diagnostic control.
 
 ### Boundary
 
+Allowed label inputs:
 - `densegen__used_tfbs_detail`
 - `densegen__plan` for audit and sigma35 suffix parsing
 - `densegen__required_regulators` for audit
 - `densegen__sampling_library_hash` for collapse audit
 - pad and GC metadata for future audit only
 
+Forbidden label inputs:
 - `latentdna__*`
 - `infer__*`
 - OPAL predictions or selections
@@ -38,7 +39,7 @@ sources. A distribution-preserving permuted null is a paired diagnostic control.
 Synthetic labels are scratch-only. They must not be written to the shared
 `usr_prom_eth_cip_opal_candidates/_opal/observed_labels.parquet` sidecar.
 
-### Vec8 Meaning
+### Historical Vec8 Meaning
 
 The v0 oracle emits binary vec8 labels in the same state order used by the
 existing SFXI campaigns: baseline/no-stress, ethanol, ciprofloxacin, and
@@ -79,43 +80,23 @@ The full matrix is 12 runs. Gates allow narrower execution: `source`,
 `cipro-random`, `random-all`, `leave-sigma35`, and `all`. `source` validates
 DenseGen source, candidate-table X schema/dimension, and label generation only.
 
-### Historical Dogfood Evidence
+### Historical Evidence
 
-Latest inspected K6 scratch run before removal:
-
-```text
-.var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/20260523T220954Z_seed7_initial6_k6
-```
-
-That run was mechanically complete: 12 campaigns finished, 144 prediction ledgers
-exist, 12 campaign reviews exist, 12 plot manifests exist, 1,782 configured
-OPAL PNG plots are referenced, and the review audit found 0 missing, zero-byte,
-bad, or undersized media references. The aggregate review manifest was generated
-at `2026-05-24T18:53:46+00:00`.
-
-The K6 scientific decision used the now-retired hard `null_lift > 1.25` STOP
-threshold. That threshold is no longer the v1 QA criterion. The retained
-interpretation is narrower: K6 validated end-to-end OPAL mechanics and showed
-recoverable synthetic DenseGen signal, but it did not support a biological
-conclusion or assay-readiness claim. Synthetic labels remain scratch-only and no
-shared observed-label sidecar is written.
+The latest inspected K6 scratch run was mechanically complete: 12 campaigns,
+144 prediction ledgers, 12 campaign reviews, 12 plot manifests, and 1,782
+referenced configured OPAL PNG plots with no missing, zero-byte, bad, or
+undersized media references. The retained interpretation is narrow: K6
+validated OPAL mechanics and recoverable synthetic DenseGen signal, not a
+biological conclusion or assay-readiness claim. Synthetic labels remain
+scratch-only and no shared observed-label sidecar is written.
 
 ### CLI
 
-Dry-run is the default:
+Dry-run is the default. `--apply` is required to create scratch artifacts or
+invoke OPAL:
 
 ```bash
-uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
-  --initial-labels 12 \
-  --selection-k 12 \
-  --seed 7 \
-  --splits random_id,leave_sigma35_variant
-```
-
-`--apply` is required to create scratch artifacts or invoke OPAL:
-
-```bash
-uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
   --initial-labels 12 --selection-k 12 --seed 7 --rounds 12 \
   --splits random_id,leave_sigma35_variant --score-batch-size 512 --apply
 ```
@@ -151,14 +132,14 @@ config validation. This still runs OPAL validation and the full candidate-table
 X-column scan:
 
 ```bash
-uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
   --gate cipro-random --stop-after validate --apply
 ```
 
 Audit a materialized run root:
 
 ```bash
-uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe status \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe status \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/<run_id>
 ```
 
@@ -181,26 +162,19 @@ IDs.
 - `PENDING`: source/materialization/validation gates passed, but no OPAL run
   metrics exist yet; this is not a research decision.
 
-Review artifacts are layered: scratch OPAL campaigns write reusable campaign
-review artifacts under `outputs/review/`; the probe writes only the
-study-specific aggregate benchmark layer under `reports/`; configured OPAL
-campaign plots are refreshed separately from the aggregate report and are
-first-class `opal.plot_artifact.v1` artifacts. The scratch campaign `plots.yaml`
-uses the same suitable registered OPAL primitives as the stress bundles,
-including feature-importance, scalar/vector round history, and SFXI diagnostics.
-Per-round browsing is driven by OPAL `round_variants` manifests, not
-report-layer file scraping. For final plot review, run
-  `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
-  then rerun the report with `--plots --json`.
-Study-specific aggregate plots remain in `reports/` unless promoted to OPAL
-through the registered plot API (`PlotMeta`, `PlotContext`, media/tidy output,
-and manifests). This prevents drift between probe-only reports and notebooks.
-- `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
+Review artifacts are layered. Scratch OPAL campaigns write campaign review
+artifacts under `outputs/review/`; the probe writes only the study-specific
+aggregate benchmark layer under `reports/`. Configured OPAL campaign plots are
+first-class `opal.plot_artifact.v1` artifacts, refreshed separately, and browsed
+through `round_variants` manifests rather than report-layer file scraping. For
+final plot review, run
+`uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
+then rerun the report with `--plots --json`.
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
-- `uv run python -m dnadesign.studies.studies.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`
   summarizes scratch OPAL round logs without digging through campaign
   directories.
 
-Missing prediction ledgers after a scored OPAL stage are execution contract
-failures, not research decisions. The probe is valuable only if it changes a
-concrete OPAL readiness or assay-design decision.
+Missing prediction ledgers after a scored OPAL stage are execution contract failures,
+not research decisions. The probe is valuable only if it changes a concrete OPAL readiness or assay-design decision.

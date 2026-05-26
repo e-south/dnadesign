@@ -87,7 +87,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Study status and preflight logic is study-owned once it becomes specific.
   OPS discovers provider metadata and imports only the selected provider
   entrypoint; study-specific execution taxonomy stays under
-  `src/dnadesign/studies/studies/<study-id>/`.
+  `src/dnadesign/studies/units/<study-id>/`.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification

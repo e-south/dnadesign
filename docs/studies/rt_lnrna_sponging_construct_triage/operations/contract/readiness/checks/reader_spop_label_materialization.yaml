@@ -25,4 +25,4 @@ rules:
   - Keep unresolved retron variants out of Construct-backed construct subject ids until explicit RT plus lnRNA sequence authority exists.
   - Export the scalar as reader_spop_endpoint_auc_v1 for OPAL scalar_identity_v1/scalar only.
 validation:
-  command: uv run pytest -q src/dnadesign/studies/tests/test_rt_lnrna_sponging_construct_triage_reader_spop_plan.py
+  command: uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py

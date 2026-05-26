@@ -10,7 +10,7 @@ last_verified: 2026-05-24
 
 Reader is the evidence owner for TF-sponging assay labels. The study-owned
 planner in
-`src/dnadesign/studies/studies/rt_lnrna_sponging_construct_triage/reader_spop_plan.py`
+`src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_plan.py`
 converts selected sibling Reader pES-retron plus pBbS2c-RFP experiments into a
 single scalar:
 

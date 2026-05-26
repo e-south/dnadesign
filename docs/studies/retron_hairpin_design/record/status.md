@@ -34,9 +34,9 @@
 ### Quick route
 
 - Compiler/product route:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
+  `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app compile --input docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt --allow-non-ligatable-s0 --out-dir /tmp/dnadesign_retron_msd_design_references --format json`
 - GenBank/native-structure-PNG/review-PNG route for the full checked-in cohort:
-  `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json`
+  `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app materialize --spec docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml --out-dir /tmp/dnadesign_retron_msd_sequences --render-format png --format json`
 - Status route for explicit progress/history questions only:
   `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json`
 - Preflight route for explicit blocker/readiness questions only:
@@ -100,7 +100,7 @@
 ### Compiler and primitive surfaces
 
 - Compiler module:
-  `src/dnadesign/studies/studies/retron_hairpin_design/`
+  `src/dnadesign/studies/units/retron_hairpin_design/`
 - Compiler registry:
   `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`
 - Cap source lookup:
@@ -154,7 +154,7 @@ status note focused on current route, settled boundaries, and next actions.
 ### Next actions
 
 1. For a lab-facing ID or complete part set, lint or compile through
-   `uv run python -m dnadesign.studies.studies.retron_hairpin_design.interfaces.cli.app`.
+   `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app`.
 2. For missing parts, open `docs/studies/retron_hairpin_design/routes/README.md` and
    route to the smallest primitive owner: Snapback, scar-nick, or YIU contrast.
 3. For provenance questions, open `docs/studies/retron_hairpin_design/workbench/`.

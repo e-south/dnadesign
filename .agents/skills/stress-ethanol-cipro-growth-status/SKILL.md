@@ -2,7 +2,7 @@
 name: stress-ethanol-cipro-growth-status
 description: Report record-backed status for stress_ethanol_cipro_growth. Use for current phase, active datasets, preflight, or LatentDNA/OPAL handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 1.0.6
+  version: 1.0.7
   category: workflow-automation
   tags: [studies, stress-ethanol-cipro-growth, status, routes, preflight]
 ---

@@ -29,6 +29,7 @@ datasets:
     owner_tool: dnadesign-data
     lifecycle: source_reference
     status: present
+    source_id: khan_2024_retron_census_rt_lnrna_sequence_authority_tsv
     path: ../dnadesign-data/sources/literature/Khan_et_al_2024_retron_census/processed/references/rt_lnrna_sequence_authority.tsv
     row_count: 171
     line_count_including_header: 172
@@ -41,6 +42,7 @@ datasets:
     owner_tool: dnadesign-data
     lifecycle: source_overlay
     status: present
+    source_id: crawford_2025_retron_ncrna_ml_eco1_ncrna_abundance_observations_tsv
     path: ../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/overlays/eco1_ncrna_abundance_observations.tsv
     row_count: 4174
     line_count_including_header: 4175
@@ -54,6 +56,7 @@ datasets:
     owner_tool: dnadesign-data
     lifecycle: source_reference
     status: present
+    source_id: crawford_2025_retron_ncrna_ml_eco1_lnrna_msd_designs_tsv
     path: ../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/references/eco1_lnrna_msd_designs.tsv
     row_count: 2578
     line_count_including_header: 2579
@@ -184,7 +187,7 @@ datasets:
     derived_lanes:
       - lane_id: crawford_lnrna_msd_designs_fixed_wt_rt
         owner_tool: study
-        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
+        generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
         dependency_surface: dnadesign-data Crawford processed reference and abundance TSVs
         source_basis: crawford_eco1_lnrna_fixed_wt_rt
         notes: >-
@@ -198,7 +201,7 @@ datasets:
           duplicate Construct subjects.
       - lane_id: khan_source_rt_lnrna_reference
         owner_tool: study
-        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
+        generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
         dependency_surface: dnadesign-data Khan processed sequence-authority TSV
         source_basis: khan_source_rt_lnrna_reference
         notes: >-
@@ -208,7 +211,7 @@ datasets:
           bp Construct window remain blocked before Construct runtime.
       - lane_id: compiler_generated_msd_lnrna_variant
         owner_tool: study
-        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.source_promotions.resolve_msd_compiler_promotions
+        generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_msd_compiler_promotions
         dependency_surface: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml
         source_basis: compiler_generated_msd_lnrna_variant
         notes: >-
@@ -220,7 +223,7 @@ datasets:
           pre-Infer concat.
       - lane_id: rt_cds_in_silico_dms
         owner_tool: study
-        generator: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
+        generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
         dependency_surface: dnadesign.permuter
         source_basis: in_silico_rt_cds_dms
         expected_overlay_columns:
@@ -292,7 +295,7 @@ datasets:
     source_record: ratio_reporter_normalizer/df
     metric_id: reader_spop_endpoint_auc_v1
     schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
-    materializer: dnadesign.studies.studies.rt_lnrna_sponging_construct_triage.reader_spop_plan
+    materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
     reader_experiment_ids:
       - 20250622_retron_Eco1_26_43_benchmark
       - 20250707_retron_Eco1_26_43_45_46_benchmark
