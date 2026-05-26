@@ -29,7 +29,7 @@ These pages define plugin-level contracts, channel semantics, and model/objectiv
 - [Expected Improvement behavior and math](./plugins/selection/expected-improvement.md): EI formulation and selection semantics.
 - [Objectives and channel refs](./plugins/objectives/README.md): objective plugin contracts and channel naming rules.
 - [SFXI behavior and math](./plugins/objectives/sfxi.md): SFXI objective mechanics and output interpretation.
-- [SPOP objective draft](./plugins/objectives/spop.md): draft objective behavior and current constraints.
+- [SPOP scalar objective](./plugins/objectives/spop.md): objective channel for predicted Reader SPOP endpoint scalars.
 - [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.
 - [Y transforms and Y-ops](./plugins/transforms/y.md): target transform contracts and label operations.
 

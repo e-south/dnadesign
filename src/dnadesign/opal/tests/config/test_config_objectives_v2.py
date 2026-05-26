@@ -57,6 +57,36 @@ selection:
     assert cfg.campaign.metadata == {"scenario_kind": "positive", "split_id": "random"}
 
 
+def test_load_config_accepts_spop_objective_channel(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: local, path: "./records.parquet" }
+  x_column_name: "X"
+  y_column_name: "reader_spop_endpoint_dose_mean_v1"
+  y_expected_length: 1
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: spop_v1, params: {} }
+selection:
+  name: top_n
+  params: { top_k: 2, score_ref: "spop_v1/spop", objective_mode: maximize, tie_handling: competition_rank }
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+
+    assert cfg.objectives.objectives[0].name == "spop_v1"
+    assert cfg.selection.selection.params["score_ref"] == "spop_v1/spop"
+
+
 def test_load_config_accepts_candidate_scope_id_list(tmp_path: Path) -> None:
     scope_path = tmp_path / "scope.parquet"
     cfg_path = _write_config(

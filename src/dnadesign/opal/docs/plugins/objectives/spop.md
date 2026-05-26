@@ -1,159 +1,85 @@
-## sponging_percent_of_positive `spop`
+## SPOP Scalar Objective `spop_v1`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-05-26
 
+`spop_v1` ranks candidates by a predicted SPOP endpoint scalar.
 
-This page documents the draft `spop` objective design and its proposed scoring equations.
-Status: historical draft objective note; it is not a registered OPAL runtime
-objective for the RT-lnRNA sponging construct triage study.
+Use it when the configured `Y` column contains one finite scalar per candidate
+for the Reader metric:
 
-The current pragmatic RT-lnRNA study path is study-owned Reader label
-materialization to `reader_spop_endpoint_auc_v1`, then OPAL
-`scalar_identity_v1/scalar`. Do not route that study through OPAL `spop_v1`
-unless a real OPAL objective plugin is implemented and registered.
+```text
+reader_spop_endpoint_dose_mean_v1
+```
 
----
+OPAL does not parse Reader plate artifacts, choose endpoints, aggregate wells,
+or recompute SPOP. Reader and the study bridge own those steps. OPAL receives a
+scalar label or prediction and exposes a typed objective channel for selection.
 
-### 1) Channels and data shape
+## Input
 
-**Per variant $g$, per dose $j\in{0..J}$ (ascending), with replicates $r$:**
+- `data.y_expected_length: 1`
+- `transforms_y.name: scalar_from_table_v1`
+- one numeric SPOP column or shared label source value per labeled candidate
+- no objective params
 
-* OD600: $O_{g,j,r}$
+The objective accepts model predictions with shape `(n, 1)` and finite numeric
+values. Regressors may predict values below zero; the objective does not clip
+them. Negative predictions remain selectable scores, but diagnostics count them.
 
-* RFP: $R_{g,j,r}$
-* Growth‑normalized RFP: $Z_{g,j,r}=R_{g,j,r}/(O_{g,j,r}+\epsilon_{od})$
+## Output Channels
 
-**Variant‑level positive control (aTc):**
+- Score channel: `spop_v1/spop`
+- Direction: maximize
+- Uncertainty channels: none
 
-$O_{pos,g,r}$, $R_{pos,g,r}$, $Z_{pos,g,r}=R_{pos,g,r}/(O_{pos,g,r}+\epsilon_{od})$
+The runtime emits these objective diagnostics:
 
-Ceiling for derepression that does not depend on retron maturation.
+- `metric_id`: `reader_spop_endpoint_dose_mean_v1`
+- `numeric_scope`: `reader_experiment_normalized_tf_sponging`
+- `score_channel`: `spop`
+- `negative_prediction_count`
+- `summary_stats`
 
-**Replicate aggregation (medians across $r$):**
+## Configuration
 
-$\tilde O_{g,j}$, $\tilde R_{g,j}$, $\tilde Z_{g,j}$, and $\tilde O_{pos,g}$, $\tilde R_{pos,g}$, $\tilde Z_{pos,g}$.
+```yaml
+data:
+  y_column_name: reader_spop_endpoint_dose_mean_v1
+  y_expected_length: 1
 
-If a variant’s aTc well is missing, use a plate‑level aTc median $\tilde Z_{pos}$ as fallback.
+transforms_y:
+  name: scalar_from_table_v1
+  params: {}
 
----
+objectives:
+  - name: spop_v1
+    params: {}
 
-### 2) Per‑dose Y label
+selection:
+  name: top_n
+  params:
+    top_k: 12
+    score_ref: spop_v1/spop
+    objective_mode: maximize
+    tie_handling: competition_rank
+```
 
-Percent of positive, growth‑normalized:
+## Record Flow
 
-$$
-y_{g,j}=\frac{\tilde Z_{g,j}}{\tilde Z_{pos,g}+\epsilon_{pos}}
-$$
+Reader computes the SPOP scalar and support vectors. A bridge materializes that
+assay result onto study, Construct, USR, or label-source records with Reader
+artifact provenance. OPAL reads the configured scalar `Y` surface and ranks
+predictions through `spop_v1/spop`.
 
-$y_{g,j}$ is unitless and comparable across plates.
+Keep the provenance with the records that carry the scalar:
 
-**Primary label vector:**
+- Reader metric id and numeric scope
+- Reader artifact reference, record id, and content digest
+- study or Construct identity bridge, when applicable
+- observed-label round and batch metadata, when used by OPAL
 
-Ordered per‑dose series used for learning:
-$$
-Y^{dose}_g=[y_{g,0},...,y_{g,J}]
-$$
-
-**Optional diagnostic (raw RFP fraction):**
-$$
-y^{raw}_{g,j}=\frac{\tilde R_{g,j}}{\tilde R_{pos,g}+\epsilon_{pos}}
-$$
-
----
-
-### 3) Viability per dose (relative to zero IPTG)
-
-We compare each induced condition to the variant’s own uninduced growth.
-
-* **Baseline per variant:** $B_g=\tilde O_{g,0}$.
-
-* **Per‑dose viability factor** (one‑sided; only penalizes drops below the baseline):
-  $$
-  v_{g,j}=min\left(1,\frac{\tilde O_{g,j}}{B_g+\epsilon_{od}}\right)
-  $$
-
-Interpretation: $v_{g,j}=1$ means “as viable as uninduced”; values below 1 indicate induction‑associated growth loss for that variant.
-
----
-
-### 4) Dose set used for scoring
-
-Exclude zero IPTG by default to avoid rewarding leakiness:
-
-$$S=\{j:\,dose_j>0\}$$
-
-
----
-
-### 5) Potency and final score (cumulative aggregation)
-
-We reward any observed sponging and, because the dose series is ascending, earlier turn‑on naturally accumulates more credit.
-
-**Potency (cumulative average across scoring doses):**
-
-  $$
-  P_g=\frac{1}{|S|}\sum_{j\in S} y_{g,j}
-  $$
-
-  This increases whenever any $y_{g,j}$ increases and is higher when a variant turns on at lower doses (since those doses also contribute at higher levels downstream).
-
-**Viability (average across scoring doses):**
-
-  $$
-  V_g=\frac{1}{|S|}\sum_{j\in S} v_{g,j}
-  $$
-
-**Final score** with viability weight $ \lambda\in[0,1] $:
-
-  $$
-  Score_g=P_g,\big((1-\lambda)+\lambda,V_g\big)
-  $$
-
-  $ \lambda=0 $ ignores viability. $ \lambda=1 $ scales potency by average viability. This is monotonic in RFP response and applies a tunable penalty when induced growth falls below the variant’s own zero‑IPTG baseline.
-
----
-
-### 6) Emissions
-
-**Per‑variant (`kind="run_pred"`):**
-
-* `pred__score_selected`: $Score_g$
-* `pred__y_per_dose`: $[y_{g,0},...,y_{g,J}]$
-* `qc__viability_per_dose`: $[v_{g,0},...,v_{g,J}]$
-* `qc__baselines`: $B_g$ and `$ \tilde Z_{pos,g} $
-
-**Per‑run (`kind="run_meta"`):**
-
-* `obj__name`: "spop_v1"
-* `selection__score_ref`: "pred__score_selected"
-* `obj__lambda`: $\lambda$
-* `obj__eps_od`: $\epsilon_{od}$
-* `obj__eps_pos`: $\epsilon_{pos}$
-* `obj__dose_vec`: original dose values (ascending, consistent units)
-* `qc__reference_strain_zero`: $ \tilde O_{ref,0} $ if used
-
----
-
-### 7) Defaults
-
-* $ \epsilon_{od}=10^{-8} $, $ \epsilon_{pos}=10^{-8} $
-* $ S=\{j:\,dose_j>0\} $ (exclude zero IPTG)
-* $ \lambda=0.5 $ (equal emphasis on potency and viability)
-* If a variant lacks aTc, use plate‑level $ \tilde Z_{pos} $ for that variant
-
----
-
-### 8) Edge cases and QC
-
-* Very small $ \tilde Z_{pos,g} $ can inflate ratios; rely on $ \epsilon_{pos} $ and flag for QC.
-* Near‑zero OD is guarded by $ \epsilon_{od}$ ($ v_{g,j} $ will be small, reducing the score when $ \lambda>0 $).
-* If no nonzero doses exist in $S$, scoring is undefined; emit null and flag.
-* Record which baselines were used ($B_g$ vs reference strain vs plate zero‑IPTG median).
-
----
-
-### 9) Pipeline summary
-
-1. **Plate to vectors.** Compute $\tilde O_{g,j}$, $\tilde R_{g,j}$, $\tilde Z_{g,j}$, the variant’s $\tilde Z_{pos,g}$, and the baseline $B_g$. Then compute \(y_{g,j}\) and \(v_{g,j}\).
-2. **Vectors to scalar.** Choose $S$; compute \(P_g\), \(V_g\), and \(Score_g\).
+Use `scalar_identity_v1/scalar` for generic scalar targets. Use `spop_v1/spop`
+when the scalar is specifically the Reader SPOP endpoint metric and the campaign
+should expose that semantic channel in ledgers, selection config, and review
+artifacts.

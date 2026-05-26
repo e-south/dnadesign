@@ -9,6 +9,7 @@ This page documents objective plugin wiring and channel reference rules. For det
 Source modules:
 
 - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
+- `src/dnadesign/opal/src/objectives/spop_v1.py`
 - `src/dnadesign/opal/src/objectives/scalar_identity_v1.py`
 - `src/dnadesign/opal/src/objectives/vector_channel_v1.py`
 - `src/dnadesign/opal/src/objectives/vector_target_similarity_v1.py`
@@ -44,6 +45,15 @@ Use when the model output is already a single scalar objective.
 - Uncertainty channels:
   - none
 
+### `spop_v1`
+
+Use when the model output is one Reader SPOP endpoint scalar.
+
+- Score channels:
+  - `spop_v1/spop` (maximize)
+- Uncertainty channels:
+  - none
+
 ### `vector_channel_v1`
 
 Use when a vector target should select on one declared channel.
@@ -65,7 +75,7 @@ Use when a vector target should select by closeness to a declared target vector.
 ### Objective detail pages
 
 - [SFXI behavior and math](sfxi.md)
-- [SPOP draft behavior and math](spop.md)
+- [SPOP scalar objective](spop.md)
 
 ### Common selection wiring examples
 
