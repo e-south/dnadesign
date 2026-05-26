@@ -314,6 +314,8 @@ def _ordinal_axis_audit_table(
                 ci_upper=ci_upper,
                 extra={
                     **axis_extra,
+                    "ordinal_metric_role": "spearman",
+                    "ordinal_metric_label": "Spearman",
                     "bootstrap_replicates": bootstrap_replicates,
                     "bootstrap_iterations": bootstrap_iterations,
                     **({"display_name": spearman_display_name} if spearman_display_name else {}),
@@ -328,6 +330,8 @@ def _ordinal_axis_audit_table(
                 metric_value=global_kendall,
                 extra={
                     **axis_extra,
+                    "ordinal_metric_role": "kendall",
+                    "ordinal_metric_label": "Kendall",
                     **({"display_name": kendall_display_name} if kendall_display_name else {}),
                 },
             )
@@ -364,6 +368,8 @@ def _ordinal_axis_audit_table(
                 ci_upper=ci_upper,
                 extra={
                     **axis_extra,
+                    "ordinal_metric_role": "balanced_spearman",
+                    "ordinal_metric_label": "Balanced Spearman",
                     "bootstrap_replicates": bootstrap_replicates,
                     "bootstrap_iterations": bootstrap_iterations,
                     **(
@@ -418,6 +424,8 @@ def _ordinal_axis_audit_table(
                     ci_upper=ci_upper,
                     extra={
                         **axis_extra,
+                        "ordinal_metric_role": "within_group_mean_spearman",
+                        "ordinal_metric_label": "Within-group Spearman",
                         "ordinal_within_group_column": outer_column,
                         "bootstrap_replicates": bootstrap_replicates,
                         "bootstrap_iterations": bootstrap_iterations,
@@ -453,6 +461,8 @@ def _ordinal_axis_audit_table(
                 metric_value=permutation_pvalue,
                 extra={
                     **axis_extra,
+                    "ordinal_metric_role": "permutation_pvalue",
+                    "ordinal_metric_label": "Permutation p-value",
                     **(
                         {"display_name": metric_label(metric_ids["permutation_pvalue"])}
                         if metric_label(metric_ids["permutation_pvalue"])

@@ -145,7 +145,10 @@ def _render_ordinal_swarm(
     median_points: list[tuple[float, float]] = []
     category_sizes: list[int] = []
     order_to_positions: dict[float, list[float]] = {}
-    max_points_per_category = 700
+    # Dense source overlays can contain thousands of rows per ordinal class.
+    # Keep the visual layer bounded while preserving all rows for the fitted
+    # statistics and endpoint summaries above.
+    max_points_per_category = 250
     for category in categories:
         category_rows = [
             row for row, row_category in zip(rows, category_values, strict=True) if row_category == category
@@ -178,7 +181,7 @@ def _render_ordinal_swarm(
         if order_value is not None:
             order_to_positions.setdefault(order_value, []).append(x_center)
         jitter = rng.uniform(-0.18, 0.18, size=plotted_values.size)
-        point_size = 36.0 if plotted_values.size == 1 else 24.0
+        point_size = 36.0 if plotted_values.size == 1 else 20.0
         ax.scatter(
             np.full(plotted_values.size, x_center, dtype=np.float32) + jitter,
             plotted_values,
@@ -251,7 +254,10 @@ def _render_ordinal_swarm(
     )
     ax.set_xlim(0.35, len(categories) + 0.65)
     rho = _finite_statistic(spearman_correlation(stat_x, stat_y, min_pairs=3))
-    tau_b = _finite_statistic(kendall_tau_b(stat_x, stat_y, min_pairs=3))
+    # The pure-Python Kendall implementation is quadratic in row count. Large
+    # review overlays keep Spearman/R2 on all rows and omit Kendall from the
+    # panel callout rather than blocking interactive notebook filtering.
+    tau_b = _finite_statistic(kendall_tau_b(stat_x, stat_y, min_pairs=3)) if len(stat_y) <= 1_500 else None
     r2 = _finite_statistic(linear_r2(stat_x, stat_y, min_pairs=3))
     if rho is not None:
         stat_label = f"Spearman ρ={rho:.2f}"

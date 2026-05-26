@@ -3268,6 +3268,13 @@ def test_sigma35_ordinal_audit_emits_confidence_intervals_for_spearman_summary_r
         "sig35_within_family_mean_spearman",
         "sig35_within_regulator_mean_spearman",
     }
+    assert {row["ordinal_metric_role"] for row in rows_table} == {
+        "spearman",
+        "kendall",
+        "balanced_spearman",
+        "permutation_pvalue",
+        "within_group_mean_spearman",
+    }
     for row in rows_table:
         if row["metric_id"] not in ci_metric_ids:
             continue
@@ -3451,6 +3458,12 @@ def test_ordinal_axes_audit_combines_multiple_ordered_metadata_axes(tmp_path: Pa
         "ordinal_axis_kendall",
         "ordinal_axis_balanced_spearman",
         "ordinal_axis_label_permutation_pvalue",
+    }
+    assert {row["ordinal_metric_role"] for row in rows_table} == {
+        "spearman",
+        "kendall",
+        "balanced_spearman",
+        "permutation_pvalue",
     }
 
 
@@ -3726,6 +3739,8 @@ def test_ordinal_ladder_rows_emit_sigma35_and_collection_strength_rows(tmp_path:
                 {
                     "group_id": "t7_w_collection_core60",
                     "label": "W collection core60",
+                    "source_value_column": "promoter_standard__strength_value_numeric",
+                    "source_value_label": "W collection measured strength",
                     "axis": {
                         "axis_id": "t7_w_collection_strength",
                         "label": "W collection strength",
@@ -3750,6 +3765,15 @@ def test_ordinal_ladder_rows_emit_sigma35_and_collection_strength_rows(tmp_path:
         "W1",
         "W9",
     }
+    source_values = {
+        row["ordinal_label"]: row["ordinal_source_value"]
+        for row in table_rows
+        if row["ordinal_group_id"] == "t7_w_collection_core60"
+    }
+    assert source_values == {"W1": 1.0, "W9": 9.0}
+    assert {
+        row["ordinal_source_value_label"] for row in table_rows if row["ordinal_group_id"] == "t7_w_collection_core60"
+    } == {"W collection measured strength"}
     assert all(row["ordinal_margin"] is not None for row in table_rows)
     assert artifact.stats["ordinal_group_count"] == 2
 

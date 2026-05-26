@@ -92,6 +92,9 @@ def metric_panel_grid_layout(
         columns = min(8, panel_count)
         rows = int(math.ceil(panel_count / columns))
         return rows, columns, (3.45 * columns, 3.55 * rows)
+    if plot_id == "rt_lnrna_overlay_ordinal_audit":
+        rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=False)
+        return rows, columns, (5.2 * columns, 5.25 * rows)
     if (prefer_single_row or plot_id == "representation_health_summary") and panel_count > 1:
         rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=True)
         figsize = _grid_figure_size(panel_count, square_panels=resolved_square_panels, prefer_single_row=True)
@@ -121,8 +124,11 @@ def plot_tight_layout_kwargs(
         kwargs["w_pad"] = 2.05
     if plot_id == "representation_health_summary":
         kwargs["w_pad"] = 1.85
-    if plot_id == "dataset_overview":
-        kwargs["w_pad"] = 1.2
+    if plot_id == "dataset_overview" or str(plot_id or "").endswith("_dataset_overview"):
+        kwargs["w_pad"] = 1.8
+    if plot_id == "rt_lnrna_overlay_ordinal_audit":
+        kwargs["w_pad"] = 1.75
+        kwargs["h_pad"] = 1.6
     if plot_id == "sigma35_ordinal_audit":
         kwargs["w_pad"] = 0.32
     if plot_id == "appendix_umap_gallery":

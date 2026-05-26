@@ -372,6 +372,55 @@ def test_xy_scatter_grid_preserves_full_axis_labels_per_panel(tmp_path: Path) ->
         plt.close(result.figure)
 
 
+def test_xy_scatter_grid_applies_first_notebook_filter_to_static_artifact(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "abundance_rows"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "assay_value": [1.0, 2.0, 1000.0],
+                "margin": [0.1, 0.2, 0.9],
+                "ordinal_group_id": ["khan_abundance", "khan_abundance", "crawford_abundance"],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "rt_lnrna_abundance_margin_scatter_gallery",
+            "kind": "xy_scatter_grid",
+            "scalar_ids": ["abundance_rows"],
+            "x_column": "assay_value",
+            "y_column": "margin",
+            "color_column": "ordinal_group_id",
+            "filter_options": [
+                {
+                    "column": "ordinal_group_id",
+                    "label": "Abundance source",
+                    "include_all": False,
+                    "values": [
+                        {"value": "khan_abundance", "label": "Khan PAGE RT-DNA abundance"},
+                        {"value": "crawford_abundance", "label": "Crawford Fig2 Eco1 msDNA score"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = render_xy_plot(
+        SimpleNamespace(output_root=tmp_path, config=SimpleNamespace(reference_sets={})),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        axis = result.figure.axes[0]
+        assert axis.get_xlim()[1] < 10.0
+    finally:
+        plt.close(result.figure)
+
+
 def test_xy_scatter_with_no_finite_rows_records_explicit_annotation_state(tmp_path: Path) -> None:
     scalar_dir = tmp_path / "scalars" / "fixture_scalar"
     scalar_dir.mkdir(parents=True)

@@ -534,6 +534,15 @@ def _ordinal_ladder_rows_table(
         for group_config in group_configs:
             group_id = str(_require_param(group_config, "group_id"))
             group_label = str(_optional_param(group_config, "label", default=humanize_label(group_id)))
+            source_value_column = str(_optional_param(group_config, "source_value_column", default="") or "")
+            source_value_label = str(
+                _optional_param(
+                    group_config,
+                    "source_value_label",
+                    default=humanize_label(source_value_column) if source_value_column else "",
+                )
+                or ""
+            )
             filters = [dict(value) for value in _optional_param(group_config, "where", default=[])]
             filtered_pairs = [
                 (index, row) for index, row in enumerate(candidate_sample.rows) if _row_matches_filters(row, filters)
@@ -583,6 +592,7 @@ def _ordinal_ladder_rows_table(
                 target_similarity = float(vector @ target_reference)
                 control_similarity = float(vector @ control_reference)
                 ordinal_margin = target_similarity - control_similarity
+                source_value = _coerce_float(row.get(source_value_column)) if source_value_column else None
                 rows.append(
                     {
                         **row,
@@ -601,6 +611,11 @@ def _ordinal_ladder_rows_table(
                             axis_value=axis_value,
                         ),
                         "ordinal_rank_value": float(axis.ranks[axis_value]),
+                        "ordinal_source_value": (
+                            float(source_value) if source_value is not None else float(axis.ranks[axis_value])
+                        ),
+                        "ordinal_source_value_column": source_value_column or axis.column,
+                        "ordinal_source_value_label": source_value_label or axis.label,
                         "ordinal_plot_order": int(plot_order[axis_value]),
                         "ordinal_margin": ordinal_margin,
                         "ordinal_target_values": ",".join(target_values),

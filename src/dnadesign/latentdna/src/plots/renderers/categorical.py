@@ -75,9 +75,10 @@ def _count_grid_size(
     square_count_panels: bool,
 ) -> tuple[float, float]:
     if square_count_panels and rows_count == 1:
-        return (4.0 * columns) + 0.35, 4.55
+        return (4.8 * columns) + 0.45, 4.9
     if square_count_panels:
-        return _grid_figure_size(panel_count, square_panels=True)
+        width, height = _grid_figure_size(panel_count, square_panels=True)
+        return width + (0.55 * columns), height
     return 6.6 * columns, 5.8 * rows_count
 
 
@@ -114,7 +115,12 @@ def _render_count_panel(
         linewidth=0.6,
         alpha=0.92,
     )
-    axis.set_yticks(y_positions, [_wrapped_tick_label(row[spec.column_column], width=22) for row in panel_rows])
+    tick_width = 18 if len(panel_rows) >= 4 else 22
+    axis.set_yticks(
+        y_positions,
+        [_wrapped_tick_label(row[spec.column_column], width=tick_width, max_lines=3) for row in panel_rows],
+    )
+    axis.tick_params(axis="y", labelsize=9.4 if len(panel_rows) >= 4 else 10.2, pad=4)
     axis.invert_yaxis()
     show_as_percent = spec.value_column in {"fraction", "percent"} or all(0.0 <= value <= 1.0 for value in values)
     axis.set_xlabel("Percent of N" if show_as_percent else humanize_display_text(spec.value_column or "row_count"))

@@ -470,6 +470,9 @@ def compact_candidate_title(value: object) -> str:
             "intermediate block",
             "intermediate embedding",
             "concat",
+            "lnrna span",
+            "rt cds span",
+            "span pair",
         )
     ):
         return text
@@ -477,12 +480,18 @@ def compact_candidate_title(value: object) -> str:
     compact = text
     replacements = [
         (r"\bEvo\s*2\b", ""),
-        (r"\b60\s*Bp Anchor\b", "60 bp"),
-        (r"\b1\s*Kb Construct Context\b", "1 kb ctx"),
-        (r"\b1\s*Kb Context\b", "1 kb ctx"),
-        (r"\b1\s*Kb Context Anchor Mean\b", "1 kb anchor mean"),
+        (r"\b60\s*bp Anchor\b", "60 bp"),
+        (r"\b1\s*kb Construct Context\b", "1 kb ctx"),
+        (r"\b1\s*kb Context\b", "1 kb ctx"),
+        (r"\b1\s*kb Context Anchor Mean\b", "1 kb anchor mean"),
+        (r"\b2,?000\s*bp\b", "2,000 bp"),
+        (r"\b384\s*bp Window In Construct Anchor Mean Bidir Concat\b", "384 bp span bidir"),
+        (r"\b1,?600\s*bp Window In Construct Anchor Mean Bidir Concat\b", "1,600 bp span bidir"),
+        (r"\blnRNA Span\b", "lnRNA span"),
+        (r"\bRT CDS Span\b", "RT CDS span"),
+        (r"\blnRNA \+ RT CDS Pair\b", "lnRNA+RT CDS pair"),
         (r"\bAnchor \+ Anchor-Mean Concat\b", "anchor + anchor-mean"),
-        (r"\bAnchor \+ 1\s*Kb Context Concat\b", "anchor + 1 kb ctx"),
+        (r"\bAnchor \+ 1\s*kb Context Concat\b", "anchor + 1 kb ctx"),
         (r"\bIntermediate Block Mean\b", "Block"),
         (r"\bIntermediate Embedding\b", "Block"),
         (r"\bOutput[- ]Layer Mean\b", "Output"),

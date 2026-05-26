@@ -54,8 +54,8 @@ class MetricPanelGridInput:
     groups: list[MetricPanelGroup]
 
 
-def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool) -> None:
-    if not ci_enabled:
+def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool, plot_id: str | None = None) -> None:
+    if not ci_enabled or plot_id == "rt_lnrna_overlay_ordinal_audit":
         return
     ax.text(
         0.012,
@@ -181,6 +181,7 @@ def metric_panel_prefers_horizontal_bars(plot_id: str | None) -> bool:
         "context_pair_summary",
         "context_robustness_summary",
         "representation_health_summary",
+        "rt_lnrna_overlay_ordinal_audit",
     }
 
 
@@ -455,7 +456,7 @@ def render_metric_panel(
         ax.set_xlabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
         ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         apply_axes_style(ax, grid=True, square=square)
-        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             render_placeholder_panel(
@@ -558,7 +559,7 @@ def render_metric_panel(
         ax.set_xlabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
         ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         apply_axes_style(ax, grid=True, square=square)
-        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             render_placeholder_panel(
@@ -781,7 +782,7 @@ def render_metric_panel(
     ax.set_ylabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
     ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
     apply_axes_style(ax, grid=True, square=square)
-    _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled)
+    _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
     ax.margins(x=0.02, y=0.02)
     if not finite_value_array.size:
         render_placeholder_panel(

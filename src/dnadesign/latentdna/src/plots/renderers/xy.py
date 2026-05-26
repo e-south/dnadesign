@@ -147,6 +147,21 @@ def _finite_xy_rows(
     ]
 
 
+def _default_static_filter(spec: ResolvedPlotSpec) -> tuple[str, str] | None:
+    for option in spec.filter_options:
+        if option.include_all or not option.values:
+            continue
+        return option.column, option.values[0].value
+    return None
+
+
+def _filter_rows(rows: list[dict[str, object]], *, column: str, value: str) -> list[dict[str, object]]:
+    filtered = [row for row in rows if str(row.get(column) or "") == value]
+    if not filtered:
+        raise ContractViolationError(f"plot filter {column!r}={value!r} matched no rows")
+    return filtered
+
+
 def render_xy_panel(
     axis: Any,
     rows: list[dict[str, object]],
@@ -287,6 +302,9 @@ def _render_single_xy(
         value_column=spec.value_column,
     )
     rows = read_table_rows(table_path)
+    default_filter = _default_static_filter(spec)
+    if default_filter is not None:
+        rows = _filter_rows(rows, column=default_filter[0], value=default_filter[1])
     figure, axis = pyplot.subplots(figsize=_grid_figure_size(1, square_panels=True))
     color_encoding = continuous_color_encoding(rows, spec, axis_styles=axis_styles)
     color_map, categories = (
@@ -419,7 +437,11 @@ def _render_xy_grid(
             y_column=spec.y_column,
             value_column=spec.value_column,
         )
-        scalar_tables.append((scalar_id, read_table_rows(table_path), resolved_x, resolved_y))
+        rows = read_table_rows(table_path)
+        default_filter = _default_static_filter(spec)
+        if default_filter is not None:
+            rows = _filter_rows(rows, column=default_filter[0], value=default_filter[1])
+        scalar_tables.append((scalar_id, rows, resolved_x, resolved_y))
 
     prefer_single_row = _prefer_single_row_panel_layout(
         spec.plot_id,

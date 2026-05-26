@@ -23,7 +23,7 @@ from ..contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..metadata.axes import axis_display_text, axis_style_map_from_payload
 from ..plots.layout import _grid_figure_size as static_grid_figure_size
 from ..plots.layout import _panel_grid_dimensions as static_panel_grid_dimensions
-from ..plots.layout import metric_panel_grid_layout
+from ..plots.layout import metric_panel_grid_layout, plot_tight_layout_kwargs
 from ..plots.panels import render_placeholder_panel
 from ..plots.renderers.curve import render_curve_panel
 from ..plots.renderers.distribution import derived_panel_label, render_distribution_panel
@@ -1078,7 +1078,7 @@ def _render_metric_grid(
         rect=(0.0, legend_bottom, 1.0, 1.0),
         pad=0.95,
         h_pad=1.4,
-        w_pad=1.85 if spec.plot_id == "representation_health_summary" else 0.95,
+        w_pad=1.85 if spec.plot_id in {"representation_health_summary", "rt_lnrna_overlay_ordinal_audit"} else 0.95,
     )
     return render_matplotlib_figure(fig, alt=alt_text)
 
@@ -1206,7 +1206,7 @@ def _render_distribution_grid(
         if spec.hide_repeated_y_axis and spec.render_mode != "ordinal_swarm" and panel_index % columns != 0:
             axis.set_ylabel("")
             axis.set_yticklabels([])
-    fig.tight_layout(pad=0.95, h_pad=1.4, w_pad=0.95)
+    fig.tight_layout(**plot_tight_layout_kwargs(spec.plot_id, legend_bottom=0.0))
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
@@ -1317,9 +1317,13 @@ def _render_categorical_count_grid(
         rows_count,
         columns,
         figsize=(
-            ((4.0 * columns) + 0.35, 4.55)
+            ((4.8 * columns) + 0.45, 4.9)
             if square_count_panels and rows_count == 1
-            else static_grid_figure_size(len(panel_values), square_panels=True)
+            else (
+                (lambda size: (size[0] + (0.55 * columns), size[1]))(
+                    static_grid_figure_size(len(panel_values), square_panels=True)
+                )
+            )
             if square_count_panels
             else (7.2 * columns, 3.85 * rows_count)
         ),
@@ -1340,7 +1344,11 @@ def _render_categorical_count_grid(
         if "order" in panel_frame.columns:
             panel_frame = panel_frame.sort_values("order", kind="stable")
 
-        labels = [humanize_display_text(value) for value in panel_frame[spec.column_column].tolist()]
+        label_width = 18 if len(panel_frame) >= 4 else 22
+        labels = [
+            wrap_plot_title(humanize_display_text(value), width=label_width, max_lines=3)
+            for value in panel_frame[spec.column_column].tolist()
+        ]
         values = pd.to_numeric(panel_frame[spec.value_column], errors="coerce").fillna(0.0).to_numpy(dtype=float)
         y_positions = np.arange(len(panel_frame), dtype=float)
         color_map = notebook_category_color_map(labels)
@@ -1355,6 +1363,7 @@ def _render_categorical_count_grid(
             alpha=0.92,
         )
         axis.set_yticks(y_positions, labels)
+        axis.tick_params(axis="y", labelsize=9.4 if len(panel_frame) >= 4 else 10.2, pad=4)
         axis.invert_yaxis()
         axis.set_ylabel("")
         axis.set_xlabel("Percent of N")
@@ -1396,8 +1405,6 @@ def _render_categorical_count_grid(
             )
 
     fig.tight_layout(
-        pad=0.95,
-        h_pad=1.5,
-        w_pad=1.2 if square_count_panels and rows_count == 1 else 0.95,
+        **plot_tight_layout_kwargs(str(spec.plot_id), legend_bottom=0.0),
     )
     return render_matplotlib_figure(fig, alt=alt_text)
