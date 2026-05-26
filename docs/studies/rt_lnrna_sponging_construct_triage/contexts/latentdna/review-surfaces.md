@@ -40,7 +40,7 @@ in `../../record/status.md`.
 UMAP coordinates are orientation/review surfaces only. Candidate-X selection
 uses high-dimensional scalar summaries: representation health, RT-native
 source/design structure, Khan/Crawford source-scoped abundance ordinal signal,
-slot/context robustness, and dimensional cost.
+span/context robustness, and dimensional cost.
 
 Reference overlays are row-identifiable. The first RT sets cover GenBank
 catalog rows, source-family anchors, MSD compiler landmarks, Khan

@@ -483,6 +483,9 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert ordinal_audit.kind == "metric_panel_grid"
     assert ordinal_audit.visibility_tier == "primary"
     assert ordinal_audit.scalar == "rt_lnrna_overlay_ordinal_audit_metrics"
+    assert ordinal_audit.facet_column == "ordinal_metric_role"
+    assert ordinal_audit.panel_title_column == "ordinal_metric_label"
+    assert ordinal_audit.color_column == "ordinal_axis_id"
     assert abundance_ladder.kind == "distribution_grid"
     assert abundance_ladder.visibility_tier == "primary"
     assert list(abundance_ladder.scalars) == [
@@ -497,6 +500,8 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert list(abundance_scatter.scalars) == [
         f"rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
     ]
+    assert abundance_scatter.x_column == "ordinal_source_value"
+    assert [option.column for option in abundance_scatter.filter_options] == ["ordinal_group_id"]
     assert context_summary.kind == "metric_panel_grid"
     assert context_summary.scalar == "rt_lnrna_slot_context_robustness_summary_metrics"
     assert slot_scatter.kind == "xy_scatter_grid"

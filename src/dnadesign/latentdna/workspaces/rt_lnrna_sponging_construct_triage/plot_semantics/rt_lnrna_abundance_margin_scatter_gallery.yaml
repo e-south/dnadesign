@@ -1,16 +1,17 @@
 plot_id: rt_lnrna_abundance_margin_scatter_gallery
-question: How do source-scoped abundance ordinal ranks relate to row-level abundance endpoint margins?
+question: How do source-scoped abundance assay values relate to row-level abundance endpoint margins?
 decision_role: primary
-encoding: XY scatter grids with abundance ordinal rank on x and endpoint margin on y, colored by abundance source or cohort metadata.
+encoding: XY scatter grids with abundance assay value on x and endpoint margin on y, colored by abundance source or cohort metadata.
 scope: Khan and Crawford source-scoped ordinal ladder rows for all RT-lnRNA intermediate and output-layer views.
 guardrails:
   - Khan and Crawford values are source-scoped and must not be merged into one abundance scale.
   - Row-level margins are exploratory evidence and should be read with the ordinal audit summary.
-caption: Source-scoped abundance rank versus latent endpoint margin across RT-lnRNA views.
-alt_text: Scatter gallery comparing abundance ordinal rank and endpoint margin for Khan and Crawford source-scoped abundance rows across RT-lnRNA representation views.
+caption: Source-scoped abundance assay value versus latent endpoint margin across RT-lnRNA views.
+alt_text: Scatter gallery comparing abundance assay value and endpoint margin for Khan and Crawford source-scoped abundance rows across RT-lnRNA representation views.
 preprocessing_md: Reuses persisted ordinal-ladder row scalars built from view-standardized, row-normalized representation matrices.
 math_md: |
+  The x axis is the source assay value: Khan PAGE RT-DNA abundance normalized to Eco1 or Crawford Fig2 Eco1 msDNA score relative to mean WT. The scales are source-scoped and should not be pooled.
   The y axis is \(m(x)=\cos(z_x,c_\mathrm{high})-\cos(z_x,c_\mathrm{low})\), using source-specific high and low abundance endpoint centroids.
 rationale_md: Makes the row-level abundance ladder behavior inspectable before candidate-X synthesis.
 limitations_md: Sparse Khan rows and source-specific Crawford cohorts can make row-level patterns noisy.
-failure_modes_md: Misconfigured source filters or ordinal bins can invert or flatten the margin pattern.
+failure_modes_md: Misconfigured source filters or ordinal groups can invert or flatten the margin pattern.

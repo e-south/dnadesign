@@ -1,17 +1,17 @@
 plot_id: appendix_umap_gallery
-question: How do the construct, slot, slot-pair, and output-layer RT-lnRNA representation views distribute in persisted UMAP coordinates?
+question: How do the construct, span, paired-span, and output-layer RT-lnRNA representation views distribute in persisted UMAP coordinates?
 decision_role: appendix
-encoding: Multi-panel persisted UMAP scatter gallery with hue controls for construct metadata plus Khan and Crawford abundance-prior overlays.
+encoding: Multi-panel persisted UMAP scatter gallery with hue controls for construct metadata plus Khan and Crawford abundance overlays.
 scope: >-
   The gallery covers the four derived intermediate views and their four
-  output-layer mean companions: full 2,000 bp forward/RC concat, lnRNA slot,
-  RT CDS slot, and lnRNA plus RT slot-pair concat.
+  output-layer mean companions: full 2,000 bp forward/RC concat, lnRNA span,
+  RT CDS span, and lnRNA + RT CDS pair concat.
 guardrails:
   - Use UMAP for orientation and overlay inspection, not as the OPAL X selector.
   - Hue changes recolor fixed coordinates and do not refit the projection.
   - Interpret output-layer mean panels as diagnostics unless a later review explicitly promotes them.
 caption: Appendix UMAP gallery for RT-lnRNA Evo2 7B intermediate and output-layer representation views.
-alt_text: Eight-panel UMAP gallery showing full construct, lnRNA-slot, RT-slot, slot-pair, and output-layer RT-lnRNA representation views with construct and source-overlay hue controls.
+alt_text: Eight-panel UMAP gallery showing full construct, lnRNA span, RT CDS span, paired-span, and output-layer RT-lnRNA representation views with construct and source-overlay hue controls.
 preprocessing_md: Uses persisted projection artifacts fit from materialized LatentDNA view matrices. Forward and reverse-complement blocks are normalized before concatenation for the bidirectional views.
 math_md: |
   The plotted coordinates are UMAP embeddings of each declared view matrix. The high-dimensional representation remains the source of record; UMAP coordinates are a nonlinear two-dimensional diagnostic.

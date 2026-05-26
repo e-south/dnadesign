@@ -3,8 +3,8 @@ question: Do the four intermediate candidate-X views preserve RT-native source a
 decision_role: primary
 encoding: Metric-panel grid of centroid separation ratios over RT-native source, overlay, compiler, RT-DMS, and regime cohorts.
 scope: >-
-  The four intermediate candidate-X views: full construct, lnRNA slot, RT CDS
-  slot, and lnRNA plus RT slot-pair.
+  The four intermediate candidate-X views: full construct, lnRNA span, RT CDS
+  span, and lnRNA + RT CDS pair.
 guardrails:
   - These axes are source/design overlays, not assay labels.
   - Khan and Crawford overlay statuses remain separate source-scoped cohorts.

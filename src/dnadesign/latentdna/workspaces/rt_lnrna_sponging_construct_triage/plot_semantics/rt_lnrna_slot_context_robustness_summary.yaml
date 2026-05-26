@@ -1,16 +1,16 @@
 plot_id: rt_lnrna_slot_context_robustness_summary
-question: How stable are aligned full-construct, slot, slot-pair, forward/RC, and output-layer relationships?
+question: How stable are aligned full-construct, span, paired-span, forward/RC, and output-layer relationships?
 decision_role: primary
 encoding: Metric-panel grid of aligned row cosine stability and cohort-retention correlations.
-scope: Aligned RT-lnRNA full 2,000 bp, lnRNA-slot, RT CDS-slot, slot-pair, forward/RC, and output-layer companion views.
+scope: Aligned RT-lnRNA full 2,000 bp, lnRNA span, RT CDS span, paired-span, forward/RC, and output-layer companion views.
 guardrails:
   - Compare only aligned rows with matching vector dimensions.
   - Intermediate-versus-output consistency requires a separate reduced-space bridge and is not inferred from this panel.
-caption: RT-lnRNA slot/context robustness summary across aligned representation views.
-alt_text: Metric grid showing context self-cosine and cohort-retention metrics for aligned full, slot, slot-pair, forward/reverse, and output-layer RT-lnRNA views.
+caption: RT-lnRNA span/context robustness summary across aligned representation views.
+alt_text: Metric grid showing context self-cosine and cohort-retention metrics for aligned full, span, paired-span, forward/reverse, and output-layer RT-lnRNA views.
 preprocessing_md: Uses persisted alignment artifacts and row-normalized matrices, with stratified sampling by candidate source where configured.
 math_md: |
   Row stability is the median \(\sum_i \hat z_i^\mathrm{anchor}\hat z_i^\mathrm{context}\). Cohort retention is the Pearson correlation between aligned cohort centroid-distance vectors.
-rationale_md: Tests whether a candidate representation is stable under the slot-structured RT-lnRNA context before OPAL handoff.
+rationale_md: Tests whether a candidate representation is stable under the span-structured RT-lnRNA context before OPAL handoff.
 limitations_md: This first pass compares same-dimensional view pairs and does not directly compare intermediate embeddings to output-layer means.
 failure_modes_md: Missing or stale alignments can produce empty context audits or misleading direct comparisons.

@@ -544,7 +544,7 @@ metadata:
   axes:
     khan_abundance_ordinal_bin:
       column: khan_abundance_ordinal_bin
-      label: Khan RT-DNA abundance prior bin
+      label: Khan PAGE RT-DNA abundance group
       kind: ordinal
       category_order: [nondetect, low, medium, high, very_high]
       display_labels:
@@ -560,7 +560,7 @@ metadata:
         khan_abundance_label_permutation_pvalue: Khan abundance permutation p-value
     crawford_abundance_ordinal_bin:
       column: crawford_abundance_ordinal_bin
-      label: Crawford msDNA abundance prior bin
+      label: Crawford Fig2 Eco1 msDNA score group
       kind: ordinal
       category_order: [very_low, low, medium, high, very_high]
       display_labels:
@@ -577,7 +577,7 @@ metadata:
 metric_definitions:
   khan_abundance_ordinal_spearman:
     display_name: Khan abundance ordinal Spearman
-    mathematical_definition: Spearman correlation between source-scoped Khan abundance-prior rank gaps and observed centroid cosine-distance gaps.
+    mathematical_definition: Spearman correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -585,7 +585,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   khan_abundance_ordinal_kendall:
     display_name: Khan abundance ordinal Kendall
-    mathematical_definition: Kendall tau correlation between source-scoped Khan abundance-prior rank gaps and observed centroid cosine-distance gaps.
+    mathematical_definition: Kendall tau correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -593,7 +593,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   khan_abundance_balanced_ordinal_spearman:
     display_name: Balanced Khan abundance ordinal Spearman
-    mathematical_definition: Spearman correlation between source-scoped Khan abundance-prior rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
+    mathematical_definition: Spearman correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -601,7 +601,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   khan_abundance_label_permutation_pvalue:
     display_name: Khan abundance permutation p-value
-    mathematical_definition: Two-sided permutation p-value for the global Khan abundance ordinal Spearman statistic under shuffled source-scoped Khan abundance ranks.
+    mathematical_definition: Two-sided permutation p-value for the global Khan abundance ordinal Spearman statistic under shuffled source-scoped Khan PAGE RT-DNA abundance groups.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: p_value
@@ -609,7 +609,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   crawford_abundance_ordinal_spearman:
     display_name: Crawford abundance ordinal Spearman
-    mathematical_definition: Spearman correlation between source-scoped Crawford abundance-prior rank gaps and observed centroid cosine-distance gaps.
+    mathematical_definition: Spearman correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -617,7 +617,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   crawford_abundance_ordinal_kendall:
     display_name: Crawford abundance ordinal Kendall
-    mathematical_definition: Kendall tau correlation between source-scoped Crawford abundance-prior rank gaps and observed centroid cosine-distance gaps.
+    mathematical_definition: Kendall tau correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -625,7 +625,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   crawford_abundance_balanced_ordinal_spearman:
     display_name: Balanced Crawford abundance ordinal Spearman
-    mathematical_definition: Spearman correlation between source-scoped Crawford abundance-prior rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
+    mathematical_definition: Spearman correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: correlation
@@ -633,7 +633,7 @@ metric_definitions:
     aggregation_level: candidate_summary
   crawford_abundance_label_permutation_pvalue:
     display_name: Crawford abundance permutation p-value
-    mathematical_definition: Two-sided permutation p-value for the global Crawford abundance ordinal Spearman statistic under shuffled source-scoped Crawford abundance ranks.
+    mathematical_definition: Two-sided permutation p-value for the global Crawford abundance ordinal Spearman statistic under shuffled source-scoped Crawford Fig2 Eco1 msDNA score groups.
     metric_family: ordinal_structure
     evidence_tier: primary
     unit: p_value
@@ -1063,7 +1063,7 @@ reference_sets:
 candidate_sets:
   rt_lnrna_construct_gallery_v1:
     label: RT-lnRNA construct representation gallery
-    description: Full-construct, lnRNA-slot, RT-slot, and slot-pair Evo2 7B intermediate plus output-layer mean views.
+    description: Full-construct, lnRNA span, RT CDS span, and paired-span Evo2 7B intermediate plus output-layer mean views.
     views:
       - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
       - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
@@ -1075,13 +1075,13 @@ candidate_sets:
       - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
       intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp intermediate
-      intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA-slot intermediate
-      intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS-slot intermediate
-      intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA plus RT slot-pair intermediate
+      intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span intermediate
+      intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span intermediate
+      intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair intermediate
       output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp output layer
-      output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA-slot output layer
-      output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS-slot output layer
-      output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA plus RT slot-pair output layer
+      output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span output layer
+      output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span output layer
+      output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair output layer
   rt_lnrna_output_layer_diagnostics_v1:
     label: RT-lnRNA output-layer diagnostics
     description: Companion Evo2 7B output-layer mean views for appendix geometry and collapse diagnostics.
@@ -1102,7 +1102,7 @@ plots:
   rt_lnrna_dataset_overview:
     kind: categorical_count
     visibility_tier: primary
-    single_row_panels: true
+    single_row_panels: false
     square_panels: true
     scalar: rt_lnrna_dataset_overview_counts
     category_column: dimension
@@ -1161,29 +1161,29 @@ plots:
       - pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
       - Full 2,000 bp intermediate
-      - lnRNA-slot intermediate
-      - RT CDS-slot intermediate
-      - lnRNA plus RT slot-pair intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
       - Full 2,000 bp output layer
-      - lnRNA-slot output layer
-      - RT CDS-slot output layer
-      - lnRNA plus RT slot-pair output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
     semantics_ref: plot_semantics/representation_scree_diagnostic.yaml
   rt_lnrna_overlay_ordinal_audit:
     kind: metric_panel_grid
     visibility_tier: primary
     scalar: rt_lnrna_overlay_ordinal_audit_metrics
-    facet_column: ordinal_axis_id
-    panel_title_column: ordinal_axis_label
+    facet_column: ordinal_metric_role
+    panel_title_column: ordinal_metric_label
     category_column: label
     label_column: candidate_label
     value_column: metric_value
     ci_lower_column: ci_lower
     ci_upper_column: ci_upper
-    color_column: candidate_family
+    color_column: ordinal_axis_id
     direction_column: direction
     unit_column: unit
-    sort_rule: panel_direction
+    sort_rule: candidate_order
     measure_kind: metric
     value_kind: score
     value_label: Ordinal geometry statistic
@@ -1204,7 +1204,7 @@ plots:
       - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
       - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     metric_columns: [ordinal_margin]
-    x_axis_label: '$r_{\mathrm{abund}}(x)$ low$\to$high abundance bin'
+    x_axis_label: '$r_{\mathrm{abund}}(x)$ low$\to$high abundance group'
     y_axis_label: '$m_{\mathrm{abund}}(x)=\cos(z_x,c_{\mathrm{high}})-\cos(z_x,c_{\mathrm{low}})$'
     color_column: ordinal_label
     render_mode: ordinal_swarm
@@ -1213,17 +1213,17 @@ plots:
         label: Abundance source
         include_all: false
         values:
-          - {value: khan_abundance, label: Khan RT-DNA abundance prior}
-          - {value: crawford_abundance, label: Crawford Eco1 msDNA abundance prior}
+          - {value: khan_abundance, label: Khan PAGE RT-DNA abundance}
+          - {value: crawford_abundance, label: Crawford Fig2 Eco1 msDNA score}
     panel_titles:
       - Full 2,000 bp intermediate
-      - lnRNA-slot intermediate
-      - RT CDS-slot intermediate
-      - lnRNA plus RT slot-pair intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
       - Full 2,000 bp output layer
-      - lnRNA-slot output layer
-      - RT CDS-slot output layer
-      - lnRNA plus RT slot-pair output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
     semantics_ref: plot_semantics/rt_lnrna_abundance_margin_ladder_gallery.yaml
   rt_lnrna_abundance_margin_scatter_gallery:
     kind: xy_scatter_grid
@@ -1232,22 +1232,29 @@ plots:
     scalars: *rt_lnrna_abundance_ladder_rows_scalars
     panel_titles:
       - Full 2,000 bp intermediate
-      - lnRNA-slot intermediate
-      - RT CDS-slot intermediate
-      - lnRNA plus RT slot-pair intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
       - Full 2,000 bp output layer
-      - lnRNA-slot output layer
-      - RT CDS-slot output layer
-      - lnRNA plus RT slot-pair output layer
-    x_column: ordinal_rank_value
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    x_column: ordinal_source_value
     y_column: ordinal_margin
-    x_axis_label: Source-scoped abundance ordinal rank
+    x_axis_label: Source assay value (source-scoped)
     y_axis_label: Abundance endpoint margin
     default_hue: ordinal_group_id
     hue_options:
       - {column: ordinal_group_id, label: Abundance source, type: categorical}
-      - {column: ordinal_axis_value, label: Abundance bin, type: ordinal}
+      - {column: ordinal_axis_value, label: Abundance group, type: ordinal}
       - {column: candidate_source, label: Candidate source, type: categorical}
+    filter_options:
+      - column: ordinal_group_id
+        label: Abundance source
+        include_all: false
+        values:
+          - {value: khan_abundance, label: Khan PAGE RT-DNA abundance}
+          - {value: crawford_abundance, label: Crawford Fig2 Eco1 msDNA score}
     semantics_ref: plot_semantics/rt_lnrna_abundance_margin_scatter_gallery.yaml
   rt_lnrna_slot_context_robustness_summary:
     kind: metric_panel_grid
@@ -1277,9 +1284,9 @@ plots:
       - rt_lnrna_slot_delta_intermediate_lnrna_rt
       - rt_lnrna_slot_delta_intermediate_full_fwd_rc
     panel_titles:
-      - Full 2,000 bp vs lnRNA slot
-      - Full 2,000 bp vs RT CDS slot
-      - lnRNA slot vs RT CDS slot
+      - Full 2,000 bp vs lnRNA span
+      - Full 2,000 bp vs RT CDS span
+      - lnRNA span vs RT CDS span
       - Full forward vs reverse complement
     x_column: context_self_cosine
     y_column: context_shift_l2
@@ -1306,9 +1313,9 @@ plots:
     label_column: frontier_label
     label_values:
       - Full 2,000 bp
-      - lnRNA slot
-      - RT CDS slot
-      - lnRNA plus RT slot pair
+      - lnRNA span
+      - RT CDS span
+      - lnRNA + RT CDS pair
     semantics_ref: plot_semantics/rt_lnrna_candidate_decision_frontier.yaml
   rt_lnrna_candidate_x_scorecard:
     kind: metric_panel_grid
@@ -1341,13 +1348,13 @@ plots:
       - umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
       - Full 2,000 bp intermediate
-      - lnRNA-slot intermediate
-      - RT CDS-slot intermediate
-      - lnRNA plus RT slot-pair intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
       - Full 2,000 bp output layer
-      - lnRNA-slot output layer
-      - RT CDS-slot output layer
-      - lnRNA plus RT slot-pair output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
     default_hue: candidate_source
     hue_options:
       - {column: candidate_source, label: Candidate source, type: categorical}
@@ -1359,10 +1366,10 @@ plots:
       - {column: rt_variant_class, label: RT variant class, type: categorical}
       - {column: rt_dms_mutation_class, label: RT-DMS mutation class, type: categorical}
       - {column: template_name, label: Template, type: categorical}
-      - {column: khan_abundance_normalized_value, label: Khan abundance prior, type: continuous, scale: panel}
-      - {column: khan_abundance_ordinal_bin, label: Khan abundance bin, type: ordinal}
-      - {column: crawford_abundance_raw_value, label: Crawford source value, type: continuous, scale: panel}
-      - {column: crawford_abundance_ordinal_bin, label: Crawford abundance bin, type: ordinal}
+      - {column: khan_abundance_normalized_value, label: Khan PAGE RT-DNA abundance, type: continuous, scale: panel}
+      - {column: khan_abundance_ordinal_bin, label: Khan abundance group, type: ordinal}
+      - {column: crawford_abundance_raw_value, label: Crawford Fig2 Eco1 msDNA score, type: continuous, scale: panel}
+      - {column: crawford_abundance_ordinal_bin, label: Crawford score group, type: ordinal}
       - {column: crawford_design_reference_status, label: Crawford design reference, type: categorical}
     annotation:
       reference_set: reference_genbank_catalog_rows
@@ -1372,7 +1379,7 @@ notebooks:
   latent_geometry_browser:
     kind: workspace
     title: RT-lnRNA latent geometry browser
-    description: Read-only QC browser for dual-cassette construct, lnRNA-slot, RT-slot, and slot-pair Evo2 7B views.
+    description: Read-only QC browser for dual-cassette construct, lnRNA span, RT CDS span, and paired-span Evo2 7B views.
     default_deliverable: representation_health_summary
     default_surface: plots
     candidate_sets:
@@ -1403,13 +1410,13 @@ notebooks:
       - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     candidate_grid_panel_titles:
       - Full 2,000 bp intermediate
-      - lnRNA-slot intermediate
-      - RT CDS-slot intermediate
-      - lnRNA plus RT slot-pair intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
       - Full 2,000 bp output layer
-      - lnRNA-slot output layer
-      - RT CDS-slot output layer
-      - lnRNA plus RT slot-pair output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
     show_missing_projection_placeholders: false
     preferred_hues:
       - candidate_source
@@ -1465,13 +1472,13 @@ notebooks:
           - reference_khan_abundance_rows
           - reference_crawford_high_abundance_examples
           - reference_crawford_low_abundance_examples
-      - label: Crawford abundance bin
+      - label: Crawford score group
         column: crawford_abundance_ordinal_bin
         type: ordinal
         reference_set_ids:
           - reference_crawford_high_abundance_examples
           - reference_crawford_low_abundance_examples
-      - label: Khan abundance bin
+      - label: Khan abundance group
         column: khan_abundance_ordinal_bin
         type: ordinal
         reference_set_ids:
@@ -1740,7 +1747,7 @@ recipes:
             - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
           axes:
             - axis_id: khan_abundance
-              label: Khan RT-DNA abundance prior
+              label: Khan PAGE RT-DNA abundance group
               column: khan_abundance_ordinal_bin
               order_path: study_inputs/khan_abundance_order.yaml
               metric_ids:
@@ -1749,7 +1756,7 @@ recipes:
                 balanced_spearman: khan_abundance_balanced_ordinal_spearman
                 permutation_pvalue: khan_abundance_label_permutation_pvalue
             - axis_id: crawford_abundance
-              label: Crawford Eco1 msDNA abundance prior
+              label: Crawford Fig2 Eco1 msDNA score group
               column: crawford_abundance_ordinal_bin
               order_path: study_inputs/crawford_abundance_order.yaml
               metric_ids:
@@ -1766,20 +1773,24 @@ recipes:
           kind: ordinal_ladder_rows
           groups: &rt_lnrna_abundance_ladder_rows_groups
             - group_id: khan_abundance
-              label: Khan RT-DNA abundance prior
+              label: Khan PAGE RT-DNA abundance
+              source_value_column: khan_abundance_normalized_value
+              source_value_label: Khan PAGE RT-DNA abundance vs Eco1
               axis:
                 axis_id: khan_abundance
-                label: Khan RT-DNA abundance prior
+                label: Khan PAGE RT-DNA abundance group
                 column: khan_abundance_ordinal_bin
                 order_path: study_inputs/khan_abundance_order.yaml
                 stronger_rank: max
               where:
                 - {column: khan_abundance_overlay_status, equals: abundance_affiliated}
             - group_id: crawford_abundance
-              label: Crawford Eco1 msDNA abundance prior
+              label: Crawford Fig2 Eco1 msDNA score
+              source_value_column: crawford_abundance_raw_value
+              source_value_label: Crawford Fig2 Eco1 msDNA score vs mean WT
               axis:
                 axis_id: crawford_abundance
-                label: Crawford Eco1 msDNA abundance prior
+                label: Crawford Fig2 Eco1 msDNA score group
                 column: crawford_abundance_ordinal_bin
                 order_path: study_inputs/crawford_abundance_order.yaml
                 stronger_rank: max
@@ -1951,15 +1962,15 @@ recipes:
             - {axis_id: abundance_affiliation, column: abundance_affiliation, metric_id: abundance_affiliation_retention_correlation, label: Abundance-affiliation retention}
             - {axis_id: rt_variant_class, column: rt_variant_class, metric_id: rt_variant_class_retention_correlation, label: RT variant-class retention, exclude_values: [variant_class_unassigned]}
           pairs:
-            - {pair_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Intermediate: full 2,000 bp vs lnRNA slot", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
-            - {pair_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: lnRNA slot vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
-            - {pair_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: RT CDS slot vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_rt_slot, anchor_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
-            - {pair_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Intermediate: lnRNA slot vs RT CDS slot", alignment_id: rt_lnrna_intermediate_lnrna_slot_to_rt_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Intermediate: full 2,000 bp vs lnRNA span", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: lnRNA span vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: RT CDS span vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_rt_slot, anchor_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Intermediate: lnRNA span vs RT CDS span", alignment_id: rt_lnrna_intermediate_lnrna_slot_to_rt_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
             - {pair_id: rt_lnrna_intermediate_forward_reverse_stability, label: "Intermediate: full forward vs reverse complement", alignment_id: rt_lnrna_intermediate_full_forward_to_reverse_complement, anchor_view_id: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean}
-            - {pair_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Output layer: full 2,000 bp vs lnRNA slot", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
-            - {pair_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: lnRNA slot vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
-            - {pair_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: RT CDS slot vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_rt_slot, anchor_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
-            - {pair_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Output layer: lnRNA slot vs RT CDS slot", alignment_id: rt_lnrna_output_lnrna_slot_to_rt_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Output layer: full 2,000 bp vs lnRNA span", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: lnRNA span vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: RT CDS span vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_rt_slot, anchor_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Output layer: lnRNA span vs RT CDS span", alignment_id: rt_lnrna_output_lnrna_slot_to_rt_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
             - {pair_id: rt_lnrna_output_forward_reverse_stability, label: "Output layer: full forward vs reverse complement", alignment_id: rt_lnrna_output_full_forward_to_reverse_complement, anchor_view_id: output_layer_mean_7b_dual_cassette_2000bp_seq_mean, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean}
       - id: build_rt_lnrna_candidate_decision_frontier_metrics
         op: scalar.build
@@ -1993,9 +2004,9 @@ recipes:
             - {candidate_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, pair_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
           annotation_labels:
             - {candidate_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Full 2,000 bp"}
-            - {candidate_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "lnRNA slot"}
-            - {candidate_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "RT CDS slot"}
-            - {candidate_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "lnRNA plus RT slot pair"}
+            - {candidate_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "lnRNA span"}
+            - {candidate_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "RT CDS span"}
+            - {candidate_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "lnRNA + RT CDS pair"}
       - id: build_rt_lnrna_candidate_x_scorecard_metrics
         op: scalar.build
         depends_on:
@@ -2190,8 +2201,8 @@ deliverables:
   rt_lnrna_overlay_ordinal_audit:
     title: RT-lnRNA overlay ordinal audit
     section: primary
-    question: Do Khan and Crawford abundance-prior overlays form coherent ordered axes in each representation view?
-    summary: Ordered metadata-axis audit for Khan RT-DNA and Crawford Eco1 msDNA abundance priors.
+    question: Do Khan and Crawford source-scoped abundance groups form coherent ordered axes in each representation view?
+    summary: Ordered metadata-axis audit for Khan PAGE RT-DNA abundance and Crawford Fig2 Eco1 msDNA scores.
     recipe: rt_lnrna_representation_review_recipe
     requires:
       views:
@@ -2218,10 +2229,10 @@ deliverables:
       - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_overlay_ordinal_audit
     acceptance_checks: []
   rt_lnrna_slot_context_robustness_summary:
-    title: RT-lnRNA slot and context robustness summary
+    title: RT-lnRNA span and context robustness summary
     section: primary
-    question: How stable are aligned full-construct, lnRNA-slot, RT-slot, slot-pair, forward/RC, and output-layer relationships?
-    summary: Aligned representation robustness metrics for the slot-structured RT-lnRNA construct population.
+    question: How stable are aligned full-construct, lnRNA span, RT CDS span, paired-span, forward/RC, and output-layer relationships?
+    summary: Aligned representation robustness metrics for the span-structured RT-lnRNA construct population.
     recipe: rt_lnrna_representation_review_recipe
     requires:
       alignments:
@@ -2271,7 +2282,7 @@ deliverables:
   appendix_umap_gallery:
     title: RT-lnRNA appendix UMAP gallery
     section: appendix
-    question: How do the construct, slot, slot-pair, and output-layer representation views distribute in persisted UMAP coordinates?
+    question: How do the construct, span, paired-span, and output-layer representation views distribute in persisted UMAP coordinates?
     summary: Appendix UMAP projection grid with Khan/Crawford overlay hue controls.
     recipe: rt_lnrna_representation_review_recipe
     requires:
