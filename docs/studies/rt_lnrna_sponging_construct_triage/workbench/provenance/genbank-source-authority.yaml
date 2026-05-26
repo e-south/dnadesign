@@ -155,4 +155,4 @@ notes:
   - The 2,000 bp region GenBank is the target context authority; it maps to pES retron-26 [56,2056) in zero-based half-open coordinates.
   - The two tet operator features are required as primary plus complement placements.
   - Retron-179 is orientation evidence only; it is not a Phase 1 candidate source.
-  - Left/right bases for retron26 and retron43 are derived from the adjacent flanking spans until explicit labels are added to those anchor GenBanks.
+  - Left/right bases for GenBank fixture rows are derived from adjacent flanking spans when the source feature table exposes flanks instead of explicit base labels.

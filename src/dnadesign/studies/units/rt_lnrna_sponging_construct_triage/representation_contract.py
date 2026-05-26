@@ -29,18 +29,24 @@ _EXPECTED_OUTPUT_LAYER_DIMENSION = 512
 REQUIRED_SOURCE_VIEW_NAMES = (
     "dual_cassette_2000bp_seq_mean",
     "dual_cassette_2000bp_reverse_complement_seq_mean",
-    "lnrna_span_in_construct_anchor_mean",
-    "lnrna_span_in_construct_reverse_complement_anchor_mean",
-    "rt_cds_span_in_construct_anchor_mean",
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
 )
 _VIEW_POOLING = {
     "dual_cassette_2000bp_seq_mean": ("seq_mean", None),
     "dual_cassette_2000bp_reverse_complement_seq_mean": ("seq_mean", None),
-    "lnrna_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
-    "lnrna_span_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
-    "rt_cds_span_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": ("anchor_mean", "sequence_view"),
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": ("anchor_mean", "sequence_view"),
+}
+_VIEW_POOLING_WINDOWS = {
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": 384,
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": 384,
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": 1600,
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": 1600,
 }
 _EXPECTED_OVERLAY_REFERENCE_IDS = (
     "khan_cross_retron_rt_dna_abundance_v1",
@@ -50,9 +56,15 @@ _EXPECTED_OVERLAY_REFERENCE_IDS = (
 )
 _EXPECTED_FIXED_SIZE_VECTORS = {
     "intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat": ("float32", 8192),
-    "intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat": ("float32", 8192),
-    "intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat": ("float32", 8192),
-    "intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat": ("float32", 16384),
+    "intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat": (
+        "float32",
+        8192,
+    ),
+    "intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat": (
+        "float32",
+        8192,
+    ),
+    "intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat": ("float32", 16384),
 }
 _EXPECTED_SCALAR_KINDS = ("log_likelihood__total", "log_likelihood__mean_per_token")
 _EXPECTED_CONSTRUCT_SUBJECT_SEQUENCE_FIELDS = (
@@ -116,6 +128,10 @@ def validate_representation_table_contract_payload(payload: object) -> Represent
             errors.append(f"{_string(item.get('view_name'))}: dataset must be {_OUTPUT_DATASET}")
         if _string(item.get("context_kind")) != "template_custom":
             errors.append(f"{_string(item.get('view_name'))}: context_kind must be template_custom")
+        view_name = _string(item.get("view_name"))
+        expected_window = _VIEW_POOLING_WINDOWS.get(view_name)
+        if expected_window is not None and int(item.get("pooling_window_bp") or 0) != expected_window:
+            errors.append(f"{view_name}: pooling_window_bp must be {expected_window}")
 
     _validate_feature_outputs(payload.get("infer_feature_outputs"), errors=errors)
     fixed_size_vectors = _parse_fixed_size_vectors(payload.get("fixed_size_vector_exports"), errors=errors)

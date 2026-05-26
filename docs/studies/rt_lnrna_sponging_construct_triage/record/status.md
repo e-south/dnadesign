@@ -1,12 +1,12 @@
 ## rt_lnrna_sponging_construct_triage
 
-- Last verified: 2026-05-25
+- Last verified: 2026-05-26
 - Owner: dnadesign-maintainers
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
 - Study execution map: `../operations/runtime/command-groups/pipeline.yaml`
 - Lifecycle posture: Phase 3 Infer handoff blocked on missing feature sidecars and real labels
-- OPS provider: none registered
+- OPS provider: study execution surfaces include a six-view Infer batch runbook
 
 ### Current Phase
 
@@ -54,12 +54,11 @@ still absent.
   `rt_lnrna_sponging_construct_triage_opal_training_examples_v1`.
 - Targeted tests assert realized 2,000 bp contexts, slot spans, real
   prefix/interstitial/suffix sequence, forward/reverse-complement rows, and the
-  forward/RC lnRNA plus RT CDS anchor-mean views with
-  `context_kind=template_custom`. Retron26 and retron43 are representative
-  GenBank catalog rows, not a separate overlay partition. Retron26 emits
-  `lnrna: [130,303)` and `rt_cds: [468,1431)`; the longer retron43 lnRNA
-  symmetrically trims the region flanks and emits `lnrna: [123,310)` and
-  `rt_cds: [475,1438)`.
+  forward/RC lnRNA plus RT CDS fixed-window anchor-mean views with
+  `context_kind=template_custom`. The GenBank catalog uses one projection path
+  for all 36 representable rows. The retron26 fixture emits slot spans
+  `lnrna: [130,303)` and `rt_cds: [468,1431)`; the retron43 fixture emits
+  `lnrna: [123,310)` and `rt_cds: [475,1438)`.
 - The catalog-to-Construct materializer now dogfoods all 36 catalog rows into
   the consolidated 2,000 bp output surface. It groups rows by per-candidate
   window offset so positive lnRNA/RT length deltas truncate only the outer
@@ -74,20 +73,18 @@ still absent.
   2,000 bp construct-window preflight. Exact declared MSD substring and short
   flank matches are retained as QC annotations because abundance-bearing
   Crawford variants can intentionally alter those regions.
-- Khan source rows now resolve through the terminal-keyed Khan sequence-authority
-  table and the Mestre Supplementary Table S3 RT locus authority path. The local
-  sequence-authority refresh resolves 169 of 171 RT CDS sequences with exact
-  translation validation; all 99 abundance-assayed rows have RT plus ncRNA
-  sequence authority. Under the current fixed 2,000 bp construct context, 129 Khan
-  rows fit and promote. Two non-assayed RT loci remain unresolved, and 40
-  otherwise sequence-authorized Khan rows are blocked before Construct because
-  their source lnRNA plus RT CDS geometry falls outside the current
-  lnRNA-centered 2,000 bp context.
+- Khan source rows resolve through the terminal-keyed Khan sequence-authority
+  table, the Khan abundance-prior overlay, and the Mestre Supplementary Table S3
+  RT locus authority path. The local sequence-authority refresh resolves 169 of
+  171 RT CDS sequences with exact translation validation. The abundance-prior
+  overlay has 99 numeric rows; 71 pass source ncRNA, translation-exact RT CDS,
+  affiliated abundance, and current 2,000 bp lane-fit gates. Two RT loci remain
+  unresolved, 58 sequence-authorized rows that fit the lane lack an affiliated
+  abundance prior, and 40 sequence-authorized rows exceed the current lane.
 - The current 2,000 bp context promotes 4,148 abundance-affiliated Crawford
-  rows and 129 Khan rows, but still leaves 18 Crawford reference-only sequences
-  without affiliated abundance and 40 otherwise sequence-authorized Khan rows
-  blocked. It is therefore a normalized Eco1-sized lane, not a complete
-  cross-retron coverage lane.
+  rows and 71 abundance-affiliated Khan rows. It also records 18 Crawford
+  design-reference-only sequences and 58 Khan sequence-authority rows as
+  missing affiliated abundance observations.
 - The compiler-generated MSD lnRNA fixture pool lives at
   `../operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml`.
   It compiles the YIU-compatible full combinatoric pool from five DE033
@@ -97,14 +94,14 @@ still absent.
   template MSD plus 5-prime/3-prime flanks, and writes ordinary Construct
   subject rows with fixed Eco1 WT RT. It does not formalize or materialize a
   pre-Infer concat.
-- The live consolidated Construct input dogfood contains 10,473 construct
+- The live consolidated Construct input dogfood contains 10,415 construct
   subjects: 36 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
-  source-sequence subjects paired with fixed WT Eco1 RT, 129 Khan source
-  RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
+  source-sequence subjects paired with fixed WT Eco1 RT, 71 abundance-affiliated
+  Khan RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
   6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
   API.
-- The live Construct output dogfood validates strictly with 20,946 realized
-  context rows and 62,838 explicit sequence-view declarations. Each construct
+- The live Construct output dogfood validates strictly with 20,830 realized
+  context rows and 62,490 explicit sequence-view declarations. Each construct
   subject has all six required view names.
 - The executable Infer-readiness gate at
   `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
@@ -112,10 +109,10 @@ still absent.
   forward context row, one reverse-complement context row, and exactly the six
   declared source sequence-view names per construct subject before the study can
   hand the dataset to Infer. A full temp dogfood through public dnadesign-data
-  source IDs passed with 10,473 subjects, 20,946 Construct output rows, and
-  62,838 sequence-view rows; the only source-promotion issues remained the
-  expected 18 Crawford reference-only rows without affiliated abundance, 2
-  missing RT CDS rows, and 40 over-window Khan rows.
+  source IDs passed with 10,415 subjects, 20,830 Construct output rows, and
+  62,490 sequence-view rows; the source-promotion issues are explicit: 76
+  missing affiliated abundance observations, 2 missing RT CDS rows, and 40
+  over-window Khan rows.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
   fixed-size representation-table contract, including expected Evo2 7B vector
   dimensions and Khan/Crawford overlay integration boundaries.
@@ -148,13 +145,19 @@ still absent.
   snapback cap, foldback, and payload/complement geometry.
 - The variant catalog resolves sequence authority for retron18, 24-27, 43,
   45-56, 170-186, and `msrmsdwt_bl21`.
+- The checked-in Infer runbook preset
+  `../../../../src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
+  is the batch entrypoint for completing the six-view Evo2 7B workload with one
+  Notify watcher for the lane. The study-level fill command is
+  `uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage`.
 
 ### Remaining Blockers
 
 - Evo2 7B Infer sidecars for the six explicit `view_name` lanes. The current
-  inventory gate resolves all 62,838 required source views with
-  `missing_products=0`, but sidecars remain absent:
-  `missing_vectors=125676` and `missing_scalars=125676`.
+  inventory gate resolves all 62,490 required source views with
+  `missing_products=0`, but sidecars remain absent. Inventory planning reports
+  `missing_vectors=124980` and `missing_scalars=124980`; exact execution
+  planning reports `missing_vectors=124980` and `missing_scalars=41660`.
 - LatentDNA materialization of the declared representation-health, ordinal
   overlay, scree, and UMAP gallery views after sidecars exist.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The

@@ -1,6 +1,6 @@
 ## Source Handoff Ledger
 
-- Last verified: 2026-05-25
+- Last verified: 2026-05-26
 - Owner: dnadesign-maintainers
 
 ### Live Inventories
@@ -62,9 +62,9 @@ Parsed offsets and SHA-256 values are pinned in
   can intentionally alter those regions. These rows are annotated as
   dnadesign-context projections, not exact Crawford expression context
   recreations.
-- 129 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
-  CDS DNA, translation-exact RT CDS validation, and the current
-  lnRNA-centered 2,000 bp construct-window preflight.
+- 71 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
+  CDS DNA, translation-exact RT CDS validation, affiliated RT-DNA abundance
+  prior, and the current 2,000 bp construct-window preflight.
 - 80 compiler-generated MSD lnRNA fixture rows compile from the YIU-compatible
   5 x 16 Snapback cap and scar-nick stem-base primitive pool, insert the
   reverse complement of the 5-prime-to-3-prime MSD product into the retron26
@@ -83,6 +83,6 @@ Parsed offsets and SHA-256 values are pinned in
 - Evo2 Infer sidecars for the six declared Construct sequence views.
 - OPAL-ready fixed-size feature table with real sponging labels.
 
-The live consolidated Construct workspace now materializes 10,473 construct
-subjects into 20,946 realized 2,000 bp contexts with 62,838 sequence-view
+The live consolidated Construct workspace now materializes 10,415 construct
+subjects into 20,830 realized 2,000 bp contexts with 62,490 sequence-view
 declarations.

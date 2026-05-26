@@ -17,12 +17,22 @@ REQUIRED_INFER_READY_VIEW_NAMES = REQUIRED_SOURCE_VIEW_NAMES
 _EXPECTED_OUTPUT_ORIENTATIONS = ("forward", "reverse_complement")
 _EXPECTED_CONTEXT_LENGTH_NT = 2000
 _VIEW_EXPECTATIONS = {
-    "dual_cassette_2000bp_seq_mean": ("forward", "seq_mean", False),
-    "dual_cassette_2000bp_reverse_complement_seq_mean": ("reverse_complement", "seq_mean", False),
-    "lnrna_span_in_construct_anchor_mean": ("forward", "anchor_mean", True),
-    "lnrna_span_in_construct_reverse_complement_anchor_mean": ("reverse_complement", "anchor_mean", True),
-    "rt_cds_span_in_construct_anchor_mean": ("forward", "anchor_mean", True),
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean": ("reverse_complement", "anchor_mean", True),
+    "dual_cassette_2000bp_seq_mean": ("forward", "seq_mean", None, None),
+    "dual_cassette_2000bp_reverse_complement_seq_mean": ("reverse_complement", "seq_mean", None, None),
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": ("forward", "anchor_mean", "lnrna", 384),
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": (
+        "reverse_complement",
+        "anchor_mean",
+        "lnrna",
+        384,
+    ),
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": ("forward", "anchor_mean", "rt_cds", 1600),
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": (
+        "reverse_complement",
+        "anchor_mean",
+        "rt_cds",
+        1600,
+    ),
 }
 
 
@@ -264,7 +274,7 @@ def _audit_sequence_views(
         if expected is None:
             errors.append(f"{view_name or '<missing-view-name>'}: unsupported RT-lnRNA Infer source view.")
             continue
-        expected_orientation, expected_pooling, requires_anchor = expected
+        expected_orientation, expected_pooling, expected_slot, expected_window_bp = expected
         if _text(getattr(view, "source_dataset_id", None)) != output_dataset:
             errors.append(f"{view_name}: source_dataset_id must be {output_dataset}.")
         if _text(getattr(view, "product_kind", None)) != "realized_context":
@@ -280,8 +290,18 @@ def _audit_sequence_views(
         has_anchor = (
             getattr(view, "anchor_start_0", None) is not None and getattr(view, "anchor_end_0", None) is not None
         )
-        if requires_anchor and not has_anchor:
+        if expected_slot is not None and not has_anchor:
             errors.append(f"{view_name}: anchor_mean view must carry anchor_start_0 and anchor_end_0.")
+        if expected_window_bp is not None and has_anchor:
+            anchor_start = int(getattr(view, "anchor_start_0"))
+            anchor_end = int(getattr(view, "anchor_end_0"))
+            if anchor_end - anchor_start != expected_window_bp:
+                errors.append(f"{view_name}: anchor bounds must span {expected_window_bp} bp.")
+            slot_span = _slot_span(output_row.get("construct__slots"), expected_slot)
+            if slot_span is None:
+                errors.append(f"{view_name}: output row must carry construct__slots span for {expected_slot}.")
+            elif anchor_start > slot_span[0] or anchor_end < slot_span[1]:
+                errors.append(f"{view_name}: fixed anchor window must contain the {expected_slot} slot span.")
 
     for subject_id in sorted(expected_subject_ids):
         names_for_subject = views_by_subject.get(subject_id, {})
@@ -311,6 +331,20 @@ def _required_text(row: Mapping[str, object], field_name: str, *, errors: list[s
     if not value:
         errors.append(f"Required field is missing or blank: {field_name}")
     return value
+
+
+def _slot_span(slots_payload: object, slot_id: str) -> tuple[int, int] | None:
+    if not isinstance(slots_payload, list):
+        return None
+    for slot in slots_payload:
+        if not isinstance(slot, dict) or _text(slot.get("slot_id")) != slot_id:
+            continue
+        start = slot.get("start")
+        end = slot.get("end")
+        if start is None or end is None:
+            return None
+        return int(start), int(end)
+    return None
 
 
 def _require_dna_field(

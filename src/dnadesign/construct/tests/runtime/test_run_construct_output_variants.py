@@ -559,12 +559,14 @@ job:
       orientation: forward
       recommended_pooling: anchor_mean
       anchor_part: lnrna
-      view_name: lnrna_span_in_construct_anchor_mean
+      anchor_window_size_bp: 4
+      view_name: lnrna_fixed_4bp_window_in_construct_anchor_mean
     - product_kind: realized_context
       orientation: forward
       recommended_pooling: anchor_mean
       anchor_part: rt_cds
-      view_name: rt_cds_span_in_construct_anchor_mean
+      anchor_window_size_bp: 8
+      view_name: rt_cds_fixed_8bp_window_in_construct_anchor_mean
   output:
     on_conflict: ignore
     target:
@@ -584,13 +586,106 @@ job:
     assert rerun.records_written == 0
     views = sorted(load_sequence_views(output_ds), key=lambda view: str(view.view_name))
     assert [view.view_name for view in views] == [
-        "lnrna_span_in_construct_anchor_mean",
-        "rt_cds_span_in_construct_anchor_mean",
+        "lnrna_fixed_4bp_window_in_construct_anchor_mean",
+        "rt_cds_fixed_8bp_window_in_construct_anchor_mean",
     ]
-    assert [(view.anchor_start_0, view.anchor_end_0) for view in views] == [(4, 6), (10, 16)]
-    assert [(view.forward_anchor_start_0, view.forward_anchor_end_0) for view in views] == [(4, 6), (10, 16)]
+    assert [(view.anchor_start_0, view.anchor_end_0) for view in views] == [(3, 7), (8, 16)]
+    assert [(view.forward_anchor_start_0, view.forward_anchor_end_0) for view in views] == [(3, 7), (8, 16)]
     assert len({view.view_id for view in views}) == 2
     assert len({alias for view in views for alias in (view.aliases or [])}) == 2
+
+
+def test_run_construct_output_variants_reject_anchor_window_shorter_than_slot(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr_root"
+    usr_root.mkdir(parents=True, exist_ok=True)
+    _write_registry(usr_root)
+    _register_candidate_slot_overlay(usr_root)
+    ensure_sequence_contract_namespaces(usr_root)
+
+    input_ds = Dataset(usr_root, "rt_lnrna_candidates")
+    input_ds.init(source="test", notes="multi-slot candidate rows")
+    add_result = input_ds.add_sequences(["A"], bio_type="dna", alphabet="dna_4", source="candidate-id-carrier")
+    candidate_id = add_result.ids[0]
+    input_ds.write_overlay(
+        "candidate",
+        pa.table(
+            {
+                "id": pa.array([candidate_id], type=pa.string()),
+                "candidate__lnrna_sequence": pa.array(["GG"], type=pa.string()),
+                "candidate__rt_cds_sequence": pa.array(["AATTAA"], type=pa.string()),
+            }
+        ),
+        key="id",
+        overwrite=True,
+    )
+
+    config_path = tmp_path / "construct_short_anchor_window.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: rt_lnrna_short_anchor_window
+  input:
+    source:
+      kind: usr
+      dataset: rt_lnrna_candidates
+      root: {usr_root.as_posix()}
+    field: null
+  template:
+    id: dual_cassette_template
+    source:
+      kind: literal
+      sequence: AAAACCCCGGGGTTTT
+    circular: false
+  parts:
+    - name: lnrna
+      role: lnrna_cassette
+      sequence:
+        source: input_field
+        field: candidate__lnrna_sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 8
+        guards:
+          replaced_sequence: CCCC
+    - name: rt_cds
+      role: rt_cds
+      sequence:
+        source: input_field
+        field: candidate__rt_cds_sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 12
+          end: 16
+        guards:
+          replaced_sequence: TTTT
+  realize:
+    mode: full_construct
+    required_slots: [lnrna, rt_cds]
+  output_variants:
+    - product_kind: realized_context
+      orientation: forward
+      recommended_pooling: anchor_mean
+      anchor_part: lnrna
+      anchor_window_size_bp: 1
+      view_name: lnrna_fixed_1bp_window_in_construct_anchor_mean
+  output:
+    target:
+      kind: usr
+      dataset: rt_lnrna_constructs
+      root: {usr_root.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="exceeds anchor_window_size_bp=1"):
+        run_from_config(config_path)
 
 
 def test_run_construct_output_variants_make_carried_aliases_variant_specific(tmp_path: Path) -> None:

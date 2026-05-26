@@ -221,8 +221,12 @@ whole-output reverse-complement products from one realized forward construct.
 - `anchor_part`: optional named part whose emitted span is copied into that
   sequence-view row's `anchor_start_0` / `anchor_end_0` bounds; use this for
   multi-slot studies that need slot-specific `anchor_mean` features
+- `anchor_window_size_bp`: optional fixed pooling-window length for
+  `anchor_mean` variants with `anchor_part`; Construct centers the window on
+  the named slot when possible, clamps it inside the emitted context, and fails
+  if the slot cannot fit inside the fixed window
 - `view_name`: optional explicit sequence-view name for a study representation,
-  for example `lnrna_span_in_construct_anchor_mean`
+  for example `lnrna_fixed_256bp_window_in_construct_anchor_mean`
 - variant sequence views require an anchor handoff span. For multi-slot jobs
   whose parts are not named or role-tagged `anchor`, set either
   `output_variants[].anchor_part` for the slot-specific view or

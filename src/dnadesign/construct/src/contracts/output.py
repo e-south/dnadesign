@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .base import StrictConfigModel
 from .datasets import USRDatasetLocatorConfig
@@ -25,12 +25,18 @@ class OutputVariantConfig(StrictConfigModel):
     orientation: Literal["forward", "reverse_complement"]
     recommended_pooling: Optional[Literal["seq_mean", "anchor_mean", "core60_mean"]] = None
     anchor_part: Optional[str] = None
+    anchor_window_size_bp: Optional[int] = Field(default=None, gt=0)
     view_name: Optional[str] = None
 
     @model_validator(mode="after")
     def _validate_product_kind_orientation(self) -> "OutputVariantConfig":
         if self.product_kind != "realized_context":
             raise ValueError("output_variants product_kind must be 'realized_context'.")
+        if self.anchor_window_size_bp is not None:
+            if self.anchor_part is None:
+                raise ValueError("output_variants anchor_window_size_bp requires anchor_part.")
+            if self.recommended_pooling != "anchor_mean":
+                raise ValueError("output_variants anchor_window_size_bp requires recommended_pooling='anchor_mean'.")
         return self
 
     @field_validator("anchor_part", "view_name")

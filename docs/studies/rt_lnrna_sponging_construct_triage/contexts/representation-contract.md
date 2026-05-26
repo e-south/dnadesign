@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-representation-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-25
+last_verified: 2026-05-26
 ---
 
 ## Representation Contract
@@ -18,10 +18,10 @@ promoted Construct subject:
 | --- | --- | --- |
 | `dual_cassette_2000bp_seq_mean` | One forward `realized_context` sequence view with `context_kind=template_custom`. | `seq_mean` over the full 2,000 bp context. |
 | `dual_cassette_2000bp_reverse_complement_seq_mean` | One reverse-complement `realized_context` companion row with `context_kind=template_custom`. | `seq_mean` over the full RC context. |
-| `lnrna_span_in_construct_anchor_mean` | Forward full construct context with lnRNA span bounds. | `anchor_mean` over the `lnrna` slot. |
-| `lnrna_span_in_construct_reverse_complement_anchor_mean` | Reverse-complement full construct context with orientation-aware lnRNA span bounds. | `anchor_mean` over the `lnrna` slot. |
-| `rt_cds_span_in_construct_anchor_mean` | Forward full construct context with RT CDS span bounds. | `anchor_mean` over the `rt_cds` slot. |
-| `rt_cds_span_in_construct_reverse_complement_anchor_mean` | Reverse-complement full construct context with orientation-aware RT CDS span bounds. | `anchor_mean` over the `rt_cds` slot. |
+| `lnrna_fixed_384bp_window_in_construct_anchor_mean` | Forward full construct context with a fixed 384 bp pooling window containing the lnRNA slot. | `anchor_mean` over the declared window. |
+| `lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean` | Reverse-complement full construct context with the orientation-aware 384 bp lnRNA pooling window. | `anchor_mean` over the declared window. |
+| `rt_cds_fixed_1600bp_window_in_construct_anchor_mean` | Forward full construct context with a fixed 1,600 bp pooling window containing the RT CDS slot. | `anchor_mean` over the declared window. |
+| `rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean` | Reverse-complement full construct context with the orientation-aware 1,600 bp RT CDS pooling window. | `anchor_mean` over the declared window. |
 
 The views are study representation names, not new USR `product_kind` values.
 Persist them through sequence-view names, aliases, and view semantics. Infer
@@ -44,10 +44,12 @@ post-inference block-normalized concat after those sidecars exist.
 
 Construct provides the coordinate authority through named slots. Every emitted
 context must carry auditable `construct__slots` spans for both `lnrna` and
-`rt_cds`. A slot-specific `anchor_mean` view must also declare the slot that
-supplies its sequence-view `anchor_start_0` / `anchor_end_0` bounds; the
+`rt_cds`. A slot-specific `anchor_mean` view declares the fixed pooling window
+that contains the named slot: 384 bp for `lnrna`, 1,600 bp for `rt_cds`. The
 lnRNA views map `construct_output_anchor_part: lnrna`, and the RT CDS views
-map `construct_output_anchor_part: rt_cds`. Row-level
+map `construct_output_anchor_part: rt_cds`; the sequence-view
+`anchor_start_0` / `anchor_end_0` coordinates are the fixed pooling window, not
+the variable-length biological slot. Row-level
 `construct__anchor_start` / `construct__anchor_end` is compatibility metadata for
 single-span consumers, not the authority for every slot in this dual-cassette
 study.
@@ -59,17 +61,15 @@ Do not duplicate either emitted sequence merely to imply a concat. Derived
 bidirectional aliases may reference both post-Infer vectors, but that is a
 LatentDNA representation step rather than a Construct sequence-view contract.
 The full 2,000 bp context is `2000bp-region.gb`, which maps to pES-retron-26
-`[56,2056)` in zero-based half-open vector coordinates. Retron26 and retron43
-are examples within the same first-class GenBank catalog, not a separate
-Construct ontology partition. In the retron26 row the region-relative anchors
-are `lnrna: [130,303)` and `rt_cds: [468,1431)`. Retron43's 14 bp longer lnRNA
-shifts the emitted window start to 63, so the region-relative anchors become
-`lnrna: [123,310)` and `rt_cds: [475,1438)`; the 165 bp interstitial remains
-constant while the prefix/suffix flanks are trimmed symmetrically.
-The same policy applies to RT length changes: retron47/retron48 keep the full
-Sso7d-fusion RT slot inside the 2,000 bp view by trimming outer flanks, yielding
-`lnrna: [27,200)` and `rt_cds: [365,1535)`. The policy never clips the lnRNA or
-RT slot itself; only the non-slot prefix/suffix context changes.
+`[56,2056)` in zero-based half-open vector coordinates. The GenBank catalog
+uses one projection path for every representable variant. In the retron26
+fixture row the region-relative slot spans are `lnrna: [130,303)` and
+`rt_cds: [468,1431)`. In the retron43 fixture row the longer lnRNA shifts the
+emitted window start to 63, giving `lnrna: [123,310)` and
+`rt_cds: [475,1438)`; the inter-slot distance stays constant while outer
+flanks absorb the length delta. The same policy applies to RT length changes:
+Sso7d-fusion RT rows keep the full RT slot inside the 2,000 bp view by trimming
+outer flanks. The policy never clips the lnRNA or RT slot itself.
 The bidirectional anchor views are also downstream derived vector views, not
 extra sequence rows: LatentDNA concatenates the declared forward and RC anchor
 aliases after Infer writes sidecars.
@@ -147,6 +147,7 @@ examples before Infer runs. Overlay-only rows must not be passed to Infer.
   the materializer postcondition before Infer runs.
 
 The slot anchor views run Evo2 over the full construct context and pool the
-declared slot span. They are not naked lnRNA-only or RT-only embeddings.
+declared fixed window that contains the slot span. They are not naked
+lnRNA-only or RT-only embeddings.
 P4/foldback/stem views remain appendix-only until construct-subject-owned subspan
 coordinates are explicit and source-backed.

@@ -13,6 +13,8 @@ required_fields:
   pooling_operation: controlled_string
   pooling_slot: string_or_null
   construct_output_anchor_part: string_or_null
+  anchor_window_size_bp: integer_or_null
+  anchor_window_policy: string_or_null
   pooling_start_0: integer_or_null
   pooling_end_0: integer_or_null
   required_slots: list_string
@@ -37,6 +39,8 @@ validation_notes:
   - Study view names are not new USR product_kind values.
   - Concat is a downstream derived vector view, not an Infer pooling operation.
   - Required lnRNA and RT CDS slots must be present in the emitted context before Infer runs.
-  - Slot-specific anchor_mean views must map one named Construct slot into
-    sequence-view anchor_start/end bounds; row-level construct__anchor_* is not
-    the authority for all slots in this study.
+  - "Slot-specific anchor_mean views must map one named Construct slot into a
+    fixed-length sequence-view window. The window must contain the slot span:
+    384 bp for lnRNA and 1,600 bp for RT CDS."
+  - Row-level construct__anchor_* is not the authority for all slots in this
+    study.

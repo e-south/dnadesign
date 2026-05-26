@@ -50,10 +50,10 @@ def test_construct_projection_manifest_uses_public_multi_slot_construct_strategy
     assert audit.required_view_names == (
         "dual_cassette_2000bp_seq_mean",
         "dual_cassette_2000bp_reverse_complement_seq_mean",
-        "lnrna_span_in_construct_anchor_mean",
-        "lnrna_span_in_construct_reverse_complement_anchor_mean",
-        "rt_cds_span_in_construct_anchor_mean",
-        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
     )
     assert audit.construct_subject_count == 2
     assert audit.construct_subject_spans["rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"] == {
@@ -134,7 +134,9 @@ def test_construct_projection_manifest_rejects_missing_lnrna_anchor_part_mapping
     audit = validate_projection_manifest_payload(payload)
 
     assert not audit.ok
-    assert "lnrna_span_in_construct_anchor_mean: construct_output_anchor_part must be lnrna" in audit.errors
+    assert (
+        "lnrna_fixed_384bp_window_in_construct_anchor_mean: construct_output_anchor_part must be lnrna" in audit.errors
+    )
 
 
 def test_construct_projection_manifest_rejects_missing_rt_cds_anchor_part_mapping() -> None:
@@ -144,7 +146,10 @@ def test_construct_projection_manifest_rejects_missing_rt_cds_anchor_part_mappin
     audit = validate_projection_manifest_payload(payload)
 
     assert not audit.ok
-    assert "rt_cds_span_in_construct_anchor_mean: construct_output_anchor_part must be rt_cds" in audit.errors
+    assert (
+        "rt_cds_fixed_1600bp_window_in_construct_anchor_mean: construct_output_anchor_part must be rt_cds"
+        in audit.errors
+    )
 
 
 def test_construct_projection_manifest_rejects_swapped_slot_sequence_fields() -> None:

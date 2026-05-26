@@ -29,7 +29,14 @@ command_groups:
       - infer_sequence_view_completion_not_run
     commands:
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
+      - uv run infer validate config --config src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml
+      - uv run infer validate sequence-view-completion --config src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml --mode inventory --format json
+      - uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage
       - uv run infer validate sequence-view-completion --config docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-run-config.yaml --mode inventory --max-missing-products 0 --max-missing-vectors 0 --max-missing-scalars 0 --max-stale-vectors 0 --max-stale-scalars 0
+    execution_surfaces:
+      infer_workspace: src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage
+      infer_batch_7b_with_notify:
+        six_view: src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml
   - id: latentdna_gallery
     status: blocked
     purpose: Validate and materialize the RT-lnRNA PCA health, scree, ordinal-audit, and UMAP gallery surfaces from Infer sidecars.

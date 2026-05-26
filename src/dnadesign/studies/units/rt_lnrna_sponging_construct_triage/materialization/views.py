@@ -45,7 +45,8 @@ def _slot_anchor_output_variants() -> list[dict[str, object]]:
             "orientation": "forward",
             "recommended_pooling": "anchor_mean",
             "anchor_part": "lnrna",
-            "view_name": "lnrna_span_in_construct_anchor_mean",
+            "anchor_window_size_bp": 384,
+            "view_name": "lnrna_fixed_384bp_window_in_construct_anchor_mean",
         },
         {
             "product_kind": "realized_context",
@@ -53,7 +54,8 @@ def _slot_anchor_output_variants() -> list[dict[str, object]]:
             "orientation": "reverse_complement",
             "recommended_pooling": "anchor_mean",
             "anchor_part": "lnrna",
-            "view_name": "lnrna_span_in_construct_reverse_complement_anchor_mean",
+            "anchor_window_size_bp": 384,
+            "view_name": "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
         },
         {
             "product_kind": "realized_context",
@@ -61,7 +63,8 @@ def _slot_anchor_output_variants() -> list[dict[str, object]]:
             "orientation": "forward",
             "recommended_pooling": "anchor_mean",
             "anchor_part": "rt_cds",
-            "view_name": "rt_cds_span_in_construct_anchor_mean",
+            "anchor_window_size_bp": 1600,
+            "view_name": "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
         },
         {
             "product_kind": "realized_context",
@@ -69,7 +72,8 @@ def _slot_anchor_output_variants() -> list[dict[str, object]]:
             "orientation": "reverse_complement",
             "recommended_pooling": "anchor_mean",
             "anchor_part": "rt_cds",
-            "view_name": "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+            "anchor_window_size_bp": 1600,
+            "view_name": "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
         },
     ]
 

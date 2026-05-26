@@ -102,7 +102,7 @@ def _select_unified_construct_subjects(
         )
         by_basis = source_promotion_report.candidates_by_basis
         crawford_count = int(by_basis.get("crawford_eco1_lnrna_fixed_wt_rt", 0))
-        khan_count = int(by_basis.get("khan_source_rt_lnrna_reference", 0))
+        khan_count = int(by_basis.get("khan_abundance_affiliated_rt_lnrna_reference", 0))
     if include_msd_compiler_promotions:
         msd_compiler_count = _append_msd_compiler_subjects(
             context=context,

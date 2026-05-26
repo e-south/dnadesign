@@ -1,6 +1,6 @@
 ## V1 Construct Subject Scope
 
-- Last verified: 2026-05-25
+- Last verified: 2026-05-26
 - Owner: dnadesign-maintainers
 
 The v1 construct-subject universe is sequence-authority gated. Every promoted
@@ -13,7 +13,7 @@ dual-cassette context.
 | GenBank-authorized retrons | active | Promote the 36 checked-in GenBank records as one first-class source cohort with explicit lnRNA and RT CDS authority. |
 | RT-CDS in silico DMS | active | Generate exhaustive sense-codon amino-acid substitutions through the public Permuter API using top E. coli codons. |
 | Crawford Eco1 lnRNA/MSD source sequences | active | Promote abundance-affiliated source lnRNA sequences with fixed WT Eco1 RT when they pass Eco1 forward k-mer orientation QC. |
-| Khan cross-retron rows | blocked until RT CDS authority | Promote only rows with explicit source RT CDS DNA sequence; do not treat RT accessions or RT-DNA product sequences as RT CDS. |
+| Khan cross-retron rows | active with representability issues | Promote rows with explicit source ncRNA sequence, explicit source RT CDS DNA sequence, translation-exact RT CDS validation, an affiliated RT-DNA abundance prior, and fit inside the current 2,000 bp Construct lane. |
 | Compiler-generated MSD lnRNA variants | active fixture pool | Compile the YIU-compatible Snapback cap x scar-nick stem-base primitive pool, reverse-complement the MSD product into the template lnRNA, and pair with fixed WT Eco1 RT. |
 | Future source datasets | planned | Add a source-owned resolver that emits the same construct-subject fields and issues before Construct execution. |
 

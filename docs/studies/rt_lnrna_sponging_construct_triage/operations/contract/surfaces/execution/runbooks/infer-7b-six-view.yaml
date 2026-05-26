@@ -1,0 +1,3 @@
+infer_batch_six_view_7b:
+  surface_type: runbook
+  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml

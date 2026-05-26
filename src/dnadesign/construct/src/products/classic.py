@@ -260,6 +260,23 @@ def build_variant_record(
             slot_id=variant.anchor_part,
             output_id=output_id,
         )
+        if variant.anchor_window_size_bp is not None:
+            view_anchor_start, view_anchor_end = fixed_anchor_window_bounds(
+                anchor_start_0=view_anchor_start,
+                anchor_end_0=view_anchor_end,
+                sequence_length=len(sequence),
+                window_size_bp=variant.anchor_window_size_bp,
+                slot_id=variant.anchor_part,
+                output_id=output_id,
+            )
+            view_forward_anchor_start, view_forward_anchor_end = fixed_anchor_window_bounds(
+                anchor_start_0=view_forward_anchor_start,
+                anchor_end_0=view_forward_anchor_end,
+                sequence_length=len(forward_record.sequence),
+                window_size_bp=variant.anchor_window_size_bp,
+                slot_id=variant.anchor_part,
+                output_id=output_id,
+            )
     view_aliases = list(record.label_aliases)
     if variant.view_name is not None:
         view_aliases = [
@@ -340,6 +357,37 @@ def slot_anchor_bounds(
     raise ValidationError(
         f"output_variants anchor_part '{slot_id}' is not present in construct__slots for {output_id}."
     )
+
+
+def fixed_anchor_window_bounds(
+    *,
+    anchor_start_0: int,
+    anchor_end_0: int,
+    sequence_length: int,
+    window_size_bp: int,
+    slot_id: str,
+    output_id: str,
+) -> tuple[int, int]:
+    anchor_length = anchor_end_0 - anchor_start_0
+    if anchor_length > window_size_bp:
+        raise ValidationError(
+            f"output_variants anchor_part '{slot_id}' span length {anchor_length} exceeds "
+            f"anchor_window_size_bp={window_size_bp} for {output_id}."
+        )
+    if window_size_bp > sequence_length:
+        raise ValidationError(
+            f"output_variants anchor_window_size_bp={window_size_bp} exceeds sequence length "
+            f"{sequence_length} for {output_id}."
+        )
+    ideal_start = anchor_start_0 + ((anchor_length - window_size_bp) // 2)
+    window_start = min(max(ideal_start, 0), sequence_length - window_size_bp)
+    window_end = window_start + window_size_bp
+    if window_start > anchor_start_0 or window_end < anchor_end_0:
+        raise ValidationError(
+            f"output_variants anchor_window_size_bp={window_size_bp} cannot contain "
+            f"anchor_part '{slot_id}' span [{anchor_start_0},{anchor_end_0}) for {output_id}."
+        )
+    return window_start, window_end
 
 
 def require_window_anchor_handoff_bounds(

@@ -414,3 +414,90 @@ def test_job_config_rejects_output_variant_anchor_part_missing_from_parts() -> N
                 }
             }
         )
+
+
+def test_job_config_rejects_anchor_window_without_explicit_anchor_part() -> None:
+    with pytest.raises(PydanticValidationError, match="anchor_window_size_bp requires anchor_part"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_missing_variant_anchor_window_part",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "anchor_mean",
+                            "anchor_window_size_bp": 256,
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_anchor_window_without_anchor_mean_pooling() -> None:
+    with pytest.raises(
+        PydanticValidationError, match="anchor_window_size_bp requires recommended_pooling='anchor_mean'"
+    ):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_anchor_window_wrong_pooling",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "seq_mean",
+                            "anchor_part": "lnrna",
+                            "anchor_window_size_bp": 256,
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )

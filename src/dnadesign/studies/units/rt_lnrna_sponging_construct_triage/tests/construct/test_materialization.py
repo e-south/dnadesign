@@ -34,11 +34,10 @@ from .helpers import (
     _assert_construct_output_subject_bridge,
     _assert_construct_subject_envelope_inputs,
     _assert_usr_contracts_strictly_validate,
-    _fixture_source_record_resolver,
     _repo_root,
     _write_msd_compiler_pool_spec,
-    _write_source_promotion_fixture,
 )
+from .source_fixtures import _fixture_source_record_resolver, _write_source_promotion_fixture
 
 
 def test_rt_lnrna_materialization_source_is_split_by_contract_domain() -> None:
@@ -54,6 +53,7 @@ def test_rt_lnrna_materialization_source_is_split_by_contract_domain() -> None:
         "materialization/manifest.py": 180,
         "materialization/common.py": 80,
         "tests/construct/helpers.py": 340,
+        "tests/construct/source_fixtures.py": 220,
         "tests/construct/test_materialization.py": 420,
         "tests/construct/test_msd_compiler.py": 260,
         "tests/construct/test_msd_compiler_primitives.py": 120,
@@ -127,10 +127,10 @@ def test_rt_lnrna_controls_materialize_real_2000bp_construct_context_views(tmp_p
     assert sorted(views_by_name) == [
         "dual_cassette_2000bp_reverse_complement_seq_mean",
         "dual_cassette_2000bp_seq_mean",
-        "lnrna_span_in_construct_anchor_mean",
-        "lnrna_span_in_construct_reverse_complement_anchor_mean",
-        "rt_cds_span_in_construct_anchor_mean",
-        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
     ]
     assert all(len(view_rows) == 2 for view_rows in views_by_name.values())
     assert {view.orientation for view in views_by_name["dual_cassette_2000bp_seq_mean"]} == {"forward"}
@@ -138,22 +138,24 @@ def test_rt_lnrna_controls_materialize_real_2000bp_construct_context_views(tmp_p
         "reverse_complement"
     }
     assert {
-        (view.anchor_start_0, view.anchor_end_0) for view in views_by_name["lnrna_span_in_construct_anchor_mean"]
-    } == {(130, 303), (123, 310)}
-    assert {view.recommended_pooling for view in views_by_name["lnrna_span_in_construct_anchor_mean"]} == {
-        "anchor_mean"
-    }
+        (view.anchor_start_0, view.anchor_end_0)
+        for view in views_by_name["lnrna_fixed_384bp_window_in_construct_anchor_mean"]
+    } == {(24, 408)}
+    assert {
+        view.recommended_pooling for view in views_by_name["lnrna_fixed_384bp_window_in_construct_anchor_mean"]
+    } == {"anchor_mean"}
     assert {
         (view.anchor_start_0, view.anchor_end_0)
-        for view in views_by_name["lnrna_span_in_construct_reverse_complement_anchor_mean"]
-    } == {(1690, 1877), (1697, 1870)}
-    assert {
-        (view.anchor_start_0, view.anchor_end_0) for view in views_by_name["rt_cds_span_in_construct_anchor_mean"]
-    } == {(468, 1431), (475, 1438)}
+        for view in views_by_name["lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean"]
+    } == {(1591, 1975)}
     assert {
         (view.anchor_start_0, view.anchor_end_0)
-        for view in views_by_name["rt_cds_span_in_construct_reverse_complement_anchor_mean"]
-    } == {(562, 1525), (569, 1532)}
+        for view in views_by_name["rt_cds_fixed_1600bp_window_in_construct_anchor_mean"]
+    } == {(149, 1749), (156, 1756)}
+    assert {
+        (view.anchor_start_0, view.anchor_end_0)
+        for view in views_by_name["rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean"]
+    } == {(243, 1843), (250, 1850)}
 
 
 def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_path: Path) -> None:
@@ -187,10 +189,10 @@ def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_
     assert {view.view_name for view in views if view.parent_sequence_id == input_id and view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
         "dual_cassette_2000bp_reverse_complement_seq_mean",
-        "lnrna_span_in_construct_anchor_mean",
-        "lnrna_span_in_construct_reverse_complement_anchor_mean",
-        "rt_cds_span_in_construct_anchor_mean",
-        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
     }
 
 
@@ -310,10 +312,10 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
     assert {view.view_name for view in views if view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
         "dual_cassette_2000bp_reverse_complement_seq_mean",
-        "lnrna_span_in_construct_anchor_mean",
-        "lnrna_span_in_construct_reverse_complement_anchor_mean",
-        "rt_cds_span_in_construct_anchor_mean",
-        "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
     }
 
 

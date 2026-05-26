@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-source-overlays
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-25
+last_verified: 2026-05-26
 ---
 
 ## Source Overlay Contract
@@ -18,19 +18,40 @@ The study keeps three result layers separate:
 
 ### Khan
 
-Khan source rows are cross-retron RT-DNA abundance priors. The overlay path is
-listed in `../record/datasets.yaml` with `99` abundance-prior rows. Use
-`raw_value` and `normalized_value` as primary numeric fields; use
-`ordinal_bin` only as secondary analysis metadata. These values are scoped to
-the Khan source and must not be put on one numeric scale with Crawford
-abundance or Reader SPOP.
+Khan et al., "An experimental census of retrons for DNA production and genome
+editing" (Nature Biotechnology, DOI `10.1038/s41587-024-02384-z`), is a
+cross-retron primary literature source. It tests diverse reverse transcriptases
+with cognate ncRNAs in a synthetic bacterial assay context and reports RT-DNA
+production relative to Eco1 by PAGE.
+
+The handoff has `171` terminal-keyed sequence-authority rows and `99` numeric
+abundance-prior rows. Those are different layers: sequence authority tells us
+which ncRNA and RT CDS can be reconstructed; the abundance overlay tells us
+which reconstructed system has a source numeric RT-DNA production value. The
+Construct promotion gate requires both layers, translation-exact RT CDS
+validation, and fit inside the current 2,000 bp lane. It currently promotes `71`
+Khan abundance-affiliated RT-lnRNA rows. The non-promoted rows are explicit
+review cases: `58` sequence-authority rows fit the lane but lack affiliated
+abundance, `40` exceed the current lane, and `2` lack RT CDS authority.
+
+Use Khan `raw_value` and `normalized_value` as source-scoped RT-DNA production
+fields. Use `ordinal_bin` only as secondary review metadata. These values must
+not be put on one numeric scale with Crawford abundance or Reader SPOP.
 
 ### Crawford
 
-Crawford source rows are Eco1-local lnRNA/MSD references and abundance
-observations. The current inventory has `2578` design reference rows and
-`4174` abundance observation rows. Preserve raw numeric fields. Do not average
-Crawford and Khan into one abundance target.
+Crawford et al., "High throughput variant libraries and machine learning yield
+design rules for retron gene editors" (Nucleic Acids Research, DOI
+`10.1093/nar/gkae1199`), is an Eco1-local primary literature source. It
+characterizes how retron Eco1 ncRNA/lnRNA/MSD sequence changes affect msDNA
+abundance in a controlled variant-library setting.
+
+The current inventory has `2,578` design-reference rows and `4,174` abundance
+observation rows. Those are different row grains. Design references carry
+sequence and MSD/MSR decomposition provenance; abundance observations carry
+source numeric msDNA abundance evidence, including repeated or duplicate
+source-observation rows that should not be collapsed away. Preserve raw numeric
+fields. Do not average Crawford and Khan into one abundance target.
 
 Promoted Crawford rows are source lnRNA sequences projected into the dnadesign
 dual-cassette construct. They must have an affiliated abundance-observation row;
@@ -104,14 +125,15 @@ sequence-authority table, but they are not
 Construct-promoted unless an explicit source RT CDS DNA sequence exists. RT
 accessions and RT-DNA product sequences are provenance, not RT CDS authority.
 Both lanes use the Construct projection manifest's lnRNA-centered window
-geometry for promotion; there is no independent combined-length shortcut.
+geometry for promotion; there is no independent combined-length shortcut. Khan
+rows without affiliated abundance priors are retained as sequence authority and
+review provenance, not Construct subjects.
 
 GenBank source-authority records are provenance records, not abundance priors
-and not labels. They can resolve candidate sequence ids and offset checks, but
-they do not create OPAL `Y` values. All GenBank variant catalog rows, including
-retron26 and retron43, are first-class members of the same GenBank source
-overlay; retron26 and retron43 may be used as examples and fixtures, but they
-are not a separate overlay partition.
+and not labels. They resolve candidate sequence ids, parsed slot spans, and
+offset checks, but they do not create OPAL `Y` values. All representable
+GenBank catalog rows use the same source-authority and Construct projection
+path.
 
 ### Reader SPOP
 

@@ -88,9 +88,9 @@ Infer handoffs from this study must select one or more explicit view names:
 
 - `dual_cassette_2000bp_seq_mean`
 - `dual_cassette_2000bp_reverse_complement_seq_mean`
-- `lnrna_span_in_construct_anchor_mean`
-- `lnrna_span_in_construct_reverse_complement_anchor_mean`
-- `rt_cds_span_in_construct_anchor_mean`
-- `rt_cds_span_in_construct_reverse_complement_anchor_mean`
+- `lnrna_fixed_384bp_window_in_construct_anchor_mean`
+- `lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean`
+- `rt_cds_fixed_1600bp_window_in_construct_anchor_mean`
+- `rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean`
 
 Do not select by `product_kind=realized_context` plus orientation alone.

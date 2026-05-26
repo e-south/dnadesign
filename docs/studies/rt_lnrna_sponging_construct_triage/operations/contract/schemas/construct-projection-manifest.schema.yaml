@@ -50,15 +50,17 @@ representation_view_contract:
     pooling_operation: controlled_string
     required_slots: list_string
     construct_output_anchor_part: string_or_null
-  slot_pooling_rule: The lnRNA and RT CDS anchor-mean views map pooling_slot to Construct output_variants[].anchor_part for the same named slot.
+    anchor_window_size_bp: integer_or_null
+    anchor_window_policy: string_or_null
+  slot_pooling_rule: The lnRNA and RT CDS anchor-mean views map pooling_slot to Construct output_variants[].anchor_part for the same named slot and emit fixed-length pooling windows.
   transform_rule: Construct source views must not declare pre-Infer concat transforms; LatentDNA owns post-inference derived concat aliases.
   required_view_names:
     - dual_cassette_2000bp_seq_mean
     - dual_cassette_2000bp_reverse_complement_seq_mean
-    - lnrna_span_in_construct_anchor_mean
-    - lnrna_span_in_construct_reverse_complement_anchor_mean
-    - rt_cds_span_in_construct_anchor_mean
-    - rt_cds_span_in_construct_reverse_complement_anchor_mean
+    - lnrna_fixed_384bp_window_in_construct_anchor_mean
+    - lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    - rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    - rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
 controlled_values:
   strategy_id:
     - construct_multi_slot_assembly_v1
@@ -79,12 +81,12 @@ future_input_normalization:
   genbank_inputs: Parse through GenBank source authority and require unambiguous feature spans.
   msd_compiler_outputs: Require materialized sequence plus feature map; labels alone are not projectable.
   crawford_design_rows: May provide Eco1 lnRNA/MSD provenance only after projection-compatible feature mapping.
-  khan_rows: Remain abundance/provenance overlays unless both RT and lnRNA sequence authority are named.
+  khan_rows: Remain abundance/provenance overlays unless ncRNA sequence, RT CDS DNA sequence, affiliated abundance, and lane fit are all resolved.
 validation_notes:
   - Reject precomposed single-anchor strategy ids.
   - Use `2000bp-region.gb`, mapped to pES-retron-26 `[56,2056)`, as the
     target context authority.
-  - "Retron26 control region-relative spans are `lnrna: [130,303)` and `rt_cds: [468,1431)`."
+  - "The retron26 fixture region-relative spans are `lnrna: [130,303)` and `rt_cds: [468,1431)`."
   - Candidate lnRNA and RT length deltas shift the 2,000 bp window by
     symmetric prefix/suffix flank adjustment, preserving the constant
     interstitial between slots.
@@ -95,5 +97,7 @@ validation_notes:
   - Reject missing lnRNA or RT CDS slot span for anchor_mean pooling.
   - Reject anchor-mean views that do not declare which named slot supplies the
     sequence-view anchor bounds.
+  - Reject lnRNA fixed-window views unless they use 384 bp pooling windows.
+  - Reject RT CDS fixed-window views unless they use 1,600 bp pooling windows.
   - Treat working/failed lab-anchor names as source-history labels; Construct
     placement uses named slots.

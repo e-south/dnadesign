@@ -41,27 +41,35 @@ _EXPECTED_SLOT_CONTRACTS = {
 _REQUIRED_VIEW_NAMES = (
     "dual_cassette_2000bp_seq_mean",
     "dual_cassette_2000bp_reverse_complement_seq_mean",
-    "lnrna_span_in_construct_anchor_mean",
-    "lnrna_span_in_construct_reverse_complement_anchor_mean",
-    "rt_cds_span_in_construct_anchor_mean",
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean",
 )
 _ANCHOR_VIEW_CONTRACTS = {
-    "lnrna_span_in_construct_anchor_mean": {
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": {
         "orientation": "forward",
         "pooling_slot": "lnrna",
+        "window_size_bp": 384,
+        "window_policy": "centered_within_context",
     },
-    "lnrna_span_in_construct_reverse_complement_anchor_mean": {
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": {
         "orientation": "reverse_complement",
         "pooling_slot": "lnrna",
+        "window_size_bp": 384,
+        "window_policy": "centered_within_context",
     },
-    "rt_cds_span_in_construct_anchor_mean": {
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": {
         "orientation": "forward",
         "pooling_slot": "rt_cds",
+        "window_size_bp": 1600,
+        "window_policy": "centered_within_context",
     },
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean": {
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": {
         "orientation": "reverse_complement",
         "pooling_slot": "rt_cds",
+        "window_size_bp": 1600,
+        "window_policy": "centered_within_context",
     },
 }
 
@@ -499,6 +507,10 @@ def _validate_anchor_view(*, view_name: str, view: dict[str, object], errors: li
         errors.append(f"{view_name}: pooling_slot must be {expected_slot}")
     if _string(view.get("construct_output_anchor_part")) != expected_slot:
         errors.append(f"{view_name}: construct_output_anchor_part must be {expected_slot}")
+    if int(view.get("anchor_window_size_bp") or 0) != int(contract["window_size_bp"]):
+        errors.append(f"{view_name}: anchor_window_size_bp must be {contract['window_size_bp']}")
+    if _string(view.get("anchor_window_policy")) != _string(contract["window_policy"]):
+        errors.append(f"{view_name}: anchor_window_policy must be {contract['window_policy']}")
 
 
 def _mapping(value: object, *, label: str, errors: list[str]) -> dict[str, object] | None:

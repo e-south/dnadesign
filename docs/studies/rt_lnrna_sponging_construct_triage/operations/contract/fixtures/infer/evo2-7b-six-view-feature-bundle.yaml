@@ -19,28 +19,28 @@ sequence_view_inputs:
   - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: lnrna_span_in_construct_anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
   - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
   - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: rt_cds_span_in_construct_anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view
   - dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     root: ../../../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
     view_selector:
-      view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
     pooling:
       operation: anchor_mean
       bounds_from: sequence_view

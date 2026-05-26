@@ -11,6 +11,7 @@ from .contracts import SourcePromotionContractError
 
 CRAWFORD_REFERENCE_SOURCE_ID = "crawford_2025_retron_ncrna_ml_eco1_lnrna_msd_designs_tsv"
 CRAWFORD_ABUNDANCE_SOURCE_ID = "crawford_2025_retron_ncrna_ml_eco1_ncrna_abundance_observations_tsv"
+KHAN_ABUNDANCE_SOURCE_ID = "khan_2024_retron_census_abundance_prior_overlay_tsv"
 KHAN_SEQUENCE_AUTHORITY_SOURCE_ID = "khan_2024_retron_census_rt_lnrna_sequence_authority_tsv"
 
 SourceRecordResolver = Callable[[str, Path], Mapping[str, object]]
@@ -71,6 +72,7 @@ def _public_source_record_resolver() -> SourceRecordResolver:
 __all__ = [
     "CRAWFORD_ABUNDANCE_SOURCE_ID",
     "CRAWFORD_REFERENCE_SOURCE_ID",
+    "KHAN_ABUNDANCE_SOURCE_ID",
     "KHAN_SEQUENCE_AUTHORITY_SOURCE_ID",
     "SourceRecordResolver",
     "resolve_source_table_path",

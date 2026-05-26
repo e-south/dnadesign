@@ -1,15 +1,24 @@
-workspaces:
-  study_runtime_root:
-    status: present
-    path: workspaces/studies/rt_lnrna_sponging_construct_triage
-    checked_in: true
-  latentdna_workspace:
-    status: planned
-    path: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
-    checked_in_config_allowed: true
-    generated_outputs_checked_in_by_default: false
-  construct_workspace:
-    status: control_dataset_present
-    blocked_by: evo2_7b_feature_sidecars_absent
-    checked_in_config_allowed: true
-    generated_outputs_checked_in_by_default: false
+study_runtime_root:
+  surface_type: workspace
+  workspace_ref: repo:workspaces/studies/rt_lnrna_sponging_construct_triage
+  status: present
+  checked_in: true
+latentdna_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
+  status: planned
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false
+construct_workspace:
+  surface_type: workspace
+  workspace_ref: repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+  status: control_dataset_present
+  blocked_by: evo2_7b_feature_sidecars_absent
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false
+infer_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage
+  status: configured
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false

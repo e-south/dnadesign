@@ -1,6 +1,6 @@
 ## RT-lnRNA Sponging Construct Vocabulary
 
-- Last verified: 2026-05-22
+- Last verified: 2026-05-26
 - Owner: dnadesign-maintainers
 
 ### Core Terms
@@ -30,8 +30,8 @@
   construct context view materialization for writing USR sequence-view rows.
 - Use `lab_anchor`, `working_anchor`, and `failed_anchor` only as source-history
   or candidate-control labels. They are not Construct part roles.
-- Treat retron26 and retron43 as representative GenBank catalog rows, not as a
-  separate GenBank overlay partition.
+- Use the GenBank catalog as one first-class sequence-authority layer for
+  representable study variants and fixtures.
 - Keep Khan abundance, Crawford abundance, and Reader SPOP numerics
   source-scoped. Ordinal bins and categorical hues are metadata views, not
   shared-scale numeric labels.

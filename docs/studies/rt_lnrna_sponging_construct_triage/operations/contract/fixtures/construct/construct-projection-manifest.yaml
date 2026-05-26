@@ -66,33 +66,41 @@ representation_views:
     pooling_operation: seq_mean
     construct_output_anchor_part:
     required_slots: [lnrna, rt_cds]
-  - view_name: lnrna_span_in_construct_anchor_mean
+  - view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
     product_kind: realized_context
     orientation: forward
     pooling_operation: anchor_mean
     pooling_slot: lnrna
     construct_output_anchor_part: lnrna
+    anchor_window_size_bp: 384
+    anchor_window_policy: centered_within_context
     required_slots: [lnrna, rt_cds]
-  - view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
+  - view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
     product_kind: realized_context
     orientation: reverse_complement
     pooling_operation: anchor_mean
     pooling_slot: lnrna
     construct_output_anchor_part: lnrna
+    anchor_window_size_bp: 384
+    anchor_window_policy: centered_within_context
     required_slots: [lnrna, rt_cds]
-  - view_name: rt_cds_span_in_construct_anchor_mean
+  - view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
     product_kind: realized_context
     orientation: forward
     pooling_operation: anchor_mean
     pooling_slot: rt_cds
     construct_output_anchor_part: rt_cds
+    anchor_window_size_bp: 1600
+    anchor_window_policy: centered_within_context
     required_slots: [lnrna, rt_cds]
-  - view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+  - view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
     product_kind: realized_context
     orientation: reverse_complement
     pooling_operation: anchor_mean
     pooling_slot: rt_cds
     construct_output_anchor_part: rt_cds
+    anchor_window_size_bp: 1600
+    anchor_window_policy: centered_within_context
     required_slots: [lnrna, rt_cds]
 candidates:
   - construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
@@ -113,10 +121,10 @@ candidates:
     construct_context_view_declarations:
       - dual_cassette_2000bp_seq_mean
       - dual_cassette_2000bp_reverse_complement_seq_mean
-      - lnrna_span_in_construct_anchor_mean
-      - lnrna_span_in_construct_reverse_complement_anchor_mean
-      - rt_cds_span_in_construct_anchor_mean
-      - rt_cds_span_in_construct_reverse_complement_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
   - construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
     fixture_ref: operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
     construct_projection_status: representable
@@ -135,7 +143,7 @@ candidates:
     construct_context_view_declarations:
       - dual_cassette_2000bp_seq_mean
       - dual_cassette_2000bp_reverse_complement_seq_mean
-      - lnrna_span_in_construct_anchor_mean
-      - lnrna_span_in_construct_reverse_complement_anchor_mean
-      - rt_cds_span_in_construct_anchor_mean
-      - rt_cds_span_in_construct_reverse_complement_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean

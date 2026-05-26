@@ -15,6 +15,8 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.infer import validate_infer_config_contract
+from dnadesign.ops.api import load_orchestration_runbook
 from dnadesign.permuter import read_infer_feature_request_manifest
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.representation_contract import (
     REQUIRED_SOURCE_VIEW_NAMES,
@@ -61,6 +63,20 @@ def _pipeline_path() -> Path:
     )
 
 
+def _infer_workspace_config_path() -> Path:
+    return (
+        _repo_root() / "src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/"
+        "config.sequence_views.six_view.evo2_7b.yaml"
+    )
+
+
+def _infer_runbook_path() -> Path:
+    return (
+        _repo_root() / "src/dnadesign/ops/runbooks/presets/"
+        "infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml"
+    )
+
+
 def _permuter_plan_payload() -> dict[str, object]:
     payload = yaml.safe_load(_permuter_plan_path().read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
@@ -78,15 +94,21 @@ def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_i
         "crawford_eco1_lnrna_msd_design_reference_v1",
         "reader_spop_endpoint_dose_mean_v1",
     )
-    assert audit.fixed_size_vectors["intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat"] == (
+    assert audit.fixed_size_vectors[
+        "intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat"
+    ] == (
         "float32",
         8192,
     )
-    assert audit.fixed_size_vectors["intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat"] == (
+    assert audit.fixed_size_vectors[
+        "intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat"
+    ] == (
         "float32",
         8192,
     )
-    assert audit.fixed_size_vectors["intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat"] == (
+    assert audit.fixed_size_vectors[
+        "intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat"
+    ] == (
         "float32",
         16384,
     )
@@ -112,6 +134,36 @@ def test_rt_lnrna_infer_feature_bundle_fixture_selects_every_view_by_explicit_vi
 
     assert audit.ok, "\n".join(audit.errors)
     assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
+
+
+def test_rt_lnrna_infer_workspace_config_and_runbook_use_six_view_contract() -> None:
+    config_audit = validate_infer_config_contract(_infer_workspace_config_path())
+    assert config_audit.model_id == "evo2_7b"
+    assert config_audit.job_ids == ("rt_lnrna_construct_six_view_7b",)
+
+    config_payload = yaml.safe_load(_infer_workspace_config_path().read_text(encoding="utf-8"))
+    assert isinstance(config_payload, dict)
+    assert config_payload["model"]["batch_size"] == 16
+    jobs = config_payload["jobs"]
+    assert isinstance(jobs, list)
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert isinstance(job, dict)
+    assert job["id"] == "rt_lnrna_construct_six_view_7b"
+    feature_bundle = job["feature_bundle"]
+    assert isinstance(feature_bundle, dict)
+
+    audit = validate_infer_feature_bundle_payload(feature_bundle)
+    assert audit.ok, "\n".join(audit.errors)
+    assert audit.selected_view_names == REQUIRED_SOURCE_VIEW_NAMES
+
+    runbook = load_orchestration_runbook(_infer_runbook_path())
+    assert runbook.workflow_id == "infer_batch_with_notify"
+    assert runbook.infer is not None
+    assert runbook.infer.config == _infer_workspace_config_path()
+    assert runbook.notify is not None
+    assert runbook.notify.tool == "infer"
+    assert runbook.resources.gpus == 1
 
 
 def test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff() -> None:

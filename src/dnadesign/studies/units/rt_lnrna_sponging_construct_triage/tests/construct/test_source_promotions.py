@@ -20,12 +20,11 @@ from .helpers import (
     _assert_construct_output_subject_bridge,
     _assert_construct_subject_envelope_inputs,
     _assert_usr_contracts_strictly_validate,
-    _fixture_source_record_resolver,
     _repo_root,
     _reverse_complement,
     _source_window_policy,
-    _write_source_promotion_fixture,
 )
+from .source_fixtures import _fixture_source_record_resolver, _write_source_promotion_fixture
 
 
 def test_rt_lnrna_source_promotion_window_policy_matches_construct_geometry() -> None:
@@ -120,6 +119,7 @@ def test_rt_lnrna_source_promotions_resolve_tables_through_public_source_ids(tmp
         "crawford_2025_retron_ncrna_ml_eco1_lnrna_msd_designs_tsv",
         "crawford_2025_retron_ncrna_ml_eco1_ncrna_abundance_observations_tsv",
         "khan_2024_retron_census_rt_lnrna_sequence_authority_tsv",
+        "khan_2024_retron_census_abundance_prior_overlay_tsv",
     ]
     assert report.candidates_by_basis == {"crawford_eco1_lnrna_fixed_wt_rt": 2}
 
@@ -183,16 +183,20 @@ def test_rt_lnrna_source_promotions_include_validated_khan_rt_lnrna_rows(
     assert report.issues_by_reason == {"missing_affiliated_abundance_observation": 1}
     assert report.candidates_by_basis == {
         "crawford_eco1_lnrna_fixed_wt_rt": 2,
-        "khan_source_rt_lnrna_reference": 1,
+        "khan_abundance_affiliated_rt_lnrna_reference": 1,
     }
     khan_candidate = [
-        candidate for candidate in report.candidates if candidate.source_basis == "khan_source_rt_lnrna_reference"
+        candidate
+        for candidate in report.candidates
+        if candidate.source_basis == "khan_abundance_affiliated_rt_lnrna_reference"
     ][0]
     assert khan_candidate.lnrna_sequence == lnrna_sequence
     assert khan_candidate.rt_cds_sequence == rt_cds_sequence
     assert khan_candidate.rt_cds_authority_kind == "source_genomic_cds_from_mestre_coordinates"
     assert khan_candidate.overlay_fields["construct_subject__rt_cds_validation_status"] == "translation_exact_match"
     assert khan_candidate.overlay_fields["construct_subject__rt_cds_locus_authority_id"] == "mestre_node_56_rt_locus"
+    assert khan_candidate.overlay_fields["construct_subject__source_abundance_record_count"] == 1
+    assert khan_candidate.overlay_fields["construct_subject__khan_abundance_ordinal_bins"] == "low"
 
 
 def test_rt_lnrna_source_promotions_reject_khan_rt_cds_without_translation_exact_validation(

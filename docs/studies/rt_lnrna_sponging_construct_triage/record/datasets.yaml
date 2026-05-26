@@ -1,6 +1,6 @@
 study_id: rt_lnrna_sponging_construct_triage
 usr_remotes_path: n/a
-verified_at: 2026-05-25
+verified_at: 2026-05-26
 datasets:
   - role: khan_abundance_prior_overlay
     owner_tool: dnadesign-data
@@ -35,10 +35,9 @@ datasets:
     row_count: 171
     line_count_including_header: 172
     notes: >-
-      Terminal-keyed ncRNA plus RT CDS sequence authority table for future Khan
-      Construct promotion. Current rows resolve ncRNA and abundance flags, but
-      RT CDS DNA remains unresolved until a curated RT CDS FASTA is supplied to
-      the dnadesign-data adapter.
+      Terminal-keyed ncRNA plus RT CDS sequence authority table for Khan
+      Construct promotion. Promoted rows also require an affiliated RT-DNA
+      abundance-prior row and fit inside the current 2,000 bp Construct lane.
   - role: crawford_eco1_ncrna_abundance_observations
     owner_tool: dnadesign-data
     lifecycle: source_overlay
@@ -203,16 +202,17 @@ datasets:
           variants can intentionally alter those regions; duplicate source rows
           are retained as source-record counts and overlay provenance, not
           duplicate Construct subjects.
-      - lane_id: khan_source_rt_lnrna_reference
+      - lane_id: khan_abundance_affiliated_rt_lnrna_reference
         owner_tool: study
         generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
-        dependency_surface: dnadesign-data Khan processed sequence-authority TSV
-        source_basis: khan_source_rt_lnrna_reference
+        dependency_surface: dnadesign-data Khan processed sequence-authority and abundance-prior TSVs
+        source_basis: khan_abundance_affiliated_rt_lnrna_reference
         notes: >-
           Promotes only Khan rows with explicit source ncRNA sequence, source RT
-          CDS DNA sequence, and translation-exact RT CDS validation from the
-          Mestre locus authority path. Rows that exceed the current fixed 2,000
-          bp Construct window remain blocked before Construct runtime.
+          CDS DNA sequence, translation-exact RT CDS validation from the Mestre
+          locus authority path, and an affiliated RT-DNA abundance prior. Rows
+          that exceed the current fixed 2,000 bp Construct window remain blocked
+          before Construct runtime.
       - lane_id: compiler_generated_msd_lnrna_variant
         owner_tool: study
         generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_msd_compiler_promotions
@@ -270,10 +270,10 @@ datasets:
     expected_sequence_views:
       - dual_cassette_2000bp_seq_mean
       - dual_cassette_2000bp_reverse_complement_seq_mean
-      - lnrna_span_in_construct_anchor_mean
-      - lnrna_span_in_construct_reverse_complement_anchor_mean
-      - rt_cds_span_in_construct_anchor_mean
-      - rt_cds_span_in_construct_reverse_complement_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_anchor_mean
+      - lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+      - rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
     notes: >-
       USR output dataset for realized 2,000 bp construct contexts. Sequence
       views remain attached to this dataset; they are not separate datasets.

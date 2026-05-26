@@ -32,10 +32,11 @@ def resolve_source_construct_subject_promotions(
     """Resolve literature sources into Construct-ready RT-lnRNA subjects.
 
     Crawford is an Eco1-local lnRNA/MSD source, so promoted rows use fixed WT
-    Eco1 RT. Khan rows are promoted only when the source table carries explicit
-    ncRNA DNA and translation-exact RT CDS authority. Compiler-generated MSD
-    pool specs are optional and explicit because they are study-owned sequence
-    design references, not literature abundance priors.
+    Eco1 RT. Khan rows are promoted only when the source tables carry explicit
+    ncRNA DNA, translation-exact RT CDS authority, and an affiliated RT-DNA
+    abundance prior. Compiler-generated MSD pool specs are optional and explicit
+    because they are study-owned sequence design references, not literature
+    abundance priors.
     """
 
     data_root = Path(dnadesign_data_root).resolve()

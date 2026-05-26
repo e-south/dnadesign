@@ -2,6 +2,7 @@ version: 2
 study_id: rt_lnrna_sponging_construct_triage
 title: RT-lnRNA sponging construct triage
 record_sources:
+  overview_ref: manifest:contexts/construct-overview.md
   narrative_ref: manifest:record/status.md
   datasets_ref: manifest:record/datasets.yaml
   pipeline_ref: manifest:operations/runtime/command-groups/pipeline.yaml
@@ -12,6 +13,7 @@ parts:
   artifacts: contract/surfaces/artifacts.yaml
   execution_surfaces:
     - contract/surfaces/execution/workspaces.yaml
+    - contract/surfaces/execution/runbooks/infer-7b-six-view.yaml
     - contract/surfaces/execution/commands/validation.yaml
   snapshot: contract/status/snapshot.yaml
   preflight:

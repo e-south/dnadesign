@@ -45,10 +45,10 @@ infer_handoff:
   required_view_names:
     - dual_cassette_2000bp_seq_mean
     - dual_cassette_2000bp_reverse_complement_seq_mean
-    - lnrna_span_in_construct_anchor_mean
-    - lnrna_span_in_construct_reverse_complement_anchor_mean
-    - rt_cds_span_in_construct_anchor_mean
-    - rt_cds_span_in_construct_reverse_complement_anchor_mean
+    - lnrna_fixed_384bp_window_in_construct_anchor_mean
+    - lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    - rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    - rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
 rejected_patterns:
   - permuter_writes_derived_infer
   - construct_subject_id_copied_to_usr_id

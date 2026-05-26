@@ -1,26 +1,67 @@
-commands:
-  docs_check:
-    status: active
-    command: uv run python -m dnadesign.devtools.docs.checks --repo-root .
-  architecture_boundaries:
-    status: conditional
-    condition: Run only when code or imports are added.
-    command: uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .
-  genbank_source_authority:
-    status: active
-    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py
-  construct_projection:
-    status: active
-    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_projection.py
-  permuter_rt_cds_dms:
-    status: active
-    command: uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
-  representation_contract:
-    status: active
-    command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
-  infer_execution:
-    status: blocked
-    blocked_by: evo2_7b_feature_sidecars_absent
-  opal_run:
-    status: blocked
-    blocked_by: rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent
+docs_check:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.devtools.docs.checks
+    - --repo-root
+    - .
+architecture_boundaries:
+  surface_type: command
+  status: conditional
+  condition: Run when code or imports are added.
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.devtools.architecture.boundaries
+    - --repo-root
+    - .
+genbank_source_authority:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py
+construct_projection:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_projection.py
+permuter_rt_cds_dms:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - -q
+    - src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids
+    - src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materialize_rejects_variant_id_metadata_alias
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
+representation_contract:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
+infer_execution:
+  surface_type: command
+  status: blocked
+  blocked_by: evo2_7b_feature_sidecars_absent
+opal_run:
+  surface_type: command
+  status: blocked
+  blocked_by: rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent
