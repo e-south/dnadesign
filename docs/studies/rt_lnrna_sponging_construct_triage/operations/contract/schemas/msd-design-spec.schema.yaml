@@ -28,7 +28,8 @@ controlled_values:
 validation_notes:
   - This schema owns cloning and design feasibility details.
   - Do not create a separate construct-level cloning_constraint_set object.
-  - rt_lnrna_msd_variant_pool_spec_v1 is the RT-lnRNA study-owned pool contract for compiling MSD primitive combinations into lnRNA variants.
+  - rt_lnrna_msd_variant_pool_spec_v1 is the RT-lnRNA study-owned pool contract for compiling YIU-compatible MSD primitive combinations into lnRNA variants.
+  - The active pool composes Snapback cap primitives with scar-nick stem-base primitives; the fixture currently resolves five DE033 cap ranks and sixteen TetO stem-base ranks for 80 explicit compiler designs.
   - The executable pool contract lives in source_promotions/msd_pool_contract.py and rejects undeclared fields with extra=forbid instead of silently dropping them.
   - The pool contract must declare template_lnrna, template_msd_design, placement flanks, compiler_inputs, expected_variant_count, max_variant_count, dedupe_policy, and primitive source_refs.
   - Literal design_space stem-base rows that declare source_ref, nick_orientation, and nickase are promoted into Retron MSD compiler scar_nick metadata as route_status=note_only; primitive-backed rows should use stem_base_source.

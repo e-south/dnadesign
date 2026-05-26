@@ -52,26 +52,28 @@ still absent.
   `rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1`,
   `rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1`, and
   `rt_lnrna_sponging_construct_triage_opal_training_examples_v1`.
-- Targeted tests assert the two realized 2,000 bp contexts, slot spans, real
+- Targeted tests assert realized 2,000 bp contexts, slot spans, real
   prefix/interstitial/suffix sequence, forward/reverse-complement rows, and the
   forward/RC lnRNA plus RT CDS anchor-mean views with
-  `context_kind=template_custom`.
-  The retron26 control emits `lnrna: [130,303)` and `rt_cds: [468,1431)`;
-  the longer retron43 lnRNA symmetrically trims the region flanks and emits
-  `lnrna: [123,310)` and `rt_cds: [475,1438)`.
+  `context_kind=template_custom`. Retron26 and retron43 are representative
+  GenBank catalog rows, not a separate overlay partition. Retron26 emits
+  `lnrna: [130,303)` and `rt_cds: [468,1431)`; the longer retron43 lnRNA
+  symmetrically trims the region flanks and emits `lnrna: [123,310)` and
+  `rt_cds: [475,1438)`.
 - The catalog-to-Construct materializer now dogfoods all 36 catalog rows into
   the consolidated 2,000 bp output surface. It groups rows by per-candidate
   window offset so positive lnRNA/RT length deltas truncate only the outer
   prefix/suffix flanks, while preserving full lnRNA and RT slot spans. The
   Sso7d-fusion retron47/retron48 rows emit `lnrna: [27,200)` and
   `rt_cds: [365,1535)`.
-- The source-promotion resolver currently promotes 4,166 Crawford source lnRNA
-  sequences from the union of design-reference and abundance-observation rows.
-  They are paired with fixed WT Eco1 RT after DNA4 validation, Eco1 forward
-  k-mer orientation QC, reverse-complement rejection, and the manifest-derived
-  lnRNA-centered 2,000 bp construct-window preflight. Exact declared MSD
-  substring and short flank matches are retained as QC annotations because
-  abundance-bearing Crawford variants can intentionally alter those regions.
+- The source-promotion resolver currently promotes 4,148 abundance-affiliated
+  Crawford source lnRNA sequences and records 18 design-reference-only sequences
+  as missing affiliated abundance observations. Promoted sequences are paired
+  with fixed WT Eco1 RT after DNA4 validation, Eco1 forward k-mer orientation
+  QC, reverse-complement rejection, and the manifest-derived lnRNA-centered
+  2,000 bp construct-window preflight. Exact declared MSD substring and short
+  flank matches are retained as QC annotations because abundance-bearing
+  Crawford variants can intentionally alter those regions.
 - Khan source rows now resolve through the terminal-keyed Khan sequence-authority
   table and the Mestre Supplementary Table S3 RT locus authority path. The local
   sequence-authority refresh resolves 169 of 171 RT CDS sequences with exact
@@ -81,24 +83,28 @@ still absent.
   otherwise sequence-authorized Khan rows are blocked before Construct because
   their source lnRNA plus RT CDS geometry falls outside the current
   lnRNA-centered 2,000 bp context.
-- The current 2,000 bp context promotes all 4,166 Crawford rows and 129 Khan
-  rows, but still leaves 40 otherwise sequence-authorized Khan rows blocked. It
-  is therefore a normalized Eco1-sized lane, not a complete cross-retron
-  coverage lane.
+- The current 2,000 bp context promotes 4,148 abundance-affiliated Crawford
+  rows and 129 Khan rows, but still leaves 18 Crawford reference-only sequences
+  without affiliated abundance and 40 otherwise sequence-authorized Khan rows
+  blocked. It is therefore a normalized Eco1-sized lane, not a complete
+  cross-retron coverage lane.
 - The compiler-generated MSD lnRNA fixture pool lives at
   `../operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml`.
-  It compiles bounded Retron MSD primitive combinations through the pure
-  compiler API, requires `lnrna_insert_sequence_5to3` to equal the reverse
-  complement of the MSD product, exact-matches the retron26 template MSD plus
-  5-prime/3-prime flanks, and writes ordinary Construct subject rows with fixed
-  Eco1 WT RT. It does not formalize or materialize a pre-Infer concat.
-- The live consolidated Construct input dogfood contains 10,412 construct
-  subjects: 36 GenBank-authorized subjects, 4,166 Crawford source-sequence
-  subjects paired with fixed WT Eco1 RT, 129 Khan source RT-lnRNA subjects, 1
-  compiler-generated MSD lnRNA variant subject, and 6,080 RT-CDS DMS subjects
-  generated through the public `dnadesign.permuter` API.
-- The live Construct output dogfood validates strictly with 20,824 realized
-  context rows and 62,472 explicit sequence-view declarations. Each construct
+  It compiles the YIU-compatible full combinatoric pool from five DE033
+  Snapback cap primitive ranks and sixteen scar-nick TetO stem-base primitive
+  ranks through the pure compiler API, requires `lnrna_insert_sequence_5to3` to
+  equal the reverse complement of the MSD product, exact-matches the retron26
+  template MSD plus 5-prime/3-prime flanks, and writes ordinary Construct
+  subject rows with fixed Eco1 WT RT. It does not formalize or materialize a
+  pre-Infer concat.
+- The live consolidated Construct input dogfood contains 10,473 construct
+  subjects: 36 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
+  source-sequence subjects paired with fixed WT Eco1 RT, 129 Khan source
+  RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
+  6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
+  API.
+- The live Construct output dogfood validates strictly with 20,946 realized
+  context rows and 62,838 explicit sequence-view declarations. Each construct
   subject has all six required view names.
 - The executable Infer-readiness gate at
   `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
@@ -106,9 +112,10 @@ still absent.
   forward context row, one reverse-complement context row, and exactly the six
   declared source sequence-view names per construct subject before the study can
   hand the dataset to Infer. A full temp dogfood through public dnadesign-data
-  source IDs passed with 10,412 subjects, 20,824 Construct output rows, and
-  62,472 sequence-view rows; the only source-promotion issues remained the
-  expected 2 missing RT CDS rows and 40 over-window Khan rows.
+  source IDs passed with 10,473 subjects, 20,946 Construct output rows, and
+  62,838 sequence-view rows; the only source-promotion issues remained the
+  expected 18 Crawford reference-only rows without affiliated abundance, 2
+  missing RT CDS rows, and 40 over-window Khan rows.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
   fixed-size representation-table contract, including expected Evo2 7B vector
   dimensions and Khan/Crawford overlay integration boundaries.
@@ -118,10 +125,11 @@ still absent.
   across intermediate and output-layer gallery views.
 - `../contexts/reader-spop-label-contract.md` and
   `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml`
-  declare the planned Reader-derived SPOP scalar materializer. It resolves
-  Reader ratio artifacts through `records.json`, keeps assay subject identity
-  separate from Construct subject identity, and routes
-  `reader_spop_endpoint_auc_v1` to OPAL as `scalar_identity_v1/scalar`.
+  declare the planned Reader-to-Construct SPOP bridge. Reader owns the SPOP
+  metric source-of-truth in `reader/docs/lib/spop_endpoint_in_reader.md`; this
+  study bridge resolves Reader ratio artifacts through `records.json`, keeps
+  assay subject identity separate from Construct subject identity, and routes
+  `reader_spop_endpoint_dose_mean_v1` to OPAL as `scalar_identity_v1/scalar`.
 - Current Reader SPOP dry-run evidence is label-planner clean with one explicit
   no-call warning:
   `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan`
@@ -144,9 +152,9 @@ still absent.
 ### Remaining Blockers
 
 - Evo2 7B Infer sidecars for the six explicit `view_name` lanes. The current
-  inventory gate resolves all 62,472 required source views with
+  inventory gate resolves all 62,838 required source views with
   `missing_products=0`, but sidecars remain absent:
-  `missing_vectors=124944` and `missing_scalars=124944`.
+  `missing_vectors=125676` and `missing_scalars=125676`.
 - LatentDNA materialization of the declared representation-health, ordinal
   overlay, scree, and UMAP gallery views after sidecars exist.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The
@@ -170,11 +178,12 @@ still absent.
 
 ### Phase 1 Posture
 
-The two lab-anchor-derived construct-subject fixtures are source-authority
-resolved and `construct_projection_status: representable` under the multi-slot
-projection manifest. Construct can emit the declared 2,000 bp views with the
-correct `template_custom` sequence-view metadata. Construct-subject fixtures
-remain source fixtures and do not inline generated view ids.
+The checked-in construct-subject fixtures are representative GenBank
+source-authority rows resolved as `construct_projection_status: representable`
+under the multi-slot projection manifest. Construct can emit the declared
+2,000 bp views with the correct `template_custom` sequence-view metadata.
+Construct-subject fixtures remain source fixtures and do not inline generated
+view ids.
 
 ### Next Actions
 

@@ -4,6 +4,7 @@ Typed MSD variant-pool contract for RT-lnRNA source promotions.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
@@ -141,30 +142,90 @@ class DesignSpaceStemBaseSpec(MsdPoolContractModel):
         return {key: value for key, value in fields.items() if value is not None}
 
 
+class DesignSpacePrimitiveRankedSourceSpec(MsdPoolContractModel):
+    source_id: str
+    run_dir: str
+    ranks: list[int]
+    expected_primitive_count: int | None = Field(default=None, ge=1)
+
+    @field_validator("source_id", "run_dir")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        return _not_blank(value)
+
+    @field_validator("ranks")
+    @classmethod
+    def _valid_ranks(cls, value: list[int]) -> list[int]:
+        if not value:
+            raise ValueError("primitive ranks must not be empty.")
+        parsed: list[int] = []
+        for rank in value:
+            if isinstance(rank, bool) or int(rank) < 1:
+                raise ValueError("primitive ranks must be positive integers.")
+            parsed.append(int(rank))
+        if len(set(parsed)) != len(parsed):
+            raise ValueError("primitive ranks must be unique.")
+        return parsed
+
+
+class DesignSpaceCapPrimitiveSourceSpec(DesignSpacePrimitiveRankedSourceSpec):
+    kind: Literal["snapback_released_solve_cap"]
+    cap_id_prefix: str
+
+    @field_validator("cap_id_prefix")
+    @classmethod
+    def _valid_cap_id_prefix(cls, value: str) -> str:
+        text = _not_blank(value)
+        if not text.startswith("C"):
+            raise ValueError("cap_id_prefix must start with C to match Retron compiler cap IDs.")
+        _validate_identifier_prefix(text, label="cap_id_prefix")
+        return text
+
+
+class DesignSpaceStemBasePrimitiveSourceSpec(DesignSpacePrimitiveRankedSourceSpec):
+    kind: Literal["scar_nick_stem_bases"]
+    stem_base_id_prefix: str
+
+    @field_validator("stem_base_id_prefix")
+    @classmethod
+    def _valid_stem_base_id_prefix(cls, value: str) -> str:
+        text = _not_blank(value)
+        _validate_identifier_prefix(text, label="stem_base_id_prefix")
+        return text
+
+
 class DesignSpaceSpec(MsdPoolContractModel):
     construct_id_prefix: str
     payload_ids: list[str]
-    cap_ids: list[str]
-    stem_bases: list[DesignSpaceStemBaseSpec]
+    cap_ids: list[str] = Field(default_factory=list)
+    cap_primitives: list[DesignSpaceCapPrimitiveSourceSpec] = Field(default_factory=list)
+    stem_bases: list[DesignSpaceStemBaseSpec] = Field(default_factory=list)
+    stem_base_primitives: list[DesignSpaceStemBasePrimitiveSourceSpec] = Field(default_factory=list)
 
     @field_validator("construct_id_prefix")
     @classmethod
     def _not_blank(cls, value: str) -> str:
         return _not_blank(value)
 
-    @field_validator("payload_ids", "cap_ids")
+    @field_validator("payload_ids")
     @classmethod
     def _not_empty_str_list(cls, value: list[str]) -> list[str]:
         if not value:
-            raise ValueError("design-space id lists must not be empty.")
+            raise ValueError("design_space.payload_ids must not be empty.")
         return [_not_blank(item) for item in value]
 
-    @field_validator("stem_bases")
+    @field_validator("cap_ids")
     @classmethod
-    def _not_empty_stem_bases(cls, value: list[DesignSpaceStemBaseSpec]) -> list[DesignSpaceStemBaseSpec]:
-        if not value:
-            raise ValueError("design_space.stem_bases must not be empty.")
-        return value
+    def _str_list(cls, value: list[str]) -> list[str]:
+        return [_not_blank(item) for item in value]
+
+    @model_validator(mode="after")
+    def _validate_design_sources(self) -> "DesignSpaceSpec":
+        if not self.cap_ids and not self.cap_primitives:
+            raise ValueError("design_space requires cap_ids or cap_primitives.")
+        if not self.stem_bases and not self.stem_base_primitives:
+            raise ValueError("design_space requires stem_bases or stem_base_primitives.")
+        return self
 
 
 class RtLnrnaMsdVariantPoolSpecV1(MsdPoolContractModel):
@@ -232,6 +293,11 @@ def _not_blank(value: str) -> str:
     if not text:
         raise ValueError("field must be non-empty.")
     return text
+
+
+def _validate_identifier_prefix(value: str, *, label: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+        raise ValueError(f"{label} must contain only letters, digits, underscore, dot, or hyphen.")
 
 
 __all__ = [

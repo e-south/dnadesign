@@ -14,7 +14,8 @@ datasets:
     notes: >-
       Numeric RT-DNA abundance prior only. Preserve raw_value and
       normalized_value as source-fidelity fields; ordinal_bin is secondary
-      metadata and not a TF-sponging label.
+      metadata and not a TF-sponging label. The numeric scale is scoped to the
+      Khan source and must not be mixed with Crawford abundance or Reader SPOP.
   - role: khan_rt_lnrna_reference_bridge
     owner_tool: dnadesign-data
     lifecycle: source_reference
@@ -51,7 +52,8 @@ datasets:
     notes: >-
       Eco1-local ncRNA abundance observations with preserved raw_value and
       normalized_value. These rows are abundance priors, not TF-sponging
-      assay observations.
+      assay observations. The numeric scale is scoped to Crawford Eco1 msDNA
+      abundance and is not comparable to Khan RT-DNA abundance or Reader SPOP.
   - role: crawford_eco1_lnrna_msd_design_references
     owner_tool: dnadesign-data
     lifecycle: source_reference
@@ -62,8 +64,9 @@ datasets:
     line_count_including_header: 2579
     notes: >-
       Eco1-derived lnRNA/MSD design references. Use as sequence/design
-      provenance; promote through the sequence-union resolver only after
-      dual-cassette projection and orientation checks.
+      provenance. A design-reference-only sequence does not move forward as a
+      Construct candidate unless it has an affiliated abundance observation and
+      passes dual-cassette projection and orientation checks.
   - role: retron_hairpin_msd_design_registry
     owner_tool: study
     lifecycle: source_reference
@@ -191,10 +194,11 @@ datasets:
         dependency_surface: dnadesign-data Crawford processed reference and abundance TSVs
         source_basis: crawford_eco1_lnrna_fixed_wt_rt
         notes: >-
-          Promotes the union of Crawford Eco1 lnRNA design-reference and
-          abundance-observation source sequences using fixed WT Eco1 RT. The
-          gate requires DNA4 sequence authority, Eco1 forward k-mer orientation
-          QC, and reverse-complement rejection. Exact MSD and short-flank
+          Promotes abundance-affiliated Crawford Eco1 lnRNA source sequences
+          using fixed WT Eco1 RT. The gate requires an abundance-observation
+          row, DNA4 sequence authority, Eco1 forward k-mer orientation QC, and
+          reverse-complement rejection. Design-reference-only sequences remain
+          source provenance and issue records. Exact MSD and short-flank
           matches are retained as QC annotations because abundance-bearing
           variants can intentionally alter those regions; duplicate source rows
           are retained as source-record counts and overlay provenance, not
@@ -215,12 +219,13 @@ datasets:
         dependency_surface: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml
         source_basis: compiler_generated_msd_lnrna_variant
         notes: >-
-          Compiles bounded Retron MSD primitive combinations into 5-prime to
-          3-prime MSD products, inserts their reverse complements into the
-          retron26 template lnRNA after exact template MSD and flank checks,
-          and pairs the generated lnRNA with fixed Eco1 WT RT. This lane is a
-          study-owned sequence/design-reference source and does not create a
-          pre-Infer concat.
+          Compiles the YIU-compatible full combinatoric pool from five DE033
+          Snapback cap ranks and sixteen scar-nick TetO stem-base ranks into
+          5-prime to 3-prime MSD products, inserts their reverse complements
+          into the retron26 template lnRNA after exact template MSD and flank
+          checks, and pairs the generated lnRNA with fixed Eco1 WT RT. This
+          lane is a study-owned sequence/design-reference source and does not
+          create a pre-Infer concat.
       - lane_id: rt_cds_in_silico_dms
         owner_tool: study
         generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_rt_cds_dms_construct_contexts
@@ -293,7 +298,9 @@ datasets:
     status: planned
     source_owner_tool: reader
     source_record: ratio_reporter_normalizer/df
-    metric_id: reader_spop_endpoint_auc_v1
+    metric_id: reader_spop_endpoint_dose_mean_v1
+    source_of_truth_doc: reader/docs/lib/spop_endpoint_in_reader.md
+    source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
     schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
     materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
     reader_experiment_ids:
@@ -308,7 +315,9 @@ datasets:
       pBbS2c-RFP experiments. Rows keep Reader assay subject identity separate
       from Construct subject identity; retron rows resolve through the
       variant GenBank catalog when explicit RT plus lnRNA sequence authority
-      exists. The 20251105 RT-variant Reader artifact is a single-point mid-log
+      exists. The SPOP numeric scope is Reader experiment-normalized
+      TF-sponging and is not comparable to Khan or Crawford abundance scales.
+      The 20251105 RT-variant Reader artifact is a single-point mid-log
       read recorded at artifact time 0 h but interpreted as approximately 10 h
       after seeding; the 20260507 retron176 wells are omitted because no actual
       strain was present.

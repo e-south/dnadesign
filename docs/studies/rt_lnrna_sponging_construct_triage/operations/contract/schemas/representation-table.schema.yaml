@@ -247,7 +247,7 @@ source_overlay_inputs:
     required_numeric_fields:
       - raw_value
       - normalized_value
-    notes: Preserve ordinal_bin as metadata only.
+    notes: Preserve ordinal_bin as metadata only; numeric scale is source-scoped to Khan RT-DNA abundance.
   - reference_overlay_id: crawford_eco1_lnrna_msd_abundance_v1
     source_role: crawford_eco1_ncrna_abundance_observations
     integration_mode: abundance_prior_overlay
@@ -256,7 +256,7 @@ source_overlay_inputs:
     required_numeric_fields:
       - raw_value
       - normalized_value
-    notes: Source abundance observations are not TF-sponging labels.
+    notes: Source abundance observations are not TF-sponging labels; numeric scale is source-scoped to Crawford Eco1 msDNA abundance.
   - reference_overlay_id: crawford_eco1_lnrna_msd_design_reference_v1
     source_role: crawford_eco1_lnrna_msd_design_references
     integration_mode: candidate_sequence_reference
@@ -266,7 +266,17 @@ source_overlay_inputs:
       - lnrna_sequence
       - msr_sequence
       - msd_sequence
-    notes: Rows require explicit RT plus lnRNA authority before construct projection.
+    notes: Rows require explicit RT plus lnRNA authority and affiliated abundance observation before Crawford construct promotion.
+  - reference_overlay_id: reader_spop_endpoint_dose_mean_v1
+    source_role: reader_spop_label_plan
+    integration_mode: sponging_assay_observation
+    allowed_as_opal_y: true
+    allowed_as_latentdna_overlay: true
+    join_basis: construct_subject_id
+    required_numeric_fields:
+      - raw_value
+      - normalized_value
+    notes: Reader SPOP is source-scoped to reader_experiment_normalized_tf_sponging and is not numerically comparable to Khan or Crawford abundance priors.
 construct_subject_promotion:
   source_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
   consolidated_construct_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
@@ -285,12 +295,13 @@ construct_subject_promotion:
   notes: >-
     Khan and Crawford rows may color or ordinally audit latent views only after
     a resolver promotes them to construct-compatible construct subject rows
-    with both lnRNA and RT CDS sequences. Crawford promotion can use the
-    design-reference plus abundance-observation sequence union when orientation
-    QC passes; Khan promotion requires explicit RT CDS DNA sequence authority.
+    with both lnRNA and RT CDS sequences. Crawford promotion requires an
+    abundance-affiliated sequence and orientation QC; design-reference-only rows
+    remain source provenance. Khan promotion requires explicit RT CDS DNA
+    sequence authority.
     Promoted rows must enter the same Construct input dataset, consolidated
     2,000 bp Construct output dataset, and six Infer source-view lanes as the
-    retron26/retron43 controls.
+    first-class GenBank catalog rows.
 p4_stem_appendix_gate:
   status: blocked_until_construct_subject_owned_subspan_table
   required_schema: construct_subject_owned_lnrna_subspan_table_v1

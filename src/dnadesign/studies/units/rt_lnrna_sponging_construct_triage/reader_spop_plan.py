@@ -35,7 +35,11 @@ DEFAULT_READER_EXPERIMENT_IDS: tuple[str, ...] = (
     "20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark",
 )
 
-SPOP_METRIC_ID = "reader_spop_endpoint_auc_v1"
+SPOP_METRIC_ID = "reader_spop_endpoint_dose_mean_v1"
+SPOP_METRIC_FAMILY = "sponging_percent_of_positive"
+SPOP_NUMERIC_SCOPE = "reader_experiment_normalized_tf_sponging"
+SPOP_SOURCE_OF_TRUTH_DOC = "reader/docs/lib/spop_endpoint_in_reader.md"
+SPOP_SOURCE_OF_TRUTH_API = "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
 REPORTER_PLASMID_ID = "pBbS2c-RFP"
 REPORTER_DESIGN_ID = "pBbS2c-rfp"
 REPORTER_READOUT = "RFP/OD600"
@@ -412,6 +416,11 @@ def _score_design(
         "baseline_condition": "0 nm aTc; 0 uM IPTG",
         "positive_control_condition": f"{positive_atc:g} nm aTc; 0 uM IPTG",
         "lambda_viability": lambda_viability,
+        "metric_definition_owner": "reader",
+        "metric_family": SPOP_METRIC_FAMILY,
+        "metric_numeric_scope": SPOP_NUMERIC_SCOPE,
+        "metric_source_of_truth_api": SPOP_SOURCE_OF_TRUTH_API,
+        "metric_source_of_truth_doc": SPOP_SOURCE_OF_TRUTH_DOC,
     }
     resolved_assay_metadata.update(dict(assay_metadata or {}))
     return ReaderSpopObservation(

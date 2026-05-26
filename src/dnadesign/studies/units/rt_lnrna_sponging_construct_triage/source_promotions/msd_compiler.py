@@ -4,7 +4,6 @@ Retron compiler-generated MSD lnRNA source promotion.
 
 from __future__ import annotations
 
-from itertools import product
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -31,6 +30,7 @@ from .common import (
     slug,
 )
 from .contracts import SourceConstructSubjectPromotion, SourcePromotionContractError
+from .msd_design_space import resolve_design_space_compiler_payload
 from .msd_pool_contract import RtLnrnaMsdVariantPoolSpecV1, load_msd_variant_pool_spec
 
 MSD_COMPILER_SOURCE_BASIS = "compiler_generated_msd_lnrna_variant"
@@ -61,7 +61,7 @@ def resolve_msd_compiler_promotions(
         payload=spec.template_lnrna.model_dump(),
     )
     compiler_inputs = spec.compiler_inputs.model_dump(mode="python")
-    variant_compiler_payload = _variant_compiler_payload(spec=spec)
+    variant_compiler_payload = _variant_compiler_payload(spec=spec, root=root)
     template_compiler_payload = {
         "contract": "retron_msd_compiler_spec_v1",
         "schema_version": 1,
@@ -186,7 +186,7 @@ def patch_lnrna_template_with_msd(
     return template[:start] + lnrna_insert + template[end:]
 
 
-def _variant_compiler_payload(*, spec: RtLnrnaMsdVariantPoolSpecV1) -> dict[str, Any]:
+def _variant_compiler_payload(*, spec: RtLnrnaMsdVariantPoolSpecV1, root: Path) -> dict[str, Any]:
     compiler_inputs = spec.compiler_inputs.model_dump(mode="python")
     if spec.compiler_spec is not None:
         payload = dict(spec.compiler_spec)
@@ -198,39 +198,7 @@ def _variant_compiler_payload(*, spec: RtLnrnaMsdVariantPoolSpecV1) -> dict[str,
                 f"Compiler pool emits {count} variant(s), which exceeds max_variant_count={spec.max_variant_count}."
             )
         return payload
-
-    if spec.design_space is None:
-        raise SourcePromotionContractError("Pool spec requires design_space when compiler_spec is absent.")
-    design_space = spec.design_space
-    payload_ids = design_space.payload_ids
-    cap_ids = design_space.cap_ids
-    stem_bases = design_space.stem_bases
-    count = len(payload_ids) * len(cap_ids) * len(stem_bases)
-    if count > spec.max_variant_count:
-        raise SourcePromotionContractError(
-            f"Compiler design_space emits {count} variant(s), which exceeds max_variant_count={spec.max_variant_count}."
-        )
-    construct_prefix = design_space.construct_id_prefix
-    designs: list[dict[str, Any]] = []
-    for payload_id, cap_id, stem_base in product(payload_ids, cap_ids, stem_bases):
-        design = {
-            "construct_id": f"{construct_prefix}__{slug(payload_id)}__{slug(cap_id)}__{slug(stem_base.stem_base_id)}",
-            "payload_id": payload_id,
-            "cap_id": cap_id,
-            **stem_base.compiler_design_fields(),
-        }
-        designs.append(design)
-    return {
-        "contract": "retron_msd_compiler_spec_v1",
-        "schema_version": 1,
-        "allow_non_ligatable_s0": spec.allow_non_ligatable_s0,
-        "designs": designs,
-        "payload_sequences": _mapping(
-            compiler_inputs.get("payload_sequences"),
-            label="compiler_inputs.payload_sequences",
-        ),
-        "cap_sequences": _mapping(compiler_inputs.get("cap_sequences"), label="compiler_inputs.cap_sequences"),
-    }
+    return resolve_design_space_compiler_payload(spec=spec, compiler_inputs=compiler_inputs, root=root)
 
 
 def _resolve_retron_compiler_payload(*, payload: Mapping[str, Any], spec_path: Path, root: Path):
@@ -295,6 +263,9 @@ def _overlay_fields(
         "construct_subject__source_literature_id": "",
         "construct_subject__source_label_kind": "compiler_design_reference",
         "construct_subject__source_regime": "study_owned_msd_combinatorics",
+        "construct_subject__msd_cloning_method": "YIU",
+        "construct_subject__msd_cloning_compatibility": "YIU_compatible_cloning_method",
+        "construct_subject__msd_primitive_composition": "snapback_cap_plus_scar_nick_stem_base",
         "construct_subject__source_lnrna_design_id": record.msd_design_id,
         "construct_subject__source_sequence_sha256": sequence_sha,
         "construct_subject__lnrna_authority_kind": MSD_COMPILER_AUTHORITY_KIND,
@@ -305,6 +276,7 @@ def _overlay_fields(
         "construct_subject__msd_design_id": record.msd_design_id,
         "construct_subject__msd_payload_id": record.payload_or_target.id,
         "construct_subject__msd_cap_id": record.cap.id,
+        "construct_subject__msd_source_notes": unit.provenance.get("source_notes") or "",
         "construct_subject__msd_stem_base_left": unit.segment_sequence("stem_base_left"),
         "construct_subject__msd_stem_base_right": unit.segment_sequence("stem_base_right"),
         "construct_subject__msd_profile_s3s2s1s0": record.scar_nick.profile_s3s2s1s0,
@@ -388,9 +360,13 @@ def _list(value: Any, *, label: str) -> list[Any]:
 
 def _required_str(payload: Mapping[str, Any], key: str) -> str:
     value = payload.get(key)
+    return _required_text(value, label=key)
+
+
+def _required_text(value: Any, *, label: str) -> str:
     text = str(value or "").strip()
     if not text:
-        raise SourcePromotionContractError(f"{key} must be non-empty.")
+        raise SourcePromotionContractError(f"{label} must be non-empty.")
     return text
 
 

@@ -3,8 +3,8 @@ schema_version: 1
 pool_id: rt_lnrna_sponging_construct_triage_compiler_msd_variant_pool_v1
 study_id: rt_lnrna_sponging_construct_triage
 payload_program_id: tetO_sponging_v1
-max_variant_count: 4
-expected_variant_count: 1
+max_variant_count: 80
+expected_variant_count: 80
 dedupe_policy: fail
 template_lnrna:
   sequence_ref: genbank:pes-retron-26-a1-a2.gb#a1-a2
@@ -27,21 +27,45 @@ compiler_inputs:
   cap_sequences:
     C26:
       sequence: AGGC
-    C172:
-      sequence: GAGAGACTC
 design_space:
-  construct_id_prefix: rt-lnrna-compiler
+  construct_id_prefix: rt-lnrna-yiu-compatible-compiler
   payload_ids:
     - TetR
-  cap_ids:
-    - C172
-  stem_bases:
-    - stem_base_id: lagtg_rcaat
-      left_base: AGTG
-      right_base: CAAT
-      profile_s3s2s1s0: MXMM
-      source_ref: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179
-      nick_orientation: bottom
-      nickase: Nb.BtsI
+  cap_primitives:
+    - source_id: de033_released_snapback_cap_primitives_v1
+      kind: snapback_released_solve_cap
+      run_dir: src/dnadesign/cruncher/workspaces/de033/outputs/released_solve
+      cap_id_prefix: CDE033R
+      ranks:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+      expected_primitive_count: 5
+  stem_base_primitives:
+    - source_id: scar_nick_teto_bbsI_hf_stem_base_primitives_v1
+      kind: scar_nick_stem_bases
+      run_dir: src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf
+      stem_base_id_prefix: scar_nick_teto_rank
+      ranks:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+      expected_primitive_count: 16
 source_refs:
-  - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179
+  - src/dnadesign/cruncher/workspaces/de033/outputs/released_solve
+  - src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf

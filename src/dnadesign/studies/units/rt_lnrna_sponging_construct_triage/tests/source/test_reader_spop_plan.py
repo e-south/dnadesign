@@ -183,13 +183,18 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
     assert by_key["retron26"].construct_subject_bridge_status == "resolved_construct_sequence_authority"
     assert by_key["retron26"].reader_artifact_record_id == "ratio_reporter_normalizer/df"
     assert by_key["retron26"].reader_artifact_content_digest == "sha256:test-ratio"
-    assert by_key["retron26"].metric_id == "reader_spop_endpoint_auc_v1"
+    assert by_key["retron26"].metric_id == "reader_spop_endpoint_dose_mean_v1"
     assert by_key["retron26"].reporter_plasmid_id == "pBbS2c-RFP"
     assert by_key["retron26"].payload_program_id == "rt_lnrna_sponging"
     assert by_key["retron26"].batch_id == experiment_id
     assert by_key["retron26"].replicate_count == 3
     assert by_key["retron26"].uncertainty is None
     assert by_key["retron26"].assay_metadata["lambda_viability"] == 0.5
+    assert by_key["retron26"].assay_metadata["metric_definition_owner"] == "reader"
+    assert (
+        by_key["retron26"].assay_metadata["metric_source_of_truth_api"]
+        == "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
+    )
     assert by_key["retron26"].spop_score_raw == by_key["retron26"].spop_score
     assert by_key["retron26"].spop_score_calibrated is None
     assert {
@@ -403,7 +408,13 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
         "sponging-assay-observation.schema.yaml"
     )
     schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
-    assert schema["label_contract"]["metric_id"] == "reader_spop_endpoint_auc_v1"
+    assert schema["label_contract"]["metric_id"] == "reader_spop_endpoint_dose_mean_v1"
+    assert schema["label_contract"]["source_owner"] == "reader"
+    assert schema["label_contract"]["source_of_truth_doc"] == "reader/docs/lib/spop_endpoint_in_reader.md"
+    assert (
+        schema["label_contract"]["source_of_truth_api"]
+        == "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
+    )
     assert schema["label_contract"]["score_direction"] == "maximize"
     assert schema["label_contract"]["y_expected_length"] == 1
     assert schema["label_contract"]["opal_objective"] == "scalar_identity_v1/scalar"
@@ -415,6 +426,8 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     contract_doc = repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md"
     assert contract_doc.exists()
     contract_text = contract_doc.read_text(encoding="utf-8")
+    assert "source-of-truth owner" in contract_text
+    assert "endpoint dose-ladder mean, not an AUC" in contract_text
     assert "pBbS2c-RFP" in contract_text
     assert "scalar_identity_v1/scalar" in contract_text
     assert "must not run OPAL `spop_v1`" in contract_text

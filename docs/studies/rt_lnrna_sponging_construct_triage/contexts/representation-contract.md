@@ -11,8 +11,8 @@ last_verified: 2026-05-25
 The representation contract is
 `dual_cassette_construct_context_embedding_v1`.
 
-The Phase 2 Construct export materializes six source sequence-view names for
-the two controls:
+The Construct export materializes six source sequence-view names for every
+promoted Construct subject:
 
 | View | Required source | Pooling |
 | --- | --- | --- |
@@ -59,12 +59,13 @@ Do not duplicate either emitted sequence merely to imply a concat. Derived
 bidirectional aliases may reference both post-Infer vectors, but that is a
 LatentDNA representation step rather than a Construct sequence-view contract.
 The full 2,000 bp context is `2000bp-region.gb`, which maps to pES-retron-26
-`[56,2056)` in zero-based half-open vector coordinates. In the retron26 control
-row the region-relative anchors are `lnrna: [130,303)` and `rt_cds: [468,1431)`.
-Retron43's 14 bp longer lnRNA shifts the emitted window start to 63, so the
-region-relative anchors become `lnrna: [123,310)` and `rt_cds: [475,1438)`;
-the 165 bp interstitial remains constant while the prefix/suffix flanks are
-trimmed symmetrically.
+`[56,2056)` in zero-based half-open vector coordinates. Retron26 and retron43
+are examples within the same first-class GenBank catalog, not a separate
+Construct ontology partition. In the retron26 row the region-relative anchors
+are `lnrna: [130,303)` and `rt_cds: [468,1431)`. Retron43's 14 bp longer lnRNA
+shifts the emitted window start to 63, so the region-relative anchors become
+`lnrna: [123,310)` and `rt_cds: [475,1438)`; the 165 bp interstitial remains
+constant while the prefix/suffix flanks are trimmed symmetrically.
 The same policy applies to RT length changes: retron47/retron48 keep the full
 Sso7d-fusion RT slot inside the 2,000 bp view by trimming outer flanks, yielding
 `lnrna: [27,200)` and `rt_cds: [365,1535)`. The policy never clips the lnRNA or
@@ -115,12 +116,12 @@ promoter-style LatentDNA work:
   construct and overlay hue controls.
 
 Khan and Crawford overlay columns preserve `raw_value` and `normalized_value`
-as numeric source fields. `ordinal_bin` is a secondary metadata axis for
-geometry review, not a replacement label and not OPAL `Y`. Crawford
-design-reference rows and abundance-observation rows remain distinct source
-record types, but their lnRNA sequence union can now be promoted as
-construct-subject sequence authority when it passes the study-owned orientation
-and representability checks.
+as source-scoped numeric fields. They are not on one shared numeric scale.
+`ordinal_bin` is a secondary metadata axis for source-local geometry review,
+not a replacement label and not OPAL `Y`. Crawford design-reference rows and
+abundance-observation rows remain distinct source record types; Construct
+promotion moves forward only with abundance-affiliated lnRNA sequences, while
+reference-only sequences are retained as source provenance and issue records.
 
 Khan and Crawford rows can participate in LatentDNA overlays only after they
 become construct-compatible construct subject rows with explicit `construct_subject__lnrna_sequence`
@@ -129,7 +130,7 @@ and `construct_subject__rt_cds_sequence` authority. Promoted rows must enter
 the consolidated
 `rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1` dataset, and
 receive the same six source sequence-view declarations as the retron26/retron43
-controls before Infer runs. Overlay-only rows must not be passed to Infer.
+examples before Infer runs. Overlay-only rows must not be passed to Infer.
 
 ### Failure Rules
 

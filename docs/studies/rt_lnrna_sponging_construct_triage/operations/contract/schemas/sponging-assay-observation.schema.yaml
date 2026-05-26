@@ -2,13 +2,19 @@ schema_id: sponging_assay_observation_v1
 study_id: rt_lnrna_sponging_construct_triage
 status: planned_reader_label_materialization
 label_contract:
-  metric_id: reader_spop_endpoint_auc_v1
+  metric_id: reader_spop_endpoint_dose_mean_v1
   metric_family: sponging_percent_of_positive
   score_direction: maximize
+  numeric_scope: reader_experiment_normalized_tf_sponging
+  ordinal_audit_scope: source_local_reader_spop
+  scale_compatibility: source_scoped_not_comparable_to_khan_or_crawford_abundance
   y_expected_length: 1
   allowed_as_opal_y: true
+  allowed_as_latentdna_overlay: true
   opal_objective: scalar_identity_v1/scalar
   source_owner: reader
+  source_of_truth_doc: reader/docs/lib/spop_endpoint_in_reader.md
+  source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
   materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
   reporter_plasmid_id: pBbS2c-RFP
   reporter_design_id: pBbS2c-rfp
@@ -21,9 +27,10 @@ label_contract:
     Median endpoint RFP/OD600 is baseline-subtracted and divided by the
     aTc-positive derepression range for each Reader experiment and candidate.
     Nonzero IPTG doses are averaged after clipping only for the primary scalar
-    floor at zero; raw dose values remain available for QC. The viability factor
-    is the mean one-sided OD600 ratio relative to zero IPTG and scales potency by
-    ((1 - lambda) + lambda * viability).
+    floor at zero; raw dose values remain available for QC. This is an endpoint
+    dose-ladder mean, not an AUC. The viability factor is the mean one-sided
+    OD600 ratio relative to zero IPTG and scales potency by ((1 - lambda) +
+    lambda * viability).
 required_fields:
   observation_id: string
   assay_subject_key: string
@@ -73,3 +80,4 @@ validation_rules:
 validation_notes:
   - This is the only planned source for OPAL TF-sponging Y values.
   - Literature abundance priors must not be converted into this schema.
+  - SPOP-derived categorical hues or ordinal bins are metadata views over this Reader metric, not replacements for raw_value or normalized_value.

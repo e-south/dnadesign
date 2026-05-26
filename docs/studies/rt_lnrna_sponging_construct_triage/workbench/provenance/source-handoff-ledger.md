@@ -17,10 +17,10 @@
 
 | Source | Path | Use |
 | --- | --- | --- |
-| MSD design registry | `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` | C26/C43 source labels and cap provenance. |
-| MSD cap source lookup | `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml` | C26/C43 cap sequences and source labels. |
+| MSD design registry | `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml` | Retron MSD source labels and cap provenance, including C26/C43 examples. |
+| MSD cap source lookup | `docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml` | Retron MSD cap sequences and source labels, including C26/C43 examples. |
 | Scar-nick profile panel | `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml` | Finite engineered variant rationale and MsdDesignSpec provenance. |
-| Compiler MSD lnRNA pool fixture | `docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml` | Bounded study-owned MSD primitive pool that emits compiler-generated lnRNA variants with reverse-complement insertion into the retron26 template lnRNA. |
+| Compiler MSD lnRNA pool fixture | `docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml` | YIU-compatible study-owned MSD primitive pool that emits 5 x 16 compiler-generated lnRNA variants with reverse-complement insertion into the retron26 template lnRNA. |
 | RT-lnRNA variant GenBank metadata | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml` | User-supplied variant comments, Benchling links, and expected RT/lnRNA class. |
 | RT-lnRNA variant GenBank catalog | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml` | Parsed lnRNA and RT slot source authority for 36 Construct-representable variants: 35 whole-plasmid GenBank sources plus the BL21 lnRNA-only source paired with Eco1 WT RT. |
 
@@ -54,20 +54,21 @@ Parsed offsets and SHA-256 values are pinned in
   `genbank:2000bp-region.gb#record`, contained in pES retron-26 at `[56,2056)`.
 - 36 GenBank-authorized RT-lnRNA construct subjects resolve to explicit lnRNA
   and RT CDS slot sequences.
-- 4,166 Crawford Eco1-local source lnRNA sequences from the design-reference
-  plus abundance-observation union pass DNA4 validation, Eco1 forward k-mer
-  orientation QC, and reverse-complement rejection, then project with fixed WT
-  Eco1 RT. Exact MSD and short-flank matches are retained as QC annotations
-  because source variants can intentionally alter those regions. These rows are
-  annotated as dnadesign-context projections, not exact Crawford expression
-  context recreations.
+- 4,148 abundance-affiliated Crawford Eco1-local source lnRNA sequences pass
+  DNA4 validation, Eco1 forward k-mer orientation QC, and reverse-complement
+  rejection, then project with fixed WT Eco1 RT. The 18 design-reference-only
+  sequences are retained as source provenance and issue records. Exact MSD and
+  short-flank matches are retained as QC annotations because source variants
+  can intentionally alter those regions. These rows are annotated as
+  dnadesign-context projections, not exact Crawford expression context
+  recreations.
 - 129 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
   CDS DNA, translation-exact RT CDS validation, and the current
   lnRNA-centered 2,000 bp construct-window preflight.
-- 1 compiler-generated MSD lnRNA fixture row compiles from Retron MSD primitive
-  provenance, inserts the reverse complement of the 5-prime-to-3-prime MSD
-  product into the retron26 lnRNA template after exact flank checks, and pairs
-  with fixed Eco1 WT RT.
+- 80 compiler-generated MSD lnRNA fixture rows compile from the YIU-compatible
+  5 x 16 Snapback cap and scar-nick stem-base primitive pool, insert the
+  reverse complement of the 5-prime-to-3-prime MSD product into the retron26
+  lnRNA template after exact flank checks, and pair with fixed Eco1 WT RT.
 - 6,080 RT-CDS in silico DMS construct subjects are generated through the
   public `dnadesign.permuter` coding-DNA DMS API.
 
@@ -82,6 +83,6 @@ Parsed offsets and SHA-256 values are pinned in
 - Evo2 Infer sidecars for the six declared Construct sequence views.
 - OPAL-ready fixed-size feature table with real sponging labels.
 
-The live consolidated Construct workspace now materializes 10,412 construct
-subjects into 20,824 realized 2,000 bp contexts with 62,472 sequence-view
+The live consolidated Construct workspace now materializes 10,473 construct
+subjects into 20,946 realized 2,000 bp contexts with 62,838 sequence-view
 declarations.

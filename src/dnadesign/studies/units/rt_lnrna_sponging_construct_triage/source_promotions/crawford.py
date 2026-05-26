@@ -34,7 +34,7 @@ from .source_catalog import (
     resolve_source_table_path,
 )
 
-CRAWFORD_PROMOTED_COLLECTION_ID = "crawford_eco1_lnrna_sequence_union_v1"
+CRAWFORD_PROMOTED_COLLECTION_ID = "crawford_eco1_lnrna_abundance_affiliated_sequence_v1"
 CRAWFORD_REFERENCE_COLLECTION_ID = "crawford_eco1_lnrna_msd_designs_v1"
 CRAWFORD_ABUNDANCE_COLLECTION_ID = "crawford_eco1_lnrna_msd_abundance_v1"
 CRAWFORD_SEQUENCE_QC_POLICY = "eco1_forward_kmer_similarity_v1"
@@ -117,11 +117,24 @@ def resolve_crawford_promotions(
         reference_rows_by_sequence.setdefault(lnrna_sequence, []).append(row)
 
     promotions: list[SourceConstructSubjectPromotion] = []
-    all_sequences = sorted(set(reference_rows_by_sequence) | set(abundance_rows_by_sequence))
-    for lnrna_sequence in all_sequences:
+    for lnrna_sequence, rows in sorted(reference_rows_by_sequence.items()):
+        if lnrna_sequence in abundance_rows_by_sequence:
+            continue
+        issues.append(
+            SourcePromotionIssue(
+                source_collection_id=CRAWFORD_REFERENCE_COLLECTION_ID,
+                source_record_id=join_row_ids(rows),
+                reason="missing_affiliated_abundance_observation",
+                detail=(
+                    f"{row_id(rows[0])}: Crawford design-reference lnRNA sequence has no affiliated abundance "
+                    "observation; retained as source reference only."
+                ),
+            )
+        )
+    for lnrna_sequence in sorted(abundance_rows_by_sequence):
         rows = reference_rows_by_sequence.get(lnrna_sequence, [])
         abundance_matches = abundance_rows_by_sequence.get(lnrna_sequence, [])
-        source_rows = rows or abundance_matches
+        source_rows = abundance_matches
         if not source_rows:
             continue
         first = source_rows[0]

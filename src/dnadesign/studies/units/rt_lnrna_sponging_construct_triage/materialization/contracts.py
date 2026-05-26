@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dnadesign.construct import RunResult
 
+from ..genbank_authority import GenBankAuthorityAudit
 from ..source_promotions import SourcePromotionReport
 
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
@@ -52,6 +53,28 @@ class MaterializationContractError(ValueError):
 
 
 @dataclass(frozen=True)
+class _MaterializationContext:
+    root: Path
+    manifest: dict[str, object]
+    authority: GenBankAuthorityAudit
+    template_sequence: str
+    target_start: int
+    target_end: int
+    template_context_sequence: str
+    slots: tuple[dict[str, object], ...]
+
+
+@dataclass(frozen=True)
+class _ConstructViewRunPlan:
+    context_job_id: str
+    slot_anchor_job_id: str
+    context_config_name: str
+    slot_anchor_config_name: str
+    subject_ids: tuple[str, ...]
+    window_offset_bp: int | None = None
+
+
+@dataclass(frozen=True)
 class ControlConstructMaterializationReport:
     usr_root: Path
     input_dataset: str
@@ -93,10 +116,3 @@ class _CatalogMaterializationCandidate:
     reader_design_id: str
     lnrna_authority_kind: str
     rt_cds_authority_kind: str
-
-
-@dataclass(frozen=True)
-class _ConstructSubjectRunGroup:
-    name: str
-    subject_ids: tuple[str, ...]
-    window_offset_bp: int | None

@@ -3,24 +3,30 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reader-spop-label-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-24
+last_verified: 2026-05-26
 ---
 
-## Reader SPOP Label Contract
+## Reader SPOP Construct Bridge
 
-Reader is the evidence owner for TF-sponging assay labels. The study-owned
+Reader is the source-of-truth owner for SPOP assay metric semantics. The
+Reader-owned reference document is `reader/docs/lib/spop_endpoint_in_reader.md`
+in the sibling Reader repository, and the public scoring surface is
+`reader.domains.plate_reader.analysis.spop.score_spop_endpoint`.
+
+This study document is narrower: it describes how the RT-lnRNA study bridges
+Reader SPOP observations onto Construct subject identity. The study-owned
 planner in
 `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_plan.py`
 converts selected sibling Reader pES-retron plus pBbS2c-RFP experiments into a
 single scalar:
 
 ```text
-reader_spop_endpoint_auc_v1
+reader_spop_endpoint_dose_mean_v1
 ```
 
 The scalar is endpoint RFP/OD600 derepression under nonzero IPTG, normalized
 within each Reader experiment by the zero-inducer baseline and the aTc positive
-control:
+control. This is an endpoint dose-ladder mean, not an AUC:
 
 ```text
 y(dose) = (Z_IPTG(dose) - Z_0) / (Z_aTc - Z_0)
@@ -30,6 +36,13 @@ score = mean(max(0, y(dose))) * ((1 - lambda) + lambda * mean(viability))
 `lambda` defaults to `0.5`. Viability is the one-sided OD600 ratio relative to
 the zero-IPTG baseline. Raw dose-level `y` values are retained for QC even when
 the primary scalar clips negative values at zero.
+
+SPOP expands to `sponging_percent_of_positive`. The metric scope is
+`reader_experiment_normalized_tf_sponging`. It is a source-scoped Reader assay
+scalar, not a Khan RT-DNA abundance value, not a Crawford Eco1 msDNA abundance
+value, and not a Construct sequence property. Downstream audits may derive
+ordinal bins or categorical hues from SPOP, but those bins are metadata views
+over this Reader metric and must preserve the underlying numeric value.
 
 ### Identity Boundary
 
@@ -60,7 +73,7 @@ was present in those wells.
 
 ### Reader Evidence
 
-The planner must resolve Reader artifacts through
+The study bridge must resolve Reader artifacts through
 `outputs/manifests/records.json`, using latest record
 `ratio_reporter_normalizer/df`. Direct path scraping is not allowed because the
 label must carry a stable `reader_artifact_ref`,
@@ -83,3 +96,8 @@ The future OPAL training table may include rows only when both conditions hold:
 1. one selected fixed-size vector `X` has been chosen after LatentDNA review;
 2. the row has a real Reader-derived SPOP scalar and any row used as a Construct
    candidate has resolved sequence authority.
+
+Before OPAL handoff, SPOP can still be joined as a LatentDNA overlay or ordinal
+audit axis when `construct_subject_bridge_status` is
+`resolved_construct_sequence_authority`. Rows without that bridge stay as assay
+evidence only and must not be silently promoted into Infer-backed training rows.

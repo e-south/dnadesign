@@ -23,6 +23,7 @@ rules:
   - Treat 20251105_retron_Eco1_RT_variants as a single-point mid-log read at approximately 10 h after seeding; do not interpret artifact time 0 h as a true biological endpoint.
   - Omit retron176 from 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark because no actual strain was present in those wells.
   - Keep unresolved retron variants out of Construct-backed construct subject ids until explicit RT plus lnRNA sequence authority exists.
-  - Export the scalar as reader_spop_endpoint_auc_v1 for OPAL scalar_identity_v1/scalar only.
+  - Treat Reader, not the dnadesign study, as the source-of-truth owner for SPOP metric semantics.
+  - Export the endpoint dose-mean scalar as reader_spop_endpoint_dose_mean_v1 for OPAL scalar_identity_v1/scalar only.
 validation:
   command: uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py

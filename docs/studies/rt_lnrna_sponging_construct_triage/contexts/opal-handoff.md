@@ -28,10 +28,11 @@ OPAL readiness means this dataset has:
 - a future label slot for `SpongingAssayObservation`;
 - no learned `Y ~ X` campaign before real labels exist.
 
-The planned label materializer is the Reader bridge documented in
-`reader-spop-label-contract.md`. It emits the scalar
-`reader_spop_endpoint_auc_v1` from pBbS2c-RFP reporter assays and routes it to
-OPAL as `scalar_identity_v1/scalar`.
+The planned label materializer is the Reader-to-Construct bridge documented in
+`reader-spop-label-contract.md`. Reader owns the SPOP metric definition; the
+study bridge emits the endpoint dose-mean scalar
+`reader_spop_endpoint_dose_mean_v1` from pBbS2c-RFP reporter assays and routes
+it to OPAL as `scalar_identity_v1/scalar`.
 
 The candidate `X` columns are declared in
 `../operations/contract/schemas/representation-table.schema.yaml`. Selection is
