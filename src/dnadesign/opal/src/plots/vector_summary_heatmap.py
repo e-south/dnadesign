@@ -24,11 +24,13 @@ from ._mpl_utils import (
     add_flush_colorbar,
     apply_notebook_axes_style,
     apply_plot_style,
+    apply_y_axis_scale,
     ensure_mpl_config_dir,
     pretty_label,
     pretty_title,
     save_notebook_square_figure,
     sequential_colormap,
+    wrap_plot_title,
 )
 
 
@@ -89,6 +91,9 @@ def render(context, params: dict) -> None:
         )
     )
     show_reference_mse = bool(params.get("reference_mse_panel", False))
+    font_size = float(params.get("font_size", 13))
+    title_font_size = float(params.get("title_font_size", font_size))
+    tick_font_size = float(params.get("tick_font_size", font_size))
 
     need = {"as_of_round", "run_id", vector_field}
     row_filters = []
@@ -204,12 +209,14 @@ def render(context, params: dict) -> None:
 
     matrix = np.asarray(matrix_rows, dtype=float)
     if show_reference_mse and reference is not None:
-        figsize = tuple(params.get("figsize_in", (11.6, 6.4)))
+        figsize = tuple(params.get("figsize_in", (10.8, 5.2)))
         fig = plt.figure(figsize=figsize)
-        gs = fig.add_gridspec(1, 3, width_ratios=[1.12, 0.035, 1.06], wspace=0.34)
+        gs = fig.add_gridspec(1, 4, width_ratios=[1.0, 0.045, 0.34, 1.12], wspace=0.08)
         ax = fig.add_subplot(gs[0, 0])
         cax = fig.add_subplot(gs[0, 1])
-        ax_mse = fig.add_subplot(gs[0, 2])
+        spacer_ax = fig.add_subplot(gs[0, 2])
+        spacer_ax.axis("off")
+        ax_mse = fig.add_subplot(gs[0, 3])
     else:
         figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
         fig, ax = plt.subplots(figsize=figsize)
@@ -233,16 +240,24 @@ def render(context, params: dict) -> None:
     ax.set_aspect("equal", adjustable="box")
     apply_notebook_axes_style(ax, grid=False, square=False)
     ax.set_xticks(np.arange(dim) + 0.5)
-    ax.set_xticklabels(channel_labels, rotation=45, ha="right")
+    ax.set_xticklabels(
+        _heatmap_channel_tick_labels(channel_labels),
+        rotation=45,
+        ha="right",
+        rotation_mode="anchor",
+        fontsize=tick_font_size,
+    )
     ax.set_yticks(np.arange(len(y_labels)) + 0.5)
-    ax.set_yticklabels(y_labels)
-    ax.set_xlabel("Vector channel")
-    ax.set_title(pretty_title(params.get("title", "Vector summary heatmap")))
+    ax.set_yticklabels(y_labels, fontsize=tick_font_size)
+    channel_axis_label = str(params.get("channel_axis_label", "Vector channel")).strip()
+    if channel_axis_label:
+        ax.set_xlabel(channel_axis_label, fontsize=font_size)
+    ax.set_title(pretty_title(params.get("title", "Vector summary heatmap")), fontsize=title_font_size)
     value_label = str(params.get("value_label", f"{pretty_label(aggregation)} predicted response"))
     if cax is None:
         add_flush_colorbar(fig, ax, im, label=value_label)
     else:
-        fig.subplots_adjust(left=0.12, right=0.965, bottom=0.23, top=0.84, wspace=0.34)
+        fig.subplots_adjust(left=0.11, right=0.965, bottom=0.24, top=0.84, wspace=0.08)
         fig.canvas.draw()
         heatmap_box = ax.get_position()
         cbar_width = max(0.014, heatmap_box.width * 0.035)
@@ -251,6 +266,8 @@ def render(context, params: dict) -> None:
         cbar = fig.colorbar(im, cax=cax)
         cbar.set_label(_short_colorbar_title(value_label), rotation=90, labelpad=8, va="center")
         cbar.ax.yaxis.set_label_position("right")
+        cbar.ax.tick_params(labelsize=tick_font_size)
+        cbar.ax.yaxis.label.set_size(font_size)
     if ax_mse is not None:
         apply_notebook_axes_style(ax_mse, square=False)
         mse_frame = pd.DataFrame(mse_rows).sort_values("round")
@@ -262,12 +279,23 @@ def render(context, params: dict) -> None:
             linewidth=2.2,
             markersize=6,
         )
-        ax_mse.set_xlabel("Round")
-        ax_mse.set_ylabel("MSE to target")
-        ax_mse.set_title("MSE to target")
+        ax_mse.set_xlabel("Round", fontsize=font_size)
+        mse_label = str(params.get("reference_mse_metric_label") or "MSE = mean((mean selected y_hat - reference)^2)")
+        ax_mse.set_ylabel(mse_label, fontsize=font_size, labelpad=18)
+        ax_mse.set_title(
+            wrap_plot_title(pretty_title(params.get("reference_mse_title", "Target-vector MSE")), width=24),
+            fontsize=title_font_size,
+        )
         ax_mse.set_xticks(mse_frame["round"].astype(int).tolist())
+        ax_mse.tick_params(axis="both", labelsize=tick_font_size)
+        apply_y_axis_scale(
+            ax_mse,
+            limits=params.get("reference_mse_y_limits", params.get("reference_mse_limits")),
+            reference_lines=params.get("reference_mse_reference_lines"),
+            include_zero_tick=bool(params.get("reference_mse_include_zero_tick", True)),
+        )
         try:
-            ax_mse.set_box_aspect(len(y_labels) / max(dim, 1))
+            ax_mse.set_box_aspect(1.0)
         except Exception:
             pass
     left_margin = 0.13 if ax_mse is not None else 0.18
@@ -309,6 +337,10 @@ def _short_colorbar_title(label: str) -> str:
     if not text:
         return ""
     return text.replace("predicted ", "").replace("Predicted ", "")
+
+
+def _heatmap_channel_tick_labels(labels: Sequence[str]) -> list[str]:
+    return [str(label) for label in labels]
 
 
 def _coerce_vector(value: object, *, field: str) -> list[float]:

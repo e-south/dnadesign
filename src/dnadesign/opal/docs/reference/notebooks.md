@@ -1,7 +1,7 @@
 ## OPAL Notebooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-22
+**Last verified:** 2026-05-26
 
 
 OPAL notebooks are generated marimo campaign analysis surfaces. They summarize
@@ -34,6 +34,23 @@ uv run opal notebook generate \
   --out /path/to/opal_campaign_set_analysis.py
 ```
 
+Generate a semantic campaign-set notebook with declared comparison views:
+
+```bash
+uv run opal notebook generate \
+  --campaign /path/to/positive-campaign \
+  --campaign /path/to/null-campaign \
+  --collection /path/to/campaign_collection.yaml \
+  --out /path/to/opal_campaign_set_analysis.py
+```
+
+`--collection` must point to a strict `opal.campaign_collection.v2` manifest.
+By default the CLI materializes collection comparison CSV, PNG, and manifest
+artifacts under `collection_visuals/` beside the notebook. Use
+`--no-materialize-collection-visuals` only for template-only diagnostics; a
+production notebook should consume materialized collection visuals through
+`opal.collection_visual_manifest_index.v1`.
+
 ### Notebook View Model
 
 Generated notebooks import public helpers from
@@ -44,7 +61,9 @@ one campaign config. Generated notebooks embed
 non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
-run ID, and follow-up `opal notebook run` / `marimo check` commands.
+run ID, optional `collection_manifest_path`, optional
+`collection_visual_index_path`, and follow-up `opal notebook run` /
+`marimo check` commands.
 
 Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 `opal.notebook_view_model.v1`; the enclosing campaign surface uses
@@ -61,10 +80,12 @@ Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
 Campaign surfaces import `build_campaign_set_notebook_view_model(...)`. The
-payload contains one `NotebookViewModel` per campaign plus aggregate warnings.
-The builder accepts one or more distinct campaign configs and fails fast on
-duplicates. `--run-id` pinning is supported only when the surface has exactly
-one campaign, because a single run ID is not portable across a campaign set.
+payload contains one `NotebookViewModel` per campaign plus aggregate warnings,
+an optional `collection`, and optional materialized
+`collection_visuals`. The builder accepts one or more distinct campaign configs
+and fails fast on duplicates. `--run-id` pinning is supported only when the
+surface has exactly one campaign, because a single run ID is not portable across
+a campaign set.
 
 The generated notebook renders the view model with progressive disclosure:
 
@@ -74,7 +95,16 @@ The generated notebook renders the view model with progressive disclosure:
 - progress-derived change rows for visible rounds and run scope;
 - campaign selector, even for one-campaign notebooks;
 - round selector for progress and manifest-backed plot scope;
-- a single visual-surface selector for manifest-backed plots;
+- an `OPAL Campaign Review` header that names the number of OPAL campaigns,
+  the review scope, and any materialized campaign-set visual count;
+- a top-level `Review surface` control: `Campaign` for one selected campaign's plot
+  surfaces, and `Campaign set` for manifest-backed collection comparison
+  visuals when collection visuals are available;
+- a visual-surface selector for manifest-backed campaign plots;
+- a campaign-set selector for explicit matched sets, such as one positive/null
+  control pair for a target/family/split;
+- a collection-visual selector for materialized comparison artifacts within the
+  selected campaign set;
 - a plot-scope selector when the active plot has multiple manifest-backed
   scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
   `round_variants`;
@@ -84,6 +114,37 @@ The generated notebook renders the view model with progressive disclosure:
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
 - limitations and evidence rows.
+
+`campaign_collection.v2` is a semantic manifest, not a plot file. It declares
+collection dimensions, relationship lenses, and explicit `comparison_views`.
+OPAL currently supports `metric_over_rounds_comparison` views over validated
+campaign relationships, `vector_reference_mse_over_rounds_comparison` views
+from `vector_summary_heatmap` tidy rows, `vector_heatmap_comparison` views
+that render side-by-side group heatmaps plus a shared MSE trajectory panel, and
+`paired_plot_gallery` views from manifest-backed source plot images. Each
+comparison view declares its source plot, grouping dimension,
+`comparison_scope`, optional `match_filters`, and the estimator/interval fields
+required by its kind. A comparison view may also
+carry an `interpretation_note`; OPAL preserves that note in the materialized
+visual manifest and notebook caption without interpreting study-specific
+biology. `comparison_scope:
+comparison_set` materializes one visual per matched set, avoiding accidental
+IQR bands across unrelated targets or label families. OPAL may render generic
+IQR bands or Student-t mean confidence intervals only when the manifest
+explicitly declares the interval kind, replicate unit, mean estimator, and
+confidence level. Materialized visual manifests may also carry a generic
+`axis_scale` object derived from source plot params, including comparable
+y-limits and reference lines. OPAL applies that scale mechanically; the study
+owns the scientific meaning of scale classes such as negative MSE or target
+count. DenseGen targets, oracle meaning, split logic, and suite-level
+interpretation remain study-owned.
+
+Relationship pairs use campaign-member identity, not display names. If a
+campaign set contains duplicate campaign slugs, such as the same DenseGen
+campaign repeated across seed roots, OPAL disambiguates members with
+`config_path` or `workdir` before building collection rows. This prevents
+seed-replicate comparisons from cross-joining rows that happen to share a
+slug.
 
 The canonical generated notebook no longer has a separate single-campaign
 record/table drilldown path. Records, labels, predictions, and selected-record

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ...plots._mpl_utils import pretty_label
+from ...plots._mpl_utils import plot_metric_expression, plot_metric_label, pretty_label
 from ._support import mapping, sequence
 
 
@@ -44,6 +44,7 @@ def rounds_text(value: Any) -> str:
 
 def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) -> str:
     params_map = mapping(params)
+    expression = plot_metric_expression(params_map)
     descriptions = {
         "metric_over_rounds": (
             "For each round and cohort, OPAL filters prediction rows, extracts the configured numeric metric, "
@@ -117,10 +118,13 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
             "The denominator is label-derived for the current round and requires the configured min_n labels."
         ),
     }
-    return descriptions.get(
+    description = descriptions.get(
         kind,
         "See the plot kind metadata for the exact data shape, required fields, parameters, and failure modes.",
     )
+    if expression:
+        description = f"{description} Configured score/loss expression: {expression}."
+    return description
 
 
 def compact_params(value: Any) -> str:
@@ -151,6 +155,17 @@ def plot_field_text(*, kind: str, params: Mapping[str, Any], metadata: Mapping[s
     encoding = plot_encoding_text(kind=kind_key, params=params)
     if encoding:
         fields.append(encoding)
+    label_field = params.get("metric") or params.get("score_field") or params.get("y_axis")
+    has_explicit_label = any(
+        params.get(key) not in (None, "") for key in ("metric_label", "score_label", "y_label", "axis_label")
+    )
+    if label_field not in (None, "") or has_explicit_label:
+        metric_label = plot_metric_label(params, label_field or "pred__score_selected")
+        if metric_label:
+            fields.append(f"metric_label={metric_label}")
+    metric_expression = plot_metric_expression(params)
+    if metric_expression:
+        fields.append(f"metric_expression={metric_expression}")
     for key in (
         "metric",
         "summary",
@@ -188,11 +203,14 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
     cohort = params.get("cohort", "selected")
     if kind == "metric_over_rounds":
         band = str(params.get("band") or "none")
-        return f"x=round; y={_pretty_with_raw(metric)} summary; series=cohort and summary; band={pretty_label(band)}"
+        return (
+            f"x=round; y={plot_metric_label(params, metric)} summary; "
+            f"series=cohort and summary; band={pretty_label(band)}"
+        )
     if kind == "scatter_score_vs_rank":
         rank_mode = str(params.get("rank_mode") or "sequential")
         score_field = str(params.get("score_field") or "pred__score_selected")
-        return f"x={rank_mode} rank; y={_pretty_with_raw(score_field)}; selected rows outlined when present"
+        return f"x={rank_mode} rank; y={plot_metric_label(params, score_field)}; selected rows outlined when present"
     if kind == "percent_high_activity_over_rounds":
         threshold = params.get("threshold", None)
         if threshold is None and params.get("threshold_quantile") is not None:
@@ -200,7 +218,9 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
         if threshold is None:
             threshold = 0.8
         mode = str(params.get("mode") or "both")
-        return f"x=round; y=percent of rows where {_pretty_with_raw(metric)} is at/above {threshold}; mode={mode}"
+        return (
+            f"x=round; y=percent of rows where {plot_metric_label(params, metric)} is at/above {threshold}; mode={mode}"
+        )
     if kind == "feature_importance_heatmap":
         return "x=feature index; y=round; color=model-reported RF feature importance"
     if kind == "feature_importance_bars":
@@ -245,7 +265,7 @@ def _pretty_with_raw(value: Any) -> str:
     text = str(value or "")
     if text in {"", "none", "None"}:
         return "none"
-    return pretty_label(text, raw=True)
+    return pretty_label(text)
 
 
 def _sfxi_uncertainty_math_description(params: Mapping[str, Any]) -> str:

@@ -16,6 +16,7 @@ from typing import Any, Iterable
 
 from ..core.utils import ExitCodes, OpalError, now_iso
 from .campaign_collection import load_campaign_collection_manifest
+from .campaign_set_artifacts import load_collection_visual_manifest_index
 from .notebook import build_notebook_view_model
 
 NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION = "opal.notebook_campaign_set_view_model.v1"
@@ -27,6 +28,7 @@ def build_campaign_set_notebook_view_model(
     round_selector: str | None = "latest",
     run_id: str | None = None,
     collection_manifest_path: str | Path | None = None,
+    collection_visual_index_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build a manifest-backed view model for one or more OPAL campaigns."""
 
@@ -55,6 +57,11 @@ def build_campaign_set_notebook_view_model(
         if collection_manifest_path is not None
         else None
     )
+    collection_visual_index = (
+        load_collection_visual_manifest_index(collection_visual_index_path)
+        if collection_visual_index_path is not None
+        else None
+    )
     return {
         "schema_version": NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION,
         "generated_at": now_iso(),
@@ -62,6 +69,8 @@ def build_campaign_set_notebook_view_model(
         "campaign_count": len(campaigns),
         "campaigns": campaigns,
         "collection": collection,
+        "collection_visual_index": collection_visual_index,
+        "collection_visuals": list(collection_visual_index.get("visuals") or []) if collection_visual_index else [],
         "warnings": warnings,
     }
 

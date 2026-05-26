@@ -23,7 +23,7 @@ from ._mpl_utils import (
     categorical_style,
     ensure_mpl_config_dir,
     legend_below_single_row,
-    pretty_label,
+    plot_metric_label,
     pretty_title,
     save_notebook_square_figure,
     scale_to_sizes,
@@ -99,6 +99,7 @@ def render(context, params: dict) -> None:
     )
     if not metric_field:
         raise ValueError("percent_high_activity_over_rounds requires a metric field.")
+    metric_label = plot_metric_label(params, metric_field)
     # Optional hue/size (applied to swarm points only)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
     cmap = get_str(params, ["cmap"], "viridis")
@@ -145,7 +146,7 @@ def render(context, params: dict) -> None:
     if threshold_quantile is not None:
         threshold = float(np.quantile(metric_values, threshold_quantile))
         quantile_pct = 100.0 * threshold_quantile
-        threshold_label = _threshold_quantile_label(metric_field, quantile_pct, threshold)
+        threshold_label = _threshold_quantile_label(metric_field, quantile_pct, threshold, metric_label=metric_label)
     else:
         threshold = float(0.8 if threshold_param is None else threshold_param)
         threshold_label = f"{threshold:.2f}"
@@ -225,9 +226,9 @@ def render(context, params: dict) -> None:
                 alpha=swarm_alpha,
                 rasterize_at=rasterize_at,
             )
-        ax.set_ylabel(pretty_label(metric_field))
+        ax.set_ylabel(metric_label)
     ax.set_xlabel("Round")
-    ax.set_title(pretty_title(params.get("title", f"High-activity rate for {pretty_label(metric_field)}")))
+    ax.set_title(pretty_title(params.get("title", f"High-activity rate for {metric_label}")))
     ax.set_xticks(rounds)
 
     # Percent-high line on a twin axis when asked
@@ -309,7 +310,7 @@ def _auto_percent_upper(max_percent: float) -> float:
     return min(100.0, max(5.0, math.ceil((max_percent * 1.15) / 5.0) * 5.0))
 
 
-def _threshold_quantile_label(metric_field: str, quantile_pct: float, threshold: float) -> str:
+def _threshold_quantile_label(metric_field: str, quantile_pct: float, threshold: float, *, metric_label: str) -> str:
     if metric_field == "pred__score_selected":
-        return f"P{quantile_pct:g} of selected score metric ({threshold:.3g})"
-    return f"P{quantile_pct:g} {pretty_label(metric_field)} cutoff ({threshold:.3g})"
+        return f"P{quantile_pct:g} of {metric_label} ({threshold:.3g})"
+    return f"P{quantile_pct:g} {metric_label} cutoff ({threshold:.3g})"

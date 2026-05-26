@@ -26,6 +26,7 @@ from ...analysis.notebook_template import render_campaign_notebook
 from ...core.pretty import console_out
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...reporting.campaign_set_artifacts import materialize_campaign_set_collection_visuals
 from ...reporting.notebook import smoke_check_notebook
 from ...reporting.notebook_set import build_campaign_set_notebook_view_model
 from ..registry import cli_group
@@ -257,7 +258,12 @@ def cmd_notebook_generate(
     collection: Optional[Path] = typer.Option(
         None,
         "--collection",
-        help="Optional opal.campaign_collection.v1 manifest for campaign-set relationship lenses.",
+        help="Optional opal.campaign_collection.v2 manifest for campaign-set comparison views.",
+    ),
+    materialize_collection_visuals: bool = typer.Option(
+        True,
+        "--materialize-collection-visuals/--no-materialize-collection-visuals",
+        help="Materialize campaign-set comparison CSV/PNG/manifests before writing the notebook.",
     ),
     out: Optional[Path] = typer.Option(
         None,
@@ -295,6 +301,7 @@ def cmd_notebook_generate(
                 out=out,
                 name=name,
                 collection=collection,
+                materialize_collection_visuals=materialize_collection_visuals,
                 force=force,
                 validate=validate,
                 json=json,
@@ -420,6 +427,7 @@ def _generate_campaign_set_notebook(
     out: Optional[Path],
     name: Optional[str],
     collection: Optional[Path],
+    materialize_collection_visuals: bool,
     force: bool,
     validate: bool,
     json: bool,
@@ -447,8 +455,10 @@ def _generate_campaign_set_notebook(
         if validate and round_sel != "all" and analysis.workspace.ledger_runs_path.exists():
             resolve_round_index_from_runs(analysis.read_runs(), round_sel)
 
+    collection_visual_index_path: Path | None = None
+    view_model = None
     if collection is not None:
-        build_campaign_set_notebook_view_model(
+        view_model = build_campaign_set_notebook_view_model(
             [analysis.config_path for analysis in analyses],
             round_selector=round_sel,
             collection_manifest_path=collection,
@@ -458,6 +468,19 @@ def _generate_campaign_set_notebook(
     notebook_name = _resolve_notebook_name(name, default_name)
     default_out = analyses[0].workspace.workdir / "notebooks" / notebook_name
     out_path = Path(out) if out is not None else default_out
+    if collection is not None and materialize_collection_visuals:
+        if view_model is None:
+            view_model = build_campaign_set_notebook_view_model(
+                [analysis.config_path for analysis in analyses],
+                round_selector=round_sel,
+                collection_manifest_path=collection,
+            )
+        visual_index = materialize_campaign_set_collection_visuals(
+            view_model["campaigns"],
+            collection=view_model["collection"],
+            output_dir=out_path.parent / "collection_visuals",
+        )
+        collection_visual_index_path = Path(str(visual_index["output_dir"])) / "collection_visual_manifest.json"
     overwritten = out_path.exists()
     if out_path.exists() and not force:
         msg = f"Notebook already exists: {out_path}. Use --force to overwrite or --name to choose a different filename."
@@ -483,6 +506,7 @@ def _generate_campaign_set_notebook(
         [analysis.config_path for analysis in analyses],
         round_selector=round_sel,
         collection_manifest_path=collection,
+        collection_visual_index_path=collection_visual_index_path,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
@@ -499,6 +523,7 @@ def _generate_campaign_set_notebook(
                 overwritten=overwritten,
                 analyses=analyses,
                 collection_manifest_path=collection,
+                collection_visual_index_path=collection_visual_index_path,
             )
         )
         return
@@ -511,6 +536,7 @@ def _generate_campaign_set_notebook(
                 "Notebook": out_path,
                 "Round": round_sel,
                 "Collection": collection or "",
+                "Collection visuals": collection_visual_index_path or "",
             },
         )
         if _print_rich(table):

@@ -12,8 +12,9 @@ from __future__ import annotations
 import json as _json
 import os
 import re
+import textwrap
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping
 
 from ..core.tmpdir import resolve_opal_tmpdir
 from ..core.utils import OpalError
@@ -44,7 +45,7 @@ _PRETTY_LABELS = {
     "round": "Round",
     "id": "ID",
     "run_id": "Run ID",
-    "pred__score_selected": "Predicted selected score",
+    "pred__score_selected": "Selected objective score",
     "pred__score_ref": "Predicted reference score",
     "pred__y_hat_model": "Predicted response vector",
     "obj__logic_fidelity": "Logic fidelity",
@@ -84,6 +85,13 @@ _PRETTY_LABELS = {
     "feature_id": "Feature ID",
     "AB interaction": "AB interaction",
     "reference_mse": "MSE to reference vector",
+    "label_oracle_kind": "Oracle role",
+    "label_family_id": "Label family",
+    "label_split_id": "Label split",
+    "target_label": "Target",
+    "label_family_label": "Label family",
+    "random_id": "Random ID",
+    "leave_sigma35_variant": "Leave sigma35 variant",
 }
 
 _ACRONYMS = {
@@ -92,6 +100,9 @@ _ACRONYMS = {
     "dna": "DNA",
     "id": "ID",
     "iqr": "IQR",
+    "densegen": "DenseGen",
+    "logic4": "logic4",
+    "sigma35": "sigma35",
     "mse": "MSE",
     "rf": "RF",
     "sfxi": "SFXI",
@@ -291,6 +302,39 @@ def math_label(key: str, *, fallback: object | None = None) -> str:
     return pretty_label(token)
 
 
+def plot_metric_label(params: Mapping[str, Any] | None, field: object) -> str:
+    """Return the campaign-declared axis label for an objective metric."""
+
+    params_map = params or {}
+    for key in ("metric_label", "score_label", "y_label", "axis_label"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return pretty_label(field)
+
+
+def plot_metric_short_label(params: Mapping[str, Any] | None, field: object) -> str:
+    """Return a compact legend label for an objective metric."""
+
+    params_map = params or {}
+    for key in ("legend_metric_label", "metric_short_label", "score_short_label"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return plot_metric_label(params_map, field)
+
+
+def plot_metric_expression(params: Mapping[str, Any] | None) -> str:
+    """Return the declared score/loss expression for a plotted objective metric."""
+
+    params_map = params or {}
+    for key in ("metric_expression", "score_expression", "loss_expression"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
+
+
 def pretty_label(value: object, *, raw: bool = False) -> str:
     """Humanize OPAL field slugs while optionally retaining the exact raw token."""
 
@@ -311,6 +355,8 @@ def pretty_title(value: object) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
+    if _looks_like_expression_title(text):
+        return text
     if "_" not in text and "__" not in text and "-" not in text:
         lower = text.lower()
         if lower in _ACRONYMS:
@@ -332,6 +378,128 @@ def pretty_title(value: object) -> str:
     label = " ".join(words)
     label = re.sub(r"\btop n\b", "top-N", label, flags=re.IGNORECASE)
     return label[:1].upper() + label[1:]
+
+
+def wrap_plot_title(value: object, *, width: int = 42, max_lines: int = 2) -> str:
+    """Wrap long subplot titles without changing short or expression-like labels."""
+
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "\n" in text:
+        return text
+    wrapped = textwrap.wrap(text, width=max(int(width), 12), break_long_words=False, break_on_hyphens=False)
+    if not wrapped:
+        return text
+    if len(wrapped) <= max_lines:
+        return "\n".join(wrapped)
+    kept = wrapped[: max(int(max_lines), 1)]
+    kept[-1] = kept[-1].rstrip(".") + "..."
+    return "\n".join(kept)
+
+
+def _looks_like_expression_title(text: str) -> bool:
+    return any(char in text for char in ("=", "[", "]", "(", ")", "^"))
+
+
+def apply_y_axis_scale(
+    ax,
+    *,
+    limits: object | None = None,
+    reference_lines: object | None = None,
+    include_zero_tick: bool = False,
+) -> None:
+    """Apply explicit y-axis limits and reference-line semantics to a plot."""
+
+    parsed_limits = _y_limit_pair(limits)
+    parsed_references = _y_reference_lines(reference_lines)
+    for line in parsed_references:
+        value = float(line["value"])
+        ax.axhline(value, color="#666666", linestyle="--", linewidth=1.0, alpha=0.82, zorder=0)
+        label = str(line.get("label") or "").strip()
+        if label:
+            ax.text(
+                0.985,
+                value,
+                label,
+                transform=ax.get_yaxis_transform(),
+                ha="right",
+                va="bottom",
+                fontsize=8.5,
+                color="#4D4D4D",
+                bbox={"facecolor": "white", "alpha": 0.78, "edgecolor": "none", "pad": 1.5},
+            )
+    if parsed_limits is not None:
+        current_low, current_high = ax.get_ylim()
+        low = current_low if parsed_limits[0] is None else parsed_limits[0]
+        high = current_high if parsed_limits[1] is None else parsed_limits[1]
+        if low == high:
+            pad = max(abs(low) * 0.05, 1.0)
+            low -= pad
+            high += pad
+        ax.set_ylim(float(low), float(high))
+    if include_zero_tick or any(abs(float(line["value"])) <= 1e-12 for line in parsed_references):
+        low, high = ax.get_ylim()
+        if min(low, high) <= 0.0 <= max(low, high):
+            ticks = list(ax.get_yticks())
+            if not any(abs(float(tick)) <= 1e-12 for tick in ticks):
+                ax.set_yticks(sorted([*ticks, 0.0]))
+
+
+def _y_limit_pair(value: object | None) -> tuple[float | None, float | None] | None:
+    if value in (None, "", False):
+        return None
+    raw: object
+    if isinstance(value, Mapping):
+        raw = value.get("limits", value.get("ylim", value.get("range")))
+        if raw in (None, ""):
+            raw = [value.get("min", value.get("y_min")), value.get("max", value.get("y_max"))]
+    else:
+        raw = value
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        raise ValueError("y-axis limits must be a two-item sequence.")
+    return _optional_float(raw[0], field="y-axis lower limit"), _optional_float(raw[1], field="y-axis upper limit")
+
+
+def _y_reference_lines(value: object | None) -> list[dict[str, object]]:
+    if value in (None, "", False):
+        return []
+    raw_lines = value
+    if isinstance(value, Mapping):
+        raw_lines = value.get("reference_lines", value.get("lines", []))
+    if isinstance(raw_lines, (str, bytes)) or not isinstance(raw_lines, (list, tuple)):
+        raise ValueError("y-axis reference lines must be a list.")
+    lines: list[dict[str, object]] = []
+    for index, raw in enumerate(raw_lines):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"y-axis reference line {index} must be a mapping.")
+        if "value" not in raw:
+            raise ValueError(f"y-axis reference line {index} must declare value.")
+        lines.append(
+            {
+                "value": _required_float(raw.get("value"), field=f"y-axis reference line {index}"),
+                "label": str(raw.get("label") or ""),
+            }
+        )
+    return lines
+
+
+def _optional_float(value: object, *, field: str) -> float | None:
+    if value in (None, ""):
+        return None
+    return _required_float(value, field=field)
+
+
+def _required_float(value: object, *, field: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be numeric.") from exc
+    import math
+
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be finite.")
+    return number
 
 
 def legend_below_single_row(fig, ax, *, handles=None, labels=None, bottom: float = 0.11) -> bool:

@@ -144,13 +144,20 @@ def render_visual_surface_cells() -> str:
                             "Current campaign and plot evidence": mo.ui.table(
                                 pl.DataFrame(build_notebook_no_plot_scope_rows(notebook_view_model)),
                                 page_size=12,
+                                show_column_summaries=False,
                             )
                         },
                         multiple=True,
                     )
                 )
                 if plot_inventory_rows:
-                    _items.append(mo.ui.table(pl.DataFrame(plot_inventory_rows), page_size=12))
+                    _items.append(
+                        mo.ui.table(
+                            pl.DataFrame(plot_inventory_rows),
+                            page_size=12,
+                            show_column_summaries=False,
+                        )
+                    )
                 plot_panel = mo.vstack(_items, gap=0.45)
             else:
                 selected = str(visual_surface_ui.value)
@@ -195,7 +202,11 @@ def render_visual_surface_cells() -> str:
                         round_value=int(round_ui.value) if round_ui is not None else None,
                     )
                     label_view = (
-                        mo.ui.table(pl.DataFrame(label_rows), page_size=5)
+                        mo.ui.table(
+                            pl.DataFrame(label_rows),
+                            page_size=5,
+                            show_column_summaries=False,
+                        )
                         if label_rows
                         else mo.md("No observed label is available for this record and round.")
                     )
@@ -238,10 +249,12 @@ def render_visual_surface_cells() -> str:
                             "Render contract": mo.ui.table(
                                 pl.DataFrame(build_notebook_baserender_contract_rows(notebook_baserender_contract)),
                                 page_size=8,
+                                show_column_summaries=False,
                             ),
                             "Plot inventory": mo.ui.table(
                                 pl.DataFrame(plot_inventory_rows),
                                 page_size=12,
+                                show_column_summaries=False,
                             ),
                         },
                         multiple=True,
@@ -267,10 +280,12 @@ def render_visual_surface_cells() -> str:
                             "Evidence": mo.ui.table(
                                 pl.DataFrame(build_notebook_plot_card_rows(choice)),
                                 page_size=12,
+                                show_column_summaries=False,
                             ),
                             "Plot inventory": mo.ui.table(
                                 pl.DataFrame(plot_inventory_rows),
                                 page_size=12,
+                                show_column_summaries=False,
                             ),
                         },
                         multiple=True,

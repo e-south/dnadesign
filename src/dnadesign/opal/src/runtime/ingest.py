@@ -221,14 +221,6 @@ def run_ingest(
     if dup_count > 0 and policy != "error":
         warnings.append(f"{dup_count} duplicate keys detected; policy dropped {dropped} row(s).")
 
-    # Logic bounds warning (best-effort): try to read first 4 entries as logic
-    try:
-        v = np.asarray([yy[:4] for yy in labels["y"].tolist()], dtype=float)
-        if (v < -1e-9).any() or (v > 1 + 1e-9).any():
-            warnings.append("logic_out_of_bounds_detected")
-    except Exception:
-        pass
-
     preview = IngestPreview(
         total_rows_in_csv=total,
         rows_with_id=rows_with_id,

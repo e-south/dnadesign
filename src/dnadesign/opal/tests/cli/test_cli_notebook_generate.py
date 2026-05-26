@@ -10,6 +10,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
     txt = out_path.read_text()
     assert "marimo.App" in txt
     assert "build_campaign_set_notebook_view_model" in txt
-    assert 'label="Campaign"' in txt
+    assert 'label="OPAL campaign"' in txt
     assert "opal" in txt.lower()
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
@@ -230,9 +231,9 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert out_path.exists()
     assert smoke_checked == [out_path]
     text = out_path.read_text()
-    assert "# Campaigns" in text
+    assert "# OPAL Campaign Review" in text
     assert "build_campaign_set_notebook_view_model" in text
-    assert 'label="Campaign"' in text
+    assert 'label="OPAL campaign"' in text
     assert 'label="Visual surface"' in text
 
 
@@ -299,19 +300,45 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
         }
         campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
         write_ledger(workdir, run_id=f"{slug}-run-0", round_index=0)
+        _write_score_selected_plot_fixture(workdir, slug=slug, value=0.4 if oracle_kind == "positive" else 0.1)
         campaigns.append(campaign)
     collection_path = tmp_path / "campaign_collection.yaml"
     collection_path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "opal.campaign_collection.v1",
-                "dimensions": ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"],
+                "schema_version": "opal.campaign_collection.v2",
+                "collection_id": "cli_fixture",
+                "dimensions": [
+                    {"id": "target"},
+                    {"id": "label_oracle_kind"},
+                    {"id": "label_family_id"},
+                    {"id": "label_split_id"},
+                    {"id": "seed"},
+                ],
                 "relationships": [
                     {
+                        "id": "positive_vs_null",
                         "kind": "control_pair",
+                        "role_dimension": "label_oracle_kind",
                         "left_role": "positive",
                         "right_role": "null",
                         "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+                    }
+                ],
+                "comparison_views": [
+                    {
+                        "id": "selected_score_positive_vs_null",
+                        "label": "Selected score positive/null trajectory",
+                        "kind": "metric_over_rounds_comparison",
+                        "relationship_id": "positive_vs_null",
+                        "source_plot_name": "score_selected_over_rounds",
+                        "source_plot_kind": "metric_over_rounds",
+                        "comparison_scope": "comparison_set",
+                        "group_key": "label_oracle_kind",
+                        "metric": "pred__score_selected",
+                        "cohort": "selected",
+                        "summary": "mean",
+                        "interval_kind": "none",
                     }
                 ],
             },
@@ -350,7 +377,11 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
     assert res.exit_code == 0, res.output
     text = out_path.read_text()
     assert f"collection_manifest_path = {str(collection_path)!r}" in text
-    assert "build_notebook_campaign_set_visual_choices(plot_choices, campaigns, collection)" in text
+    assert 'label="Review surface"' in text
+    assert "view_mode_ui = mo.ui.radio(" in text
+    assert "collection_visual_index_path" in text
+    collection_visual_index = out_path.parent / "collection_visuals" / "collection_visual_manifest.json"
+    assert collection_visual_index.exists()
 
 
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:
@@ -584,3 +615,52 @@ def test_notebook_rich_tables_use_rounded_box() -> None:
     assert list_table.box == box.ROUNDED
     assert str(kv_table.border_style) == "cyan"
     assert str(list_table.border_style) == "cyan"
+
+
+def _write_score_selected_plot_fixture(workdir: Path, *, slug: str, value: float) -> None:
+    plots_dir = workdir / "outputs" / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    tidy_path = plots_dir / "score_selected_over_rounds_rall.csv"
+    tidy_path.write_text(
+        "round,cohort,metric,summary,value\n"
+        f"0,selected,pred__score_selected,mean,{value}\n"
+        "0,selected,pred__score_selected,count,12\n",
+        encoding="utf-8",
+    )
+    manifest_path = plots_dir / "score_selected_over_rounds_rall.manifest.json"
+    manifest = {
+        "schema_version": "opal.plot_artifact.v1",
+        "plot_id": f"{slug}_score_selected_over_rounds",
+        "name": "score_selected_over_rounds",
+        "kind": "metric_over_rounds",
+        "status": "written",
+        "started_at": "2026-05-26T00:00:00+00:00",
+        "generated_at": "2026-05-26T00:00:00+00:00",
+        "run_id": f"{slug}-run-0",
+        "rounds": "all",
+        "params": {},
+        "inputs": [],
+        "outputs": [{"role": "tidy_csv", "path": str(tidy_path), "exists": True}],
+        "tidy_csv": str(tidy_path),
+        "manifest_path": str(manifest_path),
+        "metadata": {},
+        "caption": "Selected score over rounds",
+        "review_purpose": "Selected score over rounds",
+        "quality": {},
+        "freshness": {"status": "fresh"},
+        "warnings": [],
+        "error": None,
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (plots_dir / "plot_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.plot_manifest_index.v1",
+                "generated_at": "2026-05-26T00:00:00+00:00",
+                "output_dir": str(plots_dir),
+                "plot_count": 1,
+                "manifests": [manifest],
+            }
+        ),
+        encoding="utf-8",
+    )

@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-20
+**Last verified:** 2026-05-26
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -66,6 +66,14 @@ plots:
     # Opaque, plugin-specific params (required for plot knobs)
     params:
       score_field: "pred__score_selected"  # default selected score field from run_pred
+      surface_label: "Selected objective score: Score = -MSE(y_hat, target)"
+      metric_label: "Score = -MSE(y_hat, target)"  # optional objective-scale axis/notebook label
+      legend_metric_label: "negative MSE score"    # optional compact legend label
+      metric_expression: "score = -MSE(y_hat, target); MSE = d^-1 sum_c((y_hat_c - target_c)^2)"
+      y_axis:
+        scale_class: densegen_plan_logic4_negative_mse
+        limits: [-0.25, 0.0]
+        include_zero_tick: true
       hue: null                       # or "round"
       highlight_selected: false
 
@@ -95,6 +103,9 @@ plots:
   and fails visibly when no run ledger exists. Do not combine `round_variants`
   with `--run-id`.
 - `scatter_score_vs_rank` should use `pred__score_selected` unless you intentionally target another ledger metric.
+- Vector heatmaps are generic vector plots: campaigns should pass display-ready
+  `channel_labels`, `value_label`, `reference_mse_metric_label`, and
+  `reference_mse_expression` rather than relying on raw channel slugs.
 - Use `enabled: false` to keep a plot entry without running it.
 - Presets merge into each plot entry; entry values override preset values.
 - Inline `plots:` in campaign.yaml is still supported, but `plot_config` keeps runtime config lean.
@@ -138,7 +149,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | `metadata` | `PlotMeta` summary, capability, data shape, tidy schema, and failure modes |
 | `quality` | tidy CSV schema validation status when a plot declares `metadata.tidy_schema` |
 | `freshness` | mtime-based freshness summary for resolved inputs and outputs |
-| `caption`, `review_purpose` | manifest-backed human purpose text derived from plot metadata |
+| `caption`, `review_purpose` | manifest-backed human purpose text; plot params can override generic metadata text |
 | `warnings`, `error` | structured nonfatal and fatal plot outcomes |
 
 Review and generated notebook surfaces should read manifests first. Extra files
@@ -179,10 +190,31 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
     and `source_path`
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.
   - params: `metric`, `cohorts`, `summaries`, `top_k`, `threshold`,
-    `reference_lines`, `highlight_round`, `figsize_in`
+    `y_axis`, `y_limits`, `y_reference_lines`, `highlight_round`,
+    `figsize_in`
+  - default summary is `mean`. Add `median` only when it answers a stated
+    review question; add `count` when the visible cohort size matters.
+  - objective-scale plots should declare `metric_label`,
+    `legend_metric_label`, and `metric_expression` in `params`. Add
+    `surface_label` when the notebook dropdown needs more objective detail than
+    the plot title can carry without clipping. OPAL carries those strings into
+    axes, legends, manifests, notebook alt text, campaign visual choices, and
+    campaign-set visual manifests instead of presenting a vague selected-score label.
+  - use `y_axis.scale_class`, `y_axis.limits`, `y_axis.reference_lines`, and
+    `y_axis.include_zero_tick` when a compatible campaign family has a known
+    objective scale. For example, negative MSE scores can fix zero as the best
+    possible score while still making small null spikes visible in their full
+    objective-scale context.
+  - `pred__score_selected` is the selected score from the configured objective.
+    Its units are objective-specific; compare it within compatible campaigns,
+    not as a shared effect-size scale across unrelated label families.
   - `band: iqr` is a within-campaign cohort distribution band, not a
-    multi-seed confidence interval; campaign-set notebooks derive separate
-    relationship-level bands from the optional campaign collection manifest
+    multi-seed confidence interval. Campaign-set notebooks consume
+    materialized collection visual manifests derived from strict
+    `opal.campaign_collection.v2` comparison views. Per-set views show matched
+    campaign pairs without an interval unless replicate units are present and
+    declared. Collection views that aggregate across units must label IQR bands
+    and Student-t mean confidence intervals separately.
   - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, and
     `value`
 - **`percent_high_activity_over_rounds`**: thresholded scalar distribution plus
@@ -193,9 +225,17 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - rows are an optional reference vector followed by chronological rounds
   - params: `vector_field`, `cohorts`, `channel_labels`,
     `include_reference_vector`, `reference_vector`, `reference_label`,
-    `aggregation`, `top_k`, `figsize_in`, `cmap`
+    `aggregation`, `top_k`, `figsize_in`, `cmap`, `reference_mse_panel`
   - writes tidy CSV columns `row_type`, `round`, `cohort`, `channel`, and
     `value`
+  - tidy CSV reference rows are expected only when
+    `include_reference_vector` is enabled
+  - when `reference_mse_panel` is enabled, reference-MSE rows are the MSE
+    between the selected cohort mean vector and the declared reference vector.
+    Use `reference_mse_metric_label`, `reference_mse_expression`,
+    `reference_mse_y_limits`, and `reference_mse_reference_lines` only when the
+    MSE panel should carry an explicit loss expression and comparable scale.
+    They are model-output diagnostics, not replicate confidence intervals.
   - use `reference_vector` for any explicit vector baseline. Its length must
     match the plotted vector, whether the campaign uses a four-channel logic
     vector, a count vector, or a measured SFXI vector.

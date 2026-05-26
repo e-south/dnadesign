@@ -21,6 +21,7 @@ def notebook_generate_payload(
     overwritten: bool,
     analyses: list[CampaignAnalysis],
     collection_manifest_path: Path | None = None,
+    collection_visual_index_path: Path | None = None,
 ) -> dict[str, object]:
     config_paths = [str(analysis.config_path) for analysis in analyses]
     workdirs = [str(analysis.workspace.workdir) for analysis in analyses]
@@ -37,6 +38,9 @@ def notebook_generate_payload(
         "overwritten": bool(overwritten),
         "config_paths": config_paths,
         "collection_manifest_path": str(collection_manifest_path) if collection_manifest_path is not None else None,
+        "collection_visual_index_path": (
+            str(collection_visual_index_path) if collection_visual_index_path is not None else None
+        ),
         "workdirs": workdirs,
         "next_commands": {
             "run": f"uv run opal notebook run -c {config_paths[0]} --path {out_path}",

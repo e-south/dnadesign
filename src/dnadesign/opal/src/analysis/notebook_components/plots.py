@@ -102,13 +102,9 @@ def build_notebook_visual_surface_model(
                 )
             )
             continue
-        title = str(
-            entry.get("title")
-            or manifest.get("title")
-            or mapping(manifest.get("params")).get("title")
-            or display_name(name)
-        )
-        label = title
+        params = mapping(manifest.get("params"))
+        title = str(entry.get("title") or manifest.get("title") or params.get("title") or display_name(name))
+        label = str(params.get("surface_label") or params.get("display_label") or title)
         labels_seen[label] = labels_seen.get(label, 0) + 1
         if labels_seen[label] > 1:
             label = f"{label} ({Path(path).name})"

@@ -108,6 +108,8 @@ def build_plot_manifest(
         )
         status = "failed"
         error = error or RuntimeError(message)
+    caption = _clean_text(params.get("caption")) or meta.get("summary")
+    review_purpose = _clean_text(params.get("review_purpose")) or caption
     return {
         "schema_version": PLOT_ARTIFACT_SCHEMA_VERSION,
         "plot_id": plot_artifact_id(Path(str(context.filename)).stem),
@@ -124,8 +126,8 @@ def build_plot_manifest(
         "tidy_csv": tidy_csv,
         "manifest_path": str(manifest_path),
         "metadata": meta,
-        "caption": meta.get("summary"),
-        "review_purpose": meta.get("summary"),
+        "caption": caption,
+        "review_purpose": review_purpose,
         "quality": quality,
         "freshness": freshness,
         "warnings": warnings,
@@ -260,3 +262,8 @@ def _jsonable(value: Any) -> Any:
     if hasattr(value, "tolist"):
         return _jsonable(value.tolist())
     return str(value)
+
+
+def _clean_text(value: Any) -> str:
+    text = str(value or "").strip()
+    return text

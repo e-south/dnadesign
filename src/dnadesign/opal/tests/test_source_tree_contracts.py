@@ -134,9 +134,9 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     module_lengths = {path.name: len(path.read_text().splitlines()) for path in api_package.glob("*.py")}
     assert max(module_lengths.values()) <= 160
     for name in [
-        "build_notebook_campaign_set_group_options",
         "build_notebook_campaign_set_metric_comparison_rows",
-        "build_notebook_campaign_set_visual_choices",
+        "build_notebook_collection_visual_card_rows",
+        "build_notebook_collection_visual_choices",
         "load_campaign_collection_manifest",
         "render_notebook_campaign_set_metric_comparison_image",
     ]:

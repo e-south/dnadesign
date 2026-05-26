@@ -22,12 +22,22 @@ from .baserender_records import (
 from .baserender_render import (
     render_notebook_baserender_record,
 )
-from .campaign_set_comparison import (
-    build_notebook_campaign_set_group_options,
-    build_notebook_campaign_set_metric_comparison_rows,
-    render_notebook_campaign_set_metric_comparison_image,
+from .campaign_set_comparison import render_notebook_campaign_set_metric_comparison_image
+from .campaign_set_gallery import (
+    build_notebook_campaign_set_plot_gallery_items,
+    render_notebook_campaign_set_plot_gallery_image,
 )
-from .campaign_set_visuals import build_notebook_campaign_set_visual_choices
+from .campaign_set_metric_rows import build_notebook_campaign_set_metric_comparison_rows
+from .campaign_set_vector import build_notebook_campaign_set_vector_reference_mse_rows
+from .campaign_set_vector_heatmap import (
+    build_notebook_campaign_set_vector_heatmap_rows,
+    render_notebook_campaign_set_vector_heatmap_comparison_image,
+)
+from .campaign_set_visuals import (
+    build_notebook_collection_set_choices,
+    build_notebook_collection_visual_card_rows,
+    build_notebook_collection_visual_choices,
+)
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
     build_notebook_at_a_glance_rows,
@@ -75,9 +85,13 @@ __all__ = [
     "build_notebook_baserender_record_options",
     "build_notebook_campaign_header_lines",
     "build_notebook_campaign_summary_row",
-    "build_notebook_campaign_set_group_options",
     "build_notebook_campaign_set_metric_comparison_rows",
-    "build_notebook_campaign_set_visual_choices",
+    "build_notebook_campaign_set_plot_gallery_items",
+    "build_notebook_campaign_set_vector_reference_mse_rows",
+    "build_notebook_campaign_set_vector_heatmap_rows",
+    "build_notebook_collection_set_choices",
+    "build_notebook_collection_visual_card_rows",
+    "build_notebook_collection_visual_choices",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",
@@ -105,6 +119,8 @@ __all__ = [
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
     "render_notebook_campaign_set_metric_comparison_image",
+    "render_notebook_campaign_set_vector_heatmap_comparison_image",
+    "render_notebook_campaign_set_plot_gallery_image",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_plot_scope",

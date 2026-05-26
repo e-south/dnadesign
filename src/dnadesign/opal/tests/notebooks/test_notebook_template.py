@@ -13,12 +13,12 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_baserender_contract_rows,
     build_notebook_baserender_record_options,
     build_notebook_campaign_header_lines,
-    build_notebook_campaign_set_group_options,
     build_notebook_campaign_set_metric_comparison_rows,
-    build_notebook_campaign_set_visual_choices,
     build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
+    build_notebook_collection_set_choices,
+    build_notebook_collection_visual_choices,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
     build_notebook_no_plot_scope_rows,
@@ -44,7 +44,7 @@ from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, li
 
 def test_notebook_template_data_source_options() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'label="Campaign"' in text
+    assert 'label="OPAL campaign"' in text
     assert 'label="Round"' not in text
     assert "predictions (selected run)" not in text
     assert "labels (all rounds)" not in text
@@ -64,8 +64,8 @@ def test_notebook_template_removes_extra_tables() -> None:
 
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    assert 'label="Review surface"' in text
     assert 'label="Visual surface"' in text
-    assert 'label="Compare by"' in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
@@ -120,8 +120,8 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     assert "Campaign analysis command surface" not in text
     assert "mo.accordion(" in text
     for section in [
-        "Campaigns at a glance",
-        "Selected campaign",
+        "OPAL campaigns at a glance",
+        "Selected OPAL campaign",
         "Validity",
         "Changes",
         "Metric definitions",
@@ -140,8 +140,10 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_campaign_set_notebook_view_model" in text
     assert "build_notebook_campaign_summary_row" in text
     assert "build_notebook_visual_surface_model" in text
-    assert "build_notebook_campaign_set_metric_comparison_rows" in text
-    assert "build_notebook_campaign_set_visual_choices" in text
+    assert "build_notebook_collection_set_choices" in text
+    assert "build_notebook_collection_visual_choices" in text
+    assert "build_notebook_collection_visual_card_rows" in text
+    assert "build_notebook_campaign_set_visual_choices" not in text
 
 
 def test_notebook_template_degrades_without_runs() -> None:
@@ -228,49 +230,18 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
         _campaign("cipro_null_random_id", "null", [0.1, 0.15]),
     ]
 
-    options = build_notebook_campaign_set_group_options(campaigns)
-    assert options == ["label_oracle_kind"]
-    assert (
-        build_notebook_campaign_set_visual_choices(
-            [
-                {
-                    "label": "Selected score over rounds",
-                    "title": "Selected score over rounds",
-                    "name": "score_selected_over_rounds",
-                    "kind": "metric_over_rounds",
-                }
-            ],
-            campaigns,
-        )[0]["surface_kind"]
-        == "campaign_plot"
-    )
-    visual_choices = build_notebook_campaign_set_visual_choices(
+    visual_choices = build_notebook_collection_visual_choices(
         [
             {
                 "label": "Selected score over rounds",
                 "title": "Selected score over rounds",
-                "name": "score_selected_over_rounds",
-                "kind": "metric_over_rounds",
+                "source_plot_name": "score_selected_over_rounds",
+                "surface_kind": "campaign_set_metric_comparison",
             }
-        ],
-        campaigns,
-        collection={
-            "comparison_lenses": [
-                {
-                    "kind": "control_pair",
-                    "label": "Control pair by label oracle kind",
-                    "group_key": "label_oracle_kind",
-                    "match_on": ["label_family_id", "label_split_id"],
-                    "pair_count": 1,
-                }
-            ]
-        },
+        ]
     )
-    assert [choice["surface_kind"] for choice in visual_choices] == [
-        "campaign_plot",
-        "campaign_set_metric_comparison",
-    ]
-    assert visual_choices[1]["source_plot_name"] == "score_selected_over_rounds"
+    assert visual_choices[0]["surface_kind"] == "campaign_set_metric_comparison"
+    assert visual_choices[0]["source_plot_name"] == "score_selected_over_rounds"
     rows = build_notebook_campaign_set_metric_comparison_rows(
         campaigns,
         plot_name="score_selected_over_rounds",
@@ -284,7 +255,7 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
     )
     assert payload is not None
     assert payload["image_bytes"].startswith(b"\x89PNG")
-    assert "label_oracle_kind" in payload["alt_text"]
+    assert "Oracle role" in payload["alt_text"]
     assert "Selected n=6" in payload["alt_text"]
     mixed_rows = [
         {**row, "cohort": "all_pool" if row["campaign"] == "cipro_null_random_id" else row["cohort"]} for row in rows
@@ -339,6 +310,13 @@ def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp
                     "kind": "metric_over_rounds",
                     "status": "written",
                     "rounds": "all",
+                    "params": {
+                        "y_axis": {
+                            "scale_class": "densegen_plan_logic4_negative_mse",
+                            "limits": [-0.25, 0.0],
+                            "include_zero_tick": True,
+                        }
+                    },
                     "tidy_csv": str(tidy_path),
                 }
             ],
@@ -411,7 +389,56 @@ def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp
     assert payload["interval"]["rounds_with_interval"] == 4
     assert payload["interval"]["min_unit_count"] == 2
     assert payload["interval"]["is_confidence_interval"] is False
+    assert payload["axis_scale"]["limits"] == [-0.25, 0.0]
+    assert "axis scale class" in payload["caption"]
     assert "not statistical confidence intervals" in payload["caption"]
+
+
+def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="all",
+        collection_manifest_path=Path("campaign_collection.yaml"),
+        collection_visual_index_path=Path("collection_visuals/collection_visual_manifest.json"),
+    )
+
+    assert 'label="Review surface"' in text
+    assert "view_mode_ui = mo.ui.radio(" in text
+    assert 'label="Campaign set"' in text
+    assert 'label="OPAL campaign"' in text
+    assert 'label="Collection visual"' in text
+    assert "build_notebook_collection_set_choices" in text
+    assert "_top_control_items = [view_mode_ui]" in text
+    assert "elif collection_set_ui is not None:" in text
+    assert "mo.vstack(_top_control_items" in text
+    visual_panel_cell = text[text.index("def _(\n    Path,") : text.index("def _(build_notebook_evidence_rows")]
+    assert "view_mode_ui" not in visual_panel_cell
+    assert "collection_set_ui" not in visual_panel_cell
+
+
+def test_collection_visual_choices_can_filter_by_campaign_set() -> None:
+    visuals = [
+        {
+            "visual_id": "score_cipro",
+            "label": "Selected score",
+            "comparison_set_key": "target=cipro",
+            "comparison_set_label": "Cipro",
+        },
+        {
+            "visual_id": "score_ethanol",
+            "label": "Selected score",
+            "comparison_set_key": "target=ethanol",
+            "comparison_set_label": "Ethanol",
+        },
+    ]
+
+    assert build_notebook_collection_set_choices(visuals) == [
+        {"key": "target=cipro", "label": "Cipro", "visual_count": 1},
+        {"key": "target=ethanol", "label": "Ethanol", "visual_count": 1},
+    ]
+    choices = build_notebook_collection_visual_choices(visuals, comparison_set_key="target=ethanol")
+    assert [choice["comparison_set_label"] for choice in choices] == ["Ethanol"]
+    assert choices[0]["label"] == "Selected score"
 
 
 def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
@@ -612,6 +639,22 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert visual_surface["choices"][0]["capability"]["objective_family"] == "generic"
     assert "Scope: round 3" in visual_surface["choices"][0]["alt_text"]
     assert "freshness fresh" in visual_surface["choices"][0]["alt_text"]
+    labeled_surface = build_notebook_visual_surface_model(
+        {
+            **view_model,
+            "plot_manifests": [
+                {
+                    **view_model["plot_manifests"][0],
+                    "params": {
+                        "title": "Short plot title",
+                        "surface_label": "Specific objective expression",
+                    },
+                }
+            ],
+        }
+    )
+    assert labeled_surface["choices"][0]["label"] == "Specific objective expression"
+    assert labeled_surface["choices"][0]["title"] == "Short plot title"
 
     scope_view_model = {
         **view_model,
@@ -815,6 +858,8 @@ def test_registered_plot_alt_text_exposes_primary_visual_encoding() -> None:
             summary=meta["summary"],
             params={
                 "metric": "pred__score_selected",
+                "metric_label": "Score = -MSE(y_hat, [0, 0, 1, 1])",
+                "metric_expression": "score = -mean((y_hat - [0, 0, 1, 1])^2)",
                 "score_field": "pred__score_selected",
                 "y_axis": "score",
                 "hue": "logic_fidelity",
@@ -829,6 +874,8 @@ def test_registered_plot_alt_text_exposes_primary_visual_encoding() -> None:
         )
 
         assert "Encoded fields:" in alt_text, kind
+        assert "Score = -MSE(y_hat, [0, 0, 1, 1])" in alt_text, kind
+        assert "score = -mean((y_hat - [0, 0, 1, 1])^2)" in alt_text, kind
         assert any(token in alt_text for token in ("x=", "left panel x=", "panels=")), kind
         assert "Scope: round 3" in alt_text, kind
 
@@ -844,7 +891,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
         round_selector="latest",
     )
 
-    assert "# Campaigns" in text
+    assert "# OPAL Campaign Review" in text
     assert "from dnadesign.opal.notebooks.api.generated import (" in text
     assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
@@ -855,7 +902,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "Generated with marimo: `{__generated_with}`" not in text
     assert 'label="Round"' not in text
     assert "selected_round_selector = 'latest'" in text
-    assert 'label="Campaign"' in text
+    assert 'label="OPAL campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
     assert 'label="Visual surface"' in text
@@ -863,6 +910,8 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "_preferred_visual_label = visual_label_memory()" in text
     assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
+    assert "OPAL campaigns at a glance" in text
+    assert "Selected OPAL campaign" in text
     assert "Validity" in text
     assert "Changes" in text
     assert "build_notebook_artifact_garden_rows" in text
@@ -896,7 +945,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     assert '_scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")' in campaign_set
     assert "label=_scope_control_label" in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 450
+    assert len(campaign_set.splitlines()) <= 465
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:

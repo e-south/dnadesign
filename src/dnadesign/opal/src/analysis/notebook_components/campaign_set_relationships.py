@@ -36,6 +36,22 @@ def relationship_pair_membership(relationship: Mapping[str, Any] | None) -> dict
     return membership
 
 
+def campaign_pair_contexts(
+    campaign_model: Mapping[str, Any],
+    pair_membership: Mapping[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    campaign = mapping(campaign_model.get("campaign"))
+    keys = [
+        str(campaign.get("config_path") or "").strip(),
+        str(campaign.get("workdir") or "").strip(),
+        str(campaign.get("slug") or "").strip(),
+    ]
+    for key in keys:
+        if key and key in pair_membership:
+            return list(pair_membership[key])
+    return []
+
+
 def metadata_fields(metadata: Mapping[str, Any]) -> dict[str, str]:
     return {f"metadata__{key}": str(value) for key, value in metadata.items() if is_groupable_metadata_value(value)}
 

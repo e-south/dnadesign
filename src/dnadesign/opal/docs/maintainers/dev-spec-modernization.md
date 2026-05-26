@@ -60,12 +60,18 @@ fixed-target-vector campaigns can select through declared score channels.
 Broader classifier/probability semantics require a separate target-probability
 contract before they become OPAL core.
 
-Second, campaign-set comparison visuals must consume declared collection
-relationships. A campaign is an atomic run surface. A campaign set is a group
-of such surfaces selected for review. A relationship lens is an optional
-operator or study-owned manifest that declares roles, match dimensions, and
-replicate dimensions. OPAL may render generic paired comparisons from that
-manifest, but it must not infer biological controls from naming patterns.
+Second, campaign-set comparison visuals consume declared collection semantics.
+A campaign is an atomic run surface. A campaign set is a group of such surfaces
+selected for review. A `campaign_collection.v2` manifest declares dimensions,
+relationship lenses, and explicit comparison views. OPAL may render generic
+paired comparisons from that manifest, but it must not infer biological
+controls from naming patterns.
+`comparison_scope: comparison_set` is the default production posture for probe
+review because it materializes one visual per matched set instead of pooling
+targets, label families, and splits into one high-variance artifact. Use
+`match_filters` when a view is only meaningful for a subset of sets, such as
+reference-MSE rows that exist only for vector-summary plots with a declared
+reference vector.
 
 For score-over-rounds comparisons, the renderer must distinguish three bands:
 
@@ -76,22 +82,27 @@ For score-over-rounds comparisons, the renderer must distinguish three bands:
 - statistical confidence intervals, which may only be labeled as such when
   replicate semantics and the estimation method are explicit.
 
-The default notebook comparison should show median lines and, where enough
-relationship units exist, an explicitly labeled IQR band. It should not call
-that band a confidence interval unless a future manifest field and estimator
-make that claim true.
+Collection comparison views declare their source summary and interval kind. A
+view that uses `summary: mean` renders mean lines; median-style summaries render
+median lines. `interval_kind: iqr` produces an explicitly labeled IQR band when
+enough relationship units exist. `interval_kind: student_t_mean_ci` may be used
+only with `summary: mean`, declared replicate semantics, and a confidence level.
 
-Implementation checklist for this slice:
+Implemented checklist for this slice:
 
 - Add OPAL generic vector label ingest plus vector-channel and vector-target
   similarity objective plugins.
 - Register strict parameter schemas for those plugins.
 - Preserve campaign metadata in campaign-set tidy rows so notebooks can expose
   provenance without study-specific parsing.
-- Pass collection relationship pairs through the notebook visual surface and
-  build comparison rows only from validated pairs when a lens is selected.
-- Add IQR bands across campaign-set comparison units with machine-readable
-  interval metadata and prose that states the unit of aggregation.
+- Pass collection relationship pairs through first-class collection visual
+  surfaces and build comparison rows only from validated pairs.
+- Expose campaign-set selection separately from collection-visual selection in
+  generated notebooks.
+- Materialize collection comparison CSV/PNG/manifest artifacts before notebook
+  review instead of recomputing them inside marimo.
+- Add IQR and Student-t interval metadata with prose that states the unit of
+  aggregation and whether the interval is a confidence interval.
 - Update the stress/DenseGen study context to describe passive-to-active label
   family expansion as a study-owned campaign matrix over OPAL's generic
   target/objective contract.
@@ -646,7 +657,7 @@ Acceptance criteria:
 
 #### Required Example: `metric_over_rounds`
 
-X is round. Y is a declared numeric field such as `pred__score_selected`, `obj__logic_fidelity`, `obj__effect_scaled`, or any future declared metric. Supported cohorts:
+X is round. Y is a declared numeric field such as `pred__score_selected`, `obj__logic_fidelity`, `obj__effect_scaled`, or any future declared metric. `pred__score_selected` is only a ledger field name; plots that expose it should declare the actual objective-scale `metric_label`, compact `legend_metric_label`, and `metric_expression` so generated artifacts show the score or loss being optimized. Use `surface_label` when the notebook dropdown needs the objective expression but the plot title must stay short enough to render cleanly. When compatible campaigns share a meaningful objective scale, declare `y_axis.scale_class`, `y_axis.limits`, `y_axis.reference_lines`, and `y_axis.include_zero_tick`; OPAL applies those mechanically and preserves the scale contract in campaign-set visual manifests. The default summary is `mean`; add `median` or quantiles only when the review question needs them. Supported cohorts:
 
 - selected
 - top-k

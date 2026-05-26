@@ -31,11 +31,11 @@ def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
 
 def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "# Campaigns" in text
+    assert "# OPAL Campaign Review" in text
     assert "mo.accordion(" in text
     assert "mo.ui.table" in text
-    assert "Campaigns at a glance" in text
-    assert "Selected campaign" in text
+    assert "OPAL campaigns at a glance" in text
+    assert "Selected OPAL campaign" in text
     assert "Validity" in text
     assert "Visual surface" in text
 
@@ -57,11 +57,16 @@ def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     assert "build_campaign_set_round_options" not in text
     assert 'label="Round"' not in text
     assert 'selected_round_selector = "all"' in text
-    assert 'label="Campaign"' in text
+    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign set"' in text
     assert 'label="Visual surface"' in text
+    assert 'label="Review surface"' in text
+    assert "view_mode_ui = mo.ui.radio(" in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
     assert "on_change=set_visual_label_memory" in text
-    assert "build_notebook_campaign_set_visual_choices" in text
+    assert "build_notebook_collection_set_choices" in text
+    assert "build_notebook_collection_visual_choices" in text
+    assert "build_notebook_campaign_set_visual_choices" not in text
 
 
 def test_campaign_progress_keeps_lateral_tools_out_of_opal_surface() -> None:

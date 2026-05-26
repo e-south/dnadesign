@@ -40,6 +40,7 @@ _PUBLIC_EXPORTS = {
     "load_plot_config": ".src.plots.config",
     "load_plot_manifest_index": ".src.plots.manifests",
     "load_review_manifest": ".src.reporting.review",
+    "materialize_campaign_set_collection_visuals": ".src.reporting.campaign_set_artifacts",
     "parse_enabled": ".src.plots.config",
     "parse_tags": ".src.plots.config",
     "prune_stale_artifacts": ".src.reporting.artifact_garden",

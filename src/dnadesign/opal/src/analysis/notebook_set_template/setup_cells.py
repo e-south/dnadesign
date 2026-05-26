@@ -33,6 +33,9 @@ def _import_cell() -> str:
             import marimo as mo
             import polars as pl
 
+            def opal_table(data, *, page_size):
+                return mo.ui.table(data, page_size=page_size, show_column_summaries=False)
+
             from dnadesign.opal.notebooks.api.generated import (
                 build_campaign_set_notebook_view_model,
                 build_notebook_artifact_garden_rows,
@@ -40,10 +43,11 @@ def _import_cell() -> str:
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
-                build_notebook_campaign_set_metric_comparison_rows,
-                build_notebook_campaign_set_visual_choices,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
+                build_notebook_collection_set_choices,
+                build_notebook_collection_visual_card_rows,
+                build_notebook_collection_visual_choices,
                 build_notebook_evidence_rows,
                 build_notebook_metric_definition_rows,
                 build_notebook_no_plot_scope_rows,
@@ -53,7 +57,6 @@ def _import_cell() -> str:
                 build_notebook_plot_scope_options,
                 build_notebook_visual_surface_model,
                 build_notebook_validity_rows,
-                render_notebook_campaign_set_metric_comparison_image,
                 select_notebook_plot_scope,
             )
             return (
@@ -64,10 +67,11 @@ def _import_cell() -> str:
                 build_notebook_at_a_glance_rows,
                 build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row,
-                build_notebook_campaign_set_metric_comparison_rows,
-                build_notebook_campaign_set_visual_choices,
                 build_notebook_change_rows,
                 build_notebook_change_summary_rows,
+                build_notebook_collection_set_choices,
+                build_notebook_collection_visual_card_rows,
+                build_notebook_collection_visual_choices,
                 build_notebook_evidence_rows,
                 build_notebook_metric_definition_rows,
                 build_notebook_no_plot_scope_rows,
@@ -79,8 +83,8 @@ def _import_cell() -> str:
                 build_notebook_validity_rows,
                 generated_with,
                 mo,
+                opal_table,
                 pl,
-                render_notebook_campaign_set_metric_comparison_image,
                 select_notebook_plot_scope,
             )
         """
@@ -94,21 +98,29 @@ def _view_model_cell() -> str:
         def _(Path):
             config_paths = [Path(path) for path in __CONFIG_PATHS__]
             collection_manifest_path = __COLLECTION_MANIFEST_PATH__
-            return collection_manifest_path, config_paths
+            collection_visual_index_path = __COLLECTION_VISUAL_INDEX_PATH__
+            return collection_manifest_path, collection_visual_index_path, config_paths
 
 
         @app.cell
-        def _(build_campaign_set_notebook_view_model, collection_manifest_path, config_paths):
+        def _(
+            build_campaign_set_notebook_view_model,
+            collection_manifest_path,
+            collection_visual_index_path,
+            config_paths,
+        ):
             selected_round_selector = __DEFAULT_ROUND__
             campaign_set_view_model = build_campaign_set_notebook_view_model(
                 config_paths,
                 round_selector=selected_round_selector,
                 run_id=__DEFAULT_RUN_ID__,
                 collection_manifest_path=collection_manifest_path,
+                collection_visual_index_path=collection_visual_index_path,
             )
             campaigns = campaign_set_view_model["campaigns"]
             collection = campaign_set_view_model.get("collection")
-            return campaign_set_view_model, campaigns, collection, selected_round_selector
+            collection_visuals = campaign_set_view_model.get("collection_visuals") or []
+            return campaign_set_view_model, campaigns, collection, collection_visuals, selected_round_selector
         """
     )
 

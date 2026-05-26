@@ -319,6 +319,52 @@ def test_metric_over_rounds_highlight_does_not_draw_vertical_round_marker(tmp_pa
     assert res.exit_code == 0, res.stdout
 
 
+def test_metric_over_rounds_defaults_to_mean_only_and_preserves_metric_expression(tmp_path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "metric",
+                "kind": "metric_over_rounds",
+                "params": {
+                    "metric": "pred__score_selected",
+                    "cohort": "selected",
+                    "metric_label": "Score = -MSE(y_hat, [0, 0, 1, 1])",
+                    "legend_metric_label": "negative MSE score",
+                    "metric_expression": (
+                        "score = -mean((y_hat - [0, 0, 1, 1])^2); loss = mean((y_hat - [0, 0, 1, 1])^2)"
+                    ),
+                },
+                "output": {"save_data": True},
+            }
+        ],
+    )
+    from dnadesign.opal.tests._cli_helpers import write_ledger, write_state
+
+    write_state(workdir, records_path=records, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r0", round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "all"])
+
+    assert res.exit_code == 0, res.stdout
+    import pandas as pd
+
+    tidy = pd.read_csv(workdir / "outputs" / "plots" / "metric_rall.csv")
+    assert sorted(tidy["summary"].unique().tolist()) == ["mean"]
+    manifest = json.loads((workdir / "outputs" / "plots" / "metric_rall.manifest.json").read_text())
+    assert manifest["params"]["metric_label"] == "Score = -MSE(y_hat, [0, 0, 1, 1])"
+    assert "loss = mean" in manifest["params"]["metric_expression"]
+
+
 def test_plot_cli_list_registry(tmp_path):
     app = _build()
     runner = CliRunner()

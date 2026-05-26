@@ -25,6 +25,7 @@ from ._mpl_utils import (
     categorical_style,
     ensure_mpl_config_dir,
     legend_below_single_row,
+    plot_metric_label,
     pretty_label,
     pretty_title,
     save_notebook_square_figure,
@@ -85,6 +86,7 @@ def render(context, params: dict) -> None:
 
     score_field = get_str(params, ["score_field"], "pred__score_selected")
     score_field = normalize_metric_field(score_field) or "pred__score_selected"
+    score_label = plot_metric_label(params, score_field)
     rank_mode = (get_str(params, ["rank_mode"], "sequential") or "sequential").lower()
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)
@@ -225,8 +227,8 @@ def render(context, params: dict) -> None:
                     label="Selected",
                 )
         ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
-        ax.set_ylabel(pretty_label(score_field))
-        ax.set_title(pretty_title(params.get("title", f"Score vs rank, round {r}")))
+        ax.set_ylabel(score_label)
+        ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank, round {r}")))
         _set_rank_xlim(ax, float(sub[x_field].max()))
         ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         # On-plot meta + log
@@ -311,8 +313,8 @@ def render(context, params: dict) -> None:
                         label="_nolegend_",
                     )
         ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
-        ax.set_ylabel(pretty_label(score_field))
-        ax.set_title(pretty_title(params.get("title", "Score vs rank by round")))
+        ax.set_ylabel(score_label)
+        ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank by round")))
         _set_rank_xlim(ax, float(df[x_field].max()))
         ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         if hue_field is None:

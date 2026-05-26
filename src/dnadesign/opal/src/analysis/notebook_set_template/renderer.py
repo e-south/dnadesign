@@ -11,6 +11,7 @@ def render_campaign_set_notebook(
     round_selector: str,
     run_id: str | None = None,
     collection_manifest_path: str | Path | None = None,
+    collection_visual_index_path: str | Path | None = None,
 ) -> str:
     """Render a marimo notebook template for an OPAL campaign set."""
 
@@ -26,6 +27,10 @@ def render_campaign_set_notebook(
         .replace(
             "__COLLECTION_MANIFEST_PATH__",
             repr(str(Path(collection_manifest_path))) if collection_manifest_path is not None else "None",
+        )
+        .replace(
+            "__COLLECTION_VISUAL_INDEX_PATH__",
+            repr(str(Path(collection_visual_index_path))) if collection_visual_index_path is not None else "None",
         )
         .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
         .replace("__DEFAULT_RUN_ID__", repr(str(run_id)) if run_id else "None")

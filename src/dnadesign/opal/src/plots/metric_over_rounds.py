@@ -22,10 +22,13 @@ from ._mpl_utils import (
     DEFAULT_SQUARE_FIGSIZE,
     apply_notebook_axes_style,
     apply_plot_style,
+    apply_y_axis_scale,
     categorical_color,
     categorical_style,
     ensure_mpl_config_dir,
     legend_below_single_row,
+    plot_metric_label,
+    plot_metric_short_label,
     pretty_label,
     pretty_title,
     save_notebook_square_figure,
@@ -79,7 +82,7 @@ def render(context, params: dict) -> None:
     bad = sorted(set(cohorts) - allowed)
     if bad:
         raise ValueError(f"Unknown cohort(s) for metric_over_rounds: {bad}. Allowed: {sorted(allowed)}")
-    summary_param = params.get("summaries", params.get("summary", ["mean", "median"]))
+    summary_param = params.get("summaries", params.get("summary", ["mean"]))
     summaries = [summary.lower() for summary in _list_param(summary_param)]
     band = _band_param(params.get("band", params.get("interval", "none")))
     band_alpha = float(params.get("band_alpha", 0.18))
@@ -136,6 +139,11 @@ def render(context, params: dict) -> None:
                     }
                 )
     tidy = pd.DataFrame(rows).sort_values(["cohort", "summary", "round"]).reset_index(drop=True)
+    plotted_summaries = [
+        summary for summary in summaries if summary != "count" and not (band == "iqr" and summary in {"q25", "q75"})
+    ]
+    metric_label = plot_metric_label(params, metric)
+    legend_metric_label = plot_metric_short_label(params, metric)
 
     figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
     fig, ax = plt.subplots(figsize=figsize)
@@ -165,7 +173,11 @@ def render(context, params: dict) -> None:
                 alpha=band_alpha,
                 color=categorical_color(cohort_order[str(cohort)]),
                 linewidth=0,
-                label=f"{pretty_label(cohort)} IQR",
+                label=_band_legend_label(
+                    cohort=str(cohort),
+                    metric_label=legend_metric_label,
+                    cohort_count=len(cohort_order),
+                ),
                 zorder=1,
             )
     line_index = 0
@@ -175,7 +187,13 @@ def render(context, params: dict) -> None:
         if band == "iqr" and summary in {"q25", "q75"}:
             continue
         style = categorical_style(line_index)
-        label = f"{pretty_label(cohort)} {pretty_label(summary)}"
+        label = _line_legend_label(
+            cohort=str(cohort),
+            summary=str(summary),
+            metric_label=legend_metric_label,
+            cohort_count=len(set(tidy["cohort"])),
+            summary_count=len(plotted_summaries),
+        )
         line = ax.plot(
             sub["round"],
             sub["value"],
@@ -204,10 +222,17 @@ def render(context, params: dict) -> None:
     threshold = params.get("threshold", params.get("reference_line"))
     if threshold is not None:
         ax.axhline(float(threshold), color="#444444", linestyle="--", linewidth=1.0, alpha=0.8)
+    y_axis = params.get("y_axis") if isinstance(params.get("y_axis"), dict) else {}
+    apply_y_axis_scale(
+        ax,
+        limits=params.get("y_limits", y_axis.get("limits")),
+        reference_lines=params.get("y_reference_lines", y_axis.get("reference_lines")),
+        include_zero_tick=bool(params.get("include_zero_tick", y_axis.get("include_zero_tick", False))),
+    )
     ax.set_xlabel("Round")
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.set_ylabel(pretty_label(metric))
-    title = pretty_title(params.get("title", f"{pretty_label(metric)} over rounds"))
+    ax.set_ylabel(metric_label)
+    title = pretty_title(params.get("title", f"{metric_label} over rounds"))
     count_text = _cohort_count_text(tidy)
     if count_text:
         title = f"{title}\n{count_text}"
@@ -278,3 +303,25 @@ def _cohort_count_text(tidy: pd.DataFrame) -> str:
     if len(values) == 1:
         return f"{cohort_text} n={values[0]} per round"
     return f"{cohort_text} n={values[0]}-{values[-1]} per round"
+
+
+def _line_legend_label(
+    *,
+    cohort: str,
+    summary: str,
+    metric_label: str,
+    cohort_count: int,
+    summary_count: int,
+) -> str:
+    summary_label = pretty_label(summary)
+    if cohort_count <= 1:
+        if summary_count <= 1:
+            return f"{summary_label} {metric_label}"
+        return f"{summary_label} {metric_label}"
+    return f"{pretty_label(cohort)} {summary_label} {metric_label}"
+
+
+def _band_legend_label(*, cohort: str, metric_label: str, cohort_count: int) -> str:
+    if cohort_count <= 1:
+        return f"IQR {metric_label}"
+    return f"{pretty_label(cohort)} IQR {metric_label}"

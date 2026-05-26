@@ -7,7 +7,13 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.opal.src.plots._mpl_utils import COLORBLIND_PALETTE, categorical_style, math_label, pretty_label
+from dnadesign.opal.src.plots._mpl_utils import (
+    COLORBLIND_PALETTE,
+    categorical_style,
+    math_label,
+    pretty_label,
+    pretty_title,
+)
 from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot_meta
 
 
@@ -44,8 +50,11 @@ def test_plot_meta_exposes_dropdown_capability_contract() -> None:
 
 
 def test_plot_style_helpers_prettify_labels_and_cycle_accessible_categories() -> None:
-    assert pretty_label("pred__score_selected") == "Predicted selected score"
+    assert pretty_label("pred__score_selected") == "Selected objective score"
     assert pretty_label("obj__logic_fidelity", raw=True) == "Logic fidelity (obj__logic_fidelity)"
+    assert pretty_title("RF top-N Score = -MSE(y_hat, [0, 0, 1, 1]) over rounds") == (
+        "RF top-N Score = -MSE(y_hat, [0, 0, 1, 1]) over rounds"
+    )
     first = categorical_style(0)
     second = categorical_style(1)
     assert first["color"] == COLORBLIND_PALETTE[0]

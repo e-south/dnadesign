@@ -1,43 +1,41 @@
 from __future__ import annotations
 
 from ._support import block
+from .collection_cells import render_collection_cells
 from .visual_panel_cells import render_visual_panel_cell
 
 
 def render_visual_cells() -> str:
-    """Render campaign-set visual selector and manifest-backed plot panel cells."""
+    """Render campaign and campaign-set visual controls."""
 
     return "\n".join(
         (
-            _visual_model_cell(),
+            _campaign_visual_model_cell(),
+            render_collection_cells(),
             _visual_memory_cell(),
+            _visual_choices_cell(),
             _visual_selector_cell(),
             _selected_visual_cell(),
             _visual_scope_cell(),
-            _visual_comparison_cell(),
             render_visual_panel_cell(),
         )
     )
 
 
-def _visual_model_cell() -> str:
+def _campaign_visual_model_cell() -> str:
     return block(
         """
         @app.cell
         def _(
-            build_notebook_campaign_set_visual_choices,
             build_notebook_plot_inventory_rows,
             build_notebook_visual_surface_model,
-            campaigns,
-            collection,
             selected_campaign_model,
         ):
-            visual_surface_model = build_notebook_visual_surface_model(selected_campaign_model)
-            plot_choices = visual_surface_model["choices"]
-            visual_choices = build_notebook_campaign_set_visual_choices(plot_choices, campaigns, collection)
-            plot_inventory_rows = build_notebook_plot_inventory_rows(visual_surface_model)
-            plot_inventory_counts = visual_surface_model["inventory_status_counts"]
-            return plot_choices, plot_inventory_rows, plot_inventory_counts, visual_choices
+            campaign_visual_surface_model = build_notebook_visual_surface_model(selected_campaign_model)
+            campaign_plot_choices = campaign_visual_surface_model["choices"]
+            plot_inventory_rows = build_notebook_plot_inventory_rows(campaign_visual_surface_model)
+            plot_inventory_counts = campaign_visual_surface_model["inventory_status_counts"]
+            return campaign_plot_choices, plot_inventory_counts, plot_inventory_rows
         """
     )
 
@@ -53,21 +51,57 @@ def _visual_memory_cell() -> str:
     )
 
 
+def _visual_choices_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(
+            active_view_mode,
+            build_notebook_collection_visual_choices,
+            campaign_plot_choices,
+            collection_visuals,
+            selected_collection_set_choice,
+        ):
+            if active_view_mode == "Campaign set":
+                _set_key = (
+                    selected_collection_set_choice.get("key")
+                    if selected_collection_set_choice is not None
+                    else None
+                )
+                visual_choices = build_notebook_collection_visual_choices(
+                    collection_visuals,
+                    comparison_set_key=_set_key,
+                )
+            else:
+                visual_choices = campaign_plot_choices
+            return visual_choices
+        """
+    )
+
+
 def _visual_selector_cell() -> str:
     return block(
         """
         @app.cell
-        def _(mo, set_visual_label_memory, visual_choices, visual_label_memory):
+        def _(active_view_mode, mo, set_visual_label_memory, visual_choices, visual_label_memory):
             if visual_choices:
                 _labels = [choice["label"] for choice in visual_choices]
                 _preferred_visual_label = visual_label_memory()
                 _preferred_visual_label = _preferred_visual_label if _preferred_visual_label in _labels else _labels[0]
-                plot_ui = mo.ui.dropdown(
-                    _labels,
-                    value=_preferred_visual_label,
-                    label="Visual surface",
-                    on_change=set_visual_label_memory,
-                )
+                if active_view_mode == "Campaign set":
+                    plot_ui = mo.ui.dropdown(
+                        _labels,
+                        value=_preferred_visual_label,
+                        label="Collection visual",
+                        on_change=set_visual_label_memory,
+                    )
+                else:
+                    plot_ui = mo.ui.dropdown(
+                        _labels,
+                        value=_preferred_visual_label,
+                        label="Visual surface",
+                        on_change=set_visual_label_memory,
+                    )
             else: plot_ui = None
             return plot_ui
         """
@@ -93,11 +127,8 @@ def _visual_scope_cell() -> str:
     return block(
         """
         @app.cell
-        def _(build_notebook_plot_scope_options, mo, selected_visual_choice):
-            if (
-                selected_visual_choice is None
-                or selected_visual_choice.get("surface_kind") == "campaign_set_metric_comparison"
-            ):
+        def _(active_view_mode, build_notebook_plot_scope_options, mo, selected_visual_choice):
+            if active_view_mode == "Campaign set" or selected_visual_choice is None:
                 plot_scope_options = []
                 plot_scope_ui = None
             else:
@@ -113,36 +144,6 @@ def _visual_scope_cell() -> str:
                 else:
                     plot_scope_ui = None
             return plot_scope_options, plot_scope_ui
-        """
-    )
-
-
-def _visual_comparison_cell() -> str:
-    return block(
-        """
-        @app.cell
-        def _(mo, selected_visual_choice):
-            if (
-                selected_visual_choice is not None
-                and selected_visual_choice.get("surface_kind") == "campaign_set_metric_comparison"
-            ):
-                comparison_group_options = list(selected_visual_choice.get("comparison_group_options") or [])
-            else:
-                comparison_group_options = []
-            if comparison_group_options:
-                comparison_group_key = str(comparison_group_options[0])
-                if len(comparison_group_options) > 1:
-                    comparison_group_ui = mo.ui.dropdown(
-                        comparison_group_options,
-                        value=comparison_group_key,
-                        label="Compare by",
-                    )
-                else:
-                    comparison_group_ui = None
-            else:
-                comparison_group_key = None
-                comparison_group_ui = None
-            return comparison_group_key, comparison_group_options, comparison_group_ui
         """
     )
 
