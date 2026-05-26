@@ -65,6 +65,51 @@ class MetadataCopyDerivationConfig(StrictWorkspaceModel):
     value_type: MetadataValueType | None = None
 
 
+class MetadataTokenPresenceDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["token_presence"]
+    source: str | None = None
+    sources: list[str] = Field(default_factory=list)
+    delimiter: NonEmptyText = ";"
+    present_value: str | bool = True
+    absent_value: str | bool = False
+    value_type: MetadataValueType | None = None
+
+    @model_validator(mode="after")
+    def _validate_source_selection(self) -> "MetadataTokenPresenceDerivationConfig":
+        if bool(self.source) == bool(self.sources):
+            raise ValueError("token_presence derivations must declare exactly one of source or sources")
+        return self
+
+
+class MetadataDelimitedNumericMeanDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["delimited_numeric_mean"]
+    source: str
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "float64"
+
+
+class MetadataSingleCategoricalTokenDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["single_categorical_token"]
+    source: str
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "string"
+
+
+class MetadataNumericQuantileBinDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["numeric_quantile_bin"]
+    source: str
+    edges: list[float] = Field(min_length=1)
+    labels: list[NonEmptyText] = Field(min_length=2)
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "string"
+
+    @model_validator(mode="after")
+    def _validate_label_count(self) -> "MetadataNumericQuantileBinDerivationConfig":
+        if len(self.labels) != len(self.edges) + 1:
+            raise ValueError("numeric_quantile_bin labels must contain exactly len(edges) + 1 entries")
+        return self
+
+
 class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
     kind: Literal["regex_capture"]
     source: str
@@ -136,6 +181,10 @@ class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):
 
 MetadataDerivationConfig = Annotated[
     MetadataCopyDerivationConfig
+    | MetadataTokenPresenceDerivationConfig
+    | MetadataDelimitedNumericMeanDerivationConfig
+    | MetadataSingleCategoricalTokenDerivationConfig
+    | MetadataNumericQuantileBinDerivationConfig
     | MetadataRegexCaptureDerivationConfig
     | MetadataMapValuesDerivationConfig
     | MetadataCoalesceDerivationConfig

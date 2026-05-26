@@ -71,6 +71,10 @@ class PlotBaseConfig(StrictPlotModel):
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
+        if len(self.filter_options) > 1:
+            raise ValueError(
+                "plot filter_options currently supports at most one filter; use one filter or implement multi-filter UI"
+            )
         if self.default_hue is None:
             return self
         allowed = {option.column for option in self.hue_options}
@@ -535,3 +539,11 @@ class ResolvedPlotSpec(StrictPlotModel):
     hide_repeated_y_axis: bool = False
     config_id: Identifier | None = None
     semantics_ref: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_filter_options(self) -> "ResolvedPlotSpec":
+        if len(self.filter_options) > 1:
+            raise ValueError(
+                "plot filter_options currently supports at most one filter; use one filter or implement multi-filter UI"
+            )
+        return self

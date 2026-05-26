@@ -50,10 +50,23 @@ def derivation_dependency_columns(
         derivation = derivations.get(column)
         if derivation is None:
             continue
-        if derivation.kind in {"copy", "regex_capture", "map_values"}:
+        if derivation.kind in {
+            "copy",
+            "delimited_numeric_mean",
+            "single_categorical_token",
+            "numeric_quantile_bin",
+            "regex_capture",
+            "map_values",
+        }:
             dependencies.append(derivation.source)
             if available is not None and derivation.source not in available:
                 missing.append(derivation.source)
+            continue
+        if derivation.kind == "token_presence":
+            sources = [derivation.source] if derivation.source is not None else list(derivation.sources)
+            dependencies.extend(sources)
+            if available is not None:
+                missing.extend(source for source in sources if source not in available)
             continue
         if derivation.kind == "coalesce":
             if available is None:

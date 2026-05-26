@@ -77,16 +77,30 @@ def _load_alignment_input(
             raise ContractViolationError(f"source {ref_id} does not expose a records table for alignment")
         return AlignmentInput(ref_id=ref_id, rows=rows, input_path=resolved.records_path, key_columns=key_columns)
 
-    view = context.require_source_view(ref_id)
-    source = context.require_source(view.source)
+    view = context.require_view(ref_id)
     rows_path = context.output_root / "views" / ref_id / "rows.parquet"
     if not rows_path.exists():
         raise MissingArtifactError(f"alignment input view is not materialized: {ref_id}")
+    view_source_id = getattr(view, "source", None)
+    if view_source_id is not None:
+        source = context.require_source(str(view_source_id))
+        record_key = source.record_key
+        subject_key = source.subject_key
+    else:
+        manifest_path = rows_path.parent / "manifest.json"
+        if not manifest_path.exists():
+            raise MissingArtifactError(f"alignment input derived view is missing manifest: {ref_id}")
+        manifest = context.read_manifest(manifest_path)
+        params = dict(manifest.get("params") or {})
+        record_key = str(params.get("record_key") or "").strip()
+        subject_key = str(params.get("subject_key") or record_key).strip()
+        if not record_key:
+            raise ContractViolationError(f"derived view {ref_id} manifest does not declare a record_key")
     key_columns = _key_columns_for_side(
         alignment,
         side=side,
-        record_key=source.record_key,
-        subject_key=source.subject_key,
+        record_key=record_key,
+        subject_key=subject_key,
     )
     rows = read_table(rows_path, columns=key_columns)
     return AlignmentInput(ref_id=ref_id, rows=rows, input_path=rows_path, key_columns=key_columns)

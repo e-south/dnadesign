@@ -100,6 +100,21 @@ def test_plot_config_rejects_default_hue_not_declared_in_hue_options() -> None:
         )
 
 
+def test_plot_config_rejects_multiple_filter_options_until_multi_filter_ui_exists() -> None:
+    with pytest.raises(ValueError, match="filter_options currently supports at most one filter"):
+        _PLOT_CONFIG_ADAPTER.validate_python(
+            {
+                "kind": "distribution_grid",
+                "scalars": ["ordinal_ladder_rows"],
+                "metric_columns": ["ordinal_margin"],
+                "filter_options": [
+                    {"column": "ordinal_group_id", "label": "Ordinal source"},
+                    {"column": "candidate_source", "label": "Candidate source"},
+                ],
+            }
+        )
+
+
 def test_resolve_plot_spec_preserves_hue_configuration() -> None:
     config = _PLOT_CONFIG_ADAPTER.validate_python(
         {

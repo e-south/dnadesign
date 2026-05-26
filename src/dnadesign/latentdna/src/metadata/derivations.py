@@ -47,9 +47,71 @@ def _normalize(value: object, *, mode: str | None) -> object:
     raise ContractViolationError(f"unsupported metadata normalization mode: {mode!r}")
 
 
+def _nonempty_tokens(value: object, *, delimiter: str) -> list[str]:
+    if value is None:
+        return []
+    text = str(value).strip()
+    if not text:
+        return []
+    return [part.strip() for part in text.split(delimiter) if part.strip()]
+
+
+def _mean_numeric_token(value: object, *, delimiter: str, field_name: str) -> float | None:
+    tokens = _nonempty_tokens(value, delimiter=delimiter)
+    if not tokens:
+        return None
+    values: list[float] = []
+    for token in tokens:
+        try:
+            values.append(float(token))
+        except ValueError as exc:
+            raise ContractViolationError(f"{field_name} contains a non-numeric metadata value: {token!r}") from exc
+    return float(sum(values) / len(values))
+
+
+def _single_categorical_token(value: object, *, delimiter: str, field_name: str) -> str | None:
+    tokens = _nonempty_tokens(value, delimiter=delimiter)
+    if not tokens:
+        return None
+    unique = sorted(set(tokens), key=str.casefold)
+    if len(unique) != 1:
+        raise ContractViolationError(f"{field_name} contains conflicting categorical values: {unique}")
+    return unique[0]
+
+
 def derive_metadata_value(row: dict[str, Any], derivation: MetadataDerivationConfig) -> object:
     if derivation.kind == "copy":
         return row.get(derivation.source)
+    if derivation.kind == "token_presence":
+        sources = [derivation.source] if derivation.source is not None else list(derivation.sources)
+        for source in sources:
+            if _nonempty_tokens(row.get(source), delimiter=derivation.delimiter):
+                return derivation.present_value
+        return derivation.absent_value
+    if derivation.kind == "delimited_numeric_mean":
+        return _mean_numeric_token(
+            row.get(derivation.source),
+            delimiter=derivation.delimiter,
+            field_name=derivation.source,
+        )
+    if derivation.kind == "single_categorical_token":
+        return _single_categorical_token(
+            row.get(derivation.source),
+            delimiter=derivation.delimiter,
+            field_name=derivation.source,
+        )
+    if derivation.kind == "numeric_quantile_bin":
+        value = _mean_numeric_token(
+            row.get(derivation.source),
+            delimiter=derivation.delimiter,
+            field_name=derivation.source,
+        )
+        if value is None:
+            return None
+        for index, edge in enumerate(derivation.edges):
+            if value <= float(edge):
+                return derivation.labels[index]
+        return derivation.labels[-1]
     if derivation.kind == "regex_capture":
         source_value = row.get(derivation.source)
         if source_value is None:

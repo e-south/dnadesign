@@ -372,6 +372,10 @@ def _candidate_decision_frontier_table(
     design_metric_id = str(
         _optional_param(params, "design_metric_id", default="design_family_balanced_separation_ratio")
     )
+    design_output_column = str(_optional_param(params, "design_output_column", default=design_metric_id))
+    design_display_name = str(
+        _optional_param(params, "design_display_name", default="Balanced design-family separation ratio")
+    )
     ordinal_metric_id = str(_optional_param(params, "ordinal_metric_id", default="ordinal_axis_spearman"))
     ordinal_output_column = str(_optional_param(params, "ordinal_output_column", default=ordinal_metric_id))
     context_metric_id = str(_optional_param(params, "context_metric_id", default="context_self_cosine_median"))
@@ -433,9 +437,9 @@ def _candidate_decision_frontier_table(
             "effective_rank": (
                 float(health_metric_row["metric_value"]) if health_metric_row is not None else float("nan")
             ),
-            "design_family_balanced_separation_ratio": (
-                float(design_metric_row["metric_value"]) if design_metric_row is not None else float("nan")
-            ),
+            design_output_column: float(design_metric_row["metric_value"])
+            if design_metric_row is not None
+            else float("nan"),
             ordinal_output_column: (
                 float(ordinal_metric_row["metric_value"]) if ordinal_metric_row is not None else float("nan")
             ),
@@ -444,7 +448,7 @@ def _candidate_decision_frontier_table(
             ),
             "context_pair_id": context_pair_id,
             "context_validation_status": "direct" if context_pair_id is not None else "not_applicable",
-            "x_display_name": "Balanced design-family separation ratio",
+            "x_display_name": design_display_name,
             "y_display_name": str(_optional_param(params, "ordinal_display_name", default="Ordinal-axis Spearman")),
         }
         rows.append(row)
