@@ -12,360 +12,360 @@ defaults:
     - png
   neighbor_backend: auto
 sources:
-  dual_cassette_1600bp_seq_mean_intermediate:
+  dual_cassette_2000bp_seq_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: seq_mean
-      view_name: dual_cassette_1600bp_seq_mean
-  dual_cassette_1600bp_seq_mean_output_layer:
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: seq_mean
-      view_name: dual_cassette_1600bp_seq_mean
-  dual_cassette_1600bp_seq_mean_log_likelihood_total:
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: dual_cassette_1600bp_seq_mean
-  dual_cassette_1600bp_seq_mean_log_likelihood_mean_per_token:
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: dual_cassette_1600bp_seq_mean
-  dual_cassette_1600bp_reverse_complement_seq_mean_intermediate:
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_reverse_complement_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: seq_mean
-      view_name: dual_cassette_1600bp_fwd_rc_concat
-  dual_cassette_1600bp_reverse_complement_seq_mean_output_layer:
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_reverse_complement_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: seq_mean
-      view_name: dual_cassette_1600bp_fwd_rc_concat
-  dual_cassette_1600bp_reverse_complement_seq_mean_log_likelihood_total:
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_reverse_complement_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: dual_cassette_1600bp_fwd_rc_concat
-  dual_cassette_1600bp_reverse_complement_seq_mean_log_likelihood_mean_per_token:
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: dual_cassette_1600bp_reverse_complement_seq_mean
-    emitted_length_bp: 1600
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
     pooling_span_bp: full_sequence
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: dual_cassette_1600bp_fwd_rc_concat
-  lnrna_span_in_construct_anchor_mean_intermediate:
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: anchor_mean
-      view_name: lnrna_span_in_construct_anchor_mean
-  lnrna_span_in_construct_anchor_mean_output_layer:
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: anchor_mean
-      view_name: lnrna_span_in_construct_anchor_mean
-  lnrna_span_in_construct_anchor_mean_log_likelihood_total:
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: lnrna_span_in_construct_anchor_mean
-  lnrna_span_in_construct_anchor_mean_log_likelihood_mean_per_token:
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: lnrna_span_in_construct_anchor_mean
-  lnrna_span_in_construct_reverse_complement_anchor_mean_intermediate:
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: anchor_mean
-      view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
-  lnrna_span_in_construct_reverse_complement_anchor_mean_output_layer:
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: anchor_mean
-      view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
-  lnrna_span_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
-  lnrna_span_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: lnrna_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: lnrna_slot
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: lnrna_span_in_construct_reverse_complement_anchor_mean
-  rt_cds_span_in_construct_anchor_mean_intermediate:
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: anchor_mean
-      view_name: rt_cds_span_in_construct_anchor_mean
-  rt_cds_span_in_construct_anchor_mean_output_layer:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: anchor_mean
-      view_name: rt_cds_span_in_construct_anchor_mean
-  rt_cds_span_in_construct_anchor_mean_log_likelihood_total:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: rt_cds_span_in_construct_anchor_mean
-  rt_cds_span_in_construct_anchor_mean_log_likelihood_mean_per_token:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: rt_cds_span_in_construct_anchor_mean
-  rt_cds_span_in_construct_reverse_complement_anchor_mean_intermediate:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       representation_kind: intermediate_embedding
       layer_name: block26_mlp_out
       pooling_operation: anchor_mean
-      view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
-  rt_cds_span_in_construct_reverse_complement_anchor_mean_output_layer:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
     kind: infer_feature_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       representation_kind: output_layer_mean
       pooling_operation: anchor_mean
-      view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
-  rt_cds_span_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__total
-      view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
-  rt_cds_span_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
     root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_1600bp_v1
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: parent_sequence_id
     subject_key: parent_sequence_id
     role: planned
-    sequence_scope: rt_cds_span_in_construct_reverse_complement_anchor_mean
-    emitted_length_bp: 1600
-    pooling_span_bp: rt_cds_slot
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
     where:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
-      view_name: rt_cds_span_in_construct_reverse_complement_anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
 metadata:
   include:
     - candidate_source
@@ -399,7 +399,7 @@ metadata:
       value_type: string
     target_context_source_id:
       kind: constant
-      value: genbank:1600bp-region.gb#record
+      value: genbank:2000bp-region.gb#record
       value_type: string
     target_context_region_start_0:
       kind: constant
@@ -483,76 +483,76 @@ metadata:
         crawford_abundance_balanced_ordinal_spearman: Crawford abundance balanced ordinal Spearman
         crawford_abundance_label_permutation_pvalue: Crawford abundance permutation p-value
 views:
-  intermediate_embedding_7b_dual_cassette_1600bp_seq_mean:
-    source: dual_cassette_1600bp_seq_mean_intermediate
+  intermediate_embedding_7b_dual_cassette_2000bp_seq_mean:
+    source: dual_cassette_2000bp_seq_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_dual_cassette_1600bp_seq_mean
-    tags: {model: evo2_7b, family: intermediate_embedding, scope: dual_cassette_1600bp, pooling: seq_mean}
-  intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean:
-    source: dual_cassette_1600bp_reverse_complement_seq_mean_intermediate
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_seq_mean
+    tags: {model: evo2_7b, family: intermediate_embedding, scope: dual_cassette_2000bp, pooling: seq_mean}
+  intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean:
+    source: dual_cassette_2000bp_reverse_complement_seq_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_dual_cassette_1600bp_seq_mean
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_seq_mean
     tags:
       model: evo2_7b
       family: intermediate_embedding
-      scope: dual_cassette_1600bp
+      scope: dual_cassette_2000bp
       pooling: seq_mean
       orientation: reverse_complement
-  intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean:
-    source: lnrna_span_in_construct_anchor_mean_intermediate
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_anchor_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_lnrna_span_in_construct_anchor_mean
+    coordinate_space_id: evo2_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
     tags: {model: evo2_7b, family: intermediate_embedding, scope: lnrna_slot, pooling: anchor_mean}
-  intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean:
-    source: lnrna_span_in_construct_reverse_complement_anchor_mean_intermediate
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_lnrna_span_in_construct_anchor_mean
+    coordinate_space_id: evo2_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
     tags:
       model: evo2_7b
       family: intermediate_embedding
       scope: lnrna_slot
       pooling: anchor_mean
       orientation: reverse_complement
-  intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean:
-    source: rt_cds_span_in_construct_anchor_mean_intermediate
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_anchor_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_rt_cds_span_in_construct_anchor_mean
+    coordinate_space_id: evo2_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
     tags: {model: evo2_7b, family: intermediate_embedding, scope: rt_cds_slot, pooling: anchor_mean}
-  intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean:
-    source: rt_cds_span_in_construct_reverse_complement_anchor_mean_intermediate
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_intermediate
     vector: {kind: column, name: value}
-    coordinate_space_id: evo2_7b_rt_cds_span_in_construct_anchor_mean
+    coordinate_space_id: evo2_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
     tags:
       model: evo2_7b
       family: intermediate_embedding
       scope: rt_cds_slot
       pooling: anchor_mean
       orientation: reverse_complement
-  output_layer_mean_7b_dual_cassette_1600bp_seq_mean:
-    source: dual_cassette_1600bp_seq_mean_output_layer
+  output_layer_mean_7b_dual_cassette_2000bp_seq_mean:
+    source: dual_cassette_2000bp_seq_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
-    tags: {model: evo2_7b, family: output_layer_mean, scope: dual_cassette_1600bp, pooling: seq_mean}
+    tags: {model: evo2_7b, family: output_layer_mean, scope: dual_cassette_2000bp, pooling: seq_mean}
     role: appendix
-  output_layer_mean_7b_dual_cassette_1600bp_reverse_complement_seq_mean:
-    source: dual_cassette_1600bp_reverse_complement_seq_mean_output_layer
+  output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean:
+    source: dual_cassette_2000bp_reverse_complement_seq_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
     tags:
       model: evo2_7b
       family: output_layer_mean
-      scope: dual_cassette_1600bp
+      scope: dual_cassette_2000bp
       pooling: seq_mean
       orientation: reverse_complement
     role: appendix
-  output_layer_mean_7b_lnrna_span_in_construct_anchor_mean:
-    source: lnrna_span_in_construct_anchor_mean_output_layer
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_anchor_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
     tags: {model: evo2_7b, family: output_layer_mean, scope: lnrna_slot, pooling: anchor_mean}
     role: appendix
-  output_layer_mean_7b_lnrna_span_in_construct_reverse_complement_anchor_mean:
-    source: lnrna_span_in_construct_reverse_complement_anchor_mean_output_layer
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
     tags:
@@ -562,14 +562,14 @@ views:
       pooling: anchor_mean
       orientation: reverse_complement
     role: appendix
-  output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean:
-    source: rt_cds_span_in_construct_anchor_mean_output_layer
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_anchor_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
     tags: {model: evo2_7b, family: output_layer_mean, scope: rt_cds_slot, pooling: anchor_mean}
     role: appendix
-  output_layer_mean_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean:
-    source: rt_cds_span_in_construct_reverse_complement_anchor_mean_output_layer
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_output_layer
     vector: {kind: column, name: value}
     coordinate_space_id: evo2_7b_output_layer_mean
     tags:
@@ -579,26 +579,26 @@ views:
       pooling: anchor_mean
       orientation: reverse_complement
     role: appendix
-  intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat:
+  intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - intermediate_embedding_7b_dual_cassette_1600bp_seq_mean
-        - intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean
-    coordinate_space_id: evo2_7b_dual_cassette_1600bp_bidir_concat
+        - intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+        - intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_bidir_concat
     tags:
       model: evo2_7b
       family: intermediate_embedding
-      scope: dual_cassette_1600bp
+      scope: dual_cassette_2000bp
       pooling: seq_mean
       transform: block_normalized_concatenate
     role: primary
-  intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat:
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean
-        - intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
     coordinate_space_id: evo2_7b_slot_anchor_mean_bidir_concat
     tags:
       model: evo2_7b
@@ -607,12 +607,12 @@ views:
       pooling: anchor_mean
       transform: block_normalized_concatenate
     role: primary
-  intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat:
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean
-        - intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
     coordinate_space_id: evo2_7b_slot_anchor_mean_bidir_concat
     tags:
       model: evo2_7b
@@ -621,13 +621,13 @@ views:
       pooling: anchor_mean
       transform: block_normalized_concatenate
     role: primary
-  intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat:
+  intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-    coordinate_space_id: evo2_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    coordinate_space_id: evo2_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     tags:
       model: evo2_7b
       family: intermediate_embedding
@@ -635,26 +635,26 @@ views:
       pooling: anchor_mean
       transform: block_normalized_concatenate
     role: exploratory
-  output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat:
+  output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - output_layer_mean_7b_dual_cassette_1600bp_seq_mean
-        - output_layer_mean_7b_dual_cassette_1600bp_reverse_complement_seq_mean
-    coordinate_space_id: evo2_7b_output_layer_mean_dual_cassette_1600bp_bidir_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+        - output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    coordinate_space_id: evo2_7b_output_layer_mean_dual_cassette_2000bp_bidir_concat
     tags:
       model: evo2_7b
       family: output_layer_mean
-      scope: dual_cassette_1600bp
+      scope: dual_cassette_2000bp
       pooling: seq_mean
       transform: block_normalized_concatenate
     role: appendix
-  output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat:
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean
-        - output_layer_mean_7b_lnrna_span_in_construct_reverse_complement_anchor_mean
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
     coordinate_space_id: evo2_7b_output_layer_mean_slot_anchor_mean_bidir_concat
     tags:
       model: evo2_7b
@@ -663,12 +663,12 @@ views:
       pooling: anchor_mean
       transform: block_normalized_concatenate
     role: appendix
-  output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat:
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean
-        - output_layer_mean_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
     coordinate_space_id: evo2_7b_output_layer_mean_slot_anchor_mean_bidir_concat
     tags:
       model: evo2_7b
@@ -677,13 +677,13 @@ views:
       pooling: anchor_mean
       transform: block_normalized_concatenate
     role: appendix
-  output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat:
+  output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat:
     derive:
       kind: block_normalized_concatenate
       inputs:
-        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-    coordinate_space_id: evo2_7b_output_layer_mean_lnrna_rt_slot_pair_anchor_mean_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    coordinate_space_id: evo2_7b_output_layer_mean_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     tags:
       model: evo2_7b
       family: output_layer_mean
@@ -696,39 +696,39 @@ candidate_sets:
     label: RT-lnRNA construct representation gallery
     description: Full-construct, lnRNA-slot, RT-slot, and slot-pair Evo2 7B intermediate plus output-layer mean views.
     views:
-      - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-      - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
-      intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat: Full 1.6 kb intermediate
-      intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat: lnRNA-slot intermediate
-      intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat: RT CDS-slot intermediate
-      intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat: lnRNA plus RT slot-pair intermediate
-      output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat: Full 1.6 kb output layer
-      output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat: lnRNA-slot output layer
-      output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat: RT CDS-slot output layer
-      output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat: lnRNA plus RT slot-pair output layer
+      intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat: Full 1.6 kb intermediate
+      intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA-slot intermediate
+      intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS-slot intermediate
+      intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA plus RT slot-pair intermediate
+      output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat: Full 1.6 kb output layer
+      output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA-slot output layer
+      output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS-slot output layer
+      output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA plus RT slot-pair output layer
   rt_lnrna_output_layer_diagnostics_v1:
     label: RT-lnRNA output-layer diagnostics
     description: Companion Evo2 7B output-layer mean views for appendix geometry and collapse diagnostics.
     views:
-      - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
   rt_lnrna_opal_x_review_v1:
     label: RT-lnRNA OPAL X review candidates
     description: Intermediate-embedding candidates eligible for OPAL X selection after LatentDNA health review.
     views:
-      - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
 plots:
   representation_health_summary:
     kind: metric_panel_grid
@@ -751,14 +751,14 @@ plots:
     kind: curve_grid
     visibility_tier: appendix
     reducers:
-      - pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-      - pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
       - Full 1.6 kb intermediate
       - lnRNA-slot intermediate
@@ -792,14 +792,14 @@ plots:
     kind: projection_grid
     visibility_tier: appendix
     projections:
-      - umap_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - umap_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - umap_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - umap_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-      - umap_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - umap_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - umap_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - umap_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     panel_titles:
       - Full 1.6 kb intermediate
       - lnRNA-slot intermediate
@@ -833,23 +833,23 @@ notebooks:
       - rt_lnrna_opal_x_review_v1
     default_candidate_set: rt_lnrna_construct_gallery_v1
     geometry_order:
-      - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-      - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     candidate_grid_views:
-      - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-      - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-      - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-      - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     candidate_grid_panel_titles:
       - Full 1.6 kb intermediate
       - lnRNA-slot intermediate
@@ -880,8 +880,8 @@ notebooks:
       crawford_design_reference_status: categorical
     default_layout: candidate_grid
     default_compare_views:
-      - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-      - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     ordered_plots:
       - representation_health_summary
       - representation_scree_diagnostic
@@ -890,101 +890,101 @@ notebooks:
 recipes:
   rt_lnrna_representation_review_recipe:
     steps:
-      - {id: materialize_intermediate_embedding_7b_dual_cassette_1600bp_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_1600bp_seq_mean}}
-      - {id: materialize_intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean}}
-      - {id: materialize_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean}}
-      - {id: materialize_intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean}}
-      - {id: materialize_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean}}
-      - {id: materialize_intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean}}
-      - {id: materialize_output_layer_mean_7b_dual_cassette_1600bp_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_1600bp_seq_mean}}
-      - {id: materialize_output_layer_mean_7b_dual_cassette_1600bp_reverse_complement_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_1600bp_reverse_complement_seq_mean}}
-      - {id: materialize_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean}}
-      - {id: materialize_output_layer_mean_7b_lnrna_span_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_span_in_construct_reverse_complement_anchor_mean}}
-      - {id: materialize_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean}}
-      - {id: materialize_output_layer_mean_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean}}
-      - id: derive_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
+      - {id: materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean}}
+      - {id: materialize_intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean}}
+      - {id: materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_dual_cassette_2000bp_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_2000bp_seq_mean}}
+      - {id: materialize_output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean}}
+      - {id: materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean}}
+      - id: derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
         op: view.derive
         depends_on:
-          - materialize_intermediate_embedding_7b_dual_cassette_1600bp_seq_mean
-          - materialize_intermediate_embedding_7b_dual_cassette_1600bp_reverse_complement_seq_mean
-        params: {view: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat}
-      - id: derive_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - id: derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
         op: view.derive
         depends_on:
-          - materialize_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean
-          - materialize_intermediate_embedding_7b_lnrna_span_in_construct_reverse_complement_anchor_mean
-        params: {view: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-      - id: derive_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+          - materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+          - materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
         op: view.derive
         depends_on:
-          - materialize_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean
-          - materialize_intermediate_embedding_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean
-        params: {view: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-      - id: derive_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+          - materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         op: view.derive
         depends_on:
-          - derive_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - derive_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        params: {view: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat}
-      - id: derive_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
+          - derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
         op: view.derive
         depends_on:
-          - materialize_output_layer_mean_7b_dual_cassette_1600bp_seq_mean
-          - materialize_output_layer_mean_7b_dual_cassette_1600bp_reverse_complement_seq_mean
-        params: {view: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat}
-      - id: derive_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - id: derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
         op: view.derive
         depends_on:
-          - materialize_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean
-          - materialize_output_layer_mean_7b_lnrna_span_in_construct_reverse_complement_anchor_mean
-        params: {view: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-      - id: derive_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
+          - materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+          - materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
         op: view.derive
         depends_on:
-          - materialize_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean
-          - materialize_output_layer_mean_7b_rt_cds_span_in_construct_reverse_complement_anchor_mean
-        params: {view: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-      - id: derive_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+          - materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         op: view.derive
         depends_on:
-          - derive_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - derive_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        params: {view: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat}
-      - &sample_ie7_full {id: build_sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat], params: {sample: sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, view: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, strategy: all, seed: 17}}
-      - &sample_ie7_lnrna {id: build_sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
-      - &sample_ie7_rt {id: build_sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
-      - &sample_ie7_pair {id: build_sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, view: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, strategy: all, seed: 17}}
-      - &sample_ol7_full {id: build_sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat], params: {sample: sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, view: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, strategy: all, seed: 17}}
-      - &sample_ol7_lnrna {id: build_sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
-      - &sample_ol7_rt {id: build_sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
-      - &sample_ol7_pair {id: build_sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {sample: sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, view: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, strategy: all, seed: 17}}
-      - &pca_ie7_full {id: reduce_pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, run_id: pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, reduced_view_id: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat_reduced, sample: sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, dims: 16}}
-      - &pca_ie7_lnrna {id: reduce_pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, dims: 16}}
-      - &pca_ie7_rt {id: reduce_pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, dims: 16}}
-      - &pca_ie7_pair {id: reduce_pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {view: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, run_id: pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, reduced_view_id: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, dims: 16}}
-      - &pca_ol7_full {id: reduce_pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, run_id: pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, reduced_view_id: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat_reduced, sample: sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, dims: 16}}
-      - &pca_ol7_lnrna {id: reduce_pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, dims: 16}}
-      - &pca_ol7_rt {id: reduce_pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, dims: 16}}
-      - &pca_ol7_pair {id: reduce_pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {view: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, run_id: pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, reduced_view_id: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, dims: 16}}
-      - {id: fit_umap_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, sample: sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, run_id: umap_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, seed: 17}}
-      - {id: fit_umap_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, seed: 17}}
-      - {id: fit_umap_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, seed: 17}}
-      - {id: fit_umap_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {view: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample: sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, run_id: umap_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, seed: 17}}
-      - {id: fit_umap_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, sample: sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, run_id: umap_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, seed: 17}}
-      - {id: fit_umap_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, seed: 17}}
-      - {id: fit_umap_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, seed: 17}}
-      - {id: fit_umap_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat], params: {view: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample: sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, run_id: umap_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, seed: 17}}
+          - derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - &sample_ie7_full {id: build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, strategy: all, seed: 17}}
+      - &sample_ie7_lnrna {id: build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ie7_rt {id: build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ie7_pair {id: build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, strategy: all, seed: 17}}
+      - &sample_ol7_full {id: build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, strategy: all, seed: 17}}
+      - &sample_ol7_lnrna {id: build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ol7_rt {id: build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ol7_pair {id: build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, strategy: all, seed: 17}}
+      - &pca_ie7_full {id: reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, reduced_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat_reduced, sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, dims: 16}}
+      - &pca_ie7_lnrna {id: reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ie7_rt {id: reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ie7_pair {id: reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reduced_view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, dims: 16}}
+      - &pca_ol7_full {id: reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, reduced_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat_reduced, sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, dims: 16}}
+      - &pca_ol7_lnrna {id: reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ol7_rt {id: reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ol7_pair {id: reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reduced_view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, dims: 16}}
+      - {id: fit_umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, seed: 17}}
       - id: build_representation_health_summary_metrics
         op: scalar.build
         depends_on:
-          - reduce_pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-          - reduce_pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-          - reduce_pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-          - reduce_pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         params:
           scalar: representation_health_summary_metrics
           kind: representation_health_summary
@@ -995,25 +995,25 @@ recipes:
           pairwise_max_rows: 4096
           pairwise_seed: 17
           candidates:
-            - {view_id: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, reducer_id: pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat}
-            - {view_id: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample_id: sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat}
-            - {view_id: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, reducer_id: pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat}
-            - {view_id: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample_id: sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, reducer_id: pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat}
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, reducer_id: pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+            - {view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, reducer_id: pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reducer_id: pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
       - id: build_rt_lnrna_overlay_ordinal_audit_metrics
         op: scalar.build
         depends_on:
-          - build_sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-          - build_sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - build_sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - build_sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-          - build_sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-          - build_sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - build_sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - build_sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         params:
           scalar: rt_lnrna_overlay_ordinal_audit_metrics
           kind: ordinal_axes_audit
@@ -1022,14 +1022,14 @@ recipes:
           permutations: 100
           seed: 17
           candidates:
-            - {view_id: intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat}
-            - {view_id: intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample_id: sample_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat}
-            - {view_id: output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat}
-            - {view_id: output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat}
-            - {view_id: output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat, sample_id: sample_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat}
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+            - {view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
           axes:
             - axis_id: khan_abundance
               label: Khan RT-DNA abundance prior
@@ -1043,27 +1043,27 @@ recipes:
       - id: render_representation_scree_diagnostic
         op: plot.render
         depends_on:
-          - reduce_pca_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-          - reduce_pca_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-          - reduce_pca_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-          - reduce_pca_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - reduce_pca_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         params: {plot_id: representation_scree_diagnostic}
       - {id: render_rt_lnrna_overlay_ordinal_audit, op: plot.render, depends_on: [build_rt_lnrna_overlay_ordinal_audit_metrics], params: {plot_id: rt_lnrna_overlay_ordinal_audit}}
       - id: render_appendix_umap_gallery
         op: plot.render
         depends_on:
-          - fit_umap_intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-          - fit_umap_intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - fit_umap_intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - fit_umap_intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-          - fit_umap_output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-          - fit_umap_output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-          - fit_umap_output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-          - fit_umap_output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+          - fit_umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - fit_umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - fit_umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - fit_umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         params: {plot_id: appendix_umap_gallery}
 deliverables:
   representation_health_summary:
@@ -1074,14 +1074,14 @@ deliverables:
     recipe: rt_lnrna_representation_review_recipe
     requires:
       views:
-        - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-        - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     outputs:
       plots: [representation_health_summary]
       scalars: [representation_health_summary_metrics]
@@ -1096,14 +1096,14 @@ deliverables:
     recipe: rt_lnrna_representation_review_recipe
     requires:
       views:
-        - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-        - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     outputs:
       plots: [representation_scree_diagnostic]
     docs_refs: []
@@ -1117,10 +1117,10 @@ deliverables:
     recipe: rt_lnrna_representation_review_recipe
     requires:
       views:
-        - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     outputs:
       plots: [rt_lnrna_overlay_ordinal_audit]
       scalars: [rt_lnrna_overlay_ordinal_audit_metrics]
@@ -1135,14 +1135,14 @@ deliverables:
     recipe: rt_lnrna_representation_review_recipe
     requires:
       views:
-        - intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat
-        - intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat
-        - output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat
-        - output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat
-        - output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     outputs:
       plots: [appendix_umap_gallery]
     docs_refs: []

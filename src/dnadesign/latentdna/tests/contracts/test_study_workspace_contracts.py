@@ -98,32 +98,32 @@ _FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VI
 
 
 _RT_LNRNA_SOURCE_VIEW_SELECTORS = {
-    "dual_cassette_1600bp_seq_mean": "dual_cassette_1600bp_seq_mean",
-    "dual_cassette_1600bp_reverse_complement_seq_mean": "dual_cassette_1600bp_fwd_rc_concat",
-    "lnrna_span_in_construct_anchor_mean": "lnrna_span_in_construct_anchor_mean",
-    "lnrna_span_in_construct_reverse_complement_anchor_mean": (
-        "lnrna_span_in_construct_reverse_complement_anchor_mean"
+    "dual_cassette_2000bp_seq_mean": "dual_cassette_2000bp_seq_mean",
+    "dual_cassette_2000bp_reverse_complement_seq_mean": "dual_cassette_2000bp_reverse_complement_seq_mean",
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": (
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean"
     ),
-    "rt_cds_span_in_construct_anchor_mean": "rt_cds_span_in_construct_anchor_mean",
-    "rt_cds_span_in_construct_reverse_complement_anchor_mean": (
-        "rt_cds_span_in_construct_reverse_complement_anchor_mean"
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": (
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean"
     ),
 }
 
 
 _RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS = [
-    "intermediate_embedding_7b_dual_cassette_1600bp_fwd_rc_concat",
-    "intermediate_embedding_7b_lnrna_span_in_construct_anchor_mean_bidir_concat",
-    "intermediate_embedding_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat",
-    "intermediate_embedding_7b_lnrna_rt_slot_pair_anchor_mean_concat",
+    "intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat",
+    "intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat",
 ]
 
 
 _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS = [
-    "output_layer_mean_7b_dual_cassette_1600bp_fwd_rc_concat",
-    "output_layer_mean_7b_lnrna_span_in_construct_anchor_mean_bidir_concat",
-    "output_layer_mean_7b_rt_cds_span_in_construct_anchor_mean_bidir_concat",
-    "output_layer_mean_7b_lnrna_rt_slot_pair_anchor_mean_concat",
+    "output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat",
+    "output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat",
 ]
 
 

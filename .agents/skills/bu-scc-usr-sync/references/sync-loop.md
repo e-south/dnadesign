@@ -16,3 +16,7 @@ Guardrails:
 - Pull is the default posture unless the user explicitly asks to push.
 - Never delete SCC datasets as part of bootstrap or refresh.
 - Only treat directories with `records.parquet` as real datasets.
+- For RT-lnRNA Infer handoff work, sync the owning study USR root
+  `workspaces/studies/rt_lnrna_sponging_construct_triage/usr` and validate
+  `rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1` after a
+  bootstrap or major refresh.

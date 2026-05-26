@@ -18,3 +18,6 @@ Guardrails:
   plus `--secret-ref file://...`.
 - One watcher per live lane or destination dataset is the safe default when
   Notify routing and resume posture matter.
+- For the RT-lnRNA six-view Infer lane, use the runbook preset's
+  `outputs/notify/infer/six_view_7b` profile, cursor, and spool paths; keep one
+  watcher for the six-view lane.
