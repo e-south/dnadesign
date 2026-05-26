@@ -35,7 +35,6 @@ DEFAULT_FEATURE_IMPORTANCE_HEATMAP_FIGSIZE: tuple[float, float] = (14.0, 4.4)
         params={
             "order_policy": "preserve|sort_index|max_importance (default sort_index).",
             "top_n": "Optional positive debugging cap; omit for the full ordinal feature heatmap.",
-            "sort": "Legacy alias for order_policy.",
             "cluster": "Optional clustering flag; defaults false and is currently unsupported when true.",
             "cmap": "Matplotlib colormap (default opal_importance: low values white, high values dark blue).",
             "colorbar_label": "Colorbar label (default Random forest feature importance).",
@@ -71,7 +70,9 @@ def render(context, params: dict) -> None:
     apply_plot_style()
     if bool(params.get("cluster", False)):
         raise ValueError("feature_importance_heatmap does not cluster by default; set cluster: false.")
-    order_policy = str(params.get("order_policy", params.get("sort", "sort_index"))).strip().lower()
+    if "sort" in params:
+        raise ValueError("feature_importance_heatmap does not accept parameter 'sort'; use 'order_policy'.")
+    order_policy = str(params.get("order_policy", "sort_index")).strip().lower()
     if order_policy == "max_importance":
         strict_order_policy = "sort_index"
     else:

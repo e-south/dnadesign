@@ -94,16 +94,20 @@ def get_transform_x(
     params: Optional[Dict[str, Any]] = None,
 ) -> Callable[[pd.Series, Optional[PluginCtx]], np.ndarray]:
     """
-    Build a configured transform by name. `params` is optional for back-compat.
+    Build a configured transform by name from an explicit params mapping.
     Returns a callable that accepts a pandas Series and returns ndarray (N,F).
     """
     _ensure_builtins_loaded()
     if name not in _REGISTRY:
         available = ", ".join(list_transforms_x()) or "<none registered>"
         raise ValueError(f"Unknown transform_x: {name!r}. Available: {available}")
+    if params is None:
+        raise ValueError("transform_x params must be an explicit mapping; use {} when the transform has no params.")
+    if not isinstance(params, dict):
+        raise ValueError(f"transform_x params for {name!r} must be a mapping, got {type(params).__name__}.")
     factory = _REGISTRY[name]
     try:
-        fn = factory(params or {})
+        fn = factory(dict(params))
     except TypeError as e:
         raise ValueError(f"transform_x factory '{name}' must accept a params dict.") from e
     contract = getattr(factory, "__opal_contract__", None)

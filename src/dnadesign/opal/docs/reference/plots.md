@@ -4,7 +4,7 @@
 **Last verified:** 2026-05-20
 
 
-This document covers **plot plugins** and the `PlotContext` helper. Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
+Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
 
 ### How it works
 
@@ -173,8 +173,8 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - rows are stable feature IDs, columns are rounds, values are importances;
     default `order_policy: sort_index` preserves the full ordinal feature axis
     for dense X surfaces such as the 8192-D LatentDNA/Evo2 candidate table
-  - params: `order_policy` (`preserve|sort_index|max_importance`), legacy
-    `sort`, optional debugging `top_n`, `figsize_in`, `cmap`, `rasterized`
+  - params: `order_policy` (`preserve|sort_index|max_importance`),
+    optional debugging `top_n`, `figsize_in`, `cmap`, `rasterized`
   - writes tidy CSV columns `round`, `feature_id`, `importance`, `rank`,
     and `source_path`
 - **`metric_over_rounds`**: scalar summary over rounds for selected/top-k/pool cohorts.

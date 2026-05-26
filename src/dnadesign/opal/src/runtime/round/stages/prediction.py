@@ -34,6 +34,54 @@ def _predict_batch_total(estimated_batches: int, batch_index: int) -> int:
     return max(int(estimated_batches), int(batch_index))
 
 
+def _align_predictions_to_requested_order(
+    *,
+    y_hat: np.ndarray,
+    y_pred_std: np.ndarray | None,
+    predicted_ids: List[str],
+    requested_ids: List[str],
+) -> tuple[np.ndarray, np.ndarray | None, bool]:
+    predicted = [str(row_id) for row_id in predicted_ids]
+    requested = [str(row_id) for row_id in requested_ids]
+    if np.asarray(y_hat).shape[0] != len(predicted):
+        raise OpalError(
+            f"Streaming prediction row count mismatch; expected {len(predicted)}, got {np.asarray(y_hat).shape[0]}."
+        )
+    if len(predicted) != len(set(predicted)):
+        raise OpalError("Streaming prediction produced duplicate ids; aborting before writing selection artifacts.")
+    if len(requested) != len(set(requested)):
+        raise OpalError("Streaming prediction requested duplicate ids; aborting before writing selection artifacts.")
+    predicted_set = set(predicted)
+    requested_set = set(requested)
+    if predicted_set != requested_set:
+        missing = sorted(requested_set - predicted_set)
+        extra = sorted(predicted_set - requested_set)
+        detail = []
+        if missing:
+            detail.append(f"missing={missing[:10]}")
+        if extra:
+            detail.append(f"extra={extra[:10]}")
+        raise OpalError(
+            "Streaming prediction id coverage mismatch; aborting before writing selection artifacts"
+            + (f" ({'; '.join(detail)})." if detail else ".")
+        )
+    if predicted == requested:
+        return y_hat, y_pred_std, False
+
+    position = {row_id: index for index, row_id in enumerate(predicted)}
+    reorder_index = np.asarray([position[row_id] for row_id in requested], dtype=int)
+    aligned_y_hat = np.asarray(y_hat)[reorder_index]
+    aligned_std = None
+    if y_pred_std is not None:
+        std = np.asarray(y_pred_std)
+        if std.shape[0] != len(predicted):
+            raise OpalError(
+                f"Streaming prediction uncertainty row count mismatch; expected {len(predicted)}, got {std.shape[0]}."
+            )
+        aligned_std = std[reorder_index]
+    return aligned_y_hat, aligned_std, True
+
+
 def fit_and_predict(
     *,
     inputs: RoundInputs,
@@ -123,8 +171,6 @@ def fit_and_predict(
                     "rows": int(batch_X.shape[0]),
                 },
             )
-    if predicted_ids != list(map(str, id_order_pool)):
-        raise OpalError("Streaming prediction order mismatch; aborting before writing selection artifacts.")
     Y_hat_fit = np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
 
     contract = getattr(model, "__opal_contract__", None)
@@ -135,6 +181,23 @@ def fit_and_predict(
     missing = object()
     std_payload = mctx.get("model/<self>/std_devs", missing)
     y_pred_std_fit = None if std_payload is missing else coalesce_uncertainty_chunks(std_payload)
+    Y_hat_fit, y_pred_std_fit, reordered = _align_predictions_to_requested_order(
+        y_hat=Y_hat_fit,
+        y_pred_std=y_pred_std_fit,
+        predicted_ids=predicted_ids,
+        requested_ids=list(map(str, id_order_pool)),
+    )
+    if reordered:
+        append_round_log_event(
+            rdir / "logs" / "round.log.jsonl",
+            {
+                "ts": now_iso(),
+                "round": round_index,
+                "run_id": run_id,
+                "stage": "prediction_reordered",
+                "rows": int(Y_hat_fit.shape[0]),
+            },
+        )
 
     log(req.verbose, f"[y-ops] inverting {len(yops_cfg)} op(s) for predictions: {([p.name for p in yops_cfg] or [])}")
     Y_hat, y_pred_std = inverse_yops_outputs(

@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,42 +30,6 @@ class XSeriesValidation:
     x_dim: int
     value_type: str = "float64"
     item_size_bytes: int = 8
-
-
-def validate_x_series(
-    series: pd.Series,
-    *,
-    x_column: str,
-    id_series: pd.Series | None = None,
-) -> XSeriesValidation:
-    """Validate that an OPAL X column is a complete fixed-length finite vector series."""
-
-    expected_dim: int | None = None
-    row_count = 0
-    ids = id_series.tolist() if id_series is not None else [None] * len(series)
-
-    for row_index, (value, row_id) in enumerate(zip(series.tolist(), ids, strict=True)):
-        sample_id = _sample_id(row_id, row_index=row_index)
-        if _is_missing_cell(value):
-            raise OpalError(f"X column '{x_column}' is null for id {sample_id}.")
-
-        vector = _coerce_x_vector(value, x_column=x_column, sample_id=sample_id)
-        if not vector:
-            raise OpalError(f"X column '{x_column}' has an empty vector for id {sample_id}.")
-
-        current_dim = len(vector)
-        if expected_dim is None:
-            expected_dim = current_dim
-        elif current_dim != expected_dim:
-            raise OpalError(
-                f"X column '{x_column}' must be fixed-length; first non-null vector has length "
-                f"{expected_dim}, but id {sample_id} has length {current_dim}."
-            )
-        row_count += 1
-
-    if row_count == 0 or expected_dim is None:
-        raise OpalError(f"X column '{x_column}' has no rows to validate.")
-    return XSeriesValidation(row_count=row_count, x_dim=expected_dim, value_type="float64", item_size_bytes=8)
 
 
 def validate_x_parquet_column(
@@ -191,67 +154,3 @@ def _is_missing_cell(value: object) -> bool:
     if isinstance(marker, (bool, np.bool_)):
         return bool(marker)
     return False
-
-
-def _coerce_x_vector(value: object, *, x_column: str, sample_id: str) -> list[float]:
-    value = _unwrap_arrow_like(value)
-    if isinstance(value, str):
-        return _coerce_x_string(value, x_column=x_column, sample_id=sample_id)
-    if isinstance(value, (list, tuple, np.ndarray, pd.Series)):
-        return _coerce_sequence(value, x_column=x_column, sample_id=sample_id)
-    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
-        return _coerce_sequence(list(value), x_column=x_column, sample_id=sample_id)
-    if isinstance(value, (int, float, np.integer, np.floating)):
-        numeric = float(value)
-        if not math.isfinite(numeric):
-            raise OpalError(f"X column '{x_column}' contains non-finite values for id {sample_id}.")
-        return [numeric]
-    raise OpalError(
-        f"X column '{x_column}' must contain numeric vectors or JSON arrays; "
-        f"id {sample_id} has value type {type(value).__name__}."
-    )
-
-
-def _unwrap_arrow_like(value: object) -> object:
-    as_py = getattr(value, "as_py", None)
-    if callable(as_py):
-        return as_py()
-    to_pylist = getattr(value, "to_pylist", None)
-    if callable(to_pylist):
-        return to_pylist()
-    return value
-
-
-def _coerce_x_string(value: str, *, x_column: str, sample_id: str) -> list[float]:
-    stripped = value.strip()
-    if not stripped:
-        raise OpalError(f"X column '{x_column}' has an empty string for id {sample_id}.")
-    if stripped.startswith("["):
-        try:
-            parsed = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            raise OpalError(f"X column '{x_column}' has malformed JSON array for id {sample_id}: {exc}") from exc
-        if not isinstance(parsed, list):
-            raise OpalError(f"X column '{x_column}' JSON value must be an array for id {sample_id}.")
-        return _coerce_sequence(parsed, x_column=x_column, sample_id=sample_id)
-    try:
-        numeric = float(stripped)
-    except ValueError as exc:
-        raise OpalError(
-            f"X column '{x_column}' string values must be JSON arrays or numeric scalars; id {sample_id} is invalid."
-        ) from exc
-    if not math.isfinite(numeric):
-        raise OpalError(f"X column '{x_column}' contains non-finite values for id {sample_id}.")
-    return [numeric]
-
-
-def _coerce_sequence(value: object, *, x_column: str, sample_id: str) -> list[float]:
-    try:
-        arr = np.asarray(value, dtype=float).ravel()
-    except Exception as exc:
-        raise OpalError(f"X column '{x_column}' contains non-numeric vector values for id {sample_id}.") from exc
-    if arr.size == 0:
-        return []
-    if not np.all(np.isfinite(arr)):
-        raise OpalError(f"X column '{x_column}' contains non-finite values for id {sample_id}.")
-    return [float(v) for v in arr.tolist()]

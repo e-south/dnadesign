@@ -28,8 +28,7 @@ def read_predictions(
         if runs_df is None or runs_df.is_empty():
             raise OpalError(
                 "run_id was provided but outputs/ledger/runs.parquet is missing or empty. "
-                "Pass runs_df (outputs/ledger/runs.parquet) or call CampaignAnalysis.read_predictions "
-                "so OPAL can resolve run_id -> as_of_round. "
+                "Pass runs_df or call CampaignAnalysis.read_predictions so OPAL can resolve run_id -> as_of_round. "
                 "Use `opal runs list` or `opal status --with-ledger` to find valid run_id values.",
                 ExitCodes.BAD_ARGS,
             )
@@ -193,9 +192,8 @@ def _require_run_id_if_ambiguous(
         return
     if runs_df is None or runs_df.is_empty():
         raise OpalError(
-            "Run ID is required to disambiguate ledger predictions, but "
-            "outputs/ledger/runs.parquet is missing or empty. Provide run_id "
-            "explicitly (e.g., --run-id) or generate ledger runs first.",
+            "Run ID is required, but outputs/ledger/runs.parquet is missing or empty. "
+            "Provide run_id explicitly (e.g., --run-id) or generate ledger runs first.",
             ExitCodes.BAD_ARGS,
         )
     rounds = _selected_rounds(round_selector, runs_df)

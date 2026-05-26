@@ -206,7 +206,7 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
                 "workdir": str(workdir),
                 "metadata": {
                     "label_oracle_kind": group,
-                    "label_family_id": "sfxi_axis_vec8",
+                    "label_family_id": "densegen_plan_logic4",
                     "label_split_id": "random_id",
                     "probe_oracle_id": f"{group}_id",
                 },
@@ -328,7 +328,7 @@ def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp
                 "metadata": {
                     "target": "cipro",
                     "label_oracle_kind": group,
-                    "label_family_id": "sfxi_axis_vec8",
+                    "label_family_id": "densegen_plan_logic4",
                     "label_split_id": "random_id",
                     "seed": seed,
                 },
@@ -365,7 +365,7 @@ def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp
                 "right": "cipro_null_s7",
                 "match": {
                     "target": "cipro",
-                    "label_family_id": "sfxi_axis_vec8",
+                    "label_family_id": "densegen_plan_logic4",
                     "label_split_id": "random_id",
                     "seed": "7",
                 },
@@ -375,7 +375,7 @@ def test_campaign_set_metric_comparison_uses_relationship_pairs_for_iqr_band(tmp
                 "right": "cipro_null_s17",
                 "match": {
                     "target": "cipro",
-                    "label_family_id": "sfxi_axis_vec8",
+                    "label_family_id": "densegen_plan_logic4",
                     "label_split_id": "random_id",
                     "seed": "17",
                 },
@@ -424,7 +424,7 @@ def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
                     "probe_target": "cipro",
                     "probe_oracle_kind": "null",
                     "probe_split_id": "leave_sigma35_variant",
-                    "probe_label_family_id": "sfxi_axis_vec8",
+                    "probe_label_family_id": "densegen_plan_logic4",
                     "probe_seed": 29,
                 },
             },
@@ -432,11 +432,11 @@ def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
         }
     )
 
-    assert row["label"] == "Cipro | null | sigma35 | sfxi_axis_vec8 | s29 | done"
+    assert row["label"] == "Cipro | null | sigma35 | densegen_plan_logic4 | s29 | done"
     assert len(row["label"]) <= 64
     assert "probe_label_family_id" not in row["label"]
     assert row["label_context"] == (
-        "label_family_id=sfxi_axis_vec8; label_oracle_kind=null; label_split_id=leave_sigma35_variant"
+        "label_family_id=densegen_plan_logic4; label_oracle_kind=null; label_split_id=leave_sigma35_variant"
     )
     assert "Stress ethanol/ciprofloxacin" not in row["label"]
 

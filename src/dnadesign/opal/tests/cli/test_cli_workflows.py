@@ -155,7 +155,7 @@ def test_notebook_generate_json_pins_run_id_and_round(tmp_path: Path) -> None:
     assert payload["round_selector"] == "0"
     assert payload["run_id"] == "run-1"
     text = Path(payload["notebook_path"]).read_text(encoding="utf-8")
-    assert "round_default = '0'" in text
+    assert "selected_round_selector = '0'" in text
     assert "run_id='run-1'" in text
 
 

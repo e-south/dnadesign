@@ -744,6 +744,37 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
             assert width == height
 
 
+def test_feature_importance_heatmap_rejects_sort_alias(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[
+            {
+                "name": "feature_heat",
+                "kind": "feature_importance_heatmap",
+                "params": {"sort": "sort_index"},
+            }
+        ],
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign)])
+
+    assert res.exit_code == 1, res.stdout
+    manifests = sorted((workdir / "outputs" / "plots").glob("feature_heat*.manifest.json"))
+    assert len(manifests) == 1
+    manifest = json.loads(manifests[0].read_text())
+    assert manifest["status"] == "failed"
+    assert "does not accept parameter 'sort'" in manifest["error"]["message"]
+
+
 def test_plot_cli_rejects_top_level_plot_keys(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 ## OPAL Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-20
+**Last verified:** 2026-05-25
 
 
 This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, shared label sidecars, label history, and append-only ledger sinks.
@@ -28,6 +28,11 @@ OPAL is assertive by default and fails fast on inconsistent inputs.
 - `verify-outputs` is strict: selection IDs must be unique, selected IDs must
   exist in the target run ledger predictions, and run-scoped ledger prediction
   IDs must be unique before score comparisons are trusted.
+- Batched scoring is ID-strict. Candidate X may be streamed from Parquet in
+  storage order and coalesced into score-sized chunks, but model predictions are
+  realigned to the requested candidate ID order before objective scoring,
+  selection, or ledger writes. Missing, extra, or duplicate streamed IDs are
+  fatal errors.
 
 ### Records schema
 
@@ -149,4 +154,4 @@ Append-only ledger datasets:
 
 - Keep row-level diagnostics in `run_pred`, run-level summaries in `run_meta`.
 - Prefer explicit channels and references over implicit single-score columns.
-- Treat `schema__version` as compatibility guardrail for evolution.
+- Treat `schema__version` as the schema-evolution guardrail.

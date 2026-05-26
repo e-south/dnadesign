@@ -1,22 +1,18 @@
 # OPAL Modernization Development Specification
 
-**Status:** Draft for engineering planning and review
+**Status:** Active maintainer modernization plan
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-25
 **Audience:** OPAL maintainers, study integrators, and developer-experience owners
-**Date:** 2026-05-25
 **Scope:** OPAL campaign runtime, reporting, plot artifacts, CLI JSON surfaces, and generated marimo review notebooks
-**Chosen path:** `src/dnadesign/opal/docs/maintainers/dev-spec-modernization.md`
 
-The requested path `docs/opal/dev-spec-modernization.md` is not present in the current repository layout. OPAL's checked-in documentation lives under `src/dnadesign/opal/docs/`, with maintainer planning material under `src/dnadesign/opal/docs/maintainers/`. This spec is placed there so it stays in the tool-local OPAL docs tree instead of creating a new root-level docs island.
-
-This document is a specification only. It intentionally does not implement production code.
+OPAL maintainer plans live in the tool-local docs tree. Public operator contracts live in reference docs, CLI JSON schemas, checked-in tests, and manifest-backed artifacts.
 
 ## 1. Executive Summary
 
 OPAL should become a small, contract-first active-learning campaign runtime with excellent machine-readable reporting and review artifacts. Its core identity is a campaign loop over one candidate table, one explicit X column, one label source, model/objective/selector plugins, append-only ledgers, run-scoped progress, configured plots, static review bundles, and generated marimo notebooks.
 
-The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The historical full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: label ingest, artifact review, and progress surfaces must make their memory and stale-evidence contracts operator-visible, not merely pass happy-path tests. The remaining gap is product and contract maturity: ingest must stay memory-safe and telemetry-rich, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and the X contract still has a split between permissive in-memory identity parsing and strict Parquet validation.
+The reason to modernize now is not that the round loop is broken. Repository evidence shows OPAL already has strict config loading, channelized objectives, ledger contracts, run-aware review, plot registries, plot artifact manifests, public reporting exports, generated single-campaign notebooks that use public OPAL helpers, and explicit campaign-set notebook generation. The historical full-pool 12-round DenseGen-axis dogfood removed the old candidate-cap shortcut and completed scoring with bounded batches, but it exposed a real production risk: label ingest, artifact review, and progress surfaces must make their memory and stale-evidence contracts operator-visible, not merely pass happy-path tests. The remaining gap is product and contract maturity: ingest must stay memory-safe and telemetry-rich, artifacts must be gardened so stale run debris cannot look current, leakage must fail fast, generated notebooks need smaller reusable panel primitives, active dashboard code still carries UMAP/projection residue outside the canonical notebook, progress events still need clearer lock/preflight/run boundaries, and explicit import normalization must handle noncanonical X without weakening runtime campaign execution.
 
 Highest-priority changes:
 
@@ -154,6 +150,8 @@ The full-pool 12-round dogfood changed the runtime risk profile. OPAL scoring ca
 
 The desired production invariant remains memory proportionality: ingest memory should scale with the incoming label batch plus a narrow identity index, not with the full feature payload. Full candidate scoring may need batched X reads; label ingestion should not.
 
+Training-X lookup for small label batches now scans Parquet row-group IDs and reads the X column only from matching row groups. On this workstation, a 12-ID stress lookup changed from median 4.558 seconds to median 0.102 seconds while preserving requested ID order.
+
 ### Public APIs
 
 The public package exports are intentionally small and useful for study code. This is the correct direction. Generated notebooks now import public OPAL helpers instead of `dnadesign.opal.src.*`. The remaining boundary issue is size and granularity: durable generated artifacts should depend on a small public view-model/component API rather than a broad helper set and a single large template.
@@ -196,11 +194,11 @@ The main plot gap has moved from artifactization to semantic completeness. Confi
 
 ### Notebook Generation
 
-The generated marimo notebook is campaign-specific and covers records, ledgers, selected records, labels, predictions, configured plot deliverables, and CLI handoff. It now imports public OPAL helpers, reads a manifest-backed `NotebookViewModel`, exposes round/run/record/data-source/plot dropdowns, and uses lazy accordions. Campaign-set notebook generation now exists as an explicit repeated `--campaign` mode backed by `NotebookCampaignSetViewModel`; it provides campaign and plot dropdowns without changing the single-campaign contract. The remaining UX work is deeper componentization and richer campaign-set drill-downs, not first support for campaign navigation.
+The generated marimo notebook is campaign-specific and covers records, ledgers, selection summaries, label/prediction summaries, configured plot deliverables, and CLI handoff. It now imports public OPAL helpers, reads a manifest-backed `NotebookViewModel`, exposes round/run/record/data-source/plot dropdowns, and uses lazy accordions. Campaign-set notebook generation now exists as an explicit repeated `--campaign` mode backed by `NotebookCampaignSetViewModel`; it provides campaign and plot dropdowns without changing the single-campaign contract. The remaining UX work is deeper componentization and richer campaign-set drill-downs, not first support for campaign navigation.
 
 ### Study/Probe Separation
 
-The stress study route correctly describes OPAL as consuming the `usr_prom_eth_cip_opal_candidates` candidate feature table with explicit X column, while LatentDNA owns prior X selection and study code owns pre-assay batch-0/probe logic. The DenseGen axis probe is study-owned, exports no package-root compatibility API, uses scratch-only synthetic labels, and calls public OPAL progress/review APIs.
+The stress study route correctly describes OPAL as consuming the `usr_prom_eth_cip_opal_candidates` candidate feature table with explicit X column, while LatentDNA owns prior X selection and study code owns pre-assay batch-0/probe logic. The DenseGen axis probe is study-owned, exports no package-root aggregate API, uses scratch-only synthetic labels, and calls public OPAL progress/review APIs.
 
 The available DenseGen dogfood evidence remains scoped. Historical all-round runs covered scratch campaigns and reported `STOP`/`attention` under the now-retired hard null-lift threshold; that was evidence that OPAL could run and review the probe, not evidence of real assay behavior. The current study-owned follow-up is `densegen_motif_qa_k12_s3_v1`: K12, three planned seeds, `densegen_plan_logic4` plus `tf_family_count` active families, manifest-backed label families, null provenance, and paired positive-vs-null trajectory QA. Those semantics belong in the study probe package, not OPAL core.
 
@@ -231,7 +229,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Plot manifest schema is evolving from mechanical artifact presence to semantic quality/freshness metadata | Docs and tests must pin status enums, tidy schema validation, captions, and freshness fields so agents can trust manifests literally |
 | Review manifests and plot manifests detect stale artifacts, but stale/fresh semantics are still shallow | Review evidence can be mechanically present while source freshness or decision relevance remains unclear |
 | `cmd_run()` logs early command/records events before lock and before run_id | Progress can mix preflight, abort, and run events |
-| X docs now declare canonical Parquet fixed-size lists, but `identity` still accepts scalar/list/JSON cells as an in-memory transform | Runtime parsing remains more permissive than the campaign-storage contract and needs a deliberate compatibility boundary |
+| X docs now declare canonical Parquet fixed-size lists, and `identity` rejects scalar/JSON runtime cells | Import normalization must stay explicit so campaign execution does not hide noncanonical X coercion |
 | `CampaignLock` and `PathLock` are local-host locks | Shared/network mutation needs a stronger lease or documented non-support |
 | Plot primitives include several SFXI-specific single-round diagnostics | Useful diagnostics, but future plots should be data-shape primitives first |
 
@@ -245,9 +243,9 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Config top-level blocks, defaults, shared sidecar policy, and plot config wiring | `src/dnadesign/opal/docs/reference/configuration.md:12-30`, `src/dnadesign/opal/docs/reference/configuration.md:44-62`, `src/dnadesign/opal/docs/reference/configuration.md:94-101`, `src/dnadesign/opal/docs/reference/configuration.md:180-193` |
 | Loader forbids unknown fields and validates plugin names and shared sidecar constraints | `src/dnadesign/opal/src/config/loader.py:179-205`, `src/dnadesign/opal/src/config/loader.py:253-291`, `src/dnadesign/opal/src/config/loader.py:315-333` |
 | Public OPAL API currently exports config, predictions, progress, review, plot, notebook view-model, and X validation helpers | `src/dnadesign/opal/__init__.py:14-43` |
-| Data-contract docs declare runtime X as canonical Parquet fixed-size vectors, while identity transform remains permissive for in-memory parsing | `src/dnadesign/opal/docs/reference/data-contracts.md:41-59`, `src/dnadesign/opal/src/storage/x_contracts.py:70-97`, `src/dnadesign/opal/src/transforms_x/identity.py:29-78` |
+| Data-contract docs declare runtime X as canonical Parquet fixed-size vectors, and identity transform accepts only vector cells during campaign execution | `src/dnadesign/opal/docs/reference/data-contracts.md:41-59`, `src/dnadesign/opal/src/storage/x_contracts.py:70-97`, `src/dnadesign/opal/src/transforms_x/identity.py:29-78` |
 | Strict X validator tests reject variable-list and scalar physical schemas | `src/dnadesign/opal/tests/storage/test_x_contracts.py:61-90` |
-| Runtime identity transform accepts scalar/list/JSON-string inputs | `src/dnadesign/opal/src/transforms_x/identity.py:29-78` |
+| Runtime identity transform rejects scalar and JSON-string inputs before model-matrix construction | `src/dnadesign/opal/src/transforms_x/identity.py:29-78`, `src/dnadesign/opal/tests/transforms/test_transform_matrix.py` |
 | CLI run logs command/X-validation/records events before acquiring the campaign lock later | `src/dnadesign/opal/src/cli/commands/run.py:97-152` |
 | Runtime creates run_id after training and logs later run-scoped stages | `src/dnadesign/opal/src/runtime/run_round.py:119-177`, `src/dnadesign/opal/src/runtime/run_round.py:182-268`, `src/dnadesign/opal/src/runtime/run_round.py:330-380` |
 | Progress JSON builder summarizes campaign state, round logs, warnings, stale artifacts, and local lock state | `src/dnadesign/opal/src/reporting/progress.py:30-82`, `src/dnadesign/opal/src/reporting/progress.py:143-182` |
@@ -262,6 +260,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Feature importance plot currently discovers per-round files and writes optional tidy CSV | `src/dnadesign/opal/src/plots/feature_importance_bars.py:34-53`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:163-176`, `src/dnadesign/opal/src/plots/feature_importance_bars.py:213-317` |
 | Fixed-sidecar `opal ingest-y` loads only the identity frame and emits `opal.ingest_runtime.v1` runtime telemetry | `src/dnadesign/opal/src/cli/commands/ingest_y/`, `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/src/runtime/ingest_runtime.py` |
 | `opal ingest-y` needs ID/sequence membership and required-column checks for fixed-universe sidecars, not the configured X payload | `src/dnadesign/opal/src/cli/commands/ingest_y/`, `src/dnadesign/opal/src/runtime/ingest.py` |
+| Training-X lookup reads only matching Parquet row groups for requested IDs and preserves requested order | `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/tests/transforms/test_transform_matrix.py` |
 | Generated notebook imports public OPAL helpers rather than `dnadesign.opal.src.*` | `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:59-70` |
 | Generated notebook builds a manifest-backed view model and uses manifest-backed plot choices | `src/dnadesign/opal/src/reporting/notebook.py:34-113`, `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/plot_cells.py` |
 | Generated notebook exposes round, run, record, data-source, and plot dropdowns plus lazy accordions | `src/dnadesign/opal/src/analysis/notebook_template/run_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/record_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/data_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/layout_cells.py` |
@@ -308,7 +307,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 - No filesystem-discovery-first review or notebook rendering.
 - No probe-specific campaign-set notebook implementation; campaign selection and plot selection are generic view-model controls.
 - No automatic deletion of generated artifacts during inspection commands.
-- No production implementation in this spec pass.
+- No compatibility aliases, hidden migrations, or legacy shims in production code.
 
 ## 5. Architecture Principles And Invariants
 
@@ -533,21 +532,21 @@ policies.
 | Proposed change | Keep explicit event phases (`command`, `preflight`, `run`, `abort`, `finalize`) and add a preflight attempt ID or lock token before writing events that imply mutation. Emit terminal abort events on operator cancellation and contract failures where possible. |
 | Contract shape | `ProgressEventContract = {schema_version, event_id, phase, run_id, round, stage, severity, status, ts, lock_token, message, payload}`. `run_id` is required for `phase=run` after `run_context`. |
 | Affected modules | `src/dnadesign/opal/src/cli/commands/run.py`, `src/dnadesign/opal/src/runtime/run_round.py`, `src/dnadesign/opal/src/reporting/progress.py`, `src/dnadesign/opal/src/reporting/summary.py`, `src/dnadesign/opal/src/storage/locks.py`. |
-| Migration notes | Preserve old fields while adding `schema_version` and `phase`; readers should accept old logs but label them `legacy_event_contract`. Do not silently discard old preflight events. |
+| Migration notes | Treat events without `schema_version` or `phase` as noncanonical evidence. Readers may inventory them for operator review, but run-scoped review must require current event contracts instead of parsing old event shapes as valid current evidence. |
 | Acceptance criteria | `opal progress --json` reports top-level `event_contract.*`, `locks.campaign.*`, and per-round `rounds[].summary.run_scope.*`, including `ambiguous_run_scope`, `aborted`, `legacy_events`, `command_events`, `preflight_events`, `run_events`, `abort_events`, and `finalize_events`. `opal review --json` refuses mixed-run review unless run_id is explicit. |
-| Tests | Unit tests for aborted prompt, lock conflict, stale lock, multiple starts, multiple run_ids per round, missing done event, and legacy log parsing. CLI JSON snapshots. |
+| Tests | Unit tests for aborted prompt, lock conflict, stale lock, multiple starts, multiple run_ids per round, missing done event, and noncanonical log reporting. CLI JSON snapshots. |
 
 ### F. X Contract Unification
 
 | Field | Specification |
 | --- | --- |
-| Problem | Runtime `identity` accepts scalar/list/JSON string vectors, docs describe Arrow list or JSON string, and public validation requires Parquet `fixed_size_list`. This split weakens fail-fast behavior. |
+| Problem | Runtime `identity` now rejects scalar/JSON string vectors, docs declare fixed-size vectors, and public validation requires Parquet `fixed_size_list`. The remaining work is an explicit import-normalization path for noncanonical sources. |
 | Proposed change | Define canonical physical schema as Parquet Arrow `fixed_size_list<float32 or float64>` with finite, non-null values and stable row count. Noncanonical forms are allowed only through explicit import/normalization commands, never inside campaign execution. |
 | Contract shape | `XMatrixContract` with `physical_type`, `x_dim`, `canonical=true`, `validation_level=parquet_schema_and_values`, and `normalization_source` if converted. |
 | Affected modules | `src/dnadesign/opal/src/storage/x_contracts.py`, `src/dnadesign/opal/src/transforms_x/identity.py`, `src/dnadesign/opal/src/runtime/round/stages/`, `src/dnadesign/opal/docs/reference/data-contracts.md`, validate/init/run/explain paths. |
-| Migration notes | Keep `identity` as a model-matrix transform, but require candidate records to validate before run/explain/review. Add `opal x normalize` or `opal import-records` if scalar/list/JSON compatibility is needed for legacy inputs. |
+| Migration notes | Keep `identity` as a model-matrix transform, but require candidate records to validate before run/explain/review. Add `opal x normalize` or `opal import-records` only as explicit import steps that write canonical records. |
 | Acceptance criteria | `opal run`, `opal explain`, `opal review`, and notebook view model all fail or warn on invalid/noncanonical X according to severity. Docs no longer describe JSON-string X as runtime-canonical. |
-| Tests | Fixed-size list accept; variable list/scalar/JSON reject at campaign execution; normalization command accepts legacy forms and writes canonical records; review exposes x contract. |
+| Tests | Fixed-size list accept; variable list/scalar/JSON reject at campaign execution; normalization command accepts noncanonical import forms and writes canonical records; review exposes x contract. |
 
 ### G. Review Manifest Authority And Artifact Gardening
 
@@ -617,7 +616,7 @@ Campaign-specific semantics such as SFXI setpoints, stress axes, cipro, ethanol,
 | Primitive | Purpose | Required inputs | Optional params | Output artifacts | Tidy CSV shape | Failure modes | Generic rationale |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `metric_over_rounds` | Track a declared numeric metric over rounds | `run_pred` or `run_meta`, `as_of_round`, metric field | `cohort`, `summary`, `quantiles`, `top_k`, `thresholds`, `reference_lines` | line/interval plot, CSV, manifest | `round, cohort, metric, summary, value` | missing metric, nonnumeric values, no rows for cohort, ambiguous run_id | Any campaign can summarize scalar metrics |
-| `feature_importance_heatmap` | Show feature attribution changes by round | per-round feature importance artifacts with stable feature IDs | `sort`, `top_n`, `cluster=false`, `side_summaries` | heatmap, optional rank-change panel, CSV, manifest | `round, feature_id, importance, rank` | missing artifacts, unstable feature IDs, duplicate feature IDs, nonfinite importance | Attribution matrix is model/campaign generic |
+| `feature_importance_heatmap` | Show feature attribution changes by round | per-round feature importance artifacts with stable feature IDs | `order_policy`, `top_n`, `cluster=false`, `side_summaries` | heatmap, optional rank-change panel, CSV, manifest | `round, feature_id, importance, rank` | missing artifacts, unstable feature IDs, duplicate feature IDs, nonfinite importance | Attribution matrix is model/campaign generic |
 | `feature_stability_over_rounds` | Summarize attribution stability | feature importance per round | `top_n`, `rank_metric`, `adjacent_only` | line plot or table, CSV, manifest | `round_a, round_b, metric, value` | fewer than two rounds, inconsistent feature universe | Stability is generic model behavior |
 | `vector_summary_heatmap` | Compare vector channels across a reference and rounds | vector field from predictions/labels plus round/run scope | `cohort`, `vector_field`, `channel_labels`, `include_reference_vector`, `reference_vector`, `aggregation` | heatmap, CSV, manifest | `row_type, round, cohort, channel, value` | vector length mismatch, missing reference vector when requested, nonfinite values | Vector-shaped, not SFXI-specific |
 | `objective_decomposition_over_rounds` | Track objective components | declared objective component fields in `run_pred` or `run_meta` | `components`, `summary`, `cohort`, `quantiles` | multi-line/facet plot, CSV, manifest | `round, cohort, component, summary, value` | missing component, mixed objective schema, ambiguous run_id | Objective components are declared channels/diagnostics |
@@ -845,8 +844,8 @@ Update these docs as implementation lands:
 | P0a: Ingest runtime safety | Column-pruned sidecar ingest, ingest memory estimates/telemetry, fail-fast unsupported create/update modes | None | Medium; ingest touches operator workflows | Full-pool fixed-sidecar label append avoids full records load and emits `IngestRuntimeContract` | Keep old implementation only as test fixture reference, not a hidden fallback |
 | P0b: Leakage and raw/derived evidence guard | Add generic leakage checks, keep study-specific forbidden-input checks study-owned, split raw run metrics from derived review metrics | P0a independent | Medium; failures may expose previously smoothed invalid states | PASS-like decisions impossible with leakage violations; review reruns do not mutate raw metrics | Provide explicit migration for old report payloads; do not rewrite silently |
 | P0c: Artifact gardening | Stale sibling inventory, local-only run-root labeling, byte counts, prune dry-run/apply contract | None | Low/medium; deletion commands require care | Review/notebook surfaces show stale ignored artifacts; prune requires explicit apply | Inspection commands remain read-only |
-| P1: Run/progress/review contract hardening | Complete attempt_id/run_id, lock/preflight/run contract, abort events, run ambiguity JSON, stale artifact warnings in review | P0b helpful | Medium; old logs exist | Progress/review JSON schemas include warnings and refuse mixed-run review | Readers accept old logs with `legacy_event_contract` warnings |
-| P2: X contract unification | Enforce canonical fixed-size list at run/review; add normalization/import path for legacy X | P1 helpful | Medium/high; existing fixtures may use legacy X | Runtime, validator, docs, and tests agree on canonical schema | Provide explicit migration command; do not silently coerce during run |
+| P1: Run/progress/review contract hardening | Complete attempt_id/run_id, lock/preflight/run contract, abort events, run ambiguity JSON, stale artifact warnings in review | P0b helpful | Medium; noncanonical logs may exist | Progress/review JSON schemas include warnings and refuse mixed-run review | Readers inventory noncanonical logs for operator review without using them as current run evidence |
+| P2: X contract unification | Enforce canonical fixed-size list at run/review; add explicit normalization/import path for noncanonical X | P1 helpful | Medium/high; existing fixtures may use noncanonical X | Runtime, validator, docs, and tests agree on canonical schema | Provide explicit import command; do not silently coerce during run |
 | P3: Plot artifact manifest hardening | Complete metadata, stale/fresh state, interpretability captions, registry completeness, and all-round/default semantics for multi-round plots | P0c/P1 | Medium; all plot plugins affected indirectly | Every configured plot produces written/failed/skipped manifest with meaningful metadata | Runner-level manifest wrapper minimizes plugin edits |
 | P4: Generic plot primitives | Extend beyond existing `metric_over_rounds`, `feature_importance_heatmap`, and `vector_summary_heatmap` into overlap/composition/uncertainty/support/calibration primitives | P3 | Medium; temptation to over-abstract | New primitives pass data-shape contracts and avoid study names | Keep SFXI-specific plots during transition as configured diagnostics |
 | P5: Marimo review notebook modernization | Public component primitives shared by single-campaign and campaign-set notebooks, manifest-backed plot cards, campaign/plot dropdowns, lazy accordions, smoke checks | P3 | Medium; generated artifacts are durable | Notebook uses public imports and manifest authority; related campaigns are navigable from one generated notebook without duplicating implementation | Keep behavior stable through explicit view-model versioning; avoid legacy template shims |
@@ -877,7 +876,7 @@ Update these docs as implementation lands:
 1. Should the noncanonical X normalization command live under `opal x normalize`, `opal import-records`, or `opal validate --repair --out`? Recommendation: `opal x normalize` because mutation is explicit and scoped.
 2. Should campaign-set notebooks add an explicit manifest/index input in addition to repeated `--campaign` flags? Recommendation: yes, once the campaign-set manifest contract stabilizes; study/probe tools should generate that manifest through OPAL public APIs rather than adding OPAL study-specific discovery.
 3. Should study-specific campaign configs move out of `src/dnadesign/opal/campaigns/`, or stay temporarily with explicit `study_fixture` metadata? Recommendation: mark ownership immediately, then move live study configs once campaign discovery and docs can change without hidden shims.
-4. Should legacy UMAP dashboard code be deleted, moved under `archived/`, or migrated to a study/producer-owned package? Recommendation: quarantine first, then delete after confirming no canonical command imports it.
+4. Should old UMAP dashboard code be deleted, moved under `archived/`, or migrated to a study/producer-owned package? Recommendation: quarantine first, then delete after confirming no canonical command imports it.
 5. What stale-artifact threshold should make review fail rather than warn? Recommendation: missing manifest-referenced files are errors; extra unreferenced files are warnings unless a configured artifact budget is exceeded.
 6. What memory threshold should make `ingest-y` fail rather than warn? Recommendation: use configurable budgets with conservative defaults, and initially gate on regression benchmarks rather than platform-specific RSS alone.
 7. Which dogfood gates are fast enough for PR CI versus nightly/local operator runs? Recommendation: OPAL unit/fixture gates in PR; study/probe dogfood in optional/nightly workflows.

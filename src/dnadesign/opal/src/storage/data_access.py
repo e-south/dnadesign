@@ -23,6 +23,7 @@ from ..core.utils import OpalError
 from ..registries.transforms_x import get_transform_x
 from .label_history import LabelHistory
 from .records_io import RecordsIO
+from .x_lookup import transform_rows_from_matching_row_groups
 
 ESSENTIAL_COLS = [
     "id",
@@ -282,13 +283,14 @@ class RecordsStore:
         id_list = [str(i) for i in ids]
         if len(id_list) != len(set(id_list)):
             raise OpalError("transform_matrix_from_records received duplicate ids.")
-        rows: dict[str, np.ndarray] = {}
-        for X_batch, batch_ids in self.iter_transform_matrix_batches(id_list, ctx=ctx, batch_size=batch_size):
-            for row_index, row_id in enumerate(batch_ids):
-                rows[str(row_id)] = np.asarray(X_batch[row_index], dtype=float)
-        missing = [row_id for row_id in id_list if row_id not in rows]
-        if missing:
-            raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={missing[:10]}).")
+        rows = transform_rows_from_matching_row_groups(
+            records_path=self.records_path,
+            id_list=id_list,
+            x_col=self.x_col,
+            x_transform_name=self.x_transform_name,
+            x_transform_params=self.x_transform_params,
+            ctx=ctx,
+        )
         X = np.vstack([rows[row_id] for row_id in id_list])
         return np.asarray(X, dtype=float), id_list
 
@@ -321,6 +323,8 @@ class RecordsStore:
 
         tx = get_transform_x(self.x_transform_name, self.x_transform_params)
         try:
+            pending_frames: list[pd.DataFrame] = []
+            pending_rows = 0
             batches = parquet.iter_batches(columns=["id", self.x_col], batch_size=int(batch_size))
             for batch in batches:
                 id_values = [str(value) for value in batch.column("id").to_pylist()]
@@ -334,18 +338,24 @@ class RecordsStore:
                 batch_ids = frame["id"].tolist()
                 if len(batch_ids) != len(set(batch_ids)):
                     raise OpalError("records.parquet contains duplicate ids inside an X batch.")
-                found.update(batch_ids)
-                series = frame[self.x_col]
-                null_mask = series.isna()
-                if null_mask.any():
-                    bad_ids = frame.loc[null_mask, "id"].tolist()[:10]
-                    raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
-                X = tx(series, ctx=ctx)
-                if X.shape[0] != len(batch_ids):
+                repeated = sorted(set(batch_ids) & found)
+                if repeated:
                     raise OpalError(
-                        f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(batch_ids)} ids."
+                        f"records.parquet contains duplicate ids inside X batches (sample={repeated[:10]})."
                     )
-                yield np.asarray(X, dtype=float), batch_ids
+                found.update(batch_ids)
+                pending_frames.append(frame)
+                pending_rows += len(frame)
+                while pending_rows >= int(batch_size):
+                    frame_out = pd.concat(pending_frames, ignore_index=True)
+                    ready_frame = frame_out.iloc[: int(batch_size)].copy()
+                    remaining_frame = frame_out.iloc[int(batch_size) :].copy()
+                    pending_frames = [] if remaining_frame.empty else [remaining_frame]
+                    pending_rows = len(remaining_frame)
+                    yield self._transform_x_batch_frame(ready_frame, tx=tx, ctx=ctx)
+            if pending_frames:
+                frame_out = pd.concat(pending_frames, ignore_index=True)
+                yield self._transform_x_batch_frame(frame_out, tx=tx, ctx=ctx)
         except OpalError:
             raise
         except Exception as exc:
@@ -354,6 +364,20 @@ class RecordsStore:
         missing = sorted(wanted - found)
         if missing:
             raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={missing[:10]}).")
+
+    def _transform_x_batch_frame(self, frame: pd.DataFrame, *, tx: Any, ctx: PluginCtx) -> tuple[np.ndarray, list[str]]:
+        batch_ids = frame["id"].astype(str).tolist()
+        series = frame[self.x_col]
+        null_mask = series.isna()
+        if null_mask.any():
+            bad_ids = frame.loc[null_mask, "id"].tolist()[:10]
+            raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
+        X = tx(series, ctx=ctx)
+        if X.shape[0] != len(batch_ids):
+            raise OpalError(
+                f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(batch_ids)} ids."
+            )
+        return np.asarray(X, dtype=float), batch_ids
 
     # --------------- ensure rows exist for ingest ---------------
     def ensure_rows_exist(

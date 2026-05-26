@@ -41,7 +41,7 @@ Generated notebooks import public helpers from
 campaign-set template, and a single-campaign notebook is the same template with
 one campaign config. Generated notebooks embed
 `__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v2"` so
-old local notebooks can be distinguished from current templates during review.
+non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
 run ID, and follow-up `opal notebook run` / `marimo check` commands.

@@ -293,7 +293,7 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
         payload["campaign"]["metadata"] = {
             "target": "cipro",
             "label_oracle_kind": oracle_kind,
-            "label_family_id": "sfxi_axis_vec8",
+            "label_family_id": "densegen_plan_logic4",
             "label_split_id": "random_id",
             "seed": 7,
         }

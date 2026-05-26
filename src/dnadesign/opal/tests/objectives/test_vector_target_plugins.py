@@ -122,3 +122,8 @@ def test_vector_target_plugin_schemas_validate_contract_parameters() -> None:
         "vector_target_similarity_v1",
         {"target_vector": [0, 0, 1, 1]},
     ) == {"target_vector": [0.0, 0.0, 1.0, 1.0]}
+
+
+def test_plugin_param_schemas_reject_non_mapping_params() -> None:
+    with pytest.raises(TypeError, match="params must be a mapping"):
+        validate_params("transform_x", "identity", None)  # type: ignore[arg-type]

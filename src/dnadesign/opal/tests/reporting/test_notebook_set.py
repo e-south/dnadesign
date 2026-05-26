@@ -81,7 +81,7 @@ def test_campaign_set_notebook_view_model_loads_collection_relationships(tmp_pat
             payload["campaign"]["metadata"] = {
                 "target": target,
                 "label_oracle_kind": oracle_kind,
-                "label_family_id": "sfxi_axis_vec8",
+                "label_family_id": "densegen_plan_logic4",
                 "label_split_id": "random_id",
                 "seed": 7,
             }
@@ -138,7 +138,7 @@ def test_campaign_set_notebook_view_model_loads_collection_relationships(tmp_pat
                     "right": "cipro_null_random_id",
                     "match": {
                         "target": "cipro",
-                        "label_family_id": "sfxi_axis_vec8",
+                        "label_family_id": "densegen_plan_logic4",
                         "label_split_id": "random_id",
                         "seed": "7",
                     },
@@ -148,7 +148,7 @@ def test_campaign_set_notebook_view_model_loads_collection_relationships(tmp_pat
                     "right": "ethanol_null_random_id",
                     "match": {
                         "target": "ethanol",
-                        "label_family_id": "sfxi_axis_vec8",
+                        "label_family_id": "densegen_plan_logic4",
                         "label_split_id": "random_id",
                         "seed": "7",
                     },
@@ -172,7 +172,7 @@ def test_campaign_collection_lens_display_aliases_probe_metadata(tmp_path: Path)
         payload["campaign"]["metadata"] = {
             "probe_target": "cipro",
             "probe_oracle_kind": oracle_kind,
-            "probe_label_family_id": "sfxi_axis_vec8",
+            "probe_label_family_id": "densegen_plan_logic4",
             "probe_split_id": "random_id",
             "probe_seed": 7,
         }
@@ -232,7 +232,7 @@ def test_campaign_collection_manifest_fails_when_relationship_matches_no_pairs(t
         payload["campaign"]["metadata"] = {
             "target": slug,
             "label_oracle_kind": oracle_kind,
-            "label_family_id": "sfxi_axis_vec8",
+            "label_family_id": "densegen_plan_logic4",
             "label_split_id": "random_id",
             "seed": 7,
         }

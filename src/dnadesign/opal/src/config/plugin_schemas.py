@@ -37,10 +37,12 @@ def register_param_schema(category: str, name: str):
 
 def validate_params(category: str, name: str, params: Dict[str, Any]) -> Dict[str, Any]:
     """Validate params against a registered schema when available. Unknown plugin names are allowed."""
+    if not isinstance(params, dict):
+        raise TypeError(f"{category}:{name} params must be a mapping, got {type(params).__name__}.")
     model = _SCHEMAS.get(category, {}).get(name)
     if not model:
-        return params or {}
-    return model.model_validate(params or {}).model_dump()
+        return dict(params)
+    return model.model_validate(params).model_dump()
 
 
 # ---------------------------

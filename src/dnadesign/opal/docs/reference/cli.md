@@ -1,7 +1,7 @@
 ## OPAL Command Line Interface
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
+**Last verified:** 2026-05-25
 
 
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
@@ -182,6 +182,9 @@ opal run --config <yaml> --labels-as-of <r> \
 * For `writeback.prediction_records: label_history`, requires a full records frame because predictions are written back into `records.parquet`.
 * Aborts if the train plus score batch X footprint exceeds `safety.max_x_matrix_gib`.
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
+  The batch stream may follow Parquet storage order; OPAL realigns predictions
+  to the requested candidate ID order before objectives, selection, and ledger
+  writes, and fails fast on missing, extra, or duplicate streamed IDs.
 * Evaluates configured objective plugins and emits named score/uncertainty channels.
 * Resolves `selection.params.score_ref` (and optional `uncertainty_ref`) to choose channels for selection.
 * Selects with the configured strategy + tie handling.
@@ -717,9 +720,9 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 
 **Notes**
 
-* `generate` writes the campaign-specific artifact viewer for records, round/run
-  state, ledger readiness, selected records, labels, predictions, and
-  manifest-backed `outputs/plots` deliverables.
+* `generate` writes the campaign-specific artifact viewer for record contract
+  status, round/run state, ledger readiness, label and prediction summaries,
+  selection summaries, and manifest-backed `outputs/plots` deliverables.
 * Repeating `--campaign` writes an explicit campaign-set notebook with a
   campaign dropdown, at-a-glance campaign table, selected-campaign status, plot
   dropdown, and warnings/stale-artifact panel. This is a review surface over

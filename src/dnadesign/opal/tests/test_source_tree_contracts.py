@@ -117,6 +117,7 @@ def test_generated_notebook_templates_do_not_import_dashboard_internals() -> Non
 
 def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     import dnadesign.opal.notebooks.api as notebook_api
+    from dnadesign.opal.notebooks.api import generated, progress
 
     api_package = OPAL_ROOT / "notebooks" / "api"
     generated_api = api_package / "generated.py"
@@ -128,7 +129,8 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     assert aggregate_api.is_file()
     assert "analysis.dashboard" not in generated_api.read_text()
     assert "analysis.dashboard.api" in progress_api.read_text()
-    assert "Compatibility aggregate" in aggregate_api.read_text()
+    assert "build_records_preview" not in aggregate_api.read_text()
+    assert notebook_api.__all__ == ()
     module_lengths = {path.name: len(path.read_text().splitlines()) for path in api_package.glob("*.py")}
     assert max(module_lengths.values()) <= 160
     for name in [
@@ -138,8 +140,11 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
         "load_campaign_collection_manifest",
         "render_notebook_campaign_set_metric_comparison_image",
     ]:
-        assert name in notebook_api.__all__
-        assert hasattr(notebook_api, name)
+        assert name in generated.__all__
+        assert hasattr(generated, name)
+        assert not hasattr(notebook_api, name)
+    assert "build_records_preview" in progress.__all__
+    assert hasattr(progress, "build_records_preview")
 
 
 def test_analysis_root_has_no_facade_or_flat_helper_modules() -> None:
