@@ -1,0 +1,25 @@
+plot_id: rt_lnrna_abundance_margin_ladder_gallery
+title: RT-lnRNA abundance margin ladder gallery
+question: Do Khan or Crawford abundance-prior bins show a row-level monotonic trace in RT-lnRNA representation space?
+decision_role: primary
+encoding: Row-level endpoint-margin swarm panels for each RT-lnRNA candidate view. The notebook dropdown switches between Khan RT-DNA abundance-prior bins and Crawford Eco1 msDNA abundance-prior bins.
+scope: The plot uses the same Evo2 7B construct, lnRNA-slot, RT-slot, and slot-pair views as the RT-lnRNA ordinal audit. Khan and Crawford are separate source-scoped overlays.
+guardrails:
+  - Compare Khan and Crawford only within their own dropdown selections; their abundance values are source-scoped and not on a shared numeric scale.
+  - Treat the margin as geometric evidence against the source-scoped abundance bin, not as a calibrated abundance predictor.
+  - Read the row-level endpoint margin together with the centroid-distance ordinal audit; the two statistics answer related but different questions.
+  - Keep rows without abundance-affiliated metadata out of the source-specific ladder.
+caption: Source-scoped abundance endpoint-margin ladders for RT-lnRNA candidate representations.
+alt_text: Swarm-strip panel gallery showing high-dimensional endpoint-margin trends across Khan and Crawford abundance-prior bins for RT-lnRNA representation views.
+preprocessing_md: Rows are standardized within each candidate view and L2-normalized before cosine calculations. For each selected source overlay, LatentDNA keeps abundance-affiliated rows, forms the high-abundance endpoint centroid from the highest ranked bin, forms the low-abundance endpoint centroid from the lowest ranked bin, and plots every affiliated row against its ordinal abundance bin.
+math_md: |
+  For one source-scoped abundance axis, let $c_{\mathrm{high}}$ be the centroid of the highest abundance bin and let $c_{\mathrm{low}}$ be the centroid of the lowest abundance bin in normalized embedding space. The plotted margin is
+  $$
+  m_{\mathrm{abund}}(x)=
+  \cos(z_x,c_{\mathrm{high}}) -
+  \cos(z_x,c_{\mathrm{low}}).
+  $$
+  Positive values mean that row $x$ is closer to the high-abundance endpoint. Negative values mean that row $x$ is closer to the low-abundance endpoint. The panel annotation computes row-level Spearman $\rho$, Kendall $\tau_b$, and simple linear $R^2$ between abundance-bin rank and this endpoint margin.
+rationale_md: The centroid-distance audit asks whether bin centroids separate with increasing ordinal gap. This ladder asks whether individual rows move from low-endpoint-like to high-endpoint-like as source-scoped abundance bins increase.
+limitations_md: Khan has a sparse construct-compatible overlay, so its row-level trend can vary by representation. Crawford has many more affiliated rows, but its bins are quantile-derived source priors rather than direct assay labels. Both axes are exploratory until study-owned SPOP observations exist.
+failure_modes_md: Sparse bins, duplicated construct contexts, source-family confounding, or binning drift can create a visible endpoint margin that does not generalize to a supervised TF-sponging label.

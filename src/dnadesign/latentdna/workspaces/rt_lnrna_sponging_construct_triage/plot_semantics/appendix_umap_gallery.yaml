@@ -4,7 +4,7 @@ decision_role: appendix
 encoding: Multi-panel persisted UMAP scatter gallery with hue controls for construct metadata plus Khan and Crawford abundance-prior overlays.
 scope: >-
   The gallery covers the four derived intermediate views and their four
-  output-layer mean companions: full 1.6 kb forward/RC concat, lnRNA slot,
+  output-layer mean companions: full 2,000 bp forward/RC concat, lnRNA slot,
   RT CDS slot, and lnRNA plus RT slot-pair concat.
 guardrails:
   - Use UMAP for orientation and overlay inspection, not as the OPAL X selector.

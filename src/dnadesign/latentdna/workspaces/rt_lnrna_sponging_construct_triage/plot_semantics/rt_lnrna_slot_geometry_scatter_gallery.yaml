@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_slot_geometry_scatter_gallery
+question: Which RT-lnRNA rows shift most across aligned slot and orientation comparisons?
+decision_role: primary
+encoding: XY scatter grids with aligned row cosine stability on x and row L2 shift on y.
+scope: Intermediate full-to-lnRNA, full-to-RT, lnRNA-to-RT, and full forward-to-reverse-complement comparisons.
+guardrails:
+  - Treat this as a row-level diagnostic companion to the context robustness summary.
+  - Large shifts require cohort/source inspection before being interpreted biologically.
+caption: Row-level aligned geometry shifts across RT-lnRNA slot and orientation views.
+alt_text: Scatter gallery showing aligned row cosine stability and L2 shift for RT-lnRNA full construct, lnRNA slot, RT slot, and forward/reverse comparisons.
+preprocessing_md: Uses sampled alignment-metrics scalar tables built from persisted alignment artifacts and matching view matrices.
+math_md: |
+  The x axis is row cosine stability. The y axis is \(\|\hat z^\mathrm{left}-\hat z^\mathrm{right}\|_2\) after row normalization.
+rationale_md: Identifies whether apparent context robustness hides source-family or row-specific shifts.
+limitations_md: Subsampling improves rendering speed and may omit rare rows.
+failure_modes_md: Alignment-key drift or stale derived rows can scramble row-level shift interpretation.

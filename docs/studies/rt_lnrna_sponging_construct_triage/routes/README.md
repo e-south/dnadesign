@@ -53,7 +53,7 @@ registered through the study execution surfaces.
 | Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
 | RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned construct-subject-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
-| Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture, six-view batch runbook, and planned health/ordinal/UMAP gallery config present; sidecars absent |
+| Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture, six-view batch runbook, and sidecar-backed LatentDNA review surfaces present |
 | Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | planned materializer present; labels not materialized |
 | OPAL readiness | `../contexts/opal-handoff.md` | `rt_lnrna_sponging_construct_triage_opal_training_examples_v1` absent; OPAL run blocked |
 
@@ -69,6 +69,6 @@ registered through the study execution surfaces.
   construct subject ids unless explicit RT plus lnRNA sequence authority exists.
 - Construct owns named-slot assembly and realized sequence projection.
 - Infer owns feature aliases and vector sidecars.
-- LatentDNA may review geometry after Infer sidecars exist.
+- LatentDNA reviews geometry from current Infer sidecars.
 - OPAL starts only after one construct subject table has one fixed-size vector `X` and
   real `SpongingAssayObservation` labels exist.

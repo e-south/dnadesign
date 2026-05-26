@@ -6,14 +6,13 @@ study_runtime_root:
 latentdna_workspace:
   surface_type: workspace
   workspace_ref: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
-  status: planned
+  status: materialized
   checked_in_config_allowed: true
   generated_outputs_checked_in_by_default: false
 construct_workspace:
   surface_type: workspace
   workspace_ref: repo:workspaces/studies/rt_lnrna_sponging_construct_triage/usr
-  status: control_dataset_present
-  blocked_by: evo2_7b_feature_sidecars_absent
+  status: infer_sidecars_present
   checked_in_config_allowed: true
   generated_outputs_checked_in_by_default: false
 infer_workspace:

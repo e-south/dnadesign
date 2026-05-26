@@ -59,8 +59,8 @@ representation_contract:
     - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
 infer_execution:
   surface_type: command
-  status: blocked
-  blocked_by: evo2_7b_feature_sidecars_absent
+  status: active
+  blocked_by: future_infer_refresh_only
 opal_run:
   surface_type: command
   status: blocked

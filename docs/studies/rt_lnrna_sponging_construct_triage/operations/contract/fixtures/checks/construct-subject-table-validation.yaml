@@ -9,7 +9,6 @@ expected_construct_subject_ids:
   - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
   - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
 expected_blockers:
-  - evo2_7b_feature_sidecars_absent
   - real_sponging_assay_observations_absent
 forbidden_core_fields:
   - perturbation_class

@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_dataset_overview
+question: What RT-native source and readiness inventory anchors the downstream LatentDNA review?
+decision_role: primary
+encoding: Multi-panel categorical count chart over source family, promotion status, abundance affiliation, construct projection status, label readiness, and source-window case.
+scope: The materialized 2,000 bp RT-lnRNA construct denominator shared by the Evo2 7B Infer sidecar sources.
+guardrails:
+  - Inventory counts set the denominator only; they do not rank candidate representations.
+  - Label readiness is a status overlay and does not imply Reader-to-Construct SPOP labels exist.
+caption: RT-lnRNA source/readiness inventory for the materialized construct denominator.
+alt_text: Multi-panel categorical chart showing source family, promotion, abundance affiliation, projection, label readiness, and source-window shares for RT-lnRNA constructs.
+preprocessing_md: Uses the dataset-overview scalar table built from source metadata derivations; no vector geometry is used.
+math_md: |
+  Each panel reports \(p_c=n_c/N\), where \(n_c\) is the cohort count and \(N\) is the shared RT-lnRNA construct denominator.
+rationale_md: Establishes the exact RT-native denominator before representation-health, abundance, context, and candidate-X surfaces are interpreted.
+limitations_md: Descriptive inventory only; balanced source counts do not imply useful latent geometry.
+failure_modes_md: Stale source-side metadata derivations can misstate the denominator or readiness categories.

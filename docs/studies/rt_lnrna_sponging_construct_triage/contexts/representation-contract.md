@@ -88,8 +88,8 @@ integration rules.
 
 The LatentDNA workspace at
 `../../../../src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml`
-is a planned gallery contract until Evo2 sidecars exist. It declares, for each
-of the six source sequence-view selectors:
+is a sidecar-backed review contract. It declares, for each of the six source
+sequence-view selectors:
 
 - one Evo2 7B `intermediate_embedding` vector sidecar;
 - one Evo2 7B `output_layer_mean` vector sidecar;
@@ -103,20 +103,30 @@ bidirectional concat, and lnRNA plus RT slot-pair concat. The output-layer
 companions use the same view geometry as diagnostics; they do not automatically
 become OPAL `X`.
 
-The planned plot surface has four study-agnostic pieces ported from the
-promoter-style LatentDNA work:
+The current plot surface dogfoods study-agnostic LatentDNA pieces ported from
+the promoter-style workspace without promoter biology:
 
+- a dataset/source overview categorical-count surface;
 - a representation-health metric panel that gates obvious collapse using PCA
   effective rank, PC1 variance concentration, and pairwise-distance spread;
-- an appendix PCA scree diagnostic for the same eight intermediate and
-  output-layer views;
+- a source/design-structure summary over RT-native source, overlay, compiler,
+  RT-DMS, GenBank variant, and source-regime axes;
 - a Khan/Crawford ordinal overlay audit, with separate axes for Khan RT-DNA
   abundance priors and Crawford Eco1 msDNA abundance priors;
+- abundance margin ladder and scatter galleries;
+- a slot/context robustness summary and row-level slot geometry scatter gallery;
+- a candidate-X decision frontier and scorecard restricted to the four
+  intermediate OPAL X candidates;
+- an appendix PCA scree diagnostic for the same eight intermediate and
+  output-layer views;
 - an appendix UMAP gallery spanning intermediate and output-layer views with
   construct and overlay hue controls.
 
-Khan and Crawford overlay columns preserve `raw_value` and `normalized_value`
-as source-scoped numeric fields. They are not on one shared numeric scale.
+Khan overlay columns preserve `raw_value` and `normalized_value` as
+source-scoped numeric fields. Crawford exposes one source abundance value as
+`crawford_abundance_raw_value`; the prior duplicate normalized column is not
+part of the LatentDNA contract. Khan and Crawford values are not on one shared
+numeric scale.
 `ordinal_bin` is a secondary metadata axis for source-local geometry review,
 not a replacement label and not OPAL `Y`. Crawford design-reference rows and
 abundance-observation rows remain distinct source record types; Construct

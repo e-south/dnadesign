@@ -5,7 +5,7 @@
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
 - Study execution map: `../operations/runtime/command-groups/pipeline.yaml`
-- Lifecycle posture: Phase 3 Infer handoff blocked on missing feature sidecars and real labels
+- Lifecycle posture: Phase 3 LatentDNA review current; OPAL remains blocked on real labels and candidate-X selection
 - OPS provider: study execution surfaces include a six-view Infer batch runbook
 
 ### Current Phase
@@ -15,9 +15,9 @@ materialization path for GenBank-authorized retrons, Crawford source-sequence
 promotions, Khan source RT-lnRNA rows that fit the current 2,000 bp construct
 geometry, a bounded compiler-generated MSD lnRNA variant fixture pool, and
 RT-CDS in silico DMS variants, plus a fixed-size representation-table contract
-for the next Infer/LatentDNA handoff. It is not ready for OPAL training because
-Evo2 feature sidecars and materialized `SpongingAssayObservation` labels are
-still absent.
+for the next LatentDNA and OPAL handoff. It is not ready for OPAL training
+because materialized `SpongingAssayObservation` labels and a selected fixed
+candidate-X vector are still absent.
 
 ### Current Evidence
 
@@ -117,9 +117,11 @@ still absent.
   fixed-size representation-table contract, including expected Evo2 7B vector
   dimensions and Khan/Crawford overlay integration boundaries.
 - `../../../../src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml`
-  declares the planned LatentDNA PCA representation-health gate, appendix
-  scree diagnostic, Khan/Crawford ordinal audit, and appendix UMAP surfaces
-  across intermediate and output-layer gallery views.
+  declares the current sidecar-backed LatentDNA review surface: dataset/source
+  overview, representation-health gate, source/design-structure summary,
+  Khan/Crawford ordinal audit, abundance margin galleries, slot/context
+  robustness, candidate-X frontier/scorecard, appendix scree, and appendix
+  UMAP views across intermediate and output-layer gallery views.
 - `../contexts/reader-spop-label-contract.md` and
   `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml`
   declare the planned Reader-to-Construct SPOP bridge. Reader owns the SPOP
@@ -153,13 +155,9 @@ still absent.
 
 ### Remaining Blockers
 
-- Evo2 7B Infer sidecars for the six explicit `view_name` lanes. The current
-  inventory gate resolves all 62,490 required source views with
-  `missing_products=0`, but sidecars remain absent. Inventory planning reports
-  `missing_vectors=124980` and `missing_scalars=124980`; exact execution
-  planning reports `missing_vectors=124980` and `missing_scalars=41660`.
-- LatentDNA materialization of the declared representation-health, ordinal
-  overlay, scree, and UMAP gallery views after sidecars exist.
+- Reader SPOP labels and OPAL handoff. LatentDNA sidecars and review surfaces
+  are materialized, but OPAL still needs a selected fixed-size `X` and durable
+  `SpongingAssayObservation` labels.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The
   translation-validated Khan RT CDS path is present, but 40 cross-retron RTs are
   too long for the current lnRNA-centered 2,000 bp geometry when paired with
@@ -190,18 +188,14 @@ view ids.
 
 ### Next Actions
 
-1. Run Infer sequence-view completion preflight using explicit `view_name`
-   selectors before any Evo2 execution.
-2. Materialize Evo2 7B sidecars for the six declared source views.
-3. Validate the LatentDNA workspace config, validate the review recipe, and
-   materialize the declared PCA health, scree, ordinal-audit, and UMAP gallery
-   views from sidecars.
-4. Decide whether to add a larger or alternate Construct context for
+1. Review the LatentDNA candidate-X frontier and scorecard before selecting an
+   OPAL `X`; do not default to the largest concat.
+2. Decide whether to add a larger or alternate Construct context for
    over-capacity Khan source rows, or keep the current 2,000 bp lane as an
    Eco1-sized normalized context. The 2,000 bp lane is useful but not complete.
-5. Run the Reader SPOP label planner against sibling Reader manifests and audit
+3. Run the Reader SPOP label planner against sibling Reader manifests and audit
    any endpoint drift, malformed treatments, or weak aTc positive controls
    before writing a durable label sidecar.
-6. Run the schema/check fixtures before materializing larger construct subject tables.
-7. Keep abundance priors and future sponging labels separate through OPAL
+4. Run the schema/check fixtures before materializing larger construct subject tables.
+5. Keep abundance priors and future sponging labels separate through OPAL
    handoff.

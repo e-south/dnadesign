@@ -1,0 +1,39 @@
+workspace_id: rt_lnrna_sponging_construct_triage
+workspace_ref: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
+snapshot_ref: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/outputs/status/workspace_snapshot.json
+source_datasets:
+  construct_contexts: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+supported_model_families:
+  - evo2_7b
+default_model_family: evo2_7b
+default_geometry_inventory:
+  default_review_geometries:
+    - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+    - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+  diagnostic_geometries:
+    - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+    - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+attention_deliverables:
+  - rt_lnrna_dataset_overview
+  - representation_health_summary
+  - rt_lnrna_source_structure_summary
+  - rt_lnrna_overlay_ordinal_audit
+  - rt_lnrna_slot_context_robustness_summary
+  - rt_lnrna_candidate_decision_frontier
+  - rt_lnrna_candidate_x_scorecard
+gate_deliverables:
+  - representation_health_summary
+decision_deliverables:
+  - rt_lnrna_dataset_overview
+  - rt_lnrna_source_structure_summary
+  - rt_lnrna_overlay_ordinal_audit
+  - rt_lnrna_slot_context_robustness_summary
+  - rt_lnrna_candidate_decision_frontier
+  - rt_lnrna_candidate_x_scorecard
+appendix_deliverables:
+  - appendix_umap_gallery
+  - representation_scree_diagnostic

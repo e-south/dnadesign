@@ -375,8 +375,8 @@ def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
     for source_base, view_name in _RT_LNRNA_SOURCE_VIEW_SELECTORS.items():
         intermediate_source = context.config.sources[f"{source_base}_intermediate"]
         output_layer_source = context.config.sources[f"{source_base}_output_layer"]
-        assert intermediate_source.role == "planned"
-        assert output_layer_source.role == "planned"
+        assert intermediate_source.role == "primary"
+        assert output_layer_source.role == "primary"
         assert intermediate_source.where["view_name"] == view_name
         assert output_layer_source.where["view_name"] == view_name
         assert intermediate_source.where["representation_kind"] == "intermediate_embedding"
@@ -388,7 +388,7 @@ def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
         ]:
             source = context.config.sources[f"{source_base}_{scalar_suffix}"]
             assert source.kind == "infer_feature_scalar_sidecar"
-            assert source.role == "planned"
+            assert source.role == "primary"
             assert source.where["view_name"] == view_name
             assert source.where["scalar_kind"] == scalar_kind
 
@@ -406,9 +406,12 @@ def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views(
     assert list(notebook.geometry_order) == _RT_LNRNA_GALLERY_VIEWS
     assert list(notebook.candidate_grid_views) == _RT_LNRNA_GALLERY_VIEWS
     assert notebook.default_candidate_set == "rt_lnrna_construct_gallery_v1"
+    assert notebook.default_reference_set == "reference_genbank_catalog_rows"
     assert notebook.default_layout == "candidate_grid"
+    assert "rt_lnrna_slot_context_robustness_summary_metrics" in notebook.context_audit_scalar_ids
     assert notebook.preferred_hue_kinds["khan_abundance_ordinal_bin"] == "ordinal"
     assert notebook.preferred_hue_kinds["crawford_abundance_ordinal_bin"] == "ordinal"
+    assert "crawford_abundance_normalized_value" not in notebook.preferred_hue_kinds
 
     for view_id in _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS:
         view = context.config.views[view_id]
@@ -419,53 +422,144 @@ def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views(
 def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> None:
     context = load_workspace_config(_rt_lnrna_workspace())
     umap_gallery = context.config.plots["appendix_umap_gallery"]
+    dataset_overview = context.config.plots["rt_lnrna_dataset_overview"]
+    source_structure = context.config.plots["rt_lnrna_source_structure_summary"]
     ordinal_audit = context.config.plots["rt_lnrna_overlay_ordinal_audit"]
+    abundance_ladder = context.config.plots["rt_lnrna_abundance_margin_ladder_gallery"]
+    abundance_scatter = context.config.plots["rt_lnrna_abundance_margin_scatter_gallery"]
+    context_summary = context.config.plots["rt_lnrna_slot_context_robustness_summary"]
+    slot_scatter = context.config.plots["rt_lnrna_slot_geometry_scatter_gallery"]
+    candidate_frontier = context.config.plots["rt_lnrna_candidate_decision_frontier"]
+    candidate_scorecard = context.config.plots["rt_lnrna_candidate_x_scorecard"]
     scree_diagnostic = context.config.plots["representation_scree_diagnostic"]
     notebook = context.config.notebooks["latent_geometry_browser"]
-    deliverable = context.config.deliverables["representation_scree_diagnostic"]
+    scree_deliverable = context.config.deliverables["representation_scree_diagnostic"]
+    ordinal_deliverable = context.config.deliverables["rt_lnrna_overlay_ordinal_audit"]
     recipe_steps = {step.id: step for step in _recipe_steps(context, "rt_lnrna_representation_review_recipe")}
     expected_overlay_hues = [
         "candidate_source",
+        "source_family",
+        "source_literature_id",
+        "source_regime",
+        "abundance_affiliation",
         "construct_projection_status",
+        "rt_variant_class",
+        "rt_dms_mutation_class",
         "template_name",
         "khan_abundance_normalized_value",
         "khan_abundance_ordinal_bin",
-        "crawford_abundance_normalized_value",
+        "crawford_abundance_raw_value",
         "crawford_abundance_ordinal_bin",
         "crawford_design_reference_status",
     ]
 
+    assert sorted(context.config.reference_sets) == [
+        "reference_crawford_design_affiliated_rows",
+        "reference_crawford_high_abundance_examples",
+        "reference_crawford_low_abundance_examples",
+        "reference_genbank_catalog_rows",
+        "reference_khan_abundance_rows",
+        "reference_msd_compiler_landmarks",
+        "reference_source_family_anchors",
+    ]
+    assert context.config.study_binding is not None
+    assert context.config.study_binding.study_id == "rt_lnrna_sponging_construct_triage"
+
     assert umap_gallery.kind == "projection_grid"
     assert umap_gallery.visibility_tier == "appendix"
+    assert umap_gallery.default_hue == "candidate_source"
     assert list(umap_gallery.projections) == [f"umap_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
     assert [option.column for option in umap_gallery.hue_options] == expected_overlay_hues
-    assert umap_gallery.hue_options[3].type == "continuous"
-    assert umap_gallery.hue_options[4].type == "ordinal"
-    assert umap_gallery.hue_options[5].type == "continuous"
-    assert umap_gallery.hue_options[6].type == "ordinal"
+    assert umap_gallery.hue_options[9].type == "continuous"
+    assert umap_gallery.hue_options[10].type == "ordinal"
+    assert umap_gallery.hue_options[11].type == "continuous"
+    assert umap_gallery.hue_options[12].type == "ordinal"
+
+    assert dataset_overview.kind == "categorical_count"
+    assert dataset_overview.scalar == "rt_lnrna_dataset_overview_counts"
+    assert source_structure.kind == "metric_panel_grid"
+    assert source_structure.scalar == "rt_lnrna_source_structure_summary_metrics"
 
     assert ordinal_audit.kind == "metric_panel_grid"
     assert ordinal_audit.visibility_tier == "primary"
     assert ordinal_audit.scalar == "rt_lnrna_overlay_ordinal_audit_metrics"
+    assert abundance_ladder.kind == "distribution_grid"
+    assert abundance_ladder.visibility_tier == "primary"
+    assert list(abundance_ladder.scalars) == [
+        f"rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert [option.column for option in abundance_ladder.filter_options] == ["ordinal_group_id"]
+    assert [row.value for row in abundance_ladder.filter_options[0].values] == [
+        "khan_abundance",
+        "crawford_abundance",
+    ]
+    assert abundance_scatter.kind == "xy_scatter_grid"
+    assert list(abundance_scatter.scalars) == [
+        f"rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert context_summary.kind == "metric_panel_grid"
+    assert context_summary.scalar == "rt_lnrna_slot_context_robustness_summary_metrics"
+    assert slot_scatter.kind == "xy_scatter_grid"
+    assert list(slot_scatter.scalars) == [
+        "rt_lnrna_slot_delta_intermediate_full_lnrna",
+        "rt_lnrna_slot_delta_intermediate_full_rt",
+        "rt_lnrna_slot_delta_intermediate_lnrna_rt",
+        "rt_lnrna_slot_delta_intermediate_full_fwd_rc",
+    ]
+    assert candidate_frontier.kind == "xy_scatter"
+    assert candidate_frontier.scalar == "rt_lnrna_candidate_decision_frontier_metrics"
+    assert candidate_frontier.x_column == "source_family_separation_ratio"
+    assert candidate_scorecard.kind == "metric_panel_grid"
     assert resolve_plot_semantics(context, plot_id="appendix_umap_gallery").decision_role == "appendix"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_dataset_overview").decision_role == "primary"
     assert resolve_plot_semantics(context, plot_id="rt_lnrna_overlay_ordinal_audit").decision_role == "primary"
+    assert (
+        resolve_plot_semantics(context, plot_id="rt_lnrna_abundance_margin_ladder_gallery").decision_role == "primary"
+    )
 
     assert scree_diagnostic.kind == "curve_grid"
     assert scree_diagnostic.visibility_tier == "appendix"
     assert list(scree_diagnostic.reducers) == [f"pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
     assert resolve_plot_semantics(context, plot_id="representation_scree_diagnostic").decision_role == "appendix"
+    assert all("1.6 kb" not in title for title in notebook.candidate_grid_panel_titles)
     assert list(notebook.ordered_plots) == [
+        "rt_lnrna_dataset_overview",
         "representation_health_summary",
-        "representation_scree_diagnostic",
+        "rt_lnrna_source_structure_summary",
         "rt_lnrna_overlay_ordinal_audit",
+        "rt_lnrna_abundance_margin_ladder_gallery",
+        "rt_lnrna_abundance_margin_scatter_gallery",
+        "rt_lnrna_slot_context_robustness_summary",
+        "rt_lnrna_slot_geometry_scatter_gallery",
+        "rt_lnrna_candidate_decision_frontier",
+        "rt_lnrna_candidate_x_scorecard",
         "appendix_umap_gallery",
+        "representation_scree_diagnostic",
     ]
+    assert "build_rt_lnrna_dataset_overview_counts" in recipe_steps
+    assert "build_rt_lnrna_source_structure_summary_metrics" in recipe_steps
+    assert "build_rt_lnrna_slot_context_robustness_summary_metrics" in recipe_steps
+    assert "build_rt_lnrna_candidate_decision_frontier_metrics" in recipe_steps
+    assert "build_rt_lnrna_candidate_x_scorecard_metrics" in recipe_steps
+    assert "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps
+    assert recipe_steps["render_rt_lnrna_abundance_margin_ladder_gallery"].depends_on == [
+        f"build_rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert "generate_latent_geometry_browser" in recipe_steps
+    assert (
+        "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps["generate_latent_geometry_browser"].depends_on
+    )
     assert "render_representation_scree_diagnostic" in recipe_steps
     assert recipe_steps["render_representation_scree_diagnostic"].depends_on == [
         f"reduce_pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
     ]
-    assert deliverable.outputs["plots"] == ["representation_scree_diagnostic"]
-    assert deliverable.requires["views"] == _RT_LNRNA_GALLERY_VIEWS
+    assert scree_deliverable.outputs["plots"] == ["representation_scree_diagnostic"]
+    assert scree_deliverable.requires["views"] == _RT_LNRNA_GALLERY_VIEWS
+    assert ordinal_deliverable.outputs["plots"] == [
+        "rt_lnrna_overlay_ordinal_audit",
+        "rt_lnrna_abundance_margin_ladder_gallery",
+        "rt_lnrna_abundance_margin_scatter_gallery",
+    ]
 
 
 def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:
