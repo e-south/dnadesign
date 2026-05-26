@@ -32,6 +32,14 @@ def _rt_lnrna_workspace() -> Path:
     return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "rt_lnrna_sponging_construct_triage"
 
 
+def _study_unit(study_id: str) -> Path:
+    return _repo_root() / "src" / "dnadesign" / "studies" / "units" / study_id
+
+
+def _study_deliverable_doc(study_id: str, section: str, filename: str) -> str:
+    return (_study_unit(study_id) / "deliverables" / section / filename).read_text(encoding="utf-8")
+
+
 def _recipe_steps(context, recipe_id: str) -> list[object]:
     return list(context.config.recipes[recipe_id].steps)
 
@@ -461,17 +469,11 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
 
 
 def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:
-    doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "regulondb_native_promoter_panel"
-        / "deliverables"
-        / "appendix"
-        / "sigma_umap_panel.md"
-    ).read_text(encoding="utf-8")
+    doc = _study_deliverable_doc(
+        "regulondb_native_promoter_panel",
+        "appendix",
+        "sigma_umap_panel.md",
+    )
 
     assert "notebook hue dropdown" not in doc
     assert "fixed sigma-factor overlay" in doc
@@ -1186,28 +1188,16 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
 
 def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() -> None:
-    appendix_geometry_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "appendix"
-        / "appendix_geometry_review.md"
-    ).read_text(encoding="utf-8")
-    appendix_umap_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "appendix"
-        / "appendix_umap_gallery.md"
-    ).read_text(encoding="utf-8")
+    appendix_geometry_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "appendix",
+        "appendix_geometry_review.md",
+    )
+    appendix_umap_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "appendix",
+        "appendix_umap_gallery.md",
+    )
 
     parsed_geometry = _parse_deliverable_markdown(appendix_geometry_doc)
     parsed_umap = _parse_deliverable_markdown(appendix_umap_doc)
@@ -1219,39 +1209,21 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
 
 
 def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfaces() -> None:
-    sigma_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "primary"
-        / "sigma35_ordinal_audit.md"
-    ).read_text(encoding="utf-8")
-    context_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "primary"
-        / "context_robustness_summary.md"
-    ).read_text(encoding="utf-8")
-    frontier_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "primary"
-        / "candidate_decision_frontier.md"
-    ).read_text(encoding="utf-8")
+    sigma_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "sigma35_ordinal_audit.md",
+    )
+    context_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "context_robustness_summary.md",
+    )
+    frontier_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "candidate_decision_frontier.md",
+    )
 
     parsed_sigma = _parse_deliverable_markdown(sigma_doc)
     parsed_context = _parse_deliverable_markdown(context_doc)
