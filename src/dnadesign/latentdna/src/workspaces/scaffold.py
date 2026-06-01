@@ -78,8 +78,16 @@ def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, wo
     payload["study_binding"] = {
         "study_id": study_dir.name,
         "record_root": study_dir.resolve().as_posix(),
-        "deliverable_docs_root": f"src/dnadesign/studies/units/{study_dir.name}",
+        "deliverable_docs_root": _deliverable_docs_root_for_study(study_dir.name).as_posix(),
     }
+
+
+def _deliverable_docs_root_for_study(study_id: str) -> Path:
+    source_root = Path("src") / "dnadesign" / "studies" / "units" / study_id
+    workbench_root = source_root / "workbench"
+    if (resolve_repo_path(workbench_root) / "study.yaml").is_file():
+        return workbench_root
+    return source_root
 
 
 def scaffold_workspace(*, workspace_dir: Path, template: str, from_study_dir: str | Path | None = None) -> Path:

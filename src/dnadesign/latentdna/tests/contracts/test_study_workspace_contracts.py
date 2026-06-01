@@ -38,8 +38,16 @@ def _study_unit(study_id: str) -> Path:
     return _repo_root() / "src" / "dnadesign" / "studies" / "units" / study_id
 
 
+def _study_deliverable_docs_root(study_id: str) -> Path:
+    if study_id == "stress_ethanol_cipro_growth":
+        context = load_workspace_config(_live_workspace())
+        assert context.config.study_binding is not None
+        return _repo_root() / context.config.study_binding.deliverable_docs_root
+    return _study_unit(study_id)
+
+
 def _study_deliverable_doc(study_id: str, section: str, filename: str) -> str:
-    return (_study_unit(study_id) / "deliverables" / section / filename).read_text(encoding="utf-8")
+    return (_study_deliverable_docs_root(study_id) / "deliverables" / section / filename).read_text(encoding="utf-8")
 
 
 def _recipe_steps(context, recipe_id: str) -> list[object]:

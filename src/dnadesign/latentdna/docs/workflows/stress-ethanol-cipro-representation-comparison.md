@@ -199,7 +199,7 @@ otherwise.
 ### Deeper study notes
 
 Keep longer interpretation in
-`src/dnadesign/studies/units/stress_ethanol_cipro_growth/notes/`.
+`src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/notes/`.
 
 Use the notes for:
 
