@@ -20,8 +20,10 @@ contracts, and OPAL training-dataset readiness rules. It does not own Construct 
 Infer feature extraction, LatentDNA materialization, or OPAL learning.
 
 Use `contexts/construct-overview.md` for the study primer. Use
-`routes/README.md` for task routing, `record/status.md` for current state and
-blockers, `record/datasets.yaml` for source inventories, and
+`contexts/retron-tf-decoy-design-logic.md` for the cross-study manuscript
+semantics that connect RT-lnRNA construct triage to the retron hairpin study.
+Use `routes/README.md` for task routing, `record/status.md` for current state
+and blockers, `record/datasets.yaml` for source inventories, and
 `operations/ops.study.yaml` for the machine-readable contract index.
 GenBank source authority lives in
 `workbench/provenance/genbank-source-authority.yaml` with parsed offsets in
@@ -54,6 +56,7 @@ rt_lnrna_sponging_construct_triage/
   contexts/
     construct-overview.md
     construct-contract.md
+    retron-tf-decoy-design-logic.md
     permuter-onboarding.md
     representation-contract.md
     source-overlays.md
@@ -61,6 +64,7 @@ rt_lnrna_sponging_construct_triage/
   workbench/
     ontology/
     design_sets/
+    figure_mocks/
     provenance/
 ```
 

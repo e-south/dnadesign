@@ -2,19 +2,19 @@ version: 1
 study_id: rt_lnrna_sponging_construct_triage
 command_groups:
   - id: phase_0_contract_validation
-    status: active
+    status: paused
     purpose: Validate checked-in docs and contract fixtures.
     commands:
       - uv run python -m dnadesign.devtools.docs.checks --repo-root .
       - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.variant_genbank_catalog --json
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
   - id: construct_projection
-    status: active
+    status: paused
     purpose: Materialize dual-cassette construct contexts from GenBank, source-promotion, and Permuter construct subjects.
     blockers:
       - khan_source_rows_exceeding_current_2000bp_construct_window
   - id: permuter_rt_cds_dms
-    status: active
+    status: paused
     purpose: Generate RT-CDS DMS variants through the public Permuter API and promote them into study-owned construct subject envelopes before Construct realization.
     commands:
       - uv run pytest -q src/dnadesign/permuter/tests/api/test_public_api.py::test_public_api_materializes_coding_dna_dms_with_canonical_usr_ids_and_var_ids
@@ -22,7 +22,7 @@ command_groups:
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py::test_rt_lnrna_rt_cds_dms_variants_materialize_through_permuter_public_api
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py::test_rt_lnrna_permuter_plan_fixture_links_construct_subject_envelope_to_six_view_infer_handoff
   - id: infer_handoff
-    status: active
+    status: paused
     purpose: Validate feature aliases from declared construct-context views.
     blockers:
       - future_infer_refresh_only
@@ -35,21 +35,20 @@ command_groups:
     execution_surfaces:
       infer_workspace: src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage
       infer_batch_7b_with_notify:
-        six_view: src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml
+        six_view: docs/studies/rt_lnrna_sponging_construct_triage/operations/runtime/runbooks/infer-six-view-7b-with-notify.yaml
   - id: latentdna_gallery
-    status: active
+    status: paused
     purpose: Validate and materialize the RT-lnRNA dataset overview, representation health, source structure, ordinal audit, context robustness, candidate decision, scree, and UMAP gallery surfaces from Infer sidecars.
     commands:
       - uv run latentdna validate workspace --workspace rt_lnrna_sponging_construct_triage --deep --json
       - uv run latentdna recipe validate rt_lnrna_representation_review_recipe --workspace rt_lnrna_sponging_construct_triage --json
   - id: reader_spop_label_materialization
-    status: planned
-    purpose: Plan Reader-derived SPOP scalar labels for RT-lnRNA assay subjects without promoting unresolved sequence identities.
+    status: materialized_for_latentdna_overlay
+    purpose: Materialize Reader-derived SPOP scalar labels for RT-lnRNA assay subjects without promoting unresolved sequence identities.
     blockers:
       - unresolved_variant_sequence_authority_for_construct_promotion
-      - reader_spop_labels_not_materialized
     commands:
-      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --json
+      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --write-label-tables src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs --json
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
   - id: opal_readiness
     status: blocked

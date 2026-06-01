@@ -21,9 +21,11 @@ from functools import cache
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from .reader_spop_api import ReaderSpopApi, ReaderSpopApiError, load_reader_spop_api
 from .variant_genbank_catalog import build_variant_genbank_catalog
 
 DEFAULT_READER_EXPERIMENT_IDS: tuple[str, ...] = (
@@ -33,20 +35,16 @@ DEFAULT_READER_EXPERIMENT_IDS: tuple[str, ...] = (
     "20251105_retron_Eco1_RT_variants",
     "20260418_retron_Eco1_26_43_170_171_benchmark",
     "20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark",
+    "20260529_retron_Eco1_26_43_177_186_benchmark",
 )
 
-SPOP_METRIC_ID = "reader_spop_endpoint_dose_mean_v1"
-SPOP_METRIC_FAMILY = "sponging_percent_of_positive"
-SPOP_NUMERIC_SCOPE = "reader_experiment_normalized_tf_sponging"
 SPOP_SOURCE_OF_TRUTH_DOC = "reader/docs/lib/spop_endpoint_in_reader.md"
 SPOP_SOURCE_OF_TRUTH_API = "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
 REPORTER_PLASMID_ID = "pBbS2c-RFP"
 REPORTER_DESIGN_ID = "pBbS2c-rfp"
-REPORTER_READOUT = "RFP/OD600"
-VIABILITY_READOUT = "OD600"
 READER_RATIO_RECORD_ID = "ratio_reporter_normalizer/df"
-DEFAULT_LAMBDA = 0.5
-_EPS_POSITIVE = 1e-8
+SPOP_CANDIDATE_SUMMARY_TABLE = "reader_spop_candidate_summary.parquet"
+SPOP_OBSERVATION_TABLE = "reader_spop_observations.parquet"
 _RETRON_DESIGN_RE = re.compile(r"pES-retron-(?P<number>\d+);\s*pBbS2c-rfp", flags=re.IGNORECASE)
 _TREATMENT_RE = re.compile(
     r"^\s*(?P<atc>[0-9]+(?:\.[0-9]+)?)\s*nm\s*aTc;\s*"
@@ -204,17 +202,34 @@ class ReaderSpopPlan:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ReaderSpopLabelTables:
+    output_dir: str
+    observations_path: str
+    candidate_summary_path: str
+    observation_rows: int
+    candidate_summary_rows: int
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def build_reader_spop_plan(
     *,
     reader_root: Path | None = None,
     experiment_ids: Sequence[str] = DEFAULT_READER_EXPERIMENT_IDS,
-    lambda_viability: float = DEFAULT_LAMBDA,
+    lambda_viability: float | None = None,
     strict: bool = False,
 ) -> ReaderSpopPlan:
     """Build a dry-run SPOP label plan from sibling Reader retron experiments."""
-    if not math.isfinite(lambda_viability) or not 0.0 <= lambda_viability <= 1.0:
-        raise ReaderSpopContractError("lambda_viability must be finite and in [0, 1].")
     resolved_reader_root = _resolve_reader_root(reader_root)
+    try:
+        spop_api = load_reader_spop_api(resolved_reader_root)
+    except ReaderSpopApiError as exc:
+        raise ReaderSpopContractError(str(exc)) from exc
+    resolved_lambda = spop_api.default_lambda if lambda_viability is None else lambda_viability
+    if not math.isfinite(resolved_lambda) or not 0.0 <= resolved_lambda <= 1.0:
+        raise ReaderSpopContractError("lambda_viability must be finite and in [0, 1].")
     observations: list[ReaderSpopObservation] = []
     issues: list[ReaderSpopIssue] = []
     for experiment_id in experiment_ids:
@@ -231,7 +246,8 @@ def build_reader_spop_plan(
         try:
             experiment_observations, experiment_issues = _read_experiment_observations(
                 experiment_dir=experiment_dir,
-                lambda_viability=lambda_viability,
+                lambda_viability=resolved_lambda,
+                spop_api=spop_api,
             )
         except ReaderSpopContractError:
             raise
@@ -240,7 +256,7 @@ def build_reader_spop_plan(
     ordered_observations = tuple(sorted(observations, key=lambda row: (row.experiment_id, row.candidate_key)))
     plan = ReaderSpopPlan(
         reader_root=str(resolved_reader_root),
-        metric_id=SPOP_METRIC_ID,
+        metric_id=spop_api.metric_id,
         observations=ordered_observations,
         candidate_summaries=_candidate_summaries(ordered_observations),
         issues=tuple(issues),
@@ -251,10 +267,125 @@ def build_reader_spop_plan(
     return plan
 
 
+def write_reader_spop_label_tables(*, plan: ReaderSpopPlan, output_dir: Path) -> ReaderSpopLabelTables:
+    """Write durable Reader SPOP observation and construct-subject overlay tables."""
+
+    resolved_output_dir = Path(output_dir).expanduser().resolve()
+    resolved_output_dir.mkdir(parents=True, exist_ok=True)
+    observation_path = resolved_output_dir / SPOP_OBSERVATION_TABLE
+    candidate_summary_path = resolved_output_dir / SPOP_CANDIDATE_SUMMARY_TABLE
+    observation_rows = [row.to_dict() for row in plan.observations]
+    pq.write_table(pa.Table.from_pylist(observation_rows), observation_path)
+    candidate_rows = _candidate_summary_overlay_rows(plan)
+    pq.write_table(_candidate_summary_overlay_table(candidate_rows), candidate_summary_path)
+    return ReaderSpopLabelTables(
+        output_dir=resolved_output_dir.as_posix(),
+        observations_path=observation_path.as_posix(),
+        candidate_summary_path=candidate_summary_path.as_posix(),
+        observation_rows=len(observation_rows),
+        candidate_summary_rows=len(candidate_rows),
+    )
+
+
+def _candidate_summary_overlay_rows(plan: ReaderSpopPlan) -> list[dict[str, object]]:
+    observations_by_construct: dict[str, list[ReaderSpopObservation]] = {}
+    summaries_by_candidate = {row.candidate_key: row for row in plan.candidate_summaries}
+    for observation in plan.observations:
+        if observation.construct_subject_bridge_status != "resolved_construct_sequence_authority":
+            continue
+        if not observation.construct_subject_id:
+            continue
+        observations_by_construct.setdefault(observation.construct_subject_id, []).append(observation)
+
+    rows: list[dict[str, object]] = []
+    for construct_subject_id, observations in sorted(observations_by_construct.items()):
+        first = observations[0]
+        summary = summaries_by_candidate.get(first.candidate_key)
+        normalized_values = [float(row.normalized_value) for row in observations]
+        raw_values = [float(row.raw_value) for row in observations]
+        rows.append(
+            {
+                "construct_subject__id": construct_subject_id,
+                "candidate_key": first.candidate_key,
+                "assay_subject_key": first.assay_subject_key,
+                "reader_spop_overlay_status": "reader_spop_assay_observed",
+                "reader_spop_metric_id": plan.metric_id,
+                "reader_spop_numeric_scope": first.assay_metadata.get(
+                    "metric_numeric_scope",
+                    "reader_experiment_normalized_tf_sponging",
+                ),
+                "reader_spop_normalization_basis": first.normalization_basis,
+                "reader_spop_observation_ids": _join_unique(row.observation_id for row in observations),
+                "reader_spop_experiment_ids": _join_unique(row.experiment_id for row in observations),
+                "reader_spop_artifact_refs": _join_unique(row.reader_artifact_ref for row in observations),
+                "reader_spop_artifact_content_digests": _join_unique(
+                    row.reader_artifact_content_digest for row in observations
+                ),
+                "reader_spop_normalized_values": _join_numbers(normalized_values),
+                "reader_spop_raw_values": _join_numbers(raw_values),
+                "reader_spop_normalized_value": float(statistics.median(normalized_values)),
+                "reader_spop_raw_value": float(statistics.median(raw_values)),
+                "reader_spop_score_median": float(
+                    summary.spop_score_median if summary is not None else statistics.median(normalized_values)
+                ),
+                "reader_spop_score_min": float(
+                    summary.spop_score_min if summary is not None else min(normalized_values)
+                ),
+                "reader_spop_score_max": float(
+                    summary.spop_score_max if summary is not None else max(normalized_values)
+                ),
+                "reader_spop_observation_count": len(observations),
+                "reader_spop_dose_counts": _join_numbers(len(row.iptg_doses_uM) for row in observations),
+                "reader_spop_qc_flags": _join_unique(flag for row in observations for flag in row.qc_flags),
+                "construct_subject_bridge_status": first.construct_subject_bridge_status,
+            }
+        )
+    return rows
+
+
+def _candidate_summary_overlay_table(rows: list[dict[str, object]]) -> pa.Table:
+    schema = pa.schema(
+        [
+            pa.field("construct_subject__id", pa.string()),
+            pa.field("candidate_key", pa.string()),
+            pa.field("assay_subject_key", pa.string()),
+            pa.field("reader_spop_overlay_status", pa.string()),
+            pa.field("reader_spop_metric_id", pa.string()),
+            pa.field("reader_spop_numeric_scope", pa.string()),
+            pa.field("reader_spop_normalization_basis", pa.string()),
+            pa.field("reader_spop_observation_ids", pa.string()),
+            pa.field("reader_spop_experiment_ids", pa.string()),
+            pa.field("reader_spop_artifact_refs", pa.string()),
+            pa.field("reader_spop_artifact_content_digests", pa.string()),
+            pa.field("reader_spop_normalized_values", pa.string()),
+            pa.field("reader_spop_raw_values", pa.string()),
+            pa.field("reader_spop_normalized_value", pa.float64()),
+            pa.field("reader_spop_raw_value", pa.float64()),
+            pa.field("reader_spop_score_median", pa.float64()),
+            pa.field("reader_spop_score_min", pa.float64()),
+            pa.field("reader_spop_score_max", pa.float64()),
+            pa.field("reader_spop_observation_count", pa.int64()),
+            pa.field("reader_spop_dose_counts", pa.string()),
+            pa.field("reader_spop_qc_flags", pa.string()),
+            pa.field("construct_subject_bridge_status", pa.string()),
+        ]
+    )
+    return pa.Table.from_pylist(rows, schema=schema)
+
+
+def _join_unique(values: Iterable[object]) -> str:
+    return ";".join(sorted({str(value) for value in values if value is not None and str(value).strip()}))
+
+
+def _join_numbers(values: Iterable[float | int]) -> str:
+    return ";".join(f"{float(value):.12g}" for value in values)
+
+
 def _read_experiment_observations(
     *,
     experiment_dir: Path,
     lambda_viability: float,
+    spop_api: ReaderSpopApi,
 ) -> tuple[list[ReaderSpopObservation], list[ReaderSpopIssue]]:
     config = _load_experiment_config(experiment_dir)
     experiment_id = str(_mapping(config.get("experiment"), label="experiment").get("id") or experiment_dir.name)
@@ -290,7 +421,7 @@ def _read_experiment_observations(
         ]
 
     endpoint_rows = [row for row in retron_rows if _float(row.get("time"), context="time") == endpoint.row_time_h]
-    grouped = _group_endpoint_values(endpoint_rows, experiment_id=experiment_id)
+    grouped = _group_endpoint_values(endpoint_rows, experiment_id=experiment_id, spop_api=spop_api)
     observations: list[ReaderSpopObservation] = []
     issues: list[ReaderSpopIssue] = []
     for reader_design_id in sorted(grouped):
@@ -316,6 +447,7 @@ def _read_experiment_observations(
                     endpoint_time=endpoint.endpoint_time_h,
                     values=grouped[reader_design_id],
                     lambda_viability=lambda_viability,
+                    spop_api=spop_api,
                     assay_metadata=endpoint.assay_metadata,
                     qc_flags=endpoint.qc_flags,
                 )
@@ -340,69 +472,59 @@ def _score_design(
     endpoint_time: float,
     values: Mapping[tuple[float, float, str], tuple[float, int]],
     lambda_viability: float,
+    spop_api: ReaderSpopApi,
     assay_metadata: Mapping[str, object] | None = None,
     qc_flags: tuple[str, ...] = (),
 ) -> ReaderSpopObservation:
     candidate_key = _candidate_key_for_design(reader_design_id)
     if candidate_key is None:
         raise _CandidateCannotScore("non_retron_candidate", "reader design id is not a retron reporter row")
-    zero_key = (0.0, 0.0, REPORTER_READOUT)
-    zero_od_key = (0.0, 0.0, VIABILITY_READOUT)
+    zero_key = (0.0, 0.0, spop_api.reporter_readout)
+    zero_od_key = (0.0, 0.0, spop_api.viability_readout)
     if zero_key not in values:
         raise _CandidateCannotScore("zero_inducer_baseline_missing", "missing 0 aTc / 0 IPTG RFP/OD600 baseline")
     if zero_od_key not in values:
         raise _CandidateCannotScore("zero_inducer_od_missing", "missing 0 aTc / 0 IPTG OD600 baseline")
-    positive_keys = sorted(key for key in values if key[0] > 0.0 and key[1] == 0.0 and key[2] == REPORTER_READOUT)
+    positive_keys = sorted(
+        key for key in values if key[0] > 0.0 and key[1] == 0.0 and key[2] == spop_api.reporter_readout
+    )
     if not positive_keys:
         raise _CandidateCannotScore("positive_control_missing", "missing aTc positive-control RFP/OD600 row")
     positive_atc = positive_keys[-1][0]
-    dose_keys = sorted(key for key in values if key[0] == 0.0 and key[1] > 0.0 and key[2] == REPORTER_READOUT)
+    dose_keys = sorted(key for key in values if key[0] == 0.0 and key[1] > 0.0 and key[2] == spop_api.reporter_readout)
     if not dose_keys:
         raise _CandidateCannotScore("iptg_dose_rows_missing", "missing nonzero IPTG RFP/OD600 rows")
 
-    baseline_z, baseline_n = values[zero_key]
+    baseline_z, _baseline_n = values[zero_key]
     baseline_od, _baseline_od_n = values[zero_od_key]
-    positive_z, positive_n = values[(positive_atc, 0.0, REPORTER_READOUT)]
-    positive_denominator = positive_z - baseline_z
-    if positive_denominator <= _EPS_POSITIVE:
-        raise _CandidateCannotScore(
-            "positive_control_not_above_baseline",
-            "aTc positive-control RFP/OD600 is not above zero-inducer baseline",
-        )
-    if baseline_od <= 0.0:
-        raise _CandidateCannotScore("baseline_od_not_positive", "zero-inducer OD600 baseline must be positive")
-
-    y_values: list[float] = []
-    viability_values: list[float] = []
-    doses: list[float] = []
-    replicate_counts = [baseline_n, positive_n]
+    positive_z, _positive_n = values[(positive_atc, 0.0, spop_api.reporter_readout)]
+    dose_values: list[object] = []
     resolved_qc_flags = set(qc_flags)
     for atc_n_m, iptg_u_m, _channel in dose_keys:
-        dose_z, dose_n = values[(atc_n_m, iptg_u_m, REPORTER_READOUT)]
-        od_key = (atc_n_m, iptg_u_m, VIABILITY_READOUT)
+        dose_z, dose_n = values[(atc_n_m, iptg_u_m, spop_api.reporter_readout)]
+        od_key = (atc_n_m, iptg_u_m, spop_api.viability_readout)
         if od_key not in values:
             raise _CandidateCannotScore("dose_od_missing", f"missing OD600 for IPTG dose {iptg_u_m:g} uM")
         dose_od, dose_od_n = values[od_key]
-        y = (dose_z - baseline_z) / positive_denominator
-        viability = min(1.0, dose_od / baseline_od)
-        if y > 1.0:
-            resolved_qc_flags.add("derepression_exceeds_atc_positive")
-        if y < 0.0:
-            resolved_qc_flags.add("derepression_below_zero_inducer")
-        if viability < 0.8:
-            resolved_qc_flags.add("induction_growth_penalty")
-        doses.append(iptg_u_m)
-        y_values.append(y)
-        viability_values.append(viability)
-        replicate_counts.extend([dose_n, dose_od_n])
-    if len(doses) == 1:
-        resolved_qc_flags.add("single_dose_endpoint")
-
-    raw_potency = statistics.fmean(y_values)
-    potency = statistics.fmean(max(0.0, value) for value in y_values)
-    viability_mean = statistics.fmean(viability_values)
-    raw_score = raw_potency * ((1.0 - lambda_viability) + (lambda_viability * viability_mean))
-    score = potency * ((1.0 - lambda_viability) + (lambda_viability * viability_mean))
+        dose_values.append(
+            spop_api.dose_value_factory(
+                iptg_uM=iptg_u_m,
+                rfp_over_od600=dose_z,
+                od600=dose_od,
+                replicate_count=min(dose_n, dose_od_n),
+            )
+        )
+    try:
+        score = spop_api.score_endpoint(
+            baseline_rfp_over_od600=baseline_z,
+            positive_control_rfp_over_od600=positive_z,
+            baseline_od600=baseline_od,
+            dose_values=dose_values,
+            lambda_viability=lambda_viability,
+        )
+    except spop_api.scoring_error_type as exc:
+        raise _CandidateCannotScore(_reader_scoring_issue_code(str(exc)), str(exc)) from exc
+    resolved_qc_flags.update(str(flag) for flag in score.qc_flags)
     resolved_construct_subjects = _resolved_construct_subjects()
     proposed_construct_subject_id = _proposed_construct_subject_id_for_key(candidate_key)
     construct_subject_id = resolved_construct_subjects.get(candidate_key)
@@ -417,14 +539,15 @@ def _score_design(
         "positive_control_condition": f"{positive_atc:g} nm aTc; 0 uM IPTG",
         "lambda_viability": lambda_viability,
         "metric_definition_owner": "reader",
-        "metric_family": SPOP_METRIC_FAMILY,
-        "metric_numeric_scope": SPOP_NUMERIC_SCOPE,
+        "metric_family": spop_api.metric_family,
+        "metric_numeric_scope": spop_api.numeric_scope,
         "metric_source_of_truth_api": SPOP_SOURCE_OF_TRUTH_API,
         "metric_source_of_truth_doc": SPOP_SOURCE_OF_TRUTH_DOC,
+        "metric_source_module": spop_api.source_path,
     }
     resolved_assay_metadata.update(dict(assay_metadata or {}))
     return ReaderSpopObservation(
-        observation_id=f"reader:{experiment_id}:{candidate_key}:{SPOP_METRIC_ID}",
+        observation_id=f"reader:{experiment_id}:{candidate_key}:{spop_api.metric_id}",
         candidate_key=candidate_key,
         assay_subject_key=candidate_key,
         proposed_construct_subject_id=proposed_construct_subject_id,
@@ -436,32 +559,32 @@ def _score_design(
         reader_artifact_record_id=ratio_artifact.record_id,
         reader_artifact_content_digest=ratio_artifact.content_digest,
         experiment_id=experiment_id,
-        assay_id=f"{experiment_id}::{REPORTER_PLASMID_ID}::{REPORTER_READOUT}",
+        assay_id=f"{experiment_id}::{REPORTER_PLASMID_ID}::{spop_api.reporter_readout}",
         payload_program_id="rt_lnrna_sponging",
         batch_id=experiment_id,
-        metric_id=SPOP_METRIC_ID,
+        metric_id=spop_api.metric_id,
         reporter_plasmid_id=REPORTER_PLASMID_ID,
-        readout_kind=SPOP_METRIC_ID,
+        readout_kind=spop_api.metric_id,
         report_time_h=report_time,
         endpoint_time_h=endpoint_time,
-        iptg_doses_uM=tuple(doses),
-        y_derepression_by_dose=tuple(y_values),
-        viability_by_dose=tuple(viability_values),
-        replicate_count=min(replicate_counts),
-        replicate_count_min=min(replicate_counts),
+        iptg_doses_uM=tuple(float(value) for value in score.iptg_doses_uM),
+        y_derepression_by_dose=tuple(float(value) for value in score.y_derepression_by_dose),
+        viability_by_dose=tuple(float(value) for value in score.viability_by_dose),
+        replicate_count=int(score.replicate_count_min),
+        replicate_count_min=int(score.replicate_count_min),
         uncertainty=None,
         assay_metadata=resolved_assay_metadata,
         rfp_over_od600_baseline=baseline_z,
         rfp_over_od600_positive=positive_z,
         positive_control_atc_nM=positive_atc,
-        spop_potency=potency,
-        spop_viability=viability_mean,
-        spop_score=score,
-        spop_score_raw=raw_score,
+        spop_potency=float(score.spop_potency),
+        spop_viability=float(score.spop_viability),
+        spop_score=float(score.spop_score),
+        spop_score_raw=float(score.spop_score_raw),
         spop_score_calibrated=None,
-        raw_value=raw_score,
-        normalized_value=score,
-        normalization_basis="rfp_od600_derepression_fraction_relative_to_atc_positive_control",
+        raw_value=float(score.raw_value),
+        normalized_value=float(score.normalized_value),
+        normalization_basis=spop_api.normalization_basis,
         construct_promotable=construct_promotable,
         qc_flags=tuple(sorted(resolved_qc_flags)),
     )
@@ -502,6 +625,19 @@ class _CandidateCannotScore(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def _reader_scoring_issue_code(message: str) -> str:
+    normalized = message.casefold()
+    if "positive_control_rfp_over_od600" in normalized or "positive control" in normalized:
+        return "positive_control_not_above_baseline"
+    if "baseline_od600" in normalized:
+        return "baseline_od_not_positive"
+    if "nonzero iptg" in normalized or "at least one nonzero iptg" in normalized:
+        return "iptg_dose_rows_missing"
+    if "replicate_count" in normalized:
+        return "invalid_replicate_count"
+    return "reader_spop_scoring_error"
 
 
 def _resolve_reader_ratio_artifact(experiment_dir: Path, *, experiment_id: str) -> ReaderArtifactRef:
@@ -592,6 +728,7 @@ def _group_endpoint_values(
     rows: Iterable[Mapping[str, object]],
     *,
     experiment_id: str,
+    spop_api: ReaderSpopApi,
 ) -> dict[str, dict[tuple[float, float, str], tuple[float, int]]]:
     grouped_values: dict[str, dict[tuple[float, float, str], list[float]]] = {}
     grouped_positions: dict[str, dict[tuple[float, float, str], set[str]]] = {}
@@ -602,7 +739,7 @@ def _group_endpoint_values(
         if parsed is None:
             raise ReaderSpopContractError(f"{experiment_id}: malformed treatment {treatment!r}")
         channel = str(row.get("channel") or "").strip()
-        if channel not in {REPORTER_READOUT, VIABILITY_READOUT}:
+        if channel not in {spop_api.reporter_readout, spop_api.viability_readout}:
             continue
         value = _float(row.get("value"), context=f"{experiment_id}/{design_id}/{treatment}/{channel}")
         if value < 0.0:
@@ -760,7 +897,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Dry-run Reader SPOP label planning for RT-lnRNA candidates.")
     parser.add_argument("--reader-root", type=Path, default=None)
     parser.add_argument("--experiment-id", action="append", dest="experiment_ids")
-    parser.add_argument("--lambda-viability", type=float, default=DEFAULT_LAMBDA)
+    parser.add_argument("--lambda-viability", type=float, default=None)
+    parser.add_argument(
+        "--write-label-tables",
+        type=Path,
+        default=None,
+        help="Write Reader SPOP observation and construct-subject summary Parquet tables to this directory.",
+    )
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--json", action="store_true", help="Emit JSON. Plain text is the default.")
     args = parser.parse_args(argv)
@@ -771,7 +914,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         strict=bool(args.strict),
     )
     if args.json:
-        print(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+        payload = plan.to_dict()
+        if args.write_label_tables is not None:
+            payload["label_tables"] = write_reader_spop_label_tables(
+                plan=plan,
+                output_dir=args.write_label_tables,
+            ).to_dict()
+        print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(
             f"Reader SPOP plan: ok={plan.ok} observations={len(plan.observations)} "
@@ -779,6 +928,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         for issue in plan.issues:
             print(f"- issue {issue.code}: {issue.message}")
+        if args.write_label_tables is not None:
+            tables = write_reader_spop_label_tables(plan=plan, output_dir=args.write_label_tables)
+            print(
+                "Wrote Reader SPOP label tables: "
+                f"observations={tables.observation_rows} candidate_summary={tables.candidate_summary_rows}"
+            )
     return 0 if plan.ok else 1
 
 

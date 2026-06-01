@@ -294,8 +294,8 @@ datasets:
       `row_key_source` requires the Construct output construct_subject overlay bridge.
   - role: reader_spop_label_plan
     owner_tool: study_reader_bridge
-    lifecycle: planned_label_materialization
-    status: planned
+    lifecycle: reader_label_tables_materialized_for_latentdna_overlay
+    status: materialized_for_latentdna_overlay
     source_owner_tool: reader
     source_record: ratio_reporter_normalizer/df
     metric_id: reader_spop_endpoint_dose_mean_v1
@@ -303,6 +303,9 @@ datasets:
     source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
     schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
     materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
+    materialized_outputs:
+      observations: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
+      candidate_summary: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
     reader_experiment_ids:
       - 20250622_retron_Eco1_26_43_benchmark
       - 20250707_retron_Eco1_26_43_45_46_benchmark
@@ -310,13 +313,16 @@ datasets:
       - 20251105_retron_Eco1_RT_variants
       - 20260418_retron_Eco1_26_43_170_171_benchmark
       - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      - 20260529_retron_Eco1_26_43_177_186_benchmark
     notes: >-
-      Planned Reader-derived TF-sponging scalar labels from pES-retron plus
-      pBbS2c-RFP experiments. Rows keep Reader assay subject identity separate
-      from Construct subject identity; retron rows resolve through the
+      Reader-derived TF-sponging scalar labels from pES-retron plus
+      pBbS2c-RFP experiments, materialized for LatentDNA GenBank overlays.
+      Rows keep Reader assay subject identity separate from Construct subject
+      identity; retron rows resolve through the
       variant GenBank catalog when explicit RT plus lnRNA sequence authority
       exists. The SPOP numeric scope is Reader experiment-normalized
       TF-sponging and is not comparable to Khan or Crawford abundance scales.
+      Numeric scoring delegates to Reader's public score_spop_endpoint API.
       The 20251105 RT-variant Reader artifact is a single-point mid-log
       read recorded at artifact time 0 h but interpreted as approximately 10 h
       after seeding; the 20260507 retron176 wells are omitted because no actual

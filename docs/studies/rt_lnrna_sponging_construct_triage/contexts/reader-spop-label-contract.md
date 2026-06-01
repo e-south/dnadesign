@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reader-spop-label-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-26
+last_verified: 2026-05-31
 ---
 
 ## Reader SPOP Construct Bridge
@@ -26,16 +26,13 @@ reader_spop_endpoint_dose_mean_v1
 
 The scalar is endpoint RFP/OD600 derepression under nonzero IPTG, normalized
 within each Reader experiment by the zero-inducer baseline and the aTc positive
-control. This is an endpoint dose-ladder mean, not an AUC:
+control. This is an endpoint dose-ladder mean, not an AUC.
 
-```text
-y(dose) = (Z_IPTG(dose) - Z_0) / (Z_aTc - Z_0)
-score = mean(max(0, y(dose))) * ((1 - lambda) + lambda * mean(viability))
-```
-
-`lambda` defaults to `0.5`. Viability is the one-sided OD600 ratio relative to
-the zero-IPTG baseline. Raw dose-level `y` values are retained for QC even when
-the primary scalar clips negative values at zero.
+The bridge delegates all numeric scoring to Reader's public
+`score_spop_endpoint` API. It must not duplicate SPOP math in dnadesign. The
+study bridge only parses Reader artifacts, resolves Construct subject identity,
+passes dose values to Reader, and persists the Reader-owned scorer output plus
+QC metadata.
 
 SPOP expands to `sponging_percent_of_positive`. The metric scope is
 `reader_experiment_normalized_tf_sponging`. It is a source-scoped Reader assay
@@ -62,12 +59,14 @@ Construct-representable. Rows without catalog authority may carry assay labels,
 but they must remain `missing_construct_sequence_authority` until promoted
 through Construct.
 
-As of 2026-05-24, the live Reader dry run resolves the observed catalog-backed
-retron rows to Construct subject ids, including retron47/retron48 and
-retron49-56. The 2025-11-05 RT-variant experiment is a single-point mid-log
-read, not a time course; the Reader artifact stores row time as 0 h, but the
-study planner records the endpoint as approximately 10 h after seeding and
-adds `single_point_endpoint_time_override`. The 2026-05-07 retron176 wells are
+As of 2026-05-31, the live Reader bridge resolves the observed catalog-backed
+retron rows to Construct subject ids, including retron47/retron48, retron49-56,
+retron170-175, retron177-186, retron26, and retron43. It materializes 42
+Reader SPOP observations across 30 candidate summaries for LatentDNA overlays.
+The 2025-11-05 RT-variant experiment is a single-point mid-log read, not a time
+course; the Reader artifact stores row time as 0 h, but the study planner
+records the endpoint as approximately 10 h after seeding and adds
+`single_point_endpoint_time_override`. The 2026-05-07 retron176 wells are
 omitted from labels because the plate map carried retron176 but no actual strain
 was present in those wells.
 
@@ -84,12 +83,10 @@ The reporter plasmid metadata is `pBbS2c-RFP`; Reader design ids commonly use
 
 ### OPAL Handoff
 
-OPAL receives this as a one-dimensional scalar label through
-`scalar_identity_v1/scalar`.
-
-OPAL must not run OPAL `spop_v1` for this study. The OPAL `spop` note is a
-historical draft objective specification, not a registered runtime objective
-for the current RT-lnRNA study.
+OPAL receives this as a one-dimensional SPOP label through `spop_v1/spop`.
+`spop_v1` is the modular OPAL objective for Reader SPOP scalar campaigns. Use
+`scalar_identity_v1/scalar` only for generic scalar smoke tests, not for the
+RT-lnRNA SPOP campaign contract.
 
 The future OPAL training table may include rows only when both conditions hold:
 
@@ -97,7 +94,8 @@ The future OPAL training table may include rows only when both conditions hold:
 2. the row has a real Reader-derived SPOP scalar and any row used as a Construct
    candidate has resolved sequence authority.
 
-Before OPAL handoff, SPOP can still be joined as a LatentDNA overlay or ordinal
-audit axis when `construct_subject_bridge_status` is
-`resolved_construct_sequence_authority`. Rows without that bridge stay as assay
-evidence only and must not be silently promoted into Infer-backed training rows.
+Before OPAL handoff, the materialized candidate summary can be joined as a
+LatentDNA overlay or ordinal audit axis when
+`construct_subject_bridge_status` is `resolved_construct_sequence_authority`.
+Rows without that bridge stay as assay evidence only and must not be silently
+promoted into Infer-backed training rows.

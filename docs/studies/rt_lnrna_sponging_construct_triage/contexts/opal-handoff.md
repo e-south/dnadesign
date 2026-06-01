@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-opal-training-dataset
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-23
+last_verified: 2026-05-31
 ---
 
 ## OPAL Training Dataset
@@ -32,7 +32,7 @@ The planned label materializer is the Reader-to-Construct bridge documented in
 `reader-spop-label-contract.md`. Reader owns the SPOP metric definition; the
 study bridge emits the endpoint dose-mean scalar
 `reader_spop_endpoint_dose_mean_v1` from pBbS2c-RFP reporter assays and routes
-it to OPAL as `scalar_identity_v1/scalar`.
+SPOP campaigns to OPAL as `spop_v1/spop`.
 
 The candidate `X` columns are declared in
 `../operations/contract/schemas/representation-table.schema.yaml`. Selection is
@@ -48,7 +48,6 @@ For shared labels, prefer `labels.source.kind: usr_sidecar` and
 Abundance priors are allowed as metadata or separate analysis targets. They
 must not be exported as `normalized_TF_sponging_label`.
 
-The historical OPAL `spop` objective note remains a draft specification. This
-study should not call an OPAL `spop_v1` objective unless that plugin is
-implemented and registered separately; the pragmatic handoff is a
-one-dimensional Reader scalar.
+OPAL has a registered `spop_v1` objective for the one-dimensional Reader SPOP
+scalar. This study still must not run OPAL until a selected fixed-size `X` and
+Reader-materialized labels are both available in the OPAL training table.

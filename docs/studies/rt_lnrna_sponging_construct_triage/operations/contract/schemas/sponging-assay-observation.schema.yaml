@@ -1,6 +1,6 @@
 schema_id: sponging_assay_observation_v1
 study_id: rt_lnrna_sponging_construct_triage
-status: planned_reader_label_materialization
+status: reader_label_tables_materialized_for_latentdna_overlay
 label_contract:
   metric_id: reader_spop_endpoint_dose_mean_v1
   metric_family: sponging_percent_of_positive
@@ -11,7 +11,7 @@ label_contract:
   y_expected_length: 1
   allowed_as_opal_y: true
   allowed_as_latentdna_overlay: true
-  opal_objective: scalar_identity_v1/scalar
+  opal_objective: spop_v1/spop
   source_owner: reader
   source_of_truth_doc: reader/docs/lib/spop_endpoint_in_reader.md
   source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
@@ -24,13 +24,11 @@ label_contract:
   iptg_scoring_policy: nonzero_iptg_only
   default_lambda_viability: 0.5
   scalar_definition: >-
-    Median endpoint RFP/OD600 is baseline-subtracted and divided by the
-    aTc-positive derepression range for each Reader experiment and candidate.
-    Nonzero IPTG doses are averaged after clipping only for the primary scalar
-    floor at zero; raw dose values remain available for QC. This is an endpoint
-    dose-ladder mean, not an AUC. The viability factor is the mean one-sided
-    OD600 ratio relative to zero IPTG and scales potency by ((1 - lambda) +
-    lambda * viability).
+    Reader owns the numeric SPOP scoring definition in
+    reader.domains.plate_reader.analysis.spop.score_spop_endpoint. The
+    dnadesign study bridge must parse Reader evidence, pass endpoint dose values
+    to that API, and persist the scorer output without reimplementing the SPOP
+    equation.
 required_fields:
   observation_id: string
   assay_subject_key: string
@@ -76,7 +74,7 @@ validation_rules:
   - The zero-inducer baseline and aTc positive-control rows are required before scoring.
   - At least one nonzero IPTG condition is required before emitting a scalar label.
   - Wider retron variants may receive Reader SPOP labels before Construct promotion, but must carry missing_construct_sequence_authority until explicit RT plus lnRNA authority exists.
-  - OPAL receives this scalar through scalar_identity_v1/scalar; OPAL must not run the draft spop_v1 objective unless a real plugin is implemented.
+  - OPAL SPOP campaigns receive this scalar through spop_v1/spop after a selected fixed-size X and real Reader labels exist; OPAL remains blocked before then.
 validation_notes:
   - This is the only planned source for OPAL TF-sponging Y values.
   - Literature abundance priors must not be converted into this schema.

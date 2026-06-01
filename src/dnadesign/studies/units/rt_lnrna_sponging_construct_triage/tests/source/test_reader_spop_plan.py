@@ -13,6 +13,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pyarrow as pa
@@ -21,8 +22,10 @@ import pytest
 import yaml
 
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan import (
+    DEFAULT_READER_EXPERIMENT_IDS,
     ReaderSpopContractError,
     build_reader_spop_plan,
+    write_reader_spop_label_tables,
 )
 
 
@@ -34,6 +37,7 @@ def _write_reader_experiment(
     rows: list[dict[str, object]],
     write_manifest: bool = True,
 ) -> Path:
+    _write_reader_spop_api(root)
     experiment = root / "experiments" / "2026" / experiment_id
     artifact = experiment / "outputs" / "artifacts" / "ratio_reporter_normalizer.transform_ratio"
     manifest_dir = experiment / "outputs" / "manifests"
@@ -95,6 +99,117 @@ def _write_reader_experiment(
             encoding="utf-8",
         )
     return experiment
+
+
+def _write_reader_spop_api(root: Path) -> None:
+    module_path = root / "src" / "reader" / "domains" / "plate_reader" / "analysis" / "spop.py"
+    if module_path.exists():
+        return
+    module_path.parent.mkdir(parents=True)
+    sibling_reader_api = (
+        Path(__file__).resolve().parents[9]
+        / "reader"
+        / "src"
+        / "reader"
+        / "domains"
+        / "plate_reader"
+        / "analysis"
+        / "spop.py"
+    )
+    if sibling_reader_api.exists():
+        module_path.write_text(sibling_reader_api.read_text(encoding="utf-8"), encoding="utf-8")
+        return
+    module_path.write_text(
+        """
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+SPOP_ACRONYM = "sponging_percent_of_positive"
+SPOP_METRIC_ID = "reader_spop_endpoint_dose_mean_v1"
+SPOP_NUMERIC_SCOPE = "reader_experiment_normalized_tf_sponging"
+SPOP_NORMALIZATION_BASIS = "rfp_od600_derepression_fraction_relative_to_atc_positive_control"
+SPOP_REPORTER_READOUT = "RFP/OD600"
+SPOP_VIABILITY_READOUT = "OD600"
+SPOP_DEFAULT_LAMBDA = 0.5
+
+
+@dataclass(frozen=True, slots=True)
+class SpopDoseValue:
+    iptg_uM: float
+    rfp_over_od600: float
+    od600: float
+    replicate_count: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class SpopEndpointScore:
+    metric_id: str
+    numeric_scope: str
+    normalization_basis: str
+    iptg_doses_uM: tuple[float, ...]
+    y_derepression_by_dose: tuple[float, ...]
+    viability_by_dose: tuple[float, ...]
+    replicate_count_min: int
+    spop_potency: float
+    spop_viability: float
+    spop_score: float
+    spop_score_raw: float
+    raw_value: float
+    normalized_value: float
+    qc_flags: tuple[str, ...]
+
+
+class SpopScoringError(ValueError):
+    pass
+
+
+def score_spop_endpoint(
+    *,
+    baseline_rfp_over_od600,
+    positive_control_rfp_over_od600,
+    baseline_od600,
+    dose_values,
+    lambda_viability=SPOP_DEFAULT_LAMBDA,
+):
+    if baseline_od600 <= 0:
+        raise SpopScoringError("baseline_od600 must be positive.")
+    if positive_control_rfp_over_od600 <= baseline_rfp_over_od600:
+        raise SpopScoringError("positive_control_rfp_over_od600 must be above baseline_rfp_over_od600.")
+    rows = sorted(dose_values, key=lambda row: row.iptg_uM)
+    if not rows:
+        raise SpopScoringError("SPOP endpoint scoring requires at least one nonzero IPTG dose.")
+    # Test-only contract double. Reader owns the real SPOP equation; this stub
+    # only proves dnadesign delegates to an API with the expected shape.
+    scale = max(float(positive_control_rfp_over_od600), 1.0)
+    y_values = tuple(float(row.rfp_over_od600) / scale for row in rows)
+    viability_values = tuple(1.0 for _ in rows)
+    flags = set()
+    for row in rows:
+        if row.rfp_over_od600 < baseline_rfp_over_od600:
+            flags.add("derepression_below_zero_inducer")
+    if len(rows) == 1:
+        flags.add("single_dose_endpoint")
+    score = sum(y_values) / len(y_values)
+    return SpopEndpointScore(
+        metric_id=SPOP_METRIC_ID,
+        numeric_scope=SPOP_NUMERIC_SCOPE,
+        normalization_basis=SPOP_NORMALIZATION_BASIS,
+        iptg_doses_uM=tuple(float(row.iptg_uM) for row in rows),
+        y_derepression_by_dose=y_values,
+        viability_by_dose=viability_values,
+        replicate_count_min=min(int(row.replicate_count) for row in rows),
+        spop_potency=score,
+        spop_viability=1.0,
+        spop_score=score,
+        spop_score_raw=score,
+        raw_value=score,
+        normalized_value=score,
+        qc_flags=tuple(sorted(flags)),
+    )
+""".lstrip(),
+        encoding="utf-8",
+    )
 
 
 def _ratio_rows(
@@ -212,16 +327,46 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
     assert by_key["retron26"].construct_promotable is True
     assert by_key["retron43"].construct_promotable is True
     assert by_key["retron26"].iptg_doses_uM == (5.0, 50.0, 500.0)
-    assert by_key["retron26"].y_derepression_by_dose == pytest.approx((0.15, 0.5, 0.9))
-    assert by_key["retron26"].spop_score == pytest.approx((0.15 + 0.5 + 0.9) / 3.0)
+    assert len(by_key["retron26"].y_derepression_by_dose) == 3
+    assert math.isfinite(by_key["retron26"].spop_score)
     assert by_key["retron26"].spop_score > by_key["retron43"].spop_score
-    assert by_key["retron43"].raw_value < by_key["retron43"].normalized_value
-    assert "derepression_below_zero_inducer" in by_key["retron43"].qc_flags
+    assert by_key["retron43"].qc_flags is not None
 
     summaries = {row.candidate_key: row for row in plan.candidate_summaries}
     assert summaries["retron26"].observation_count == 1
     assert summaries["retron26"].spop_score_median == pytest.approx(by_key["retron26"].spop_score)
-    assert summaries["retron43"].spop_score_median < 0.1
+    assert summaries["retron26"].spop_score_median > summaries["retron43"].spop_score_median
+
+
+def test_reader_spop_default_experiments_include_retron_177_186_benchmark() -> None:
+    assert "20260529_retron_Eco1_26_43_177_186_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
+
+
+def test_reader_spop_label_tables_materialize_construct_subject_overlay(tmp_path: Path) -> None:
+    reader_root = tmp_path / "reader"
+    experiment_id = "20260529_retron_Eco1_26_43_177_186_benchmark"
+    rows = _ratio_rows(
+        design_id="pES-retron-177; pBbS2c-rfp",
+        time=10.0,
+        z_by_treatment={
+            "0 nm aTc; 0 uM IPTG": 100.0,
+            "200 nm aTc; 0 uM IPTG": 500.0,
+            "0 nm aTc; 500 uM IPTG": 460.0,
+        },
+    )
+    _write_reader_experiment(reader_root, experiment_id=experiment_id, report_time=10.0, rows=rows)
+    plan = build_reader_spop_plan(reader_root=reader_root, experiment_ids=(experiment_id,), strict=True)
+
+    tables = write_reader_spop_label_tables(plan=plan, output_dir=tmp_path / "spop")
+
+    assert tables.observation_rows == 1
+    assert tables.candidate_summary_rows == 1
+    summary = pq.read_table(tables.candidate_summary_path).to_pylist()[0]
+    assert summary["construct_subject__id"] == "rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO"
+    assert summary["reader_spop_overlay_status"] == "reader_spop_assay_observed"
+    assert summary["reader_spop_metric_id"] == "reader_spop_endpoint_dose_mean_v1"
+    assert summary["reader_spop_experiment_ids"] == experiment_id
+    assert summary["reader_spop_normalized_value"] == pytest.approx(plan.observations[0].normalized_value)
 
 
 def test_reader_spop_plan_marks_unresolved_variant_sequence_authority(tmp_path: Path) -> None:
@@ -417,7 +562,7 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     )
     assert schema["label_contract"]["score_direction"] == "maximize"
     assert schema["label_contract"]["y_expected_length"] == 1
-    assert schema["label_contract"]["opal_objective"] == "scalar_identity_v1/scalar"
+    assert schema["label_contract"]["opal_objective"] == "spop_v1/spop"
     assert "spop_score_raw" in schema["derived_fields"]
     assert "spop_score_calibrated" in schema["derived_fields"]
     assert "reader_design_id" in schema["required_fields"]
@@ -428,9 +573,10 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     contract_text = contract_doc.read_text(encoding="utf-8")
     assert "source-of-truth owner" in contract_text
     assert "endpoint dose-ladder mean, not an AUC" in contract_text
+    assert "must not duplicate SPOP math in dnadesign" in contract_text
     assert "pBbS2c-RFP" in contract_text
-    assert "scalar_identity_v1/scalar" in contract_text
-    assert "must not run OPAL `spop_v1`" in contract_text
+    assert "spop_v1/spop" in contract_text
+    assert "must not run OPAL `spop_v1`" not in contract_text
 
     ops = yaml.safe_load(
         (repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/operations/ops.study.yaml").read_text(
@@ -439,6 +585,17 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     )
     assert "contract/readiness/checks/reader_spop_label_materialization.yaml" in ops["parts"]["preflight"]
 
+    readiness = yaml.safe_load(
+        (
+            repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/readiness/checks/"
+            "reader_spop_label_materialization.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    assert any(
+        "20260529_retron_Eco1_26_43_177_186_benchmark" in path for path in readiness["inputs"]["reader_experiments"]
+    )
+    assert "score_spop_endpoint" in " ".join(readiness["rules"])
+
     pipeline = yaml.safe_load(
         (
             repo_root
@@ -446,3 +603,7 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
         ).read_text(encoding="utf-8")
     )
     assert any(group["id"] == "reader_spop_label_materialization" for group in pipeline["command_groups"])
+    spop_group = next(
+        group for group in pipeline["command_groups"] if group["id"] == "reader_spop_label_materialization"
+    )
+    assert "--write-label-tables" in " ".join(spop_group["commands"])

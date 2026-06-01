@@ -1,5 +1,5 @@
 id: reader_spop_label_materialization
-status: planned
+status: materialized_for_latentdna_overlay
 owner: study_reader_bridge
 phase: phase_6_label_materialization
 inputs:
@@ -10,8 +10,12 @@ inputs:
     - ../reader/experiments/2025/20251105_retron_Eco1_RT_variants
     - ../reader/experiments/2026/20260418_retron_Eco1_26_43_170_171_benchmark
     - ../reader/experiments/2026/20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    - ../reader/experiments/2026/20260529_retron_Eco1_26_43_177_186_benchmark
   schema: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
   contract: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md
+outputs:
+  observations: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
+  candidate_summary: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
 rules:
   - Resolve Reader ratio artifacts only through outputs/manifests/records.json latest ratio_reporter_normalizer/df.
   - Parse pES-retron plus pBbS2c-rfp design ids case-insensitively.
@@ -24,6 +28,7 @@ rules:
   - Omit retron176 from 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark because no actual strain was present in those wells.
   - Keep unresolved retron variants out of Construct-backed construct subject ids until explicit RT plus lnRNA sequence authority exists.
   - Treat Reader, not the dnadesign study, as the source-of-truth owner for SPOP metric semantics.
-  - Export the endpoint dose-mean scalar as reader_spop_endpoint_dose_mean_v1 for OPAL scalar_identity_v1/scalar only.
+  - Delegate SPOP scoring to reader.domains.plate_reader.analysis.spop.score_spop_endpoint; dnadesign must not reimplement the SPOP equation.
+  - Publish reader_spop_endpoint_dose_mean_v1 as LatentDNA overlay metadata and as OPAL spop_v1/spop label input only after selected X and real labels exist.
 validation:
-  command: uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
+  command: uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --write-label-tables src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs --json

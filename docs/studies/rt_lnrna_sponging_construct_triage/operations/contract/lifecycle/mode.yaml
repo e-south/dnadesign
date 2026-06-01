@@ -2,5 +2,6 @@ mode: record_only
 status: phase_0_contract_bootstrap
 registered_ops_provider: false
 notes:
+  - Study execution is paused; keep surfaces as auditable records rather than default run targets.
   - Use checked-in records and planned readiness checks until a concrete provider exists.
   - Do not borrow status or preflight providers from another study.

@@ -5,7 +5,7 @@
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
 - Study execution map: `../operations/runtime/command-groups/pipeline.yaml`
-- Lifecycle posture: Phase 3 LatentDNA review current; OPAL remains blocked on real labels and candidate-X selection
+- Lifecycle posture: record-only and paused; LatentDNA review artifacts are retained for audit, while OPAL remains blocked on real labels and candidate-X selection
 - OPS provider: study execution surfaces include a six-view Infer batch runbook
 
 ### Current Phase
@@ -124,15 +124,18 @@ candidate-X vector are still absent.
   UMAP views across intermediate and output-layer gallery views.
 - `../contexts/reader-spop-label-contract.md` and
   `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml`
-  declare the planned Reader-to-Construct SPOP bridge. Reader owns the SPOP
+  declare the Reader-to-Construct SPOP bridge. Reader owns the SPOP
   metric source-of-truth in `reader/docs/lib/spop_endpoint_in_reader.md`; this
   study bridge resolves Reader ratio artifacts through `records.json`, keeps
-  assay subject identity separate from Construct subject identity, and routes
-  `reader_spop_endpoint_dose_mean_v1` to OPAL as `scalar_identity_v1/scalar`.
-- Current Reader SPOP dry-run evidence is label-planner clean with one explicit
+  assay subject identity separate from Construct subject identity, delegates
+  scoring to Reader's public `score_spop_endpoint` API, materializes LatentDNA
+  overlay tables, and routes OPAL SPOP campaigns as `spop_v1/spop` only after a
+  selected `X` exists.
+- Current Reader SPOP materialization evidence is label-planner clean with one explicit
   no-call warning:
   `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan`
-  reports 30 observations across 20 candidate summaries. The
+  reports 42 observations across 30 candidate summaries, including
+  `20260529_retron_Eco1_26_43_177_186_benchmark`. The
   `20251105_retron_Eco1_RT_variants` Reader artifact is treated as a
   single-point mid-log read at approximately 10 h after seeding, even though the
   artifact stores row time as 0 h and the historical config reported 12 h.
@@ -147,9 +150,9 @@ candidate-X vector are still absent.
   snapback cap, foldback, and payload/complement geometry.
 - The variant catalog resolves sequence authority for retron18, 24-27, 43,
   45-56, 170-186, and `msrmsdwt_bl21`.
-- The checked-in Infer runbook preset
-  `../../../../src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
-  is the batch entrypoint for completing the six-view Evo2 7B workload with one
+- The study-owned Infer runbook
+  `../operations/runtime/runbooks/infer-six-view-7b-with-notify.yaml`
+  records the batch entrypoint for completing the six-view Evo2 7B workload with one
   Notify watcher for the lane. The study-level fill command is
   `uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage`.
 

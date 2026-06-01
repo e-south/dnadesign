@@ -23,6 +23,7 @@ registered through the study execution surfaces.
 | Need | Surface |
 | --- | --- |
 | Study primer | `../contexts/construct-overview.md` |
+| Retron TF decoy manuscript semantics | `../contexts/retron-tf-decoy-design-logic.md` |
 | Current state | `../record/status.md` |
 | Source inventories | `../record/datasets.yaml` |
 | Reader SPOP label contract | `../contexts/reader-spop-label-contract.md` |
@@ -47,6 +48,7 @@ registered through the study execution surfaces.
 | Need | First owner surface | State |
 | --- | --- | --- |
 | Biological scope | this page and `../workbench/ontology/vocabulary.md` | Phase 0 planned |
+| Cross-study manuscript framing | `../contexts/retron-tf-decoy-design-logic.md` | routed prose context present |
 | Construct subject universe | `../workbench/design_sets/v1-construct-subject-scope.md` | Phase 0 planned |
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
 | Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 36 cataloged sources: 35 retron whole-plasmid variants plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
@@ -54,7 +56,7 @@ registered through the study execution surfaces.
 | RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned construct-subject-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
 | Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture, six-view batch runbook, and sidecar-backed LatentDNA review surfaces present |
-| Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | planned materializer present; labels not materialized |
+| Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | materialized for LatentDNA overlays; OPAL blocked until selected X and training table handoff |
 | OPAL readiness | `../contexts/opal-handoff.md` | `rt_lnrna_sponging_construct_triage_opal_training_examples_v1` absent; OPAL run blocked |
 
 ### Boundary Rules

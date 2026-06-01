@@ -7,11 +7,11 @@
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects
   notes: Anchor fixtures are source-authority resolved and representable under the multi-slot Construct manifest.
 - id: phase_2_construct_projection
-  status: active
+  status: paused
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-contract.md
   notes: Strategy resolved as public multi-slot Construct assembly; six source view lanes are test-backed with template_custom context metadata.
 - id: phase_3_infer_handoff
-  status: active
+  status: paused
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/representation-contract.md
   notes: Evo2 7B sidecars exist for the six explicit view_name selectors; future Infer refreshes must keep explicit view_name selection.
 - id: phase_4_overlay_linkage
@@ -19,9 +19,9 @@
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
   notes: Keep abundance priors separate from future sponging labels.
 - id: phase_5_analysis
-  status: active
+  status: paused
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/design_sets/v1-construct-subject-scope.md
-  notes: LatentDNA review surfaces are materialized; candidate-X review is active before OPAL handoff.
+  notes: LatentDNA review surfaces are materialized for audit; candidate-X review is paused before OPAL handoff.
 - id: phase_6_wet_lab_handoff
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md

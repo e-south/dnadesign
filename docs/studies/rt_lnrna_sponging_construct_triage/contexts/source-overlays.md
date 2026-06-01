@@ -156,9 +156,11 @@ consolidated Construct output that feeds Infer. Unresolved Reader retron rows
 remain label evidence and review overlays until their GenBank or sequence
 authority is supplied.
 
-Reader SPOP is the planned lab TF-sponging scalar. Its numeric scope is
+Reader SPOP is the materialized lab TF-sponging scalar for LatentDNA GenBank
+overlays. Its numeric scope is
 `reader_experiment_normalized_tf_sponging`, separate from Khan RT-DNA abundance
-and Crawford Eco1 msDNA abundance. The current metric is an endpoint dose-ladder
-mean, not an AUC. It may be used as a categorical hue, an ordinal audit axis, or
-OPAL `Y` only after the row has a resolved Construct subject bridge and the
-materialized `SpongingAssayObservation` contract is written.
+and Crawford Eco1 msDNA abundance. Numeric scoring is delegated to Reader's
+public `score_spop_endpoint` API. It may be used as a categorical hue, an
+ordinal audit axis, or OPAL `Y` only after the row has a resolved Construct
+subject bridge and the materialized `SpongingAssayObservation` contract is
+written.

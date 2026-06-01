@@ -37,6 +37,7 @@ progress or blocker questions.
 | Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](product/scar-nick-base-junction.md) |
 | Whole-product sequence composition boundary | [Linear ssDNA composition](composition/linear-ssdna-composition.md) |
 | Mismatch/boundary contrast only | [YIU boundary check](quality/yiu-boundary-check.md) |
+| Cross-study TF-decoy manuscript framing with RT-lnRNA | [RT-lnRNA retron TF decoy design logic](../../rt_lnrna_sponging_construct_triage/contexts/retron-tf-decoy-design-logic.md) |
 | Explicit status/history question | `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` |
 | Explicit blocker/readiness question | `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` |
 
