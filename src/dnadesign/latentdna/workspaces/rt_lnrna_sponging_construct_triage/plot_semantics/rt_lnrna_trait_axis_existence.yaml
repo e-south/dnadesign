@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_trait_axis_existence
+question: Do source-scoped abundance measurements align with fitted LatentDNA trait-axis projection values?
+decision_role: primary
+encoding: XY scatter with density contours for source assay value against fitted trait-axis projection, filtered to one trait axis at a time.
+scope: Fit and eval source rows with finite Crawford or Khan abundance values in the four intermediate candidate-X views.
+guardrails:
+  - Crawford and Khan abundance scales are not pooled; the plot filter selects one configured trait axis.
+  - Reference, compiler, and DMS rows do not have source assay values and are handled by the population-placement plot.
+caption: Source-scoped abundance values versus LatentDNA trait-axis projection for the selected Crawford or Khan axis.
+alt_text: Density scatter plot showing whether measured abundance values increase with fitted trait-axis projection across endpoint definitions and candidate-X views.
+preprocessing_md: Uses the generic trait_axis_projection_rows scalar table and the default axis filter from the plot config.
+math_md: |
+  The row scalar fits high-minus-low endpoint centroids in normalized representation space and reports the signed projection of each scored row onto that axis.
+rationale_md: Exposes whether the fitted latent direction behaves like an abundance axis before downstream triage uses it.
+limitations_md: Dense overlap can hide per-view structure; use the summary scorecard and filter controls for view-level comparisons.
+failure_modes_md: A stale row scalar or missing source-value column can make the plot empty even when the workspace still validates.

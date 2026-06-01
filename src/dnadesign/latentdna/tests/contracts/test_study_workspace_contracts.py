@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dnadesign.latentdna.src.notebooks.browser_runtime import _parse_deliverable_markdown
 from dnadesign.latentdna.src.services.catalog_service import workspace_catalog_from_context
 from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
@@ -411,6 +413,7 @@ def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views(
     assert "rt_lnrna_slot_context_robustness_summary_metrics" in notebook.context_audit_scalar_ids
     assert notebook.preferred_hue_kinds["khan_abundance_ordinal_bin"] == "ordinal"
     assert notebook.preferred_hue_kinds["crawford_abundance_ordinal_bin"] == "ordinal"
+    assert notebook.preferred_hue_kinds["reader_spop_score_median"] == "continuous"
     assert "crawford_abundance_normalized_value" not in notebook.preferred_hue_kinds
 
     for view_id in _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS:
@@ -427,6 +430,11 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     ordinal_audit = context.config.plots["rt_lnrna_overlay_ordinal_audit"]
     abundance_ladder = context.config.plots["rt_lnrna_abundance_margin_ladder_gallery"]
     abundance_scatter = context.config.plots["rt_lnrna_abundance_margin_scatter_gallery"]
+    trait_axis_existence = context.config.plots["rt_lnrna_trait_axis_existence"]
+    trait_axis_agreement = context.config.plots["rt_lnrna_crawford_khan_axis_agreement"]
+    trait_axis_endpoint_sensitivity = context.config.plots["rt_lnrna_trait_axis_endpoint_sensitivity"]
+    trait_axis_view_scorecard = context.config.plots["rt_lnrna_trait_axis_view_scorecard"]
+    reference_compiler_projection = context.config.plots["rt_lnrna_reference_compiler_axis_projection"]
     context_summary = context.config.plots["rt_lnrna_slot_context_robustness_summary"]
     slot_scatter = context.config.plots["rt_lnrna_slot_geometry_scatter_gallery"]
     candidate_frontier = context.config.plots["rt_lnrna_candidate_decision_frontier"]
@@ -435,6 +443,7 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     notebook = context.config.notebooks["latent_geometry_browser"]
     scree_deliverable = context.config.deliverables["representation_scree_diagnostic"]
     ordinal_deliverable = context.config.deliverables["rt_lnrna_overlay_ordinal_audit"]
+    trait_axis_deliverable = context.config.deliverables["rt_lnrna_trait_axis_projection"]
     recipe_steps = {step.id: step for step in _recipe_steps(context, "rt_lnrna_representation_review_recipe")}
     expected_overlay_hues = [
         "candidate_source",
@@ -446,6 +455,8 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
         "rt_variant_class",
         "rt_dms_mutation_class",
         "template_name",
+        "reader_spop_score_median",
+        "reader_spop_overlay_status",
         "khan_abundance_normalized_value",
         "khan_abundance_ordinal_bin",
         "crawford_abundance_raw_value",
@@ -460,6 +471,7 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
         "reference_genbank_catalog_rows",
         "reference_khan_abundance_rows",
         "reference_msd_compiler_landmarks",
+        "reference_reader_spop_assayed_genbank_rows",
         "reference_source_family_anchors",
     ]
     assert context.config.study_binding is not None
@@ -471,9 +483,11 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert list(umap_gallery.projections) == [f"umap_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
     assert [option.column for option in umap_gallery.hue_options] == expected_overlay_hues
     assert umap_gallery.hue_options[9].type == "continuous"
-    assert umap_gallery.hue_options[10].type == "ordinal"
+    assert umap_gallery.hue_options[10].type == "categorical"
     assert umap_gallery.hue_options[11].type == "continuous"
     assert umap_gallery.hue_options[12].type == "ordinal"
+    assert umap_gallery.hue_options[13].type == "continuous"
+    assert umap_gallery.hue_options[14].type == "ordinal"
 
     assert dataset_overview.kind == "categorical_count"
     assert dataset_overview.scalar == "rt_lnrna_dataset_overview_counts"
@@ -486,6 +500,19 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert ordinal_audit.facet_column == "ordinal_metric_role"
     assert ordinal_audit.panel_title_column == "ordinal_metric_label"
     assert ordinal_audit.color_column == "ordinal_axis_id"
+    assert ordinal_audit.bar_orientation == "horizontal"
+    assert ordinal_audit.show_uncertainty_note is False
+    assert ordinal_audit.panel_width == pytest.approx(5.2)
+    assert ordinal_audit.panel_height == pytest.approx(5.25)
+    assert ordinal_audit.tight_layout_h_pad == pytest.approx(1.6)
+    assert ordinal_audit.tight_layout_w_pad == pytest.approx(1.75)
+    assert (
+        context.config.metadata.axes["candidate_source"].display_labels["khan_abundance_affiliated_rt_lnrna_reference"]
+        == "Khan RT-lnRNA abundance reference"
+    )
+    assert context.config.metadata.axes["axis_id"].display_labels["crawford_eco1_msdna_abundance_axis"] == (
+        "Crawford Eco1 msDNA abundance"
+    )
     assert abundance_ladder.kind == "distribution_grid"
     assert abundance_ladder.visibility_tier == "primary"
     assert list(abundance_ladder.scalars) == [
@@ -502,6 +529,31 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     ]
     assert abundance_scatter.x_column == "ordinal_source_value"
     assert [option.column for option in abundance_scatter.filter_options] == ["ordinal_group_id"]
+    assert trait_axis_existence.kind == "xy_scatter"
+    assert trait_axis_existence.scalar == "rt_lnrna_trait_axis_projection_rows"
+    assert trait_axis_existence.x_column == "source_value"
+    assert trait_axis_existence.y_column == "axis_projection"
+    assert trait_axis_existence.render_mode == "density_contour"
+    assert [option.column for option in trait_axis_existence.filter_options] == ["axis_id"]
+    assert [row.value for row in trait_axis_existence.filter_options[0].values] == [
+        "crawford_eco1_msdna_abundance_axis",
+        "khan_rt_dna_abundance_axis",
+    ]
+    assert trait_axis_agreement.kind == "metric_panel_grid"
+    assert trait_axis_agreement.scalar == "rt_lnrna_trait_axis_projection_concordance"
+    assert trait_axis_agreement.value_column == "axis_concordance"
+    assert trait_axis_endpoint_sensitivity.kind == "metric_panel_grid"
+    assert trait_axis_endpoint_sensitivity.scalar == "rt_lnrna_trait_axis_projection_summary"
+    assert trait_axis_endpoint_sensitivity.value_column == "axis_vector_primary_concordance"
+    assert trait_axis_view_scorecard.kind == "metric_panel_grid"
+    assert trait_axis_view_scorecard.scalar == "rt_lnrna_trait_axis_projection_summary"
+    assert trait_axis_view_scorecard.panel_title_column == "view_id"
+    assert trait_axis_view_scorecard.label_column == "endpoint_definition_id"
+    assert trait_axis_view_scorecard.value_column == "axis_projection_spearman"
+    assert reference_compiler_projection.kind == "distribution_grid"
+    assert list(reference_compiler_projection.scalars) == ["rt_lnrna_trait_axis_projection_rows"]
+    assert list(reference_compiler_projection.metric_columns) == ["axis_projection", "endpoint_margin"]
+    assert [option.column for option in reference_compiler_projection.filter_options] == ["axis_id"]
     assert context_summary.kind == "metric_panel_grid"
     assert context_summary.scalar == "rt_lnrna_slot_context_robustness_summary_metrics"
     assert slot_scatter.kind == "xy_scatter_grid"
@@ -521,14 +573,22 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert (
         resolve_plot_semantics(context, plot_id="rt_lnrna_abundance_margin_ladder_gallery").decision_role == "primary"
     )
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_trait_axis_existence").decision_role == "primary"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_crawford_khan_axis_agreement").decision_role == "primary"
 
     assert scree_diagnostic.kind == "curve_grid"
     assert scree_diagnostic.visibility_tier == "appendix"
     assert list(scree_diagnostic.reducers) == [f"pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
     assert resolve_plot_semantics(context, plot_id="representation_scree_diagnostic").decision_role == "appendix"
     assert all("1.6 kb" not in title for title in notebook.candidate_grid_panel_titles)
+    assert notebook.default_deliverable == "rt_lnrna_trait_axis_projection"
     assert list(notebook.ordered_plots) == [
         "rt_lnrna_dataset_overview",
+        "rt_lnrna_trait_axis_existence",
+        "rt_lnrna_crawford_khan_axis_agreement",
+        "rt_lnrna_trait_axis_endpoint_sensitivity",
+        "rt_lnrna_trait_axis_view_scorecard",
+        "rt_lnrna_reference_compiler_axis_projection",
         "representation_health_summary",
         "rt_lnrna_source_structure_summary",
         "rt_lnrna_overlay_ordinal_audit",
@@ -544,6 +604,13 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert "build_rt_lnrna_dataset_overview_counts" in recipe_steps
     assert "build_rt_lnrna_source_structure_summary_metrics" in recipe_steps
     assert "build_rt_lnrna_slot_context_robustness_summary_metrics" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_rows" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_summary" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_concordance" in recipe_steps
+    assert recipe_steps["build_rt_lnrna_trait_axis_projection_concordance"].depends_on == [
+        "build_rt_lnrna_trait_axis_projection_summary"
+    ]
+    assert recipe_steps["build_rt_lnrna_trait_axis_projection_concordance"].params["kind"] == "scalar_sidecar_table"
     assert "build_rt_lnrna_candidate_decision_frontier_metrics" in recipe_steps
     assert "build_rt_lnrna_candidate_x_scorecard_metrics" in recipe_steps
     assert "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps
@@ -554,6 +621,10 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert (
         "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps["generate_latent_geometry_browser"].depends_on
     )
+    assert "render_rt_lnrna_trait_axis_existence" in recipe_steps
+    assert "render_rt_lnrna_crawford_khan_axis_agreement" in recipe_steps
+    assert "render_rt_lnrna_reference_compiler_axis_projection" in recipe_steps
+    assert "render_rt_lnrna_trait_axis_view_scorecard" in recipe_steps["generate_latent_geometry_browser"].depends_on
     assert "render_representation_scree_diagnostic" in recipe_steps
     assert recipe_steps["render_representation_scree_diagnostic"].depends_on == [
         f"reduce_pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
@@ -564,6 +635,18 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
         "rt_lnrna_overlay_ordinal_audit",
         "rt_lnrna_abundance_margin_ladder_gallery",
         "rt_lnrna_abundance_margin_scatter_gallery",
+    ]
+    assert trait_axis_deliverable.outputs["plots"] == [
+        "rt_lnrna_trait_axis_existence",
+        "rt_lnrna_crawford_khan_axis_agreement",
+        "rt_lnrna_trait_axis_endpoint_sensitivity",
+        "rt_lnrna_trait_axis_view_scorecard",
+        "rt_lnrna_reference_compiler_axis_projection",
+    ]
+    assert trait_axis_deliverable.outputs["scalars"] == [
+        "rt_lnrna_trait_axis_projection_rows",
+        "rt_lnrna_trait_axis_projection_summary",
+        "rt_lnrna_trait_axis_projection_concordance",
     ]
 
 

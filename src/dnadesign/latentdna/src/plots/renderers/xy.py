@@ -324,6 +324,19 @@ def _render_single_xy(
             square=True,
         )
         annotation_state = empty_annotation_state(context, spec=spec, error="no_finite_rows")
+    elif (spec.render_mode or "points") != "points" and spec.size_column is None:
+        annotation_state = render_xy_panel(
+            axis,
+            rows,
+            context=context,
+            spec=spec,
+            resolved_x=resolved_x,
+            resolved_y=resolved_y,
+            panel_title=spec.plot_id,
+            color_map=color_map,
+            shape_map=shape_map,
+            axis_styles=axis_styles,
+        )
     else:
         point_style = scatter_style(len(finite_rows))
         point_sizes = scatter_point_sizes(

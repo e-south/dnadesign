@@ -22,6 +22,7 @@ attention_deliverables:
   - representation_health_summary
   - rt_lnrna_source_structure_summary
   - rt_lnrna_overlay_ordinal_audit
+  - rt_lnrna_trait_axis_projection
   - rt_lnrna_slot_context_robustness_summary
   - rt_lnrna_candidate_decision_frontier
   - rt_lnrna_candidate_x_scorecard
@@ -31,6 +32,7 @@ decision_deliverables:
   - rt_lnrna_dataset_overview
   - rt_lnrna_source_structure_summary
   - rt_lnrna_overlay_ordinal_audit
+  - rt_lnrna_trait_axis_projection
   - rt_lnrna_slot_context_robustness_summary
   - rt_lnrna_candidate_decision_frontier
   - rt_lnrna_candidate_x_scorecard

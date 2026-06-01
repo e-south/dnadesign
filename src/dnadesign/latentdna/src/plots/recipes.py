@@ -51,6 +51,19 @@ def _resolved_layout_fields(config: PlotConfig) -> dict[str, object]:
         "single_row_panels": bool(getattr(config, "single_row_panels", False)),
         "square_panels": bool(getattr(config, "square_panels", False)),
         "hide_repeated_y_axis": bool(getattr(config, "hide_repeated_y_axis", False)),
+        "panel_width": getattr(config, "panel_width", None),
+        "panel_height": getattr(config, "panel_height", None),
+        "extra_width_per_column": getattr(config, "extra_width_per_column", None),
+        "tight_layout_pad": getattr(config, "tight_layout_pad", None),
+        "tight_layout_h_pad": getattr(config, "tight_layout_h_pad", None),
+        "tight_layout_w_pad": getattr(config, "tight_layout_w_pad", None),
+    }
+
+
+def _resolved_metric_panel_fields(config: PlotConfig) -> dict[str, object]:
+    return {
+        "bar_orientation": getattr(config, "bar_orientation", "auto"),
+        "show_uncertainty_note": bool(getattr(config, "show_uncertainty_note", True)),
     }
 
 
@@ -267,6 +280,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
+            **_resolved_metric_panel_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )

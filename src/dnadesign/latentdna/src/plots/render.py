@@ -66,7 +66,14 @@ def _tight_layout_kwargs(
     legend_bottom: float,
     legend_right: float = 0.0,
 ) -> dict[str, object]:
-    return plot_tight_layout_kwargs(spec.plot_id, legend_bottom=legend_bottom, legend_right=legend_right)
+    return plot_tight_layout_kwargs(
+        spec.plot_id,
+        legend_bottom=legend_bottom,
+        legend_right=legend_right,
+        pad=spec.tight_layout_pad,
+        h_pad=spec.tight_layout_h_pad,
+        w_pad=spec.tight_layout_w_pad,
+    )
 
 
 def _inject_svg_accessibility(output_path: Path, *, semantics: PlotSemantics) -> None:
@@ -181,6 +188,9 @@ def render_plot_artifact(
             len(panel_groups),
             prefer_single_row=bool(spec.single_row_panels),
             square_panels=square_metric_panels,
+            panel_width=spec.panel_width,
+            panel_height=spec.panel_height,
+            extra_width_per_column=spec.extra_width_per_column,
         )
         fig, axes = plt.subplots(
             rows_count,

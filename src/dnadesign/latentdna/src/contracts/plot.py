@@ -68,6 +68,12 @@ class PlotBaseConfig(StrictPlotModel):
     single_row_panels: bool = False
     square_panels: bool = False
     hide_repeated_y_axis: bool = False
+    panel_width: float | None = Field(default=None, gt=0)
+    panel_height: float | None = Field(default=None, gt=0)
+    extra_width_per_column: float | None = Field(default=None, ge=0)
+    tight_layout_pad: float | None = Field(default=None, ge=0)
+    tight_layout_h_pad: float | None = Field(default=None, ge=0)
+    tight_layout_w_pad: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
@@ -332,6 +338,8 @@ class MetricPanelGridPlotConfig(PlotBaseConfig):
     value_kind: str
     value_label: str
     reference_line: float | None = None
+    bar_orientation: Literal["auto", "vertical", "horizontal"] = "auto"
+    show_uncertainty_note: bool = True
 
 
 class DistributionPlotConfig(PlotBaseConfig):
@@ -537,6 +545,14 @@ class ResolvedPlotSpec(StrictPlotModel):
     single_row_panels: bool = False
     square_panels: bool = False
     hide_repeated_y_axis: bool = False
+    panel_width: float | None = None
+    panel_height: float | None = None
+    extra_width_per_column: float | None = None
+    tight_layout_pad: float | None = None
+    tight_layout_h_pad: float | None = None
+    tight_layout_w_pad: float | None = None
+    bar_orientation: Literal["auto", "vertical", "horizontal"] = "auto"
+    show_uncertainty_note: bool = True
     config_id: Identifier | None = None
     semantics_ref: str | None = None
 

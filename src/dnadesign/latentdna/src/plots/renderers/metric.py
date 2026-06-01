@@ -54,8 +54,8 @@ class MetricPanelGridInput:
     groups: list[MetricPanelGroup]
 
 
-def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool, plot_id: str | None = None) -> None:
-    if not ci_enabled or plot_id == "rt_lnrna_overlay_ordinal_audit":
+def _add_metric_uncertainty_note(ax: Any, *, ci_enabled: bool, show_note: bool = True) -> None:
+    if not ci_enabled or not show_note:
         return
     ax.text(
         0.012,
@@ -174,14 +174,17 @@ def metric_panel_needs_candidate_label_ticks(rows: list[dict[str, object]], spec
     return False
 
 
-def metric_panel_prefers_horizontal_bars(plot_id: str | None) -> bool:
+def metric_panel_prefers_horizontal_bars(spec: ResolvedPlotSpec) -> bool:
     """Return whether dense candidate labels should be placed on the y axis."""
 
-    return plot_id in {
+    if spec.bar_orientation == "horizontal":
+        return True
+    if spec.bar_orientation == "vertical":
+        return False
+    return spec.plot_id in {
         "context_pair_summary",
         "context_robustness_summary",
         "representation_health_summary",
-        "rt_lnrna_overlay_ordinal_audit",
     }
 
 
@@ -310,7 +313,7 @@ def render_metric_panel(
     label_column = metric_panel_label_column(spec)
     ordered_rows = _sorted_metric_rows(rows, spec=spec)
     grouped_family_bars = metric_panel_uses_grouped_family_bars(ordered_rows, spec)
-    horizontal_metric = metric_panel_prefers_horizontal_bars(spec.plot_id) and not grouped_family_bars
+    horizontal_metric = metric_panel_prefers_horizontal_bars(spec) and not grouped_family_bars
     include_family = not (spec.color_column == "candidate_family")
     use_candidate_label_ticks = metric_panel_needs_candidate_label_ticks(ordered_rows, spec)
     tick_fallback_column = "candidate_label" if use_candidate_label_ticks else label_column
@@ -334,7 +337,7 @@ def render_metric_panel(
         bar_colors = [PUBLICATION_PALETTE[0]] * len(ordered_rows)
     ci_enabled = spec.ci_lower_column is not None and spec.ci_upper_column is not None and ordered_rows
     horizontal_grouped_metric = grouped_family_bars and (
-        spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS or metric_panel_prefers_horizontal_bars(spec.plot_id)
+        spec.plot_id in _HORIZONTAL_GROUPED_METRIC_PLOT_IDS or metric_panel_prefers_horizontal_bars(spec)
     )
 
     if horizontal_grouped_metric:
@@ -456,7 +459,7 @@ def render_metric_panel(
         ax.set_xlabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
         ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         apply_axes_style(ax, grid=True, square=square)
-        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, show_note=spec.show_uncertainty_note)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             render_placeholder_panel(
@@ -559,7 +562,7 @@ def render_metric_panel(
         ax.set_xlabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=28, max_lines=2))
         ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
         apply_axes_style(ax, grid=True, square=square)
-        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
+        _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, show_note=spec.show_uncertainty_note)
         ax.margins(x=0.02, y=0.02)
         if not finite_value_array.size:
             render_placeholder_panel(
@@ -782,7 +785,7 @@ def render_metric_panel(
     ax.set_ylabel(wrapped_axis_label(_metric_axis_label(rows=ordered_rows, spec=spec), width=20))
     ax.set_title(_metric_panel_title(panel_title, plot_id=spec.plot_id), pad=8)
     apply_axes_style(ax, grid=True, square=square)
-    _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, plot_id=spec.plot_id)
+    _add_metric_uncertainty_note(ax, ci_enabled=ci_enabled, show_note=spec.show_uncertainty_note)
     ax.margins(x=0.02, y=0.02)
     if not finite_value_array.size:
         render_placeholder_panel(

@@ -26,6 +26,7 @@ and use concepts when aligning terminology across workspaces.
 
 - [Operations guide](operations/README.md)
 - [Development notes](dev/README.md)
+- [Trait axis projection dev spec](dev/trait-axis-projection.md)
 - [By-type docs index](index.md)
 
 ### Package Routes

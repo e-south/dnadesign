@@ -1020,6 +1020,9 @@ def _render_metric_grid(
         len(panel_groups),
         prefer_single_row=bool(spec.single_row_panels),
         square_panels=square_metric_panels,
+        panel_width=spec.panel_width,
+        panel_height=spec.panel_height,
+        extra_width_per_column=spec.extra_width_per_column,
     )
     fig, axes = plt.subplots(
         rows_count,
@@ -1075,10 +1078,13 @@ def _render_metric_grid(
         style_notebook_legend(legend)
         legend_bottom = layout.bottom_margin
     fig.tight_layout(
-        rect=(0.0, legend_bottom, 1.0, 1.0),
-        pad=0.95,
-        h_pad=1.4,
-        w_pad=1.85 if spec.plot_id in {"representation_health_summary", "rt_lnrna_overlay_ordinal_audit"} else 0.95,
+        **plot_tight_layout_kwargs(
+            spec.plot_id,
+            legend_bottom=legend_bottom,
+            pad=spec.tight_layout_pad,
+            h_pad=spec.tight_layout_h_pad,
+            w_pad=spec.tight_layout_w_pad,
+        )
     )
     return render_matplotlib_figure(fig, alt=alt_text)
 
@@ -1206,7 +1212,15 @@ def _render_distribution_grid(
         if spec.hide_repeated_y_axis and spec.render_mode != "ordinal_swarm" and panel_index % columns != 0:
             axis.set_ylabel("")
             axis.set_yticklabels([])
-    fig.tight_layout(**plot_tight_layout_kwargs(spec.plot_id, legend_bottom=0.0))
+    fig.tight_layout(
+        **plot_tight_layout_kwargs(
+            spec.plot_id,
+            legend_bottom=0.0,
+            pad=spec.tight_layout_pad,
+            h_pad=spec.tight_layout_h_pad,
+            w_pad=spec.tight_layout_w_pad,
+        )
+    )
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
@@ -1272,7 +1286,15 @@ def _render_curve_grid(plot_spec: dict[str, object], *, output_root: Path, alt_t
         handletextpad=0.5,
     )
     style_notebook_legend(legend)
-    fig.tight_layout(rect=(0.0, layout.bottom_margin, 1.0, 1.0), pad=0.95, h_pad=1.4, w_pad=0.95)
+    fig.tight_layout(
+        **plot_tight_layout_kwargs(
+            spec.plot_id,
+            legend_bottom=layout.bottom_margin,
+            pad=spec.tight_layout_pad,
+            h_pad=spec.tight_layout_h_pad,
+            w_pad=spec.tight_layout_w_pad,
+        )
+    )
     return render_matplotlib_figure(fig, alt=alt_text)
 
 
@@ -1405,6 +1427,12 @@ def _render_categorical_count_grid(
             )
 
     fig.tight_layout(
-        **plot_tight_layout_kwargs(str(spec.plot_id), legend_bottom=0.0),
+        **plot_tight_layout_kwargs(
+            str(spec.plot_id),
+            legend_bottom=0.0,
+            pad=spec.tight_layout_pad,
+            h_pad=spec.tight_layout_h_pad,
+            w_pad=spec.tight_layout_w_pad,
+        ),
     )
     return render_matplotlib_figure(fig, alt=alt_text)

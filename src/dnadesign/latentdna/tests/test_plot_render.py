@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from matplotlib.collections import PathCollection
+from matplotlib.collections import PathCollection, PolyCollection
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
@@ -53,6 +53,7 @@ from dnadesign.latentdna.src.plots.renderers.metric import (
     load_metric_panel_grid_input,
     metric_panel_groups,
     metric_panel_needs_candidate_label_ticks,
+    metric_panel_prefers_horizontal_bars,
     metric_panel_uses_grouped_family_bars,
     render_metric_panel,
 )
@@ -164,6 +165,36 @@ def _metric_spec(*, plot_id: str, color_column: str | None) -> ResolvedPlotSpec:
     if color_column is not None:
         payload["color_column"] = color_column
     return ResolvedPlotSpec.model_validate(payload)
+
+
+def test_metric_panel_layout_accepts_configured_geometry_overrides() -> None:
+    rows, columns, figsize = metric_panel_grid_layout(
+        "study_owned_metric_panel",
+        4,
+        panel_width=5.2,
+        panel_height=5.25,
+    )
+
+    assert (rows, columns) == (2, 2)
+    assert figsize == pytest.approx((10.4, 10.5))
+    assert plot_tight_layout_kwargs(
+        "study_owned_metric_panel",
+        legend_bottom=0.0,
+        h_pad=1.6,
+        w_pad=1.75,
+    ) == {"pad": 0.95, "h_pad": 1.6, "w_pad": 1.75}
+
+
+def test_metric_panel_bar_orientation_is_config_not_plot_id() -> None:
+    horizontal = _metric_spec(plot_id="study_owned_metric_panel", color_column=None).model_copy(
+        update={"bar_orientation": "horizontal"}
+    )
+    vertical = _metric_spec(plot_id="representation_health_summary", color_column=None).model_copy(
+        update={"bar_orientation": "vertical"}
+    )
+
+    assert metric_panel_prefers_horizontal_bars(horizontal)
+    assert not metric_panel_prefers_horizontal_bars(vertical)
 
 
 def test_category_key_compacts_list_values_for_categorical_legends() -> None:
@@ -417,6 +448,46 @@ def test_xy_scatter_grid_applies_first_notebook_filter_to_static_artifact(tmp_pa
     try:
         axis = result.figure.axes[0]
         assert axis.get_xlim()[1] < 10.0
+    finally:
+        plt.close(result.figure)
+
+
+def test_xy_scatter_honors_non_point_render_mode(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "dense_rows"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "x": [float(index % 7) for index in range(70)],
+                "y": [float(index // 7) for index in range(70)],
+                "group": ["a" if index % 2 == 0 else "b" for index in range(70)],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "dense_xy",
+            "kind": "xy_scatter",
+            "scalar_id": "dense_rows",
+            "x_column": "x",
+            "y_column": "y",
+            "color_column": "group",
+            "render_mode": "hexbin",
+        }
+    )
+
+    result = render_xy_plot(
+        SimpleNamespace(output_root=tmp_path, config=SimpleNamespace(reference_sets={})),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        collections = result.figure.axes[0].collections
+        assert any(isinstance(collection, PolyCollection) for collection in collections)
+        assert not any(isinstance(collection, PathCollection) for collection in collections)
     finally:
         plt.close(result.figure)
 

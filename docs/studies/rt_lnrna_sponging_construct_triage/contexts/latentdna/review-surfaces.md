@@ -11,6 +11,7 @@ in `../../record/status.md`.
 
 - `rt_lnrna_dataset_overview`
 - `rt_lnrna_source_structure_summary`
+- `rt_lnrna_trait_axis_projection`
 - `rt_lnrna_slot_context_robustness_summary`
 - `rt_lnrna_candidate_decision_frontier`
 - `rt_lnrna_candidate_x_scorecard`
@@ -22,6 +23,11 @@ in `../../record/status.md`.
 ### Primary Review Path
 
 - `rt_lnrna_dataset_overview`
+- `rt_lnrna_trait_axis_existence`
+- `rt_lnrna_crawford_khan_axis_agreement`
+- `rt_lnrna_trait_axis_endpoint_sensitivity`
+- `rt_lnrna_trait_axis_view_scorecard`
+- `rt_lnrna_reference_compiler_axis_projection`
 - `representation_health_summary`
 - `rt_lnrna_source_structure_summary`
 - `rt_lnrna_overlay_ordinal_audit`

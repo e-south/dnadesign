@@ -148,6 +148,7 @@ class MetadataLookupDerivationConfig(StrictWorkspaceModel):
     right_key: str
     value_column: str
     missing_policy: Literal["error", "null"] = "error"
+    default: str | int | float | bool | None = None
 
 
 class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):

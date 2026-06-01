@@ -368,6 +368,91 @@ def test_materialize_view_lookup_derivation_fails_on_missing_parent_match(tmp_pa
         materialize_view_artifact(context, view_id="child_embedding")
 
 
+def test_materialize_view_lookup_derivation_can_fill_missing_matches_with_default(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["parent_a"], type=pa.string()),
+                "label_status": pa.array(["observed"], type=pa.string()),
+            }
+        ),
+        inputs_dir / "parents.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "subject_id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "parent_id": pa.array(["parent_a", "missing_parent"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0], [1.0, 0.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "children.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "lookup_default_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "parents": {
+                        "kind": "parquet",
+                        "path": "inputs/parents.parquet",
+                        "record_key": "id",
+                        "subject_key": "id",
+                    },
+                    "children": {
+                        "kind": "parquet",
+                        "path": "inputs/children.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    },
+                },
+                "metadata": {
+                    "include": ["label_status"],
+                    "derivations": {
+                        "label_status": {
+                            "kind": "lookup",
+                            "source": "parents",
+                            "left_key": "parent_id",
+                            "right_key": "id",
+                            "value_column": "label_status",
+                            "missing_policy": "null",
+                            "default": "missing",
+                        }
+                    },
+                },
+                "views": {
+                    "child_embedding": {
+                        "source": "children",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="child_embedding")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["label_status"] for row in rows] == ["observed", "missing"]
+
+
 def test_sig35_variant_uses_upstream_sigma70_core_annotation_when_plan_lacks_sig35() -> None:
     row = {
         "usr_label__primary": "pDual-10-ES3p",

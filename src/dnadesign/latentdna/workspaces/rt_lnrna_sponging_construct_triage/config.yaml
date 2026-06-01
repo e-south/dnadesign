@@ -366,6 +366,12 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
       view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_lnrna_reader_spop_candidate_summary:
+    kind: parquet
+    path: study_inputs/reader_spop_candidate_summary.parquet
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: source_overlay
 metadata:
   include:
     - source_family
@@ -397,6 +403,13 @@ metadata:
     - crawford_abundance_raw_value
     - crawford_abundance_ordinal_bin
     - crawford_design_reference_status
+    - reader_spop_overlay_status
+    - reader_spop_metric_id
+    - reader_spop_experiment_ids
+    - reader_spop_normalized_value
+    - reader_spop_score_median
+    - reader_spop_observation_count
+    - reader_spop_qc_flags
   derivations:
     source_family:
       kind: copy
@@ -452,9 +465,13 @@ metadata:
       source: construct_subject__construct_projection_status
       value_type: string
     label_readiness_status:
-      kind: constant
-      value: reader_spop_labels_not_materialized
-      value_type: string
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_overlay_status
+      missing_policy: "null"
+      default: reader_spop_labels_not_materialized
     template_name:
       kind: constant
       value: dual_cassette_rt_lnrna_expression_template_v1
@@ -541,6 +558,55 @@ metadata:
       present_value: design_reference_affiliated
       absent_value: not_design_reference_affiliated
       value_type: string
+    reader_spop_overlay_status:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_overlay_status
+      missing_policy: "null"
+    reader_spop_metric_id:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_metric_id
+      missing_policy: "null"
+    reader_spop_experiment_ids:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_experiment_ids
+      missing_policy: "null"
+    reader_spop_normalized_value:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_normalized_value
+      missing_policy: "null"
+    reader_spop_score_median:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_score_median
+      missing_policy: "null"
+    reader_spop_observation_count:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_observation_count
+      missing_policy: "null"
+    reader_spop_qc_flags:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_qc_flags
+      missing_policy: "null"
   axes:
     khan_abundance_ordinal_bin:
       column: khan_abundance_ordinal_bin
@@ -574,6 +640,94 @@ metadata:
         crawford_abundance_ordinal_kendall: Crawford abundance ordinal Kendall
         crawford_abundance_balanced_ordinal_spearman: Crawford abundance balanced ordinal Spearman
         crawford_abundance_label_permutation_pvalue: Crawford abundance permutation p-value
+    candidate_source:
+      column: candidate_source
+      label: Candidate source
+      kind: categorical
+      display_labels: &rt_lnrna_source_display_labels
+        compiler_generated_msd_lnrna_variant: Compiler msDNA lnRNA variant
+        crawford_eco1_lnrna_fixed_wt_rt: Crawford Eco1 lnRNA fixed WT RT
+        genbank_variant_catalog: GenBank variant catalog
+        in_silico_rt_cds_dms: In silico RT CDS DMS
+        khan_abundance_affiliated_rt_lnrna_reference: Khan RT-lnRNA abundance reference
+    source_family:
+      column: source_family
+      label: Source family
+      kind: categorical
+      display_labels: *rt_lnrna_source_display_labels
+    ordinal_group_id:
+      column: ordinal_group_id
+      label: Abundance source
+      kind: categorical
+      display_labels:
+        khan_abundance: Khan PAGE RT-DNA abundance
+        crawford_abundance: Crawford Fig2 Eco1 msDNA score
+    ordinal_axis_id:
+      column: ordinal_axis_id
+      label: Abundance axis
+      kind: categorical
+      display_labels:
+        khan_abundance: Khan PAGE RT-DNA abundance
+        crawford_abundance: Crawford Fig2 Eco1 msDNA score
+    axis_id:
+      column: axis_id
+      label: Trait axis
+      kind: categorical
+      display_labels:
+        crawford_eco1_msdna_abundance_axis: Crawford Eco1 msDNA abundance
+        khan_rt_dna_abundance_axis: Khan RT-DNA abundance
+    endpoint_definition_id:
+      column: endpoint_definition_id
+      label: Endpoint definition
+      kind: categorical
+      category_order: [quantile_0_10, quantile_0_05, quantile_0_20, min_max]
+      display_labels:
+        quantile_0_05: q05 endpoint
+        quantile_0_10: q10 endpoint
+        quantile_0_20: q20 endpoint
+        min_max: min/max endpoint
+    population_role:
+      column: population_role
+      label: Scored population
+      kind: categorical
+      category_order: [fit, eval, reference, sensitivity]
+      display_labels:
+        fit: Fit rows
+        eval: Evaluation rows
+        reference: GenBank/reference rows
+        sensitivity: Sensitivity rows
+    label_readiness_status:
+      column: label_readiness_status
+      label: Label readiness
+      kind: categorical
+      display_labels:
+        reader_spop_assay_observed: Reader SPOP observed
+        reader_spop_labels_not_materialized: SPOP labels not materialized
+    reader_spop_score_median:
+      column: reader_spop_score_median
+      label: Reader SPOP median
+      kind: continuous
+    source_window_case:
+      column: source_window_case
+      label: Source window
+      kind: categorical
+      display_labels:
+        lnrna_slot: lnRNA span
+        rt_cds_slot: RT CDS span
+        lnrna_rt_slot_pair: lnRNA + RT CDS pair
+    view_id:
+      column: view_id
+      label: Candidate-X view
+      kind: categorical
+      display_labels: &rt_lnrna_view_display_labels
+        intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp intermediate
+        intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span intermediate
+        intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span intermediate
+        intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair intermediate
+        output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp output layer
+        output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span output layer
+        output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span output layer
+        output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair output layer
 metric_definitions:
   khan_abundance_ordinal_spearman:
     display_name: Khan abundance ordinal Spearman
@@ -1004,6 +1158,16 @@ reference_sets:
         equals: genbank_variant_catalog
       - column: source_variant_id
         not_regex: '^no_source_variant$'
+  reference_reader_spop_assayed_genbank_rows:
+    label: Reader SPOP assayed GenBank rows
+    match_column: construct_subject__id
+    label_column: source_variant_id
+    label_limit: 12
+    where_all:
+      - column: candidate_source
+        equals: genbank_variant_catalog
+      - column: reader_spop_overlay_status
+        equals: reader_spop_assay_observed
   reference_source_family_anchors:
     label: Source-family anchors
     match_column: construct_subject__id
@@ -1187,6 +1351,12 @@ plots:
     measure_kind: metric
     value_kind: score
     value_label: Ordinal geometry statistic
+    bar_orientation: horizontal
+    show_uncertainty_note: false
+    panel_width: 5.2
+    panel_height: 5.25
+    tight_layout_h_pad: 1.6
+    tight_layout_w_pad: 1.75
     semantics_ref: plot_semantics/rt_lnrna_overlay_ordinal_audit.yaml
   rt_lnrna_abundance_margin_ladder_gallery:
     kind: distribution_grid
@@ -1256,6 +1426,93 @@ plots:
           - {value: khan_abundance, label: Khan PAGE RT-DNA abundance}
           - {value: crawford_abundance, label: Crawford Fig2 Eco1 msDNA score}
     semantics_ref: plot_semantics/rt_lnrna_abundance_margin_scatter_gallery.yaml
+  rt_lnrna_trait_axis_existence:
+    kind: xy_scatter
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_rows
+    x_column: source_value
+    y_column: axis_projection
+    x_axis_label: Source assay value (source-scoped)
+    y_axis_label: Trait-axis projection
+    render_mode: density_contour
+    default_hue: endpoint_definition_id
+    hue_options:
+      - {column: endpoint_definition_id, label: Endpoint definition, type: categorical}
+      - {column: population_role, label: Population role, type: categorical}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: view_id, label: Candidate-X view, type: categorical}
+    filter_options: &rt_lnrna_trait_axis_filter
+      - column: axis_id
+        label: Trait axis
+        include_all: false
+        values:
+          - {value: crawford_eco1_msdna_abundance_axis, label: Crawford Eco1 msDNA abundance}
+          - {value: khan_rt_dna_abundance_axis, label: Khan RT-DNA abundance}
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_existence.yaml
+  rt_lnrna_crawford_khan_axis_agreement:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalar: rt_lnrna_trait_axis_projection_concordance
+    facet_column: endpoint_definition_id
+    panel_title_column: endpoint_definition_id
+    category_column: left_trait_id
+    label_column: view_id
+    value_column: axis_concordance
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Crawford-Khan axis vector concordance
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_crawford_khan_axis_agreement.yaml
+  rt_lnrna_trait_axis_endpoint_sensitivity:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_summary
+    facet_column: trait_id
+    panel_title_column: view_id
+    category_column: endpoint_definition_id
+    label_column: endpoint_definition_id
+    value_column: axis_vector_primary_concordance
+    color_column: endpoint_definition_id
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Axis concordance to primary endpoint
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_endpoint_sensitivity.yaml
+  rt_lnrna_trait_axis_view_scorecard:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_summary
+    facet_column: trait_id
+    panel_title_column: view_id
+    category_column: endpoint_definition_id
+    label_column: endpoint_definition_id
+    value_column: axis_projection_spearman
+    color_column: endpoint_definition_id
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Source-value Spearman correlation
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_view_scorecard.yaml
+  rt_lnrna_reference_compiler_axis_projection:
+    kind: distribution_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalars:
+      - rt_lnrna_trait_axis_projection_rows
+    metric_columns: [axis_projection, endpoint_margin]
+    panel_titles:
+      - Trait-axis projection by scored population
+      - Endpoint margin by scored population
+    x_axis_label: Scored population role
+    y_axis_label: Trait-axis score
+    color_column: population_role
+    render_mode: violin_box
+    filter_options: *rt_lnrna_trait_axis_filter
+    semantics_ref: plot_semantics/rt_lnrna_reference_compiler_axis_projection.yaml
   rt_lnrna_slot_context_robustness_summary:
     kind: metric_panel_grid
     visibility_tier: primary
@@ -1366,6 +1623,8 @@ plots:
       - {column: rt_variant_class, label: RT variant class, type: categorical}
       - {column: rt_dms_mutation_class, label: RT-DMS mutation class, type: categorical}
       - {column: template_name, label: Template, type: categorical}
+      - {column: reader_spop_score_median, label: Reader SPOP median, type: continuous, scale: panel}
+      - {column: reader_spop_overlay_status, label: Reader SPOP status, type: categorical}
       - {column: khan_abundance_normalized_value, label: Khan PAGE RT-DNA abundance, type: continuous, scale: panel}
       - {column: khan_abundance_ordinal_bin, label: Khan abundance group, type: ordinal}
       - {column: crawford_abundance_raw_value, label: Crawford Fig2 Eco1 msDNA score, type: continuous, scale: panel}
@@ -1380,7 +1639,7 @@ notebooks:
     kind: workspace
     title: RT-lnRNA latent geometry browser
     description: Read-only QC browser for dual-cassette construct, lnRNA span, RT CDS span, and paired-span Evo2 7B views.
-    default_deliverable: representation_health_summary
+    default_deliverable: rt_lnrna_trait_axis_projection
     default_surface: plots
     candidate_sets:
       - rt_lnrna_construct_gallery_v1
@@ -1428,6 +1687,8 @@ notebooks:
       - rt_variant_class
       - rt_dms_mutation_class
       - template_name
+      - reader_spop_score_median
+      - reader_spop_overlay_status
       - khan_abundance_normalized_value
       - khan_abundance_ordinal_bin
       - crawford_abundance_raw_value
@@ -1443,6 +1704,8 @@ notebooks:
       rt_variant_class: categorical
       rt_dms_mutation_class: categorical
       template_name: categorical
+      reader_spop_score_median: continuous
+      reader_spop_overlay_status: categorical
       khan_abundance_normalized_value: continuous
       khan_abundance_ordinal_bin: ordinal
       crawford_abundance_raw_value: continuous
@@ -1458,6 +1721,7 @@ notebooks:
           - reference_msd_compiler_landmarks
           - reference_khan_abundance_rows
           - reference_crawford_design_affiliated_rows
+          - reference_reader_spop_assayed_genbank_rows
       - label: Literature source
         column: source_literature_id
         type: categorical
@@ -1465,6 +1729,19 @@ notebooks:
           - reference_genbank_catalog_rows
           - reference_khan_abundance_rows
           - reference_crawford_design_affiliated_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Reader SPOP median
+        column: reader_spop_score_median
+        type: continuous
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Reader SPOP status
+        column: reader_spop_overlay_status
+        type: categorical
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_reader_spop_assayed_genbank_rows
       - label: Abundance affiliation
         column: abundance_affiliation
         type: categorical
@@ -1489,6 +1766,11 @@ notebooks:
       - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     ordered_plots:
       - rt_lnrna_dataset_overview
+      - rt_lnrna_trait_axis_existence
+      - rt_lnrna_crawford_khan_axis_agreement
+      - rt_lnrna_trait_axis_endpoint_sensitivity
+      - rt_lnrna_trait_axis_view_scorecard
+      - rt_lnrna_reference_compiler_axis_projection
       - representation_health_summary
       - rt_lnrna_source_structure_summary
       - rt_lnrna_overlay_ordinal_audit
@@ -1868,6 +2150,155 @@ recipes:
           groups: *rt_lnrna_abundance_ladder_rows_groups
           candidates:
             - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: build_rt_lnrna_trait_axis_projection_rows
+        op: scalar.build
+        depends_on:
+          - build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params:
+          scalar: rt_lnrna_trait_axis_projection_rows
+          kind: trait_axis_projection_rows
+          candidate_id_column: construct_subject__id
+          metadata_columns:
+            - source_family
+            - candidate_source
+            - source_literature_id
+            - source_variant_id
+            - abundance_affiliation
+            - rt_variant_class
+            - rt_dms_mutation_class
+            - compiler_msd_design_id
+            - crawford_abundance_ordinal_bin
+            - khan_abundance_ordinal_bin
+            - reader_spop_overlay_status
+            - reader_spop_score_median
+            - reader_spop_experiment_ids
+          candidate_views:
+            - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+            - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          axes:
+            - trait_id: crawford_eco1_msdna_abundance
+              axis_id: crawford_eco1_msdna_abundance_axis
+              label: Crawford Eco1 msDNA abundance
+              source_value_column: crawford_abundance_raw_value
+              primary_endpoint_definition_id: quantile_0_10
+              fit_population:
+                population_id: crawford_abundance_fit_basis
+                role: fit
+                where:
+                  - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                  - {column: crawford_abundance_raw_value, finite: true}
+              endpoint_groups:
+                method: quantile
+                value_column: crawford_abundance_raw_value
+                low_quantile: 0.10
+                high_quantile: 0.90
+                min_low_rows: 10
+                min_high_rows: 10
+              endpoint_sensitivity:
+                enabled: true
+                endpoint_definitions: [min_max, quantile_0_05, quantile_0_10, quantile_0_20]
+              score_populations:
+                - population_id: crawford_labeled
+                  role: fit
+                  where:
+                    - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                - population_id: khan_labeled
+                  role: eval
+                  where:
+                    - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                - population_id: genbank_catalog
+                  role: reference
+                  where:
+                    - {column: source_family, equals: genbank_variant_catalog}
+                - population_id: compiler_msd
+                  role: reference
+                  where:
+                    - {column: source_family, equals: compiler_generated_msd_lnrna_variant}
+                - population_id: rt_cds_dms
+                  role: sensitivity
+                  where:
+                    - {column: source_family, equals: in_silico_rt_cds_dms}
+            - trait_id: khan_rt_dna_abundance
+              axis_id: khan_rt_dna_abundance_axis
+              label: Khan RT-DNA abundance
+              source_value_column: khan_abundance_normalized_value
+              primary_endpoint_definition_id: quantile_0_20
+              fit_population:
+                population_id: khan_abundance_fit_basis
+                role: fit
+                where:
+                  - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                  - {column: khan_abundance_normalized_value, finite: true}
+              endpoint_groups:
+                method: quantile
+                value_column: khan_abundance_normalized_value
+                low_quantile: 0.20
+                high_quantile: 0.80
+                min_low_rows: 3
+                min_high_rows: 3
+              endpoint_sensitivity:
+                enabled: true
+                endpoint_definitions: [min_max, quantile_0_20]
+              score_populations:
+                - population_id: khan_labeled
+                  role: fit
+                  where:
+                    - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                - population_id: crawford_labeled
+                  role: eval
+                  where:
+                    - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                - population_id: genbank_catalog
+                  role: reference
+                  where:
+                    - {column: source_family, equals: genbank_variant_catalog}
+                - population_id: compiler_msd
+                  role: reference
+                  where:
+                    - {column: source_family, equals: compiler_generated_msd_lnrna_variant}
+                - population_id: rt_cds_dms
+                  role: sensitivity
+                  where:
+                    - {column: source_family, equals: in_silico_rt_cds_dms}
+      - id: build_rt_lnrna_trait_axis_projection_summary
+        op: scalar.build
+        depends_on:
+          - build_rt_lnrna_trait_axis_projection_rows
+        params:
+          scalar: rt_lnrna_trait_axis_projection_summary
+          kind: trait_axis_projection_summary
+          source_scalar: rt_lnrna_trait_axis_projection_rows
+          score_columns:
+            - axis_projection
+            - endpoint_margin
+          concordance:
+            enabled: true
+            compare_trait_ids:
+              - [crawford_eco1_msdna_abundance, khan_rt_dna_abundance]
+      - id: build_rt_lnrna_trait_axis_projection_concordance
+        op: scalar.build
+        depends_on:
+          - build_rt_lnrna_trait_axis_projection_summary
+        params:
+          scalar: rt_lnrna_trait_axis_projection_concordance
+          kind: scalar_sidecar_table
+          source_scalar: rt_lnrna_trait_axis_projection_summary
+          sidecar: axis_concordance.parquet
+          required_columns:
+            - view_id
+            - endpoint_definition_id
+            - left_trait_id
+            - right_trait_id
+            - left_axis_id
+            - right_axis_id
+            - axis_concordance
+            - axis_angle
+            - normalization_policy
       - id: build_rt_lnrna_slot_delta_intermediate_full_lnrna
         op: scalar.build
         depends_on:
@@ -2078,6 +2509,11 @@ recipes:
           - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
           - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
         params: {plot_id: rt_lnrna_abundance_margin_scatter_gallery}
+      - {id: render_rt_lnrna_trait_axis_existence, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_rows], params: {plot_id: rt_lnrna_trait_axis_existence}}
+      - {id: render_rt_lnrna_crawford_khan_axis_agreement, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_concordance], params: {plot_id: rt_lnrna_crawford_khan_axis_agreement}}
+      - {id: render_rt_lnrna_trait_axis_endpoint_sensitivity, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_summary], params: {plot_id: rt_lnrna_trait_axis_endpoint_sensitivity}}
+      - {id: render_rt_lnrna_trait_axis_view_scorecard, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_summary], params: {plot_id: rt_lnrna_trait_axis_view_scorecard}}
+      - {id: render_rt_lnrna_reference_compiler_axis_projection, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_rows], params: {plot_id: rt_lnrna_reference_compiler_axis_projection}}
       - {id: render_rt_lnrna_slot_context_robustness_summary, op: plot.render, depends_on: [build_rt_lnrna_slot_context_robustness_summary_metrics], params: {plot_id: rt_lnrna_slot_context_robustness_summary}}
       - id: render_rt_lnrna_slot_geometry_scatter_gallery
         op: plot.render
@@ -2111,6 +2547,11 @@ recipes:
           - render_rt_lnrna_overlay_ordinal_audit
           - render_rt_lnrna_abundance_margin_ladder_gallery
           - render_rt_lnrna_abundance_margin_scatter_gallery
+          - render_rt_lnrna_trait_axis_existence
+          - render_rt_lnrna_crawford_khan_axis_agreement
+          - render_rt_lnrna_trait_axis_endpoint_sensitivity
+          - render_rt_lnrna_trait_axis_view_scorecard
+          - render_rt_lnrna_reference_compiler_axis_projection
           - render_rt_lnrna_slot_context_robustness_summary
           - render_rt_lnrna_slot_geometry_scatter_gallery
           - render_rt_lnrna_candidate_decision_frontier
@@ -2227,6 +2668,32 @@ deliverables:
         - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
     docs_refs:
       - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_overlay_ordinal_audit
+    acceptance_checks: []
+  rt_lnrna_trait_axis_projection:
+    title: RT-lnRNA trait-axis projection
+    section: primary
+    question: Does fitted LatentDNA geometry encode source-scoped Crawford or Khan abundance directions across candidate-X views?
+    summary: Row-level projection and compact summary scalars for separately fitted Crawford and Khan abundance trait axes.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots:
+        - rt_lnrna_trait_axis_existence
+        - rt_lnrna_crawford_khan_axis_agreement
+        - rt_lnrna_trait_axis_endpoint_sensitivity
+        - rt_lnrna_trait_axis_view_scorecard
+        - rt_lnrna_reference_compiler_axis_projection
+      scalars:
+        - rt_lnrna_trait_axis_projection_rows
+        - rt_lnrna_trait_axis_projection_summary
+        - rt_lnrna_trait_axis_projection_concordance
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_trait_axis_projection
     acceptance_checks: []
   rt_lnrna_slot_context_robustness_summary:
     title: RT-lnRNA span and context robustness summary

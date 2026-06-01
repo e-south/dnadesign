@@ -221,7 +221,7 @@ def _lookup_metadata_array(
         )
         if left_key not in mapping:
             missing_keys.append(left_key)
-            values.append(None)
+            values.append(derivation.default)
             continue
         values.append(mapping[left_key])
     if missing_keys and derivation.missing_policy == "error":

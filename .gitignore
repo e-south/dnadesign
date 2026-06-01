@@ -110,6 +110,8 @@ tmp/
 # Large/binary data artifacts (keep out of git)
 # -----------------------------------------------------------------------------
 *.parquet
+!src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
+!src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
 *.parq
 *.pq
 *.feather

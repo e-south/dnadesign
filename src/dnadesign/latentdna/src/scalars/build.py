@@ -37,9 +37,14 @@ from .builders.representation_scorecard import (
     build_candidate_metric_pairs_scalar,
     build_representation_scorecard_scalar,
 )
+from .builders.sidecar_table import build_scalar_sidecar_table_scalar
 from .builders.tf_axis_orientation import (
     build_tf_axis_orientation_audit_scalar,
     build_tf_axis_orientation_tests_scalar,
+)
+from .builders.trait_axis_projection import (
+    build_trait_axis_projection_rows_scalar,
+    build_trait_axis_projection_summary_scalar,
 )
 from .classification_metrics import dual_joint_margin
 from .common import (
@@ -1298,6 +1303,27 @@ def build_scalar_artifact(
 
     if builder_kind == "tf_axis_orientation_tests":
         return build_tf_axis_orientation_tests_scalar(
+            context,
+            artifact_dir=artifact_dir,
+            params=params,
+        )
+
+    if builder_kind == "trait_axis_projection_rows":
+        return build_trait_axis_projection_rows_scalar(
+            context,
+            artifact_dir=artifact_dir,
+            params=params,
+        )
+
+    if builder_kind == "trait_axis_projection_summary":
+        return build_trait_axis_projection_summary_scalar(
+            context,
+            artifact_dir=artifact_dir,
+            params=params,
+        )
+
+    if builder_kind == "scalar_sidecar_table":
+        return build_scalar_sidecar_table_scalar(
             context,
             artifact_dir=artifact_dir,
             params=params,
