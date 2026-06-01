@@ -52,16 +52,16 @@ Keep ownership boundaries clear.
 
 ## Study-Owned Source Routing
 
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/service.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/service.py`:
   OPS service orchestration and contract binding.
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/snapshot.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/snapshot.py`:
   record-backed status assembly.
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/preflight.py`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/preflight.py`:
   preflight context resolution and check coordination.
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/probes/`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/probes/`:
   semantic completeness, sequence-view, and runtime probes. Deep Infer feature
   completion stays under preflight command checks.
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/status/ops/`:
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/ops/`:
   OPS provider entrypoints and checked-in status registry metadata.
 
 ## Router rule
