@@ -14,6 +14,11 @@ from .constants import (
     DENSEGEN_PLAN_LOGIC4_COLUMNS,
     PASSIVE_LABEL_FAMILY_IDS,
 )
+from .tfbs.schema import (
+    TFBS_LEARNABILITY_ACTIVE_LABEL_FAMILIES,
+    TFBS_LEARNABILITY_REQUIRED_LABEL_COLUMNS,
+    TFBS_LEARNABILITY_SCHEMA_VERSION,
+)
 
 TF_FAMILIES = ("lexA", "cpxR", "baeR")
 TF_FAMILY_COUNT_COLUMNS = tuple(f"tf_family__{family}__count" for family in TF_FAMILIES)
@@ -115,6 +120,81 @@ def label_family_specs() -> tuple[LabelFamilySpec, ...]:
             },
         ),
     )
+
+
+def tfbs_learnability_label_family_specs() -> tuple[LabelFamilySpec, ...]:
+    """Return the strict v1 production label-family registry."""
+
+    return (
+        LabelFamilySpec(
+            label_family_id="tf_family_count",
+            role="active",
+            target_type="integer_count",
+            columns=("lexA_count", "cpxR_count", "baeR_count", "cpxR_or_baeR_count"),
+            source="densegen__used_tfbs_detail",
+            description="Counts of variable TFBS entries in the literal DenseGen construction metadata.",
+            opal_adapter={"objective": "vector_channel_v1", "score_semantics": "predicted_expected_scalar_label"},
+        ),
+        LabelFamilySpec(
+            label_family_id="tf_family_presence",
+            role="active",
+            target_type="binary_scalar",
+            columns=("lexA_present", "cpxR_present", "baeR_present", "cpxR_or_baeR_present"),
+            source="densegen__used_tfbs_detail",
+            description="Presence indicators for variable TFBS families anywhere in the three DenseGen TFBS entries.",
+            opal_adapter={"objective": "vector_channel_v1", "score_semantics": "predicted_expected_scalar_label"},
+        ),
+        LabelFamilySpec(
+            label_family_id="tf_family_count_fraction",
+            role="active",
+            target_type="fraction_scalar",
+            columns=(
+                "lexA_count_fraction",
+                "cpxR_count_fraction",
+                "baeR_count_fraction",
+                "cpxR_or_baeR_count_fraction",
+            ),
+            source="densegen__used_tfbs_detail",
+            description="Fraction of the three variable DenseGen TFBS entries assigned to the target family/group.",
+            opal_adapter={"objective": "vector_channel_v1", "score_semantics": "predicted_expected_scalar_label"},
+        ),
+        LabelFamilySpec(
+            label_family_id="tf_slot_family_presence",
+            role="active",
+            target_type="binary_scalar",
+            columns=(
+                "lexA_in_slot0",
+                "lexA_in_slot1",
+                "lexA_in_slot2",
+                "cpxR_or_baeR_in_slot0",
+                "cpxR_or_baeR_in_slot1",
+                "cpxR_or_baeR_in_slot2",
+            ),
+            source="densegen__used_tfbs_detail",
+            description="Slot-family indicators after sorting the three variable TFBS entries by offset_raw.",
+            opal_adapter={"objective": "vector_channel_v1", "score_semantics": "predicted_expected_scalar_label"},
+        ),
+    )
+
+
+def tfbs_learnability_label_family_manifest(labels: pd.DataFrame | None = None) -> dict[str, Any]:
+    """Return a manifest for the v1 TFBS learnability label ontology."""
+
+    specs = tfbs_learnability_label_family_specs()
+    family_ids = tuple(spec.label_family_id for spec in specs)
+    if family_ids != TFBS_LEARNABILITY_ACTIVE_LABEL_FAMILIES:
+        raise ValueError("TFBS learnability label-family specs are out of sync with the v1 contract constants")
+    payload: dict[str, Any] = {
+        "schema_version": f"{TFBS_LEARNABILITY_SCHEMA_VERSION}.label_families",
+        "active_label_families": list(family_ids),
+        "families": [spec.to_dict() for spec in specs],
+    }
+    if labels is not None:
+        missing = [column for column in TFBS_LEARNABILITY_REQUIRED_LABEL_COLUMNS if column not in labels.columns]
+        payload["columns_present"] = sorted(set(labels.columns))
+        payload["columns_missing"] = missing
+        payload["summaries"] = _label_family_summaries(labels, specs)
+    return payload
 
 
 def label_family_ids() -> tuple[str, ...]:

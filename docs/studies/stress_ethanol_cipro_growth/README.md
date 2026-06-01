@@ -47,6 +47,7 @@ stress_ethanol_cipro_growth/
   routes/          # one-hop router plus focused route details
     README.md
   contexts/        # durable cross-tool context
+    promoter-design-intent.md
     latentdna/
       binding.yaml
   audits/          # typed sync/readiness evidence
@@ -63,5 +64,7 @@ the progressive-disclosure lane map before opening the full pipeline. Split
 execution and readiness fragments under
 `operations/contract/` by owner lane; do not flatten them back into one YAML
 shelf. Use `operations/catalog/` when the task is status or readiness,
+`contexts/promoter-design-intent.md` when a reader needs the study's
+higher-level biological motivation, semantic guardrails, or manuscript framing,
 `contexts/latentdna/` when LatentDNA needs durable study context, and
 `audits/readiness/` or `audits/usr-sync/` for evidence payloads.

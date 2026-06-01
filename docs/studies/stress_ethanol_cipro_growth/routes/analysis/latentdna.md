@@ -90,6 +90,11 @@ surface. Keep status questions in `../../record/status.md` or `ops progress`.
   and not OPAL candidate-selection inputs.
 - The configured exploratory regulator appendix keeps BaeR/CpxR/LexA landmark
   orientation separate from post-hoc regulator discovery.
+- Planned response-archetype KL/Jensen-Shannon maps over measured
+  `[baseline, ethanol, ciprofloxacin, combined]` expression vectors are
+  OPAL/study-analysis deliverables after labels exist, not LatentDNA
+  representation-readiness gates. LatentDNA may contribute feature, margin, or
+  cluster covariates for downstream enrichment or mutual-information analysis.
 
 ### Browser Guardrails
 

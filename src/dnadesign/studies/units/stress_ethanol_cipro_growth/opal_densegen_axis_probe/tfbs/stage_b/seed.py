@@ -1,0 +1,116 @@
+"""Initial-label seed policies for DenseGen TFBS Stage B probe campaigns."""
+
+from __future__ import annotations
+
+import hashlib
+from typing import TYPE_CHECKING, Sequence
+
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
+
+TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM = "label_value_stratified_random"
+TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM = "uniform_random"
+TFBS_STAGE_B_INITIAL_SEED_POLICIES = (
+    TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM,
+    TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM,
+)
+
+
+def validate_tfbs_stage_b_initial_seed_policy(value: str) -> str:
+    """Return a supported Stage B initial seed policy or fail fast."""
+
+    policy = str(value)
+    if policy not in TFBS_STAGE_B_INITIAL_SEED_POLICIES:
+        raise ValueError(
+            "Unsupported Stage B initial seed policy "
+            f"{policy!r}; expected one of {list(TFBS_STAGE_B_INITIAL_SEED_POLICIES)}"
+        )
+    return policy
+
+
+def select_tfbs_stage_b_initial_ids(
+    frame: pd.DataFrame,
+    *,
+    label_name: str,
+    initial_label_count: int,
+    seed: int,
+    policy: str,
+    seed_context: str = "",
+) -> tuple[str, ...]:
+    """Select initial labeled IDs for a synthetic TFBS learnability probe campaign."""
+
+    policy = validate_tfbs_stage_b_initial_seed_policy(policy)
+    prepared = _seed_frame(frame, label_name=label_name)
+    count = int(initial_label_count)
+    if count <= 0:
+        raise ValueError("Stage B initial_label_count must be positive")
+    if count > len(prepared):
+        raise ValueError(f"Stage B initial_label_count={count} exceeds row universe size {len(prepared)}")
+    if policy == TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM:
+        import numpy as np
+
+        rng = np.random.default_rng(int(seed))
+        return _uniform_random_ids(prepared["id"].tolist(), count=count, rng=rng)
+    if policy == TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM:
+        import numpy as np
+
+        rng = np.random.default_rng(_stable_seed(seed=seed, context=f"{policy}:{label_name}:{seed_context}"))
+        return _label_value_stratified_random_ids(prepared, count=count, rng=rng)
+    raise AssertionError(f"validated unsupported Stage B initial seed policy: {policy}")
+
+
+def _seed_frame(frame: pd.DataFrame, *, label_name: str) -> pd.DataFrame:
+    import pandas as pd
+
+    missing = sorted({"id", label_name} - set(frame.columns))
+    if missing:
+        raise ValueError(f"Stage B initial seed frame missing column(s): {missing}")
+    out = frame.loc[:, ["id", label_name]].copy()
+    out["id"] = out["id"].astype(str)
+    if out["id"].isna().any():
+        raise ValueError("Stage B initial seed ids must not be null")
+    if out["id"].duplicated().any():
+        duplicates = out.loc[out["id"].duplicated(), "id"].head(10).tolist()
+        raise ValueError(f"Stage B initial seed frame contains duplicate id(s): {duplicates}")
+    out[label_name] = pd.to_numeric(out[label_name], errors="raise")
+    if out[label_name].isna().any():
+        raise ValueError(f"Stage B initial seed label {label_name!r} must not contain nulls")
+    return out.sort_values(["id"]).reset_index(drop=True)
+
+
+def _uniform_random_ids(ids: Sequence[str], *, count: int, rng: np.random.Generator) -> tuple[str, ...]:
+    unique_ids = sorted(set(map(str, ids)))
+    if len(unique_ids) != len(ids):
+        raise ValueError("Stage B uniform initial seed sampling requires unique ids")
+    selected_indices = rng.choice(len(unique_ids), size=count, replace=False)
+    return tuple(unique_ids[int(index)] for index in sorted(selected_indices.tolist()))
+
+
+def _label_value_stratified_random_ids(
+    frame: pd.DataFrame,
+    *,
+    count: int,
+    rng: np.random.Generator,
+) -> tuple[str, ...]:
+    import numpy as np
+
+    label_name = frame.columns.difference(["id"]).tolist()[0]
+    ordered = frame.sort_values([label_name, "id"]).reset_index(drop=True)
+    selected: list[str] = []
+    for stratum_index in range(count):
+        start = int(np.floor(stratum_index * len(ordered) / count))
+        stop = int(np.floor((stratum_index + 1) * len(ordered) / count))
+        if stop <= start:
+            stop = start + 1
+        stratum = ordered.iloc[start:stop]
+        selected_row_index = int(rng.choice(stratum.index.to_numpy(dtype=int), size=1)[0])
+        selected.append(str(ordered.loc[selected_row_index, "id"]))
+    if len(set(selected)) != len(selected):
+        raise AssertionError("Stage B stratified initial seed sampling produced duplicate ids")
+    return tuple(selected)
+
+
+def _stable_seed(*, seed: int, context: str) -> int:
+    digest = hashlib.sha256(f"{int(seed)}:{context}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=False)

@@ -1,6 +1,14 @@
 # OPAL DenseGen Plan-Logic Probe
 
-This package owns the study-local scratch probe that checks whether the current OPAL X surface can recover DenseGen part-derived plan logic and TF-count structure. It is organized by contract boundary rather than as a root-level study script.
+This package owns two study-local OPAL probes that use DenseGen construction
+metadata as synthetic labels. The root package keeps the older plan-logic probe.
+The `tfbs/` subpackage owns the strict TFBS learnability probe, where each
+positive campaign is paired with a matched null so OPAL learnability can be
+reviewed against a scrambling control rather than inferred from predicted scores
+alone.
+
+The organizing rule is ownership, not historical arrival order: study-specific
+DenseGen semantics stay here, while OPAL core remains campaign-agnostic.
 
 - `axis_oracle.py`: DenseGen metadata parsing and four-channel plan-logic label construction.
 - `artifacts.py`: run specs, run-root audit DTOs, and artifact-path layout semantics.
@@ -16,11 +24,58 @@ This package owns the study-local scratch probe that checks whether the current 
 - `status.py`: materialized run-root audits.
 - `cli.py` and `__main__.py`: command-line entrypoints.
 
+## TFBS Learnability Subpackage
+
+`tfbs/` answers a narrower question than the root plan-logic probe: can OPAL
+learn literal DenseGen TFBS construction labels from the sequence feature
+surface without label leakage, and does that learning exceed a matched null?
+
+- `schema.py`: literal label ontology: `count`, `presence`,
+  `count_fraction`, and `slot_family_presence`.
+- `contracts.py`: strict row parser, final-coordinate slot contract, and
+  passive sigma-core validation.
+- `oracle.py`, `manifests.py`: positive-label construction and replay
+  manifests.
+- `nulls.py`, `null_artifacts.py`: matched-null construction, viability
+  reports, and null artifact writing.
+- `active_targets.py`: scalar expected-label targets for generic OPAL
+  `vector_from_table_v1` and `vector_channel_v1` use.
+- `retention.py`: preflight retention estimates for sentinel and full-matrix
+  campaign footprints.
+- `stage_a/materialization.py`, `stage_a/manifests.py`: Stage A label/null
+  materialization, source fingerprints, pairings, and retention estimates.
+- `stage_b/configs.py`: Stage B campaign-set materialization driver.
+- `stage_b/layout.py`: Stage B filesystem ontology.
+- `stage_b/io.py`: fail-fast filesystem and parquet/JSON contracts.
+- `stage_b/commands.py`: OPAL validation and ingest command contracts.
+- `stage_b/payloads.py`: OPAL YAML payload builders.
+- `stage_b/seed.py`, `stage_b/semantics.py`: seed policy and campaign
+  identity semantics.
+- `stage_b/execution.py`, `stage_b/prune.py`: campaign execution and scoped
+  artifact cleanup.
+- `stage_b/review.py`, `stage_b/claims.py`, `stage_b/review_plots.py`,
+  `stage_b/slot_diagnostics.py`, `stage_b/slot_plots.py`,
+  `stage_b/notebook_visuals.py`: realized-label review, claim gates, and
+  notebook-facing visual registration.
+
 Run with:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run --gate source
 ```
+
+Materialize the v1 TFBS learnability Stage A label/null/preflight artifacts with:
+
+```bash
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe tfbs-stage-a \
+  --run-id densegen_tfbs_learnability_stage_a_seed7 \
+  --json
+```
+
+This writes the positive label table, sentinel matched-null label tables, null
+viability reports, row-universe/source/label manifests, `pairing_manifest.json`,
+`retention_estimate.json`, and `tfbs_stage_a_manifest.json`. It does not run OPAL
+campaigns.
 
 The default suite is `densegen_motif_qa_k12_s3_v1`: K12, initial labels 12,
 seeds 7/17/29, 12 planned rounds, and active `densegen_plan_logic4` plus

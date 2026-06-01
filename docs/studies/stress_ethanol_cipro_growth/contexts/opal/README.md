@@ -6,7 +6,11 @@ Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
 
 - [Candidate table](candidate-table.md): shared USR candidate-table and label
   source contract.
-- [DenseGen motif QA K12/S3 v1](densegen-motif-qa-k12-s3-v1.md): current
-  planned K12, three-seed, trajectory-based motif-composition QA benchmark.
+- [DenseGen TFBS learnability probe v1](densegen-tfbs-learnability-probe-v1.md):
+  production replacement spec for scalar TF family content and slot-geometry
+  synthetic-control campaigns.
+- [DenseGen motif QA K12/S3 v1](densegen-motif-qa-k12-s3-v1.md): historical
+  K12, three-seed, trajectory-based motif-composition QA benchmark and
+  execution precedent.
 - [DenseGen axis probe v0](densegen-axis-probe-v0.md): scratch-only
   historical K6 synthetic-oracle probe for OPAL/LatentDNA readiness.

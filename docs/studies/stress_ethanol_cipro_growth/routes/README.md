@@ -29,6 +29,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Status | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` |
 | Preflight | `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json` |
 | Machine-readable contract | `../operations/ops.study.yaml` |
+| Study intent and semantic guardrails | [Promoter design intent](../contexts/promoter-design-intent.md) |
 
 ### Route Index
 
@@ -43,6 +44,9 @@ Use this page after the checked-in study status tells you where the record stand
 
 ### Terminology Guardrails
 
+- The study's center of gravity is specification-driven promoter design across
+  regulatory contexts; ethanol/ciprofloxacin is the tractable case study, not
+  the whole contribution.
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
 - OPAL campaigns are downstream objectives: ethanol factor, ciprofloxacin factor, and AND. AND is not a synonym for every `ethanol_ciprofloxacin` DenseGen row.
 - OPAL reads an `opal_candidate_feature_table`, not just a matrix. The materialized table is the dense generated promoter subset in `usr_prom_eth_cip_opal_candidates` with X column `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.

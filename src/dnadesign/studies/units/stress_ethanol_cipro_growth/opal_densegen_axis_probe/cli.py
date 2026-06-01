@@ -19,6 +19,7 @@ from .constants import (
 )
 from .paths import _repo_root_from, _resolve_repo_path
 from .status import _format_status_text, audit_run_root
+from .tfbs.cli import add_tfbs_subcommands, handle_tfbs_command
 
 
 def _status_probe(args: argparse.Namespace) -> int:
@@ -230,6 +231,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     suite.add_argument("--round", default="all", help="Round selector for the optional OPAL notebook.")
     suite.add_argument("--json", action="store_true", help="Emit machine-readable JSON suite summary.")
+    add_tfbs_subcommands(subparsers)
     return parser
 
 
@@ -251,7 +253,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _plot_probe(args)
         if args.command == "suite":
             return _suite_probe(args)
-    except (ValueError, RuntimeError) as exc:
+        tfbs_result = handle_tfbs_command(args)
+        if tfbs_result is not None:
+            return tfbs_result
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")
     parser.error(f"unsupported command: {args.command}")
     return 2

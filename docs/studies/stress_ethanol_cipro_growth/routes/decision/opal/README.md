@@ -38,10 +38,14 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Candidate table and label-source semantics:
   `../../../contexts/opal/candidate-table.md`
-- Current motif-composition QA plan:
+- Production DenseGen TFBS learnability replacement spec:
+  `../../../contexts/opal/densegen-tfbs-learnability-probe-v1.md`
+- Historical motif-composition QA precedent:
   `../../../contexts/opal/densegen-motif-qa-k12-s3-v1.md`
 - Historical scratch synthetic-oracle probe:
   `../../../contexts/opal/densegen-axis-probe-v0.md`
+- Manuscript intent and planned response-shape analyses:
+  `../../../contexts/promoter-design-intent.md`
 - Campaign configs and commands: `campaign-commands.md`
 
 ### Candidate Table Contract
@@ -80,3 +84,23 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - LatentDNA can narrow the choice of `X`, but OPAL owns label-source
   validation, training, scoring, active selection, and ledgers after labels
   exist.
+
+### Planned Analysis TODOs
+
+- Add a round-aware response-archetype divergence plot after measured
+  four-condition labels exist. Compute KL or Jensen-Shannon divergence from the
+  underlying response vector `[baseline, ethanol, ciprofloxacin, combined]`,
+  not from SFXI alone. Initial visual contract: x-axis `D_KL` to AND-like
+  combined-stress target, y-axis `D_KL` to OR-like general-stress target, point
+  size SFXI or effect-scaled utility, and point color OPAL round.
+- Keep SFXI as an overlay or selection objective: KL maps response shape; SFXI
+  ranks whether the response is strong and specific enough to be useful.
+- After campaign labels exist, run study-owned mutual-information and feature
+  enrichment analyses against DenseGen metadata such as TFBS identity, family,
+  count, density, order, spacing, orientation, core promoter variant, and
+  distance to promoter elements. Use the same idea in DenseGen probes where
+  synthetic labels are available, but keep probe conclusions separate from
+  measured promoter-function claims.
+- Define behavior classes in response space before architecture clustering.
+  UMAP can display architecture clusters, but should not define AND-like or
+  OR-like labels.

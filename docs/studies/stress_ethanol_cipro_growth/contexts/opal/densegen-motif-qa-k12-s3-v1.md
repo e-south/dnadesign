@@ -1,8 +1,12 @@
 ## DenseGen Motif QA K12/S3 v1
 
-`densegen_motif_qa_k12_s3_v1` is the current planned study-owned OPAL QA
-suite for the pre-assay stress ethanol/cipro campaign. It replaces the stale
-K6/single-seed probe framing with a K12, three-seed, trajectory-based benchmark.
+**Supersession note:** this document is now historical execution precedent for
+the DenseGen OPAL probe family. The production replacement spec is
+[`densegen-tfbs-learnability-probe-v1.md`](densegen-tfbs-learnability-probe-v1.md).
+
+`densegen_motif_qa_k12_s3_v1` is a study-owned OPAL QA suite for the pre-assay
+stress ethanol/cipro campaign. It replaced the stale K6/single-seed probe
+framing with a K12, three-seed, trajectory-based benchmark.
 
 The suite asks a bounded methods question: can the configured OPAL campaign
 loop, using the current LatentDNA/Evo2 X column, recover known
