@@ -30,8 +30,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
-- Batch-0 selector: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/`
-- Candidate provenance audit: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/provenance.py`
+- Batch-0 selector: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/`
+- Candidate provenance audit: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/provenance.py`
 - Primary doc: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
 
 ### Detail Surfaces
@@ -64,8 +64,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - OPAL reads the study-owned `opal_candidate_feature_table`; do not route this as a generic feature matrix.
 - OPAL does not own the full DenseGen/Construct/Infer lineage; use
-  `opal_batch0.provenance` to verify that DenseGen sidecar resolution is
-  complete by `id`.
+  `dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.batch0.provenance`
+  to verify that DenseGen sidecar resolution is complete by `id`.
 - For transient simulation campaigns that must not mutate shared USR records,
   copy the candidate table into an isolated local data root. If the campaign
   uses `labels.source.kind: usr_sidecar`, configure a scratch USR root with
@@ -87,20 +87,13 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Planned Analysis TODOs
 
-- Add a round-aware response-archetype divergence plot after measured
-  four-condition labels exist. Compute KL or Jensen-Shannon divergence from the
-  underlying response vector `[baseline, ethanol, ciprofloxacin, combined]`,
-  not from SFXI alone. Initial visual contract: x-axis `D_KL` to AND-like
-  combined-stress target, y-axis `D_KL` to OR-like general-stress target, point
-  size SFXI or effect-scaled utility, and point color OPAL round.
-- Keep SFXI as an overlay or selection objective: KL maps response shape; SFXI
-  ranks whether the response is strong and specific enough to be useful.
-- After campaign labels exist, run study-owned mutual-information and feature
-  enrichment analyses against DenseGen metadata such as TFBS identity, family,
-  count, density, order, spacing, orientation, core promoter variant, and
-  distance to promoter elements. Use the same idea in DenseGen probes where
-  synthetic labels are available, but keep probe conclusions separate from
-  measured promoter-function claims.
-- Define behavior classes in response space before architecture clustering.
-  UMAP can display architecture clusters, but should not define AND-like or
+- After measured four-condition labels exist, add round-aware KL/Jensen-Shannon
+  response-archetype plots over `[baseline, ethanol, ciprofloxacin, combined]`;
+  keep SFXI as strength/specificity overlay or selection objective, not the
+  response-shape axis.
+- Run study-owned mutual-information and enrichment analyses against DenseGen
+  TFBS identity, family, count, density, order, spacing, orientation, core
+  promoter variant, and distance-to-element metadata.
+- DenseGen probe conclusions stay separate from measured promoter-function
+  claims; UMAP may display architecture clusters but must not define AND-like or
   OR-like labels.

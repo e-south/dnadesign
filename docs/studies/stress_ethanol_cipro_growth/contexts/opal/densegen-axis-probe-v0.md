@@ -96,7 +96,7 @@ Dry-run is the default. `--apply` is required to create scratch artifacts or
 invoke OPAL:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --initial-labels 12 --selection-k 12 --seed 7 --rounds 12 \
   --splits random_id,leave_sigma35_variant --score-batch-size 512 --apply
 ```
@@ -132,14 +132,14 @@ config validation. This still runs OPAL validation and the full candidate-table
 X-column scan:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate cipro-random --stop-after validate --apply
 ```
 
 Audit a materialized run root:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe status \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe status \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/<run_id>
 ```
 
@@ -168,11 +168,11 @@ aggregate benchmark layer under `reports/`. Configured OPAL campaign plots are
 first-class `opal.plot_artifact.v1` artifacts, refreshed separately, and browsed
 through `round_variants` manifests rather than report-layer file scraping. For
 final plot review, run
-`uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe plot --run-root <run> --round all --json`,
+`uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe plot --run-root <run> --round all --json`,
 then rerun the report with `--plots --json`.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe report --run-root <run>`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe report --run-root <run>`
   rebuilds the review layer over an existing run root.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run>`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run>`
   summarizes scratch OPAL round logs without digging through campaign
   directories.
 

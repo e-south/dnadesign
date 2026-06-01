@@ -99,7 +99,7 @@ DNADESIGN_HEADLESS=1 uv run pytest -q \
   src/dnadesign/opal/tests/notebooks \
   src/dnadesign/opal/tests/analysis \
   src/dnadesign/opal/tests/cli/test_cli_notebook_generate.py
-uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_batch0/test_opal_batch0.py
+uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/batch0/test_opal_batch0.py
 bash .agents/skills/stress-ethanol-cipro-growth-status/scripts/audit-stress-ethanol-cipro-growth-status-skill.sh
 uv run ruff check src/dnadesign/opal src/dnadesign/studies .agents/skills/stress-ethanol-cipro-growth-status
 uv run ruff format --check src/dnadesign/opal src/dnadesign/studies

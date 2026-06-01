@@ -109,8 +109,8 @@ locations are recorded.
 
 Study-owned implementation paths:
 
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_densegen_axis_probe/`
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe/`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/`
 - `docs/studies/stress_ethanol_cipro_growth/contexts/opal/densegen-tfbs-learnability-probe-v1.md`
 
 Boundaries:
@@ -135,13 +135,14 @@ Boundaries:
 ### Concrete Steps
 
 1. Add v1 row parser and coordinate/sigma-core contracts under
-   `opal_densegen_axis_probe/tfbs_contracts.py`.
+   `decision/opal/densegen_axis_probe/tfbs/contracts.py`.
 2. Add positive-oracle label/manifests under
-   `opal_densegen_axis_probe/tfbs_oracle.py`.
+   `decision/opal/densegen_axis_probe/tfbs/oracle.py`.
 3. Add v1 label-family registry surface in
-   `opal_densegen_axis_probe/label_families.py`.
+   `decision/opal/densegen_axis_probe/plan_logic/label_families.py` and
+   TFBS-owned schema/active-target modules.
 4. Add focused parser and label tests under
-   `tests/opal_densegen_axis_probe/test_tfbs_learnability_*.py`.
+   `tests/decision/opal/densegen_axis_probe/test_tfbs_learnability_*.py`.
 5. Add live Stage A CLI/materialization path and record generated artifact
    locations here.
 6. Add matched-null construction and null artifact writers.
@@ -174,9 +175,9 @@ Stage C: not started. The full matrix must wait for Stage A and Stage B gates.
 
 Run and record the exact commands and outcomes:
 
-- `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe`
-- `uv run ruff check src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_densegen_axis_probe src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe`
-- `uv run ruff format --check src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_densegen_axis_probe src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe`
+- `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
+- `uv run ruff check src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
+- `uv run ruff format --check src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
@@ -185,22 +186,22 @@ Run and record the exact commands and outcomes:
 
 Recent targeted validation:
 
-- `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe/test_tfbs_stage_b_configs.py`
+- `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_tfbs_stage_b_configs.py`
   passed with 3 tests.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe tfbs-stage-b-configs --stage-a-run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --replace-out-dir --json`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe tfbs-stage-b-configs --stage-a-run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --replace-out-dir --json`
   passed and reported `campaign_count=10`, `validation_status=PASS`.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe tfbs-stage-a --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --replace-run-root --json`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe tfbs-stage-a --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --replace-run-root --json`
   passed after replacing stale Stage B campaign artifacts under the run root.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe tfbs-stage-b-configs --stage-a-run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --json`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe tfbs-stage-b-configs --stage-a-run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530 --json`
   passed with 10 configs, 24 rounds, `selection_k=6`, `initial_label_count=6`,
   `tie_handling=ordinal`, and `selection_budget_mode=exact_top_k`.
-- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe tfbs-stage-b-run --config-manifest .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530/stage_b_sentinel_configs/manifests/stage_b_sentinel_config_manifest.json --json`
+- `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe tfbs-stage-b-run --config-manifest .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_tfbs_learnability_stage_a_seed7_20260530/stage_b_sentinel_configs/manifests/stage_b_sentinel_config_manifest.json --json`
   passed with `campaign_count=10` and 24 rounds.
 - Stage B artifact audit passed: every `selection_top_k.csv` contained exactly
   6 rows, every sidecar contained 144 labels, every round contributed exactly 6
   labels, and all 10 campaigns wrote `outputs/retention_manifest.json`.
 - Targeted validation passed:
-  `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe/test_tfbs_stage_a_materialization.py src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe/test_tfbs_stage_b_configs.py src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe/test_tfbs_stage_b_execution.py`
+  `uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_tfbs_stage_a_materialization.py src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_tfbs_stage_b_configs.py src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_tfbs_stage_b_execution.py`
   reported 11 tests passed.
 - `uv run ruff check ...` and `uv run ruff format --check ...` passed for the
   touched Stage B implementation and tests.

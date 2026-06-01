@@ -2,8 +2,8 @@
 
 **Status:** implementation-ready dev spec
 **Owner:** `stress_ethanol_cipro_growth` study package
-**Target package:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_densegen_axis_probe`
-**Test owner:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe`
+**Target package:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe`
+**Test owner:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
 **Replaces:** the production role of the prior OPAL DenseGen axis probe
 
 This document is the handoff packet for the next implementation pass. It is
@@ -1422,7 +1422,7 @@ Implement a manifest-aware retention tool that:
 DenseGen-specific logic belongs in:
 
 ```text
-src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_densegen_axis_probe
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe
 ```
 
 This package owns:
@@ -1446,18 +1446,18 @@ Existing study package surfaces to inspect before adding new files:
 | `source_contract.py` | Candidate/sidecar source validation. Add the 60 bp, row-count, `offset_raw`, part-count, and fixed-element contract checks here or in a narrow v1 contract module called from here. |
 | `label_families.py` | Study-owned label-family registry. Add strict v1 family names only: `tf_family_count`, `tf_family_presence`, `tf_family_count_fraction`, and `tf_slot_family_presence`. |
 | `active_targets.py` | Study-owned OPAL target declarations. Add scalar expected-label targets that rank by the declared label channel. Do not add plan-vector target similarity for v1 labels. |
-| `nulls.py` | Null provenance and distribution checks. Add matched permutation viability reports and explicit `PASS`/`FAIL_*` status values here or in a narrow v1 null module. |
-| `tfbs_stage_a.py` | Stage A label/null/preflight materialization. Write positive labels, sentinel nulls, source-file hash manifests, pairing manifest, retention estimate, and Stage A summary without running OPAL campaigns. |
-| `tfbs_retention.py` | Stage A retention estimator for sentinel and full-matrix campaign modes. Fail closed when estimated retained artifacts exceed the configured budget. |
-| `tfbs_stage_a_manifests.py` | Source-file fingerprint, positive/null pairing, and Stage A summary manifest builders. Keep manifest semantics study-owned and replay-safe. |
-| `plan.py`, `suite_manifest.py`, `scratch.py` | Campaign/suite materialization. Generate sentinel configs after Stage A gates pass and before full-matrix configs; preserve retention/preflight manifests. |
+| `tfbs/nulls/` | Matched-null construction, exchangeability strata, viability reports, and explicit `PASS`/`FAIL_*` status values. |
+| `tfbs/stage_a/materialization.py` | Stage A label/null/preflight materialization. Write positive labels, sentinel nulls, source-file hash manifests, pairing manifest, retention estimate, and Stage A summary without running OPAL campaigns. |
+| `tfbs/retention.py` | Stage A retention estimator for sentinel and full-matrix campaign modes. Fail closed when estimated retained artifacts exceed the configured budget. |
+| `tfbs/stage_a/manifests.py` | Source-file fingerprint, positive/null pairing, and Stage A summary manifest builders. Keep manifest semantics study-owned and replay-safe. |
+| `runtime/plan.py`, `reporting/suite_manifest.py`, `runtime/scratch.py`, `tfbs/stage_b/configs/` | Campaign/suite materialization. Generate sentinel configs after Stage A gates pass and before full-matrix configs; preserve retention/preflight manifests. |
 | `trajectory_metrics.py`, `suite_replicates.py`, `suite_review.py` | Positive/null paired metrics and replicate summaries. Add selected true-label lift, paired AUC delta, final lift, and seed intervals here. |
-| `plotting.py`, `suite_notebook.py`, `review/` | Manifest-backed review surfaces. Add raw true-label enrichment, null viability, and sigma-core balance visuals without making OPAL notebooks DenseGen-specific. |
+| `reporting/plotting.py`, `reporting/suite_notebook.py`, `reporting/review/`, `tfbs/stage_b/review/` | Manifest-backed review surfaces. Add raw true-label enrichment, null viability, and sigma-core balance visuals without making OPAL notebooks DenseGen-specific. |
 
 Tests belong in:
 
 ```text
-src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe
 ```
 
 Durable docs:
@@ -1760,7 +1760,7 @@ Run the repo's standard checks. At minimum include:
 uv run ruff check .
 uv run ruff format --check .
 uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .
-uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/opal_densegen_axis_probe
+uv run pytest -q src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe
 uv run python -m dnadesign.devtools.docs.checks
 git diff --check
 ```

@@ -267,7 +267,7 @@ more review before using this probe as a methods figure.
 Source/materialization dry run:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate source --selection-k 12 --initial-labels 12 --seed 7 --json
 ```
 
@@ -275,14 +275,14 @@ Apply the source gate and write the suite, label-family, and null provenance
 manifests:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate source --selection-k 12 --initial-labels 12 --seed 7 --apply --json
 ```
 
 Validate the full per-seed campaign matrix without scoring the candidate pool:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate all --selection-k 12 --initial-labels 12 --rounds 12 --seed 7 \
   --score-batch-size 512 --stop-after validate --apply --json
 ```
@@ -296,7 +296,7 @@ explicit.
 One-seed scored burn-in:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate all --selection-k 12 --initial-labels 12 --rounds 12 --seed 7 \
   --score-batch-size 512 --apply --json
 ```
@@ -309,7 +309,7 @@ To run a lower-cost scope before the full 72-campaign suite, constrain the
 active families explicitly:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate all --active-label-families densegen_plan_logic4 --selection-k 12 \
   --initial-labels 12 --rounds 12 --seed 7 --score-batch-size 512 --apply --json
 ```
@@ -317,7 +317,7 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_denseg
 or:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe run \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe run \
   --gate random-all --active-label-families tf_family_count --selection-k 12 \
   --initial-labels 12 --rounds 12 --seed 7 --score-batch-size 512 --apply --json
 ```
@@ -331,7 +331,7 @@ After configured plots and per-root reports are refreshed, write the suite
 aggregate:
 
 ```bash
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe suite \
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe suite \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_motif_qa_k12_s3_v1_seed7_all_r12 \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_motif_qa_k12_s3_v1_seed17_all_r12 \
   --run-root .var/studies/stress_ethanol_cipro_growth/opal_densegen_axis_probe/densegen_motif_qa_k12_s3_v1_seed29_all_r12 \

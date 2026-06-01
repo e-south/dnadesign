@@ -291,12 +291,12 @@ study_pipeline:
       and: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml
     progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
     review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
-    densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_densegen_axis_probe progress --run-root <run-root> --json
+    densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run-root> --json
     notebook:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true
       mutates_notebook: true
       generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force
       run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
-    batch0_selector: src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml
+    batch0_selector: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml
     state: candidate_table_materialized_pre_assay
