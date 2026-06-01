@@ -27,6 +27,6 @@ def test_studies_package_data_includes_concrete_study_ops_status_registries() ->
 
     assert '"dnadesign.studies" = [' in pyproject
     assert '"studies/retron_hairpin_design/status/ops/status.registry.yaml"' in pyproject
-    assert '"studies/stress_ethanol_cipro_growth/status/ops/status.registry.yaml"' in pyproject
-    assert '"studies/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml"' in pyproject
+    assert '"studies/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml"' in pyproject
+    assert '"studies/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml"' in pyproject
     assert '"*/status.registry.yaml"' not in pyproject

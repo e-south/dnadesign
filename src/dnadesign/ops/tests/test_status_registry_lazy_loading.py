@@ -57,7 +57,7 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     assert supported_specs["usr-dataset-state"].owner_boundary == "usr"
     assert supported_specs["usr-dataset-state"].observes_plane == "data"
     assert supported_specs["stress-ethanol-cipro-growth-preflight"].provider_ref == (
-        "dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider:provide_stress_ethanol_cipro_growth_preflight"
+        "dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider:provide_stress_ethanol_cipro_growth_preflight"
     )
     assert supported_specs["stress-ethanol-cipro-growth-preflight"].owner_boundary == "studies"
     assert supported_specs["stress-ethanol-cipro-growth-preflight"].observes_plane == "execution_readiness"
@@ -108,8 +108,8 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
         'dnadesign.studies.units.retron_hairpin_design.status.service',
         'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
@@ -127,9 +127,9 @@ import importlib
 import json
 import sys
 
-importlib.import_module('dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider')
+importlib.import_module('dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider')
 watched = {
-    'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
+    'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
     'dnadesign.densegen',
     'dnadesign.infer',
     'dnadesign.usr',
@@ -503,8 +503,8 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
         'dnadesign.studies.units.retron_hairpin_design.status.service',
         'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
@@ -533,8 +533,8 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
         'dnadesign.studies.units.retron_hairpin_design.status.service',
         'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
@@ -686,8 +686,8 @@ print(json.dumps(sorted(
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
         'dnadesign.studies.units.retron_hairpin_design.status.service',
         'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
@@ -718,8 +718,8 @@ print(json.dumps(sorted(
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.status.ops.provider',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
+        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
         'dnadesign.studies.units.retron_hairpin_design.status.service',
         'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }

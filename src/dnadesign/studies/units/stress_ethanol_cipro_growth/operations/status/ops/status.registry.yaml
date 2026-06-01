@@ -1,0 +1,63 @@
+version: 1
+provider_id: study.stress_ethanol_cipro_growth
+entries:
+  - status_kind: stress-ethanol-cipro-growth-status
+    owner_boundary: studies
+    observes_plane: record
+    provider_ref: dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider:provide_stress_ethanol_cipro_growth_status
+    description: Read the stress_ethanol_cipro_growth study record and summarize dataset, phase, and handoff posture from repo-backed evidence.
+    surface_type: study_snapshot
+    cost_class: cheap
+    summary_scope: repo
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in stress_ethanol_cipro_growth study directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, and operations/ops.study.yaml.
+        type: path
+        required: false
+        path_base: repo
+    notes:
+      - If `docs/studies/index.yaml` declares `stress_ethanol_cipro_growth` as `active_study_id`, you can omit `--study-dir`. Use `--study-dir` only to pin `docs/studies/stress_ethanol_cipro_growth` from outside the repo checkout.
+  - status_kind: stress-ethanol-cipro-growth-preflight
+    owner_boundary: studies
+    observes_plane: execution_readiness
+    provider_ref: dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider:provide_stress_ethanol_cipro_growth_preflight
+    description: Run the read-only stress_ethanol_cipro_growth preflight suite across DenseGen, Construct, Infer, Notify, and batch-plan surfaces.
+    surface_type: study_preflight
+    cost_class: deep
+    summary_scope: host
+    input_schema:
+      - name: study_dir
+        manifest_key: study_dir
+        cli_flag: --study-dir
+        placeholder: docs/studies/<study-id>
+        summary: Checked-in stress_ethanol_cipro_growth study directory containing record/campaign.yaml, record/datasets.yaml, record/status.md, and operations/ops.study.yaml.
+        type: path
+        required: false
+        path_base: repo
+      - name: scope
+        manifest_key: scope
+        cli_flag: --scope
+        placeholder: next
+        summary: >-
+          Preflight scope for stress-ethanol-cipro-growth-preflight surfaces: `full` runs
+          the whole suite; `next` focuses the next actionable phase and
+          defers later-lane blockers.
+        type: enum
+        required: false
+        default: next
+        choices: [next, full]
+      - name: command_timeout_seconds
+        manifest_key: command_timeout_seconds
+        cli_flag: --command-timeout-seconds
+        placeholder: "30"
+        summary: Per-command timeout for command-backed preflight checks on this host.
+        type: int
+        required: false
+        default: 180
+    notes:
+      - This route composes read-only command preflights. Use it after the cheaper `studies.stress-ethanol-cipro-growth.status` snapshot when you need command-level blockers.
+      - Pass `--command-timeout-seconds <seconds>` for bounded local probes when a full host readiness check is too slow.
+      - If `docs/studies/index.yaml` declares `stress_ethanol_cipro_growth` as `active_study_id`, you can omit `--study-dir`. Use `--study-dir` only to pin `docs/studies/stress_ethanol_cipro_growth` from outside the repo checkout.

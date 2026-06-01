@@ -1,6 +1,9 @@
 # Stress / Ethanol / Ciprofloxacin Growth Study
 
-This directory holds the checked-in study snapshot for the stress / ethanol / ciprofloxacin promoter study. Use it to see the current study phase, the active LatentDNA review path, and the linked study notes.
+This package holds study-owned implementation, durable review prose, and static
+curation records for the stress / ethanol / ciprofloxacin promoter study. Use
+the docs-side study record for current state, and use this source package only
+when the task needs executable study surfaces or checked-in review artifacts.
 
 - Binding file: [contexts/latentdna/binding.yaml](../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml)
 - Workspace snapshot consumer doc: [stress-ethanol-cipro-representation-comparison.md](../../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
@@ -8,21 +11,45 @@ This directory holds the checked-in study snapshot for the stress / ethanol / ci
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`, `reference_to_plan_centroid_heatmap`, `reference_standard_strength_audit`
 - Appendix support: `sigma35_centroid_distance_gallery`, `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`
 - Appendix deliverables: `appendix_geometry_review`, `appendix_umap_gallery`
-- Deliverable docs: [deliverables/README.md](deliverables/README.md)
+- Deliverable docs: [workbench/deliverables/README.md](workbench/deliverables/README.md)
 - Reference-view branch: `usr_promoter_references` -> `construct_prom_eth_cip_reference_core60` -> `construct_prom_eth_cip_reference_contexts` -> `infer_prom_eth_cip_reference_views_7b`
-- Study notes: [notes/README.md](notes/README.md)
-- Bidirectional-context audit: [2026-05-09 bidirectional context-anchor mean confidence](notes/audits/2026-05-09-bidirectional-context-anchor-mean-confidence.md)
-- View-language prose audit: [2026-05-09 view-language prose](notes/audits/2026-05-09-view-language-prose.md)
-- Candidate-X rationale and story surfaces: [2026-05-10 candidate-X story surfaces](notes/rationale/2026-05-10-candidate-x-story-surfaces.md)
-- Native reference processing and ontology audit: [2026-05-10 native reference processing and ontology](notes/audits/2026-05-10-native-reference-processing-and-ontology.md)
+- Study notes: [workbench/notes/README.md](workbench/notes/README.md)
+- Bidirectional-context audit: [2026-05-09 bidirectional context-anchor mean confidence](workbench/notes/audits/2026-05-09-bidirectional-context-anchor-mean-confidence.md)
+- View-language prose audit: [2026-05-09 view-language prose](workbench/notes/audits/2026-05-09-view-language-prose.md)
+- Candidate-X rationale and story surfaces: [2026-05-10 candidate-X story surfaces](workbench/notes/rationale/2026-05-10-candidate-x-story-surfaces.md)
+- Native reference processing and ontology audit: [2026-05-10 native reference processing and ontology](workbench/notes/audits/2026-05-10-native-reference-processing-and-ontology.md)
 
 ## Source Orientation
 
-- `status/service.py`: study status service orchestration and OPS contract binding.
-- `status/snapshot.py`: record-backed snapshot assembly.
-- `status/preflight.py`: study-owned preflight context and check coordination.
-- `status/probes/`: bounded data/runtime probes for semantic completeness,
-  sequence-view contracts, and host/runtime dependencies. Deeper Infer feature
-  completion remains command-backed preflight behavior, not cheap status.
-- `status/ops/`: OPS provider entrypoints and status registry metadata.
-- `opal_batch0/`: OPAL candidate-table sampling for this study only.
+```text
+stress_ethanol_cipro_growth/
+  decision/
+    opal/
+      batch0/               # pre-assay OPAL candidate-table handoff
+      densegen_axis_probe/  # DenseGen-label OPAL probe and TFBS learnability
+  operations/
+    status/                 # OPS status/preflight provider implementation
+  workbench/
+    study.yaml              # LatentDNA deliverable-doc binding metadata
+    deliverables/           # LatentDNA-facing checked-in review prose
+    notes/                  # dated study interpretation and handoffs
+    reference_sets/         # static study curation records
+  tests/                    # mirrors decision/ and operations/
+```
+
+- `decision/opal/batch0/`: OPAL candidate-table sampling for this study only.
+- `decision/opal/densegen_axis_probe/`: study-local OPAL probes that consume
+  DenseGen construction metadata through study-owned contracts.
+- `operations/status/service.py`: study status service orchestration and OPS
+  contract binding.
+- `operations/status/snapshot.py`: record-backed snapshot assembly.
+- `operations/status/preflight.py`: study-owned preflight context and check
+  coordination.
+- `operations/status/probes/`: bounded data/runtime probes for semantic
+  completeness, sequence-view contracts, and host/runtime dependencies. Deeper
+  Infer feature completion remains command-backed preflight behavior, not cheap
+  status.
+- `operations/status/ops/`: OPS provider entrypoints and status registry
+  metadata.
+- `workbench/`: durable prose and static curation records that are not Python
+  execution surfaces.
