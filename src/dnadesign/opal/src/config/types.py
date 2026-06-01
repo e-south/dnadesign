@@ -116,6 +116,23 @@ class WritebackBlock:
 
 
 @dataclass
+class ArtifactRetentionBlock:
+    # audit_full | production_review | ephemeral_selection
+    mode: str = "audit_full"
+    # all_rounds_full | latest_full_plus_selected_history | selected_history_only
+    prediction_ledger: str = "all_rounds_full"
+    # full | compact | none
+    plot_tidy_data: str = "full"
+    # all | latest
+    model_artifacts: str = "all"
+    # parquet | parquet_zstd
+    tabular_format: str = "parquet"
+    max_estimated_bytes: int = 50_000_000_000
+    fail_if_estimate_exceeds: bool = True
+    final_round: Optional[int] = None
+
+
+@dataclass
 class SafetyBlock:
     fail_on_mixed_biotype_or_alphabet: bool = True
     require_biotype_and_alphabet_on_init: bool = True
@@ -155,5 +172,6 @@ class RootConfig:
     safety: SafetyBlock
     labels: LabelsBlock = field(default_factory=LabelsBlock)
     writeback: WritebackBlock = field(default_factory=WritebackBlock)
+    artifact_retention: ArtifactRetentionBlock = field(default_factory=ArtifactRetentionBlock)
     plot_config: Optional[str] = None
     ownership: Optional[OwnershipBlock] = None

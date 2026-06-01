@@ -12,18 +12,18 @@ def build_notebook_collection_set_choices(collection_visuals: Iterable[Mapping[s
 
     counts: dict[str, int] = {}
     labels: dict[str, str] = {}
+    order: list[str] = []
     for raw in sequence(collection_visuals):
         if not isinstance(raw, Mapping):
             continue
         key = str(raw.get("comparison_set_key") or "").strip()
         if not key:
             continue
+        if key not in counts:
+            order.append(key)
         counts[key] = counts.get(key, 0) + 1
         labels.setdefault(key, str(raw.get("comparison_set_label") or key))
-    return [
-        {"key": key, "label": labels[key], "visual_count": counts[key]}
-        for key in sorted(counts, key=lambda item: labels[item])
-    ]
+    return [{"key": key, "label": labels[key], "visual_count": counts[key]} for key in order]
 
 
 def build_notebook_collection_visual_choices(

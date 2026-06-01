@@ -62,6 +62,8 @@ def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     assert 'label="Visual surface"' in text
     assert 'label="Review surface"' in text
     assert "view_mode_ui = mo.ui.radio(" in text
+    assert 'default_view_mode = "Campaign set" if collection_set_choices else "Campaign"' in text
+    assert "value=default_view_mode" in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
     assert "on_change=set_visual_label_memory" in text
     assert "build_notebook_collection_set_choices" in text

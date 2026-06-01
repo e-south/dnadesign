@@ -24,6 +24,7 @@ from ..core.config_resolve import resolve_campaign_root
 from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
 from .types import (
+    ArtifactRetentionBlock,
     CampaignBlock,
     CandidateScope,
     DataBlock,
@@ -174,6 +175,40 @@ class PWriteback(BaseModel):
     prediction_records: Literal["label_history", "ledger_only"] = "label_history"
 
 
+class PArtifactRetention(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["audit_full", "production_review", "ephemeral_selection"] = "audit_full"
+    prediction_ledger: Literal[
+        "all_rounds_full",
+        "latest_full_plus_selected_history",
+        "selected_history_only",
+    ] = "all_rounds_full"
+    plot_tidy_data: Literal["full", "compact", "none"] = "full"
+    model_artifacts: Literal["all", "latest"] = "all"
+    tabular_format: Literal["parquet", "parquet_zstd"] = "parquet"
+    max_estimated_bytes: int = 50_000_000_000
+    fail_if_estimate_exceeds: bool = True
+    final_round: Optional[int] = None
+
+    @field_validator("max_estimated_bytes")
+    @classmethod
+    def _max_estimated_bytes_positive(cls, value: int) -> int:
+        out = int(value)
+        if out <= 0:
+            raise ValueError("artifact_retention.max_estimated_bytes must be positive")
+        return out
+
+    @field_validator("final_round")
+    @classmethod
+    def _final_round_nonnegative(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        out = int(value)
+        if out < 0:
+            raise ValueError("artifact_retention.final_round must be non-negative")
+        return out
+
+
 class PIngest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     duplicate_policy: Literal["error", "keep_first", "keep_last"] = "error"
@@ -216,6 +251,7 @@ class PRoot(BaseModel):
     selection: PPluginRef
     labels: PLabels = Field(default_factory=PLabels)
     writeback: Optional[PWriteback] = None
+    artifact_retention: PArtifactRetention = Field(default_factory=PArtifactRetention)
     training: PTraining = Field(default_factory=PTraining)
     ingest: PIngest = Field(default_factory=PIngest)
     scoring: PScoring = Field(default_factory=PScoring)
@@ -397,6 +433,16 @@ def load_config(path: Path | str) -> RootConfig:
     writeback_dc = WritebackBlock(
         prediction_records=(pyd.writeback.prediction_records if pyd.writeback else "label_history")
     )
+    artifact_retention_dc = ArtifactRetentionBlock(
+        mode=str(pyd.artifact_retention.mode),
+        prediction_ledger=str(pyd.artifact_retention.prediction_ledger),
+        plot_tidy_data=str(pyd.artifact_retention.plot_tidy_data),
+        model_artifacts=str(pyd.artifact_retention.model_artifacts),
+        tabular_format=str(pyd.artifact_retention.tabular_format),
+        max_estimated_bytes=int(pyd.artifact_retention.max_estimated_bytes),
+        fail_if_estimate_exceeds=bool(pyd.artifact_retention.fail_if_estimate_exceeds),
+        final_round=(None if pyd.artifact_retention.final_round is None else int(pyd.artifact_retention.final_round)),
+    )
     safety_dc = SafetyBlock(
         fail_on_mixed_biotype_or_alphabet=pyd.safety.fail_on_mixed_biotype_or_alphabet,
         require_biotype_and_alphabet_on_init=pyd.safety.require_biotype_and_alphabet_on_init,
@@ -434,6 +480,7 @@ def load_config(path: Path | str) -> RootConfig:
         safety=safety_dc,
         labels=labels_dc,
         writeback=writeback_dc,
+        artifact_retention=artifact_retention_dc,
         plot_config=(_abs(pyd.plot_config) if pyd.plot_config else None),
         ownership=ownership_dc,
     )

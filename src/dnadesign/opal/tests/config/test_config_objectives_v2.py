@@ -196,6 +196,48 @@ selection:
     assert cfg.writeback.prediction_records == "ledger_only"
 
 
+def test_load_config_accepts_artifact_retention_block(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: local, path: "./records.parquet" }
+  x_column_name: "X"
+  y_column_name: "Y"
+artifact_retention:
+  mode: production_review
+  prediction_ledger: latest_full_plus_selected_history
+  plot_tidy_data: compact
+  model_artifacts: latest
+  tabular_format: parquet_zstd
+  max_estimated_bytes: 50000000000
+  fail_if_estimate_exceeds: true
+  final_round: 11
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params: { top_k: 2, score_ref: "scalar_identity_v1/scalar", objective_mode: maximize, tie_handling: competition_rank }
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+
+    assert cfg.artifact_retention.mode == "production_review"
+    assert cfg.artifact_retention.prediction_ledger == "latest_full_plus_selected_history"
+    assert cfg.artifact_retention.plot_tidy_data == "compact"
+    assert cfg.artifact_retention.model_artifacts == "latest"
+    assert cfg.artifact_retention.tabular_format == "parquet_zstd"
+    assert cfg.artifact_retention.final_round == 11
+
+
 def test_load_config_rejects_usr_sidecar_without_explicit_prediction_writeback(tmp_path: Path) -> None:
     cfg_path = _write_config(
         tmp_path / "campaign.yaml",

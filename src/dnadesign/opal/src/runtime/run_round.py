@@ -26,6 +26,7 @@ from ..registries.transforms_x import get_transform_x
 from ..storage.artifacts import append_round_log_event
 from ..storage.data_access import RecordsStore
 from ..storage.workspace import CampaignWorkspace
+from .retention import apply_runtime_artifact_retention
 from .round.context import build_round_ctx
 from .round.contracts import RoundInputs, RunRoundRequest, RunRoundResult
 from .round.stages import stage_scoring, stage_training, stage_x_matrices
@@ -369,6 +370,21 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     append_round_log_event(
         round_log_path,
         {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "state_update_done"},
+    )
+    append_round_log_event(
+        round_log_path,
+        {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "retention_start"},
+    )
+    retention_manifest = apply_runtime_artifact_retention(cfg, ws)
+    append_round_log_event(
+        round_log_path,
+        {
+            "ts": now_iso(),
+            "round": int(req.as_of_round),
+            "run_id": run_id,
+            "stage": "retention_done",
+            "status": retention_manifest.get("status"),
+        },
     )
 
     append_round_log_event(

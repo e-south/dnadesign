@@ -404,6 +404,8 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
 
     assert 'label="Review surface"' in text
     assert "view_mode_ui = mo.ui.radio(" in text
+    assert 'default_view_mode = "Campaign set" if collection_set_choices else "Campaign"' in text
+    assert "value=default_view_mode" in text
     assert 'label="Campaign set"' in text
     assert 'label="OPAL campaign"' in text
     assert 'label="Collection visual"' in text
@@ -419,6 +421,12 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
 def test_collection_visual_choices_can_filter_by_campaign_set() -> None:
     visuals = [
         {
+            "visual_id": "review",
+            "label": "Realized review",
+            "comparison_set_key": "stage_b_realized_label_review",
+            "comparison_set_label": "Stage B realized-label review",
+        },
+        {
             "visual_id": "score_cipro",
             "label": "Selected score",
             "comparison_set_key": "target=cipro",
@@ -433,6 +441,7 @@ def test_collection_visual_choices_can_filter_by_campaign_set() -> None:
     ]
 
     assert build_notebook_collection_set_choices(visuals) == [
+        {"key": "stage_b_realized_label_review", "label": "Stage B realized-label review", "visual_count": 1},
         {"key": "target=cipro", "label": "Cipro", "visual_count": 1},
         {"key": "target=ethanol", "label": "Ethanol", "visual_count": 1},
     ]
