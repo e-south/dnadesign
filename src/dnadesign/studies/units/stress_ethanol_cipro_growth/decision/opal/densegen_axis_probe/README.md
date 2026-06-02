@@ -63,6 +63,28 @@ surface without label leakage, and does that learning exceed a matched null?
   keeps artifact readers, trajectory frames, summary payloads, and
   materialization separate.
 
+## Review Plot And Outcome Contracts
+
+Probe-level review artifacts stay under `reporting/review/`. Aggregate plots
+are registry-backed in `reporting/review/aggregate_plots/`, with separate
+contracts, normalized source frames, renderers, and writer orchestration. This
+keeps OPAL campaign plots generic while allowing the study to add future
+probe-specific review plots by registering a new `ProbeAggregatePlotSpec` and
+renderer, rather than hardcoding plot order in the report builder.
+
+All study-owned aggregate and TFBS review plots use the shared
+`tfbs.plot_style` axis contract: styled ticks, visible left/bottom axes only,
+review grid styling, and square axes where the data shape supports it. OPAL
+campaign plots remain OPAL-owned primitives, but the study-generated campaign
+configs request those primitives through `plots.yaml` instead of embedding
+study rendering code in OPAL core.
+
+The review manifest includes `outcome_summary`, a compact operator explanation
+of the probe decision. Its interpretation boundary is deliberately narrow:
+these are pre-assay synthetic-oracle learnability results, not growth,
+stress-tolerance, TF-binding, regulatory-mechanism, wet-lab phenotype, or
+biological-causality claims.
+
 Run with:
 
 ```bash

@@ -38,7 +38,9 @@ def test_probe_review_is_semantic_package() -> None:
     review_package = probe_root / "reporting" / "review"
 
     assert not review_file.exists()
+    assert not (review_package / "probe_plots.py").exists()
     assert review_package.is_dir()
+    assert (review_package / "aggregate_plots").is_dir()
     module_lengths = {
         path.relative_to(review_package).as_posix(): len(path.read_text(encoding="utf-8").splitlines())
         for path in review_package.rglob("*.py")

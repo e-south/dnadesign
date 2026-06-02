@@ -136,8 +136,11 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
     assert "OPAL campaign run review artifacts remain campaign-scoped" in review_text
     assert "PASS_CIPRO_RANDOM_GATE" in review_text
     assert "Configured OPAL Plots" in review_text
+    assert "Probe Outcome" in review_text
+    assert "pre-assay synthetic-oracle learnability probe" in review_text
     index_text = Path(payload["index"]).read_text(encoding="utf-8")
     assert "DenseGen axis probe review" in index_text
+    assert "Probe Outcome" in index_text
     assert "cipro_positive_random_id" in index_text
     assert "score_selected_over_rounds" in index_text
     assert "Decision Reasons" in index_text
@@ -151,12 +154,15 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
     assert manifest["opal_configured_plots"][0]["plot_count"] == 1
     assert manifest["plot_quality"]["plot_count"] == 1
     assert manifest["plot_quality"]["problem_count"] == 0
+    assert manifest["outcome_summary"]["decision"] == "DEBUG"
+    assert "wet-lab phenotype" in manifest["outcome_summary"]["interpretation_boundary"]
     assert manifest["decision_reasons"]
     assert manifest["gate_results"]
     assert manifest["round_dynamics"][0]["run_key"] == "cipro_positive_random_id"
     status_payload = json.loads((run_root / "reports" / "status.json").read_text(encoding="utf-8"))
     assert status_payload["decision_reasons"]
     assert status_payload["round_dynamics"]
+    assert status_payload["outcome_summary"]["next_action"]
     assert probe_main(["report", "--run-root", str(run_root), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["decision"] == "DEBUG"
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .formatting import _fmt, _gate_observed, _gate_threshold
+from .outcome import markdown_outcome_lines
 
 
 def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_payload: Mapping[str, Any]) -> str:
@@ -18,6 +19,7 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
     plots = review_manifest.get("probe_plots") or []
     problems = review_manifest.get("problems") or []
     decision_reasons = review_manifest.get("decision_reasons") or []
+    outcome_summary = review_manifest.get("outcome_summary") or {}
     gate_results = review_manifest.get("gate_results") or []
     metric_quality = review_manifest.get("metric_quality") or {}
     round_dynamics = review_manifest.get("round_dynamics") or metrics_payload.get("round_dynamics") or []
@@ -42,6 +44,7 @@ def render_probe_review_markdown(review_manifest: Mapping[str, Any], metrics_pay
         f"- run_root: `{review_manifest.get('run_root')}`",
         f"- weak count-aware runs: `{metric_quality.get('weak_count_approx_binomial_p_gt_0_05', 0)}`",
         "",
+        *markdown_outcome_lines(outcome_summary),
         "## Coverage",
         "",
         f"- campaigns: `{', '.join(coverage.get('campaigns') or []) or 'none'}`",

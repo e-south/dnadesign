@@ -172,8 +172,12 @@ require_file "$PROBE_SRC/evaluation/decision.py"
 require_file "$PROBE_SRC/evaluation/prediction_ledger.py"
 require_file "$PROBE_SRC/reporting/progress.py"
 require_dir "$PROBE_SRC/reporting/review"
+require_dir "$PROBE_SRC/reporting/review/aggregate_plots"
 require_file "$PROBE_SRC/reporting/review/__init__.py"
 require_file "$PROBE_SRC/reporting/review/builder.py"
+require_file "$PROBE_SRC/reporting/review/aggregate_plots/contracts.py"
+require_file "$PROBE_SRC/reporting/review/aggregate_plots/renderers.py"
+require_file "$PROBE_SRC/reporting/review/aggregate_plots/writer.py"
 require_file "$PROBE_SRC/reporting/status.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
@@ -237,6 +241,12 @@ else
   pass "DenseGen probe review is a semantic package"
 fi
 
+if [[ -e "$PROBE_SRC/reporting/review/probe_plots.py" ]]; then
+  fail "DenseGen probe aggregate plots are a semantic package"
+else
+  pass "DenseGen probe aggregate plots are a semantic package"
+fi
+
 require_max_lines "$STATUS_SRC/service.py" 320 "status service stays orchestration-sized"
 require_max_lines "$STATUS_SRC/probes/runtime_dependencies.py" 140 "runtime probe module stays bounded"
 require_max_lines "$STATUS_SRC/probes/semantic_completeness.py" 200 "semantic-completeness probe module stays bounded"
@@ -248,7 +258,9 @@ require_max_lines "$PROBE_SRC/cli.py" 280 "DenseGen probe CLI module stays bound
 require_max_lines "$PROBE_SRC/reporting/status.py" 220 "DenseGen probe status module stays bounded"
 require_max_lines "$PROBE_SRC/reporting/review/builder.py" 180 "DenseGen probe review builder stays bounded"
 require_max_lines "$PROBE_SRC/reporting/review/configured_plots.py" 260 "DenseGen probe review configured-plot module stays bounded"
-require_max_lines "$PROBE_SRC/reporting/review/probe_plots.py" 360 "DenseGen probe review plot module stays bounded"
+require_max_lines "$PROBE_SRC/reporting/review/aggregate_plots/contracts.py" 140 "DenseGen probe aggregate plot contracts stay bounded"
+require_max_lines "$PROBE_SRC/reporting/review/aggregate_plots/renderers.py" 260 "DenseGen probe aggregate plot renderers stay bounded"
+require_max_lines "$PROBE_SRC/reporting/review/aggregate_plots/writer.py" 120 "DenseGen probe aggregate plot writer stays bounded"
 require_max_lines "$PROBE_SRC/reporting/review/rendering/html.py" 320 "DenseGen probe review HTML renderer stays bounded"
 require_max_lines "$PROBE_SRC/reporting/review/rendering/markdown.py" 240 "DenseGen probe review Markdown renderer stays bounded"
 require_max_lines "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/README.md" 140 "stress study route map stays one-hop"

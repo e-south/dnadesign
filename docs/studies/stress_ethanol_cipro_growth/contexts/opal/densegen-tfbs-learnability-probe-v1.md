@@ -63,6 +63,15 @@ deterministic replay inputs, selected rows, compact summaries, latest/final
 predictions, PNGs, manifests, and collection visuals while avoiding every-round
 full-pool ledgers and heavy all-row plot CSVs by default.
 
+Review surfaces are also part of the contract. Study-owned aggregate plots are
+registered under the probe review package and must use the shared review-axis
+style: styled ticks, no top/right spine, readable axes, and square axes where
+the plotted data shape supports them. OPAL campaign and campaign-set plots stay
+generic OPAL primitives requested through configured plot manifests; DenseGen
+TFBS interpretation remains in this study package. Every generated review
+manifest should include an `outcome_summary` that explains PASS/DEBUG/STOP or
+PENDING in pre-assay synthetic-oracle terms and repeats the non-claim boundary.
+
 ### 2. Scientific Claim And Non-Claims
 
 #### Claim

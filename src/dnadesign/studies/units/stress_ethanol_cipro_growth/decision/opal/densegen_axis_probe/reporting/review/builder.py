@@ -16,11 +16,13 @@ from ...evaluation.decision import (
     trajectory_qa_summary,
 )
 from ..status import audit_run_root
+from .aggregate_plots import write_probe_aggregate_plots
 from .campaign_reviews import _build_campaign_reviews
 from .configured_plots import _build_configured_plot_reviews, _plot_quality_summary, _review_next_steps
 from .io import _write_json, _write_jsonl
 from .metrics import _enriched_metrics_payload, _gate_coverage, _load_metrics, _review_decision, _review_problems
-from .probe_plots import _write_probe_plots
+from .outcomes import outcome_summary_payload
+from .problems import campaign_review_problems, plot_quality_problems
 from .rendering import render_probe_review_html, render_probe_review_markdown
 from .run_manifest import _build_run_manifest
 
@@ -62,12 +64,21 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
     campaign_reviews = _build_campaign_reviews(layout, metrics_payload=metrics_payload, include_plots=include_plots)
     configured_plots = _build_configured_plot_reviews(layout, metrics_payload=metrics_payload)
     plot_quality = _plot_quality_summary(configured_plots)
+    gate_coverage = _gate_coverage(metrics_payload.get("runs") or [])
     review_problems = [
         *_review_problems(audit=audit, review_decision=review_decision),
-        *_campaign_review_problems(campaign_reviews),
-        *_plot_quality_problems(plot_quality),
+        *campaign_review_problems(campaign_reviews),
+        *plot_quality_problems(plot_quality),
     ]
     review_status = "attention" if review_problems else audit.status
+    outcome_summary = outcome_summary_payload(
+        decision=review_decision,
+        status=review_status,
+        review_problems=review_problems,
+        decision_reasons=decision_reasons,
+        gate_coverage=gate_coverage,
+        trajectory_qa=trajectory_qa,
+    )
     run_manifest = _build_run_manifest(
         layout,
         audit=audit,
@@ -81,7 +92,7 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
     )
     next_steps = _review_next_steps(layout=layout, plot_quality=plot_quality)
     plot_paths = (
-        _write_probe_plots(layout, metrics_payload=metrics_payload, configured_plots=configured_plots)
+        write_probe_aggregate_plots(layout, metrics_payload=metrics_payload, configured_plots=configured_plots)
         if include_plots
         else []
     )
@@ -94,12 +105,13 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         "status": review_status,
         "problems": review_problems,
         "decision_reasons": decision_reasons,
+        "outcome_summary": outcome_summary,
         "gate_results": gate_results,
         "metric_quality": metric_quality,
         "round_dynamics": round_dynamics,
         "trajectory_qa": trajectory_qa,
         "metric_definitions": metric_definitions(),
-        "gate_coverage": _gate_coverage(metrics_payload.get("runs") or []),
+        "gate_coverage": gate_coverage,
         "opal_campaign_reviews": campaign_reviews,
         "opal_configured_plots": configured_plots,
         "plot_quality": plot_quality,
@@ -126,6 +138,7 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
     status_payload["metric_quality"] = metric_quality
     status_payload["round_dynamics"] = round_dynamics
     status_payload["trajectory_qa"] = trajectory_qa
+    status_payload["outcome_summary"] = outcome_summary
     _write_json(layout.status_path, status_payload)
     layout.review_path.write_text(render_probe_review_markdown(review_manifest, metrics_payload), encoding="utf-8")
     layout.review_index_path.write_text(
@@ -144,30 +157,9 @@ def build_probe_review(run_root: Path, *, include_plots: bool = True) -> dict[st
         "opal_configured_plots": configured_plots,
         "plot_quality": plot_quality,
         "next_steps": next_steps,
+        "outcome_summary": outcome_summary,
         "decision": review_decision,
         "persisted_decision": audit.decision,
         "status": review_status,
         "problems": review_problems,
     }
-
-
-def _campaign_review_problems(campaign_reviews: list[dict[str, Any]]) -> list[str]:
-    problems: list[str] = []
-    for row in campaign_reviews:
-        run_key = str(row.get("run_key") or "unknown")
-        warnings = row.get("warnings") or []
-        stale_artifacts = row.get("stale_artifacts") or []
-        if warnings:
-            problems.append(f"opal_campaign_review_warnings:{run_key}:{len(warnings)}")
-        if stale_artifacts:
-            problems.append(f"opal_campaign_review_stale_artifacts:{run_key}:{len(stale_artifacts)}")
-    return problems
-
-
-def _plot_quality_problems(plot_quality: Mapping[str, Any]) -> list[str]:
-    if plot_quality.get("status") == "ok":
-        return []
-    return [
-        f"configured_plot_quality:{problem.get('run_key', 'unknown')}:{problem.get('problem', 'unknown')}"
-        for problem in plot_quality.get("problems") or []
-    ]
