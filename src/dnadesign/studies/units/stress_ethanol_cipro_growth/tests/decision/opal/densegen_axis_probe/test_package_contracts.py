@@ -78,9 +78,15 @@ def test_tfbs_null_and_slot_diagnostics_are_semantic_packages() -> None:
 def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
     probe_root = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe")
     stage_b_root = probe_root / "tfbs" / "stage_b"
-    semantic_packages = (stage_b_root / "configs", stage_b_root / "review", stage_b_root / "notebook_visuals")
+    semantic_packages = (
+        stage_b_root / "configs",
+        stage_b_root / "execution",
+        stage_b_root / "review",
+        stage_b_root / "notebook_visuals",
+    )
 
     assert not (stage_b_root / "configs.py").exists()
+    assert not (stage_b_root / "execution.py").exists()
     assert not (stage_b_root / "review.py").exists()
     assert not (stage_b_root / "notebook_visuals.py").exists()
     assert not (stage_b_root / "notebook_visual_specs.py").exists()

@@ -52,8 +52,10 @@ surface without label leakage, and does that learning exceed a matched null?
 - `stage_b/payloads.py`: OPAL YAML payload builders.
 - `stage_b/seed.py`, `stage_b/semantics.py`: seed policy and campaign
   identity semantics.
-- `stage_b/execution.py`, `stage_b/prune.py`: campaign execution and scoped
-  artifact cleanup.
+- `stage_b/execution/`: campaign execution split into public contracts, OPAL
+  command construction, label-input materialization, manifest validation,
+  selection-budget contracts, and per-campaign orchestration.
+- `stage_b/prune.py`: scoped artifact cleanup.
 - `stage_b/review/`, `stage_b/claims.py`, `stage_b/review_plots.py`,
   `stage_b/slot_diagnostics/`, `stage_b/slot_plots.py`,
   `stage_b/notebook_visuals/`: realized-label review, claim gates, and
