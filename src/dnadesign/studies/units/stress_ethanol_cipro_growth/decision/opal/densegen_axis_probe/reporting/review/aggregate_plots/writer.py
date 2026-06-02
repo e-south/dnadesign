@@ -42,6 +42,7 @@ def write_probe_aggregate_plots(
 ) -> list[Path]:
     """Write registered probe-level plots and return their paths in registry order."""
 
+    validate_probe_aggregate_plot_renderers()
     runs = metrics_payload.get("runs") or []
     if not runs:
         return []
@@ -54,13 +55,24 @@ def write_probe_aggregate_plots(
     for spec in PROBE_AGGREGATE_PLOT_REGISTRY.values():
         if not _available(spec, context):
             continue
-        renderer = _RENDERERS.get(spec.name)
-        if renderer is None:
-            raise RuntimeError(f"registered probe aggregate plot has no renderer: {spec.name}")
+        renderer = _RENDERERS[spec.name]
         path = layout.review_plots_dir / spec.filename
         renderer(context, path)
         paths.append(path)
     return paths
+
+
+def validate_probe_aggregate_plot_renderers() -> None:
+    """Fail fast when aggregate plot specs and renderer bindings drift."""
+
+    spec_names = set(PROBE_AGGREGATE_PLOT_REGISTRY)
+    renderer_names = set(_RENDERERS)
+    missing = sorted(spec_names - renderer_names)
+    extra = sorted(renderer_names - spec_names)
+    if missing or extra:
+        raise RuntimeError(
+            f"Probe aggregate plot registry/renderer mismatch (missing_renderers={missing}, extra_renderers={extra})"
+        )
 
 
 def _available(spec: ProbeAggregatePlotSpec, context: ProbeAggregatePlotContext) -> bool:

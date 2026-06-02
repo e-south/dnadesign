@@ -5,14 +5,33 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping
 
 import pandas as pd
 
 from ..plot_style import role_color, style_review_axis
 from ..stage_a.manifests import file_sha256
+from .notebook_visuals.specs import REALIZED_REVIEW_VISUAL_SPECS, StageBNotebookVisualSpec
 
 REALIZED_REVIEW_PLOT_MANIFEST_SCHEMA_VERSION = "stress_ethanol_cipro_growth.tfbs_stage_b_review_plots.v1"
+RealizedReviewRenderer = Callable[[pd.DataFrame, pd.DataFrame, Path, str], None]
+
+_REALIZED_REVIEW_RENDERERS: Mapping[str, RealizedReviewRenderer] = {
+    "realized_label_lift_trajectory": (
+        lambda trajectory, pair_summary, path, label_name: _plot_lift_trajectory(
+            trajectory,
+            path,
+            label_name=label_name,
+        )
+    ),
+    "positive_null_lift_summary": (
+        lambda trajectory, pair_summary, path, label_name: _plot_positive_null_summary(
+            pair_summary,
+            path,
+            label_name=label_name,
+        )
+    ),
+}
 
 
 def materialize_tfbs_stage_b_realized_review_plots(
@@ -33,29 +52,23 @@ def materialize_tfbs_stage_b_realized_review_plots(
     label_names = _shared_label_names(trajectory, pair_summary)
     plots: list[dict[str, Any]] = []
     for label_name in label_names:
-        slug = _slug(label_name)
-        plots.append(
-            _materialize_plot(
-                path=output_dir / f"{slug}__selected_true_lift_trajectory.png",
-                title=f"{label_name}: selected true-label lift over rounds",
-                kind="realized_label_lift_trajectory",
-                label_name=label_name,
-                draw=lambda path, label_name=label_name: _plot_lift_trajectory(trajectory, path, label_name=label_name),
-            )
-        )
-        plots.append(
-            _materialize_plot(
-                path=output_dir / f"{slug}__positive_minus_null_lift_summary.png",
-                title=f"{label_name}: positive-minus-null realized lift",
-                kind="positive_null_lift_summary",
-                label_name=label_name,
-                draw=lambda path, label_name=label_name: _plot_positive_null_summary(
-                    pair_summary,
-                    path,
+        for spec in REALIZED_REVIEW_VISUAL_SPECS.values():
+            renderer = _realized_review_renderer(spec)
+            plots.append(
+                _materialize_plot(
+                    path=output_dir / spec.plot_filename(label_name=label_name),
+                    spec=spec,
                     label_name=label_name,
-                ),
+                    draw=(
+                        lambda path, renderer=renderer, label_name=label_name: renderer(
+                            trajectory,
+                            pair_summary,
+                            path,
+                            label_name,
+                        )
+                    ),
+                )
             )
-        )
     manifest = {
         "schema_version": REALIZED_REVIEW_PLOT_MANIFEST_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -105,16 +118,29 @@ def _shared_label_names(trajectory: pd.DataFrame, pair_summary: pd.DataFrame) ->
     return labels
 
 
-def _materialize_plot(*, path: Path, title: str, kind: str, label_name: str, draw: Any) -> dict[str, Any]:
+def _materialize_plot(
+    *,
+    path: Path,
+    spec: StageBNotebookVisualSpec,
+    label_name: str,
+    draw: Any,
+) -> dict[str, Any]:
     draw(path)
     return {
-        "kind": kind,
-        "title": title,
+        "kind": spec.kind,
+        "title": spec.plot_title(label_name=label_name),
         "label_name": label_name,
         "path": str(path),
         "sha256": file_sha256(path),
-        "alt_text": _alt_text(kind),
+        "alt_text": spec.alt_text,
     }
+
+
+def _realized_review_renderer(spec: StageBNotebookVisualSpec) -> RealizedReviewRenderer:
+    try:
+        return _REALIZED_REVIEW_RENDERERS[spec.kind]
+    except KeyError as exc:
+        raise RuntimeError(f"registered Stage B realized review visual has no renderer: {spec.kind}") from exc
 
 
 def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -> None:
@@ -200,24 +226,3 @@ def _plot_positive_null_summary(frame: pd.DataFrame, path: Path, *, label_name: 
     ax.legend(frameon=False)
     fig.savefig(path, dpi=160)
     plt.close(fig)
-
-
-def _slug(value: str) -> str:
-    import re
-
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("_") or "label"
-
-
-def _alt_text(kind: str) -> str:
-    if kind == "realized_label_lift_trajectory":
-        return (
-            "Line plot of selected true-label lift over active-learning rounds for each sentinel label, with the "
-            "initial seed batch shown as a square marker before round zero and positive and matched-null roles drawn "
-            "separately."
-        )
-    if kind == "positive_null_lift_summary":
-        return (
-            "Bar plot comparing final and normalized trajectory AUC positive-minus-null lift for each sentinel label, "
-            "using realized oracle labels from selected rows."
-        )
-    return "DenseGen TFBS Stage B realized-label review plot."

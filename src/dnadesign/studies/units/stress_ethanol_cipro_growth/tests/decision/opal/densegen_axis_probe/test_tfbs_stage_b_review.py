@@ -54,6 +54,12 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
     assert summary["claim_readiness"]["blocked_or_limited_claim_count"] == 0
     plot_manifest = json.loads(Path(summary["plot_manifest_json_path"]).read_text(encoding="utf-8"))
     assert plot_manifest["plot_count"] == 2
+    assert [plot["kind"] for plot in plot_manifest["plots"]] == [
+        "realized_label_lift_trajectory",
+        "positive_null_lift_summary",
+    ]
+    assert plot_manifest["plots"][0]["title"] == "lexA_present: selected true-label lift over rounds"
+    assert plot_manifest["plots"][0]["alt_text"].startswith("Line plot of selected true-label lift")
 
 
 def test_stage_b_realized_review_fails_fast_on_selected_ids_missing_from_label_table(tmp_path: Path) -> None:

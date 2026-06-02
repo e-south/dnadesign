@@ -64,3 +64,9 @@ def test_review_axis_style_contract_enforces_spines_ticks_and_square() -> None:
     assert ax.spines["left"].get_edgecolor()
     assert ax.get_box_aspect() == pytest.approx(1.0)
     plt.close(fig)
+
+
+def test_probe_aggregate_plot_renderers_match_registry() -> None:
+    writer = probe_module("reporting.review.aggregate_plots.writer")
+
+    writer.validate_probe_aggregate_plot_renderers()

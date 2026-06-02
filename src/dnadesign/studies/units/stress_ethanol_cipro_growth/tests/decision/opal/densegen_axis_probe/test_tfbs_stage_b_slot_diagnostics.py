@@ -37,6 +37,14 @@ def test_stage_b_slot_diagnostics_report_count_confound_and_restricted_lift(tmp_
     assert summary["slot_label_count"] == 1
     assert summary["resolved_position_signal_labels"] == ["lexA_in_slot0"]
     assert Path(summary["plot_manifest_json_path"]).exists()
+    plot_manifest = json.loads(Path(summary["plot_manifest_json_path"]).read_text(encoding="utf-8"))
+    assert [plot["kind"] for plot in plot_manifest["plots"]] == [
+        "slot_target_count_mean_trajectory",
+        "slot_count_stratified_lift_trajectory",
+        "slot_count_stratified_lift_summary",
+    ]
+    assert plot_manifest["plots"][2]["title"] == "Count-stratified positive-minus-null slot lift"
+    assert plot_manifest["plots"][2]["alt_text"].startswith("Bar plot comparing final")
 
     selected_dist = count_distribution.query(
         "campaign_key == 'lexA_in_slot0_positive' and round == 1 and target_count == 1"

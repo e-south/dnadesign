@@ -59,9 +59,12 @@ surface without label leakage, and does that learning exceed a matched null?
 - `stage_b/review/`, `stage_b/claims.py`, `stage_b/review_plots.py`,
   `stage_b/slot_diagnostics/`, `stage_b/slot_plots.py`,
   `stage_b/notebook_visuals/`: realized-label review, claim gates, and
-  registry-backed notebook-facing visual registration. The `review/` package
-  keeps artifact readers, trajectory frames, summary payloads, and
-  materialization separate.
+  registry-backed plot and notebook-facing visual registration. The
+  `notebook_visuals/specs.py` registry owns each Stage B visual's stable kind,
+  plot filename, title, caption, alt text, metric contract, and tidy-source
+  ownership so plot manifests and OPAL collection visual entries cannot drift.
+  The `review/` package keeps artifact readers, trajectory frames, summary
+  payloads, and materialization separate.
 
 ## Review Plot And Outcome Contracts
 

@@ -5,14 +5,28 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping
 
 import pandas as pd
 
 from ..plot_style import role_color, style_review_axis
 from ..stage_a.manifests import file_sha256
+from .notebook_visuals.specs import SLOT_DIAGNOSTIC_VISUAL_SPECS, StageBNotebookVisualSpec
 
 SLOT_DIAGNOSTIC_PLOT_MANIFEST_SCHEMA_VERSION = "stress_ethanol_cipro_growth.tfbs_stage_b_slot_diagnostic_plots.v1"
+SlotDiagnosticRenderer = Callable[[pd.DataFrame, pd.DataFrame, pd.DataFrame, Path], None]
+
+_SLOT_DIAGNOSTIC_RENDERERS: Mapping[str, SlotDiagnosticRenderer] = {
+    "slot_target_count_mean_trajectory": (
+        lambda trajectory, pair_summary, count_distribution, path: _plot_target_count_mean(trajectory, path)
+    ),
+    "slot_count_stratified_lift_trajectory": (
+        lambda trajectory, pair_summary, count_distribution, path: _plot_count_stratified_lift(trajectory, path)
+    ),
+    "slot_count_stratified_lift_summary": (
+        lambda trajectory, pair_summary, count_distribution, path: _plot_count_stratified_summary(pair_summary, path)
+    ),
+}
 
 
 def materialize_tfbs_stage_b_slot_diagnostic_plots(
@@ -31,28 +45,25 @@ def materialize_tfbs_stage_b_slot_diagnostic_plots(
     output_dir.mkdir(parents=True, exist_ok=True)
     trajectory = _read_csv(trajectory_path, label="slot trajectory")
     pair_summary = _read_csv(pair_path, label="slot pair summary")
-    _read_csv(distribution_path, label="slot count distribution")
+    count_distribution = _read_csv(distribution_path, label="slot count distribution")
 
-    plots = [
-        _materialize_plot(
-            path=output_dir / "slot_target_count_mean_trajectory.png",
-            title="Selected target-family count over rounds",
-            kind="slot_target_count_mean_trajectory",
-            draw=lambda path: _plot_target_count_mean(trajectory, path),
-        ),
-        _materialize_plot(
-            path=output_dir / "slot_count_stratified_lift_trajectory.png",
-            title="Count-stratified slot-label lift over rounds",
-            kind="slot_count_stratified_lift_trajectory",
-            draw=lambda path: _plot_count_stratified_lift(trajectory, path),
-        ),
-        _materialize_plot(
-            path=output_dir / "slot_count_stratified_lift_summary.png",
-            title="Count-stratified positive-minus-null slot lift",
-            kind="slot_count_stratified_lift_summary",
-            draw=lambda path: _plot_count_stratified_summary(pair_summary, path),
-        ),
-    ]
+    plots: list[dict[str, Any]] = []
+    for spec in SLOT_DIAGNOSTIC_VISUAL_SPECS.values():
+        renderer = _slot_diagnostic_renderer(spec)
+        plots.append(
+            _materialize_plot(
+                path=output_dir / spec.plot_filename(),
+                spec=spec,
+                draw=(
+                    lambda path, renderer=renderer: renderer(
+                        trajectory,
+                        pair_summary,
+                        count_distribution,
+                        path,
+                    )
+                ),
+            )
+        )
     manifest = {
         "schema_version": SLOT_DIAGNOSTIC_PLOT_MANIFEST_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -83,15 +94,22 @@ def _read_csv(path: Path, *, label: str) -> pd.DataFrame:
     return frame
 
 
-def _materialize_plot(*, path: Path, title: str, kind: str, draw: Any) -> dict[str, Any]:
+def _materialize_plot(*, path: Path, spec: StageBNotebookVisualSpec, draw: Any) -> dict[str, Any]:
     draw(path)
     return {
-        "kind": kind,
-        "title": title,
+        "kind": spec.kind,
+        "title": spec.plot_title(),
         "path": str(path),
         "sha256": file_sha256(path),
-        "alt_text": _alt_text(kind),
+        "alt_text": spec.alt_text,
     }
+
+
+def _slot_diagnostic_renderer(spec: StageBNotebookVisualSpec) -> SlotDiagnosticRenderer:
+    try:
+        return _SLOT_DIAGNOSTIC_RENDERERS[spec.kind]
+    except KeyError as exc:
+        raise RuntimeError(f"registered Stage B slot diagnostic visual has no renderer: {spec.kind}") from exc
 
 
 def _plot_target_count_mean(frame: pd.DataFrame, path: Path) -> None:
@@ -216,26 +234,6 @@ def _plot_count_stratified_summary(frame: pd.DataFrame, path: Path) -> None:
     ax.legend(frameon=False)
     fig.savefig(path, dpi=160)
     plt.close(fig)
-
-
-def _alt_text(kind: str) -> str:
-    if kind == "slot_target_count_mean_trajectory":
-        return (
-            "Line plot of selected target-family count over active-learning rounds for slot-label campaigns, "
-            "with positive and matched-null or control roles shown separately."
-        )
-    if kind == "slot_count_stratified_lift_trajectory":
-        return (
-            "Line plot of slot-label lift over rounds after deterministic count strata are excluded and selected "
-            "rows are compared to count-stratum baselines. X markers at y equals zero indicate rounds with no "
-            "nondeterministic selected rows rather than missing plotted data."
-        )
-    if kind == "slot_count_stratified_lift_summary":
-        return (
-            "Bar plot comparing final and normalized trajectory AUC positive-minus-null slot lift after controlling "
-            "for target-family count."
-        )
-    return "DenseGen TFBS Stage B slot-count diagnostic plot."
 
 
 def _status_color(value: str) -> str:
