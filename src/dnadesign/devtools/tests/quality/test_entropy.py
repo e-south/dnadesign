@@ -40,7 +40,7 @@ def _write_minimal_quality_score(
                 "## Quality scorecard",
                 "| Area | Axis | Score (0-4) | Trend | Gate | Evidence | Owner | Last verified | Next action |",
                 "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-                f"| `usr` | domain | 3 | stable | enforced | `{evidence_path}` | maintainers | 2026-02-18 | none |",
+                f"| `usr` | domain | 3 | stable | enforced | `{evidence_path}` | maintainers | {verified} | none |",
                 "",
                 "## Gap tracker",
                 "| Gap | Impact | Tracking artifact | Exit criteria |",
@@ -193,7 +193,7 @@ def test_main_fails_when_gap_tracker_section_is_missing(tmp_path: Path) -> None:
                 "## Quality scorecard",
                 "| Area | Axis | Score (0-4) | Trend | Gate | Evidence | Owner | Last verified | Next action |",
                 "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-                "| `usr` | domain | 3 | stable | enforced | `docs/README.md` | maintainers | 2026-02-18 | none |",
+                f"| `usr` | domain | 3 | stable | enforced | `docs/README.md` | maintainers | {today} | none |",
             ]
         )
         + "\n",
@@ -242,7 +242,7 @@ def test_main_fails_when_scorecard_row_owner_is_empty(tmp_path: Path) -> None:
                 "## Quality scorecard",
                 "| Area | Axis | Score (0-4) | Trend | Gate | Evidence | Owner | Last verified | Next action |",
                 "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-                "| `usr` | domain | 3 | stable | enforced | `docs/README.md` |  | 2026-02-18 | none |",
+                f"| `usr` | domain | 3 | stable | enforced | `docs/README.md` |  | {today} | none |",
                 "",
                 "## Gap tracker",
                 "| Gap | Impact | Tracking artifact | Exit criteria |",
