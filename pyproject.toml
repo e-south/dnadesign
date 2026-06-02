@@ -21,7 +21,7 @@ dependencies = [
   "openpyxl",
   "ortools>=9.9,<9.10",
   "pandas",
-  "pyarrow>=16",
+  "pyarrow>=23.0.1",
   "pydantic",
   "pygments>=2.20.0",
   "pymc",
@@ -34,8 +34,8 @@ dependencies = [
   "typer",
   "duckdb>=0.10.0",
   "xlrd",
-  # Torch 2.8 includes the CVE-2025-3730 fix.
-  "torch>=2.8,<2.9; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # Torch 2.9 includes the CVE-2025-3730 fix and avoids PyTorch 2.8 advisories.
+  "torch>=2.9,<2.10; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "dense-arrays",
   "polars>=1.36.1",
   "altair>=6.0.0",
@@ -69,9 +69,9 @@ ops        = "dnadesign.ops.cli:main"
 # GPU stack (Linux x86_64 only)
 infer-evo2 = [
   # --- torch (GPU wheels via uv sources below)
-  "torch>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchvision>=0.23,<0.24; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchaudio>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch>=2.9,<2.10; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision>=0.24,<0.25; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio>=2.9,<2.10; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip>=26.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -192,8 +192,11 @@ environments = [
 ]
 constraint-dependencies = [
   "cryptography>=46.0.7",
+  "idna>=3.15",
   "onnx>=1.21.0",
   "pillow>=12.2.0",
+  "pymdown-extensions>=10.21.3",
+  "starlette>=1.0.1",
 ]
 
 # flash-attn + TE-torch must build against the same torch as the runtime env
