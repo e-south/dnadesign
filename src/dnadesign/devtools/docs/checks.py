@@ -864,7 +864,15 @@ def _find_entrypoint_local_path_literal_issues(repo_root: Path) -> list[str]:
 def _find_agents_path_reference_issues(repo_root: Path) -> list[str]:
     resolved_repo_root = repo_root.expanduser().resolve()
     issues: list[str] = []
-    skipped_dir_names = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"}
+    skipped_dir_names = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        ".worktrees",
+        "__pycache__",
+    }
     for agents_path in sorted(resolved_repo_root.rglob("AGENTS.md")):
         relative_agents_path = agents_path.relative_to(resolved_repo_root)
         if any(part in skipped_dir_names for part in relative_agents_path.parts):

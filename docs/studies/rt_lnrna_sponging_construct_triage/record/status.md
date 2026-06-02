@@ -151,7 +151,7 @@ candidate-X vector are still absent.
 - The variant catalog resolves sequence authority for retron18, 24-27, 43,
   45-56, 170-186, and `msrmsdwt_bl21`.
 - The study-owned Infer runbook
-  `../operations/runtime/runbooks/infer-six-view-7b-with-notify.yaml`
+  `../../../../src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
   records the batch entrypoint for completing the six-view Evo2 7B workload with one
   Notify watcher for the lane. The study-level fill command is
   `uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage`.

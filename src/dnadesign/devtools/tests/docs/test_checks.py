@@ -1240,6 +1240,17 @@ def test_agents_path_reference_check_allows_existing_and_non_path_spans(tmp_path
     assert issues == []
 
 
+def test_agents_path_reference_check_ignores_local_worktrees(tmp_path: Path) -> None:
+    _write(
+        tmp_path / ".worktrees" / "feature" / "src" / "dnadesign" / "cruncher" / "AGENTS.md",
+        "- Default config: `src/dnadesign/cruncher/workspaces/missing/config.yaml`\n",
+    )
+
+    issues = _find_agents_path_reference_issues(tmp_path)
+
+    assert issues == []
+
+
 def test_densegen_docs_language_check_flags_canonical_term(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "densegen" / "README.md", "This is the canonical densegen guide.\n")
 

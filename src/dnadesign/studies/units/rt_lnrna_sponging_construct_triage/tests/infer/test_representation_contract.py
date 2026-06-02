@@ -72,8 +72,8 @@ def _infer_workspace_config_path() -> Path:
 
 def _infer_runbook_path() -> Path:
     return (
-        _repo_root() / "docs/studies/rt_lnrna_sponging_construct_triage/operations/runtime/runbooks/"
-        "infer-six-view-7b-with-notify.yaml"
+        _repo_root() / "src/dnadesign/ops/runbooks/presets/"
+        "infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml"
     )
 
 

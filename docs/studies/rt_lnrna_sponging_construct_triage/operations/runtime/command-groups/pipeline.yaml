@@ -35,7 +35,7 @@ command_groups:
     execution_surfaces:
       infer_workspace: src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage
       infer_batch_7b_with_notify:
-        six_view: docs/studies/rt_lnrna_sponging_construct_triage/operations/runtime/runbooks/infer-six-view-7b-with-notify.yaml
+        six_view: src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml
   - id: latentdna_gallery
     status: paused
     purpose: Validate and materialize the RT-lnRNA dataset overview, representation health, source structure, ordinal audit, context robustness, candidate decision, scree, and UMAP gallery surfaces from Infer sidecars.
