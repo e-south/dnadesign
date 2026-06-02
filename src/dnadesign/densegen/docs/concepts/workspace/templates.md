@@ -1,7 +1,7 @@
 ## Workspace templates
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 This concept page explains how packaged DenseGen workspaces are organized and how to choose between demo and study templates. Read it when you need a consistent path from first-run tutorials to real study workspaces.
 
 For the full DenseGen doc map, use the **[DenseGen documentation index](../../index.md)**.

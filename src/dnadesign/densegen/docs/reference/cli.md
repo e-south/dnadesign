@@ -1,7 +1,7 @@
 ## DenseGen CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
 - [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)

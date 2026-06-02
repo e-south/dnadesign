@@ -1,7 +1,7 @@
 # USR event log contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 `.events.log` is newline-delimited JSON and is the operator integration boundary.

@@ -1,7 +1,7 @@
 ## OPAL Internal Notes Archive
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 Use `docs/dev/journal.md` for active development notes. This file is retained as historical archive.

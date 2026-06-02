@@ -1,7 +1,7 @@
 ## DenseGen config reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
 All relative paths resolve from the config file directory.

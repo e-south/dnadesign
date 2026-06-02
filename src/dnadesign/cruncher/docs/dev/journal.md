@@ -1,7 +1,7 @@
 ## cruncher dev journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 **Last updated by:** cruncher-maintainers on 2026-02-23

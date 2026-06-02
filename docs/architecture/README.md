@@ -1,7 +1,7 @@
 ## Architecture Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-02
+**Last verified:** 2026-06-02
 
 ### At a glance
 This index points to architecture-level references, decisions, and system boundaries.

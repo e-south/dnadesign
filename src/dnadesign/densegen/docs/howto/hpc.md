@@ -1,7 +1,7 @@
 ## DenseGen HPC runbook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 This how-to guide provides scheduler-safe DenseGen execution patterns for long-running environments. Read it when you need predictable preflight checks, resume behavior, and clear separation between generation and analysis phases.

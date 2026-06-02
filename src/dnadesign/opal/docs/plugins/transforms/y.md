@@ -1,7 +1,7 @@
 ## OPAL Y Transforms
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This page documents Y-transform and y-op contracts used during ingest and model-time Y processing. Use it when configuring `transforms_y` for ingest and `training.y_ops` for runtime inversion behavior.

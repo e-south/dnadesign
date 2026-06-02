@@ -1,7 +1,7 @@
 # DenseGen Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This page defines how DenseGen record outputs map into `baserender`.

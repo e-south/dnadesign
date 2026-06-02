@@ -1,7 +1,7 @@
 # USR Sync Audit Loop
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 Use this runbook when you need machine-readable transfer decisions during iterative sync between HPC and local clones.

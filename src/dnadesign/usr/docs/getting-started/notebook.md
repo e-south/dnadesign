@@ -1,7 +1,7 @@
 # USR interactive notebook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 Use the marimo notebook for interactive exploration (filters, summaries, and quick dataset inspection).

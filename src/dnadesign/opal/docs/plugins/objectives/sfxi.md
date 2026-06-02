@@ -1,7 +1,7 @@
 ## setpoint_fidelity_x_intensity `sfxi`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This page documents `sfxi_v1` objective behavior, equations, and emitted channels.

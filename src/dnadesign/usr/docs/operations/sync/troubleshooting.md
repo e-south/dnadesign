@@ -1,7 +1,7 @@
 # USR sync troubleshooting
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 Use this sequence when sync commands fail or verification blocks transfer.

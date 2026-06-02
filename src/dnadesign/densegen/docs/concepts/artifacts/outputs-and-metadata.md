@@ -1,7 +1,7 @@
 ## Outputs and metadata model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 This concept page explains how DenseGen artifacts are organized by runtime stage and how to interpret them together. Read it when you need to debug run outcomes, join tables correctly, or choose the right file for analysis.
 
 ### Output layout overview

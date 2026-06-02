@@ -1,7 +1,7 @@
 ## Stress ethanol and ciprofloxacin study tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 Use this tutorial to run the largest packaged DenseGen campaign. It combines expanded stress-condition plans, a GUROBI solver backend, and a shared USR sink around a constitutive σ70 promoter core.

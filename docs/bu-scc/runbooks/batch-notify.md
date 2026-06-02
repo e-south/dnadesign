@@ -1,7 +1,7 @@
 ## BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 ### Purpose
 

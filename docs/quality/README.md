@@ -1,7 +1,7 @@
 ## Quality Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-02
+**Last verified:** 2026-06-02
 
 ### At a glance
 This index tracks quality expectations for tests, CI signal, coverage gates, and documentation parity.

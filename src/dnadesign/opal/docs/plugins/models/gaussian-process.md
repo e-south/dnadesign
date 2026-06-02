@@ -1,7 +1,7 @@
 ## Gaussian Process Plugin (`gaussian_process`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This page documents `gaussian_process` behavior, equations, and runtime invariants. For registry-level model contracts and model inventory, see [Models](README.md).

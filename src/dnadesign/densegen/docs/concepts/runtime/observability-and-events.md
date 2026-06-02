@@ -1,7 +1,7 @@
 ## Observability and events
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 This document defines the event and diagnostics boundaries across DenseGen, USR, and Notify. Read it when you need to debug watcher wiring, understand where runtime failures are reported, or avoid mixing telemetry with mutation events.
 
 ### Core streams

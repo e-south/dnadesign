@@ -1,7 +1,7 @@
 ## DenseGen sampling baseline tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 Use this tutorial to run the sampling baseline with PWM inputs. It covers Stage-A mining, Stage-B generation, and dual output sinks (`parquet` and `usr`).

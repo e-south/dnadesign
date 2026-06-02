@@ -1,7 +1,7 @@
 ## DenseGen on BU SCC
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 This how-to guide captures BU SCC specifics that differ from the base DenseGen HPC runbook. Read it when running DenseGen on BU SCC and you need the correct scheduler flags, certificate setup, and BU docs.

@@ -1,7 +1,7 @@
 ## OPAL X Transforms
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This page documents X-transform plugin contracts and runtime expectations. Use it when configuring `transforms_x` in `campaign.yaml` or implementing a new X transform plugin.

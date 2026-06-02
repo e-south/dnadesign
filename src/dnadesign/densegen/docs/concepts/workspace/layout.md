@@ -1,7 +1,7 @@
 ## Workspace model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 This concept page explains the expected DenseGen workspace layout and why DenseGen commands are designed around that layout. Read it when you need predictable path resolution, safe reset behavior, and clear artifact boundaries.
 
 ### Expected layout

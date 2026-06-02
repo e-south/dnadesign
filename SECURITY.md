@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-02
+**Last verified:** 2026-06-02
 
 ## At a glance
 This document records security expectations for code, data, secrets, and dependency handling in `dnadesign`.
