@@ -9,6 +9,10 @@ from .helpers import (
 from .probe_modules import PROBE_PACKAGE
 
 
+def _line_count(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
 def test_probe_package_root_exports_no_flat_api_surface() -> None:
     package = importlib.import_module(PROBE_PACKAGE)
 
@@ -56,20 +60,42 @@ def test_probe_root_keeps_only_entrypoint_modules() -> None:
     assert {path.name for path in probe_root.glob("*.py")} == {"__init__.py", "__main__.py", "cli.py"}
 
 
+def test_probe_known_large_entrypoints_are_explicitly_budget_guarded() -> None:
+    probe_root = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe")
+    budgets = {
+        probe_root / "tfbs" / "cli.py": 480,
+        probe_root / "plan_logic" / "axis_oracle.py": 470,
+    }
+
+    for path, max_lines in budgets.items():
+        assert path.is_file()
+        assert _line_count(path) <= max_lines
+
+
 def test_tfbs_null_and_slot_diagnostics_are_semantic_packages() -> None:
     probe_root = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe")
     tfbs_root = probe_root / "tfbs"
     nulls_package = tfbs_root / "nulls"
+    candidate_scopes_package = tfbs_root / "candidate_scopes"
     slot_diagnostics_package = tfbs_root / "stage_b" / "slot_diagnostics"
 
     assert not (tfbs_root / "nulls.py").exists()
     assert nulls_package.is_dir()
+    assert not (tfbs_root / "candidate_scopes.py").exists()
+    assert candidate_scopes_package.is_dir()
     assert not (tfbs_root / "stage_b" / "slot_diagnostics.py").exists()
+    assert not (tfbs_root / "stage_b" / "slot_plots.py").exists()
     assert slot_diagnostics_package.is_dir()
+    assert (slot_diagnostics_package / "plots").is_dir()
 
     module_lengths = {
         path.relative_to(probe_root).as_posix(): len(path.read_text(encoding="utf-8").splitlines())
-        for package in (nulls_package, slot_diagnostics_package)
+        for package in (
+            nulls_package,
+            candidate_scopes_package,
+            slot_diagnostics_package,
+            slot_diagnostics_package / "plots",
+        )
         for path in package.glob("*.py")
         if path.name != "__init__.py"
     }
@@ -84,12 +110,14 @@ def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
         stage_b_root / "configs",
         stage_b_root / "execution",
         stage_b_root / "review",
+        stage_b_root / "review" / "plots",
         stage_b_root / "notebook_visuals",
     )
 
     assert not (stage_b_root / "configs.py").exists()
     assert not (stage_b_root / "execution.py").exists()
     assert not (stage_b_root / "review.py").exists()
+    assert not (stage_b_root / "review_plots.py").exists()
     assert not (stage_b_root / "notebook_visuals.py").exists()
     assert not (stage_b_root / "notebook_visual_specs.py").exists()
     assert all(path.is_dir() for path in semantic_packages)
@@ -102,6 +130,14 @@ def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 360
+
+
+def test_tfbs_target_profiles_are_first_class_contract_module() -> None:
+    probe_root = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe")
+    tfbs_root = probe_root / "tfbs"
+
+    assert (tfbs_root / "profiles.py").exists()
+    assert not (tfbs_root / "target_profiles.py").exists()
 
 
 def test_probe_tests_are_semantic_package() -> None:

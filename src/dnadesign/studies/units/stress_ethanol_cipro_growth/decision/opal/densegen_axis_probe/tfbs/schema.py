@@ -8,6 +8,9 @@ import json
 TFBS_LEARNABILITY_ORACLE_VERSION = "densegen_tfbs_learnability_positive_v1"
 TFBS_LEARNABILITY_FAMILY_CONTENT_NULL_VERSION = "densegen_tfbs_learnability_family_content_matched_null_v1"
 TFBS_LEARNABILITY_SLOT_GEOMETRY_NULL_VERSION = "densegen_tfbs_learnability_slot_geometry_count_matched_null_v1"
+TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION = (
+    "densegen_tfbs_learnability_slot_position_count_fixed_shuffled_null_v1"
+)
 TFBS_LEARNABILITY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.densegen_tfbs_learnability.v1"
 TFBS_LEARNABILITY_ACTIVE_LABEL_FAMILIES = (
     "tf_family_count",
@@ -79,13 +82,27 @@ TFBS_LEARNABILITY_MINIMUM_TARGET_SET = (
     "cpxR_or_baeR_in_slot1",
     "cpxR_or_baeR_in_slot2",
 )
-TFBS_LEARNABILITY_SENTINEL_TARGET_SET = (
-    "lexA_present",
-    "cpxR_or_baeR_present",
+TFBS_LEARNABILITY_CANONICAL_COUNT_FRACTION_TARGET_SET = (
     "lexA_count_fraction",
+    "cpxR_count_fraction",
+    "baeR_count_fraction",
+)
+TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET = (
+    "lexA_in_slot0",
+    "lexA_in_slot1",
+    "lexA_in_slot2",
+    "cpxR_or_baeR_in_slot0",
+    "cpxR_or_baeR_in_slot1",
+    "cpxR_or_baeR_in_slot2",
+)
+TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET = (
     "lexA_in_slot0",
     "cpxR_or_baeR_in_slot2",
 )
+TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_SENTINEL_TARGET_SET = (
+    *TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET,
+)
+TFBS_LEARNABILITY_SENTINEL_TARGET_SET = (*TFBS_LEARNABILITY_CANONICAL_COUNT_FRACTION_TARGET_SET,)
 TFBS_LEARNABILITY_NULL_VIABILITY_STATUSES = (
     "PASS",
     "PASS_WITH_COARSENING",

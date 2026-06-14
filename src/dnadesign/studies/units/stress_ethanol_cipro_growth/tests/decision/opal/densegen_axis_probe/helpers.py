@@ -154,6 +154,88 @@ def _write_probe_prediction_campaign(
     return config_path
 
 
+def _write_stage_b_review_fixture(tmp_path: Path, *, include_missing_selection_id: bool = False) -> Path:
+    campaigns = []
+    pairs: dict[str, str] = {}
+    for role in ("positive", "matched_null"):
+        workdir = tmp_path / "campaigns" / f"lexA_present_{role}"
+        config_path = workdir / "configs" / "campaign.yaml"
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("campaign:\n  workdir: placeholder\n", encoding="utf-8")
+        label_path = workdir / "labels.parquet"
+        initial_label_path = workdir / "inputs" / "r0" / "labels-b0.parquet"
+        values = [0, 0, 1, 1] if role == "positive" else [1, 0, 1, 0]
+        frame = pd.DataFrame({"id": ["a", "b", "c", "d"], "lexA_present": values})
+        if role == "matched_null":
+            frame["null_version"] = "densegen_tfbs_learnability_family_content_matched_null_v1"
+        frame.to_parquet(label_path, index=False)
+        initial_label_path.parent.mkdir(parents=True)
+        frame.loc[frame["id"].isin(["a", "c"]), ["id", "lexA_present"]].to_parquet(initial_label_path, index=False)
+        _write_stage_b_review_selection(workdir, 0, ["c", "a"] if role == "positive" else ["b", "d"], [0.1, 0.2])
+        round_1_ids = ["c", "missing"] if include_missing_selection_id and role == "positive" else ["c", "d"]
+        _write_stage_b_review_selection(workdir, 1, round_1_ids, [0.8, 0.7])
+        campaign_key = f"lexA_present_{role}"
+        pairs[role] = campaign_key
+        campaigns.append(
+            {
+                "campaign_key": campaign_key,
+                "label_name": "lexA_present",
+                "label_family_id": "tf_family_presence",
+                "oracle_role": role,
+                "split_id": "random_id",
+                "seed": 7,
+                "selection_k": 2,
+                "config_path": str(config_path),
+                "label_table_path": str(label_path),
+                "initial_label_input_path": str(initial_label_path),
+            }
+        )
+    manifest_path = tmp_path / "stage_b_sentinel_config_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "fixture.stage_b",
+                "status": "PASS",
+                "stage": "B",
+                "scope": "sentinel",
+                "rounds": 2,
+                "selection_k": 2,
+                "campaign_count": 2,
+                "campaigns": campaigns,
+                "pairs": [
+                    {
+                        "label_name": "lexA_present",
+                        "split_id": "random_id",
+                        "seed": 7,
+                        "positive_campaign_key": pairs["positive"],
+                        "null_campaign_key": pairs["matched_null"],
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
+def _write_stage_b_review_selection(workdir: Path, round_index: int, ids: list[str], scores: list[float]) -> None:
+    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ids, "pred__score_selected": scores}).to_csv(path, index=False)
+
+
+def _dark_edge_pixel_count(image: object, *, edge_width: int = 5) -> int:
+    width, height = image.size
+    edge_pixels = []
+    edge_pixels.extend(image.crop((0, 0, width, edge_width)).get_flattened_data())
+    edge_pixels.extend(image.crop((0, height - edge_width, width, height)).get_flattened_data())
+    edge_pixels.extend(image.crop((0, 0, edge_width, height)).get_flattened_data())
+    edge_pixels.extend(image.crop((width - edge_width, 0, width, height)).get_flattened_data())
+    return sum(1 for red, green, blue in edge_pixels if min(red, green, blue) < 245)
+
+
 __all__ = [
     "AXIS_CLASS_TO_LOGIC4",
     "CANDIDATE_RECORDS",
@@ -169,6 +251,7 @@ __all__ = [
     "_compact_split_metadata",
     "_decision_from_metrics",
     "_detail",
+    "_dark_edge_pixel_count",
     "_evaluate_run",
     "_evaluate_run_rounds",
     "_make_training_input",
@@ -179,6 +262,7 @@ __all__ = [
     "_valid_metrics_payload",
     "_write_campaign_config",
     "_write_probe_prediction_campaign",
+    "_write_stage_b_review_fixture",
     "annotations",
     "audit_run_root",
     "build_axis_oracle",

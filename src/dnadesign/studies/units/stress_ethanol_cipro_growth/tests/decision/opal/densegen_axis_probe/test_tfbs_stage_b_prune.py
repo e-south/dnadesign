@@ -63,7 +63,26 @@ def test_stage_b_prune_cli_emits_json(tmp_path: Path, capsys: pytest.CaptureFixt
     assert payload["retained_campaign_count"] == 2
 
 
-def _write_prune_fixture(root: Path) -> Path:
+def test_stage_b_prune_uses_manifest_labels_for_non_seed7_campaign_keys(tmp_path: Path) -> None:
+    manifest_path = _write_prune_fixture(tmp_path, seed=17)
+
+    prune_tfbs_stage_b_campaigns(
+        manifest_path,
+        prune_label_names=("lexA_in_slot0",),
+        delete_review_artifacts=False,
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert {row["campaign_key"] for row in manifest["validation"]["reports"]} == {
+        "tfbs_lexA_present_positive_random_id_seed17",
+        "tfbs_lexA_present_matched_null_random_id_seed17",
+    }
+    assert not (
+        tmp_path / "validation_reports" / "tfbs_lexA_in_slot0_positive_random_id_seed17.opal_validate.json"
+    ).exists()
+
+
+def _write_prune_fixture(root: Path, *, seed: int = 7) -> Path:
     (root / "manifests").mkdir(parents=True)
     campaigns = []
     pairs = []
@@ -71,7 +90,7 @@ def _write_prune_fixture(root: Path) -> Path:
     for label_name in ("lexA_present", "lexA_in_slot0"):
         role_keys = {}
         for role in ("positive", "matched_null"):
-            key = f"tfbs_{label_name}_{role}_random_id_seed7"
+            key = f"tfbs_{label_name}_{role}_random_id_seed{seed}"
             workdir = root / "campaigns" / key
             config_path = workdir / "configs" / "campaign.yaml"
             config_path.parent.mkdir(parents=True)

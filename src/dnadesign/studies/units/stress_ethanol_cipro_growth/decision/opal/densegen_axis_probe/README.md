@@ -28,9 +28,34 @@ DenseGen semantics stay here, while OPAL core remains campaign-agnostic.
 `tfbs/` answers a narrower question than the root plan-logic probe: can OPAL
 learn literal DenseGen TFBS construction labels from the sequence feature
 surface without label leakage, and does that learning exceed a matched null?
+The current completed claim profile is `tfbs_count_fraction_probe_v1`, which
+contains exactly `lexA_count_fraction`, `cpxR_count_fraction`, and
+`baeR_count_fraction`. The slim named boundary profile
+`tfbs_slot_position_sentinel_probe_v1` contains `lexA_in_slot0` and
+`cpxR_or_baeR_in_slot2` for a 2-label, 3-seed count-matched positional screen.
+That screen is diagnostic because its control preserves row-level motif counts.
+The stricter claim-oriented boundary profile is
+`tfbs_slot_position_count_fixed_sentinel_probe_v1`, which uses the same two
+sentinel labels but restricts each label's candidate universe to rows with
+exactly one target-family motif and compares against a count-fixed shuffled-slot
+negative control. In that profile, `lexA_in_slot0` uses `lexA_count == 1`, and
+`cpxR_or_baeR_in_slot2` uses `cpxR_or_baeR_count == 1`.
+The broader `tfbs_slot_position_probe_v1` profile contains `lexA_in_slot0/1/2`
+and `cpxR_or_baeR_in_slot0/1/2` when a full slot-by-family resolution map is
+worth the additional campaign footprint. Presence labels remain valid ontology
+members for custom diagnostics, but they are not part of the current canonical
+count-fraction claim.
 
 - `schema.py`: literal label ontology: `count`, `presence`,
   `count_fraction`, and `slot_family_presence`.
+- `profiles.py`: first-class target-profile contracts that separate the
+  completed count-fraction probe, the slim count-preserving slot-position
+  diagnostic, the count-fixed slot-position sentinel boundary probe, the broader
+  slot-position resolution-map probe, and custom
+  operator-selected label sets.
+- `candidate_scopes/`: label-specific candidate-scope contracts, including the
+  count-fixed slot-position rule that computes pool baselines on the filtered
+  universe rather than the full DenseGen candidate pool.
 - `contracts.py`: strict row parser, final-coordinate slot contract, and
   passive sigma-core validation.
 - `oracle.py`, `manifests.py`: positive-label construction and replay
@@ -56,15 +81,39 @@ surface without label leakage, and does that learning exceed a matched null?
   command construction, label-input materialization, manifest validation,
   selection-budget contracts, and per-campaign orchestration.
 - `stage_b/prune.py`: scoped artifact cleanup.
-- `stage_b/review/`, `stage_b/claims.py`, `stage_b/review_plots.py`,
-  `stage_b/slot_diagnostics/`, `stage_b/slot_plots.py`,
-  `stage_b/notebook_visuals/`: realized-label review, claim gates, and
-  registry-backed plot and notebook-facing visual registration. The
+- `stage_b/review/`, `stage_b/claims.py`, `stage_b/slot_diagnostics/`, and
+  `stage_b/notebook_visuals/`: realized-label review, claim gates, count
+  confound diagnostics, and registry-backed plot/notebook-facing visual
+  registration. `review/plots/` and `slot_diagnostics/plots/` keep manifest
+  contracts, renderer registries, and materialization separated. The
   `notebook_visuals/specs.py` registry owns each Stage B visual's stable kind,
   plot filename, title, caption, alt text, metric contract, and tidy-source
   ownership so plot manifests and OPAL collection visual entries cannot drift.
   The `review/` package keeps artifact readers, trajectory frames, summary
   payloads, and materialization separate.
+
+## TFBS Stage B Paired-Start Contract
+
+Stage B count-fraction campaigns are paired active-learning probes. For each
+`label_name`, the positive oracle and its matched-null oracle must ingest the
+same initial labeled sequence IDs before round 0. The two campaign protocols
+then diverge only in the label table they read from. This makes the positive
+versus matched-null comparison about the DenseGen construction-label objective,
+not about a lucky or unlucky starting batch.
+
+The shared-start seed context is recorded in campaign metadata and pair
+manifests as `initial_seed_context`,
+`initial_seed_pairing=shared_positive_null_starting_ids`, and an
+`initial_label_ids_hash`. Older materializations that started positive and null
+from different sampled IDs are valid historical artifacts but should not be used
+as the modern paired-start evidence surface.
+
+Replicate variation is a seed dimension, not a hidden plot option. Run the same
+target profile with additional `--seed` values to produce seed-pair replicates.
+The realized-label trajectory plot renders the observed line for single-seed
+materializations; when replicate seed rows are present, it renders mean lines
+with sample-standard-deviation bands and records that descriptive, non-CI
+interval contract in the OPAL collection visual manifest.
 
 ## Review Plot And Outcome Contracts
 
@@ -81,6 +130,19 @@ review grid styling, and square axes where the data shape supports it. OPAL
 campaign plots remain OPAL-owned primitives, but the study-generated campaign
 configs request those primitives through `plots.yaml` instead of embedding
 study rendering code in OPAL core.
+
+For TFBS Stage B campaign-set notebooks, study-owned visuals are registered into
+an OPAL `opal.collection_visual_manifest_index.v1` file. After running
+`tfbs-stage-b-review`, regenerate the OPAL notebook with:
+
+```bash
+uv run opal notebook generate \
+  --collection-visual-index <collection_visual_manifest.json> \
+  --no-materialize-collection-visuals
+```
+
+This keeps OPAL campaign-set rendering generic and prevents generic collection
+materialization from clobbering the registered realized-label review visuals.
 
 The review manifest includes `outcome_summary`, a compact operator explanation
 of the probe decision. Its interpretation boundary is deliberately narrow:

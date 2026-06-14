@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .semantics import stage_b_dataset_id
+from .semantics import slug_token, stage_b_dataset_id
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,15 @@ class TfbsStageBLayout:
     @property
     def candidate_scope_path(self) -> Path:
         return self.dataset_dir / "candidate_scope_ids.parquet"
+
+    def label_candidate_scope_path(self, label_name: str) -> Path:
+        return self.dataset_dir / "candidate_scopes" / f"{slug_token(label_name)}.candidate_scope_ids.parquet"
+
+    def label_candidate_scope_manifest_path(self, label_name: str) -> Path:
+        return self.manifests_dir / "candidate_scopes" / f"{slug_token(label_name)}.candidate_scope_manifest.json"
+
+    def scoped_label_table_path(self, label_name: str, oracle_role: str) -> Path:
+        return self.out_dir / "labels" / slug_token(label_name) / f"{slug_token(oracle_role)}.parquet"
 
     def campaign_workdir(self, run_key: str) -> Path:
         return self.out_dir / "campaigns" / run_key

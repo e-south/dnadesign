@@ -16,9 +16,14 @@ slot_visual_spec = _specs.slot_visual_spec
 def test_stage_b_notebook_visual_specs_are_registry_backed() -> None:
     spec = realized_visual_spec("realized_label_lift_trajectory")
 
-    assert spec.visual_id(label_name="lexA present") == "tfbs_stage_b_lexA_present_realized_label_lift_trajectory"
-    assert spec.plot_filename(label_name="lexA present") == "lexA_present__selected_true_lift_trajectory.png"
-    assert spec.plot_title(label_name="lexA present") == "lexA present: selected true-label lift over rounds"
+    assert spec.visual_id(label_name="lexA present") == "tfbs_stage_b_lexA_present_selected_label_lift_trajectory"
+    assert spec.plot_filename(label_name="lexA present") == "lexA_present__selected_label_lift_trajectory.png"
+    assert spec.plot_title(label_name="lexA present") == "LexA Present enrichment vs candidate pool"
+    assert "oracle" not in spec.caption_text(label_name="lexA_present").lower()
+    assert "Count-fraction labels use target TFBS count / 3" in spec.caption_text(label_name="lexA_present")
+    assert "slot-position labels use y=1" in spec.caption_text(label_name="lexA_present")
+    assert "bold line = mean" in spec.caption_text(label_name="lexA_present")
+    assert "sample SD" in spec.caption_text(label_name="lexA_present")
     assert spec.tidy_csv_path(
         trajectory_csv_path=Path("trajectory.csv"),
         pair_summary_csv_path=Path("pair_summary.csv"),

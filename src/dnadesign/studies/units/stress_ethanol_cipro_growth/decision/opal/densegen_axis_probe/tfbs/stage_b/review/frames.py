@@ -11,6 +11,7 @@ import pandas as pd
 from ...schema import (
     TFBS_LEARNABILITY_FAMILY_CONTENT_NULL_VERSION,
     TFBS_LEARNABILITY_SLOT_GEOMETRY_NULL_VERSION,
+    TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION,
 )
 from .contracts import VALID_NEGATIVE_CONTROL
 from .io import campaign_workdir, label_table, selection_table
@@ -212,6 +213,11 @@ def null_metadata_from_label_table(label_table: pd.DataFrame) -> dict[str, str]:
         return {
             "null_control_role": "count_preserving_slot_confound_control",
             "negative_control_claim_status": "CONFOUND_CONTROL_ONLY",
+        }
+    if null_version == TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION:
+        return {
+            "null_control_role": "count_fixed_shuffled_slot_negative_control",
+            "negative_control_claim_status": VALID_NEGATIVE_CONTROL,
         }
     return {
         "null_control_role": explicit_role,

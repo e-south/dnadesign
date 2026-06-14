@@ -31,6 +31,31 @@ def write_tfbs_stage_b_source_fixture(tmp_path: Path) -> tuple[Path, Path]:
     return candidate_path, sidecar_path
 
 
+def write_tfbs_count_fixed_stage_b_source_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    candidate_path = tmp_path / "records.parquet"
+    sidecar_path = tmp_path / "densegen.parquet"
+    ids = [f"id-{idx}" for idx in range(9)]
+    pd.DataFrame({"id": ids, "sequence": [SEQ60] * len(ids)}).to_parquet(candidate_path, index=False)
+    pd.DataFrame(
+        {
+            "id": [*ids, "sidecar-only"],
+            "densegen__used_tfbs_detail": [
+                _detail("LexA", "BaeR", "background"),
+                _detail("BaeR", "LexA", "background"),
+                _detail("background", "LexA", "BaeR"),
+                _detail("LexA", "background", "BaeR"),
+                _detail("BaeR", "background", "LexA"),
+                _detail("background", "BaeR", "LexA"),
+                _detail("LexA", "LexA", "background"),
+                _detail("background", "BaeR", "CpxR"),
+                _detail("background", "background", "background"),
+                _detail("CpxR", "BaeR", "background"),
+            ],
+        }
+    ).to_parquet(sidecar_path, index=False)
+    return candidate_path, sidecar_path
+
+
 def _detail(slot0: str, slot1: str, slot2: str) -> list[dict[str, object]]:
     return [
         _tfbs(slot0, 10),

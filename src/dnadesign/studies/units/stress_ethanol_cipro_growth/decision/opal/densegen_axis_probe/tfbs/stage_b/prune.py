@@ -65,7 +65,7 @@ def prune_tfbs_stage_b_campaigns(
     deleted_paths: list[str] = []
     for campaign in pruned_campaigns:
         deleted_paths.extend(_delete_campaign_artifacts(campaign))
-    validation = _pruned_validation(manifest.get("validation"), labels=labels)
+    validation = _pruned_validation(manifest.get("validation"), labels=labels, campaigns=campaigns)
     for report in validation["pruned_reports"]:
         report_path = Path(str(report.get("report_path") or ""))
         if _delete_path(report_path):
@@ -135,15 +135,25 @@ def _delete_campaign_artifacts(campaign: Mapping[str, Any]) -> list[str]:
     return deleted
 
 
-def _pruned_validation(value: Any, *, labels: Sequence[str]) -> dict[str, Any]:
+def _pruned_validation(
+    value: Any,
+    *,
+    labels: Sequence[str],
+    campaigns: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
     validation = dict(value) if isinstance(value, Mapping) else {}
     reports = _mapping_list(validation.get("reports", []), field="validation.reports")
     labels_set = set(labels)
+    label_by_campaign_key = {
+        str(row.get("campaign_key") or ""): str(row.get("label_name") or "")
+        for row in campaigns
+        if str(row.get("campaign_key") or "")
+    }
     pruned_reports = [
-        row for row in reports if _label_from_campaign_key(str(row.get("campaign_key") or "")) in labels_set
+        row for row in reports if label_by_campaign_key.get(str(row.get("campaign_key") or "")) in labels_set
     ]
     retained_reports = [
-        row for row in reports if _label_from_campaign_key(str(row.get("campaign_key") or "")) not in labels_set
+        row for row in reports if label_by_campaign_key.get(str(row.get("campaign_key") or "")) not in labels_set
     ]
     retained = {
         **validation,
@@ -151,18 +161,6 @@ def _pruned_validation(value: Any, *, labels: Sequence[str]) -> dict[str, Any]:
         "reports": retained_reports,
     }
     return {"retained_validation": retained, "pruned_reports": pruned_reports}
-
-
-def _label_from_campaign_key(key: str) -> str:
-    prefix = "tfbs_"
-    suffixes = ("_positive_random_id_seed7", "_matched_null_random_id_seed7")
-    if not key.startswith(prefix):
-        return ""
-    body = key[len(prefix) :]
-    for suffix in suffixes:
-        if body.endswith(suffix):
-            return body[: -len(suffix)]
-    return ""
 
 
 def _stage_b_root(config_manifest_path: Path) -> Path:

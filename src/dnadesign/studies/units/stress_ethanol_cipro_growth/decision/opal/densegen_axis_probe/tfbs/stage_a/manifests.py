@@ -17,6 +17,14 @@ from ..schema import (
     TFBS_LEARNABILITY_SCHEMA_VERSION,
 )
 
+TFBS_STAGE_A_NULL_PERMUTATION_SEED_CONTEXT_VERSION = "tfbs_stage_a_matched_null_permutation_v1"
+
+
+def tfbs_stage_a_null_permutation_seed_context(*, seed: int) -> str:
+    """Return the seed context used to construct deterministic matched-null labels."""
+
+    return f"{TFBS_STAGE_A_NULL_PERMUTATION_SEED_CONTEXT_VERSION}:seed={int(seed)}"
+
 
 def attach_source_file_fingerprints(
     oracle: Any,
@@ -72,10 +80,12 @@ def build_pairing_manifest(
     retention_estimate: Mapping[str, Any],
     written_nulls: list[TfbsNullBuild],
     seed: int,
+    target_profile: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build manifest-backed positive/null pair relationships for Stage B sentinels."""
 
     retention_hash = str(retention_estimate["retention_policy_hash"])
+    null_seed_context = tfbs_stage_a_null_permutation_seed_context(seed=seed)
     pairs = []
     for build in written_nulls:
         report = build.null_viability_report
@@ -90,6 +100,10 @@ def build_pairing_manifest(
                 "null_oracle_role": "matched_null",
                 "positive_oracle_version": TFBS_LEARNABILITY_ORACLE_VERSION,
                 "null_version": report["null_version"],
+                "null_control_role": report["null_control_role"],
+                "negative_control_claim_status": report["negative_control_claim_status"],
+                "null_permutation_seed": int(seed),
+                "null_permutation_seed_context": null_seed_context,
                 "positive_label_table_path": positive_label_manifest["label_table_path"],
                 "positive_label_table_hash": positive_label_manifest["label_table_hash"],
                 "null_label_table_path": report["null_label_table_path"],
@@ -110,12 +124,16 @@ def build_pairing_manifest(
                 ),
                 "campaign_config_hash_kind": "stage_a_planned_sentinel_contract_hash",
                 "retention_policy_hash": retention_hash,
+                **_scope_metadata(report),
             }
         )
     return {
         "schema_version": f"{TFBS_LEARNABILITY_SCHEMA_VERSION}.pairing_manifest",
         "positive_oracle_version": TFBS_LEARNABILITY_ORACLE_VERSION,
+        "null_permutation_seed": int(seed),
+        "null_permutation_seed_context": null_seed_context,
         "retention_policy_hash": retention_hash,
+        "target_profile": target_profile,
         "pairing_scope": "stage_b_sentinel_initial",
         "pairs": sorted(pairs, key=lambda row: row["label_name"]),
     }
@@ -134,9 +152,11 @@ def build_stage_manifest(
     pairing_manifest_path: Path,
     retention_estimate_path: Path,
     sentinel_labels: tuple[str, ...],
+    target_profile: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build the Stage A summary manifest after artifact files are written."""
 
+    null_seed_context = tfbs_stage_a_null_permutation_seed_context(seed=seed)
     null_artifacts = []
     for build in written_nulls:
         report = build.null_viability_report
@@ -148,11 +168,14 @@ def build_stage_manifest(
             {
                 "label_name": report["label_name"],
                 "null_version": report["null_version"],
+                "null_control_role": report["null_control_role"],
+                "negative_control_claim_status": report["negative_control_claim_status"],
                 "viability_status": report["viability_status"],
                 "null_label_table_path": str(label_table_path),
                 "null_label_table_hash": report["null_label_table_hash"],
                 "null_viability_report_path": str(report_path),
                 "null_viability_report_hash": file_sha256(report_path),
+                **_scope_metadata(report),
             }
         )
     return {
@@ -161,11 +184,14 @@ def build_stage_manifest(
         "status": "PASS",
         "run_root": str(run_root),
         "seed": int(seed),
+        "null_permutation_seed": int(seed),
+        "null_permutation_seed_context": null_seed_context,
         "rounds": int(rounds),
         "selection_k": int(selection_k),
         "positive_oracle_version": TFBS_LEARNABILITY_ORACLE_VERSION,
         "positive_label_table_path": positive_label_manifest["label_table_path"],
         "positive_label_table_hash": positive_label_manifest["label_table_hash"],
+        "target_profile": target_profile,
         "sentinel_labels": list(sentinel_labels),
         "label_rate_sanity": dict(label_rate_sanity),
         "retention_estimate_path": str(retention_estimate_path),
@@ -175,6 +201,18 @@ def build_stage_manifest(
         "pairing_manifest_hash": file_sha256(pairing_manifest_path),
         "null_artifacts": sorted(null_artifacts, key=lambda row: row["label_name"]),
     }
+
+
+def _scope_metadata(report: Mapping[str, Any]) -> dict[str, Any]:
+    keys = (
+        "candidate_scope_policy_id",
+        "target_family_count_column",
+        "required_count_value",
+        "claim_boundary",
+        "row_count",
+        "positive_label_marginal",
+    )
+    return {key: report[key] for key in keys if key in report}
 
 
 def file_sha256(path: Path) -> str:

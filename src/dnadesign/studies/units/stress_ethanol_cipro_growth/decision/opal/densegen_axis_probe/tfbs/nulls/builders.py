@@ -6,10 +6,12 @@ from typing import Sequence
 
 import pandas as pd
 
+from ..candidate_scopes import build_count_fixed_slot_position_scope, filter_labels_to_scope
 from ..oracle import validate_tfbs_label_algebra
 from ..schema import (
     TFBS_LEARNABILITY_FAMILY_CONTENT_NULL_VERSION,
     TFBS_LEARNABILITY_SLOT_GEOMETRY_NULL_VERSION,
+    TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION,
 )
 from .contracts import (
     TFBS_ACTIVE_NUMERIC_COLUMNS,
@@ -152,6 +154,85 @@ def build_tfbs_slot_geometry_count_matched_null(
             seed=seed,
             positive_labels=frame,
             selected=selected,
+        ),
+        null_viability_report=report,
+    )
+
+
+def build_tfbs_slot_position_count_fixed_shuffled_null(
+    labels: pd.DataFrame,
+    *,
+    label_name: str,
+    seed: int,
+    stratum_candidates: Sequence[Sequence[str]] = (
+        ("sigma35_variant", "spacer_length", "lexA_count", "cpxR_count", "baeR_count"),
+        ("sigma35_variant", "lexA_count", "cpxR_count", "baeR_count"),
+        ("lexA_count", "cpxR_count", "baeR_count"),
+    ),
+    config: TfbsNullConfig | None = None,
+) -> TfbsNullBuild:
+    """Permute slot labels inside the target-count==1 candidate universe."""
+
+    if label_name not in TFBS_SLOT_EVENT_COLUMNS:
+        raise ValueError(f"count-fixed slot null label_name must be a v1 slot label, got {label_name!r}")
+    cfg = config or TfbsNullConfig()
+    scope = build_count_fixed_slot_position_scope(labels, label_name=label_name)
+    frame = filter_labels_to_scope(labels, scope=scope)
+    _require_columns(
+        frame,
+        (
+            "id",
+            "quality_flag",
+            *TFBS_SLOT_FAMILY_COLUMNS,
+            *TFBS_SLOT_EVENT_COLUMNS,
+            *TFBS_SLOT_COUNT_MATCH_COLUMNS,
+            *TFBS_PASSIVE_STRATUM_COLUMNS,
+        ),
+    )
+    selected = _select_viable_stratum(frame, stratum_candidates=stratum_candidates, config=cfg)
+    donor_positions = _permuted_donor_positions(frame, selected.stratum_columns, seed=seed)
+    out = frame.copy()
+    donor = frame.iloc[donor_positions].reset_index(drop=True)
+    for column in TFBS_SLOT_FAMILY_COLUMNS:
+        out[column] = donor[column].to_numpy()
+    _recompute_slot_event_columns(out)
+    _validate_count_matching(frame, out)
+    _validate_label_distribution(frame, out, columns=(label_name,))
+    validate_tfbs_label_algebra(out)
+    _validate_slot_label_consistency(out)
+    scope_manifest = scope.to_manifest()
+    report = _null_viability_report(
+        before=frame,
+        after=out,
+        null_version=TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION,
+        seed=seed,
+        label_name=label_name,
+        selected=selected,
+        config=cfg,
+        compare_columns=(label_name,),
+        label_joint_columns=(*TFBS_SLOT_FAMILY_COLUMNS, *TFBS_SLOT_EVENT_COLUMNS),
+        null_control_role="count_fixed_shuffled_slot_negative_control",
+        preserved_signal="count-fixed candidate scope, row-level TF family counts, and target-label marginal",
+        disrupted_signal="row association between sequence identity and slot-family label inside the count-fixed scope",
+        negative_control_claim_status="VALID_AS_NEGATIVE_CONTROL",
+        warnings=[],
+    )
+    report.update(scope_manifest)
+    return TfbsNullBuild(
+        labels=_with_null_metadata(
+            out,
+            null_version=TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION,
+            null_control_role="count_fixed_shuffled_slot_negative_control",
+            negative_control_claim_status="VALID_AS_NEGATIVE_CONTROL",
+            seed=seed,
+            positive_labels=frame,
+            selected=selected,
+            extra_metadata={
+                "candidate_scope_policy_id": scope.policy.policy_id,
+                "target_family_count_column": scope.policy.target_family_count_column,
+                "required_count_value": int(scope.policy.required_count_value),
+                "claim_boundary": scope.policy.claim_boundary,
+            },
         ),
         null_viability_report=report,
     )

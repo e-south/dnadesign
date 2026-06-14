@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from ..slot_diagnostics import SLOT_LABEL_SPECS
+from ..slot_diagnostics.contracts import SLOT_LABEL_SPECS
 
 
 def read_review_manifest(path: Path) -> dict[str, Any]:

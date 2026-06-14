@@ -8,12 +8,13 @@ from pathlib import Path
 
 from ..core.constants import CANDIDATE_RECORDS, DEFAULT_SEED, DENSEGEN_SIDECAR
 from ..core.paths import _default_run_root, _repo_root_from, _resolve_repo_path, validate_run_root_policy
+from .profiles import resolve_tfbs_target_label_names, tfbs_target_profile_ids
 from .retention import (
     DEFAULT_TFBS_STAGE_INITIAL_LABELS,
     DEFAULT_TFBS_STAGE_ROUNDS,
     DEFAULT_TFBS_STAGE_SELECTION_K,
 )
-from .schema import TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES, TFBS_LEARNABILITY_SENTINEL_TARGET_SET
+from .schema import TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES
 from .stage_b.seed import (
     TFBS_STAGE_B_INITIAL_SEED_POLICIES,
     TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM,
@@ -26,6 +27,7 @@ TFBS_COMMANDS = {
     "tfbs-stage-b-prune",
     "tfbs-stage-b-run",
     "tfbs-stage-b-review",
+    "tfbs-stage-b-replicate-review",
 }
 
 
@@ -46,7 +48,19 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
         action="append",
         default=[],
         choices=TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES,
-        help="Restrict Stage A null materialization to a TFBS learnability label. Repeatable.",
+        help=(
+            "Restrict Stage A null materialization to a TFBS learnability label. Repeatable. "
+            "The default is the canonical lexA/cpxR/baeR count_fraction profile."
+        ),
+    )
+    tfbs_stage_a.add_argument(
+        "--target-profile",
+        default=None,
+        choices=tfbs_target_profile_ids(),
+        help=(
+            "Named TFBS target profile to materialize. Omit for the canonical count_fraction profile. "
+            "Cannot be combined with --label-name."
+        ),
     )
     tfbs_stage_a.add_argument("--rounds", type=int, default=DEFAULT_TFBS_STAGE_ROUNDS)
     tfbs_stage_a.add_argument("--selection-k", type=int, default=DEFAULT_TFBS_STAGE_SELECTION_K)
@@ -87,7 +101,19 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
         action="append",
         default=[],
         choices=TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES,
-        help="Restrict Stage B config generation to a TFBS learnability label. Repeatable.",
+        help=(
+            "Restrict Stage B config generation to a TFBS learnability label. Repeatable. "
+            "The default is the canonical lexA/cpxR/baeR count_fraction profile."
+        ),
+    )
+    tfbs_stage_b.add_argument(
+        "--target-profile",
+        default=None,
+        choices=tfbs_target_profile_ids(),
+        help=(
+            "Named TFBS target profile to generate. Omit for the canonical count_fraction profile. "
+            "Cannot be combined with --label-name."
+        ),
     )
     tfbs_stage_b.add_argument("--rounds", type=int, default=DEFAULT_TFBS_STAGE_ROUNDS)
     tfbs_stage_b.add_argument("--selection-k", type=int, default=DEFAULT_TFBS_STAGE_SELECTION_K)
@@ -119,6 +145,11 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
         "--replace-out-dir",
         action="store_true",
         help="Delete an existing Stage B config output directory before writing.",
+    )
+    tfbs_stage_b.add_argument(
+        "--refresh-existing-execution-state",
+        action="store_true",
+        help="Refresh generated configs/manifests while preserving existing Stage B campaign outputs.",
     )
     tfbs_stage_b.add_argument("--json", action="store_true", help="Emit machine-readable JSON summaries.")
 
@@ -181,6 +212,31 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
     )
     tfbs_stage_b_review.add_argument("--json", action="store_true", help="Emit machine-readable JSON summaries.")
 
+    tfbs_stage_b_replicate_review = subparsers.add_parser(
+        "tfbs-stage-b-replicate-review",
+        help=(
+            "Write replicated true-label lift, endpoint, claim, and plot artifacts for deterministic "
+            "count_fraction Stage B seed pairs."
+        ),
+    )
+    tfbs_stage_b_replicate_review.add_argument(
+        "--config-manifest",
+        action="append",
+        required=True,
+        help="Stage B config manifest for one deterministic replicate seed. Repeat exactly for seeds 7, 17, and 29.",
+    )
+    tfbs_stage_b_replicate_review.add_argument("--out-dir", required=True)
+    tfbs_stage_b_replicate_review.add_argument(
+        "--collection-visual-index",
+        default=None,
+        help="Optional OPAL collection_visual_manifest.json to update with replicated review plots.",
+    )
+    tfbs_stage_b_replicate_review.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON summaries.",
+    )
+
 
 def handle_tfbs_command(args: argparse.Namespace) -> int | None:
     """Dispatch TFBS learnability commands, or return None for non-TFBS commands."""
@@ -195,7 +251,16 @@ def handle_tfbs_command(args: argparse.Namespace) -> int | None:
         return _tfbs_stage_b_prune(args)
     if args.command == "tfbs-stage-b-review":
         return _tfbs_stage_b_review(args)
+    if args.command == "tfbs-stage-b-replicate-review":
+        return _tfbs_stage_b_replicate_review(args)
     return None
+
+
+def _resolve_cli_target_label_names(args: argparse.Namespace) -> tuple[str, ...]:
+    return resolve_tfbs_target_label_names(
+        target_profile_id=getattr(args, "target_profile", None),
+        label_names=tuple(getattr(args, "label_name", ()) or ()),
+    )
 
 
 def _tfbs_stage_a(args: argparse.Namespace) -> int:
@@ -227,7 +292,8 @@ def _tfbs_stage_a(args: argparse.Namespace) -> int:
             fail_if_estimate_exceeds=bool(args.fail_if_estimate_exceeds),
             enforce_live_label_rate_sanity=not bool(args.skip_live_label_rate_sanity),
             replace_run_root=bool(args.replace_run_root),
-            label_names=tuple(args.label_name or TFBS_LEARNABILITY_SENTINEL_TARGET_SET),
+            label_names=_resolve_cli_target_label_names(args),
+            target_profile_id=getattr(args, "target_profile", None),
         )
     )
     payload = result.to_dict()
@@ -255,7 +321,8 @@ def _tfbs_stage_b_configs(args: argparse.Namespace) -> int:
             stage_a_run_root=stage_a_run_root,
             out_dir=out_dir,
             repo_root=repo_root,
-            label_names=tuple(args.label_name or TFBS_LEARNABILITY_SENTINEL_TARGET_SET),
+            label_names=_resolve_cli_target_label_names(args),
+            target_profile_id=getattr(args, "target_profile", None),
             split_id=str(args.split_id),
             seed=int(args.seed),
             rounds=int(args.rounds),
@@ -265,6 +332,7 @@ def _tfbs_stage_b_configs(args: argparse.Namespace) -> int:
             selection_tie_handling=str(args.tie_handling),
             validate_configs=bool(args.validate_configs),
             replace_out_dir=bool(args.replace_out_dir),
+            refresh_existing_execution_state=bool(args.refresh_existing_execution_state),
             score_batch_size=int(args.score_batch_size),
             max_x_matrix_gib=float(args.max_x_matrix_gib),
         )
@@ -332,7 +400,7 @@ def _tfbs_stage_b_prune(args: argparse.Namespace) -> int:
 
 
 def _tfbs_stage_b_review(args: argparse.Namespace) -> int:
-    from .stage_b.review import build_tfbs_stage_b_realized_label_review
+    from .stage_b.review.materialization import build_tfbs_stage_b_realized_label_review
 
     repo_root = _repo_root_from(Path.cwd())
     config_manifest_path = _resolve_repo_path(repo_root, Path(args.config_manifest))
@@ -354,6 +422,37 @@ def _tfbs_stage_b_review(args: argparse.Namespace) -> int:
         print(f"review_dir={payload['review_dir']}")
         print(f"trajectory_csv={payload['trajectory_csv_path']}")
         print(f"pair_summary_csv={payload['pair_summary_csv_path']}")
+        print(f"claim_assessment_csv={payload['claim_assessment_csv_path']}")
+        print(f"plot_manifest_json={payload['plot_manifest_json_path']}")
+        print(f"summary_json={payload['summary_json_path']}")
+    return 0 if payload["status"] == "PASS" else 1
+
+
+def _tfbs_stage_b_replicate_review(args: argparse.Namespace) -> int:
+    from .stage_b.review.replicates.materialization import build_tfbs_stage_b_replicated_realized_label_review
+
+    repo_root = _repo_root_from(Path.cwd())
+    config_manifest_paths = tuple(_resolve_repo_path(repo_root, Path(path)) for path in args.config_manifest)
+    out_dir = _resolve_repo_path(repo_root, Path(args.out_dir))
+    collection_visual_index_path = (
+        _resolve_repo_path(repo_root, Path(args.collection_visual_index)) if args.collection_visual_index else None
+    )
+    result = build_tfbs_stage_b_replicated_realized_label_review(
+        config_manifest_paths,
+        out_dir=out_dir,
+        collection_visual_index_path=collection_visual_index_path,
+    )
+    payload = result.to_dict()
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("densegen_tfbs_learnability_stage_b_replicated_review")
+        print(f"status={payload['status']}")
+        print(f"replicate_seeds={payload['replicate_seeds']}")
+        print(f"review_dir={payload['review_dir']}")
+        print(f"trajectory_csv={payload['trajectory_csv_path']}")
+        print(f"replicate_pair_summary_csv={payload['replicate_pair_summary_csv_path']}")
+        print(f"endpoint_summary_csv={payload['endpoint_summary_csv_path']}")
         print(f"claim_assessment_csv={payload['claim_assessment_csv_path']}")
         print(f"plot_manifest_json={payload['plot_manifest_json_path']}")
         print(f"summary_json={payload['summary_json_path']}")

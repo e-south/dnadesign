@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM = "label_value_stratified_random"
 TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM = "uniform_random"
+TFBS_STAGE_B_SHARED_INITIAL_SEED_CONTEXT_VERSION = "tfbs_stage_b_shared_initial_seed_v1"
 TFBS_STAGE_B_INITIAL_SEED_POLICIES = (
     TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM,
     TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM,
@@ -27,6 +28,18 @@ def validate_tfbs_stage_b_initial_seed_policy(value: str) -> str:
             f"{policy!r}; expected one of {list(TFBS_STAGE_B_INITIAL_SEED_POLICIES)}"
         )
     return policy
+
+
+def tfbs_stage_b_shared_initial_seed_context(*, label_name: str, split_id: str, seed: int) -> str:
+    """Return the shared seed context used for one positive/null campaign pair."""
+
+    label_text = str(label_name).strip()
+    split_text = str(split_id).strip()
+    if not label_text:
+        raise ValueError("Stage B shared initial seed context requires label_name")
+    if not split_text:
+        raise ValueError("Stage B shared initial seed context requires split_id")
+    return f"{TFBS_STAGE_B_SHARED_INITIAL_SEED_CONTEXT_VERSION}:label={label_text}:split={split_text}:seed={int(seed)}"
 
 
 def select_tfbs_stage_b_initial_ids(
@@ -60,6 +73,51 @@ def select_tfbs_stage_b_initial_ids(
     raise AssertionError(f"validated unsupported Stage B initial seed policy: {policy}")
 
 
+def select_tfbs_stage_b_paired_initial_ids(
+    positive_frame: pd.DataFrame,
+    control_frame: pd.DataFrame,
+    *,
+    label_name: str,
+    initial_label_count: int,
+    seed: int,
+    policy: str,
+    seed_context: str = "",
+) -> tuple[str, ...]:
+    """Select shared initial IDs that are non-degenerate under positive and control labels."""
+
+    policy = validate_tfbs_stage_b_initial_seed_policy(policy)
+    positive = _seed_frame(positive_frame, label_name=label_name).rename(columns={label_name: "__positive__"})
+    control = _seed_frame(control_frame, label_name=label_name).rename(columns={label_name: "__control__"})
+    merged = positive.merge(control, on="id", how="inner", validate="one_to_one")
+    if len(merged) != len(positive) or len(merged) != len(control):
+        raise ValueError("Stage B paired initial seed selection requires matching positive/control candidate IDs")
+    count = int(initial_label_count)
+    if count <= 0:
+        raise ValueError("Stage B initial_label_count must be positive")
+    if count > len(merged):
+        raise ValueError(f"Stage B initial_label_count={count} exceeds paired candidate scope size {len(merged)}")
+    for attempt in range(256):
+        ids = _select_candidate_ids_for_attempt(
+            merged,
+            label_name=label_name,
+            count=count,
+            seed=seed,
+            policy=policy,
+            seed_context=seed_context,
+            attempt=attempt,
+        )
+        if _selected_has_multiple_values(merged, ids=ids, column="__positive__") and _selected_has_multiple_values(
+            merged,
+            ids=ids,
+            column="__control__",
+        ):
+            return ids
+    raise ValueError(
+        "Stage B paired initial seed selection could not find a non-degenerate shared batch "
+        f"for {label_name} under both positive and control labels"
+    )
+
+
 def _seed_frame(frame: pd.DataFrame, *, label_name: str) -> pd.DataFrame:
     import pandas as pd
 
@@ -85,6 +143,34 @@ def _uniform_random_ids(ids: Sequence[str], *, count: int, rng: np.random.Genera
         raise ValueError("Stage B uniform initial seed sampling requires unique ids")
     selected_indices = rng.choice(len(unique_ids), size=count, replace=False)
     return tuple(unique_ids[int(index)] for index in sorted(selected_indices.tolist()))
+
+
+def _select_candidate_ids_for_attempt(
+    frame: pd.DataFrame,
+    *,
+    label_name: str,
+    count: int,
+    seed: int,
+    policy: str,
+    seed_context: str,
+    attempt: int,
+) -> tuple[str, ...]:
+    import numpy as np
+
+    context = f"{policy}:{label_name}:{seed_context}:paired_attempt={int(attempt)}"
+    rng = np.random.default_rng(_stable_seed(seed=seed, context=context))
+    if policy == TFBS_STAGE_B_INITIAL_SEED_POLICY_UNIFORM_RANDOM:
+        return _uniform_random_ids(frame["id"].tolist(), count=count, rng=rng)
+    if policy == TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM:
+        prepared = frame.loc[:, ["id", "__positive__"]].rename(columns={"__positive__": label_name})
+        return _label_value_stratified_random_ids(prepared, count=count, rng=rng)
+    raise AssertionError(f"validated unsupported Stage B initial seed policy: {policy}")
+
+
+def _selected_has_multiple_values(frame: pd.DataFrame, *, ids: Sequence[str], column: str) -> bool:
+    wanted = set(map(str, ids))
+    selected = frame.loc[frame["id"].astype(str).isin(wanted), column]
+    return selected.nunique(dropna=False) >= 2
 
 
 def _label_value_stratified_random_ids(

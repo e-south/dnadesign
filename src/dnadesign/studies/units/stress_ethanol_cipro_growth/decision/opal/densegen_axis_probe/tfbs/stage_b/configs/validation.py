@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ...active_targets import validate_tfbs_learnability_target_set
+from ...profiles import resolve_tfbs_target_profile
 from ..commands import opal_validate_command
 from ..io import write_stage_b_json
 from ..layout import TfbsStageBLayout
@@ -24,7 +25,11 @@ def normalize_config(config: TfbsStageBConfig) -> TfbsStageBConfig:
         raise ValueError("Stage B stage_a_run_root must be explicit")
     if not stage_a_run_root.exists():
         raise FileNotFoundError(f"Stage A run root not found: {stage_a_run_root}")
-    label_names = validate_tfbs_learnability_target_set(tuple(config.label_names))
+    target_profile = resolve_tfbs_target_profile(
+        target_profile_id=config.target_profile_id,
+        label_names=tuple(config.label_names),
+    )
+    label_names = validate_tfbs_learnability_target_set(target_profile.label_names)
     validate_stage_b_split_id(config.split_id)
     if config.seed < 0:
         raise ValueError("Stage B seed must be non-negative")
@@ -53,6 +58,7 @@ def normalize_config(config: TfbsStageBConfig) -> TfbsStageBConfig:
         out_dir=None if config.out_dir is None else Path(config.out_dir),
         repo_root=None if config.repo_root is None else Path(config.repo_root),
         label_names=label_names,
+        target_profile_id=target_profile.profile_id,
         initial_seed_policy=initial_seed_policy,
         selection_tie_handling=selection_tie_handling,
     )
@@ -66,6 +72,7 @@ def validate_stage_a_inputs(
     requested_labels: Sequence[str],
     seed: int,
     split_id: str,
+    target_profile_id: str | None = None,
 ) -> None:
     """Validate Stage A manifests before materializing Stage B campaign configs."""
 
@@ -93,6 +100,35 @@ def validate_stage_a_inputs(
             raise ValueError(f"Stage A pairing seed mismatch for {row.get('label_name')}: {row.get('seed')}")
         if str(row.get("retention_policy_hash")) != str(retention.get("retention_policy_hash")):
             raise ValueError(f"Stage A pairing retention hash mismatch for {row.get('label_name')}")
+    if target_profile_id:
+        for source_name, source in (("Stage A", stage_a), ("Stage A pairing", pairing)):
+            profile = source.get("target_profile")
+            if not isinstance(profile, Mapping):
+                raise ValueError(f"{source_name} manifest missing target_profile")
+            if str(profile.get("profile_id")) != str(target_profile_id):
+                raise ValueError(
+                    f"{source_name} target_profile mismatch: expected {target_profile_id!r}, "
+                    f"observed {profile.get('profile_id')!r}"
+                )
+
+
+def pair_rows_by_label(pairing: Mapping[str, Any], label_names: Sequence[str]) -> dict[str, Mapping[str, Any]]:
+    """Return pairing rows keyed by requested label name."""
+
+    rows = pairing.get("pairs")
+    if not isinstance(rows, list):
+        raise ValueError("pairing manifest pairs must be a list")
+    out: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise ValueError("pairing manifest pair entries must be mappings")
+        label = str(row.get("label_name"))
+        if label in label_names:
+            out[label] = row
+    missing = sorted(set(label_names) - set(out))
+    if missing:
+        raise ValueError(f"pairing manifest missing label(s): {missing}")
+    return out
 
 
 def validate_campaign_configs(campaigns: Sequence[Mapping[str, Any]], *, cfg: TfbsStageBConfig) -> dict[str, Any]:

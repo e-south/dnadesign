@@ -8,8 +8,10 @@ from string import Formatter
 from types import MappingProxyType
 from typing import Iterable, Literal, Mapping
 
+from ...label_text import tfbs_label_display, tfbs_label_expression, tfbs_label_title
+
 TidySource = Literal["trajectory", "pair_summary", "count_distribution"]
-_ALLOWED_TEMPLATE_FIELDS = {"label_name", "label_slug"}
+_ALLOWED_TEMPLATE_FIELDS = {"label_name", "label_slug", "label_display", "label_expression", "label_title"}
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,22 @@ class StageBNotebookVisualSpec:
             label_name=label_name,
             kind=self.kind,
             field="plot_title_template",
+        )
+
+    def caption_text(self, *, label_name: str | None = None) -> str:
+        return _format_label_template(
+            self.caption,
+            label_name=label_name,
+            kind=self.kind,
+            field="caption",
+        )
+
+    def alt_text_value(self, *, label_name: str | None = None) -> str:
+        return _format_label_template(
+            self.alt_text,
+            label_name=label_name,
+            kind=self.kind,
+            field="alt_text",
         )
 
     def tidy_csv_path(
@@ -149,7 +167,13 @@ def _format_label_template(
     if fields and (label_name is None or not str(label_name).strip()):
         raise ValueError(f"Visual kind {kind!r} requires a nonempty label_name for {field}")
     label_value = str(label_name or "")
-    return template.format(label_name=label_value, label_slug=slug_token(label_value))
+    return template.format(
+        label_name=label_value,
+        label_slug=slug_token(label_value),
+        label_display=tfbs_label_display(label_value),
+        label_expression=tfbs_label_expression(label_value) or "",
+        label_title=tfbs_label_title(label_value),
+    )
 
 
 def _validate_visual_spec(spec: StageBNotebookVisualSpec, *, surface: str) -> None:
@@ -171,6 +195,8 @@ def _validate_visual_spec(spec: StageBNotebookVisualSpec, *, surface: str) -> No
     _validate_template_fields(spec.visual_id_template, field="visual_id_template", surface=surface)
     _validate_template_fields(spec.plot_filename_template, field="plot_filename_template", surface=surface)
     _validate_template_fields(spec.plot_title_template, field="plot_title_template", surface=surface)
+    _validate_template_fields(spec.caption, field="caption", surface=surface)
+    _validate_template_fields(spec.alt_text, field="alt_text", surface=surface)
     if not spec.plot_filename_template.endswith(".png"):
         raise ValueError(f"{surface} visual spec {spec.kind!r} must write a .png filename")
 
@@ -189,48 +215,44 @@ REALIZED_REVIEW_VISUAL_SPECS = build_visual_spec_registry(
     (
         StageBNotebookVisualSpec(
             kind="realized_label_lift_trajectory",
-            visual_id_template="tfbs_stage_b_{label_slug}_realized_label_lift_trajectory",
-            label="Realized selected true-label lift trajectory",
+            visual_id_template="tfbs_stage_b_{label_slug}_selected_label_lift_trajectory",
+            label="Selected-label enrichment trajectory",
             group_key="label_oracle_kind",
-            metric_name="selected_true_lift_ratio",
-            metric_label="Selected true-label lift ratio",
-            metric_expression="selected_true_mean / pool_baseline",
+            metric_name="selected_label_lift_ratio",
+            metric_label="Enrichment vs candidate pool",
+            metric_expression="mean(selected label) / mean(candidate-pool label)",
             summary_name="per_round",
             tidy_source="trajectory",
             caption=(
-                "Realized selected-label lift by round, computed by joining selected row IDs to the positive or "
-                "null/control oracle label table. The square marker is the initial labeled seed batch; round 0 is "
-                "the first model-selected acquisition batch after those labels are ingested. This is the "
-                "learnability evidence surface; predicted score remains an acquisition trace."
+                "Per-round top-k selected-batch label mean divided by candidate-pool label mean. Round 0 is the "
+                "first acquired batch after the shared initial IDs. Count-fraction labels use target TFBS count / "
+                "3; slot-position labels use y=1 when the target family is in the requested slot. Encoding: "
+                "bold line = mean, band = sample SD, faint lines = seeds."
             ),
-            plot_filename_template="{label_slug}__selected_true_lift_trajectory.png",
-            plot_title_template="{label_name}: selected true-label lift over rounds",
+            plot_filename_template="{label_slug}__selected_label_lift_trajectory.png",
+            plot_title_template="{label_title} enrichment vs candidate pool",
             alt_text=(
-                "Line plot of selected true-label lift over active-learning rounds for each sentinel label, with the "
-                "initial seed batch shown as a square marker before round zero and positive and matched-null roles "
-                "drawn separately."
+                "{label_title} selected-batch enrichment versus the candidate pool; round 0 is the first acquired "
+                "batch after the shared start."
             ),
         ),
         StageBNotebookVisualSpec(
             kind="positive_null_lift_summary",
             visual_id_template="tfbs_stage_b_{label_slug}_positive_null_lift_summary",
-            label="Realized positive-minus-null lift summary",
+            label="DenseGen-minus-control enrichment summary",
             group_key="peer_review_claim_status",
             metric_name="positive_minus_null_lift_ratio",
-            metric_label="Positive-minus-null lift ratio",
-            metric_expression="positive_lift_ratio - null_or_control_lift_ratio",
+            metric_label="DenseGen minus control enrichment",
+            metric_expression="DenseGen lift ratio - control lift ratio",
             summary_name="final_and_normalized_auc",
             tidy_source="pair_summary",
             caption=(
-                "Final and normalized trajectory positive-minus-null/control lift for each sentinel TFBS label. "
-                "Rows marked as confound controls should not be interpreted as clean negative-control separation."
+                "DenseGen minus control enrichment at final round and trajectory AUC. Bars show mean across paired "
+                "seed runs; whiskers show sample SD."
             ),
             plot_filename_template="{label_slug}__positive_minus_null_lift_summary.png",
-            plot_title_template="{label_name}: positive-minus-null realized lift",
-            alt_text=(
-                "Bar plot comparing final and normalized trajectory AUC positive-minus-null lift for each sentinel "
-                "label, using realized oracle labels from selected rows."
-            ),
+            plot_title_template="{label_title} DenseGen-control enrichment summary",
+            alt_text=("{label_title} DenseGen-minus-control enrichment for final round and trajectory AUC."),
         ),
     ),
     surface="Stage B realized review",
@@ -255,7 +277,7 @@ SLOT_DIAGNOSTIC_VISUAL_SPECS = build_visual_spec_registry(
             plot_filename_template="slot_target_count_mean_trajectory.png",
             plot_title_template="Selected target-family count over rounds",
             alt_text=(
-                "Line plot of selected target-family count over active-learning rounds for slot-label campaigns, "
+                "Line plot of selected target-family count over rounds for slot-label campaigns, "
                 "with positive and matched-null or control roles shown separately."
             ),
         ),

@@ -11,6 +11,7 @@ _nulls = probe_module("tfbs.nulls")
 TfbsNullConfig = _nulls.TfbsNullConfig
 build_tfbs_family_content_matched_null = _nulls.build_tfbs_family_content_matched_null
 build_tfbs_slot_geometry_count_matched_null = _nulls.build_tfbs_slot_geometry_count_matched_null
+build_tfbs_slot_position_count_fixed_shuffled_null = _nulls.build_tfbs_slot_position_count_fixed_shuffled_null
 
 _oracle = probe_module("tfbs.oracle")
 build_tfbs_learnability_oracle = _oracle.build_tfbs_learnability_oracle
@@ -19,6 +20,9 @@ validate_tfbs_label_algebra = _oracle.validate_tfbs_label_algebra
 _schema = probe_module("tfbs.schema")
 TFBS_LEARNABILITY_FAMILY_CONTENT_NULL_VERSION = _schema.TFBS_LEARNABILITY_FAMILY_CONTENT_NULL_VERSION
 TFBS_LEARNABILITY_SLOT_GEOMETRY_NULL_VERSION = _schema.TFBS_LEARNABILITY_SLOT_GEOMETRY_NULL_VERSION
+TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION = (
+    _schema.TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION
+)
 
 SEQ60 = "A" * 60
 
@@ -65,6 +69,24 @@ def test_slot_geometry_null_preserves_counts_but_permutates_slot_labels() -> Non
         build.labels[["cpxR_or_baeR_in_slot0", "cpxR_or_baeR_in_slot1", "cpxR_or_baeR_in_slot2"]].sum(axis=1)
         == build.labels["cpxR_or_baeR_count"]
     ).all()
+
+
+def test_count_fixed_slot_position_null_is_valid_only_inside_fixed_count_scope() -> None:
+    labels = _slot_labels()
+
+    build = build_tfbs_slot_position_count_fixed_shuffled_null(labels, label_name="lexA_in_slot0", seed=29)
+
+    assert build.labels["null_version"].unique().tolist() == [TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_NULL_VERSION]
+    assert build.null_viability_report["label_name"] == "lexA_in_slot0"
+    assert build.null_viability_report["null_control_role"] == "count_fixed_shuffled_slot_negative_control"
+    assert build.null_viability_report["negative_control_claim_status"] == "VALID_AS_NEGATIVE_CONTROL"
+    assert build.null_viability_report["candidate_scope_policy_id"] == "tfbs_slot_position_target_count_eq_1_v1"
+    assert build.null_viability_report["target_family_count_column"] == "lexA_count"
+    assert build.null_viability_report["required_count_value"] == 1
+    assert (build.labels["lexA_count"] == 1).all()
+    assert build.labels["lexA_in_slot0"].sum() == labels["lexA_in_slot0"].sum()
+    assert build.labels["lexA_in_slot0"].tolist() != labels["lexA_in_slot0"].tolist()
+    assert build.labels["candidate_scope_policy_id"].unique().tolist() == ["tfbs_slot_position_target_count_eq_1_v1"]
 
 
 def test_family_content_null_fails_fast_when_declared_strata_are_not_exchangeable() -> None:

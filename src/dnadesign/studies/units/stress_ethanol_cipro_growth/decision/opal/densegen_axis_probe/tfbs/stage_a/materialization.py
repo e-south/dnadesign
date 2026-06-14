@@ -20,8 +20,10 @@ from ..nulls import (
     TfbsNullBuild,
     build_tfbs_family_content_matched_null,
     build_tfbs_slot_geometry_count_matched_null,
+    build_tfbs_slot_position_count_fixed_shuffled_null,
 )
 from ..oracle import build_tfbs_learnability_oracle, validate_observed_label_rates
+from ..profiles import SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID, resolve_tfbs_target_profile
 from ..retention import (
     DEFAULT_RETENTION_MAX_ESTIMATED_BYTES,
     DEFAULT_TFBS_STAGE_ROUNDS,
@@ -29,7 +31,6 @@ from ..retention import (
     TfbsRetentionPolicy,
     estimate_tfbs_learnability_retention,
 )
-from ..schema import TFBS_LEARNABILITY_SENTINEL_TARGET_SET
 from .manifests import (
     attach_source_file_fingerprints,
     build_pairing_manifest,
@@ -51,7 +52,8 @@ class TfbsStageAConfig:
     fail_if_estimate_exceeds: bool = True
     enforce_live_label_rate_sanity: bool = True
     replace_run_root: bool = False
-    label_names: tuple[str, ...] = TFBS_LEARNABILITY_SENTINEL_TARGET_SET
+    label_names: tuple[str, ...] = ()
+    target_profile_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -108,7 +110,13 @@ def materialize_tfbs_stage_a(config: TfbsStageAConfig) -> TfbsStageAResult:
         candidate_row_count=len(oracle.labels),
         policy=retention_policy,
     )
-    null_builds = _build_sentinel_nulls(oracle.labels, seed=cfg.seed, label_names=cfg.label_names)
+    target_profile = resolve_tfbs_target_profile(target_profile_id=cfg.target_profile_id, label_names=cfg.label_names)
+    null_builds = _build_sentinel_nulls(
+        oracle.labels,
+        seed=cfg.seed,
+        label_names=cfg.label_names,
+        target_profile_id=target_profile.profile_id,
+    )
     _prepare_run_root(cfg.run_root, replace=cfg.replace_run_root)
 
     oracle = attach_source_file_fingerprints(
@@ -129,6 +137,7 @@ def materialize_tfbs_stage_a(config: TfbsStageAConfig) -> TfbsStageAResult:
         retention_estimate=retention_estimate,
         written_nulls=written_nulls,
         seed=cfg.seed,
+        target_profile=target_profile.to_manifest(),
     )
     pairing_manifest_path = manifests_dir / "pairing_manifest.json"
     _write_json(pairing_manifest_path, pairing_manifest)
@@ -144,6 +153,7 @@ def materialize_tfbs_stage_a(config: TfbsStageAConfig) -> TfbsStageAResult:
         pairing_manifest_path=pairing_manifest_path,
         retention_estimate_path=retention_estimate_path,
         sentinel_labels=cfg.label_names,
+        target_profile=target_profile.to_manifest(),
     )
     stage_manifest_path = manifests_dir / "tfbs_stage_a_manifest.json"
     _write_json(stage_manifest_path, stage_manifest)
@@ -181,13 +191,18 @@ def _normalize_config(config: TfbsStageAConfig) -> TfbsStageAConfig:
         raise ValueError("Stage A selection_k must be positive")
     if config.max_estimated_bytes <= 0:
         raise ValueError("Stage A max_estimated_bytes must be positive")
-    label_names = validate_tfbs_learnability_target_set(tuple(config.label_names))
+    target_profile = resolve_tfbs_target_profile(
+        target_profile_id=config.target_profile_id,
+        label_names=tuple(config.label_names),
+    )
+    label_names = validate_tfbs_learnability_target_set(target_profile.label_names)
     return replace(
         config,
         candidate_records_path=candidate_records_path,
         densegen_sidecar_path=densegen_sidecar_path,
         run_root=run_root,
         label_names=label_names,
+        target_profile_id=target_profile.profile_id,
     )
 
 
@@ -223,10 +238,18 @@ def _parquet_schema_names(path: Path) -> set[str]:
     return set(pq.ParquetFile(path).schema_arrow.names)
 
 
-def _build_sentinel_nulls(labels: pd.DataFrame, *, seed: int, label_names: tuple[str, ...]) -> list[TfbsNullBuild]:
+def _build_sentinel_nulls(
+    labels: pd.DataFrame,
+    *,
+    seed: int,
+    label_names: tuple[str, ...],
+    target_profile_id: str,
+) -> list[TfbsNullBuild]:
     builds: list[TfbsNullBuild] = []
     for label_name in label_names:
-        if label_name in TFBS_SLOT_EVENT_COLUMNS:
+        if target_profile_id == SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID:
+            builds.append(build_tfbs_slot_position_count_fixed_shuffled_null(labels, label_name=label_name, seed=seed))
+        elif label_name in TFBS_SLOT_EVENT_COLUMNS:
             builds.append(build_tfbs_slot_geometry_count_matched_null(labels, label_name=label_name, seed=seed))
         else:
             builds.append(build_tfbs_family_content_matched_null(labels, label_name=label_name, seed=seed))

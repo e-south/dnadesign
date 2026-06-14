@@ -9,7 +9,6 @@ from typing import Any, Mapping
 import pandas as pd
 
 from ...stage_a.manifests import file_sha256
-from ..slot_plots import materialize_tfbs_stage_b_slot_diagnostic_plots
 from .contracts import (
     POSITION_SIGNAL_AFTER_COUNT_RESTRICTION,
     SLOT_DIAGNOSTIC_SCHEMA_VERSION,
@@ -17,6 +16,7 @@ from .contracts import (
 )
 from .io import _campaign_rows, _read_json, _slot_pair_rows
 from .metrics import _slot_pair_summary_frame, _slot_trajectory_frames
+from .plots import materialize_tfbs_stage_b_slot_diagnostic_plots
 
 
 def build_tfbs_stage_b_slot_diagnostics(

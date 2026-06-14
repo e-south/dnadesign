@@ -11,6 +11,11 @@ from .probe_modules import probe_module
 _schema = probe_module("tfbs.schema")
 TFBS_LEARNABILITY_ORACLE_VERSION = _schema.TFBS_LEARNABILITY_ORACLE_VERSION
 TFBS_LEARNABILITY_SENTINEL_TARGET_SET = _schema.TFBS_LEARNABILITY_SENTINEL_TARGET_SET
+TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET = _schema.TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET
+TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET = _schema.TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET
+_profiles = probe_module("tfbs.profiles")
+SLOT_POSITION_PROFILE_ID = _profiles.SLOT_POSITION_PROFILE_ID
+SLOT_POSITION_SENTINEL_PROFILE_ID = _profiles.SLOT_POSITION_SENTINEL_PROFILE_ID
 
 _stage_a = probe_module("tfbs.stage_a.materialization")
 TfbsStageAConfig = _stage_a.TfbsStageAConfig
@@ -60,7 +65,12 @@ def test_tfbs_stage_a_materializes_positive_labels_sentinel_nulls_and_manifests(
 
     assert stage_manifest["stage"] == "A"
     assert stage_manifest["status"] == "PASS"
+    assert stage_manifest["null_permutation_seed"] == 7
+    assert stage_manifest["null_permutation_seed_context"] == "tfbs_stage_a_matched_null_permutation_v1:seed=7"
     assert stage_manifest["positive_oracle_version"] == TFBS_LEARNABILITY_ORACLE_VERSION
+    assert stage_manifest["target_profile"]["profile_id"] == "tfbs_count_fraction_probe_v1"
+    assert stage_manifest["target_profile"]["canonical"] is True
+    assert stage_manifest["target_profile"]["label_names"] == list(TFBS_LEARNABILITY_SENTINEL_TARGET_SET)
     assert set(stage_manifest["sentinel_labels"]) == set(TFBS_LEARNABILITY_SENTINEL_TARGET_SET)
     assert len(stage_manifest["null_artifacts"]) == len(TFBS_LEARNABILITY_SENTINEL_TARGET_SET)
     assert sorted(row["label_name"] for row in stage_manifest["null_artifacts"]) == sorted(
@@ -70,16 +80,20 @@ def test_tfbs_stage_a_materializes_positive_labels_sentinel_nulls_and_manifests(
     assert all(Path(row["null_viability_report_path"]).exists() for row in stage_manifest["null_artifacts"])
 
     assert pairing_manifest["schema_version"].endswith(".pairing_manifest")
+    assert pairing_manifest["null_permutation_seed"] == 7
+    assert pairing_manifest["null_permutation_seed_context"] == "tfbs_stage_a_matched_null_permutation_v1:seed=7"
+    assert pairing_manifest["target_profile"]["profile_id"] == "tfbs_count_fraction_probe_v1"
     assert len(pairing_manifest["pairs"]) == len(TFBS_LEARNABILITY_SENTINEL_TARGET_SET)
     assert {row["label_name"] for row in pairing_manifest["pairs"]} == set(TFBS_LEARNABILITY_SENTINEL_TARGET_SET)
     assert all(row["positive_oracle_version"] == TFBS_LEARNABILITY_ORACLE_VERSION for row in pairing_manifest["pairs"])
+    assert all(row["null_permutation_seed"] == 7 for row in pairing_manifest["pairs"])
     assert all(
         row["retention_policy_hash"] == retention_estimate["retention_policy_hash"] for row in pairing_manifest["pairs"]
     )
 
     assert retention_estimate["status"] == "PASS"
     assert retention_estimate["max_estimated_bytes"] == 1_000_000_000
-    assert retention_estimate["estimates"]["sentinel_initial"]["planned_campaign_count"] == 10
+    assert retention_estimate["estimates"]["sentinel_initial"]["planned_campaign_count"] == 6
     assert retention_estimate["estimates"]["full_matrix"]["planned_campaign_count"] == 144
 
 
@@ -134,6 +148,88 @@ def test_tfbs_stage_a_cli_materializes_from_explicit_sources(
     assert Path(payload["positive_label_table_path"]).exists()
     assert Path(payload["stage_a_manifest_path"]).exists()
     assert Path(payload["retention_estimate_path"]).exists()
+
+
+def test_tfbs_stage_a_cli_materializes_named_slot_position_profile(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    candidate_path, sidecar_path = _write_sources(tmp_path)
+    run_root = tmp_path / "cli-stage-a-slot-position"
+
+    assert (
+        main(
+            [
+                "tfbs-stage-a",
+                "--candidate-records",
+                str(candidate_path),
+                "--densegen-sidecar",
+                str(sidecar_path),
+                "--run-root",
+                str(run_root),
+                "--allow-custom-run-root",
+                "--skip-live-label-rate-sanity",
+                "--max-estimated-bytes",
+                "1000000000",
+                "--target-profile",
+                SLOT_POSITION_PROFILE_ID,
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    stage_manifest = _read_json(Path(payload["stage_a_manifest_path"]))
+    pairing_manifest = _read_json(Path(payload["pairing_manifest_path"]))
+    assert payload["null_artifact_count"] == len(TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET)
+    assert stage_manifest["target_profile"]["profile_id"] == SLOT_POSITION_PROFILE_ID
+    assert stage_manifest["sentinel_labels"] == list(TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET)
+    assert pairing_manifest["target_profile"]["profile_id"] == SLOT_POSITION_PROFILE_ID
+    assert {row["null_control_role"] for row in stage_manifest["null_artifacts"]} == {
+        "count_preserving_slot_confound_control"
+    }
+
+
+def test_tfbs_stage_a_cli_materializes_named_slot_position_sentinel_profile(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    candidate_path, sidecar_path = _write_sources(tmp_path)
+    run_root = tmp_path / "cli-stage-a-slot-position-sentinel"
+
+    assert (
+        main(
+            [
+                "tfbs-stage-a",
+                "--candidate-records",
+                str(candidate_path),
+                "--densegen-sidecar",
+                str(sidecar_path),
+                "--run-root",
+                str(run_root),
+                "--allow-custom-run-root",
+                "--skip-live-label-rate-sanity",
+                "--max-estimated-bytes",
+                "1000000000",
+                "--target-profile",
+                SLOT_POSITION_SENTINEL_PROFILE_ID,
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    stage_manifest = _read_json(Path(payload["stage_a_manifest_path"]))
+    pairing_manifest = _read_json(Path(payload["pairing_manifest_path"]))
+    assert payload["null_artifact_count"] == len(TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET)
+    assert stage_manifest["target_profile"]["profile_id"] == SLOT_POSITION_SENTINEL_PROFILE_ID
+    assert stage_manifest["sentinel_labels"] == list(TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET)
+    assert pairing_manifest["target_profile"]["profile_id"] == SLOT_POSITION_SENTINEL_PROFILE_ID
+    assert {row["label_name"] for row in stage_manifest["null_artifacts"]} == set(
+        TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET
+    )
 
 
 def _write_sources(tmp_path: Path) -> tuple[Path, Path]:

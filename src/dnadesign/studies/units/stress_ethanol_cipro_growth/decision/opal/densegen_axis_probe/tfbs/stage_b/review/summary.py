@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from ...profiles import tfbs_target_profile_for_labels
 from ...stage_a.manifests import file_sha256
 from ..claims import summarize_tfbs_stage_b_claim_assessment
 from .contracts import REALIZED_REVIEW_SCHEMA_VERSION
@@ -35,6 +36,9 @@ def summary_payload(
         if not pair_summary.empty
         else 0
     )
+    target_profile = manifest.get("target_profile")
+    if not isinstance(target_profile, Mapping):
+        target_profile = tfbs_target_profile_for_labels(_review_label_names(manifest)).to_manifest()
     return {
         "schema_version": REALIZED_REVIEW_SCHEMA_VERSION,
         "status": "PASS" if budget_failures == 0 else "FAIL_SELECTION_BUDGET",
@@ -43,6 +47,7 @@ def summary_payload(
         "campaign_count": int(manifest["campaign_count"]),
         "pair_count": int(len(pair_summary)),
         "rounds": int(manifest["rounds"]),
+        "target_profile": dict(target_profile),
         "trajectory_csv_path": str(trajectory_path),
         "trajectory_csv_hash": file_sha256(trajectory_path),
         "pair_summary_csv_path": str(pair_summary_path),
@@ -70,8 +75,22 @@ def summary_payload(
         "budget_failure_count": budget_failures,
         "confounded_null_pair_count": confounded_pairs,
         "interpretation_boundary": (
-            "Realized selected-label lift is the primary ML learnability endpoint. "
+            "Realized selected-label enrichment ratio is the primary ML learnability endpoint. "
             "Predicted selected score is an acquisition diagnostic and must not be used alone as evidence "
-            "that a positive oracle is learned better than its null/control."
+            "that the DenseGen label is learned better than its matched scrambled-label control."
         ),
     }
+
+
+def _review_label_names(manifest: Mapping[str, Any]) -> tuple[str, ...]:
+    labels = manifest.get("sentinel_labels")
+    if isinstance(labels, list) and labels:
+        return tuple(str(label) for label in labels)
+    pairs = manifest.get("pairs")
+    if isinstance(pairs, list):
+        return tuple(
+            dict.fromkeys(
+                str(row.get("label_name")) for row in pairs if isinstance(row, Mapping) and row.get("label_name")
+            )
+        )
+    raise ValueError("Stage B review manifest must expose sentinel_labels or pair label_name values")

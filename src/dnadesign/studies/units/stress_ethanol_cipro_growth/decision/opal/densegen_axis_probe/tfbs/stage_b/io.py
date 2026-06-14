@@ -128,7 +128,12 @@ def write_stage_b_records_reference(src: Path, dst: Path) -> None:
         dst.symlink_to(src.resolve())
 
 
-def prepare_stage_b_out_dir(out_dir: Path, *, replace: bool) -> None:
+def prepare_stage_b_out_dir(
+    out_dir: Path,
+    *,
+    replace: bool,
+    refresh_existing_execution_state: bool = False,
+) -> None:
     """Prepare a Stage B output directory without silently overwriting run state."""
 
     if replace and out_dir.exists():
@@ -140,8 +145,11 @@ def prepare_stage_b_out_dir(out_dir: Path, *, replace: bool) -> None:
         out_dir.glob("scratch_usr/*/_opal/*/observed_labels.parquet")
     )
     if mutable_outputs:
+        if refresh_existing_execution_state:
+            return
         preview = ", ".join(str(path) for path in mutable_outputs[:3])
         raise RuntimeError(
             "Stage B config generation refuses to overwrite execution state without replace_out_dir=True "
+            "or refresh_existing_execution_state=True "
             f"(sample={preview})"
         )

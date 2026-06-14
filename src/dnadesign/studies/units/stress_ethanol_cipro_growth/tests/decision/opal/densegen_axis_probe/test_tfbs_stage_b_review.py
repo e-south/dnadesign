@@ -5,15 +5,25 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from PIL import Image
 
+from .helpers import _dark_edge_pixel_count, _write_stage_b_review_fixture
 from .probe_modules import probe_module
 
-build_tfbs_stage_b_realized_label_review = probe_module("tfbs.stage_b.review").build_tfbs_stage_b_realized_label_review
+build_tfbs_stage_b_realized_label_review = probe_module(
+    "tfbs.stage_b.review.materialization"
+).build_tfbs_stage_b_realized_label_review
 main = probe_module("cli").main
+realized_visual_spec = probe_module("tfbs.stage_b.notebook_visuals.specs").realized_visual_spec
+realized_review_renderer = probe_module("tfbs.stage_b.review.plots.renderers").realized_review_renderer
+review_plot_text = probe_module("tfbs.stage_b.review.plots.display_text")
+materialize_tfbs_stage_b_realized_review_plots = probe_module(
+    "tfbs.stage_b.review.plots.materialization"
+).materialize_tfbs_stage_b_realized_review_plots
 
 
 def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_path: Path) -> None:
-    manifest_path = _write_stage_b_fixture(tmp_path)
+    manifest_path = _write_stage_b_review_fixture(tmp_path)
 
     result = build_tfbs_stage_b_realized_label_review(manifest_path)
 
@@ -46,6 +56,8 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
     assert summary["status"] == "PASS"
     assert summary["campaign_count"] == 2
     assert summary["pair_count"] == 1
+    assert summary["target_profile"]["profile_id"] == "custom_tfbs_learnability_label_set"
+    assert summary["target_profile"]["canonical"] is False
     assert Path(summary["plot_manifest_json_path"]).exists()
     assert Path(summary["claim_assessment_csv_path"]).exists()
     claims = pd.read_csv(summary["claim_assessment_csv_path"])
@@ -54,16 +66,56 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
     assert summary["claim_readiness"]["blocked_or_limited_claim_count"] == 0
     plot_manifest = json.loads(Path(summary["plot_manifest_json_path"]).read_text(encoding="utf-8"))
     assert plot_manifest["plot_count"] == 2
+    assert plot_manifest["style_contract"] == {
+        "axis_style": "stress_ethanol_cipro_growth.tfbs_review_axis.v1",
+        "axes_facecolor": "white",
+        "grid": "light_gray_background_grid_lines",
+        "visible_spines": ["left", "bottom"],
+        "tick_style": "styled_outward_ticks",
+        "font_scale": "unified_review_body_font_for_ticks_axes_subtitle_legend",
+        "square_axes": "where_data_shape_supports_it",
+        "trajectory_axes": "square",
+    }
+    assert plot_manifest["text_contract"] == {
+        "baseline": "No enrichment: selected mean = full candidate-pool mean",
+        "count_fraction_label": (
+            "count_fraction label = target TFBS count / 3 per sequence; plotted values are enrichment ratios, "
+            "not raw counts"
+        ),
+        "initial_batch": "square markers are the same initial IDs scored by each label source before round 0",
+        "interval": "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI",
+        "legend_layout": "single row below the plot",
+        "pairing": "DenseGen-label and control campaigns share initial selected IDs; only the label table differs",
+        "role_labels": "DenseGen label versus profile-appropriate matched control",
+        "selected_label_values": (
+            "selected_true_* artifact columns are selected values from that campaign's label table; for shuffled "
+            "controls this is a control-label value, not post hoc DenseGen truth"
+        ),
+        "trajectory_semantics": (
+            "line points are per-round top-k acquired selected batches; round 0 is the first acquired batch after the "
+            "shared initial IDs, not the initial seed batch"
+        ),
+        "subtitle_layout": "centered single-line subtitle",
+        "title_alignment": "centered title; title may wrap, subtitle must not wrap",
+        "type_scale": "axis labels, tick labels, subtitle, and legend use the same review body size",
+    }
     assert [plot["kind"] for plot in plot_manifest["plots"]] == [
         "realized_label_lift_trajectory",
         "positive_null_lift_summary",
     ]
-    assert plot_manifest["plots"][0]["title"] == "lexA_present: selected true-label lift over rounds"
-    assert plot_manifest["plots"][0]["alt_text"].startswith("Line plot of selected true-label lift")
+    assert plot_manifest["plots"][0]["title"] == "LexA presence enrichment from promoter embeddings"
+    assert "selected-batch enrichment versus the candidate pool" in plot_manifest["plots"][0]["alt_text"]
+    assert "Round 0 is the first acquired batch after the shared start" in plot_manifest["plots"][0]["alt_text"]
+    assert "active-learning rounds" not in plot_manifest["plots"][0]["alt_text"]
+    assert "LexA presence" in plot_manifest["plots"][0]["alt_text"]
+    assert all("each sentinel label" not in plot["alt_text"] for plot in plot_manifest["plots"])
+    visible_text = " ".join(str(plot[field]) for plot in plot_manifest["plots"] for field in ("title", "alt_text"))
+    assert "oracle" not in visible_text.lower()
+    assert "pool baseline" not in visible_text.lower()
 
 
 def test_stage_b_realized_review_fails_fast_on_selected_ids_missing_from_label_table(tmp_path: Path) -> None:
-    manifest_path = _write_stage_b_fixture(tmp_path, include_missing_selection_id=True)
+    manifest_path = _write_stage_b_review_fixture(tmp_path, include_missing_selection_id=True)
 
     with pytest.raises(ValueError, match="selected id"):
         build_tfbs_stage_b_realized_label_review(manifest_path)
@@ -73,7 +125,7 @@ def test_stage_b_review_cli_writes_realized_label_artifacts(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    manifest_path = _write_stage_b_fixture(tmp_path)
+    manifest_path = _write_stage_b_review_fixture(tmp_path)
 
     assert main(["tfbs-stage-b-review", "--config-manifest", str(manifest_path), "--json"]) == 0
 
@@ -88,7 +140,7 @@ def test_stage_b_review_cli_writes_realized_label_artifacts(
 
 def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path: Path) -> None:
     stage_b_root = tmp_path / "stage_b"
-    manifest_path = _write_stage_b_fixture(stage_b_root / "manifests")
+    manifest_path = _write_stage_b_review_fixture(stage_b_root / "manifests")
     visual_index_path = stage_b_root / "notebooks" / "collection_visuals" / "collection_visual_manifest.json"
     visual_index_path.parent.mkdir(parents=True)
     visual_index_path.write_text(
@@ -116,10 +168,12 @@ def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path:
     assert refreshed["comparison_set_count"] == 1
     assert refreshed["visual_count"] == 2
     assert refreshed["comparison_sets"][0]["key"] == "stage_b_realized_label_review__lexA_present"
-    assert refreshed["comparison_sets"][0]["label"] == "lexA_present positive/null pair"
+    assert refreshed["comparison_sets"][0]["label"] == "LexA presence DenseGen label vs scrambled control pair"
     assert {visual["surface_kind"] for visual in refreshed["visuals"]} == {"study_realized_label_review"}
+    assert {visual["target_label"] for visual in refreshed["visuals"]} == {"LexA presence"}
+    assert all("each sentinel label" not in visual["alt_text"] for visual in refreshed["visuals"])
     assert {visual["metric"] for visual in refreshed["visuals"]} == {
-        "selected_true_lift_ratio",
+        "selected_label_lift_ratio",
         "positive_minus_null_lift_ratio",
     }
     assert all(Path(visual["path"]).exists() for visual in refreshed["visuals"])
@@ -130,8 +184,162 @@ def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path:
     assert len(rerun["visuals"]) == 2
 
 
+def test_stage_b_review_long_count_fraction_plot_titles_stay_inside_square_canvas(tmp_path: Path) -> None:
+    trajectory = pd.DataFrame(
+        {
+            "label_name": ["baeR_count_fraction"] * 6,
+            "oracle_role": ["positive"] * 3 + ["matched_null"] * 3,
+            "round": [0, 1, 23, 0, 1, 23],
+            "selected_true_lift_ratio": [1.1, 2.0, 4.3, 1.0, 1.4, 1.8],
+            "seed_true_lift_ratio": [0.9, 0.9, 0.9, 1.0, 1.0, 1.0],
+        }
+    )
+    pair_summary = pd.DataFrame(
+        {
+            "label_name": ["baeR_count_fraction"],
+            "final_positive_minus_null_lift_ratio": [2.5],
+            "trapezoid_auc_positive_minus_null_lift_ratio": [1.9],
+        }
+    )
+
+    for kind in ("realized_label_lift_trajectory", "positive_null_lift_summary"):
+        path = tmp_path / f"{kind}.png"
+        renderer = realized_review_renderer(realized_visual_spec(kind))
+        renderer(trajectory, pair_summary, path, "baeR_count_fraction")
+
+        image = Image.open(path).convert("RGB")
+        assert image.size == (1152, 1152)
+        assert _dark_edge_pixel_count(image) == 0
+
+
+def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
+    assert review_plot_text.role_display_label("positive", label_name="baeR_count_fraction") == "DenseGen label"
+    assert review_plot_text.role_display_label("matched_null", label_name="baeR_count_fraction") == "Scrambled control"
+    assert (
+        review_plot_text.role_display_label(
+            "matched_null",
+            label_name="lexA_in_slot0",
+            control_role="count_fixed_shuffled_slot_negative_control",
+        )
+        == "Count-fixed shuffled-slot control"
+    )
+    assert review_plot_text.trajectory_plot_title("baeR_count_fraction", replicate_count=3) == (
+        "BaeR motif-count enrichment from promoter embeddings"
+    )
+    assert review_plot_text.label_definition("baeR_count_fraction") == (
+        "BaeR count-fraction = BaeR count / 3 per sequence"
+    )
+    assert review_plot_text.trajectory_y_axis_label("baeR_count_fraction") == (
+        r"Enrichment vs pool ($\bar{y}_{sel}/\bar{y}_{pool}$)"
+    )
+    assert review_plot_text.enrichment_formula_text("baeR_count_fraction") == (
+        "y = selected mean fraction / pool mean fraction"
+    )
+    assert review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3) == (
+        "DenseGen label vs scrambled control across 3 paired seed runs"
+    )
+    assert review_plot_text.trajectory_plot_subtitle(
+        "lexA_in_slot0",
+        replicate_count=3,
+        control_role="count_fixed_shuffled_slot_negative_control",
+    ) == ("DenseGen slot label vs count-fixed shuffled-slot control across 3 paired seed runs")
+    assert "\n" not in review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3)
+    assert review_plot_text.seed_run_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
+    assert review_plot_text.seed_pair_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
+    assert review_plot_text.positive_null_summary_title("baeR_count_fraction", replicate_count=3) == (
+        "BaeR count-fraction enrichment over control"
+    )
+    assert review_plot_text.positive_null_summary_subtitle(replicate_count=3) == (
+        "Bars = mean; whiskers = SD across 3 paired seed runs"
+    )
+    assert "\n" not in review_plot_text.positive_null_summary_subtitle(replicate_count=3)
+    trajectory_alt = review_plot_text.plot_manifest_alt_text(
+        "realized_label_lift_trajectory",
+        label_name="baeR_count_fraction",
+        replicate_count=3,
+        control_role="matched_label_permutation_negative_control",
+    )
+    summary_alt = review_plot_text.plot_manifest_alt_text(
+        "positive_null_lift_summary",
+        label_name="baeR_count_fraction",
+        replicate_count=3,
+    )
+    assert "selected-batch enrichment versus the candidate pool" in trajectory_alt
+    assert "Round 0 is the first acquired batch after the shared start" in trajectory_alt
+    assert "Lines show DenseGen label and scrambled control" in trajectory_alt
+    assert "not a confidence interval" in trajectory_alt
+    assert len(trajectory_alt) < 240
+    assert "final round and trajectory AUC" in summary_alt
+    assert len(summary_alt) < 170
+    assert review_plot_text.TRAILING_TRAJECTORY_NOTE.startswith("Faint lines = individual seeds; bold line = mean")
+    assert "squares = shared start" in review_plot_text.TRAILING_TRAJECTORY_NOTE
+    assert review_plot_text.NO_ENRICHMENT_BASELINE_LABEL == "Baseline"
+
+
+def test_stage_b_review_plots_record_sample_sd_interval_when_seed_replicates_exist(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.csv"
+    pair_summary_path = tmp_path / "pair_summary.csv"
+    pd.DataFrame(
+        {
+            "campaign_key": [
+                "positive_s1",
+                "positive_s2",
+                "positive_s1",
+                "positive_s2",
+                "matched_null_s1",
+                "matched_null_s2",
+                "matched_null_s1",
+                "matched_null_s2",
+            ],
+            "label_name": ["lexA_present"] * 8,
+            "oracle_role": ["positive", "positive", "positive", "positive"]
+            + ["matched_null", "matched_null", "matched_null", "matched_null"],
+            "seed": [1, 2, 1, 2, 1, 2, 1, 2],
+            "round": [0, 0, 1, 1, 0, 0, 1, 1],
+            "selected_true_lift_ratio": [1.2, 1.6, 2.0, 2.4, 1.0, 1.1, 1.2, 1.4],
+            "seed_true_lift_ratio": [0.9, 1.1, 0.9, 1.1, 1.0, 1.2, 1.0, 1.2],
+        }
+    ).to_csv(trajectory_path, index=False)
+    pd.DataFrame(
+        {
+            "label_name": ["lexA_present", "lexA_present"],
+            "final_positive_minus_null_lift_ratio": [0.8, 1.0],
+            "trapezoid_auc_positive_minus_null_lift_ratio": [0.6, 0.9],
+        }
+    ).to_csv(pair_summary_path, index=False)
+
+    manifest_path = materialize_tfbs_stage_b_realized_review_plots(
+        trajectory_csv_path=trajectory_path,
+        pair_summary_csv_path=pair_summary_path,
+        out_dir=tmp_path / "plots",
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    by_kind = {plot["kind"]: plot for plot in manifest["plots"]}
+    trajectory_interval = by_kind["realized_label_lift_trajectory"]["interval"]
+    summary_interval = by_kind["positive_null_lift_summary"]["interval"]
+    assert trajectory_interval == {
+        "applies_to": "selected label lift ratio by label source and round",
+        "estimator": "mean_plus_minus_sample_standard_deviation",
+        "is_confidence_interval": False,
+        "kind": "sample_sd",
+        "replicate_count": 2,
+        "status": "available",
+        "unit": "seed replicate",
+    }
+    assert summary_interval == {
+        "applies_to": "DenseGen-minus-control lift summary",
+        "estimator": "mean_plus_minus_sample_standard_deviation",
+        "is_confidence_interval": False,
+        "kind": "sample_sd",
+        "replicate_count": 2,
+        "status": "available",
+        "unit": "DenseGen/control seed pair",
+    }
+
+
 def test_stage_b_realized_review_fails_on_invalid_notebook_visual_index_schema(tmp_path: Path) -> None:
-    manifest_path = _write_stage_b_fixture(tmp_path)
+    manifest_path = _write_stage_b_review_fixture(tmp_path)
     visual_index_path = tmp_path / "bad_collection_visual_manifest.json"
     visual_index_path.write_text(
         json.dumps(
@@ -149,70 +357,3 @@ def test_stage_b_realized_review_fails_on_invalid_notebook_visual_index_schema(t
             manifest_path,
             collection_visual_index_path=visual_index_path,
         )
-
-
-def _write_stage_b_fixture(tmp_path: Path, *, include_missing_selection_id: bool = False) -> Path:
-    campaigns = []
-    pairs: dict[str, str] = {}
-    for role in ("positive", "matched_null"):
-        workdir = tmp_path / "campaigns" / f"lexA_present_{role}"
-        config_path = workdir / "configs" / "campaign.yaml"
-        config_path.parent.mkdir(parents=True)
-        config_path.write_text("campaign:\n  workdir: placeholder\n", encoding="utf-8")
-        label_path = workdir / "labels.parquet"
-        initial_label_path = workdir / "inputs" / "r0" / "labels-b0.parquet"
-        values = [0, 0, 1, 1] if role == "positive" else [1, 0, 1, 0]
-        frame = pd.DataFrame({"id": ["a", "b", "c", "d"], "lexA_present": values})
-        if role == "matched_null":
-            frame["null_version"] = "densegen_tfbs_learnability_family_content_matched_null_v1"
-        frame.to_parquet(label_path, index=False)
-        initial_label_path.parent.mkdir(parents=True)
-        frame.loc[frame["id"].isin(["a", "c"]), ["id", "lexA_present"]].to_parquet(initial_label_path, index=False)
-        round_0_ids = ["c", "a"] if role == "positive" else ["b", "d"]
-        _write_selection(workdir, 0, round_0_ids, scores=[0.1, 0.2])
-        round_1_ids = ["c", "missing"] if include_missing_selection_id and role == "positive" else ["c", "d"]
-        _write_selection(workdir, 1, round_1_ids, scores=[0.8, 0.7])
-        campaign_key = f"lexA_present_{role}"
-        pairs[role] = campaign_key
-        campaigns.append(
-            {
-                "campaign_key": campaign_key,
-                "label_name": "lexA_present",
-                "label_family_id": "tf_family_presence",
-                "oracle_role": role,
-                "split_id": "random_id",
-                "seed": 7,
-                "selection_k": 2,
-                "config_path": str(config_path),
-                "label_table_path": str(label_path),
-                "initial_label_input_path": str(initial_label_path),
-            }
-        )
-    manifest = {
-        "schema_version": "fixture.stage_b",
-        "status": "PASS",
-        "stage": "B",
-        "scope": "sentinel",
-        "rounds": 2,
-        "selection_k": 2,
-        "campaign_count": 2,
-        "campaigns": campaigns,
-        "pairs": [
-            {
-                "label_name": "lexA_present",
-                "split_id": "random_id",
-                "seed": 7,
-                "positive_campaign_key": pairs["positive"],
-                "null_campaign_key": pairs["matched_null"],
-            }
-        ],
-    }
-    manifest_path = tmp_path / "stage_b_sentinel_config_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-    return manifest_path
-
-
-def _write_selection(workdir: Path, round_index: int, ids: list[str], *, scores: list[float]) -> None:
-    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"id": ids, "pred__score_selected": scores}).to_csv(path, index=False)

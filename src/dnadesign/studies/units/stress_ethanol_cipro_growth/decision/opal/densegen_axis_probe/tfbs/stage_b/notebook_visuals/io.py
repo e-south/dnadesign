@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..review_plots import REALIZED_REVIEW_PLOT_MANIFEST_SCHEMA_VERSION
-from ..slot_plots import SLOT_DIAGNOSTIC_PLOT_MANIFEST_SCHEMA_VERSION
+from ..review.plots import REALIZED_REVIEW_PLOT_MANIFEST_SCHEMA_VERSION
+from ..slot_diagnostics.plots import SLOT_DIAGNOSTIC_PLOT_MANIFEST_SCHEMA_VERSION
 from .contracts import COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION
 
 

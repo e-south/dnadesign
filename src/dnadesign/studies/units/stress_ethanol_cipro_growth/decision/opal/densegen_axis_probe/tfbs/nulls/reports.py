@@ -84,6 +84,7 @@ def _with_null_metadata(
     seed: int,
     positive_labels: pd.DataFrame,
     selected: _SelectedStratum,
+    extra_metadata: Mapping[str, Any] | None = None,
 ) -> pd.DataFrame:
     out = labels.copy()
     out["null_version"] = null_version
@@ -96,6 +97,8 @@ def _with_null_metadata(
     out["stratum_key"] = _stratum_key_label(selected.stratum_columns)
     out["coarsening_steps_applied"] = json.dumps(list(selected.coarsening_steps_applied), separators=(",", ":"))
     out["viability_status"] = selected.viability_status
+    for key, value in (extra_metadata or {}).items():
+        out[str(key)] = value
     return out
 
 

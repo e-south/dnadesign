@@ -8,7 +8,9 @@ import pytest
 
 from .probe_modules import probe_module
 
-build_tfbs_stage_b_slot_diagnostics = probe_module("tfbs.stage_b.slot_diagnostics").build_tfbs_stage_b_slot_diagnostics
+build_tfbs_stage_b_slot_diagnostics = probe_module(
+    "tfbs.stage_b.slot_diagnostics.materialization"
+).build_tfbs_stage_b_slot_diagnostics
 
 
 def test_stage_b_slot_diagnostics_report_count_confound_and_restricted_lift(tmp_path: Path) -> None:
@@ -38,6 +40,15 @@ def test_stage_b_slot_diagnostics_report_count_confound_and_restricted_lift(tmp_
     assert summary["resolved_position_signal_labels"] == ["lexA_in_slot0"]
     assert Path(summary["plot_manifest_json_path"]).exists()
     plot_manifest = json.loads(Path(summary["plot_manifest_json_path"]).read_text(encoding="utf-8"))
+    assert plot_manifest["style_contract"] == {
+        "axis_style": "stress_ethanol_cipro_growth.tfbs_review_axis.v1",
+        "axes_facecolor": "white",
+        "grid": "light_gray_background_grid_lines",
+        "visible_spines": ["left", "bottom"],
+        "tick_style": "styled_outward_ticks",
+        "font_scale": "larger_review_tick_and_axis_labels",
+        "square_axes": "where_data_shape_supports_it",
+    }
     assert [plot["kind"] for plot in plot_manifest["plots"]] == [
         "slot_target_count_mean_trajectory",
         "slot_count_stratified_lift_trajectory",

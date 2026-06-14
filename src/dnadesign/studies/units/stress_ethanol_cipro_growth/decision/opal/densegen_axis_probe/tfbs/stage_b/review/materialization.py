@@ -12,11 +12,11 @@ from ..notebook_visuals import (
     maybe_register_tfbs_stage_b_realized_review_visuals,
     maybe_register_tfbs_stage_b_slot_diagnostic_visuals,
 )
-from ..review_plots import materialize_tfbs_stage_b_realized_review_plots
-from ..slot_diagnostics import build_tfbs_stage_b_slot_diagnostics
+from ..slot_diagnostics.materialization import build_tfbs_stage_b_slot_diagnostics
 from .contracts import TfbsStageBRealizedReviewResult
 from .frames import pair_summary_frame, trajectory_frame
 from .io import campaign_rows, has_slot_pairs, pair_rows, read_review_manifest
+from .plots import materialize_tfbs_stage_b_realized_review_plots
 from .summary import summary_payload
 
 

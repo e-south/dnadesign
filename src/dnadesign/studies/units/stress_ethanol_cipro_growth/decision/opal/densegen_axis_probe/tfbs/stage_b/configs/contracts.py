@@ -12,7 +12,6 @@ from ...retention import (
     DEFAULT_TFBS_STAGE_ROUNDS,
     DEFAULT_TFBS_STAGE_SELECTION_K,
 )
-from ...schema import TFBS_LEARNABILITY_SENTINEL_TARGET_SET
 from ..seed import TFBS_STAGE_B_INITIAL_SEED_POLICY_LABEL_VALUE_STRATIFIED_RANDOM
 from ..semantics import TFBS_STAGE_B_DEFAULT_TIE_HANDLING, TFBS_STAGE_B_SPLIT_ID
 
@@ -24,7 +23,8 @@ class TfbsStageBConfig:
     stage_a_run_root: Path
     out_dir: Path | None = None
     repo_root: Path | None = None
-    label_names: tuple[str, ...] = TFBS_LEARNABILITY_SENTINEL_TARGET_SET
+    label_names: tuple[str, ...] = ()
+    target_profile_id: str | None = None
     split_id: str = TFBS_STAGE_B_SPLIT_ID
     seed: int = DEFAULT_SEED
     rounds: int = DEFAULT_TFBS_STAGE_ROUNDS
@@ -34,6 +34,7 @@ class TfbsStageBConfig:
     selection_tie_handling: str = TFBS_STAGE_B_DEFAULT_TIE_HANDLING
     validate_configs: bool = True
     replace_out_dir: bool = False
+    refresh_existing_execution_state: bool = False
     score_batch_size: int = 1000
     max_x_matrix_gib: float = 8.0
 

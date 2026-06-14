@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from .builders import build_tfbs_family_content_matched_null, build_tfbs_slot_geometry_count_matched_null
+from .builders import (
+    build_tfbs_family_content_matched_null,
+    build_tfbs_slot_geometry_count_matched_null,
+    build_tfbs_slot_position_count_fixed_shuffled_null,
+)
 from .contracts import (
     TFBS_ACTIVE_NUMERIC_COLUMNS,
     TFBS_CONTENT_BLOCK_COLUMNS,
@@ -31,4 +35,5 @@ __all__ = [
     "TfbsNullConfig",
     "build_tfbs_family_content_matched_null",
     "build_tfbs_slot_geometry_count_matched_null",
+    "build_tfbs_slot_position_count_fixed_shuffled_null",
 ]

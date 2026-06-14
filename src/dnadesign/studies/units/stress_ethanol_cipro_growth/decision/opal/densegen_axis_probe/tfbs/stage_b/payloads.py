@@ -9,6 +9,7 @@ import yaml
 
 from ...core.constants import STUDY_ID, X_COLUMN
 from ..active_targets import tfbs_learnability_active_target_spec
+from ..label_text import tfbs_label_dropdown_title, tfbs_label_title
 from .layout import TfbsStageBLayout
 from .semantics import (
     TFBS_STAGE_B_LABEL_SOURCE_KIND,
@@ -53,6 +54,11 @@ def tfbs_stage_b_campaign_config_payload(
     pair_row: Mapping[str, Any],
     label_name: str,
     oracle_role: str,
+    candidate_scope_path: Path,
+    candidate_scope_metadata: Mapping[str, Any],
+    initial_seed_context: str,
+    initial_seed_source_role: str,
+    baserender_metadata_records_path: Path | None = None,
 ) -> dict[str, Any]:
     """Build the OPAL campaign config payload for one positive or null run."""
 
@@ -65,13 +71,24 @@ def tfbs_stage_b_campaign_config_payload(
         seed=cfg.seed,
     ).campaign_slug
     final_round = int(cfg.rounds) - 1
+    target_label = tfbs_label_title(label_name)
+    target_dropdown_label = tfbs_label_dropdown_title(label_name)
+    role_label = _role_label(oracle_role=oracle_role, pair_row=pair_row)
+    baserender_metadata = (
+        {
+            "baserender_metadata_source": "densegen_sidecar",
+            "baserender_metadata_records_path": str(baserender_metadata_records_path),
+        }
+        if baserender_metadata_records_path is not None
+        else {}
+    )
     return {
         "campaign": {
-            "name": f"DenseGen TFBS learnability {label_name} {oracle_role} seed {int(cfg.seed)}",
+            "name": f"DenseGen TFBS learnability: {target_label}, {role_label}, seed {int(cfg.seed)}",
             "slug": slug,
             "description": (
                 "Stage B sentinel OPAL campaign for a synthetic DenseGen TFBS construction label. "
-                "The label is an oracle target for learnability review, not a wet-lab phenotype."
+                "The label is a pre-assay learnability target, not a wet-lab phenotype."
             ),
             "workdir": str(workdir.resolve()),
             "metadata": {
@@ -82,7 +99,8 @@ def tfbs_stage_b_campaign_config_payload(
                 "label_name": label_name,
                 "label_family_id": target.label_family_id,
                 "target": label_name,
-                "target_label": target.target_description,
+                "target_label": target_label,
+                "target_dropdown_label": target_dropdown_label,
                 "label_oracle_kind": "positive" if oracle_role == "positive" else "null",
                 "label_split_id": cfg.split_id,
                 "target_kind": target.target_kind,
@@ -98,11 +116,18 @@ def tfbs_stage_b_campaign_config_payload(
                 "selection_tie_handling": cfg.selection_tie_handling,
                 "selection_budget_mode": stage_b_selection_budget_mode(tie_handling=cfg.selection_tie_handling),
                 "initial_label_count": int(cfg.initial_label_count),
+                "initial_seed_context": initial_seed_context,
+                "initial_seed_source_role": initial_seed_source_role,
+                "initial_seed_pairing": "shared_positive_null_starting_ids",
+                "replicate_dimension": "seed",
+                "replicate_seed": int(cfg.seed),
                 "retention_mode": TFBS_STAGE_B_RETENTION_MODE,
                 "retention_policy_hash": retention["retention_policy_hash"],
                 "stage_a_manifest_path": str(cfg.stage_a_run_root / "manifests" / "tfbs_stage_a_manifest.json"),
                 "stage_a_pairing_manifest_path": str(pairing_manifest_path),
                 "interpretation_boundary": target.interpretation_boundary,
+                **dict(candidate_scope_metadata),
+                **baserender_metadata,
             },
         },
         "plot_config": "plots.yaml",
@@ -123,7 +148,7 @@ def tfbs_stage_b_campaign_config_payload(
             "y_expected_length": int(target.y_expected_length),
             "candidate_scope": {
                 "kind": "id_list",
-                "path": str(layout.candidate_scope_path.resolve()),
+                "path": str(candidate_scope_path.resolve()),
                 "id_column": "id",
             },
         },
@@ -200,6 +225,7 @@ def tfbs_stage_b_campaign_config_payload(
 def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_display: str) -> None:
     """Write the OPAL plot config for one Stage B sentinel campaign."""
 
+    target_label = tfbs_label_title(label_name) or target_display
     payload = {
         "plots": [
             {
@@ -212,8 +238,8 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
                     "cohort": "selected",
                     "summaries": ["mean", "count"],
                     "band": "iqr",
-                    "title": f"Selected predicted {label_name} over rounds",
-                    "surface_label": f"Selected predicted expected label: {target_display}",
+                    "title": f"Predicted selected-label value by round: {target_label}",
+                    "surface_label": f"Predicted selected-label value: {target_label}",
                     "caption": (
                         "Selected-candidate mean predicted expected scalar label by OPAL round. "
                         "This is a synthetic construction-label objective, not a measured biological phenotype."
@@ -226,3 +252,14 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _role_label(*, oracle_role: str, pair_row: Mapping[str, Any]) -> str:
+    if oracle_role == "positive":
+        return "DenseGen label"
+    null_role = str(pair_row.get("null_control_role") or "")
+    if null_role == "count_fixed_shuffled_slot_negative_control":
+        return "count-fixed shuffled-slot control"
+    if null_role == "count_preserving_slot_confound_control":
+        return "count-preserving slot confound control"
+    return "matched scrambled-label control"
