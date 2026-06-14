@@ -126,7 +126,7 @@ def render_sequence_panel_image(
     adapter_policies: Mapping[str, object] | None = None,
     style_overrides: Mapping[str, object] | None = None,
     target_width_px: int = 2200,
-    target_height_px: int = 310,
+    target_height_px: int = 430,
     vertical_anchor: str = "center",
     canvas_top_pad_px: int = 0,
 ) -> SequencePanelImage:
@@ -159,6 +159,7 @@ def render_sequence_panel_image(
         style_preset=config.style_preset,
         style_overrides=config.style_overrides,
     )
+    _force_opaque_white_figure(fig)
     image = _figure_rgba(fig)
     plt.close(fig)
     image = _normalize_panel_image(
@@ -381,6 +382,14 @@ def render_record_figure(
     from ..render import render_record
 
     return render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+
+
+def _force_opaque_white_figure(fig) -> None:
+    fig.patch.set_facecolor("white")
+    fig.patch.set_alpha(1.0)
+    for axis in fig.axes:
+        axis.set_facecolor("white")
+        axis.patch.set_alpha(1.0)
 
 
 def _figure_rgba(fig):

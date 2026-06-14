@@ -27,7 +27,7 @@ class SequencePanelConfig:
     renderer_name: str = "sequence_rows"
     alphabet: str = "DNA"
     target_width_px: int = 2200
-    target_height_px: int = 310
+    target_height_px: int = 430
     vertical_anchor: str = "center"
     canvas_top_pad_px: int = 0
 
@@ -61,7 +61,7 @@ def _densegen_tfbs_adapter_defaults() -> tuple[dict[str, str], dict[str, object]
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
         },
-        {"on_invalid_row": "error", "require_non_empty": True},
+        {"on_invalid_row": "error", "require_non_empty": False},
     )
 
 
@@ -140,7 +140,7 @@ def sequence_panel_config_for_adapter(
     adapter_policies: Mapping[str, object] | None = None,
     style_overrides: Mapping[str, object] | None = None,
     target_width_px: int = 2200,
-    target_height_px: int = 310,
+    target_height_px: int = 430,
     vertical_anchor: str = "center",
     canvas_top_pad_px: int = 0,
 ) -> SequencePanelConfig:

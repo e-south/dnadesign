@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 import dnadesign.baserender as baserender
@@ -109,6 +110,53 @@ def test_public_sequence_panel_contract_renders_image() -> None:
     assert result.diagnostics.contract_id == "dnadesign.baserender.sequence_panel.v1"
     assert result.diagnostics.style_profile == "promoter_compact_slide.v1"
     assert result.diagnostics.strand_count == 2
+
+
+def test_public_sequence_panel_contract_uses_white_canvas_under_dark_rc() -> None:
+    row = {
+        "id": "r1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+            {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
+        ],
+    }
+
+    with plt.rc_context(
+        {
+            "figure.facecolor": "black",
+            "axes.facecolor": "black",
+            "savefig.facecolor": "black",
+        }
+    ):
+        result = baserender.render_sequence_panel_image(
+            row,
+            adapter_kind="densegen_tfbs",
+            target_width_px=420,
+            target_height_px=140,
+        )
+
+    rgb = np.asarray(result.image)[:, :, :3]
+    near_black_fraction = float((rgb.max(axis=2) <= 24).mean())
+    assert near_black_fraction < 0.01
+
+
+def test_public_sequence_panel_contract_renders_empty_densegen_annotations() -> None:
+    row = {
+        "id": "r1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [],
+    }
+
+    result = baserender.render_sequence_panel_image(
+        row,
+        adapter_kind="densegen_tfbs",
+        target_width_px=420,
+        target_height_px=140,
+    )
+
+    assert result.image.shape == (140, 420, 4)
+    assert result.diagnostics.feature_count == 0
 
 
 def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
