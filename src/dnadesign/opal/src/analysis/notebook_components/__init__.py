@@ -16,11 +16,20 @@ from .baserender import (
 )
 from .baserender_records import (
     build_notebook_baserender_label_rows,
+    build_notebook_baserender_record_annotation_counts,
+    build_notebook_baserender_record_choices,
+    build_notebook_baserender_record_choices_with_counts,
     build_notebook_baserender_record_options,
+    build_notebook_selected_baserender_record_ids,
     load_notebook_baserender_record_row,
+    select_notebook_baserender_default_record_id,
 )
 from .baserender_render import (
     render_notebook_baserender_record,
+)
+from .campaign_set_baserender import (
+    CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
+    build_notebook_collection_baserender_role_choices,
 )
 from .campaign_set_comparison import render_notebook_campaign_set_metric_comparison_image
 from .campaign_set_gallery import (
@@ -37,6 +46,7 @@ from .campaign_set_visuals import (
     build_notebook_collection_set_choices,
     build_notebook_collection_visual_card_rows,
     build_notebook_collection_visual_choices,
+    build_notebook_collection_visual_description,
 )
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
@@ -82,9 +92,14 @@ __all__ = [
     "build_notebook_baserender_label_rows",
     "build_notebook_baserender_contract",
     "build_notebook_baserender_contract_rows",
+    "build_notebook_baserender_record_annotation_counts",
+    "build_notebook_baserender_record_choices",
+    "build_notebook_baserender_record_choices_with_counts",
     "build_notebook_baserender_record_options",
+    "build_notebook_selected_baserender_record_ids",
     "build_notebook_campaign_header_lines",
     "build_notebook_campaign_summary_row",
+    "build_notebook_collection_baserender_role_choices",
     "build_notebook_campaign_set_metric_comparison_rows",
     "build_notebook_campaign_set_plot_gallery_items",
     "build_notebook_campaign_set_vector_reference_mse_rows",
@@ -92,6 +107,7 @@ __all__ = [
     "build_notebook_collection_set_choices",
     "build_notebook_collection_visual_card_rows",
     "build_notebook_collection_visual_choices",
+    "build_notebook_collection_visual_description",
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",
@@ -114,6 +130,7 @@ __all__ = [
     "build_notebook_validity_lines",
     "build_notebook_validity_rows",
     "compact_notebook_path",
+    "CAMPAIGN_SET_BASERENDER_SURFACE_KIND",
     "find_notebook_repo_root",
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
@@ -123,5 +140,6 @@ __all__ = [
     "render_notebook_campaign_set_plot_gallery_image",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
+    "select_notebook_baserender_default_record_id",
     "select_notebook_plot_scope",
 ]

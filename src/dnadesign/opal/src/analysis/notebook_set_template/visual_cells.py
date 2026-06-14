@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from ._support import block
-from .collection_cells import render_collection_cells
 from .visual_panel_cells import render_visual_panel_cell
 
 
@@ -11,7 +10,6 @@ def render_visual_cells() -> str:
     return "\n".join(
         (
             _campaign_visual_model_cell(),
-            render_collection_cells(),
             _visual_memory_cell(),
             _visual_choices_cell(),
             _visual_selector_cell(),
@@ -56,10 +54,13 @@ def _visual_choices_cell() -> str:
         """
         @app.cell
         def _(
+            CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
             active_view_mode,
+            baserender_role_ui,
             build_notebook_collection_visual_choices,
             campaign_plot_choices,
             collection_visuals,
+            selected_campaign_baserender_contract,
             selected_collection_set_choice,
         ):
             if active_view_mode == "Campaign set":
@@ -72,8 +73,25 @@ def _visual_choices_cell() -> str:
                     collection_visuals,
                     comparison_set_key=_set_key,
                 )
+                if baserender_role_ui is not None and selected_campaign_baserender_contract.get("available"):
+                    visual_choices.append(
+                        {
+                            "label": "Selected DenseGen sequence render",
+                            "surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
+                            "title": "Selected DenseGen sequence render",
+                        }
+                    )
             else:
-                visual_choices = campaign_plot_choices
+                visual_choices = []
+                if selected_campaign_baserender_contract.get("available"):
+                    visual_choices.append(
+                        {
+                            "label": "Selected sequence render",
+                            "surface_kind": "baserender",
+                            "title": "Selected sequence render",
+                        }
+                    )
+                visual_choices.extend(campaign_plot_choices)
             return visual_choices
         """
     )
@@ -128,7 +146,11 @@ def _visual_scope_cell() -> str:
         """
         @app.cell
         def _(active_view_mode, build_notebook_plot_scope_options, mo, selected_visual_choice):
-            if active_view_mode == "Campaign set" or selected_visual_choice is None:
+            if (
+                active_view_mode == "Campaign set"
+                or selected_visual_choice is None
+                or selected_visual_choice.get("surface_kind") in {"baserender", "campaign_set_baserender"}
+            ):
                 plot_scope_options = []
                 plot_scope_ui = None
             else:

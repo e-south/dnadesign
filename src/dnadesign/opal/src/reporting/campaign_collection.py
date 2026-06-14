@@ -8,15 +8,13 @@ from typing import Any, Iterable, Mapping
 
 import yaml
 
+from ..analysis.campaign_set import (
+    collection_visual_source_plot_kind_for_view_kind,
+    list_collection_comparison_view_kinds,
+)
 from ..core.utils import ExitCodes, OpalError
 
 CAMPAIGN_COLLECTION_SCHEMA_VERSION = "opal.campaign_collection.v2"
-COMPARISON_VIEW_KINDS = {
-    "metric_over_rounds_comparison",
-    "paired_plot_gallery",
-    "vector_heatmap_comparison",
-    "vector_reference_mse_over_rounds_comparison",
-}
 INTERVAL_KINDS = {"none", "iqr", "student_t_mean_ci"}
 COMPARISON_SCOPES = {"collection", "comparison_set"}
 
@@ -60,6 +58,11 @@ def load_campaign_collection_manifest(
         for index, row in enumerate(_mapping_list(raw.get("comparison_views"), field="comparison_views"))
     ]
     _require_unique_ids(comparison_views, field="comparison_views")
+    collection_visual_surface_kinds = _string_list(
+        raw.get("collection_visual_surface_kinds"),
+        field="collection_visual_surface_kinds",
+        allow_empty=True,
+    )
     return {
         "schema_version": CAMPAIGN_COLLECTION_SCHEMA_VERSION,
         "collection_id": collection_id,
@@ -70,6 +73,7 @@ def load_campaign_collection_manifest(
         "relationship_count": len(relationships),
         "comparison_views": comparison_views,
         "comparison_view_count": len(comparison_views),
+        "collection_visual_surface_kinds": collection_visual_surface_kinds,
         "comparison_lenses": [_comparison_lens(row) for row in relationships],
     }
 
@@ -201,9 +205,10 @@ def _comparison_view_payload(
 ) -> dict[str, Any]:
     view_id = _required_string(row.get("id"), field=f"comparison_views[{index}].id")
     kind = _required_string(row.get("kind"), field=f"comparison_views[{index}].kind")
-    if kind not in COMPARISON_VIEW_KINDS:
+    allowed_view_kinds = list_collection_comparison_view_kinds()
+    if kind not in allowed_view_kinds:
         raise OpalError(
-            f"Campaign collection comparison_views[{index}].kind must be one of {sorted(COMPARISON_VIEW_KINDS)}.",
+            f"Campaign collection comparison_views[{index}].kind must be one of {sorted(allowed_view_kinds)}.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     relationship_id = _required_string(
@@ -224,7 +229,7 @@ def _comparison_view_payload(
         row.get("source_plot_kind"),
         field=f"comparison_views[{index}].source_plot_kind",
     )
-    expected_source_kind = _expected_source_plot_kind(kind)
+    expected_source_kind = collection_visual_source_plot_kind_for_view_kind(kind)
     if source_plot_kind != expected_source_kind:
         raise OpalError(
             f"Campaign collection comparison view {view_id!r} kind={kind!r} requires "
@@ -321,17 +326,6 @@ def _comparison_view_payload(
     if interpretation_note:
         payload["interpretation_note"] = interpretation_note
     return payload
-
-
-def _expected_source_plot_kind(kind: str) -> str:
-    if kind == "metric_over_rounds_comparison":
-        return "metric_over_rounds"
-    if kind in {"paired_plot_gallery", "vector_heatmap_comparison", "vector_reference_mse_over_rounds_comparison"}:
-        return "vector_summary_heatmap"
-    raise OpalError(
-        f"Unsupported campaign collection comparison view kind: {kind!r}",
-        ExitCodes.CONTRACT_VIOLATION,
-    )
 
 
 def _comparison_set_count(relationship: Mapping[str, Any]) -> int:

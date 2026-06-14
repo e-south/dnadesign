@@ -8,6 +8,10 @@ OPAL_ROOT = Path("src/dnadesign/opal")
 OPAL_SOURCE_ROOT = OPAL_ROOT / "src"
 
 
+def _line_count(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
 def test_opal_package_root_has_no_ad_hoc_python_modules() -> None:
     root_modules = sorted(path.name for path in OPAL_ROOT.glob("*.py") if path.name != "__init__.py")
 
@@ -37,6 +41,17 @@ def test_opal_console_script_targets_public_package_entrypoint() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
 
     assert pyproject["project"]["scripts"]["opal"] == "dnadesign.opal:main"
+
+
+def test_opal_large_entrypoints_are_explicitly_budget_guarded() -> None:
+    budgets = {
+        OPAL_SOURCE_ROOT / "cli" / "commands" / "notebook.py": 660,
+        OPAL_SOURCE_ROOT / "reporting" / "review.py": 680,
+    }
+
+    for path, max_lines in budgets.items():
+        assert path.is_file()
+        assert _line_count(path) <= max_lines
 
 
 def test_sfxi_public_api_namespace_is_declared_public_surface() -> None:
@@ -88,12 +103,17 @@ def test_notebook_set_template_is_semantic_package_modules() -> None:
     }
     assert {
         "_support.py",
+        "baserender_cells.py",
+        "baserender_record_cells.py",
+        "baserender_scope_cells.py",
         "campaign_cells.py",
         "cells.py",
+        "collection_cells.py",
         "details_cells.py",
         "renderer.py",
         "setup_cells.py",
         "visual_cells.py",
+        "visual_panel_cells.py",
     }.issubset(module_lengths)
     assert max(module_lengths.values()) <= 180
 

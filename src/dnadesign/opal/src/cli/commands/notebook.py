@@ -260,6 +260,14 @@ def cmd_notebook_generate(
         "--collection",
         help="Optional opal.campaign_collection.v2 manifest for campaign-set comparison views.",
     ),
+    collection_visual_index: Optional[Path] = typer.Option(
+        None,
+        "--collection-visual-index",
+        help=(
+            "Existing opal.collection_visual_manifest_index.v1 to embed in a campaign-set notebook. "
+            "Use with --no-materialize-collection-visuals."
+        ),
+    ),
     materialize_collection_visuals: bool = typer.Option(
         True,
         "--materialize-collection-visuals/--no-materialize-collection-visuals",
@@ -301,6 +309,7 @@ def cmd_notebook_generate(
                 out=out,
                 name=name,
                 collection=collection,
+                collection_visual_index=collection_visual_index,
                 materialize_collection_visuals=materialize_collection_visuals,
                 force=force,
                 validate=validate,
@@ -310,6 +319,11 @@ def cmd_notebook_generate(
 
         if collection is not None:
             raise OpalError("--collection is only supported for campaign-set notebook generation.", ExitCodes.BAD_ARGS)
+        if collection_visual_index is not None:
+            raise OpalError(
+                "--collection-visual-index is only supported for campaign-set notebook generation.",
+                ExitCodes.BAD_ARGS,
+            )
 
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
         cfg = analysis.config
@@ -427,6 +441,7 @@ def _generate_campaign_set_notebook(
     out: Optional[Path],
     name: Optional[str],
     collection: Optional[Path],
+    collection_visual_index: Optional[Path],
     materialize_collection_visuals: bool,
     force: bool,
     validate: bool,
@@ -444,6 +459,14 @@ def _generate_campaign_set_notebook(
         )
     if out is not None and name is not None:
         raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
+    if collection_visual_index is not None:
+        if collection is None:
+            raise OpalError("--collection-visual-index requires --collection.", ExitCodes.BAD_ARGS)
+        if materialize_collection_visuals:
+            raise OpalError(
+                "Use --no-materialize-collection-visuals when passing --collection-visual-index.",
+                ExitCodes.BAD_ARGS,
+            )
 
     analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
     round_sel = _parse_notebook_round_selector(round, allow_all=True)
@@ -455,32 +478,10 @@ def _generate_campaign_set_notebook(
         if validate and round_sel != "all" and analysis.workspace.ledger_runs_path.exists():
             resolve_round_index_from_runs(analysis.read_runs(), round_sel)
 
-    collection_visual_index_path: Path | None = None
-    view_model = None
-    if collection is not None:
-        view_model = build_campaign_set_notebook_view_model(
-            [analysis.config_path for analysis in analyses],
-            round_selector=round_sel,
-            collection_manifest_path=collection,
-        )
-
     default_name = "opal_campaign_set_analysis.py"
     notebook_name = _resolve_notebook_name(name, default_name)
     default_out = analyses[0].workspace.workdir / "notebooks" / notebook_name
     out_path = Path(out) if out is not None else default_out
-    if collection is not None and materialize_collection_visuals:
-        if view_model is None:
-            view_model = build_campaign_set_notebook_view_model(
-                [analysis.config_path for analysis in analyses],
-                round_selector=round_sel,
-                collection_manifest_path=collection,
-            )
-        visual_index = materialize_campaign_set_collection_visuals(
-            view_model["campaigns"],
-            collection=view_model["collection"],
-            output_dir=out_path.parent / "collection_visuals",
-        )
-        collection_visual_index_path = Path(str(visual_index["output_dir"])) / "collection_visual_manifest.json"
     overwritten = out_path.exists()
     if out_path.exists() and not force:
         msg = f"Notebook already exists: {out_path}. Use --force to overwrite or --name to choose a different filename."
@@ -501,6 +502,29 @@ def _generate_campaign_set_notebook(
             else:
                 print_stdout("Aborted.")
             return
+
+    if collection_visual_index is not None:
+        build_campaign_set_notebook_view_model(
+            [analysis.config_path for analysis in analyses],
+            round_selector=round_sel,
+            run_id=None,
+            collection_manifest_path=collection,
+            collection_visual_index_path=collection_visual_index,
+        )
+
+    collection_visual_index_path: Path | None = collection_visual_index
+    if collection is not None and materialize_collection_visuals:
+        view_model = build_campaign_set_notebook_view_model(
+            [analysis.config_path for analysis in analyses],
+            round_selector=round_sel,
+            collection_manifest_path=collection,
+        )
+        visual_index = materialize_campaign_set_collection_visuals(
+            view_model["campaigns"],
+            collection=view_model["collection"],
+            output_dir=out_path.parent / "collection_visuals",
+        )
+        collection_visual_index_path = Path(str(visual_index["output_dir"])) / "collection_visual_manifest.json"
 
     content = render_campaign_set_notebook(
         [analysis.config_path for analysis in analyses],

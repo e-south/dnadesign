@@ -4,14 +4,15 @@ from typing import Any, Iterable, Mapping
 
 from ._support import display_name, mapping, sequence
 
-CAMPAIGN_SET_COMPARISON_SURFACE_KIND = "campaign_set_metric_comparison"
-
 
 def build_notebook_collection_set_choices(collection_visuals: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Return selectable campaign-set choices from materialized collection visuals."""
 
     counts: dict[str, int] = {}
     labels: dict[str, str] = {}
+    matches: dict[str, dict[str, Any]] = {}
+    tier_labels: dict[str, str] = {}
+    tier_ranks: dict[str, int] = {}
     order: list[str] = []
     for raw in sequence(collection_visuals):
         if not isinstance(raw, Mapping):
@@ -23,7 +24,32 @@ def build_notebook_collection_set_choices(collection_visuals: Iterable[Mapping[s
             order.append(key)
         counts[key] = counts.get(key, 0) + 1
         labels.setdefault(key, str(raw.get("comparison_set_label") or key))
-    return [{"key": key, "label": labels[key], "visual_count": counts[key]} for key in order]
+        if key not in matches:
+            matches[key] = dict(mapping(raw.get("comparison_set_match")))
+        if key not in tier_labels:
+            tier_label = str(raw.get("evidence_tier_label") or "").strip()
+            if tier_label:
+                tier_labels[key] = tier_label
+        if key not in tier_ranks:
+            try:
+                tier_ranks[key] = int(raw.get("evidence_tier_rank"))
+            except (TypeError, ValueError):
+                pass
+    labels_seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    for key in sorted(order, key=lambda item: (tier_ranks.get(item, 10_000), order.index(item))):
+        row = {
+            "key": key,
+            "label": _unique_label(_set_choice_label(labels[key], tier_labels.get(key)), labels_seen),
+            "visual_count": counts[key],
+            "match": matches[key],
+        }
+        if tier_labels.get(key):
+            row["evidence_tier_label"] = tier_labels[key]
+        if key in tier_ranks:
+            row["evidence_tier_rank"] = tier_ranks[key]
+        rows.append(row)
+    return rows
 
 
 def build_notebook_collection_visual_choices(
@@ -41,8 +67,11 @@ def build_notebook_collection_visual_choices(
         if comparison_set_key not in (None, "") and str(raw.get("comparison_set_key") or "") != comparison_set_key:
             continue
         choice = dict(raw)
-        choice.setdefault("surface_kind", CAMPAIGN_SET_COMPARISON_SURFACE_KIND)
-        choice.setdefault("kind", CAMPAIGN_SET_COMPARISON_SURFACE_KIND)
+        surface_kind = str(choice.get("surface_kind") or "").strip()
+        if not surface_kind:
+            raise ValueError("Collection visual choice is missing required surface_kind.")
+        choice["surface_kind"] = surface_kind
+        choice.setdefault("kind", surface_kind)
         choice["label"] = _unique_label(_choice_label(choice), labels_seen)
         choices.append(choice)
     return choices
@@ -55,6 +84,10 @@ def build_notebook_collection_visual_card_rows(choice: Mapping[str, Any]) -> lis
     rows = [
         {"field": "visual", "value": choice.get("label") or choice.get("id") or "not recorded"},
         {"field": "campaign set", "value": choice.get("comparison_set_label") or "not recorded"},
+        {
+            "field": "evidence tier",
+            "value": choice.get("evidence_tier_label") or choice.get("evidence_tier") or "not recorded",
+        },
         {"field": "surface", "value": choice.get("surface_kind") or "not recorded"},
         {"field": "source plot", "value": choice.get("source_plot_name") or "not recorded"},
         {"field": "relationship", "value": choice.get("relationship_id") or "not recorded"},
@@ -62,6 +95,10 @@ def build_notebook_collection_visual_card_rows(choice: Mapping[str, Any]) -> lis
         {"field": "metric", "value": choice.get("metric") or "not recorded"},
         {"field": "metric label", "value": choice.get("metric_label") or "not recorded"},
         {"field": "metric expression", "value": choice.get("metric_expression") or "not recorded"},
+        {"field": "premise", "value": choice.get("premise") or "not recorded"},
+        {"field": "math note", "value": choice.get("math_note") or "not recorded"},
+        {"field": "design note", "value": choice.get("design_note") or "not recorded"},
+        {"field": "claim boundary", "value": choice.get("claim_boundary") or "not recorded"},
         {"field": "axis scale", "value": _axis_scale_text(mapping(choice.get("axis_scale")))},
         {"field": "cohort", "value": choice.get("cohort") or "not recorded"},
         {"field": "summary", "value": choice.get("summary") or "not recorded"},
@@ -75,6 +112,52 @@ def build_notebook_collection_visual_card_rows(choice: Mapping[str, Any]) -> lis
         rows.append({"field": "interval unit", "value": interval.get("unit") or "not recorded"})
         rows.append({"field": "is confidence interval", "value": bool(interval.get("is_confidence_interval"))})
     return rows
+
+
+def build_notebook_collection_visual_description(choice: Mapping[str, Any]) -> str:
+    """Build a short reader-facing description for a collection visual accordion."""
+
+    title = str(choice.get("title") or choice.get("label") or "Selected visual").strip()
+    caption = str(choice.get("caption") or "").strip()
+    metric_label = str(choice.get("metric_label") or "").strip()
+    metric_expression = str(choice.get("metric_expression") or "").strip()
+    summary = str(choice.get("summary") or "").strip()
+    interval_kind = str(choice.get("interval_kind") or "").strip()
+    interval = mapping(choice.get("interval"))
+    premise = str(choice.get("premise") or "").strip()
+    math_note = str(choice.get("math_note") or "").strip()
+    design_note = str(choice.get("design_note") or "").strip()
+    claim_boundary = str(choice.get("claim_boundary") or "").strip()
+    interpretation = str(choice.get("interpretation_note") or "").strip()
+
+    lines = [f"### {title}", ""]
+    if premise:
+        lines.extend([f"Premise: {premise}", ""])
+    if caption:
+        lines.extend([caption, ""])
+    if metric_label:
+        lines.append(f"- Metric: {metric_label}")
+    if metric_expression:
+        lines.append(f"- Calculation: `{metric_expression}`")
+    if math_note:
+        lines.append(f"- Math: {math_note}")
+    if design_note:
+        lines.append(f"- Design: {design_note}")
+    if summary:
+        lines.append(f"- Summary: {_description_label(summary)}")
+    if interval:
+        interval_text = _interval_description(interval)
+        if interval_text:
+            lines.append(f"- Spread: {interval_text}")
+    elif interval_kind and interval_kind != "none":
+        lines.append(f"- Spread: {_description_label(interval_kind)}")
+    else:
+        lines.append("- Spread: none for this materialized single-pair review.")
+    if claim_boundary:
+        lines.extend(["", f"Claim boundary: {claim_boundary}"])
+    if interpretation:
+        lines.extend(["", interpretation])
+    return "\n".join(lines)
 
 
 def _axis_scale_text(axis_scale: Mapping[str, Any]) -> str:
@@ -92,6 +175,26 @@ def _axis_scale_text(axis_scale: Mapping[str, Any]) -> str:
     return "; ".join(parts) if parts else "not recorded"
 
 
+def _interval_description(interval: Mapping[str, Any]) -> str:
+    unit = str(interval.get("unit") or "").strip()
+    kind = str(interval.get("kind") or "").strip()
+    if not kind:
+        return ""
+    label = _description_label(kind)
+    if unit:
+        label = f"{label} across {unit}"
+    if interval.get("is_confidence_interval") is False:
+        label = f"{label}; not a statistical confidence interval"
+    return label
+
+
+def _description_label(value: Any) -> str:
+    text = str(value or "").replace("_", " ").strip()
+    if text.lower() == "iqr":
+        return "IQR"
+    return text
+
+
 def _choice_label(choice: Mapping[str, Any]) -> str:
     return str(choice.get("label") or choice.get("title") or display_name(choice.get("name") or "visual"))
 
@@ -105,3 +208,13 @@ def _unique_label(label: str, seen: set[str]) -> str:
         index += 1
     seen.add(candidate)
     return candidate
+
+
+def _set_choice_label(label: str, tier_label: str | None) -> str:
+    base = str(label or "Campaign set").strip() or "Campaign set"
+    tier = str(tier_label or "").strip()
+    if not tier:
+        return base
+    if base.lower().startswith(f"{tier.lower()}:"):
+        return base
+    return f"{tier}: {base}"

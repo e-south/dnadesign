@@ -384,6 +384,273 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
     assert collection_visual_index.exists()
 
 
+def test_notebook_generate_campaign_set_accepts_existing_collection_visual_index(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    campaigns: list[Path] = []
+    for oracle_kind in ("positive", "null"):
+        slug = f"tfbs_lexa_{oracle_kind}"
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True)
+        records = workdir / "records.parquet"
+        write_records(records)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(
+            campaign,
+            workdir=workdir,
+            records_path=records,
+            slug=slug,
+        )
+        write_ledger(workdir, run_id=f"{slug}-run-0", round_index=0)
+        campaigns.append(campaign)
+    collection_path = tmp_path / "campaign_collection.yaml"
+    collection_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign_collection.v2",
+                "collection_id": "cli_fixture_registered",
+                "dimensions": [{"id": "target"}],
+                "relationships": [],
+                "comparison_views": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    visual_index_path = tmp_path / "registered_visuals" / "collection_visual_manifest.json"
+    visual_index_path.parent.mkdir()
+    visual_index_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.collection_visual_manifest_index.v1",
+                "generated_at": "2026-06-02T00:00:00+00:00",
+                "collection_id": "cli_fixture_registered",
+                "output_dir": str(visual_index_path.parent),
+                "comparison_set_count": 0,
+                "comparison_sets": [],
+                "visual_count": 0,
+                "visuals": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "campaign_set_registered_visuals.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--collection",
+            str(collection_path),
+            "--collection-visual-index",
+            str(visual_index_path),
+            "--no-materialize-collection-visuals",
+            "--out",
+            str(out_path),
+        ],
+    )
+
+    assert res.exit_code == 0, res.output
+    text = out_path.read_text()
+    assert f"collection_visual_index_path = {str(visual_index_path)!r}" in text
+    assert visual_index_path.exists()
+    assert not (out_path.parent / "collection_visuals" / "collection_visual_manifest.json").exists()
+
+
+def test_notebook_generate_campaign_set_rejects_mismatched_collection_visual_index(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    campaigns: list[Path] = []
+    for oracle_kind in ("positive", "null"):
+        slug = f"tfbs_lexa_{oracle_kind}"
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True)
+        records = workdir / "records.parquet"
+        write_records(records)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(campaign, workdir=workdir, records_path=records, slug=slug)
+        write_ledger(workdir, run_id=f"{slug}-run-0", round_index=0)
+        campaigns.append(campaign)
+    collection_path = tmp_path / "campaign_collection.yaml"
+    collection_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign_collection.v2",
+                "collection_id": "cli_fixture_registered",
+                "dimensions": [{"id": "target"}],
+                "relationships": [],
+                "comparison_views": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    visual_index_path = tmp_path / "registered_visuals" / "collection_visual_manifest.json"
+    visual_index_path.parent.mkdir()
+    visual_index_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.collection_visual_manifest_index.v1",
+                "generated_at": "2026-06-02T00:00:00+00:00",
+                "collection_id": "wrong_collection",
+                "output_dir": str(visual_index_path.parent),
+                "comparison_set_count": 0,
+                "comparison_sets": [],
+                "visual_count": 0,
+                "visuals": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "campaign_set_registered_visuals.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    smoke_checked: list[Path] = []
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
+        or {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--collection",
+            str(collection_path),
+            "--collection-visual-index",
+            str(visual_index_path),
+            "--no-materialize-collection-visuals",
+            "--out",
+            str(out_path),
+        ],
+    )
+
+    assert res.exit_code != 0, res.output
+    assert "collection_id mismatch" in res.output
+    assert not out_path.exists()
+    assert smoke_checked == []
+
+
+def test_notebook_generate_existing_campaign_set_name_does_not_materialize_collection_visuals_without_force(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    campaigns = []
+    for slug, oracle_kind in [("campaign_positive", "positive"), ("campaign_null", "null")]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records = workdir / "records.parquet"
+        write_records(records, slug=slug)
+        campaign = workdir / "campaign.yaml"
+        write_campaign_yaml(campaign, workdir=workdir, records_path=records, slug=slug)
+        payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+        payload["campaign"]["metadata"] = {
+            "target": "cipro",
+            "label_oracle_kind": oracle_kind,
+            "label_family_id": "densegen_plan_logic4",
+            "label_split_id": "random_id",
+            "seed": 7,
+        }
+        campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        campaigns.append(campaign)
+    collection_path = tmp_path / "campaign_collection.yaml"
+    collection_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign_collection.v2",
+                "collection_id": "cli_fixture",
+                "dimensions": [
+                    {"id": "target"},
+                    {"id": "label_oracle_kind"},
+                    {"id": "label_family_id"},
+                    {"id": "label_split_id"},
+                    {"id": "seed"},
+                ],
+                "relationships": [
+                    {
+                        "id": "positive_vs_null",
+                        "kind": "control_pair",
+                        "role_dimension": "label_oracle_kind",
+                        "left_role": "positive",
+                        "right_role": "null",
+                        "match_on": ["target", "label_family_id", "label_split_id", "seed"],
+                    }
+                ],
+                "comparison_views": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "campaign_set_collection.py"
+    out_path.write_text("import marimo\n", encoding="utf-8")
+
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    materialized_dirs: list[Path] = []
+
+    def _materialize(*args, **kwargs):
+        output_dir = Path(kwargs["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "collection_visual_manifest.json").write_text("{}", encoding="utf-8")
+        materialized_dirs.append(output_dir)
+        return {"output_dir": str(output_dir)}
+
+    monkeypatch.setattr(notebook_cmd, "materialize_campaign_set_collection_visuals", _materialize)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--campaign",
+            str(campaigns[0]),
+            "--campaign",
+            str(campaigns[1]),
+            "--collection",
+            str(collection_path),
+            "--out",
+            str(out_path),
+            "--no-validate",
+        ],
+    )
+
+    assert res.exit_code != 0, res.output
+    assert "already exists" in res.output.lower()
+    assert materialized_dirs == []
+    assert not (out_path.parent / "collection_visuals" / "collection_visual_manifest.json").exists()
+
+
 def test_notebook_generate_existing_name_requires_force(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

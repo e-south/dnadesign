@@ -16,7 +16,7 @@ from typing import Any, Iterable
 
 from ..core.utils import ExitCodes, OpalError, now_iso
 from .campaign_collection import load_campaign_collection_manifest
-from .campaign_set_artifacts import load_collection_visual_manifest_index
+from .collection_visual_index import load_collection_visual_manifest_index
 from .notebook import build_notebook_view_model
 
 NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION = "opal.notebook_campaign_set_view_model.v1"
@@ -58,7 +58,11 @@ def build_campaign_set_notebook_view_model(
         else None
     )
     collection_visual_index = (
-        load_collection_visual_manifest_index(collection_visual_index_path)
+        load_collection_visual_manifest_index(
+            collection_visual_index_path,
+            expected_collection_id=str(collection["collection_id"]) if collection is not None else None,
+            allowed_surface_kinds=collection.get("collection_visual_surface_kinds") if collection is not None else None,
+        )
         if collection_visual_index_path is not None
         else None
     )

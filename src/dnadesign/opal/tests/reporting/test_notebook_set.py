@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import json
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.reporting import notebook_set as notebook_set_mod
 from dnadesign.opal.src.reporting.campaign_collection import load_campaign_collection_manifest
 from dnadesign.opal.src.reporting.campaign_set_artifacts import materialize_campaign_set_collection_visuals
+from dnadesign.opal.src.reporting.collection_visual_index import load_collection_visual_manifest_index
 from dnadesign.opal.src.reporting.notebook_set import (
     build_campaign_set_notebook_view_model,
     build_campaign_set_round_options,
@@ -1021,6 +1023,239 @@ def test_materialize_campaign_set_collection_visuals_writes_manifest_backed_outp
     assert "Positive" in heatmap_visual["alt_text"]
     assert "Null" in heatmap_visual["alt_text"]
     assert Path(heatmap_visual["path"]).exists()
+
+
+def test_materialize_campaign_set_collection_visuals_rejects_artifact_stem_collisions(tmp_path: Path) -> None:
+    collection = {
+        "collection_id": "fixture",
+        "comparison_views": [
+            {
+                "id": "selected_score",
+                "label": "Selected score",
+                "kind": "metric_over_rounds_comparison",
+                "source_plot_name": "score_selected_over_rounds",
+                "source_plot_kind": "metric_over_rounds",
+                "comparison_scope": "comparison_set",
+                "group_key": "label_oracle_kind",
+                "metric": "pred__score_selected",
+                "cohort": "selected",
+                "summary": "mean",
+                "interval_kind": "none",
+                "relationship": {
+                    "id": "positive_vs_null",
+                    "kind": "control_pair",
+                    "role_dimension": "label_oracle_kind",
+                    "match_on": ["target", "seed"],
+                    "replicate_on": ["seed"],
+                    "pairs": [
+                        {
+                            "left": "a_positive",
+                            "right": "a_null",
+                            "match": {"target": "a/b", "seed": "7"},
+                        },
+                        {
+                            "left": "b_positive",
+                            "right": "b_null",
+                            "match": {"target": "a b", "seed": "7"},
+                        },
+                    ],
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(OpalError, match="artifact stem collision"):
+        materialize_campaign_set_collection_visuals([], collection=collection, output_dir=tmp_path / "visuals")
+
+
+def test_collection_visual_manifest_index_validates_loaded_study_surfaces(tmp_path: Path) -> None:
+    index_path = _write_collection_visual_index_fixture(tmp_path)
+
+    with pytest.raises(OpalError, match="without caller approval"):
+        load_collection_visual_manifest_index(index_path, expected_collection_id="fixture_collection")
+
+    payload = load_collection_visual_manifest_index(
+        index_path,
+        expected_collection_id="fixture_collection",
+        allowed_surface_kinds=["study_realized_label_review"],
+    )
+
+    assert payload["visual_count"] == 1
+    assert payload["visuals"][0]["surface_kind"] == "study_realized_label_review"
+
+    with pytest.raises(OpalError, match="collection_id mismatch"):
+        load_collection_visual_manifest_index(
+            index_path,
+            expected_collection_id="other_collection",
+            allowed_surface_kinds=["study_realized_label_review"],
+        )
+
+
+def test_collection_visual_manifest_index_rejects_undeclared_or_stale_entries(tmp_path: Path) -> None:
+    undeclared_path = _write_collection_visual_index_fixture(
+        tmp_path / "undeclared",
+        surface_kinds=[],
+    )
+    with pytest.raises(OpalError, match="surface_kind is not declared"):
+        load_collection_visual_manifest_index(undeclared_path)
+
+    missing_media_path = _write_collection_visual_index_fixture(
+        tmp_path / "missing_media",
+        path_override="missing.png",
+    )
+    with pytest.raises(OpalError, match="does not exist"):
+        load_collection_visual_manifest_index(
+            missing_media_path,
+            allowed_surface_kinds=["study_realized_label_review"],
+        )
+
+    bad_count_path = _write_collection_visual_index_fixture(
+        tmp_path / "bad_count",
+        payload_overrides={"visual_count": 2},
+    )
+    with pytest.raises(OpalError, match="visual_count=2"):
+        load_collection_visual_manifest_index(
+            bad_count_path,
+            allowed_surface_kinds=["study_realized_label_review"],
+        )
+
+
+def test_collection_visual_manifest_index_deep_validates_generic_artifact_manifests(tmp_path: Path) -> None:
+    bad_schema_path = _write_collection_visual_index_fixture(
+        tmp_path / "bad_generic_schema",
+        surface_kinds=["campaign_set_metric_comparison"],
+        visual_overrides={"surface_kind": "campaign_set_metric_comparison"},
+        manifest_overrides={
+            "schema_version": "stress.fixture.owner_manifest.v1",
+            "surface_kind": "campaign_set_metric_comparison",
+        },
+    )
+    with pytest.raises(OpalError, match="Unsupported collection visual artifact manifest schema"):
+        load_collection_visual_manifest_index(bad_schema_path)
+
+    mismatch_path = _write_collection_visual_index_fixture(
+        tmp_path / "generic_manifest_mismatch",
+        surface_kinds=["campaign_set_metric_comparison"],
+        visual_overrides={"surface_kind": "campaign_set_metric_comparison"},
+        manifest_overrides={
+            "schema_version": "opal.collection_visual_artifact.v1",
+            "surface_kind": "campaign_set_metric_comparison",
+            "visual_id": "other_visual",
+        },
+    )
+    with pytest.raises(OpalError, match="visual_id mismatch"):
+        load_collection_visual_manifest_index(mismatch_path)
+
+
+def test_collection_visual_manifest_index_requires_schema_for_extension_manifests(tmp_path: Path) -> None:
+    index_path = _write_collection_visual_index_fixture(
+        tmp_path / "missing_extension_schema",
+        manifest_overrides={"schema_version": ""},
+    )
+
+    with pytest.raises(OpalError, match="no schema_version"):
+        load_collection_visual_manifest_index(
+            index_path,
+            allowed_surface_kinds=["study_realized_label_review"],
+        )
+
+
+def test_campaign_set_visual_model_rejects_unknown_view_kind() -> None:
+    collection = {
+        "collection_id": "fixture",
+        "comparison_views": [
+            {
+                "id": "bad_visual",
+                "kind": "not_registered",
+                "relationship": {"pairs": []},
+            }
+        ],
+    }
+
+    with pytest.raises(OpalError, match="Unsupported collection comparison view kind"):
+        build_campaign_set_collection_visual_model([], collection)
+
+
+def test_campaign_set_visual_model_requires_manifest_owned_fields() -> None:
+    collection = {
+        "collection_id": "fixture",
+        "comparison_views": [
+            {
+                "id": "selected_score",
+                "kind": "metric_over_rounds_comparison",
+                "source_plot_name": "score_selected_over_rounds",
+                "source_plot_kind": "metric_over_rounds",
+                "comparison_scope": "comparison_set",
+                "group_key": "label_oracle_kind",
+                "metric": "pred__score_selected",
+                "cohort": "selected",
+                "summary": "mean",
+                "relationship": {"pairs": []},
+            }
+        ],
+    }
+
+    with pytest.raises(OpalError, match="interval_kind"):
+        build_campaign_set_collection_visual_model([], collection)
+
+
+def _write_collection_visual_index_fixture(
+    root: Path,
+    *,
+    surface_kinds: list[str] | None = None,
+    path_override: str | None = None,
+    payload_overrides: dict[str, object] | None = None,
+    visual_overrides: dict[str, object] | None = None,
+    manifest_overrides: dict[str, object] | None = None,
+) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    media = root / "visual.png"
+    tidy = root / "visual.csv"
+    manifest = root / "visual.manifest.json"
+    media.write_bytes(b"png")
+    tidy.write_text("round,value\n0,1\n", encoding="utf-8")
+    visual: dict[str, object] = {
+        "collection_id": "fixture_collection",
+        "visual_id": "selected_label_lift",
+        "label": "Selected-label lift",
+        "surface_kind": "study_realized_label_review",
+        "comparison_set_key": "target=lexA",
+        "comparison_set_label": "LexA",
+        "path": str(media if path_override is None else path_override),
+        "tidy_csv": str(tidy),
+        "manifest_path": str(manifest),
+        "freshness": {"status": "current"},
+    }
+    if visual_overrides:
+        visual.update(visual_overrides)
+    manifest_payload: dict[str, object] = {
+        "schema_version": "stress.fixture.owner_manifest.v1",
+        "collection_id": visual["collection_id"],
+        "visual_id": visual["visual_id"],
+        "surface_kind": visual["surface_kind"],
+        "comparison_set_key": visual["comparison_set_key"],
+        "path": visual["path"],
+        "tidy_csv": visual["tidy_csv"],
+    }
+    if manifest_overrides:
+        manifest_payload.update(manifest_overrides)
+    manifest.write_text(json.dumps(manifest_payload, indent=2) + "\n", encoding="utf-8")
+    payload: dict[str, object] = {
+        "schema_version": "opal.collection_visual_manifest_index.v1",
+        "generated_at": "2026-06-02T00:00:00+00:00",
+        "collection_id": "fixture_collection",
+        "output_dir": str(root),
+        "surface_kinds": ["study_realized_label_review"] if surface_kinds is None else surface_kinds,
+        "comparison_set_count": 1,
+        "comparison_sets": [{"key": "target=lexA", "label": "LexA"}],
+        "visual_count": 1,
+        "visuals": [visual],
+    }
+    if payload_overrides:
+        payload.update(payload_overrides)
+    index_path = root / "collection_visual_manifest.json"
+    index_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return index_path
 
 
 def test_campaign_set_round_options_include_round_history(tmp_path: Path) -> None:

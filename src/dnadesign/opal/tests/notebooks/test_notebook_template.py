@@ -1,6 +1,10 @@
 import ast
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
+import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -11,14 +15,19 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_at_a_glance_rows,
     build_notebook_baserender_contract,
     build_notebook_baserender_contract_rows,
+    build_notebook_baserender_record_annotation_counts,
+    build_notebook_baserender_record_choices,
+    build_notebook_baserender_record_choices_with_counts,
     build_notebook_baserender_record_options,
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_metric_comparison_rows,
     build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
+    build_notebook_collection_baserender_role_choices,
     build_notebook_collection_set_choices,
     build_notebook_collection_visual_choices,
+    build_notebook_collection_visual_description,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
     build_notebook_no_plot_scope_rows,
@@ -28,12 +37,14 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_plot_method_sections,
     build_notebook_plot_scope_options,
     build_notebook_run_summary_lines,
+    build_notebook_selected_baserender_record_ids,
     build_notebook_validity_lines,
     build_notebook_visual_surface_model,
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     render_notebook_campaign_set_metric_comparison_image,
     render_visual_surface_cells,
+    select_notebook_baserender_default_record_id,
     select_notebook_plot_scope,
 )
 from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text
@@ -413,7 +424,11 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
     assert "_top_control_items = [view_mode_ui]" in text
     assert "elif collection_set_ui is not None:" in text
     assert "mo.vstack(_top_control_items" in text
-    visual_panel_cell = text[text.index("def _(\n    Path,") : text.index("def _(build_notebook_evidence_rows")]
+    visual_panel_cell = text[
+        text.index("def _(\n    CAMPAIGN_SET_BASERENDER_SURFACE_KIND,") : text.index(
+            "def _(build_notebook_evidence_rows"
+        )
+    ]
     assert "view_mode_ui" not in visual_panel_cell
     assert "collection_set_ui" not in visual_panel_cell
 
@@ -423,15 +438,98 @@ def test_collection_visual_choices_can_filter_by_campaign_set() -> None:
         {
             "visual_id": "review",
             "label": "Realized review",
+            "surface_kind": "study_realized_label_review",
             "comparison_set_key": "stage_b_realized_label_review",
             "comparison_set_label": "Stage B realized-label review",
         },
         {
             "visual_id": "score_cipro",
             "label": "Selected score",
+            "surface_kind": "campaign_set_metric_comparison",
             "comparison_set_key": "target=cipro",
             "comparison_set_label": "Cipro",
         },
+        {
+            "visual_id": "score_ethanol",
+            "label": "Selected score",
+            "surface_kind": "campaign_set_metric_comparison",
+            "comparison_set_key": "target=ethanol",
+            "comparison_set_label": "Ethanol",
+        },
+    ]
+
+    assert build_notebook_collection_set_choices(visuals) == [
+        {
+            "key": "stage_b_realized_label_review",
+            "label": "Stage B realized-label review",
+            "visual_count": 1,
+            "match": {},
+        },
+        {"key": "target=cipro", "label": "Cipro", "visual_count": 1, "match": {}},
+        {"key": "target=ethanol", "label": "Ethanol", "visual_count": 1, "match": {}},
+    ]
+    choices = build_notebook_collection_visual_choices(visuals, comparison_set_key="target=ethanol")
+    assert [choice["comparison_set_label"] for choice in choices] == ["Ethanol"]
+    assert choices[0]["label"] == "Selected score"
+
+
+def test_collection_set_choices_disambiguate_duplicate_display_labels() -> None:
+    visuals = [
+        {
+            "visual_id": "score_a",
+            "label": "Selected score",
+            "surface_kind": "campaign_set_metric_comparison",
+            "comparison_set_key": "target=cipro",
+            "comparison_set_label": "Stress condition",
+        },
+        {
+            "visual_id": "score_b",
+            "label": "Selected score",
+            "surface_kind": "campaign_set_metric_comparison",
+            "comparison_set_key": "target=ethanol",
+            "comparison_set_label": "Stress condition",
+        },
+    ]
+
+    choices = build_notebook_collection_set_choices(visuals)
+
+    assert [choice["key"] for choice in choices] == ["target=cipro", "target=ethanol"]
+    assert [choice["label"] for choice in choices] == ["Stress condition", "Stress condition (2)"]
+
+
+def test_collection_set_choices_surface_evidence_tiers() -> None:
+    visuals = [
+        {
+            "visual_id": "boundary",
+            "label": "Selected-label enrichment",
+            "surface_kind": "study_realized_label_review",
+            "comparison_set_key": "slot_position_count_fixed",
+            "comparison_set_label": "Count-fixed slot sentinel",
+            "evidence_tier_label": "Current boundary",
+            "evidence_tier_rank": 20,
+        },
+        {
+            "visual_id": "claim",
+            "label": "Selected-label enrichment",
+            "surface_kind": "study_realized_label_review",
+            "comparison_set_key": "count_fraction",
+            "comparison_set_label": "Count-fraction composition",
+            "evidence_tier_label": "Current claim",
+            "evidence_tier_rank": 10,
+        },
+    ]
+
+    choices = build_notebook_collection_set_choices(visuals)
+
+    assert [choice["key"] for choice in choices] == ["count_fraction", "slot_position_count_fixed"]
+    assert [choice["label"] for choice in choices] == [
+        "Current claim: Count-fraction composition",
+        "Current boundary: Count-fixed slot sentinel",
+    ]
+
+
+def test_collection_visual_choices_require_surface_kind() -> None:
+    visuals = [
         {
             "visual_id": "score_ethanol",
             "label": "Selected score",
@@ -440,14 +538,8 @@ def test_collection_visual_choices_can_filter_by_campaign_set() -> None:
         },
     ]
 
-    assert build_notebook_collection_set_choices(visuals) == [
-        {"key": "stage_b_realized_label_review", "label": "Stage B realized-label review", "visual_count": 1},
-        {"key": "target=cipro", "label": "Cipro", "visual_count": 1},
-        {"key": "target=ethanol", "label": "Ethanol", "visual_count": 1},
-    ]
-    choices = build_notebook_collection_visual_choices(visuals, comparison_set_key="target=ethanol")
-    assert [choice["comparison_set_label"] for choice in choices] == ["Ethanol"]
-    assert choices[0]["label"] == "Selected score"
+    with pytest.raises(ValueError, match="surface_kind"):
+        build_notebook_collection_visual_choices(visuals, comparison_set_key="target=ethanol")
 
 
 def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
@@ -468,7 +560,7 @@ def test_campaign_summary_label_is_compact_for_probe_campaigns() -> None:
         }
     )
 
-    assert row["label"] == "Cipro | null | sigma35 | densegen_plan_logic4 | s29 | done"
+    assert row["label"] == "Cipro | matched-null | sigma35 | logic4 | s29 | done"
     assert len(row["label"]) <= 64
     assert "probe_label_family_id" not in row["label"]
     assert row["label_context"] == (
@@ -953,13 +1045,347 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     assert "label=_scope_control_label" in single
     assert '_scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")' in campaign_set
     assert "label=_scope_control_label" in campaign_set
+    assert "mo.vstack(_items)" in campaign_set
+    assert "return mo.vstack(_items)" not in campaign_set
+    assert "mo.vstack(_items)\n    return" not in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 465
+    assert len(campaign_set.splitlines()) <= 760
+
+
+def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surface() -> None:
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="latest",
+    )
+
+    assert "selected_campaign_baserender_contract" in text
+    assert "build_notebook_collection_baserender_role_choices" in text
+    assert '"surface_kind": "baserender"' in text
+    assert '"surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND' in text
+    assert 'label="Selected sequence"' in text
+    assert "build_notebook_baserender_record_choices" in text
+    assert "build_notebook_baserender_record_annotation_counts" in text
+    assert "build_notebook_baserender_record_choices_with_counts" in text
+    assert "select_notebook_baserender_default_record_id" in text
+    assert "baserender_record_annotation_counts" in text
+    assert "baserender_record_choices" in text
+    assert "baserender_record_id" in text
+    assert 'label="Selection round"' in text
+    assert 'label="Selection run"' in text
+    assert 'label="Label source"' in text
+    assert 'str(selected_round_selector).strip().lower() == "all"' in text
+    assert "baserender_campaign_model" in text
+    assert "selected_baserender_round" in text
+    assert "baserender_selected_round" not in text
+    assert "selected_baserender_ids" in text
+    assert "record_ids=selected_baserender_ids" in text
+    assert "render_notebook_baserender_record" in text
+    assert '"width": "100%"' in text
+    assert '"background-color": "#FFFFFF"' in text
+    assert "What this sequence view shows" in text
+    assert "What this visual shows" in text
+    assert "densegen__used_tfbs_detail" not in text
+    ast.parse(text)
+
+
+def test_collection_baserender_role_choices_follow_selected_campaign_set() -> None:
+    campaigns = [
+        {"campaign": {"slug": "tfbs_lexA_positive", "config_path": "positive.yaml"}},
+        {"campaign": {"slug": "tfbs_lexA_matched_null", "config_path": "null.yaml"}},
+    ]
+    collection = {
+        "comparison_lenses": [
+            {
+                "kind": "control_pair",
+                "left_role": "positive",
+                "right_role": "null",
+                "pairs": [
+                    {
+                        "left": "tfbs_lexA_positive",
+                        "right": "tfbs_lexA_matched_null",
+                        "match": {"target": "lexA_count_fraction", "seed": "7"},
+                    },
+                    {
+                        "left": "tfbs_lexA_positive",
+                        "right": "tfbs_lexA_matched_null",
+                        "match": {"target": "lexA_in_slot0", "seed": "7"},
+                    },
+                ],
+            }
+        ]
+    }
+    choices = build_notebook_collection_baserender_role_choices(
+        campaigns,
+        collection,
+        {"match": {"label_name": "lexA_count_fraction", "review_surface": "realized_label_review"}},
+    )
+
+    assert choices == [
+        {"label": "DenseGen label", "role": "positive", "campaign_slug": "tfbs_lexA_positive"},
+        {"label": "Scrambled control", "role": "null", "campaign_slug": "tfbs_lexA_matched_null"},
+    ]
+
+    count_fixed_choices = build_notebook_collection_baserender_role_choices(
+        campaigns,
+        collection,
+        {
+            "match": {
+                "label_name": "lexA_in_slot0",
+                "review_surface": "realized_label_review",
+                "control_role": "count_fixed_shuffled_slot_negative_control",
+            }
+        },
+    )
+    assert count_fixed_choices[1]["label"] == "Count-fixed shuffled-slot control"
+
+
+def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
+    class _CampaignAnalysis:
+        def read_predictions(self, **kwargs: object) -> pl.DataFrame:
+            assert kwargs["round_selector"] == [3]
+            assert kwargs["run_id"] == "run-3"
+            return pl.DataFrame(
+                {
+                    "id": ["second", "unselected", "first", "null-selection"],
+                    "as_of_round": [3, 3, 3, 3],
+                    "run_id": ["run-3", "run-3", "run-3", "run-3"],
+                    "sel__rank_competition": [2, 1, 1, 3],
+                    "sel__is_selected": [True, False, True, None],
+                }
+            )
+
+    ids, rows = build_notebook_selected_baserender_record_ids(
+        _CampaignAnalysis(),
+        round_value=3,
+        run_id="run-3",
+    )
+
+    assert ids == ["first", "second"]
+    assert rows == [
+        {"field": "selection round", "value": 3},
+        {"field": "selection run", "value": "run-3"},
+        {"field": "selected records", "value": 2},
+    ]
+    assert build_notebook_selected_baserender_record_ids(_CampaignAnalysis(), round_value=3, run_id=None)[1] == [
+        {"field": "selection scope", "value": "no run available"}
+    ]
+
+
+def test_baserender_record_choices_compact_record_ids_without_losing_identity() -> None:
+    choices = build_notebook_baserender_record_choices(
+        [
+            "fixture-record-alpha-with-left-site",
+            "fixture-record-beta-with-right-site",
+        ]
+    )
+
+    assert choices == [
+        {
+            "label": "1. fixture-reco...eft-site",
+            "record_id": "fixture-record-alpha-with-left-site",
+        },
+        {
+            "label": "2. fixture-reco...ght-site",
+            "record_id": "fixture-record-beta-with-right-site",
+        },
+    ]
+
+
+def test_baserender_record_choices_label_counts_and_default_to_annotated_record() -> None:
+    record_ids = [
+        "fixture-record-no-annotations",
+        "fixture-record-five-tfbs-sites",
+    ]
+    counts = {
+        "fixture-record-no-annotations": 0,
+        "fixture-record-five-tfbs-sites": 5,
+    }
+
+    choices = build_notebook_baserender_record_choices_with_counts(
+        record_ids,
+        counts,
+        annotation_label="TFBS",
+    )
+
+    assert choices == [
+        {
+            "label": "1. fixture-reco...otations | 0 TFBS",
+            "record_id": "fixture-record-no-annotations",
+        },
+        {
+            "label": "2. fixture-reco...bs-sites | 5 TFBS",
+            "record_id": "fixture-record-five-tfbs-sites",
+        },
+    ]
+    assert select_notebook_baserender_default_record_id(record_ids, counts) == "fixture-record-five-tfbs-sites"
+    assert select_notebook_baserender_default_record_id(record_ids, {}) == record_ids[0]
+
+
+def test_baserender_densegen_contract_uses_metadata_records_path_for_annotations(tmp_path: Path) -> None:
+    records_path = tmp_path / "records.parquet"
+    metadata_records_path = tmp_path / "densegen.parquet"
+    record_id = "fixture-record-densegen-metadata"
+    stale_detail = []
+    authoritative_detail = [
+        {"part_kind": "tfbs", "regulator": "baeR_TTTCTSCVHNA", "offset_raw": 5, "length": 6},
+        {"part_kind": "fixed_element", "role": "upstream", "offset_raw": 0, "length": 6},
+    ]
+    pl.DataFrame(
+        {
+            "id": [record_id],
+            "sequence": ["TTGACAAAAAAAAAAAAAAAATATAAT"],
+            "densegen__used_tfbs_detail": [stale_detail],
+        }
+    ).write_parquet(records_path)
+    pl.DataFrame(
+        {
+            "id": [record_id],
+            "densegen__used_tfbs_detail": [authoritative_detail],
+        }
+    ).write_parquet(metadata_records_path)
+
+    contract = build_notebook_baserender_contract(
+        ["id", "sequence", "densegen__used_tfbs_detail"],
+        records_path=str(records_path),
+        metadata_records_path=str(metadata_records_path),
+        metadata_schema_columns=["id", "densegen__used_tfbs_detail"],
+    )
+
+    assert contract["available"] is True
+    assert contract["metadata_records_path"] == str(metadata_records_path)
+    assert build_notebook_baserender_record_annotation_counts(records_path, contract, record_ids=[record_id]) == {
+        record_id: 2
+    }
+    row = load_notebook_baserender_record_row(records_path, record_id, contract)
+    assert row is not None
+    assert row["sequence"] == "TTGACAAAAAAAAAAAAAAAATATAAT"
+    assert len(row["densegen__used_tfbs_detail"]) == 2
+    assert row["densegen__used_tfbs_detail"][0]["regulator"] == "baeR_TTTCTSCVHNA"
+    assert row["densegen__used_tfbs_detail"][1]["role"] == "upstream"
+
+
+def test_campaign_dropdown_label_prefers_display_target_metadata() -> None:
+    row = build_notebook_campaign_summary_row(
+        {
+            "campaign": {
+                "slug": "tfbs_baeR_count_fraction_matched_null_random_id_seed7",
+                "name": "DenseGen TFBS learnability: BaeR count fraction (BaeR count / 3), matched-null oracle, seed 7",
+                "metadata": {
+                    "target": "baeR_count_fraction",
+                    "target_label": "BaeR count fraction (BaeR count / 3)",
+                    "target_dropdown_label": "BaeR count fraction (count / 3)",
+                    "label_oracle_kind": "null",
+                    "label_split_id": "random_id",
+                    "label_family_id": "tf_family_count_fraction",
+                    "seed": 7,
+                },
+            },
+            "status": {"progress_status": "done"},
+            "plot_manifests": [],
+            "stale_artifacts": [],
+            "warnings": [],
+        }
+    )
+
+    assert row["label"] == ("BaeR count fraction (count / 3) | matched-null | random | s7 | done")
+    assert "baeR_count_fraction" not in row["label"]
+    assert "tf_family_count_fraction" not in row["label"]
+
+
+def test_campaign_dropdown_label_disambiguates_slot_probe_scope() -> None:
+    base = {
+        "campaign": {
+            "slug": "tfbs_cpxR_or_baeR_in_slot2_matched_null_random_id_seed7",
+            "name": "DenseGen TFBS learnability: CpxR or BaeR in slot 2, matched-null oracle, seed 7",
+            "metadata": {
+                "target_dropdown_label": "CpxR or BaeR in slot 2",
+                "label_oracle_kind": "null",
+                "label_split_id": "random_id",
+                "label_family_id": "tf_slot_family_presence",
+                "seed": 7,
+            },
+        },
+        "status": {"progress_status": "done"},
+        "plot_manifests": [],
+        "stale_artifacts": [],
+        "warnings": [],
+    }
+    count_preserving = {
+        **base,
+        "campaign": {
+            **base["campaign"],
+            "metadata": {
+                **base["campaign"]["metadata"],
+                "null_version": "densegen_tfbs_learnability_slot_geometry_count_matched_null_v1",
+            },
+        },
+    }
+    count_fixed = {
+        **base,
+        "campaign": {
+            **base["campaign"],
+            "metadata": {
+                **base["campaign"]["metadata"],
+                "candidate_scope_policy_id": "tfbs_slot_position_target_count_eq_1_v1",
+            },
+        },
+    }
+
+    assert "count-preserving" in build_notebook_campaign_summary_row(count_preserving)["label"]
+    assert "count-fixed" in build_notebook_campaign_summary_row(count_fixed)["label"]
+    assert (
+        build_notebook_campaign_summary_row(count_preserving)["label"]
+        != build_notebook_campaign_summary_row(count_fixed)["label"]
+    )
+
+
+def test_collection_visual_description_explains_metric_and_interval() -> None:
+    text = build_notebook_collection_visual_description(
+        {
+            "title": "BaeR count fraction lift",
+            "caption": "Realized selected-label lift by round.",
+            "metric_label": "Selected-label lift ratio",
+            "metric_expression": "mean(selected label) / mean(candidate-pool label)",
+            "premise": "Active selection should enrich the DenseGen label.",
+            "math_note": "Enrichment is mean(y_selected) / mean(y_candidate_pool).",
+            "design_note": "Campaigns share initial IDs; only the label table differs.",
+            "claim_boundary": "Synthetic metadata learnability only.",
+            "summary": "per_round",
+            "interval_kind": "none",
+            "interpretation_note": "This is a synthetic construction-label learnability surface.",
+        }
+    )
+
+    assert "BaeR count fraction lift" in text
+    assert "Premise: Active selection should enrich the DenseGen label." in text
+    assert "mean(selected label) / mean(candidate-pool label)" in text
+    assert "Math: Enrichment is mean(y_selected) / mean(y_candidate_pool)." in text
+    assert "Design: Campaigns share initial IDs; only the label table differs." in text
+    assert "Claim boundary: Synthetic metadata learnability only." in text
+    assert "Spread: none for this materialized single-pair review." in text
+    assert "synthetic construction-label learnability" in text
+
+    replicate_text = build_notebook_collection_visual_description(
+        {
+            "title": "BaeR count fraction lift",
+            "caption": "Realized selected-label lift by round.",
+            "metric_label": "Selected-label lift ratio",
+            "metric_expression": "mean(selected label) / mean(candidate-pool label)",
+            "summary": "per_round",
+            "interval_kind": "iqr",
+            "interval": {
+                "kind": "iqr",
+                "unit": "seed replicate",
+                "is_confidence_interval": False,
+            },
+        }
+    )
+
+    assert "Spread: IQR across seed replicate; not a statistical confidence interval" in replicate_text
 
 
 def test_notebook_baserender_contract_detects_schema_without_generated_import() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert "render_notebook_baserender_record" not in text
     assert "from dnadesign.baserender import" not in text
 
     unavailable = build_notebook_baserender_contract(["id", "sequence"], records_path="records.parquet")
@@ -1000,7 +1426,7 @@ def test_notebook_baserender_options_fail_fast_for_bad_available_contract(tmp_pa
         build_notebook_baserender_record_options(tmp_path / "missing.parquet", contract)
 
 
-def test_notebook_baserender_record_options_skip_empty_feature_rows(tmp_path: Path) -> None:
+def test_notebook_baserender_record_options_include_empty_densegen_annotation_rows(tmp_path: Path) -> None:
     feature_type = pa.list_(
         pa.struct(
             [
@@ -1014,10 +1440,11 @@ def test_notebook_baserender_record_options_skip_empty_feature_rows(tmp_path: Pa
     records_path = tmp_path / "records.parquet"
     table = pa.table(
         {
-            "id": pa.array(["empty", "good"]),
-            "sequence": pa.array(["TTGACATATAAT", "TTGACATATAAT"]),
+            "id": pa.array(["null", "empty", "good"]),
+            "sequence": pa.array(["TTGACATATAAT", "TTGACATATAAT", "TTGACATATAAT"]),
             "densegen__used_tfbs_detail": pa.array(
                 [
+                    None,
                     [],
                     [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
                 ],
@@ -1028,6 +1455,156 @@ def test_notebook_baserender_record_options_skip_empty_feature_rows(tmp_path: Pa
     pq.write_table(table, records_path)
     contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
 
-    assert build_notebook_baserender_record_options(records_path, contract) == ["good"]
-    assert load_notebook_baserender_record_row(records_path, "empty", contract) is None
+    assert build_notebook_baserender_record_options(records_path, contract) == ["null", "empty", "good"]
+    assert build_notebook_baserender_record_annotation_counts(records_path, contract) == {
+        "null": 0,
+        "empty": 0,
+        "good": 1,
+    }
+    assert load_notebook_baserender_record_row(records_path, "null", contract)["id"] == "null"
+    assert load_notebook_baserender_record_row(records_path, "empty", contract)["id"] == "empty"
     assert load_notebook_baserender_record_row(records_path, "good", contract)["id"] == "good"
+
+
+def test_notebook_baserender_record_options_filter_to_selected_ids(tmp_path: Path) -> None:
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["first", "second"]),
+            "sequence": pa.array(["TTGACATATAAT", "TTGACATATAAT"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+
+    assert build_notebook_baserender_record_options(records_path, contract, record_ids=["second"]) == ["second"]
+    assert build_notebook_baserender_record_options(records_path, contract, record_ids=[]) == [
+        "(no renderable records)"
+    ]
+
+
+def test_notebook_baserender_render_passes_record_id_as_sequence_panel_title(monkeypatch: pytest.MonkeyPatch) -> None:
+    import dnadesign.opal.src.analysis.notebook_components.baserender_render as baserender_render
+
+    captured: dict[str, object] = {}
+
+    def fake_render_sequence_panel_image(row, **kwargs):
+        captured["row"] = dict(row)
+        captured["kwargs"] = dict(kwargs)
+        return SimpleNamespace(
+            image=np.full((72, 240, 4), 255, dtype=np.uint8),
+            diagnostics=SimpleNamespace(sequence_length_bp=4, feature_count=0),
+        )
+
+    fake_baserender = SimpleNamespace(render_sequence_panel_image=fake_render_sequence_panel_image)
+    monkeypatch.setattr(baserender_render, "import_module", lambda _name: fake_baserender)
+
+    payload = render_notebook_baserender_record(
+        {"id": "record-abc", "sequence": "ACGT"},
+        {
+            "available": True,
+            "adapter_kind": "densegen_tfbs",
+            "adapter_columns": {"id": "id", "sequence": "sequence", "annotations": "densegen__used_tfbs_detail"},
+            "adapter_policies": {"require_non_empty": False},
+            "render_route": "sequence_panel",
+        },
+    )
+
+    row = captured["row"]
+    kwargs = captured["kwargs"]
+    assert isinstance(row, dict)
+    assert row["__opal_baserender_record_title"] == "Record record-abc"
+    assert isinstance(kwargs, dict)
+    assert kwargs["adapter_columns"]["overlay_text"] == "__opal_baserender_record_title"
+    assert kwargs["style_overrides"]["overlay_align"] == "center"
+    assert payload["record_id"] == "record-abc"
+
+
+def test_notebook_baserender_render_uses_high_resolution_content_fit_canvas(tmp_path: Path) -> None:
+    from PIL import Image
+
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["promoter-record"]),
+            "sequence": pa.array(["TTGACAAAAAAAATATAATCCCCCCCCCCTTGACAGGGGGGTATAATCCGGAATTCCGG"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    [
+                        {"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0},
+                        {"regulator": "cpxR", "sequence": "TATAAT", "orientation": "fwd", "offset": 13},
+                        {"regulator": "baeR", "sequence": "TTGACA", "orientation": "fwd", "offset": 29},
+                        {"regulator": "baeR", "sequence": "TATAAT", "orientation": "fwd", "offset": 42},
+                    ]
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+    row = load_notebook_baserender_record_row(records_path, "promoter-record", contract)
+
+    payload = render_notebook_baserender_record(row, contract)
+
+    image = Image.open(BytesIO(payload["image_bytes"])).convert("RGBA")
+    arr = np.asarray(image)
+    assert arr[:, :, 3].min() == 255
+    assert tuple(arr[0, 0, :3].tolist()) == (255, 255, 255)
+    rgb = arr[:, :, :3]
+    near_black_fraction = float((rgb.max(axis=2) <= 24).mean())
+    assert near_black_fraction < 0.01
+    assert image.width >= 900
+    content_mask = (rgb < 245).any(axis=2)
+    ys, xs = np.where(content_mask)
+    assert int(xs.min()) <= 40
+    assert int(image.width - 1 - xs.max()) <= 40
+    assert int(ys.min()) <= 40
+    assert int(image.height - 1 - ys.max()) <= 40
+
+
+def test_notebook_baserender_content_fit_normalizes_black_matte_to_white() -> None:
+    from PIL import Image, ImageDraw
+
+    from dnadesign.opal.src.analysis.notebook_components.baserender_render import _encode_content_fit_white_png
+
+    source = Image.new("RGBA", (420, 140), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(source)
+    draw.rounded_rectangle((96, 48, 324, 88), radius=10, fill=(68, 106, 140, 255))
+
+    image = Image.open(BytesIO(_encode_content_fit_white_png(source))).convert("RGBA")
+    arr = np.asarray(image)
+
+    assert arr[:, :, 3].min() == 255
+    assert tuple(arr[0, 0, :3].tolist()) == (255, 255, 255)
+    assert tuple(arr[-1, -1, :3].tolist()) == (255, 255, 255)
+    edge = np.concatenate((arr[0, :, :3], arr[-1, :, :3], arr[:, 0, :3], arr[:, -1, :3]))
+    assert int(((edge < 20).all(axis=1)).sum()) == 0
+    assert bool(((arr[:, :, 2] > arr[:, :, 0]) & (arr[:, :, 1] > 80)).any())

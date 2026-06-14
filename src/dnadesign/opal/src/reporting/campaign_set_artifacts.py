@@ -8,19 +8,11 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ..analysis.campaign_set import build_campaign_set_collection_visual_model
-from ..analysis.notebook_components import (
-    build_notebook_campaign_set_metric_comparison_rows,
-    build_notebook_campaign_set_plot_gallery_items,
-    build_notebook_campaign_set_vector_heatmap_rows,
-    build_notebook_campaign_set_vector_reference_mse_rows,
-    render_notebook_campaign_set_metric_comparison_image,
-    render_notebook_campaign_set_plot_gallery_image,
-    render_notebook_campaign_set_vector_heatmap_comparison_image,
-)
-from ..core.utils import ExitCodes, OpalError, now_iso, read_json, write_json
+from ..core.utils import ExitCodes, OpalError, now_iso, write_json
+from .collection_visual_index import COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION
+from .collection_visual_renderers import render_collection_visual_artifact
 
 COLLECTION_VISUAL_ARTIFACT_SCHEMA_VERSION = "opal.collection_visual_artifact.v1"
-COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION = "opal.collection_visual_manifest_index.v1"
 
 
 def materialize_campaign_set_collection_visuals(
@@ -36,6 +28,7 @@ def materialize_campaign_set_collection_visuals(
     _clear_owned_collection_visual_outputs(output_path)
     campaign_list = [campaign for campaign in campaigns if isinstance(campaign, Mapping)]
     model = build_campaign_set_collection_visual_model(campaign_list, collection)
+    _validate_unique_visual_artifact_stems(model["visuals"])
     visuals = [
         _materialize_visual(campaign_list, visual=visual, collection=collection, output_dir=output_path)
         for visual in model["visuals"]
@@ -45,6 +38,7 @@ def materialize_campaign_set_collection_visuals(
         "generated_at": now_iso(),
         "collection_id": collection.get("collection_id"),
         "output_dir": str(output_path),
+        "surface_kinds": _surface_kinds(visuals),
         "comparison_set_count": model["comparison_set_count"],
         "comparison_sets": model["comparison_sets"],
         "visual_count": len(visuals),
@@ -64,19 +58,27 @@ def _clear_owned_collection_visual_outputs(output_dir: Path) -> None:
             child.unlink()
 
 
-def load_collection_visual_manifest_index(path: str | Path) -> dict[str, Any]:
-    payload = read_json(path)
-    if not isinstance(payload, dict):
-        raise OpalError(
-            f"Collection visual manifest index is not a JSON object: {path}",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    if payload.get("schema_version") != COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION:
-        raise OpalError(
-            f"Unsupported collection visual manifest index schema: {payload.get('schema_version')!r}",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    return payload
+def _validate_unique_visual_artifact_stems(visuals: Iterable[Mapping[str, Any]]) -> None:
+    stems: dict[str, str] = {}
+    for visual in visuals:
+        if not isinstance(visual, Mapping):
+            continue
+        visual_id = str(visual.get("id") or "collection_visual")
+        set_key = str(visual.get("comparison_set_key") or "")
+        logical_key = "__".join(part for part in [set_key, visual_id] if part)
+        stem = _artifact_stem(logical_key)
+        previous = stems.get(stem)
+        if previous is not None:
+            raise OpalError(
+                "Collection visual artifact stem collision after filename sanitization: "
+                f"{previous!r} and {logical_key!r} both map to {stem!r}",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        stems[stem] = logical_key
+
+
+def _surface_kinds(visuals: Iterable[Mapping[str, Any]]) -> list[str]:
+    return sorted({str(visual.get("surface_kind") or "").strip() for visual in visuals if visual.get("surface_kind")})
 
 
 def _materialize_visual(
@@ -92,11 +94,14 @@ def _materialize_visual(
     tidy_path = output_dir / f"{stem}.csv"
     media_path = output_dir / f"{stem}.png"
     manifest_path = output_dir / f"{stem}.manifest.json"
-    rows, rendered, input_paths = _render_visual(
+    render_result = render_collection_visual_artifact(
         campaigns,
         visual=visual,
         media_path=media_path,
     )
+    rows = render_result.rows
+    rendered = render_result.rendered
+    input_paths = render_result.input_paths
     if not rows or rendered is None:
         raise OpalError(
             f"Campaign-set comparison view {visual_id!r} has no matching source rows.",
@@ -158,94 +163,6 @@ def _materialize_visual(
     return manifest
 
 
-def _render_visual(
-    campaigns: list[Mapping[str, Any]],
-    *,
-    visual: Mapping[str, Any],
-    media_path: Path,
-) -> tuple[list[Mapping[str, Any]], dict[str, Any] | None, list[Path]]:
-    surface_kind = str(visual.get("surface_kind") or "")
-    if surface_kind == "campaign_set_metric_comparison":
-        rows = build_notebook_campaign_set_metric_comparison_rows(
-            campaigns,
-            plot_name=str(visual["source_plot_name"]),
-            group_key=str(visual["group_key"]),
-            summary=str(visual["summary"]),
-            relationship=visual,
-        )
-        rows = _filter_metric_rows(rows, visual=visual)
-        rendered = render_notebook_campaign_set_metric_comparison_image(
-            rows,
-            title=str(visual.get("title") or visual.get("label") or visual.get("id")),
-            group_key=str(visual["group_key"]),
-            interval_kind=str(visual.get("interval_kind") or "none"),
-            confidence_level=visual.get("confidence_level") if visual.get("confidence_level") is not None else None,
-            interpretation_note=str(visual.get("interpretation_note") or ""),
-        )
-        return rows, rendered, _source_tidy_paths(rows)
-    if surface_kind == "campaign_set_vector_reference_mse_comparison":
-        rows = build_notebook_campaign_set_vector_reference_mse_rows(
-            campaigns,
-            plot_name=str(visual["source_plot_name"]),
-            group_key=str(visual["group_key"]),
-            relationship=visual,
-            cohort=str(visual.get("cohort") or "selected"),
-        )
-        rows = _filter_metric_rows(rows, visual=visual)
-        rendered = render_notebook_campaign_set_metric_comparison_image(
-            rows,
-            title=str(visual.get("title") or visual.get("label") or visual.get("id")),
-            group_key=str(visual["group_key"]),
-            interval_kind=str(visual.get("interval_kind") or "none"),
-            confidence_level=visual.get("confidence_level") if visual.get("confidence_level") is not None else None,
-            interpretation_note=str(visual.get("interpretation_note") or ""),
-        )
-        return rows, rendered, _source_tidy_paths(rows)
-    if surface_kind == "campaign_set_plot_gallery":
-        items = build_notebook_campaign_set_plot_gallery_items(
-            campaigns,
-            plot_name=str(visual["source_plot_name"]),
-            plot_kind=str(visual["source_plot_kind"]),
-            group_key=str(visual["group_key"]),
-            relationship=visual,
-        )
-        rendered = render_notebook_campaign_set_plot_gallery_image(
-            items,
-            title=str(visual.get("title") or visual.get("label") or visual.get("id")),
-            group_key=str(visual["group_key"]),
-        )
-        return items, rendered, _source_media_paths(items)
-    if surface_kind == "campaign_set_vector_heatmap_comparison":
-        rows = build_notebook_campaign_set_vector_heatmap_rows(
-            campaigns,
-            plot_name=str(visual["source_plot_name"]),
-            group_key=str(visual["group_key"]),
-            relationship=visual,
-            cohort=str(visual.get("cohort") or "selected"),
-        )
-        rendered = render_notebook_campaign_set_vector_heatmap_comparison_image(
-            rows,
-            title=str(visual.get("title") or visual.get("label") or visual.get("id")),
-            group_key=str(visual["group_key"]),
-            interval_kind=str(visual.get("interval_kind") or "none"),
-            interpretation_note=str(visual.get("interpretation_note") or ""),
-        )
-        return rows, rendered, _source_tidy_paths(rows)
-    raise OpalError(
-        f"Unsupported collection visual surface_kind: {surface_kind!r}",
-        ExitCodes.CONTRACT_VIOLATION,
-    )
-
-
-def _filter_metric_rows(rows: list[dict[str, Any]], *, visual: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return [
-        row
-        for row in rows
-        if str(row.get("metric") or "") == str(visual["metric"])
-        and str(row.get("cohort") or "") == str(visual["cohort"])
-    ]
-
-
 def _write_rows_csv(rows: list[Mapping[str, Any]], path: Path) -> None:
     columns = [
         "row_type",
@@ -282,16 +199,6 @@ def _write_rows_csv(rows: list[Mapping[str, Any]], path: Path) -> None:
         writer = csv.DictWriter(handle, fieldnames=[*columns, *extras], extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-
-
-def _source_tidy_paths(rows: Iterable[Mapping[str, Any]]) -> list[Path]:
-    paths = sorted({str(row.get("tidy_csv") or "") for row in rows if row.get("tidy_csv")})
-    return [Path(path) for path in paths]
-
-
-def _source_media_paths(rows: Iterable[Mapping[str, Any]]) -> list[Path]:
-    paths = sorted({str(row.get("media_path") or "") for row in rows if row.get("media_path")})
-    return [Path(path) for path in paths]
 
 
 def _artifact_stem(value: str) -> str:

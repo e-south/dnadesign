@@ -230,15 +230,14 @@ def render_visual_surface_cells() -> str:
                                 caption=str(payload["caption"]),
                                 rounded=True,
                                 style={
-                                    "width": "auto",
-                                    "max-height": "min(58vh, 520px)",
+                                    "width": "100%",
                                     "max-width": "100%",
                                     "height": "auto",
                                     "object-fit": "contain",
                                     "overflow": "auto",
-                                    "background": "white",
+                                    "background-color": "#FFFFFF",
                                     "display": "block",
-                                    "margin": "0 auto",
+                                    "margin": "0",
                                 },
                             )
                         except Exception as exc:

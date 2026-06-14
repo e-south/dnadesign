@@ -12,11 +12,14 @@ def build_notebook_baserender_contract(
     schema_columns: Sequence[str],
     *,
     records_path: str | None = None,
+    metadata_records_path: str | None = None,
+    metadata_schema_columns: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Detect whether records expose a public BaseRender-compatible surface."""
 
     baserender = import_module("dnadesign.baserender")
     columns = {str(column) for column in schema_columns}
+    metadata_columns = {str(column) for column in metadata_schema_columns or ()}
     if {"id", "sequence", GENERIC_BASERENDER_FEATURES_COLUMN}.issubset(columns):
         return _available_contract(
             adapter_kind="generic_features",
@@ -35,16 +38,24 @@ def build_notebook_baserender_contract(
 
     densegen_config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
     densegen_columns = dict(densegen_config.adapter_columns)
-    required = [str(densegen_columns[key]) for key in ("id", "sequence", "annotations") if key in densegen_columns]
-    if set(required).issubset(columns):
+    detection_required = [
+        str(densegen_columns[key]) for key in ("id", "sequence", "annotations") if key in densegen_columns
+    ]
+    metadata_required = [str(densegen_columns[key]) for key in ("id", "annotations") if key in densegen_columns]
+    row_required = [str(densegen_columns[key]) for key in ("id", "sequence") if key in densegen_columns]
+    has_embedded_annotations = set(detection_required).issubset(columns)
+    has_metadata_annotations = set(row_required).issubset(columns) and set(metadata_required).issubset(metadata_columns)
+    if has_embedded_annotations or has_metadata_annotations:
         return _available_contract(
             adapter_kind=str(densegen_config.adapter_kind),
             adapter_columns=densegen_columns,
             adapter_policies=dict(densegen_config.adapter_policies),
-            required_columns=required,
+            required_columns=row_required,
             render_route="sequence_panel",
             renderer_name=str(densegen_config.renderer_name),
             records_path=records_path,
+            metadata_records_path=metadata_records_path if has_metadata_annotations else None,
+            metadata_required_columns=metadata_required if has_metadata_annotations else [],
             caption="BaseRender DenseGen TFBS view.",
             style_overrides=dict(densegen_config.style_overrides or {}),
             target_width_px=int(densegen_config.target_width_px),
@@ -63,6 +74,8 @@ def build_notebook_baserender_contract(
         "adapter_columns": {},
         "adapter_policies": {},
         "records_path": records_path,
+        "metadata_records_path": metadata_records_path,
+        "metadata_required_columns": [],
         "reason": "No public BaseRender-compatible record surface was detected.",
     }
 
@@ -76,6 +89,8 @@ def _available_contract(
     render_route: str,
     renderer_name: str,
     records_path: str | None,
+    metadata_records_path: str | None = None,
+    metadata_required_columns: Sequence[str] | None = None,
     caption: str,
     style_overrides: Mapping[str, Any] | None = None,
     target_width_px: int | None = None,
@@ -93,6 +108,8 @@ def _available_contract(
         "adapter_columns": dict(adapter_columns),
         "adapter_policies": dict(adapter_policies),
         "records_path": records_path,
+        "metadata_records_path": metadata_records_path,
+        "metadata_required_columns": list(metadata_required_columns or ()),
         "reason": "detected",
         "caption": caption,
         "alt_text_template": "BaseRender sequence diagram for record {record_id}; {feature_count} annotations.",

@@ -86,6 +86,7 @@ def _layout_cell() -> str:
             collection_set_ui,
             campaign_ui,
             changes_panel,
+            collection_visuals,
             evidence_panel,
             header_md,
             metric_definitions_panel,
@@ -104,10 +105,10 @@ def _layout_cell() -> str:
             elif collection_set_ui is not None:
                 _top_control_items.append(collection_set_ui)
             _items.append(mo.vstack(_top_control_items, gap=0.20))
-            if active_view_mode != "Campaign set":
-                _items.append(selected_campaign_header_md)
+            if active_view_mode != "Campaign set": _items.append(selected_campaign_header_md)
+            _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "OPAL campaigns at a glance"
             _accordion_items = {
-                "OPAL campaigns at a glance": opal_table(campaign_summary_df, page_size=12),
+                _campaign_inventory_label: opal_table(campaign_summary_df, page_size=12),
             }
             if active_view_mode != "Campaign set":
                 _accordion_items.update(
@@ -120,9 +121,7 @@ def _layout_cell() -> str:
                         "Warnings and stale artifacts": evidence_panel,
                     }
                 )
-            _items.extend([plot_panel, mo.accordion(_accordion_items, multiple=True, lazy=True)])
-            mo.vstack(_items)
-            return
+            _items.extend([plot_panel, mo.accordion(_accordion_items, multiple=True, lazy=True)]); mo.vstack(_items)
         """
     )
 

@@ -4,21 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
+from ...core.utils import ExitCodes, OpalError
 from ...plots._mpl_utils import pretty_label
+from .visual_kinds import collection_visual_surface_kind_for_view_kind
 
 CAMPAIGN_SET_VISUAL_MODEL_SCHEMA_VERSION = "opal.campaign_set_visual_model.v1"
-COLLECTION_VISUAL_SURFACE_KIND = "campaign_set_metric_comparison"
-COLLECTION_VECTOR_MSE_SURFACE_KIND = "campaign_set_vector_reference_mse_comparison"
-COLLECTION_VECTOR_HEATMAP_SURFACE_KIND = "campaign_set_vector_heatmap_comparison"
-COLLECTION_PLOT_GALLERY_SURFACE_KIND = "campaign_set_plot_gallery"
 COMPARISON_SET_SCOPE = "comparison_set"
 COLLECTION_SCOPE = "collection"
-VIEW_KIND_SURFACES = {
-    "metric_over_rounds_comparison": COLLECTION_VISUAL_SURFACE_KIND,
-    "vector_reference_mse_over_rounds_comparison": COLLECTION_VECTOR_MSE_SURFACE_KIND,
-    "vector_heatmap_comparison": COLLECTION_VECTOR_HEATMAP_SURFACE_KIND,
-    "paired_plot_gallery": COLLECTION_PLOT_GALLERY_SURFACE_KIND,
-}
 
 
 def build_campaign_set_collection_visual_model(
@@ -59,7 +51,22 @@ def build_campaign_set_collection_visual_model(
 
 def _collection_visuals_from_view(view: Mapping[str, Any]) -> list[dict[str, Any]]:
     relationship = _mapping(view.get("relationship"))
-    comparison_scope = str(view.get("comparison_scope") or COLLECTION_SCOPE)
+    visual_id = _required_string(view.get("id"), field="comparison_views[].id")
+    view_kind = _required_string(view.get("kind"), field=f"comparison view {visual_id!r}.kind")
+    collection_visual_surface_kind_for_view_kind(view_kind)
+    _required_string(view.get("source_plot_name"), field=f"comparison view {visual_id!r}.source_plot_name")
+    _required_string(view.get("source_plot_kind"), field=f"comparison view {visual_id!r}.source_plot_kind")
+    _required_string(view.get("interval_kind"), field=f"comparison view {visual_id!r}.interval_kind")
+    comparison_scope = _required_string(
+        view.get("comparison_scope"),
+        field=f"comparison view {visual_id!r}.comparison_scope",
+    )
+    if comparison_scope not in {COLLECTION_SCOPE, COMPARISON_SET_SCOPE}:
+        raise OpalError(
+            f"Campaign collection comparison view {visual_id!r} comparison_scope must be one of "
+            f"{sorted({COLLECTION_SCOPE, COMPARISON_SET_SCOPE})}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
     if comparison_scope == COMPARISON_SET_SCOPE:
         match_filters = _mapping(view.get("match_filters"))
         return [
@@ -88,10 +95,27 @@ def _collection_visual_from_view(
     relationship: Mapping[str, Any],
     comparison_set: Mapping[str, Any],
 ) -> dict[str, Any]:
+    visual_id = _required_string(view.get("id"), field="comparison_views[].id")
+    view_kind = _required_string(view.get("kind"), field=f"comparison view {visual_id!r}.kind")
+    source_plot_name = _required_string(
+        view.get("source_plot_name"),
+        field=f"comparison view {visual_id!r}.source_plot_name",
+    )
+    source_plot_kind = _required_string(
+        view.get("source_plot_kind"),
+        field=f"comparison view {visual_id!r}.source_plot_kind",
+    )
+    comparison_scope = _required_string(
+        view.get("comparison_scope"),
+        field=f"comparison view {visual_id!r}.comparison_scope",
+    )
+    interval_kind = _required_string(
+        view.get("interval_kind"),
+        field=f"comparison view {visual_id!r}.interval_kind",
+    )
     group_key = str(view.get("group_key") or relationship.get("role_dimension") or "")
-    visual_id = str(view.get("id") or "")
     label = str(view.get("label") or visual_id or "Campaign-set comparison")
-    surface_kind = VIEW_KIND_SURFACES.get(str(view.get("kind") or ""), COLLECTION_VISUAL_SURFACE_KIND)
+    surface_kind = collection_visual_surface_kind_for_view_kind(view_kind)
     comparison_set_key = str(comparison_set.get("key") or "")
     comparison_set_label = str(comparison_set.get("label") or comparison_set_key)
     return {
@@ -100,11 +124,11 @@ def _collection_visual_from_view(
         "label": label,
         "title": label,
         "kind": surface_kind,
-        "view_kind": str(view.get("kind") or ""),
+        "view_kind": view_kind,
         "surface_kind": surface_kind,
-        "source_plot_name": str(view.get("source_plot_name") or ""),
-        "source_plot_kind": str(view.get("source_plot_kind") or "metric_over_rounds"),
-        "comparison_scope": str(view.get("comparison_scope") or COLLECTION_SCOPE),
+        "source_plot_name": source_plot_name,
+        "source_plot_kind": source_plot_kind,
+        "comparison_scope": comparison_scope,
         "comparison_set_key": comparison_set_key,
         "comparison_set_label": comparison_set_label,
         "comparison_set_match": dict(_mapping(comparison_set.get("match"))),
@@ -124,7 +148,7 @@ def _collection_visual_from_view(
         "metric": str(view.get("metric") or ""),
         "cohort": str(view.get("cohort") or ""),
         "summary": str(view.get("summary") or ""),
-        "interval_kind": str(view.get("interval_kind") or "none"),
+        "interval_kind": interval_kind,
         "confidence_level": view.get("confidence_level"),
         "interpretation_note": view.get("interpretation_note"),
         "manifest_path": view.get("manifest_path"),
@@ -209,3 +233,13 @@ def _sequence(value: Any) -> list[Any]:
     if isinstance(value, tuple):
         return list(value)
     return []
+
+
+def _required_string(value: Any, *, field: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise OpalError(
+            f"Campaign-set collection visual field {field} must be a non-empty string.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return text

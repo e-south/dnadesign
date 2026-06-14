@@ -4,6 +4,11 @@ from importlib import import_module
 from io import BytesIO
 from typing import Any, Mapping
 
+_BASERENDER_CANVAS_BACKGROUND_RGB = (255, 255, 255)
+_BASERENDER_CONTENT_THRESHOLD = 245
+_BASERENDER_CONTENT_PAD_PX = 32
+_BASERENDER_BLACK_MATTE_THRESHOLD = 24
+
 
 def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
     """Render a single record through the public BaseRender API."""
@@ -19,30 +24,39 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
     render_sequence_panel_image = baserender.render_sequence_panel_image
 
     style_overrides = dict(contract.get("style_overrides") or {})
+    adapter_columns = dict(contract.get("adapter_columns") or {})
     try:
         from PIL import Image
 
         render_route = str(contract.get("render_route") or "figure")
         if render_route == "sequence_panel":
+            render_row = dict(record_row)
+            title_column = "__opal_baserender_record_title"
+            render_row[title_column] = f"Record {record_id}"
+            render_adapter_columns = dict(adapter_columns)
+            render_adapter_columns["overlay_text"] = title_column
+            render_style_overrides = dict(style_overrides)
+            render_style_overrides.setdefault("overlay_align", "center")
+            render_style_overrides.setdefault("overlay_title_color", "#111827")
             panel = render_sequence_panel_image(
-                dict(record_row),
+                render_row,
                 adapter_kind=adapter_kind,
-                adapter_columns=dict(contract.get("adapter_columns") or {}),
+                adapter_columns=render_adapter_columns,
                 adapter_policies=dict(contract.get("adapter_policies") or {}),
-                style_overrides=style_overrides,
+                style_overrides=render_style_overrides,
                 target_width_px=int(contract.get("target_width_px") or 2600),
                 target_height_px=int(contract.get("target_height_px") or 430),
                 vertical_anchor=str(contract.get("vertical_anchor") or "top"),
                 canvas_top_pad_px=int(contract.get("canvas_top_pad_px") or 8),
             )
-            image_bytes = _encode_opaque_white_png(Image.fromarray(panel.image))
+            image_bytes = _encode_content_fit_white_png(Image.fromarray(panel.image))
             sequence_length = int(panel.diagnostics.sequence_length_bp)
             feature_count = int(panel.diagnostics.feature_count)
         else:
             record = baserender.adapt_record(
                 dict(record_row),
                 adapter_kind=adapter_kind,
-                adapter_columns=dict(contract.get("adapter_columns") or {}),
+                adapter_columns=adapter_columns,
                 adapter_policies=dict(contract.get("adapter_policies") or {}),
             )
             figure = baserender.render_record_figure(
@@ -57,7 +71,8 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
                 axis.set_facecolor("white")
             buffer = BytesIO()
             figure.savefig(buffer, format="png", facecolor="white", transparent=False, bbox_inches="tight")
-            image_bytes = buffer.getvalue()
+            buffer.seek(0)
+            image_bytes = _encode_content_fit_white_png(Image.open(buffer))
             sequence_length = len(str(record.sequence))
             feature_count = len(record.features)
             try:
@@ -105,7 +120,58 @@ def _encode_opaque_white_png(image: Any) -> bytes:
 
     buffer = BytesIO()
     rgba = image.convert("RGBA")
-    canvas = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+    canvas = Image.new("RGBA", rgba.size, (*_BASERENDER_CANVAS_BACKGROUND_RGB, 255))
     canvas.alpha_composite(rgba)
     canvas.convert("RGB").save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def _encode_content_fit_white_png(image: Any) -> bytes:
+    """Encode a white-canvas PNG whose visible sequence content fills the natural width."""
+
+    import numpy as np
+    from PIL import Image
+
+    rgba = image.convert("RGBA")
+    white = Image.new("RGBA", rgba.size, (*_BASERENDER_CANVAS_BACKGROUND_RGB, 255))
+    white.alpha_composite(rgba)
+    white = _normalize_black_border_matte_to_white(white)
+
+    arr = np.asarray(white.convert("RGB"))
+    content_mask = (arr < _BASERENDER_CONTENT_THRESHOLD).any(axis=2)
+    if not content_mask.any():
+        return _encode_opaque_white_png(white)
+
+    ys, xs = np.where(content_mask)
+    pad = int(_BASERENDER_CONTENT_PAD_PX)
+    left = max(0, int(xs.min()) - pad)
+    right = min(white.width, int(xs.max()) + pad + 1)
+    top = max(0, int(ys.min()) - pad)
+    bottom = min(white.height, int(ys.max()) + pad + 1)
+    fitted = white.crop((left, top, right, bottom))
+    return _encode_opaque_white_png(fitted)
+
+
+def _normalize_black_border_matte_to_white(image: Any) -> Any:
+    """Replace a black border-connected matte with white before content fitting."""
+
+    from PIL import ImageDraw
+
+    rgba = image.convert("RGBA")
+    white = (*_BASERENDER_CANVAS_BACKGROUND_RGB, 255)
+    corners = (
+        (0, 0),
+        (max(0, rgba.width - 1), 0),
+        (0, max(0, rgba.height - 1)),
+        (max(0, rgba.width - 1), max(0, rgba.height - 1)),
+    )
+    for corner in corners:
+        pixel = rgba.getpixel(corner)
+        if _is_black_matte_pixel(pixel):
+            ImageDraw.floodfill(rgba, corner, white, thresh=_BASERENDER_BLACK_MATTE_THRESHOLD)
+    return rgba
+
+
+def _is_black_matte_pixel(pixel: object) -> bool:
+    channels = tuple(int(value) for value in pixel)  # type: ignore[arg-type]
+    return len(channels) >= 3 and max(channels[:3]) <= _BASERENDER_BLACK_MATTE_THRESHOLD

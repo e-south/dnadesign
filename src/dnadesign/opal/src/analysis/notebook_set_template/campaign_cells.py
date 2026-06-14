@@ -34,9 +34,10 @@ def _campaign_selector_cell() -> str:
                 if collection_visuals
                 else ""
             )
+            _campaign_inventory_label = "raw campaign artifacts" if collection_visuals else "OPAL campaigns"
             header_md = mo.md(
                 "# OPAL Campaign Review\\n\\n"
-                f"There are `{campaign_set_view_model['campaign_count']}` OPAL campaigns available for "
+                f"There are `{campaign_set_view_model['campaign_count']}` {_campaign_inventory_label} available for "
                 f"review scope `{selected_round_selector}`.{_collection_clause}"
             )
             return campaign_labels, campaign_summary_df, campaign_ui, header_md
