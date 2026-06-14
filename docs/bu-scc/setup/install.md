@@ -1,7 +1,7 @@
 ## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Last verified:** 2026-06-14
 
 ### Purpose
 

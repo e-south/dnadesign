@@ -1,7 +1,7 @@
 ## Notify documentation index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-06-14
 
 Use this page for Notify command contracts and maintainer docs. If you need to set up, run, or recover a watcher, start with [Notify USR events runbook](../../../../docs/notify/usr-events.md).
 

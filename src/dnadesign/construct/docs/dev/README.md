@@ -1,7 +1,7 @@
 ## Construct developer notes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-06-14
 
 Use this area for Construct implementation notes, evolution records, and future design follow-ups.
 

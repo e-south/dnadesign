@@ -1,7 +1,7 @@
 ## Notify maintainer architecture map
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-06-14
 
 This page maps package boundaries for maintainers extending command registration, event resolution, and delivery/runtime flows.
 

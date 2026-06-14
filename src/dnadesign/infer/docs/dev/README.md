@@ -1,7 +1,7 @@
 ## Infer Dev Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-06-14
 
 - Architecture map: [../architecture/README.md](../architecture/README.md)
 - Active development journal: [journal.md](journal.md)

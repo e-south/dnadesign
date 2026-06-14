@@ -1,7 +1,7 @@
 ## Construct Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-06-14
 
 This journal tracks `dnadesign.construct` design and implementation decisions, scope boundaries, and validation notes.
 

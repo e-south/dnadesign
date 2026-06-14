@@ -1,7 +1,7 @@
 ## Cluster CLI contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-06-14
 
 This page collects the stable command, layout, and data-shape contracts for `cluster`.
 

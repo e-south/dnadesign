@@ -1,7 +1,7 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Last verified:** 2026-06-14
 
 ### Purpose
 

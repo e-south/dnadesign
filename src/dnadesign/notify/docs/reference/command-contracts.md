@@ -1,7 +1,7 @@
 ## Notify command contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-06-14
 
 This page is the tool-local source for Notify command invocation contracts and fail-fast behavior.
 

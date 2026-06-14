@@ -1,7 +1,7 @@
 ## Cluster ownership boundary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-06-14
 
 Use this page when you need the package-role decision before choosing a downstream route.
 

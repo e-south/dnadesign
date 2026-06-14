@@ -1,7 +1,7 @@
 # USR sync target modes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-06-14
 
 
 Use this page when dataset-id sync is not enough and you need explicit path mapping.

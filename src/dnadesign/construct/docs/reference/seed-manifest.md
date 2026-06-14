@@ -1,7 +1,7 @@
 ## Construct seed/import manifest reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-14
+**Last verified:** 2026-06-14
 
 ### Purpose
 

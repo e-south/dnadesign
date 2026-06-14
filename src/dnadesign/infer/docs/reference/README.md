@@ -1,7 +1,7 @@
 ## infer reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-06-14
 
 Use this section for stable infer command/runtime contracts before scripting or automation.
 

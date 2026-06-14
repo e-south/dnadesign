@@ -7,7 +7,7 @@
 **Exit artifact:** chosen sync runbook for setup, execution, or troubleshooting
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-06-14
 
 
 Use this page to choose setup, daily sync, or troubleshooting for USR dataset and file transfers over SSH.

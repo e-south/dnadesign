@@ -1,7 +1,7 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-07
+**Last verified:** 2026-06-14
 
 This guide is the first-run setup sequence for local development and CLI usage: confirm platform/version contracts, run the required install and baseline verification, then run additional sections only when required by the workload.
 
