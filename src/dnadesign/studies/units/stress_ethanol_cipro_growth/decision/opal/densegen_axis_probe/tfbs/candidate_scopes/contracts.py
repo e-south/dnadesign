@@ -68,6 +68,16 @@ _COUNT_FIXED_SLOT_POSITION_POLICIES = MappingProxyType(
                 "therefore not be explained by selecting rows with more CpxR/BaeR motifs."
             ),
         ),
+        "baeR_in_slot1": TfbsCandidateScopePolicy(
+            label_name="baeR_in_slot1",
+            policy_id=COUNT_FIXED_SLOT_POSITION_SCOPE_POLICY_ID,
+            target_family_count_column="baeR_count",
+            required_count_value=COUNT_FIXED_SLOT_POSITION_SCOPE_VALUE,
+            claim_boundary=(
+                "Candidate universe is restricted to rows with exactly one BaeR motif. Enrichment can therefore "
+                "not be explained by selecting rows with more BaeR motifs."
+            ),
+        ),
     }
 )
 

@@ -71,6 +71,7 @@ class ParsedDenseGenTfbsRow:
             "lexA_in_slot0": int(slot0 == "LexA"),
             "lexA_in_slot1": int(slot1 == "LexA"),
             "lexA_in_slot2": int(slot2 == "LexA"),
+            "baeR_in_slot1": int(slot1 == "BaeR"),
             "cpxR_or_baeR_in_slot0": int(slot0 in {"CpxR", "BaeR"}),
             "cpxR_or_baeR_in_slot1": int(slot1 in {"CpxR", "BaeR"}),
             "cpxR_or_baeR_in_slot2": int(slot2 in {"CpxR", "BaeR"}),

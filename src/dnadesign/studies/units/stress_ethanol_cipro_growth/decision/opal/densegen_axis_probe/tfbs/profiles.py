@@ -9,6 +9,7 @@ from typing import Any
 from .schema import (
     TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES,
     TFBS_LEARNABILITY_CANONICAL_COUNT_FRACTION_TARGET_SET,
+    TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET,
     TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_SENTINEL_TARGET_SET,
     TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET,
     TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET,
@@ -17,6 +18,7 @@ from .schema import (
 CANONICAL_COUNT_FRACTION_PROFILE_ID = "tfbs_count_fraction_probe_v1"
 SLOT_POSITION_SENTINEL_PROFILE_ID = "tfbs_slot_position_sentinel_probe_v1"
 SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID = "tfbs_slot_position_count_fixed_sentinel_probe_v1"
+SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID = "tfbs_slot_position_count_fixed_baer_middle_probe_v1"
 SLOT_POSITION_PROFILE_ID = "tfbs_slot_position_probe_v1"
 CUSTOM_TFBS_TARGET_PROFILE_ID = "custom_tfbs_learnability_label_set"
 DEFAULT_TFBS_TARGET_PROFILE_ID = CANONICAL_COUNT_FRACTION_PROFILE_ID
@@ -96,12 +98,35 @@ SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE = TfbsProbeTargetProfile(
     ),
 )
 
+SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE = TfbsProbeTargetProfile(
+    profile_id=SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID,
+    profile_role="boundary_stage_b_count_fixed_minimal_placement_probe",
+    label_names=TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET,
+    label_family_ids=("tf_slot_family_presence",),
+    canonical=False,
+    interpretation_boundary=(
+        "Count-fixed BaeR middle-slot placement probe. This profile restricts the candidate universe to rows "
+        "with exactly one BaeR motif, then asks whether active selection can enrich BaeR in the middle TFBS slot "
+        "against a count-fixed shuffled-slot negative control. It adds a minimal middle-slot placement check "
+        "without expanding into a full regulator-by-slot map, and supports only synthetic construction-label "
+        "learnability claims."
+    ),
+)
+
 _NAMED_TARGET_PROFILES = MappingProxyType(
     {
         CANONICAL_COUNT_FRACTION_PROFILE.profile_id: CANONICAL_COUNT_FRACTION_PROFILE,
         SLOT_POSITION_SENTINEL_PROFILE.profile_id: SLOT_POSITION_SENTINEL_PROFILE,
         SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE.profile_id: SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE,
+        SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE.profile_id: SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE,
         SLOT_POSITION_PROFILE.profile_id: SLOT_POSITION_PROFILE,
+    }
+)
+
+_COUNT_FIXED_SLOT_POSITION_PROFILE_IDS = frozenset(
+    {
+        SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID,
+        SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID,
     }
 )
 
@@ -128,6 +153,18 @@ def slot_position_count_fixed_sentinel_label_names() -> tuple[str, ...]:
     """Return the count-fixed TFBS slot-position sentinel boundary labels."""
 
     return SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE.label_names
+
+
+def slot_position_count_fixed_baer_middle_label_names() -> tuple[str, ...]:
+    """Return the count-fixed BaeR middle-slot placement label."""
+
+    return SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE.label_names
+
+
+def is_count_fixed_slot_position_profile_id(profile_id: str) -> bool:
+    """Return whether a named profile requires count-fixed slot-position controls."""
+
+    return str(profile_id or "").strip() in _COUNT_FIXED_SLOT_POSITION_PROFILE_IDS
 
 
 def tfbs_target_profile_ids() -> tuple[str, ...]:
@@ -205,6 +242,8 @@ def tfbs_target_profile_for_labels(label_names: tuple[str, ...]) -> TfbsProbeTar
             f"{list(labels)} match both {SLOT_POSITION_SENTINEL_PROFILE_ID!r} and "
             f"{SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID!r}; pass target_profile_id explicitly"
         )
+    if labels == SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE.label_names:
+        return SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE
     if labels == SLOT_POSITION_PROFILE.label_names:
         return SLOT_POSITION_PROFILE
     return TfbsProbeTargetProfile(

@@ -10,22 +10,43 @@ SEQ60 = "A" * 60
 def write_tfbs_stage_b_source_fixture(tmp_path: Path) -> tuple[Path, Path]:
     candidate_path = tmp_path / "records.parquet"
     sidecar_path = tmp_path / "densegen.parquet"
-    pd.DataFrame({"id": [f"id-{idx}" for idx in range(6)], "sequence": [SEQ60] * 6}).to_parquet(
+    details = [
+        # Count stratum: LexA=1, CpxR=0, BaeR=1.
+        _detail("LexA", "BaeR", "background"),
+        _detail("BaeR", "LexA", "background"),
+        _detail("background", "LexA", "BaeR"),
+        _detail("LexA", "background", "BaeR"),
+        _detail("BaeR", "background", "LexA"),
+        _detail("background", "BaeR", "LexA"),
+        # Count stratum: LexA=2, CpxR=0, BaeR=0.
+        _detail("LexA", "LexA", "background"),
+        _detail("LexA", "background", "LexA"),
+        _detail("background", "LexA", "LexA"),
+        # Count stratum: LexA=0, CpxR=2, BaeR=1.
+        _detail("CpxR", "CpxR", "BaeR"),
+        _detail("CpxR", "BaeR", "CpxR"),
+        _detail("BaeR", "CpxR", "CpxR"),
+        # Count stratum: LexA=0, CpxR=0, BaeR=3.
+        _detail("BaeR", "BaeR", "BaeR"),
+        _detail("BaeR", "BaeR", "BaeR"),
+        _detail("BaeR", "BaeR", "BaeR"),
+        # Count stratum: LexA=1, CpxR=1, BaeR=1.
+        _detail("LexA", "CpxR", "BaeR"),
+        _detail("LexA", "BaeR", "CpxR"),
+        _detail("CpxR", "LexA", "BaeR"),
+        _detail("CpxR", "BaeR", "LexA"),
+        _detail("BaeR", "LexA", "CpxR"),
+        _detail("BaeR", "CpxR", "LexA"),
+    ]
+    ids = [f"id-{idx}" for idx in range(len(details))]
+    pd.DataFrame({"id": ids, "sequence": [SEQ60] * len(ids)}).to_parquet(
         candidate_path,
         index=False,
     )
     pd.DataFrame(
         {
-            "id": [f"id-{idx}" for idx in range(6)] + ["sidecar-only"],
-            "densegen__used_tfbs_detail": [
-                _detail("LexA", "BaeR", "background"),
-                _detail("BaeR", "LexA", "background"),
-                _detail("background", "LexA", "BaeR"),
-                _detail("LexA", "background", "BaeR"),
-                _detail("BaeR", "background", "LexA"),
-                _detail("background", "BaeR", "LexA"),
-                _detail("CpxR", "BaeR", "background"),
-            ],
+            "id": [*ids, "sidecar-only"],
+            "densegen__used_tfbs_detail": [*details, _detail("CpxR", "BaeR", "background")],
         }
     ).to_parquet(sidecar_path, index=False)
     return candidate_path, sidecar_path

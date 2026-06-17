@@ -17,15 +17,21 @@ TFBS_LEARNABILITY_SENTINEL_TARGET_SET = _schema.TFBS_LEARNABILITY_SENTINEL_TARGE
 TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_SENTINEL_TARGET_SET = (
     _schema.TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_SENTINEL_TARGET_SET
 )
+TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET = (
+    _schema.TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET
+)
 TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET = _schema.TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET
 TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET = _schema.TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET
 
 _profiles = probe_module("tfbs.profiles")
 CANONICAL_COUNT_FRACTION_PROFILE_ID = _profiles.CANONICAL_COUNT_FRACTION_PROFILE_ID
+SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID = _profiles.SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID
 SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID = _profiles.SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID
 SLOT_POSITION_SENTINEL_PROFILE_ID = _profiles.SLOT_POSITION_SENTINEL_PROFILE_ID
 SLOT_POSITION_PROFILE_ID = _profiles.SLOT_POSITION_PROFILE_ID
 canonical_count_fraction_label_names = _profiles.canonical_count_fraction_label_names
+is_count_fixed_slot_position_profile_id = _profiles.is_count_fixed_slot_position_profile_id
+slot_position_count_fixed_baer_middle_label_names = _profiles.slot_position_count_fixed_baer_middle_label_names
 slot_position_count_fixed_sentinel_label_names = _profiles.slot_position_count_fixed_sentinel_label_names
 slot_position_label_names = _profiles.slot_position_label_names
 slot_position_sentinel_label_names = _profiles.slot_position_sentinel_label_names
@@ -56,12 +62,15 @@ def test_binary_presence_target_uses_expected_scalar_channel_not_plan_similarity
 def test_count_fraction_and_slot_targets_have_explicit_axis_labels() -> None:
     fraction = tfbs_learnability_active_target_spec("lexA_count_fraction")
     slot = tfbs_learnability_active_target_spec("cpxR_or_baeR_in_slot2")
+    baer_middle = tfbs_learnability_active_target_spec("baeR_in_slot1")
 
     assert fraction.label_family_id == "tf_family_count_fraction"
     assert fraction.score_label == "Predicted E[LexA count / 3]"
     assert fraction.score_axis["limits"] == [0.0, 1.0]
     assert slot.label_family_id == "tf_slot_family_presence"
     assert slot.score_label == "Predicted P(CpxR or BaeR in rightmost TFBS slot)"
+    assert baer_middle.label_family_id == "tf_slot_family_presence"
+    assert baer_middle.score_label == "Predicted P(BaeR in middle TFBS slot)"
     assert slot.score_axis["scale_class"] == "tfbs_expected_scalar_unit_interval"
 
 
@@ -89,6 +98,7 @@ def test_tfbs_target_profiles_separate_canonical_positional_and_custom_label_set
         tfbs_target_profile_for_labels(TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET)
     sentinel = tfbs_target_profile_for_profile_id(SLOT_POSITION_SENTINEL_PROFILE_ID).to_manifest()
     count_fixed = tfbs_target_profile_for_profile_id(SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID).to_manifest()
+    baer_middle = tfbs_target_profile_for_profile_id(SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID).to_manifest()
     positional = tfbs_target_profile_for_labels(TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET).to_manifest()
     custom = tfbs_target_profile_for_labels(("lexA_present",)).to_manifest()
 
@@ -116,6 +126,18 @@ def test_tfbs_target_profiles_separate_canonical_positional_and_custom_label_set
     assert count_fixed["canonical"] is False
     assert count_fixed["label_names"] == ["lexA_in_slot0", "cpxR_or_baeR_in_slot2"]
     assert "exactly one target-family motif" in count_fixed["interpretation_boundary"]
+    assert (
+        slot_position_count_fixed_baer_middle_label_names()
+        == TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET
+    )
+    assert baer_middle["profile_id"] == SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID
+    assert baer_middle["profile_role"] == "boundary_stage_b_count_fixed_minimal_placement_probe"
+    assert baer_middle["canonical"] is False
+    assert baer_middle["label_names"] == ["baeR_in_slot1"]
+    assert "BaeR in the middle TFBS slot" in baer_middle["interpretation_boundary"]
+    assert is_count_fixed_slot_position_profile_id(SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID) is True
+    assert is_count_fixed_slot_position_profile_id(SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_PROFILE_ID) is True
+    assert is_count_fixed_slot_position_profile_id(SLOT_POSITION_SENTINEL_PROFILE_ID) is False
     assert slot_position_label_names() == TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET
     assert tfbs_label_names_for_profile_id(SLOT_POSITION_PROFILE_ID) == TFBS_LEARNABILITY_SLOT_POSITION_TARGET_SET
     assert tfbs_target_profile_for_profile_id(SLOT_POSITION_PROFILE_ID).to_manifest() == positional

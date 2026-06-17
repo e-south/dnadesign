@@ -35,7 +35,7 @@ def tfbs_label_display(label_name: object) -> str:
         return f"{_display_regulator(text.removesuffix('_present'))} presence"
     slot_match = re.fullmatch(r"(.+)_in_slot([0-9]+)", text)
     if slot_match:
-        return f"{_display_regulator(slot_match.group(1))} in slot {int(slot_match.group(2))}"
+        return f"{_display_regulator(slot_match.group(1))} in {_slot_display(int(slot_match.group(2)))} slot"
     return _fallback_display(text)
 
 
@@ -113,3 +113,13 @@ def _display_regulator(value: str) -> str:
 def _fallback_display(value: str) -> str:
     words = str(value).replace("_", " ").split()
     return " ".join(_REGULATOR_LABELS.get(word, word[:1].upper() + word[1:]) for word in words) or "TFBS label"
+
+
+def _slot_display(slot_index: int) -> str:
+    if slot_index == 0:
+        return "leftmost"
+    if slot_index == 1:
+        return "middle"
+    if slot_index == 2:
+        return "rightmost"
+    return f"slot {slot_index}"

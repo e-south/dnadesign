@@ -21,6 +21,7 @@ TFBS_SLOT_EVENT_COLUMNS = (
     "lexA_in_slot0",
     "lexA_in_slot1",
     "lexA_in_slot2",
+    "baeR_in_slot1",
     "cpxR_or_baeR_in_slot0",
     "cpxR_or_baeR_in_slot1",
     "cpxR_or_baeR_in_slot2",

@@ -22,7 +22,7 @@ def test_tfbs_label_text_prettifies_literal_labels_without_losing_math() -> None
         "CpxR or BaeR count fraction (combined count / 3)"
     )
     assert tfbs_label_title("lexA_present") == "LexA presence"
-    assert tfbs_label_title("lexA_in_slot0") == "LexA in slot 0"
+    assert tfbs_label_title("lexA_in_slot0") == "LexA in leftmost slot"
 
 
 def test_tfbs_control_text_distinguishes_count_fixed_slot_controls() -> None:

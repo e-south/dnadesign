@@ -164,8 +164,8 @@ def test_tfbs_stage_b_generates_sentinel_configs_from_stage_a_artifacts(tmp_path
         assert cfg.get("training", {}).get("y_ops") in (None, [])
         plot_cfg = yaml.safe_load((config_path.parent / "plots.yaml").read_text(encoding="utf-8"))
         assert plot_cfg["plot_defaults"]["output"]["save_data"] is True
-        assert plot_cfg["plots"][0]["params"]["title"] == (f"Predicted selected-label value by round: {target_label}")
-        assert plot_cfg["plots"][0]["params"]["surface_label"] == (f"Predicted selected-label value: {target_label}")
+        assert plot_cfg["plots"][0]["params"]["title"] == (f"Predicted selected label value by round: {target_label}")
+        assert plot_cfg["plots"][0]["params"]["surface_label"] == (f"Predicted selected label value: {target_label}")
         assert label_name not in plot_cfg["plots"][0]["params"]["title"]
 
         labels = pd.read_parquet(initial_label_input_path)

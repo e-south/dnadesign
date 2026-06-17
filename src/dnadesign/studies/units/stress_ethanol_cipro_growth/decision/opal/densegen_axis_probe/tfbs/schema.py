@@ -36,6 +36,7 @@ TFBS_LEARNABILITY_REQUIRED_LABEL_COLUMNS = (
     "lexA_in_slot0",
     "lexA_in_slot1",
     "lexA_in_slot2",
+    "baeR_in_slot1",
     "cpxR_or_baeR_in_slot0",
     "cpxR_or_baeR_in_slot1",
     "cpxR_or_baeR_in_slot2",
@@ -64,6 +65,7 @@ TFBS_LEARNABILITY_ACTIVE_LABEL_NAMES = (
     "lexA_in_slot0",
     "lexA_in_slot1",
     "lexA_in_slot2",
+    "baeR_in_slot1",
     "cpxR_or_baeR_in_slot0",
     "cpxR_or_baeR_in_slot1",
     "cpxR_or_baeR_in_slot2",
@@ -102,6 +104,7 @@ TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET = (
 TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_SENTINEL_TARGET_SET = (
     *TFBS_LEARNABILITY_SLOT_POSITION_SENTINEL_TARGET_SET,
 )
+TFBS_LEARNABILITY_SLOT_POSITION_COUNT_FIXED_BAER_MIDDLE_TARGET_SET = ("baeR_in_slot1",)
 TFBS_LEARNABILITY_SENTINEL_TARGET_SET = (*TFBS_LEARNABILITY_CANONICAL_COUNT_FRACTION_TARGET_SET,)
 TFBS_LEARNABILITY_NULL_VIABILITY_STATUSES = (
     "PASS",

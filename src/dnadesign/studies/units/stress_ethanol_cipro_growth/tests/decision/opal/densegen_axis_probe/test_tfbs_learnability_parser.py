@@ -27,6 +27,7 @@ def test_parse_densegen_tfbs_row_uses_offset_raw_slots_and_sigma_core_controls()
     assert labels["cpxR_present"] == 0
     assert labels["lexA_count_fraction"] == pytest.approx(1 / 3)
     assert labels["lexA_in_slot0"] == 1
+    assert labels["baeR_in_slot1"] == 1
     assert labels["cpxR_or_baeR_in_slot1"] == 1
     assert labels["cpxR_or_baeR_in_slot2"] == 0
     assert labels["sigma35_offset_raw"] == 0

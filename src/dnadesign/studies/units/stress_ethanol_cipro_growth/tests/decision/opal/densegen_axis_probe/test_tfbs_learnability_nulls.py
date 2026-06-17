@@ -89,6 +89,22 @@ def test_count_fixed_slot_position_null_is_valid_only_inside_fixed_count_scope()
     assert build.labels["candidate_scope_policy_id"].unique().tolist() == ["tfbs_slot_position_target_count_eq_1_v1"]
 
 
+def test_count_fixed_slot_position_null_supports_baer_middle_without_count_shortcut() -> None:
+    labels = _slot_labels()
+
+    build = build_tfbs_slot_position_count_fixed_shuffled_null(labels, label_name="baeR_in_slot1", seed=29)
+
+    assert build.null_viability_report["label_name"] == "baeR_in_slot1"
+    assert build.null_viability_report["null_control_role"] == "count_fixed_shuffled_slot_negative_control"
+    assert build.null_viability_report["negative_control_claim_status"] == "VALID_AS_NEGATIVE_CONTROL"
+    assert build.null_viability_report["target_family_count_column"] == "baeR_count"
+    assert build.null_viability_report["required_count_value"] == 1
+    assert (build.labels["baeR_count"] == 1).all()
+    assert build.labels["baeR_in_slot1"].sum() == labels["baeR_in_slot1"].sum()
+    assert build.labels["baeR_in_slot1"].tolist() != labels["baeR_in_slot1"].tolist()
+    assert build.labels["baeR_in_slot1"].equals(build.labels["slot1_family"].eq("BaeR").astype(int))
+
+
 def test_family_content_null_fails_fast_when_declared_strata_are_not_exchangeable() -> None:
     labels = _content_labels().copy()
     labels["sigma35_variant"] = [f"unique-{idx}" for idx in range(len(labels))]

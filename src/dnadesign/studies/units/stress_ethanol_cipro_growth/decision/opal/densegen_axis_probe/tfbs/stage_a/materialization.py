@@ -23,7 +23,7 @@ from ..nulls import (
     build_tfbs_slot_position_count_fixed_shuffled_null,
 )
 from ..oracle import build_tfbs_learnability_oracle, validate_observed_label_rates
-from ..profiles import SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID, resolve_tfbs_target_profile
+from ..profiles import is_count_fixed_slot_position_profile_id, resolve_tfbs_target_profile
 from ..retention import (
     DEFAULT_RETENTION_MAX_ESTIMATED_BYTES,
     DEFAULT_TFBS_STAGE_ROUNDS,
@@ -247,7 +247,7 @@ def _build_sentinel_nulls(
 ) -> list[TfbsNullBuild]:
     builds: list[TfbsNullBuild] = []
     for label_name in label_names:
-        if target_profile_id == SLOT_POSITION_COUNT_FIXED_SENTINEL_PROFILE_ID:
+        if is_count_fixed_slot_position_profile_id(target_profile_id):
             builds.append(build_tfbs_slot_position_count_fixed_shuffled_null(labels, label_name=label_name, seed=seed))
         elif label_name in TFBS_SLOT_EVENT_COLUMNS:
             builds.append(build_tfbs_slot_geometry_count_matched_null(labels, label_name=label_name, seed=seed))
