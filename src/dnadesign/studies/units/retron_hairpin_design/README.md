@@ -25,7 +25,7 @@ Open source modules by responsibility:
 - `compiler/exceptions.py`: fail-fast compiler exception type.
 - `catalog/`: label parsing, typed `retron_msd_compiler_spec_v1` parsing,
   primitive selectors, and registry loading.
-- `outputs/`: single-unit sequence payloads, output-layout constants,
+- `artifact_contracts/`: single-unit sequence payloads, output-layout constants,
   stale-artifact guards, manifests, GenBank/plot publication, and rasterization.
 - `status/`: study status and preflight provider implementation.
 

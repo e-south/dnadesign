@@ -15,7 +15,7 @@ from pathlib import Path
 
 from dnadesign.contracts.sequence import MsdDesignCatalogV1
 
-from ..outputs.layout import (
+from ..artifact_contracts.layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
     CATALOG_FILENAME,
@@ -24,14 +24,14 @@ from ..outputs.layout import (
     REFERENCE_INDEX_FILENAME,
     VARIANT_DIRNAME,
 )
-from ..outputs.manifests import (
+from ..artifact_contracts.manifests import (
     reference_bundle_filename,
     reference_index_row,
     write_bundle_manifest,
     write_bundle_readme,
     write_reference_index,
 )
-from ..outputs.output_guards import guard_catalog_output_layout
+from ..artifact_contracts.output_guards import guard_catalog_output_layout
 from .exceptions import RetronMsdCompilerError
 
 

@@ -172,11 +172,11 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catal
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/registry.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/sequence_inputs.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/composition_payload.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/output_guards.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/materialized_outputs.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/manifests.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/outputs/layout.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/output_guards.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/materialized_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/manifests.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/layout.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
@@ -310,10 +310,10 @@ budgets = {
     "interfaces/cli/inputs.py": 140,
     "interfaces/cli/io.py": 140,
     "interfaces/cli/messages.py": 180,
-    "outputs/composition_payload.py": 450,
-    "outputs/output_guards.py": 450,
-    "outputs/materialized_outputs.py": 450,
-    "outputs/manifests.py": 450,
+    "artifact_contracts/composition_payload.py": 450,
+    "artifact_contracts/output_guards.py": 450,
+    "artifact_contracts/materialized_outputs.py": 450,
+    "artifact_contracts/manifests.py": 450,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
     "catalog/compiler_spec_io.py": 140,

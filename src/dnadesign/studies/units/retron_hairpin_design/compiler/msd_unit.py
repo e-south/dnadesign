@@ -9,8 +9,8 @@ from typing import Mapping
 
 from dnadesign.contracts.sequence import MsdDesignReferenceV1
 
+from ..artifact_contracts.layout import DEFAULT_FLANK_3P_SUFFIX, DEFAULT_FLANK_5P_PREFIX, SNAPBACK_FOLDBACK_SEGMENT_ID
 from ..catalog.sequence_inputs import validate_dna_sequence
-from ..outputs.layout import DEFAULT_FLANK_3P_SUFFIX, DEFAULT_FLANK_5P_PREFIX, SNAPBACK_FOLDBACK_SEGMENT_ID
 from .exceptions import RetronMsdCompilerError
 
 

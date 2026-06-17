@@ -2359,10 +2359,10 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "catalog/strict_mapping_io.py": 120,
         "catalog/msd_ids.py": 450,
         "catalog/registry.py": 450,
-        "outputs/composition_payload.py": 450,
-        "outputs/output_guards.py": 450,
-        "outputs/materialized_outputs.py": 450,
-        "outputs/manifests.py": 450,
+        "artifact_contracts/composition_payload.py": 450,
+        "artifact_contracts/output_guards.py": 450,
+        "artifact_contracts/materialized_outputs.py": 450,
+        "artifact_contracts/manifests.py": 450,
     }
 
     for filename, max_lines in budgets.items():

@@ -15,14 +15,7 @@ from pathlib import Path
 
 import typer
 
-from ...catalog.compiler_spec import MsdCompilerSpecError, load_msd_compiler_spec
-from ...catalog.msd_ids import MsdIdError
-from ...catalog.registry import RetronMsdRegistryError
-from ...compiler.catalog_bundle import write_msd_design_catalog
-from ...compiler.exceptions import RetronMsdCompilerError
-from ...compiler.materialization import materialize_msd_design_artifacts
-from ...compiler.references import build_msd_design_reference, compile_msd_design_catalog
-from ...outputs.layout import (
+from ...artifact_contracts.layout import (
     BUNDLE_MANIFEST_FILENAME,
     BUNDLE_README_FILENAME,
     CATALOG_FILENAME,
@@ -36,6 +29,13 @@ from ...outputs.layout import (
     REFERENCE_INDEX_FILENAME,
     VARIANT_DIRNAME,
 )
+from ...catalog.compiler_spec import MsdCompilerSpecError, load_msd_compiler_spec
+from ...catalog.msd_ids import MsdIdError
+from ...catalog.registry import RetronMsdRegistryError
+from ...compiler.catalog_bundle import write_msd_design_catalog
+from ...compiler.exceptions import RetronMsdCompilerError
+from ...compiler.materialization import materialize_msd_design_artifacts
+from ...compiler.references import build_msd_design_reference, compile_msd_design_catalog
 from .inputs import collect_labels, merge_sequence_maps, reject_mixed_design_sources, sequence_override_map
 from .io import emit, exit_with_error, format_option
 from .messages import compile_next_step, lint_next_step, materialize_next_step, materialize_warnings

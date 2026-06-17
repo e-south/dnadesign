@@ -88,14 +88,14 @@ base-junction scar-nick work.
 - `src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec_io.py` owns
   fail-fast compiler-spec file loading, including duplicate JSON/YAML mapping-key
   rejection before typed parsing.
-- `src/dnadesign/studies/units/retron_hairpin_design/outputs/composition_payload.py`
+- `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.
-- `src/dnadesign/studies/units/retron_hairpin_design/outputs/output_guards.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/output_guards.py` owns
   fail-fast stale-output guards for the shallow output-bundle layout.
-- `src/dnadesign/studies/units/retron_hairpin_design/outputs/materialized_outputs.py`
+- `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/materialized_outputs.py`
   owns GenBank/plot/manifest artifact publication from Construct output.
-- `src/dnadesign/studies/units/retron_hairpin_design/outputs/manifests.py` owns
+- `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/manifests.py` owns
   catalog, index, manifest, and bundle README writers for that shallow
   output-bundle layout.
 - `src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/app.py` is the thin Typer

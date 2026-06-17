@@ -21,14 +21,13 @@ import yaml
 from dnadesign.construct import run_linear_ssdna_composition
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
-from ..catalog.sequence_inputs import validate_dna_sequence
-from ..outputs.composition_payload import (
+from ..artifact_contracts.composition_payload import (
     composition_config_payload,
     normalize_render_formats,
     render_formats_for_review,
     require_sequence_subcomponents,
 )
-from ..outputs.layout import (
+from ..artifact_contracts.layout import (
     BUNDLE_README_FILENAME,
     COMPOSITION_CONFIG_DIRNAME,
     CONSTRUCT_RUNTIME_DIRNAME,
@@ -44,7 +43,7 @@ from ..outputs.layout import (
     VARIANT_DIRNAME,
     VARIANT_RUNTIME_DIRNAME,
 )
-from ..outputs.manifests import (
+from ..artifact_contracts.manifests import (
     record_with_sequence_artifacts,
     reference_bundle_filename,
     sequence_index_row,
@@ -52,8 +51,9 @@ from ..outputs.manifests import (
     write_sequence_index,
     write_sequence_manifest,
 )
-from ..outputs.materialized_outputs import publish_variant_outputs, run_baserender_jobs
-from ..outputs.output_guards import guard_materialize_output_layout
+from ..artifact_contracts.materialized_outputs import publish_variant_outputs, run_baserender_jobs
+from ..artifact_contracts.output_guards import guard_materialize_output_layout
+from ..catalog.sequence_inputs import validate_dna_sequence
 from .catalog_bundle import write_materialized_catalog
 from .exceptions import RetronMsdCompilerError
 
