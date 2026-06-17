@@ -154,6 +154,7 @@ where = ["src"]
   "studies/retron_hairpin_design/status/ops/status.registry.yaml",
   "studies/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
   "studies/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml",
+  "studies/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/*.yaml",
 ]
 "dnadesign.usr" = [
   "ops/status.registry.yaml",

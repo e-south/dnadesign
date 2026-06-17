@@ -195,6 +195,25 @@ def _motif_score_summary(detail: Any) -> str:
     return ";".join(parts)
 
 
+def _tfbs_regulator_set_from_detail(detail: Any) -> str:
+    regulators = {_regulator_base(entry.get("regulator_base")) for entry in _signal_tfbs(detail)}
+    regulators = {regulator for regulator in regulators if regulator}
+    return "+".join(sorted(regulators, key=lambda item: _REGULATOR_ORDER.get(item, 99)))
+
+
+def _tfbs_regulator_set_from_summary(summary: Any) -> str:
+    raw = _normal_text(summary)
+    if not raw or raw == "none":
+        return ""
+    regulators: set[str] = set()
+    for part in raw.split(";"):
+        token = part.split("@", 1)[0].split(":", 1)[0]
+        regulator = _regulator_base(token)
+        if regulator:
+            regulators.add(regulator)
+    return "+".join(sorted(regulators, key=lambda item: _REGULATOR_ORDER.get(item, 99)))
+
+
 def _ensure_candidate_columns(candidates: pd.DataFrame) -> pd.DataFrame:
     out = candidates.copy()
     if "id" not in out.columns:
@@ -237,6 +256,11 @@ def _ensure_candidate_columns(candidates: pd.DataFrame) -> pd.DataFrame:
         out["motif_score_summary"] = out.get("densegen__used_tfbs_detail", pd.Series([None] * len(out))).map(
             _motif_score_summary
         )
+    if "tfbs_regulators" not in out.columns:
+        if "densegen__used_tfbs_detail" in out.columns:
+            out["tfbs_regulators"] = out["densegen__used_tfbs_detail"].map(_tfbs_regulator_set_from_detail)
+        else:
+            out["tfbs_regulators"] = out["tfbs_summary"].map(_tfbs_regulator_set_from_summary)
     if "x_provenance" not in out.columns:
         out["x_provenance"] = "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
     return out
@@ -322,6 +346,16 @@ def _slot_matches(frame: pd.DataFrame, slot: Mapping[str, Any]) -> pd.Series:
         mask &= frame["regulator_composition"].map(
             lambda value: bool(wanted_any.intersection(set(str(value).split("+"))))
         )
+
+    tfbs_required = slot.get("require_tfbs_regulators_all") or []
+    for regulator in tfbs_required:
+        reg = _regulator_base(regulator)
+        mask &= frame["tfbs_regulators"].map(lambda value: reg in str(value).split("+"))
+
+    tfbs_excluded = slot.get("exclude_tfbs_regulators") or []
+    for regulator in tfbs_excluded:
+        reg = _regulator_base(regulator)
+        mask &= frame["tfbs_regulators"].map(lambda value: reg not in str(value).split("+"))
 
     allowed_sigma = slot.get("allowed_sigma35_variants")
     if allowed_sigma:
@@ -429,6 +463,10 @@ def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.Dat
         column_name = str(column)
         if column_name in frame.columns:
             frame = frame[frame[column_name].isna()].copy()
+    allowed_spacers = filters.get("allowed_spacer_lengths") or []
+    if allowed_spacers:
+        wanted_spacers = {int(value) for value in allowed_spacers}
+        frame = frame[pd.to_numeric(frame["spacer_length"], errors="coerce").isin(wanted_spacers)].copy()
     selected_frames: list[pd.DataFrame] = []
     used_ids: set[str] = set()
 

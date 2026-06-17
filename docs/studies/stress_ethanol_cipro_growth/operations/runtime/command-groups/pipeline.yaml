@@ -292,6 +292,11 @@ study_pipeline:
     progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
     review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
     densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run-root> --json
+    selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json
+    selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --out <selection-set.csv> --format csv --json
+    synthesis_handoff_batch0_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json
+    synthesis_handoff_round_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --write --json
+    synthesis_handoff_round_draft_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <as_of_round> --write --json
     notebook:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true

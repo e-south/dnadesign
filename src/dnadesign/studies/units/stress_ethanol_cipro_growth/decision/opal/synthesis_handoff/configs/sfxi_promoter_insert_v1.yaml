@@ -1,0 +1,5 @@
+name: sfxi_promoter_insert
+version: v1
+left_flank: accgggatcctgcag
+right_flank: tgagggaattcgcga
+expected_core_length: 60

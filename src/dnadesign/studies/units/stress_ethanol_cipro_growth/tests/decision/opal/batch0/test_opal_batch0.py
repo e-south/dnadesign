@@ -88,6 +88,7 @@ def _row(
     *,
     plan: str,
     regulators: str,
+    tfbs_regulators: str | None = None,
     sigma: str = "f",
     spacer: int = 16,
     ethanol: float = 0.2,
@@ -95,6 +96,10 @@ def _row(
     dual: float = 0.2,
     tier: int = 1,
 ) -> dict[str, object]:
+    if tfbs_regulators == "none":
+        tfbs_summary = "none"
+    else:
+        tfbs_summary = ";".join(f"{regulator}@{spacer}" for regulator in (tfbs_regulators or regulators).split("+"))
     return {
         "id": row_id,
         "sequence": "ACGT" * 15,
@@ -107,7 +112,7 @@ def _row(
         "synthetic_margin_cipro_vs_background": cipro,
         "synthetic_margin_dual_vs_background": dual,
         "sig35_margin_f_vs_b": 0.4,
-        "tfbs_summary": f"{regulators}@{spacer}",
+        "tfbs_summary": tfbs_summary,
         "motif_score_summary": f"tier={tier}",
         "tfbs_offset_summary": str(spacer),
         "tfbs_orientation_summary": "fwd",
@@ -272,6 +277,15 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     config = load_sampling_config(SAMPLING)
     rows = [
         _row("eth_baer_f1", plan="ethanol", regulators="baeR", sigma="f", ethanol=0.91),
+        _row("eth_baer_no_tfbs", plan="ethanol", regulators="baeR", tfbs_regulators="none", sigma="f", ethanol=0.99),
+        _row(
+            "eth_baer_with_cpxr_tfbs",
+            plan="ethanol",
+            regulators="baeR",
+            tfbs_regulators="baeR+cpxR",
+            sigma="f",
+            ethanol=0.98,
+        ),
         _row("eth_cpxr_e1", plan="ethanol", regulators="cpxR", sigma="e", ethanol=0.90),
         _row("eth_baer_e2", plan="ethanol", regulators="baeR", sigma="e", ethanol=0.89),
         _row("eth_cpxr_f2", plan="ethanol", regulators="cpxR", sigma="f", ethanol=0.88),
@@ -279,6 +293,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         _row("eth_dual_cpxr", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="f", ethanol=0.86),
         _row("eth_dual_baer", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", ethanol=0.85),
         _row("cip_lexa_f1", plan="ciprofloxacin", regulators="lexA", sigma="f", cipro=0.91),
+        _row("cip_lexa_spacer20_high", plan="ciprofloxacin", regulators="lexA", sigma="f", spacer=20, cipro=1.5),
         _row("cip_lexa_e1", plan="ciprofloxacin", regulators="lexA", sigma="e", cipro=0.90),
         _row("cip_lexa_f2", plan="ciprofloxacin", regulators="lexA", sigma="f", cipro=0.89),
         _row("cip_lexa_e2", plan="ciprofloxacin", regulators="lexA", sigma="e", cipro=0.88),
@@ -291,6 +306,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         _row("and_baer_1", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="f", dual=0.93),
         _row("and_baer_2", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", dual=0.92),
         _row("and_baer_3", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="c", dual=0.91),
+        _row("and_baer_4", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="f", dual=0.90),
         _row("negative_prior", plan="ethanol", regulators="baeR", sigma="f", ethanol=-0.1),
     ]
 
@@ -304,12 +320,23 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     }
     assert not selected["id"].duplicated().any()
     assert "negative_prior" not in set(selected["id"])
+    assert "eth_baer_no_tfbs" not in set(selected["id"])
+    assert "eth_baer_with_cpxr_tfbs" not in set(selected["id"])
+    assert "cip_lexa_spacer20_high" not in set(selected["id"])
+    assert "none" not in set(selected["tfbs_summary"])
+    assert selected["spacer_length"].isin([16, 17, 18, 19]).all()
 
     ethanol = selected[selected["campaign"] == "stress_eth_cip_ethanol_rf_sfxi_topn"]
     assert ethanol["setpoint"].map(tuple).unique().tolist() == [(0, 1, 0, 1)]
     assert ethanol["canonical_densegen_plan"].value_counts().to_dict() == {
         "ethanol": 4,
         "ethanol_ciprofloxacin": 2,
+    }
+    assert ethanol["regulator_composition"].value_counts().to_dict() == {
+        "baeR": 3,
+        "baeR+lexA": 1,
+        "cpxR": 1,
+        "cpxR+lexA": 1,
     }
 
     cipro = selected[selected["campaign"] == "stress_eth_cip_cipro_rf_sfxi_topn"]
@@ -318,16 +345,25 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         "ciprofloxacin": 4,
         "ethanol_ciprofloxacin": 2,
     }
-    assert cipro["regulator_composition"].str.contains("lexA").all()
+    assert cipro["regulator_composition"].value_counts().to_dict() == {
+        "lexA": 4,
+        "baeR+lexA": 1,
+        "cpxR+lexA": 1,
+    }
 
     and_gate = selected[selected["campaign"] == "stress_eth_cip_and_rf_sfxi_topn"]
     assert and_gate["setpoint"].map(tuple).unique().tolist() == [(0, 0, 0, 1)]
     assert and_gate["canonical_densegen_plan"].unique().tolist() == ["ethanol_ciprofloxacin"]
     assert and_gate["regulator_composition"].value_counts().to_dict() == {
-        "baeR+lexA": 3,
-        "cpxR+lexA": 3,
+        "baeR+lexA": 4,
+        "cpxR+lexA": 2,
     }
-    assert and_gate["sigma35_variant"].isin(["c", "d"]).any()
+
+    exploratory = selected[selected["slot"].str.contains("exploratory")]
+    strong = selected[~selected["slot"].str.contains("exploratory")]
+    assert exploratory["sigma35_variant"].isin(["c", "d"]).all()
+    assert strong["sigma35_variant"].isin(["f", "e"]).all()
+    assert "b" not in set(selected["sigma35_variant"])
 
 
 def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_alignment(

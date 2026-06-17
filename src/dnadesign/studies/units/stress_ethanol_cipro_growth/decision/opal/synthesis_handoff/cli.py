@@ -1,0 +1,458 @@
+"""CLI for stress-study OPAL synthesis handoff fixture flows."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+import yaml
+
+from .azenta import render_azenta_workbook, validate_azenta_workbook
+from .batch0_source import (
+    DEFAULT_BATCH0_BATCH_ID,
+    DEFAULT_BATCH0_SELECTION_CONFIG,
+    build_batch0_selected_candidates,
+)
+from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS
+from .contracts import CloningStrategy, SelectedCandidate
+from .exports import campaign_synthesis_output_dir, render_campaign_scoped_exports
+from .manifest import build_synthesis_manifest
+from .opal_round_source import selected_candidates_from_opal_round_campaigns
+from .records import (
+    DEFAULT_SYNTHESIS_HANDOFF_RECORD,
+    SynthesisHandoffRecord,
+    apply_handoff_record_lifecycle,
+    get_synthesis_handoff_record,
+    handoff_record_payload,
+    run_id_by_campaign_from_handoff_record,
+    source_mode_from_handoff_record,
+    validate_manifest_against_handoff_record,
+)
+
+
+def _load_strategy(path: Path) -> CloningStrategy:
+    with path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"strategy config must be a mapping: {path}")
+    return CloningStrategy(
+        name=str(raw["name"]),
+        version=str(raw["version"]),
+        left_flank=str(raw["left_flank"]),
+        right_flank=str(raw["right_flank"]),
+        expected_core_length=int(raw["expected_core_length"]),
+    )
+
+
+def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
+    rows = pd.read_csv(path, dtype=str).fillna("")
+    required = [
+        "campaign_slug",
+        "as_of_round",
+        "run_id",
+        "selection_rank",
+        "id",
+        "sequence",
+        "synthesis_name",
+    ]
+    missing = [column for column in required if column not in rows.columns]
+    if missing:
+        raise ValueError("selected-csv missing required columns: " + ", ".join(missing))
+    selected: list[SelectedCandidate] = []
+    for idx, row in rows.iterrows():
+        selected.append(
+            SelectedCandidate(
+                campaign_slug=str(row["campaign_slug"]),
+                as_of_round=int(row["as_of_round"]),
+                run_id=str(row["run_id"]),
+                selection_rank=int(row["selection_rank"]),
+                id=str(row["id"]),
+                sequence=str(row["sequence"]),
+                synthesis_name=str(row["synthesis_name"]),
+                selection_source=str(row.get("selection_source", "selected_csv")),
+                selection_epoch=str(row.get("selection_epoch", "external_selected_csv") or "external_selected_csv"),
+                assay_batch_index=_optional_int(row.get("assay_batch_index")),
+                model_as_of_round=_optional_int(row.get("model_as_of_round")),
+            )
+        )
+    return selected
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    if pd.isna(value):
+        return None
+    return int(value)
+
+
+def _repo_root_from(path: Path) -> Path:
+    for parent in [path.resolve(), *path.resolve().parents]:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError(f"could not resolve repo root from {path}")
+
+
+def _parse_run_id_args(
+    values: Sequence[str] | None, *, campaign_config_count: int
+) -> tuple[str | None, dict[str, str]]:
+    if not values:
+        return None, {}
+    single: str | None = None
+    by_campaign: dict[str, str] = {}
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            raise ValueError("--run-id values must be non-empty")
+        if "=" in text:
+            campaign_slug, run_id = text.split("=", 1)
+            campaign_slug = campaign_slug.strip()
+            run_id = run_id.strip()
+            if not campaign_slug or not run_id:
+                raise ValueError("--run-id campaign mappings must look like campaign_slug=run_id")
+            by_campaign[campaign_slug] = run_id
+            continue
+        if single is not None:
+            raise ValueError("provide at most one unqualified --run-id")
+        single = text
+    if single is not None and by_campaign:
+        raise ValueError("do not mix unqualified --run-id with campaign_slug=run_id mappings")
+    if single is not None and int(campaign_config_count) != 1:
+        raise ValueError("unqualified --run-id is only valid with one --campaign-config")
+    return single, by_campaign
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Build and validate stress-study OPAL synthesis handoff artifacts.",
+    )
+    parser.add_argument(
+        "--source",
+        choices=("selected-csv", "batch0", "opal-round"),
+        help="Selected-candidate source. Omit for a no-write strategy dry run.",
+    )
+    parser.add_argument(
+        "--handoff-id",
+        help="Checked-in synthesis handoff lifecycle id. Resolves source, batch id, and record checks.",
+    )
+    parser.add_argument(
+        "--record-yaml",
+        type=Path,
+        help="Checked-in synthesis handoff lifecycle record. Defaults to the stress-study record plane.",
+    )
+    parser.add_argument("--selected-csv", type=Path, help="CSV with selected candidate rows.")
+    parser.add_argument(
+        "--batch0-config",
+        type=Path,
+        default=DEFAULT_BATCH0_SELECTION_CONFIG,
+        help="Batch-0 sampling config used when --source batch0.",
+    )
+    parser.add_argument(
+        "--campaign-config",
+        type=Path,
+        action="append",
+        help=(
+            "OPAL campaign config used when --source opal-round. "
+            "Repeat for multiple campaigns; defaults to the three stress SFXI campaign configs."
+        ),
+    )
+    parser.add_argument(
+        "--round",
+        "--as-of-round",
+        dest="as_of_round",
+        type=int,
+        help="OPAL as_of_round used when --source opal-round.",
+    )
+    parser.add_argument(
+        "--run-id",
+        action="append",
+        help=(
+            "Optional OPAL run_id for raw --source opal-round. "
+            "For --handoff-id, record run IDs in the lifecycle record instead."
+        ),
+    )
+    parser.add_argument(
+        "--strategy-yaml",
+        type=Path,
+        default=Path(__file__).parent / "configs" / "sfxi_promoter_insert_v1.yaml",
+        help="YAML cloning strategy config.",
+    )
+    parser.add_argument("--batch-id", help="Synthesis batch identifier.")
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root for campaign-scoped outputs. Defaults from the selected source path or current repo.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Directory for generated artifacts. Campaign-scoped sources write campaign subdirectories here.",
+    )
+    parser.add_argument("--write", action="store_true", help="Write manifest CSV and Azenta workbook outputs.")
+    parser.add_argument("--json", action="store_true", help="Print a JSON summary.")
+    return parser
+
+
+def _summary(payload: dict[str, Any], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    for key, value in payload.items():
+        print(f"{key}: {value}")
+
+
+def _record_path_for(repo_root: Path, explicit_path: Path | None) -> Path:
+    if explicit_path is not None:
+        if explicit_path.is_absolute():
+            return explicit_path
+        return repo_root / explicit_path
+    return repo_root / DEFAULT_SYNTHESIS_HANDOFF_RECORD
+
+
+def _resolve_handoff_record(
+    *,
+    handoff_id: str | None,
+    record_yaml: Path | None,
+    repo_root: Path,
+) -> SynthesisHandoffRecord | None:
+    if handoff_id is None:
+        return None
+    return get_synthesis_handoff_record(_record_path_for(repo_root, record_yaml), handoff_id)
+
+
+def _source_from_args_and_record(
+    *,
+    source: str | None,
+    selected_csv: Path | None,
+    handoff_record: SynthesisHandoffRecord | None,
+) -> tuple[str | None, int | None]:
+    inferred_round: int | None = None
+    if source is None and selected_csv is not None:
+        source = "selected-csv"
+    if handoff_record is None:
+        return source, inferred_round
+    if selected_csv is not None:
+        raise ValueError("--handoff-id cannot be combined with --selected-csv")
+    record_source, inferred_round = source_mode_from_handoff_record(handoff_record)
+    if source is None:
+        return record_source, inferred_round
+    if source != record_source:
+        raise ValueError(
+            f"--source {source!r} conflicts with handoff record source {record_source!r} "
+            f"for {handoff_record.handoff_id}"
+        )
+    return source, inferred_round
+
+
+def _batch_id_from_source(
+    *,
+    source: str,
+    args_batch_id: str | None,
+    handoff_record: SynthesisHandoffRecord | None,
+    as_of_round: int | None,
+) -> str:
+    if handoff_record is not None:
+        if args_batch_id is not None and args_batch_id != handoff_record.handoff_id:
+            raise ValueError(
+                f"--batch-id {args_batch_id!r} conflicts with handoff record id {handoff_record.handoff_id!r}"
+            )
+        return handoff_record.handoff_id
+    if source == "batch0":
+        return args_batch_id or DEFAULT_BATCH0_BATCH_ID
+    if source == "opal-round":
+        if as_of_round is None:
+            raise ValueError("--round is required when --source opal-round")
+        return args_batch_id or f"stress-opal-r{int(as_of_round)}-sfxi-v1"
+    return args_batch_id or "stress-opal-synthesis-batch"
+
+
+def _validate_record_manifest(
+    *,
+    manifest: pd.DataFrame,
+    handoff_record: SynthesisHandoffRecord | None,
+    strategy_id: str,
+) -> dict[str, Any] | None:
+    if handoff_record is None:
+        return None
+    return validate_manifest_against_handoff_record(
+        manifest,
+        handoff_record,
+        strategy_id=strategy_id,
+    )
+
+
+def _run_ids_for_opal_round_source(
+    *,
+    args_run_id: Sequence[str] | None,
+    campaign_config_count: int,
+    handoff_record: SynthesisHandoffRecord | None,
+) -> tuple[str | None, dict[str, str]]:
+    if handoff_record is None:
+        return _parse_run_id_args(
+            args_run_id,
+            campaign_config_count=campaign_config_count,
+        )
+    if args_run_id:
+        raise ValueError("--handoff-id records OPAL run IDs; do not also pass --run-id")
+    return None, run_id_by_campaign_from_handoff_record(handoff_record)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    fallback_repo_root = args.repo_root or _repo_root_from(Path.cwd())
+    try:
+        handoff_record = _resolve_handoff_record(
+            handoff_id=args.handoff_id,
+            record_yaml=args.record_yaml,
+            repo_root=fallback_repo_root,
+        )
+        source, inferred_as_of_round = _source_from_args_and_record(
+            source=args.source,
+            selected_csv=args.selected_csv,
+            handoff_record=handoff_record,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    as_of_round = args.as_of_round if args.as_of_round is not None else inferred_as_of_round
+    if handoff_record is not None and inferred_as_of_round is not None and args.as_of_round is not None:
+        if int(args.as_of_round) != int(inferred_as_of_round):
+            parser.error(
+                f"--round {args.as_of_round} conflicts with handoff record model_as_of_round {inferred_as_of_round}"
+            )
+
+    if source is None:
+        if args.write:
+            parser.error("--source batch0, --source opal-round, or --selected-csv is required when --write is set")
+        strategy = _load_strategy(args.strategy_yaml)
+        _summary(
+            {
+                "status": "ok",
+                "mode": "dry_run_helpful_noop",
+                "strategy_id": strategy.strategy_id,
+                "batch0_default_batch_id": DEFAULT_BATCH0_BATCH_ID,
+                "opal_round_default_campaign_configs": [str(path) for path in DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS],
+                "note": "provide --source batch0, --source opal-round, or --selected-csv to build a manifest",
+            },
+            as_json=bool(args.json),
+        )
+        return 0
+
+    strategy = _load_strategy(args.strategy_yaml)
+    try:
+        batch_id = _batch_id_from_source(
+            source=source,
+            args_batch_id=args.batch_id,
+            handoff_record=handoff_record,
+            as_of_round=as_of_round,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    source_report: dict[str, Any] = {}
+    if source == "batch0":
+        repo_root = args.repo_root or _repo_root_from(args.batch0_config)
+        try:
+            selected, source_report = build_batch0_selected_candidates(
+                config_path=args.batch0_config,
+                repo_root=repo_root,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+    elif source == "opal-round":
+        repo_root = args.repo_root or _repo_root_from(Path.cwd())
+        campaign_configs = args.campaign_config or [repo_root / path for path in DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS]
+        try:
+            run_id, run_id_by_campaign = _run_ids_for_opal_round_source(
+                args_run_id=args.run_id,
+                campaign_config_count=len(campaign_configs),
+                handoff_record=handoff_record,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        try:
+            selected, source_report = selected_candidates_from_opal_round_campaigns(
+                campaign_configs,
+                as_of_round=int(as_of_round),
+                run_id=run_id,
+                run_id_by_campaign=run_id_by_campaign,
+                repo_root=repo_root,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+    else:
+        if args.selected_csv is None:
+            parser.error("--selected-csv is required when --source selected-csv")
+        repo_root = args.repo_root
+        try:
+            selected = _selected_from_csv(args.selected_csv)
+        except ValueError as exc:
+            parser.error(str(exc))
+
+    if handoff_record is not None:
+        selected = apply_handoff_record_lifecycle(selected, handoff_record)
+
+    try:
+        manifest = build_synthesis_manifest(selected=selected, strategy=strategy, batch_id=batch_id)
+        record_manifest_validation = _validate_record_manifest(
+            manifest=manifest,
+            handoff_record=handoff_record,
+            strategy_id=strategy.strategy_id,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    campaign_counts = manifest.groupby("campaign_slug", sort=False).size().astype(int).to_dict()
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "mode": "validated",
+        "source": source,
+        "batch_id": batch_id,
+        "row_count": int(len(manifest)),
+        "campaign_counts": campaign_counts,
+        "strategy_id": strategy.strategy_id,
+    }
+    if source_report:
+        payload["source_report"] = source_report
+
+    if args.write:
+        if source in {"batch0", "opal-round"}:
+            campaign_exports = render_campaign_scoped_exports(
+                manifest,
+                batch_id=batch_id,
+                repo_root=repo_root,
+                output_root=args.output_dir,
+            )
+            payload["mode"] = "written"
+            payload["campaign_exports"] = campaign_exports.to_dict("records")
+        elif args.output_dir is None:
+            parser.error("--output-dir is required when --write is set")
+        else:
+            args.output_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path = args.output_dir / "synthesis_manifest.csv"
+            workbook_path = args.output_dir / "azenta_gene_synthesis.xlsx"
+            manifest.to_csv(manifest_path, index=False)
+            render_azenta_workbook(manifest, workbook_path)
+            payload["mode"] = "written"
+            payload["manifest_path"] = str(manifest_path)
+            payload["azenta_workbook_path"] = str(workbook_path)
+            payload["azenta_validation"] = validate_azenta_workbook(manifest, workbook_path)
+    elif source in {"batch0", "opal-round"}:
+        root = repo_root or args.repo_root or _repo_root_from(Path.cwd())
+        payload["default_campaign_output_dirs"] = {
+            campaign: str(campaign_synthesis_output_dir(root, campaign_slug=campaign, batch_id=batch_id))
+            for campaign in campaign_counts
+        }
+    if handoff_record is not None:
+        root = repo_root or fallback_repo_root
+        payload["handoff_record"] = handoff_record_payload(handoff_record, repo_root=root)
+        payload["handoff_record"]["manifest_validation"] = record_manifest_validation
+
+    _summary(payload, as_json=bool(args.json))
+    return 0

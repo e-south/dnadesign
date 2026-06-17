@@ -8,6 +8,7 @@ study.
 
 - `campaign.yaml`: progress manifest for the study record
 - `datasets.yaml`: study-affiliated dataset registry and sync posture
+- `synthesis_handoffs.yaml`: physical synthesis handoff lifecycle registry
 - `status.md`: current state, blockers, and next actions
 
 Use `../routes/README.md` for owner-surface navigation and
