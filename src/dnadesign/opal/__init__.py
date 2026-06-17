@@ -31,6 +31,7 @@ _PUBLIC_EXPORTS = {
     "describe_plot_kind": ".src.registries.plots",
     "enforce_x_matrix_memory_budget": ".src.runtime.memory_guard",
     "estimate_x_matrix_memory": ".src.runtime.memory_guard",
+    "frozen_round0_scores": ".src.analysis.learning_loop_baselines",
     "latest_round": ".src.analysis.ledger",
     "latest_run_id": ".src.analysis.ledger",
     "list_configured_plot_specs": ".src.plots.config",

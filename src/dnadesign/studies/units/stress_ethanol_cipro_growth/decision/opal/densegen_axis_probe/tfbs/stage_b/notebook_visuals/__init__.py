@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .portfolio import (
+    TfbsStageBLearningLoopPortfolioSource,
     TfbsStageBReviewPortfolioResult,
     TfbsStageBReviewPortfolioSource,
     write_tfbs_stage_b_review_portfolio,
@@ -22,6 +23,7 @@ from .specs import (
 
 __all__ = [
     "StageBNotebookVisualSpec",
+    "TfbsStageBLearningLoopPortfolioSource",
     "TfbsStageBReviewPortfolioResult",
     "TfbsStageBReviewPortfolioSource",
     "maybe_register_tfbs_stage_b_realized_review_visuals",

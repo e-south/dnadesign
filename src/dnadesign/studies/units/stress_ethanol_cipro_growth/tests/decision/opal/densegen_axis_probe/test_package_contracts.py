@@ -112,6 +112,8 @@ def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
         stage_b_root / "review",
         stage_b_root / "review" / "plots",
         stage_b_root / "notebook_visuals",
+        stage_b_root / "learning_loop_baselines",
+        stage_b_root / "learning_loop_baselines" / "plots",
     )
 
     assert not (stage_b_root / "configs.py").exists()
@@ -120,6 +122,7 @@ def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
     assert not (stage_b_root / "review_plots.py").exists()
     assert not (stage_b_root / "notebook_visuals.py").exists()
     assert not (stage_b_root / "notebook_visual_specs.py").exists()
+    assert not (stage_b_root / "learning_loop_baselines.py").exists()
     assert all(path.is_dir() for path in semantic_packages)
 
     module_lengths = {

@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping
 from .contracts import COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION
 from .entries import visual_entries
 from .io import read_json, read_realized_plot_manifest, require_existing_file
+from .learning_loop import TfbsStageBLearningLoopPortfolioSource, namespaced_learning_loop_visuals
 from .specs import slug_token
 
 REPLICATED_REVIEW_SCHEMA_VERSION = "stress_ethanol_cipro_growth.tfbs_stage_b_replicated_review.v1"
@@ -29,7 +30,10 @@ EVIDENCE_TIER_RANKS = {
 }
 _CURRENT_TIER_PROFILE_ROLES = {
     "current_claim": {"canonical_stage_b_probe"},
-    "current_boundary": {"boundary_stage_b_count_fixed_sentinel_probe"},
+    "current_boundary": {
+        "boundary_stage_b_count_fixed_minimal_placement_probe",
+        "boundary_stage_b_count_fixed_sentinel_probe",
+    },
 }
 
 
@@ -66,6 +70,7 @@ def write_tfbs_stage_b_review_portfolio(
     *,
     out_dir: str | Path,
     collection_id: str,
+    learning_loop_sources: Iterable[TfbsStageBLearningLoopPortfolioSource] = (),
 ) -> TfbsStageBReviewPortfolioResult:
     """Write a combined OPAL collection manifest and visual index for replicated TFBS reviews."""
 
@@ -80,6 +85,14 @@ def write_tfbs_stage_b_review_portfolio(
     visuals: list[dict[str, Any]] = []
     for source in source_rows:
         visuals.extend(_namespaced_source_visuals(source))
+    for source in list(learning_loop_sources):
+        visuals.extend(
+            namespaced_learning_loop_visuals(
+                source,
+                evidence_tier_labels=EVIDENCE_TIER_LABELS,
+                evidence_tier_ranks=EVIDENCE_TIER_RANKS,
+            )
+        )
     _fail_on_duplicate_visual_keys(visuals)
     comparison_sets = _comparison_sets_from_visuals(visuals)
     evidence_tiers = _evidence_tiers_from_visuals(visuals)
@@ -262,11 +275,12 @@ def _apply_evidence_tier_narrative(visual: dict[str, Any], *, source_label: str,
         f"Diagnostic surface: {source_label} documents a control or confound check, not the current claim evidence."
     )
     visual["claim_boundary"] = (
-        "Diagnostic only: use this surface to explain probe limitations and design choices, not as the headline "
-        "negative-control evidence."
+        "Diagnostic only: use this surface to explain probe limitations, boundary cases, and design choices; do not "
+        "treat it as clean negative-control evidence."
     )
     visual["interpretation_note"] = (
-        "This diagnostic surface remains visible for data fidelity, but it is not part of the current claim tier."
+        "This diagnostic remains visible to show known confounds and boundary cases; it is not part of the "
+        "current claim tier."
     )
 
 
@@ -306,6 +320,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 __all__ = [
+    "TfbsStageBLearningLoopPortfolioSource",
     "TfbsStageBReviewPortfolioResult",
     "TfbsStageBReviewPortfolioSource",
     "write_tfbs_stage_b_review_portfolio",
