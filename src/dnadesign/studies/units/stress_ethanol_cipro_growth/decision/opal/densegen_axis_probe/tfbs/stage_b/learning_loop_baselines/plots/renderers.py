@@ -215,10 +215,10 @@ def _plot_endpoint_adaptive_gain(frame: pd.DataFrame, path: Path) -> None:
             frameon=False,
             fontsize=REVIEW_LEGEND_FONTSIZE,
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.14),
+            bbox_to_anchor=(0.5, -0.10),
             ncols=1,
         )
-    fig.subplots_adjust(left=0.18, right=0.94, top=0.84, bottom=0.26)
+    fig.subplots_adjust(left=0.22, right=0.94, top=0.84, bottom=0.30)
     fig.savefig(path, dpi=160, facecolor="white")
     plt.close(fig)
 

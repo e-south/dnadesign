@@ -97,5 +97,4 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   TFBS identity, family, count, density, order, spacing, orientation, core
   promoter variant, and distance-to-element metadata.
 - DenseGen probe conclusions stay separate from measured promoter-function
-  claims; UMAP may display architecture clusters but must not define AND-like or
-  OR-like labels.
+  claims; UMAP can show architecture clusters but must not define response labels.
