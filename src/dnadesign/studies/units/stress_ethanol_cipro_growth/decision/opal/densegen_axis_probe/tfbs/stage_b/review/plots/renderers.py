@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import fill
-from types import MappingProxyType
-from typing import Mapping
 
 import pandas as pd
 
@@ -22,6 +20,7 @@ from .contracts import RealizedReviewRenderer
 from .display_text import (
     INITIAL_BATCH_TICK_LABEL,
     NO_ENRICHMENT_BASELINE_LABEL,
+    SAME_BATCH_TOP_K_REFERENCE_LABEL,
     TRAJECTORY_X_AXIS_LABEL,
     plot_manifest_title,
     positive_null_summary_subtitle,
@@ -30,6 +29,7 @@ from .display_text import (
     trajectory_plot_subtitle,
     trajectory_y_axis_label,
 )
+from .registry import build_realized_review_renderer_registry
 from .statistics import (
     replicate_column,
     replicate_round_summary,
@@ -41,27 +41,8 @@ from .statistics import (
 
 _TITLE_Y = 0.965
 _SUBTITLE_Y = 0.855
-_TRAJECTORY_LAYOUT = {"left": 0.17, "right": 0.91, "top": 0.805, "bottom": 0.23}
-_SUMMARY_LAYOUT = {"left": 0.18, "right": 0.92, "top": 0.805, "bottom": 0.24}
-_LEGEND_ROW_ANCHOR_Y = -0.16
-
-
-def build_realized_review_renderer_registry(
-    renderers: Mapping[str, RealizedReviewRenderer],
-) -> Mapping[str, RealizedReviewRenderer]:
-    """Build a fail-fast realized-label renderer registry keyed by visual kind."""
-
-    registry: dict[str, RealizedReviewRenderer] = {}
-    for kind, renderer in renderers.items():
-        token = str(kind).strip()
-        if not token:
-            raise ValueError("Stage B realized review renderer kind must be nonempty")
-        if token in registry:
-            raise ValueError(f"Duplicate Stage B realized review renderer kind: {token}")
-        registry[token] = renderer
-    if not registry:
-        raise ValueError("Stage B realized review renderer registry must not be empty")
-    return MappingProxyType(registry)
+_TRAJECTORY_LAYOUT = {"left": 0.27, "right": 0.84, "top": 0.79, "bottom": 0.29}
+_SUMMARY_LAYOUT = {"left": 0.18, "right": 0.93, "top": 0.79, "bottom": 0.25}
 
 
 def realized_review_renderer(spec: StageBNotebookVisualSpec) -> RealizedReviewRenderer:
@@ -77,16 +58,12 @@ REALIZED_REVIEW_RENDERERS = build_realized_review_renderer_registry(
     {
         "realized_label_lift_trajectory": (
             lambda trajectory, pair_summary, path, label_name: _plot_lift_trajectory(
-                trajectory,
-                path,
-                label_name=label_name,
+                trajectory, path, label_name=label_name
             )
         ),
         "positive_null_lift_summary": (
             lambda trajectory, pair_summary, path, label_name: _plot_positive_null_summary(
-                pair_summary,
-                path,
-                label_name=label_name,
+                pair_summary, path, label_name=label_name
             )
         ),
     }
@@ -96,7 +73,14 @@ REALIZED_REVIEW_RENDERERS = build_realized_review_renderer_registry(
 def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -> None:
     import matplotlib.pyplot as plt
 
-    required = {"label_name", "oracle_role", "round", "selected_true_lift_ratio", "seed_true_lift_ratio"}
+    required = {
+        "label_name",
+        "oracle_role",
+        "round",
+        "same_batch_top_lift_ratio",
+        "selected_true_lift_ratio",
+        "seed_true_lift_ratio",
+    }
     missing = sorted(required - set(frame.columns))
     if missing:
         raise ValueError(f"Stage B lift trajectory plot missing column(s): {missing}")
@@ -117,7 +101,7 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
         role_summary = replicate_round_summary(sub_role)
         has_spread = bool(role_summary["replicate_count"].max() > 1)
         seed_lift = seed_lift_summary(sub_role)
-        role_label = role_display_label(
+        role_label = _legend_role_label(
             role,
             label_name=label_name,
             control_role=_control_role_for_label(sub_role),
@@ -174,7 +158,16 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
                 alpha=0.72,
                 zorder=3,
             )
+    top_lift = _same_batch_top_k_lift(sub_label)
     ax.axhline(1.0, color="#222222", linewidth=0.9, linestyle="--", label=NO_ENRICHMENT_BASELINE_LABEL)
+    ax.axhline(
+        top_lift,
+        color="#5F7F5F",
+        linewidth=1.2,
+        linestyle=":",
+        label=SAME_BATCH_TOP_K_REFERENCE_LABEL,
+        zorder=2,
+    )
     ax.set_xlim(left=-1.5)
     ax.margins(y=0.08)
     style_review_axis(ax, square=True)
@@ -202,16 +195,7 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
         color="#4D555C",
     )
     _set_trajectory_round_ticks(ax, df)
-    ax.legend(
-        frameon=False,
-        fontsize=REVIEW_LEGEND_FONTSIZE,
-        loc="upper center",
-        bbox_to_anchor=(0.5, _LEGEND_ROW_ANCHOR_Y),
-        ncols=3,
-        columnspacing=1.2,
-        handlelength=1.5,
-        handletextpad=0.5,
-    )
+    _legend_below_figure(fig, ax, ncols=2)
     fig.savefig(path, dpi=160, facecolor="white")
     plt.close(fig)
 
@@ -284,15 +268,7 @@ def _plot_positive_null_summary(frame: pd.DataFrame, path: Path, *, label_name: 
         color="#4D555C",
     )
     if final_summary["replicate_count"] > 1 or auc_summary["replicate_count"] > 1:
-        ax.legend(
-            frameon=False,
-            fontsize=REVIEW_LEGEND_FONTSIZE,
-            loc="upper center",
-            bbox_to_anchor=(0.5, _LEGEND_ROW_ANCHOR_Y),
-            ncols=1,
-            handlelength=1.5,
-            handletextpad=0.5,
-        )
+        _legend_below_figure(fig, ax, ncols=1)
     fig.savefig(path, dpi=160, facecolor="white")
     plt.close(fig)
 
@@ -314,7 +290,7 @@ def _set_trajectory_round_ticks(ax: object, df: pd.DataFrame) -> None:
 
 
 def _plot_title(text: str) -> str:
-    return fill(str(text), width=42, break_long_words=False)
+    return fill(str(text), width=34, break_long_words=False)
 
 
 def _single_nonempty(values: object) -> str:
@@ -331,3 +307,38 @@ def _control_role_for_label(frame: pd.DataFrame) -> str:
     if role:
         return role
     return _single_nonempty(frame["null_control_role"])
+
+
+def _legend_role_label(role: object, *, label_name: object, control_role: object | None = None) -> str:
+    role_text = str(role)
+    if role_text == "matched_null" and str(control_role or "") == "count_fixed_shuffled_slot_negative_control":
+        return "Shuffled-slot control"
+    return role_display_label(role, label_name=label_name, control_role=control_role)
+
+
+def _legend_below_figure(fig: object, ax: object, *, ncols: int) -> None:
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles, strict=False))
+    fig.legend(
+        by_label.values(),
+        by_label.keys(),
+        frameon=False,
+        fontsize=REVIEW_LEGEND_FONTSIZE,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.040),
+        ncols=min(int(ncols), max(1, len(by_label))),
+        columnspacing=0.9,
+        handlelength=1.4,
+        handletextpad=0.45,
+    )
+
+
+def _same_batch_top_k_lift(frame: pd.DataFrame) -> float:
+    """Return the plotted same-batch top-label lift for a label trajectory."""
+
+    positive = frame.loc[frame["oracle_role"].astype(str) == "positive", "same_batch_top_lift_ratio"]
+    source = positive if not positive.empty else frame["same_batch_top_lift_ratio"]
+    values = pd.to_numeric(source, errors="raise").dropna()
+    if values.empty:
+        raise ValueError("Stage B lift trajectory has no same_batch_top_lift_ratio values")
+    return float(values.mean())

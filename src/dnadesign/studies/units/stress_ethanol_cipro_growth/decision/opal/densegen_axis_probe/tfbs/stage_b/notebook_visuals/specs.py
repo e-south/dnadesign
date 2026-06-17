@@ -216,7 +216,7 @@ REALIZED_REVIEW_VISUAL_SPECS = build_visual_spec_registry(
         StageBNotebookVisualSpec(
             kind="realized_label_lift_trajectory",
             visual_id_template="tfbs_stage_b_{label_slug}_selected_label_lift_trajectory",
-            label="Selected-label enrichment trajectory",
+            label="Selected label enrichment trajectory",
             group_key="label_oracle_kind",
             metric_name="selected_label_lift_ratio",
             metric_label="Enrichment vs candidate pool",
@@ -227,13 +227,13 @@ REALIZED_REVIEW_VISUAL_SPECS = build_visual_spec_registry(
                 "Per-round top-k selected-batch label mean divided by candidate-pool label mean. Round 0 is the "
                 "first acquired batch after the shared initial IDs. Count-fraction labels use target TFBS count / "
                 "3; slot-position labels use y=1 when the target family is in the requested slot. Encoding: "
-                "bold line = mean, band = sample SD, faint lines = seeds."
+                "bold line = mean, band = sample SD, faint lines = seeds, dotted line = same-batch top-K reference."
             ),
             plot_filename_template="{label_slug}__selected_label_lift_trajectory.png",
             plot_title_template="{label_title} enrichment vs candidate pool",
             alt_text=(
-                "{label_title} selected-batch enrichment versus the candidate pool; round 0 is the first acquired "
-                "batch after the shared start."
+                "{label_title} selected-batch enrichment vs pool; round 0 follows the shared start; dotted line is "
+                "the same-batch top-K reference."
             ),
         ),
         StageBNotebookVisualSpec(
@@ -272,7 +272,7 @@ SLOT_DIAGNOSTIC_VISUAL_SPECS = build_visual_spec_registry(
             tidy_source="trajectory",
             caption=(
                 "Selected target-family count by round for slot-label campaigns. A null/control can look strong "
-                "when OPAL selects rows with high target-family count rather than learning slot position."
+                "when selected rows have high target-family count rather than the requested slot-position label."
             ),
             plot_filename_template="slot_target_count_mean_trajectory.png",
             plot_title_template="Selected target-family count over rounds",

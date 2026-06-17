@@ -24,6 +24,7 @@ REALIZED_REVIEW_STYLE_CONTRACT = {
     "font_scale": "unified_review_body_font_for_ticks_axes_subtitle_legend",
     "square_axes": "where_data_shape_supports_it",
     "trajectory_axes": "square",
+    "trajectory_reference_lines": ["baseline", "same_batch_top_k_reference"],
 }
 
 RealizedReviewRenderer = Callable[[pd.DataFrame, pd.DataFrame, Path, str], None]

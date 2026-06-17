@@ -56,11 +56,14 @@ def test_stage_b_replicated_review_aggregates_seed_pair_rows_before_claims(tmp_p
     assert plot_manifest["text_contract"]["interval"] == (
         "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI"
     )
-    assert plot_manifest["text_contract"]["legend_layout"] == "single row below the plot"
+    assert (
+        plot_manifest["text_contract"]["legend_layout"] == "legend below the plot; wrap when needed to avoid clipping"
+    )
     assert plot_manifest["text_contract"]["subtitle_layout"] == "centered single-line subtitle"
     assert plot_manifest["text_contract"]["title_alignment"] == "centered title; title may wrap, subtitle must not wrap"
-    assert "selected-batch enrichment versus the candidate pool" in plot_manifest["plots"][0]["alt_text"]
-    assert "Round 0 is the first acquired batch after the shared start" in plot_manifest["plots"][0]["alt_text"]
+    assert "selected-batch enrichment vs pool" in plot_manifest["plots"][0]["alt_text"]
+    assert "Round 0 follows the shared start" in plot_manifest["plots"][0]["alt_text"]
+    assert "same-batch top-K reference" in plot_manifest["plots"][0]["alt_text"]
     assert len(plot_manifest["plots"][0]["alt_text"]) < 220
     visible_text = " ".join(str(plot[field]) for plot in plot_manifest["plots"] for field in ("title", "alt_text"))
     assert "oracle" not in visible_text.lower()

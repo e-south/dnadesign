@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from PIL import Image
 
+from .helpers import _dark_edge_pixel_count
 from .probe_modules import probe_module
 
 build_tfbs_stage_b_slot_diagnostics = probe_module(
@@ -48,6 +50,8 @@ def test_stage_b_slot_diagnostics_report_count_confound_and_restricted_lift(tmp_
         "tick_style": "styled_outward_ticks",
         "font_scale": "larger_review_tick_and_axis_labels",
         "square_axes": "where_data_shape_supports_it",
+        "trajectory_layout": "single_row_square_panels_for_label_trajectories",
+        "legend_layout": "single row below the plot",
     }
     assert [plot["kind"] for plot in plot_manifest["plots"]] == [
         "slot_target_count_mean_trajectory",
@@ -56,6 +60,9 @@ def test_stage_b_slot_diagnostics_report_count_confound_and_restricted_lift(tmp_
     ]
     assert plot_manifest["plots"][2]["title"] == "Count-stratified positive-minus-null slot lift"
     assert plot_manifest["plots"][2]["alt_text"].startswith("Bar plot comparing final")
+    for plot in plot_manifest["plots"]:
+        image = Image.open(plot["path"]).convert("RGB")
+        assert _dark_edge_pixel_count(image) == 0
 
     selected_dist = count_distribution.query(
         "campaign_key == 'lexA_in_slot0_positive' and round == 1 and target_count == 1"

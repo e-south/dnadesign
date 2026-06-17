@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from ....label_text import (
     tfbs_control_display_label,
-    tfbs_control_pair_label,
     tfbs_label_compact_title,
     tfbs_label_expression,
     tfbs_label_title,
@@ -12,11 +11,16 @@ from ....label_text import (
 
 NO_ENRICHMENT_BASELINE_LABEL = "Baseline"
 NO_ENRICHMENT_BASELINE_CONTRACT = "No enrichment: selected mean = full candidate-pool mean"
+SAME_BATCH_TOP_K_REFERENCE_LABEL = "Same-batch top-K reference"
+SAME_BATCH_TOP_K_REFERENCE_CONTRACT = (
+    "Same-batch top-K reference: mean of the top selection_k label values in the candidate pool divided by "
+    "the same pool mean used for plotted lift. This is a reference ceiling, not an observed campaign."
+)
 TRAJECTORY_X_AXIS_LABEL = "Round"
 INITIAL_BATCH_TICK_LABEL = "Shared\nstart"
 TRAILING_TRAJECTORY_NOTE = (
-    "Faint lines = individual seeds; bold line = mean selected batch; squares = shared start; dashed line = no "
-    "enrichment."
+    "Faint lines = individual seeds; bold line = mean selected batch; squares = shared start; dashed = baseline; "
+    "dotted = same-batch top-K reference."
 )
 REALIZED_REVIEW_TEXT_CONTRACT = {
     "baseline": NO_ENRICHMENT_BASELINE_CONTRACT,
@@ -26,7 +30,7 @@ REALIZED_REVIEW_TEXT_CONTRACT = {
     ),
     "initial_batch": "square markers are the same initial IDs scored by each label source before round 0",
     "interval": "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI",
-    "legend_layout": "single row below the plot",
+    "legend_layout": "legend below the plot; wrap when needed to avoid clipping",
     "pairing": ("DenseGen-label and control campaigns share initial selected IDs; only the label table differs"),
     "role_labels": "DenseGen label versus profile-appropriate matched control",
     "selected_label_values": (
@@ -34,9 +38,10 @@ REALIZED_REVIEW_TEXT_CONTRACT = {
         "controls this is a control-label value, not post hoc DenseGen truth"
     ),
     "trajectory_semantics": (
-        "line points are per-round top-k acquired selected batches; round 0 is the first acquired batch after the "
+        "line points are per-round top-k selected batches; round 0 is the first acquired batch after the "
         "shared initial IDs, not the initial seed batch"
     ),
+    "same_batch_top_k_reference": SAME_BATCH_TOP_K_REFERENCE_CONTRACT,
     "subtitle_layout": "centered single-line subtitle",
     "title_alignment": "centered title; title may wrap, subtitle must not wrap",
     "type_scale": "axis labels, tick labels, subtitle, and legend use the same review body size",
@@ -71,13 +76,11 @@ def trajectory_plot_subtitle(
 
     seed_phrase = _paired_seed_run_phrase(replicate_count)
     if _is_slot_label(label_name):
+        if str(control_role or "") == "count_fixed_shuffled_slot_negative_control":
+            return f"DenseGen vs shuffled-slot control; count fixed; {seed_phrase}"
         control = tfbs_control_display_label(control_role, label_name=label_name)
-        return f"DenseGen slot label vs {control} across {seed_phrase}"
-    control_pair = tfbs_control_pair_label(
-        control_role or "matched_label_permutation_negative_control",
-        label_name=label_name,
-    )
-    return f"{control_pair} across {seed_phrase}"
+        return f"DenseGen vs {control}; {seed_phrase}"
+    return f"DenseGen vs scrambled control; {seed_phrase}"
 
 
 def label_definition(label_name: object) -> str:
@@ -108,7 +111,10 @@ def trajectory_encoding_note(*, replicate_count: int) -> str:
 
     if replicate_count > 1:
         return TRAILING_TRAJECTORY_NOTE
-    return "Line = selected batch trajectory; square = shared initial IDs before round 0; dashed line = no enrichment."
+    return (
+        "Line = selected batch trajectory; square = shared initial IDs before round 0; "
+        "dashed = baseline; dotted = same-batch top-K reference."
+    )
 
 
 def seed_run_sample_sd_label(*, replicate_count: int) -> str:
@@ -164,9 +170,10 @@ def plot_manifest_alt_text(
     if kind == "realized_label_lift_trajectory":
         interval = "band=SD" if replicate_count > 1 else "single seed run"
         return (
-            f"{label_title} selected-batch enrichment versus the candidate pool. "
-            f"Round 0 is the first acquired batch after the shared start. "
-            f"Lines show DenseGen label and {control}; {interval}, not a confidence interval."
+            f"{label_title} selected-batch enrichment vs pool. "
+            f"Round 0 follows the shared start. "
+            f"Lines show DenseGen label and {control}; dotted = same-batch top-K reference; "
+            f"{interval}, not CI."
         )
     if kind == "positive_null_lift_summary":
         interval = (

@@ -75,7 +75,7 @@ def summary_payload(
         "budget_failure_count": budget_failures,
         "confounded_null_pair_count": confounded_pairs,
         "interpretation_boundary": (
-            "Realized selected-label enrichment ratio is the primary ML learnability endpoint. "
+            "Realized selected label enrichment ratio is the primary ML learnability endpoint. "
             "Predicted selected score is an acquisition diagnostic and must not be used alone as evidence "
             "that the DenseGen label is learned better than its matched scrambled-label control."
         ),

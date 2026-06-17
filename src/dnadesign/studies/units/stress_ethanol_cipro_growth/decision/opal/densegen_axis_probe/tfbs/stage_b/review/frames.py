@@ -18,7 +18,7 @@ from .io import campaign_workdir, label_table, selection_table
 
 
 def trajectory_frame(campaigns: Sequence[Mapping[str, Any]], *, rounds: int) -> pd.DataFrame:
-    """Build per-round realized selected-label trajectory rows."""
+    """Build per-round realized selected label trajectory rows."""
 
     rows: list[dict[str, Any]] = []
     if rounds <= 0:
@@ -32,6 +32,12 @@ def trajectory_frame(campaigns: Sequence[Mapping[str, Any]], *, rounds: int) -> 
         selected_count_expected = int(campaign.get("selection_k") or 0)
         if selected_count_expected <= 0:
             raise ValueError(f"campaign missing positive selection_k: {campaign.get('campaign_key')}")
+        same_batch_top = same_batch_top_label_summary(
+            labels,
+            label_name=label_name,
+            selection_k=selected_count_expected,
+            pool_baseline=pool_baseline,
+        )
         null_metadata = null_metadata_from_label_table(labels)
         seed_summary = seed_label_summary(
             Path(str(campaign["initial_label_input_path"])),
@@ -69,6 +75,7 @@ def trajectory_frame(campaigns: Sequence[Mapping[str, Any]], *, rounds: int) -> 
                     "selected_true_sum": float(np.sum(selected_values)),
                     "selected_true_mean": selected_mean,
                     "pool_baseline": pool_baseline,
+                    **same_batch_top,
                     **seed_summary,
                     "selected_true_lift_delta": selected_mean - pool_baseline,
                     "selected_true_lift_ratio": lift_ratio,
@@ -190,6 +197,36 @@ def seed_label_summary(path: Path, *, label_name: str, pool_baseline: float) -> 
         "seed_true_mean": seed_mean,
         "seed_true_lift_ratio": seed_mean / pool_baseline if pool_baseline > 0 else np.nan,
         "round_zero_semantics": "first_model_selected_batch_after_seed_labels",
+    }
+
+
+def same_batch_top_label_summary(
+    label_table: pd.DataFrame,
+    *,
+    label_name: str,
+    selection_k: int,
+    pool_baseline: float,
+) -> dict[str, Any]:
+    """Return the best same-size selected-batch label mean for the plotted label table."""
+
+    if selection_k <= 0:
+        raise ValueError("Stage B same-batch top label summary requires positive selection_k")
+    if pool_baseline <= 0:
+        raise ValueError("Stage B same-batch top label summary requires positive pool_baseline")
+    missing = sorted({"id", label_name} - set(label_table.columns))
+    if missing:
+        raise ValueError(f"Stage B same-batch top label summary missing column(s): {missing}")
+    values = pd.to_numeric(label_table[label_name], errors="raise").sort_values(ascending=False)
+    if len(values) < int(selection_k):
+        raise ValueError(
+            f"Stage B same-batch top label summary requires at least selection_k rows "
+            f"(selection_k={int(selection_k)}, rows={len(values)})"
+        )
+    top_mean = float(values.head(int(selection_k)).mean())
+    return {
+        "same_batch_top_label_mean": top_mean,
+        "same_batch_top_lift_ratio": top_mean / float(pool_baseline),
+        "same_batch_top_selection_k": int(selection_k),
     }
 
 

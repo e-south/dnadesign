@@ -21,6 +21,8 @@ SLOT_DIAGNOSTIC_STYLE_CONTRACT = {
     "tick_style": "styled_outward_ticks",
     "font_scale": "larger_review_tick_and_axis_labels",
     "square_axes": "where_data_shape_supports_it",
+    "trajectory_layout": "single_row_square_panels_for_label_trajectories",
+    "legend_layout": "single row below the plot",
 }
 
 SlotDiagnosticRenderer = Callable[[pd.DataFrame, pd.DataFrame, pd.DataFrame, Path], None]

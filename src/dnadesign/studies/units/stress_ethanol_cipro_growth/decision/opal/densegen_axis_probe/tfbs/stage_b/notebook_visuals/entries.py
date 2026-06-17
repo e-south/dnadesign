@@ -112,15 +112,15 @@ def _realized_visual_premise(label_name: str, *, control_role: object | None = N
     role = str(control_role or "")
     if role == "count_fixed_shuffled_slot_negative_control":
         return (
-            "When target motif count is fixed at one, active selection should only win by enriching the requested "
-            f"slot-position label for {tfbs_label_title(label_name)}."
+            "When target-family TFBS count is fixed at one, this compares enrichment for the requested "
+            f"slot-position label against the shuffled-slot control for {tfbs_label_title(label_name)}."
         )
     if role == "count_preserving_slot_confound_control":
         return (
             "Diagnostic check: count-preserving slot controls test how much target motif count can explain "
             f"slot-label enrichment for {tfbs_label_title(label_name)}."
         )
-    return f"Active selection should enrich the DenseGen label for {tfbs_label_title(label_name)} over its control."
+    return f"Compares DenseGen-label enrichment for {tfbs_label_title(label_name)} against its matched control."
 
 
 def _realized_visual_math_note(label_name: str) -> str:
@@ -147,14 +147,14 @@ def _realized_visual_claim_boundary(*, control_role: object | None = None) -> st
     role = str(control_role or "")
     if role == "count_fixed_shuffled_slot_negative_control":
         return (
-            "This supports a synthetic DenseGen slot-position metadata learnability claim for the sentinel labels; "
-            "it does not claim biological TF binding, mechanism, growth phenotype, or all possible regulator-slot "
-            "combinations."
+            "For labels that pass the replicated review gate, this is evidence that the harness can enrich the "
+            "declared synthetic slot-position label. It does not claim biological TF binding, mechanism, growth "
+            "phenotype, or all possible regulator-slot combinations."
         )
     if role == "count_preserving_slot_confound_control":
         return (
             "Diagnostic only: this count-preserving control is useful for detecting motif-count confounding, but it "
-            "is not a valid negative-control surface for a clean slot-position learnability claim."
+            "is not valid as negative-control evidence for the slot-position selection claim."
         )
     return (
         "This is a synthetic DenseGen metadata learnability surface, not a biological binding, mechanism, or "

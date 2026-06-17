@@ -38,8 +38,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Candidate table and label-source semantics:
   `../../../contexts/opal/candidate-table.md`
-- Production DenseGen TFBS learnability replacement spec:
+- DenseGen TFBS learnability v1 contract/spec:
   `../../../contexts/opal/densegen-tfbs-learnability-probe-v1.md`
+- Current DenseGen TFBS implementation/profile surface:
+  `../../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/README.md`
 - Historical motif-composition QA precedent:
   `../../../contexts/opal/densegen-motif-qa-k12-s3-v1.md`
 - Historical scratch synthetic-oracle probe:

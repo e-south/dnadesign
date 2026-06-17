@@ -238,8 +238,8 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
                     "cohort": "selected",
                     "summaries": ["mean", "count"],
                     "band": "iqr",
-                    "title": f"Predicted selected-label value by round: {target_label}",
-                    "surface_label": f"Predicted selected-label value: {target_label}",
+                    "title": f"Predicted selected label value by round: {target_label}",
+                    "surface_label": f"Predicted selected label value: {target_label}",
                     "caption": (
                         "Selected-candidate mean predicted expected scalar label by OPAL round. "
                         "This is a synthetic construction-label objective, not a measured biological phenotype."

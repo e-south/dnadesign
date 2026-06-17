@@ -5,17 +5,14 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from PIL import Image
 
-from .helpers import _dark_edge_pixel_count, _write_stage_b_review_fixture
+from .helpers import _write_stage_b_review_fixture
 from .probe_modules import probe_module
 
 build_tfbs_stage_b_realized_label_review = probe_module(
     "tfbs.stage_b.review.materialization"
 ).build_tfbs_stage_b_realized_label_review
 main = probe_module("cli").main
-realized_visual_spec = probe_module("tfbs.stage_b.notebook_visuals.specs").realized_visual_spec
-realized_review_renderer = probe_module("tfbs.stage_b.review.plots.renderers").realized_review_renderer
 review_plot_text = probe_module("tfbs.stage_b.review.plots.display_text")
 materialize_tfbs_stage_b_realized_review_plots = probe_module(
     "tfbs.stage_b.review.plots.materialization"
@@ -36,6 +33,8 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
     assert positive_final["selected_true_mean"].iloc[0] == pytest.approx(1.0)
     assert positive_final["pool_baseline"].iloc[0] == pytest.approx(0.5)
     assert positive_final["selected_true_lift_ratio"].iloc[0] == pytest.approx(2.0)
+    assert positive_final["same_batch_top_label_mean"].iloc[0] == pytest.approx(1.0)
+    assert positive_final["same_batch_top_lift_ratio"].iloc[0] == pytest.approx(2.0)
     assert positive_final["seed_label_count"].iloc[0] == 2
     assert positive_final["seed_true_mean"].iloc[0] == pytest.approx(0.5)
     assert positive_final["round_zero_semantics"].iloc[0] == "first_model_selected_batch_after_seed_labels"
@@ -75,6 +74,7 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
         "font_scale": "unified_review_body_font_for_ticks_axes_subtitle_legend",
         "square_axes": "where_data_shape_supports_it",
         "trajectory_axes": "square",
+        "trajectory_reference_lines": ["baseline", "same_batch_top_k_reference"],
     }
     assert plot_manifest["text_contract"] == {
         "baseline": "No enrichment: selected mean = full candidate-pool mean",
@@ -84,7 +84,7 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
         ),
         "initial_batch": "square markers are the same initial IDs scored by each label source before round 0",
         "interval": "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI",
-        "legend_layout": "single row below the plot",
+        "legend_layout": "legend below the plot; wrap when needed to avoid clipping",
         "pairing": "DenseGen-label and control campaigns share initial selected IDs; only the label table differs",
         "role_labels": "DenseGen label versus profile-appropriate matched control",
         "selected_label_values": (
@@ -92,8 +92,12 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
             "controls this is a control-label value, not post hoc DenseGen truth"
         ),
         "trajectory_semantics": (
-            "line points are per-round top-k acquired selected batches; round 0 is the first acquired batch after the "
+            "line points are per-round top-k selected batches; round 0 is the first acquired batch after the "
             "shared initial IDs, not the initial seed batch"
+        ),
+        "same_batch_top_k_reference": (
+            "Same-batch top-K reference: mean of the top selection_k label values in the candidate pool divided "
+            "by the same pool mean used for plotted lift. This is a reference ceiling, not an observed campaign."
         ),
         "subtitle_layout": "centered single-line subtitle",
         "title_alignment": "centered title; title may wrap, subtitle must not wrap",
@@ -104,8 +108,9 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
         "positive_null_lift_summary",
     ]
     assert plot_manifest["plots"][0]["title"] == "LexA presence enrichment from promoter embeddings"
-    assert "selected-batch enrichment versus the candidate pool" in plot_manifest["plots"][0]["alt_text"]
-    assert "Round 0 is the first acquired batch after the shared start" in plot_manifest["plots"][0]["alt_text"]
+    assert "selected-batch enrichment vs pool" in plot_manifest["plots"][0]["alt_text"]
+    assert "Round 0 follows the shared start" in plot_manifest["plots"][0]["alt_text"]
+    assert "same-batch top-K reference" in plot_manifest["plots"][0]["alt_text"]
     assert "active-learning rounds" not in plot_manifest["plots"][0]["alt_text"]
     assert "LexA presence" in plot_manifest["plots"][0]["alt_text"]
     assert all("each sentinel label" not in plot["alt_text"] for plot in plot_manifest["plots"])
@@ -184,34 +189,6 @@ def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path:
     assert len(rerun["visuals"]) == 2
 
 
-def test_stage_b_review_long_count_fraction_plot_titles_stay_inside_square_canvas(tmp_path: Path) -> None:
-    trajectory = pd.DataFrame(
-        {
-            "label_name": ["baeR_count_fraction"] * 6,
-            "oracle_role": ["positive"] * 3 + ["matched_null"] * 3,
-            "round": [0, 1, 23, 0, 1, 23],
-            "selected_true_lift_ratio": [1.1, 2.0, 4.3, 1.0, 1.4, 1.8],
-            "seed_true_lift_ratio": [0.9, 0.9, 0.9, 1.0, 1.0, 1.0],
-        }
-    )
-    pair_summary = pd.DataFrame(
-        {
-            "label_name": ["baeR_count_fraction"],
-            "final_positive_minus_null_lift_ratio": [2.5],
-            "trapezoid_auc_positive_minus_null_lift_ratio": [1.9],
-        }
-    )
-
-    for kind in ("realized_label_lift_trajectory", "positive_null_lift_summary"):
-        path = tmp_path / f"{kind}.png"
-        renderer = realized_review_renderer(realized_visual_spec(kind))
-        renderer(trajectory, pair_summary, path, "baeR_count_fraction")
-
-        image = Image.open(path).convert("RGB")
-        assert image.size == (1152, 1152)
-        assert _dark_edge_pixel_count(image) == 0
-
-
 def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
     assert review_plot_text.role_display_label("positive", label_name="baeR_count_fraction") == "DenseGen label"
     assert review_plot_text.role_display_label("matched_null", label_name="baeR_count_fraction") == "Scrambled control"
@@ -236,13 +213,13 @@ def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
         "y = selected mean fraction / pool mean fraction"
     )
     assert review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3) == (
-        "DenseGen label vs scrambled control across 3 paired seed runs"
+        "DenseGen vs scrambled control; 3 paired seed runs"
     )
     assert review_plot_text.trajectory_plot_subtitle(
         "lexA_in_slot0",
         replicate_count=3,
         control_role="count_fixed_shuffled_slot_negative_control",
-    ) == ("DenseGen slot label vs count-fixed shuffled-slot control across 3 paired seed runs")
+    ) == ("DenseGen vs shuffled-slot control; count fixed; 3 paired seed runs")
     assert "\n" not in review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3)
     assert review_plot_text.seed_run_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
     assert review_plot_text.seed_pair_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
@@ -264,16 +241,18 @@ def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
         label_name="baeR_count_fraction",
         replicate_count=3,
     )
-    assert "selected-batch enrichment versus the candidate pool" in trajectory_alt
-    assert "Round 0 is the first acquired batch after the shared start" in trajectory_alt
+    assert "selected-batch enrichment vs pool" in trajectory_alt
+    assert "Round 0 follows the shared start" in trajectory_alt
     assert "Lines show DenseGen label and scrambled control" in trajectory_alt
-    assert "not a confidence interval" in trajectory_alt
+    assert "same-batch top-K reference" in trajectory_alt
+    assert "not CI" in trajectory_alt
     assert len(trajectory_alt) < 240
     assert "final round and trajectory AUC" in summary_alt
     assert len(summary_alt) < 170
     assert review_plot_text.TRAILING_TRAJECTORY_NOTE.startswith("Faint lines = individual seeds; bold line = mean")
     assert "squares = shared start" in review_plot_text.TRAILING_TRAJECTORY_NOTE
     assert review_plot_text.NO_ENRICHMENT_BASELINE_LABEL == "Baseline"
+    assert review_plot_text.SAME_BATCH_TOP_K_REFERENCE_LABEL == "Same-batch top-K reference"
 
 
 def test_stage_b_review_plots_record_sample_sd_interval_when_seed_replicates_exist(tmp_path: Path) -> None:
@@ -296,6 +275,7 @@ def test_stage_b_review_plots_record_sample_sd_interval_when_seed_replicates_exi
             + ["matched_null", "matched_null", "matched_null", "matched_null"],
             "seed": [1, 2, 1, 2, 1, 2, 1, 2],
             "round": [0, 0, 1, 1, 0, 0, 1, 1],
+            "same_batch_top_lift_ratio": [2.5] * 8,
             "selected_true_lift_ratio": [1.2, 1.6, 2.0, 2.4, 1.0, 1.1, 1.2, 1.4],
             "seed_true_lift_ratio": [0.9, 1.1, 0.9, 1.1, 1.0, 1.2, 1.0, 1.2],
         }

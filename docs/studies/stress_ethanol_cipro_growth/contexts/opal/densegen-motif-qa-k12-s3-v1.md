@@ -1,8 +1,10 @@
 ## DenseGen Motif QA K12/S3 v1
 
-**Supersession note:** this document is now historical execution precedent for
-the DenseGen OPAL probe family. The production replacement spec is
-[`densegen-tfbs-learnability-probe-v1.md`](densegen-tfbs-learnability-probe-v1.md).
+**Supersession note:** this document is historical execution precedent for the
+DenseGen OPAL probe family. The retained v1 TFBS contract is
+[`densegen-tfbs-learnability-probe-v1.md`](densegen-tfbs-learnability-probe-v1.md);
+current realized profile boundaries live in the source package README and
+profile registry.
 
 `densegen_motif_qa_k12_s3_v1` is a study-owned OPAL QA suite for the pre-assay
 stress ethanol/cipro campaign. It replaced the stale K6/single-seed probe
@@ -179,7 +181,7 @@ Initial supported mappings:
 
 Both `densegen_plan_logic4` and `tf_family_count` use generic OPAL plots, such
 as score over rounds, score versus rank, feature importance, vector summary
-heatmaps, selected-label enrichment, and scalar/vector distribution diagnostics.
+heatmaps, selected label enrichment, and scalar/vector distribution diagnostics.
 SFXI-specific diagnostics are intentionally omitted from this synthetic control
 probe. Real SFXI assay campaigns can enable SFXI objective and plot plugins
 later, when the labels are measured SFXI values rather than DenseGen-derived

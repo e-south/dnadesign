@@ -1,20 +1,22 @@
 ## OPAL DenseGen TFBS Learnability Probe v1
 
-**Status:** implementation-ready dev spec
+**Status:** retained v1 contract and historical implementation spec
 **Owner:** `stress_ethanol_cipro_growth` study package
 **Target package:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe`
 **Test owner:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
 **Replaces:** the production role of the prior OPAL DenseGen axis probe
 
-This document is the handoff packet for the next implementation pass. It is
-not a result report. It defines the v1 production probe, the scientific
-contract, the OPAL/study ownership boundary, the staged campaign plan, and the
-runtime-retention gates needed before running larger matrices.
+This document records the v1 design contract that led to the current study-owned
+implementation. It is not a result report. For current realized profile
+boundaries, use the source package README and profile registry under
+`src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe`.
+This document remains useful for the scientific contract, OPAL/study ownership
+boundary, staged campaign plan, and runtime-retention gates.
 
-Audience and outcome: this is written for a follow-on Codex implementation
-agent working in `dnadesign`. The expected outcome is an implementable,
-testable study-owned probe design. It is not authorization to run sentinel or
-full-matrix campaigns before the Stage A gates pass.
+Audience and outcome: this is written for maintainers and follow-on agents
+working in `dnadesign`. Treat it as a contract and rationale record, not as the
+current artifact inventory. It is not authorization to run placement or
+full-matrix campaigns before the relevant gates pass.
 
 Final-direction rule: later decisions in the source discussion supersede
 earlier exploratory ideas. Do not reintroduce legacy load/amount terminology,
@@ -25,10 +27,10 @@ objectives, or DenseGen-specific OPAL-core logic as implementation
 ### 1. Executive Summary
 
 The TFBS learnability probe is a study-owned synthetic-control benchmark. It
-asks whether OPAL can actively enrich for DenseGen variable TFBS construction
-features from the current OPAL `X` representation.
+asks whether the OPAL harness can enrich DenseGen variable TFBS construction
+features from the current `X` representation.
 
-The v1 production probe has exactly two active surfaces:
+The v1 contract has two active surfaces:
 
 1. **Family content:** which variable TFBS families are present, and how often?
 2. **Slot geometry:** which TFBS family occupies which DenseGen left, middle,
@@ -126,7 +128,7 @@ Historical suite behavior:
   - 3 seeds
 
 The historical suite remains useful as execution evidence and as a
-synthetic-control precedent. The v1 production probe must not copy its active
+synthetic-control precedent. The current TFBS probe must not copy its active
 label strategy.
 
 In particular:
@@ -242,6 +244,7 @@ Examples:
 lexA_in_slot0 = 1[family(slot0) == LexA]
 lexA_in_slot1 = 1[family(slot1) == LexA]
 lexA_in_slot2 = 1[family(slot2) == LexA]
+baeR_in_slot1 = 1[family(slot1) == BaeR]
 cpxR_or_baeR_in_slot0 = 1[family(slot0) in {CpxR, BaeR}]
 cpxR_or_baeR_in_slot1 = 1[family(slot1) in {CpxR, BaeR}]
 cpxR_or_baeR_in_slot2 = 1[family(slot2) in {CpxR, BaeR}]
@@ -715,10 +718,14 @@ Preserve jointly:
 Do not independently permute derived labels. Count, presence, and
 count-fraction labels must remain algebraically consistent after permutation.
 
-#### 9.3 Slot Geometry Null
+#### 9.3 Slot-Position Controls
 
-For `tf_slot_family_presence`, the null must separate slot geometry from
-family content.
+For `tf_slot_family_presence`, the control must separate slot placement from
+family content. The original count-preserving slot control is useful as a
+confound diagnostic, but it is not sufficient as the negative-control evidence
+for a slot-position selection claim. The current claim-oriented control fixes
+the target-family count in the candidate universe first, then uses a
+count-fixed shuffled-slot control for supported placement labels.
 
 Preserve at least:
 
@@ -745,11 +752,12 @@ slot-event labels across matched rows. Preserve row-level slot constraints
 where possible by shuffling the whole slot-family vector instead of each slot
 independently.
 
-Required slot-null reporting:
+Required slot-control reporting:
 
-- Does the positive-vs-null effect survive after target-family count matching?
-- Does the null preserve the target-family count distribution exactly?
-- Does the null preserve sigma35/spacer strata exactly for retained rows?
+- Does the DenseGen-vs-control effect survive when target-family count cannot
+  drive selection?
+- Does the control preserve the candidate scope and label marginal?
+- Does the older count-preserving diagnostic show target-count confounding?
 - What fraction of rows kept the same slot-event label after permutation?
 
 #### 9.4 Null Viability Report
@@ -1079,7 +1087,7 @@ For each label, split, oracle role, seed, and campaign set, report:
 The predicted selected score is an acquisition diagnostic, not the endpoint.
 Because OPAL explicitly selects rows with high predicted score, a plot of
 `pred__score_selected` can make a null/control campaign look successful by
-construction. The peer-review-facing endpoint is the realized selected-label
+construction. The peer-review-facing endpoint is the realized selected label
 trajectory computed from `selection_top_k.csv` joined to the positive or null
 label table.
 

@@ -1,12 +1,13 @@
-# OPAL DenseGen Plan-Logic Probe
+# OPAL DenseGen Synthetic-Metadata Probes
 
 This package owns two study-local OPAL probes that use DenseGen construction
-metadata as synthetic labels. The root package is only the entrypoint layer
-(`cli.py` and `__main__.py`). The older plan-logic probe implementation is split
-across semantic subpackages; the `tfbs/` subpackage owns the strict TFBS
-learnability probe, where each positive campaign is paired with a matched null
-so OPAL learnability can be reviewed against a scrambling control rather than
-inferred from predicted scores alone.
+metadata as synthetic labels. The current narrative surface is the TFBS
+synthetic-metadata probe; the older plan-logic suite remains historical
+execution precedent. The root package is only the entrypoint layer (`cli.py` and
+`__main__.py`). The `tfbs/` subpackage owns the strict TFBS review surface,
+where each positive campaign is paired with a matched control so enrichment can
+be evaluated from realized selected labels rather than inferred from predicted
+scores alone.
 
 The organizing rule is ownership, not historical arrival order: study-specific
 DenseGen semantics stay here, while OPAL core remains campaign-agnostic.
@@ -25,21 +26,37 @@ DenseGen semantics stay here, while OPAL core remains campaign-agnostic.
 
 ## TFBS Learnability Subpackage
 
-`tfbs/` answers a narrower question than the root plan-logic probe: can OPAL
-learn literal DenseGen TFBS construction labels from the sequence feature
-surface without label leakage, and does that learning exceed a matched null?
-The current completed claim profile is `tfbs_count_fraction_probe_v1`, which
-contains exactly `lexA_count_fraction`, `cpxR_count_fraction`, and
-`baeR_count_fraction`. The slim named boundary profile
+`tfbs/` answers a narrower question than the root plan-logic probe: can the
+OPAL harness enrich literal DenseGen TFBS construction labels from the sequence
+feature surface without label leakage, and does that enrichment exceed a matched
+control?
+The current completed synthetic-metadata review profile is
+`tfbs_count_fraction_probe_v1`, which contains exactly
+`lexA_count_fraction`, `cpxR_count_fraction`, and `baeR_count_fraction`. A
+learning-loop baseline review now accompanies this profile as an offline
+ablation: it retrains no new campaigns, but asks whether the initial X-based
+model ranking already explains the count-fraction enrichment, whether iterative
+OPAL retraining adds cumulative enrichment over the same acquired budget, and
+what fraction of the same-budget top-label reference the active loop recovers.
+The slim named diagnostic profile
 `tfbs_slot_position_sentinel_probe_v1` contains `lexA_in_slot0` and
 `cpxR_or_baeR_in_slot2` for a 2-label, 3-seed count-matched positional screen.
 That screen is diagnostic because its control preserves row-level motif counts.
-The stricter claim-oriented boundary profile is
+The stricter boundary profile is
 `tfbs_slot_position_count_fixed_sentinel_probe_v1`, which uses the same two
-sentinel labels but restricts each label's candidate universe to rows with
-exactly one target-family motif and compares against a count-fixed shuffled-slot
-negative control. In that profile, `lexA_in_slot0` uses `lexA_count == 1`, and
+placement labels but restricts each label's candidate universe to rows with
+exactly one target-family TFBS construction entry and compares against a
+count-fixed shuffled-slot negative control. In that profile, `lexA_in_slot0`
+uses `lexA_count == 1`, and
 `cpxR_or_baeR_in_slot2` uses `cpxR_or_baeR_count == 1`.
+`tfbs_slot_position_count_fixed_baer_middle_probe_v1` adds the minimal middle-slot
+placement extension `baeR_in_slot1`, scoped to `baeR_count == 1`, so the review
+can show left, middle, and right placement checks without running every
+regulator-by-slot combination.
+The count-fixed placement profiles also have a learning-loop baseline review.
+That surface is boundary-tier evidence: it asks whether placement enrichment was
+already present in the initial ranker or benefited from adaptive retraining, but
+it does not convert mixed placement outcomes into a general slot-geometry claim.
 The broader `tfbs_slot_position_probe_v1` profile contains `lexA_in_slot0/1/2`
 and `cpxR_or_baeR_in_slot0/1/2` when a full slot-by-family resolution map is
 worth the additional campaign footprint. Presence labels remain valid ontology
@@ -50,8 +67,9 @@ count-fraction claim.
   `count_fraction`, and `slot_family_presence`.
 - `profiles.py`: first-class target-profile contracts that separate the
   completed count-fraction probe, the slim count-preserving slot-position
-  diagnostic, the count-fixed slot-position sentinel boundary probe, the broader
-  slot-position resolution-map probe, and custom
+  diagnostic, the count-fixed two-label placement boundary probe, the BaeR
+  middle-slot count-fixed extension, the broader slot-position resolution-map
+  probe, and custom
   operator-selected label sets.
 - `candidate_scopes/`: label-specific candidate-scope contracts, including the
   count-fixed slot-position rule that computes pool baselines on the filtered
@@ -91,6 +109,11 @@ count-fraction claim.
   ownership so plot manifests and OPAL collection visual entries cannot drift.
   The `review/` package keeps artifact readers, trajectory frames, summary
   payloads, and materialization separate.
+- `stage_b/learning_loop_baselines/`: offline active/frozen/top-label reference
+  reviews for completed Stage B campaigns. It keeps source loading, one-shot
+  scoring, deterministic rank-chunk replay, cumulative-budget metric frames,
+  plot contracts, notebook visual entries, and materialization in separate
+  modules so the harness ablation does not become a new campaign runner.
 
 ## TFBS Stage B Paired-Start Contract
 
@@ -114,6 +137,18 @@ The realized-label trajectory plot renders the observed line for single-seed
 materializations; when replicate seed rows are present, it renders mean lines
 with sample-standard-deviation bands and records that descriptive, non-CI
 interval contract in the OPAL collection visual manifest.
+
+The learning-loop baseline reuses the same shared-start campaign configs,
+candidate scopes, label tables, model config, and selection budget. For each
+campaign, it trains only on the round-0 seed labels, freezes that ranking, takes
+the same `selection_k` chunks over 24 rounds, and evaluates cumulative
+selected label lift against the same candidate-pool baseline. It also adds a
+same-budget top-label reference by selecting the highest known labels from the same
+post-seed acquisition pool. This surface supports a harness-level statement
+about adaptive gain only when the active trajectory beats the frozen replay at
+the paired-seed level; the reference reports how much of the same-budget
+achievable enrichment was recovered. It does not broaden the DenseGen metadata
+claim.
 
 ## Review Plot And Outcome Contracts
 

@@ -68,7 +68,7 @@ PROBE_AGGREGATE_PLOT_REGISTRY = build_probe_aggregate_plot_registry(
             filename="target_lift_and_precision.png",
             title="Probe target lift and precision",
             availability="runs",
-            outcome_focus="final selected-label enrichment and precision for each scored run",
+            outcome_focus="final selected label enrichment and precision for each scored run",
         ),
         ProbeAggregatePlotSpec(
             name="positive_null_lift_delta",
