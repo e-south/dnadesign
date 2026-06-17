@@ -13,15 +13,15 @@ exit_artifact: vendor_neutral_synthesis_manifest
 implementation_tracker: ../../../../exec-plans/active/2026-06-17-stress-opal-synthesis-handoff.md
 ---
 
-# OPAL Synthesis Handoff
+## OPAL Synthesis Handoff
 
-## Plan Intent Summary
+### Plan Intent Summary
 
 Create a study-owned handoff surface that turns selected OPAL promoter
 candidates into order-ready synthesis records without changing OPAL candidate
 semantics or coupling the active-learning runtime to a vendor workbook format.
 
-## Worth-Doing Preflight
+### Worth-Doing Preflight
 
 Best case: selected stress-study promoters can move from OPAL campaign ledgers
 to physical synthesis orders with deterministic names, case-aware cloning
@@ -30,7 +30,7 @@ selection is only experimentally useful if the exact ordered sequence can be
 traced back to canonical candidate ID, campaign, round, run, and cloning
 strategy.
 
-## Scope
+### Scope
 
 In scope:
 
@@ -43,6 +43,8 @@ In scope:
   canonical candidate IDs.
 - Azenta/GeneWiz workbook rendering as the first vendor adapter.
 - Readback validation from rendered workbook back to the manifest.
+- GenBank rendering with flank, promoter-core, DenseGen TFBS, sigma-35,
+  sigma-10, alias, hash, and campaign provenance annotations.
 - OPAL-ledger selected rows for measured post-assay rounds.
 - Tracking through
   `docs/exec-plans/active/2026-06-17-stress-opal-synthesis-handoff.md`.
@@ -57,7 +59,7 @@ Out of scope for the first implementation slice:
   examples without an explicit checked-in strategy config.
 - Submitting or committing generated `outputs/**` handoff artifacts by default.
 
-## Ownership Boundaries
+### Ownership Boundaries
 
 - OPAL owns campaign config validation, model fitting, scoring, active
   selection, and ledgers.
@@ -69,7 +71,7 @@ Out of scope for the first implementation slice:
 - Candidate IDs remain canonical. Human order names are aliases and must never
   replace `id`.
 
-## Core Contract
+### Core Contract
 
 The first production contract has these concepts:
 
@@ -99,8 +101,17 @@ Required invariants:
 - Every order alias is globally unique within the study alias ledger.
 - Manifest row count equals vendor export row count.
 - Workbook readback exactly matches manifest aliases and final sequences.
+- GenBank files use the final order sequence, currently 90 nt, with one file
+  per synthesis alias and core-local DenseGen coordinates projected by
+  `core_start`.
+- DenseGen TFBS annotations must validate against `offset`; `offset_raw` is not
+  a TFBS fallback. DenseGen sigma-70 fixed elements (`-35` and `-10`) must
+  validate against `offset_raw`, because their `offset`/`end` fields can be
+  padded slot coordinates rather than exact motif sequence coordinates.
+- GenBank readback exactly matches manifest aliases, final sequences, expected
+  per-alias filenames, and required flank/core feature labels.
 
-## Batch Zero Semantics
+### Batch Zero Semantics
 
 Batch zero is the pre-assay seed order for the three stress-study OPAL
 campaigns. It is not a trained OPAL active-learning round. The source is the
@@ -134,7 +145,7 @@ not confuse this source with a future OPAL model round. Future measured rounds
 should use OPAL `selection-set` records backed by campaign ledgers, with
 `selection_epoch=opal_model_round` and explicit `run_id` plus `as_of_round`.
 
-## Anti-Drift Source Map
+### Anti-Drift Source Map
 
 There are three nearby surfaces, but only two are synthesis sources:
 
@@ -180,7 +191,7 @@ same-round rerun by accident. The record-owned `assay_batch_index` is stamped
 onto the synthesis manifest; OPAL supplies `model_as_of_round` and selected
 candidate rows, but it does not own the physical batch number.
 
-## Operator Fetch Path
+### Operator Fetch Path
 
 Generate the current batch-0 files with:
 
@@ -200,10 +211,20 @@ Default generated output paths:
 - AND:
   `src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
 
-Each campaign folder contains `synthesis_manifest.csv` and
-`azenta_gene_synthesis.xlsx`. Fetch the workbook for vendor upload, but keep
-the manifest beside it for canonical IDs, provenance, core/final hashes, and
-readback validation evidence.
+Each campaign folder contains campaign-explicit files whose names remain
+identifiable if detached from the folder:
+
+- `stress-opal-batch0-sfxi-v1__<campaign_slug>__synthesis_manifest.csv`
+- `stress-opal-batch0-sfxi-v1__<campaign_slug>__azenta_gene_synthesis.xlsx`
+- `stress-opal-batch0-sfxi-v1__<campaign_slug>__genbank_inserts/`
+- `stress-opal-batch0-sfxi-v1__<campaign_slug>__genbank_features.csv`
+
+Fetch the workbook for vendor upload, keep the manifest beside it for canonical
+IDs, provenance, core/final hashes, and readback validation evidence, and open
+the per-sequence GenBank files under the `genbank_inserts/` directory in
+Benchling, SnapGene, or ApE to inspect flanks, promoter core, DenseGen TFBS,
+sigma-35, sigma-10, aliases, hashes, and campaign provenance. The feature-table
+CSV is the coordinate audit sidecar for the GenBank renderer.
 
 Preview the same handoff without writing:
 
@@ -215,10 +236,11 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 
 That preview is the clean human fetch check: it returns the three expected
 campaign rows in `handoff_record.expected_artifacts` and the live generated-file
-state in `handoff_record.artifact_status`, including manifest/workbook
-existence, SHA-256 values, manifest row counts, and workbook readback status.
+state in `handoff_record.artifact_status`, including manifest/workbook/GenBank
+existence, SHA-256 values, manifest row counts, workbook readback status, and
+GenBank readback status.
 
-## Measured Round Lifecycle Harness
+### Measured Round Lifecycle Harness
 
 After physical assay labels exist, the happy path for each campaign round is:
 
@@ -296,7 +318,7 @@ Measured-round default output folders use
 `model_as_of_round=<as_of_round>`, the resolved `run_id`, and the exact
 `as_of_round`.
 
-## Ordered Action Checklist
+### Ordered Action Checklist
 
 1. Persist this study dev spec and the active execution tracker before code.
 2. Add RED tests for strategy validation, manifest construction, duplicate
@@ -310,7 +332,7 @@ Measured-round default output folders use
 6. Validate with targeted tests and repo gates, then update the execution plan
    with evidence.
 
-## First Slice Contract
+### First Slice Contract
 
 Goal: prove the handoff ontology and first renderer with fixtures, without
 depending on a completed live OPAL run.
@@ -341,7 +363,7 @@ Done criteria:
   records table before rendering vendor files.
 - No generated `outputs/**` artifacts are committed.
 
-## Validation And Risk Handling
+### Validation And Risk Handling
 
 Functional checks:
 
@@ -368,7 +390,7 @@ Risk controls:
 - For batch zero, fetch files from the OPAL campaign `outputs/synthesis_handoff`
   directories; do not add another checked-in source tree for vendor workbooks.
 
-## Open Questions
+### Open Questions
 
 - The production alias namespace should either continue historical
   `ES-promoter-N` numbering from the sibling cloning workbooks or switch to a

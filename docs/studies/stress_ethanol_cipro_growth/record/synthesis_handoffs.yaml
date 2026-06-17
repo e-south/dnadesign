@@ -9,7 +9,10 @@ generated_artifact_policy:
   generated_outputs_are_not_committed_by_default: true
   accepted_handoff_requires_manifest_sha256: true
   accepted_handoff_requires_vendor_workbook_sha256: true
+  accepted_handoff_requires_genbank_dir_sha256: true
+  accepted_handoff_requires_genbank_feature_table_sha256: true
   accepted_handoff_requires_workbook_readback_pass: true
+  accepted_handoff_requires_genbank_readback_pass: true
 operator_preview_command: >-
   uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
   --handoff-id <handoff_id> --json
@@ -27,8 +30,12 @@ canonical_contract:
     - strategy_id
     - manifest_path
     - vendor_workbook_path
+    - genbank_dir_path
+    - genbank_feature_table_path
     - manifest_sha256
     - vendor_workbook_sha256
+    - genbank_dir_sha256
+    - genbank_feature_table_sha256
   measured_round_record_rules:
     - source_authority must be opal_selection_set
     - selection_epoch must be opal_model_round
@@ -55,23 +62,38 @@ handoffs:
     expected_campaigns:
       - campaign_slug: stress_eth_cip_ethanol_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/azenta_gene_synthesis.xlsx
+        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_ethanol_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_ethanol_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_ethanol_rf_sfxi_topn__genbank_features.csv
         manifest_sha256: null
         vendor_workbook_sha256: null
+        genbank_dir_sha256: null
+        genbank_feature_table_sha256: null
         workbook_readback_status: null
+        genbank_readback_status: null
       - campaign_slug: stress_eth_cip_cipro_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/azenta_gene_synthesis.xlsx
+        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_cipro_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_cipro_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_cipro_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_cipro_rf_sfxi_topn__genbank_features.csv
         manifest_sha256: null
         vendor_workbook_sha256: null
+        genbank_dir_sha256: null
+        genbank_feature_table_sha256: null
         workbook_readback_status: null
+        genbank_readback_status: null
       - campaign_slug: stress_eth_cip_and_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/azenta_gene_synthesis.xlsx
+        manifest_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_and_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_and_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_and_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__stress_eth_cip_and_rf_sfxi_topn__genbank_features.csv
         manifest_sha256: null
         vendor_workbook_sha256: null
+        genbank_dir_sha256: null
+        genbank_feature_table_sha256: null
         workbook_readback_status: null
+        genbank_readback_status: null
     note: Refined in place as the BaeR-forward pre-assay seed order before acceptance; generated local artifacts must be hashed and readback-validated before changing lifecycle_status to accepted_for_order.

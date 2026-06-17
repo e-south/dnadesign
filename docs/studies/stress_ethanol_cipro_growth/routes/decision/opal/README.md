@@ -16,22 +16,15 @@ exit_artifact: opal_campaign_records_and_ledgers
 
 ## OPAL Route Detail
 
-**Last verified:** 2026-06-17
-
 Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Surface
 
-- Type: `route`
-- Plane: `control-plane`
-- Surface role: `decision`
-- Owner-boundary: `opal`
 - Current state: `candidate_table_materialized_pre_assay`
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
 - Batch-0 selector: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/`
-- Candidate provenance audit: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/provenance.py`
 - Primary doc: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
 
 ### Detail Surfaces
@@ -66,39 +59,14 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Physical Synthesis Handoff
 
-- Batch-0 GeneWiz/Azenta files are generated per campaign from the checked-in
-  lifecycle record with
-  `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json`.
-- Batch zero is the BaeR-forward pre-assay seed order: ethanol uses 3 `baeR`,
-  1 `cpxR`, 1 `baeR+lexA`, and 1 `cpxR+lexA`; ciprofloxacin uses 4 `lexA`,
-  1 `baeR+lexA`, and 1 `cpxR+lexA`; AND uses 4 `baeR+lexA` and 2
-  `cpxR+lexA`. The selector requires actual parsed TFBS regulators, f/e
-  strong sigma-35 slots, d/c exploratory slots, and 16-19 bp spacers.
-- The same command without `--write` is the operator preview: it validates the
-  batch-0 selector, checks the lifecycle record, and reports exact
-  campaign-local manifest/workbook paths plus current hash/readback status.
-- Fetch each workbook from
-  `src/dnadesign/opal/campaigns/<campaign_slug>/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/azenta_gene_synthesis.xlsx`;
-  the matching `synthesis_manifest.csv` in the same folder is the canonical
-  ID/provenance/readback artifact.
-- After measured labels are ingested and OPAL has run, add a measured-round
-  lifecycle row to `../../record/synthesis_handoffs.yaml` with
-  `source_authority=opal_selection_set`, `selection_epoch=opal_model_round`,
-  `model_as_of_round=<as_of_round>`, `assay_batch_index=<physical_batch_index>`,
-  and explicit OPAL `run_id` values. Then generate files with
-  `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --write --json`.
-- Before generating a measured-round handoff, inspect the OPAL-selected set with
-  `uv run opal selection-set show -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json`.
-- Measured-round files live under the paths declared by that lifecycle row,
-  usually
-  `src/dnadesign/opal/campaigns/<campaign_slug>/outputs/synthesis_handoff/stress-opal-r<round>-sfxi-v1/`.
-  If a campaign has multiple run IDs for the same round, record the selected
-  value as `expected_campaigns[].run_id`; the `--handoff-id` path will pass it
-  through to OPAL `selection-set`.
-- Handoff lifecycle state is tracked in
-  `../../record/synthesis_handoffs.yaml`; generated manifests/workbooks remain
-  ignored `outputs/**` artifacts until an operator records hashes and accepts
-  the handoff for ordering.
+- Lifecycle record: `../../record/synthesis_handoffs.yaml`
+- Dev spec: `../../../contexts/opal/synthesis-handoff.md`
+- Preview/write command:
+  `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <handoff_id> [--write] --json`
+- Generated files are campaign-scoped ignored outputs: synthesis manifest,
+  Azenta workbook, per-sequence GenBank directory, and GenBank feature table.
+- Batch-0 handoffs come from the checked-in pre-assay selector; measured-round
+  handoffs must cite OPAL `run_id`, `model_as_of_round`, and assay batch index.
 
 ### Boundaries
 
@@ -130,15 +98,3 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - The DenseGen axis probe is an in-silico simulation harness. It may exercise
   round mechanics, but it is not a physical synthesis source and must not fork
   batch0 or OPAL-ledger selection semantics.
-
-### Planned Analysis TODOs
-
-- After measured four-condition labels exist, add round-aware KL/Jensen-Shannon
-  response-archetype plots over `[baseline, ethanol, ciprofloxacin, combined]`;
-  keep SFXI as strength/specificity overlay or selection objective, not the
-  response-shape axis.
-- Run study-owned mutual-information and enrichment analyses against DenseGen
-  TFBS identity, family, count, density, order, spacing, orientation, core
-  promoter variant, and distance-to-element metadata.
-- DenseGen probe conclusions stay separate from measured promoter-function
-  claims; UMAP can show architecture clusters but must not define response labels.

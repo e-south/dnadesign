@@ -215,6 +215,23 @@ def _record_path_for(repo_root: Path, explicit_path: Path | None) -> Path:
     return repo_root / DEFAULT_SYNTHESIS_HANDOFF_RECORD
 
 
+def _batch0_candidate_records_path(*, config_path: Path, repo_root: Path) -> Path:
+    with config_path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"batch-0 config must be a mapping: {config_path}")
+    candidate_table = raw.get("candidate_feature_table")
+    if not isinstance(candidate_table, dict):
+        raise ValueError(f"batch-0 config missing candidate_feature_table mapping: {config_path}")
+    records_path = candidate_table.get("records_path")
+    if records_path is None or not str(records_path).strip():
+        raise ValueError(f"batch-0 config missing candidate_feature_table.records_path: {config_path}")
+    path = Path(str(records_path))
+    if path.is_absolute():
+        return path
+    return repo_root / path
+
+
 def _resolve_handoff_record(
     *,
     handoff_id: str | None,
@@ -357,9 +374,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error(str(exc))
 
     source_report: dict[str, Any] = {}
+    candidate_records_path: Path | None = None
     if source == "batch0":
         repo_root = args.repo_root or _repo_root_from(args.batch0_config)
         try:
+            candidate_records_path = _batch0_candidate_records_path(
+                config_path=args.batch0_config,
+                repo_root=repo_root,
+            )
             selected, source_report = build_batch0_selected_candidates(
                 config_path=args.batch0_config,
                 repo_root=repo_root,
@@ -428,6 +450,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 batch_id=batch_id,
                 repo_root=repo_root,
                 output_root=args.output_dir,
+                candidate_records_path=candidate_records_path,
             )
             payload["mode"] = "written"
             payload["campaign_exports"] = campaign_exports.to_dict("records")

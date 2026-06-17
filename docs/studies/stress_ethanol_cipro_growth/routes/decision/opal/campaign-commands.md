@@ -48,9 +48,10 @@ The repeated physical-assay loop is:
    `model_as_of_round=<as_of_round>`, the physical `assay_batch_index`, and
    explicit OPAL `run_id` values.
 6. `synthesis_handoff --handoff-id <measured_round_handoff_id>` consumes that
-   record-backed selected-set surface and writes campaign-scoped
-   `synthesis_manifest.csv` plus
-   `azenta_gene_synthesis.xlsx`.
+   record-backed selected-set surface and writes campaign-scoped manifest,
+   Azenta/GeneWiz workbook, per-sequence GenBank directory, and GenBank
+   feature-table artifacts with names prefixed by
+   `<handoff_id>__<campaign_slug>__`.
 
 For checked-in lifecycle records, prefer `--handoff-id <handoff_id>` over raw
 source flags. Batch zero currently has the checked-in handoff id

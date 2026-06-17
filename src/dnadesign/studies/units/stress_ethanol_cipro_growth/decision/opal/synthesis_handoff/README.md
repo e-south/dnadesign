@@ -41,7 +41,9 @@ slots use `d/c`, spacers are constrained to 16-19 bp, and all current selected
 promoters carry the `TATAAT` sigma-10 core.
 
 The handoff assigns deterministic aliases like `SECG-B0-ETH-01` while
-preserving the canonical OPAL candidate `id` in the manifest.
+preserving the canonical OPAL candidate `id` in the manifest. `SECG` means
+stress ethanol/ciprofloxacin growth, `B0` is the pre-assay batch-zero seed, and
+`ETH` is the campaign short code.
 
 ## Operator Commands
 
@@ -53,7 +55,8 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
   --json
 ```
 
-Write the campaign-scoped manifest and Azenta/GeneWiz workbook files:
+Write the campaign-scoped manifest, Azenta/GeneWiz workbook, GenBank, and
+feature-table files:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
@@ -66,7 +69,7 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 `docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`. For
 batch zero it resolves to the checked-in batch-0 selector, validates the
 expected campaign row counts and lifecycle fields, and reports the exact
-campaign-local manifest/workbook paths plus current hash/readback status.
+campaign-local artifact paths plus current hash/readback status.
 
 After measured labels exist, use the same handoff command with a new checked-in
 lifecycle record. The measured-round record should set
@@ -131,11 +134,31 @@ Measured-round folders use `stress-opal-r<round>-sfxi-v1` unless an explicit
 
 Each folder contains:
 
-- `synthesis_manifest.csv`: canonical manifest with candidate IDs, aliases,
+- `<batch_id>__<campaign_slug>__synthesis_manifest.csv`: canonical manifest
+  with candidate IDs, aliases,
   campaign/round/source provenance, `selection_epoch`, `assay_batch_index`,
   `model_as_of_round`, core and final sequence hashes, and flank spans.
-- `azenta_gene_synthesis.xlsx`: GeneWiz/Azenta-ready workbook projection with
-  `Sequence Name` and `Sequence` columns.
+- `<batch_id>__<campaign_slug>__azenta_gene_synthesis.xlsx`:
+  GeneWiz/Azenta-ready workbook projection with `Sequence Name` and `Sequence`
+  columns.
+- `<batch_id>__<campaign_slug>__genbank_inserts/`: directory containing one
+  GenBank file per final 90 nt order insert, with flank, promoter-core,
+  DenseGen TFBS, sigma-35, sigma-10, alias, hash, and campaign provenance
+  qualifiers when DenseGen annotations are available. Individual filenames are
+  prefixed by `<batch_id>__<campaign_slug>__<synthesis_name>__`.
+- `<batch_id>__<campaign_slug>__genbank_features.csv`: tabular feature sidecar
+  used to render and audit the GenBank coordinates.
+
+DenseGen coordinate projection is intentionally fail-fast:
+
+- TFBS annotations must validate against `offset`; `offset_raw` is not a
+  fallback for TFBS.
+- Sigma-70 fixed elements (`-35` and `-10`) must validate against
+  `offset_raw`; padded `offset`/`end` values are not used for these sites.
+- The feature table records `densegen_coordinate_key`,
+  `densegen_expected_sequence`, `densegen_offset`, `densegen_offset_raw`, and
+  `densegen_orientation` so coordinate provenance is visible in the generated
+  artifact.
 
 ## First Slice
 
@@ -147,6 +170,8 @@ The first implementation slice supports:
 - versioned `CloningStrategy` transforms
 - manifest validation with hashes and core spans
 - Azenta/GeneWiz workbook rendering and readback validation
+- GenBank rendering and readback validation with DenseGen positional
+  annotations for batch-0 stress promoters
 - CLI help, fixture CSV dry-run/write flow, batch-0 campaign-scoped writes, and
   measured-round campaign-scoped writes
 - OPAL `selection-set` reader/export command as the canonical measured-round

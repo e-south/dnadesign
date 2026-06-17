@@ -15,6 +15,7 @@ STRESS_OPAL_CAMPAIGN_ALIAS_CODES: dict[str, str] = {
     "stress_eth_cip_cipro_rf_sfxi_topn": "CIP",
     "stress_eth_cip_and_rf_sfxi_topn": "AND",
 }
+STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX = "SECG"
 
 
 def stress_opal_campaign_code(campaign_slug: str) -> str:
@@ -32,7 +33,9 @@ def batch0_synthesis_name(campaign_slug: str, selection_rank: int) -> str:
 
     if int(selection_rank) <= 0:
         raise ValueError("selection_rank must be positive")
-    return f"SECG-B0-{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
+    return (
+        f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-B0-{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
+    )
 
 
 def opal_round_synthesis_name(campaign_slug: str, as_of_round: int, selection_rank: int) -> str:
@@ -42,4 +45,7 @@ def opal_round_synthesis_name(campaign_slug: str, as_of_round: int, selection_ra
         raise ValueError("as_of_round must be non-negative")
     if int(selection_rank) <= 0:
         raise ValueError("selection_rank must be positive")
-    return f"SECG-R{int(as_of_round)}-{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
+    return (
+        f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-R{int(as_of_round)}-"
+        f"{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
+    )

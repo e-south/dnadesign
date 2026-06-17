@@ -33,6 +33,24 @@ from .helpers import (
     write_json,
 )
 
+_REVIEW_MPL_RC = {
+    "font.family": "DejaVu Sans",
+    "font.size": REVIEW_AXIS_LABEL_FONTSIZE,
+    "axes.titlesize": REVIEW_TITLE_FONTSIZE,
+    "axes.labelsize": REVIEW_AXIS_LABEL_FONTSIZE,
+    "xtick.labelsize": REVIEW_TICK_LABEL_FONTSIZE,
+    "ytick.labelsize": REVIEW_TICK_LABEL_FONTSIZE,
+    "legend.fontsize": REVIEW_LEGEND_FONTSIZE,
+    "axes.titleweight": "normal",
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+    "savefig.facecolor": "white",
+    "text.color": "#111111",
+    "axes.labelcolor": "#111111",
+    "xtick.color": "#444B52",
+    "ytick.color": "#444B52",
+}
+
 
 def materialize_frozen_replay_plots(
     *,
@@ -52,9 +70,12 @@ def materialize_frozen_replay_plots(
     cumulative_path = output_dir / "frozen_round0_cumulative_enrichment.png"
     endpoint_path = output_dir / "frozen_round0_endpoint_adaptive_gain.png"
     known_label_reference_path = output_dir / "same_budget_known_label_gain_recovered.png"
-    _plot_cumulative_enrichment(trajectory, cumulative_path, title=spec.comparison_set_label)
-    _plot_endpoint_adaptive_gain(claims, endpoint_path)
-    _plot_known_label_gain_recovery(claims, known_label_reference_path)
+    import matplotlib as mpl
+
+    with mpl.rc_context(_REVIEW_MPL_RC):
+        _plot_cumulative_enrichment(trajectory, cumulative_path, title=spec.comparison_set_label)
+        _plot_endpoint_adaptive_gain(claims, endpoint_path)
+        _plot_known_label_gain_recovery(claims, known_label_reference_path)
     manifest_path = output_dir / "learning_loop_baseline_plot_manifest.json"
     manifest = {
         "schema_version": LEARNING_LOOP_BASELINE_PLOT_MANIFEST_SCHEMA_VERSION,
@@ -281,9 +302,9 @@ def _plot_known_label_gain_recovery(frame: pd.DataFrame, path: Path) -> None:
             frameon=False,
             fontsize=REVIEW_LEGEND_FONTSIZE,
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.14),
+            bbox_to_anchor=(0.5, -0.10),
             ncols=1,
         )
-    fig.subplots_adjust(left=0.20, right=0.90, top=0.84, bottom=0.26)
+    fig.subplots_adjust(left=0.24, right=0.92, top=0.82, bottom=0.32)
     save_review_figure(fig, path)
     plt.close(fig)

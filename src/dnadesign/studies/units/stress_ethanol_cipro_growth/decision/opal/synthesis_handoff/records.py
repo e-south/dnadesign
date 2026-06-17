@@ -12,6 +12,7 @@ import yaml
 
 from .azenta import validate_azenta_workbook
 from .contracts import SelectedCandidate
+from .genbank import validate_genbank_record_set
 
 DEFAULT_SYNTHESIS_HANDOFF_RECORD = Path("docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml")
 
@@ -24,10 +25,15 @@ class ExpectedHandoffArtifact:
     expected_rows: int
     manifest_path: str
     vendor_workbook_path: str
+    genbank_dir_path: str
+    genbank_feature_table_path: str
     run_id: str | None = None
     manifest_sha256: str | None = None
     vendor_workbook_sha256: str | None = None
+    genbank_dir_sha256: str | None = None
+    genbank_feature_table_sha256: str | None = None
     workbook_readback_status: str | None = None
+    genbank_readback_status: str | None = None
 
     def __post_init__(self) -> None:
         if not str(self.campaign_slug).strip():
@@ -38,6 +44,10 @@ class ExpectedHandoffArtifact:
             raise ValueError(f"manifest_path must be non-empty for campaign={self.campaign_slug}")
         if not str(self.vendor_workbook_path).strip():
             raise ValueError(f"vendor_workbook_path must be non-empty for campaign={self.campaign_slug}")
+        if not str(self.genbank_dir_path).strip():
+            raise ValueError(f"genbank_dir_path must be non-empty for campaign={self.campaign_slug}")
+        if not str(self.genbank_feature_table_path).strip():
+            raise ValueError(f"genbank_feature_table_path must be non-empty for campaign={self.campaign_slug}")
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -45,10 +55,15 @@ class ExpectedHandoffArtifact:
             "expected_rows": int(self.expected_rows),
             "manifest_path": self.manifest_path,
             "vendor_workbook_path": self.vendor_workbook_path,
+            "genbank_dir_path": self.genbank_dir_path,
+            "genbank_feature_table_path": self.genbank_feature_table_path,
             "run_id": self.run_id,
             "manifest_sha256": self.manifest_sha256,
             "vendor_workbook_sha256": self.vendor_workbook_sha256,
+            "genbank_dir_sha256": self.genbank_dir_sha256,
+            "genbank_feature_table_sha256": self.genbank_feature_table_sha256,
             "workbook_readback_status": self.workbook_readback_status,
+            "genbank_readback_status": self.genbank_readback_status,
         }
 
 
@@ -138,10 +153,15 @@ def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
             expected_rows=int(item["expected_rows"]),
             manifest_path=str(item["manifest_path"]),
             vendor_workbook_path=str(item["vendor_workbook_path"]),
+            genbank_dir_path=str(item["genbank_dir_path"]),
+            genbank_feature_table_path=str(item["genbank_feature_table_path"]),
             run_id=_optional_text(item.get("run_id")),
             manifest_sha256=_optional_text(item.get("manifest_sha256")),
             vendor_workbook_sha256=_optional_text(item.get("vendor_workbook_sha256")),
+            genbank_dir_sha256=_optional_text(item.get("genbank_dir_sha256")),
+            genbank_feature_table_sha256=_optional_text(item.get("genbank_feature_table_sha256")),
             workbook_readback_status=_optional_text(item.get("workbook_readback_status")),
+            genbank_readback_status=_optional_text(item.get("genbank_readback_status")),
         )
         for item in campaigns_raw
     )
@@ -346,6 +366,18 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_genbank_dir(path: Path) -> str:
+    digest = hashlib.sha256()
+    for file_path in sorted(path.glob("*.gb")):
+        digest.update(file_path.name.encode("utf-8"))
+        digest.update(b"\0")
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def artifact_status_for_handoff_record(
     record: SynthesisHandoffRecord,
     *,
@@ -355,24 +387,36 @@ def artifact_status_for_handoff_record(
 
     rows: list[dict[str, Any]] = []
     present_campaigns = 0
-    readback_pass_count = 0
+    workbook_readback_pass_count = 0
+    genbank_readback_pass_count = 0
     for expected in record.expected_campaigns:
         manifest_path = _resolve_repo_path(repo_root, expected.manifest_path)
         workbook_path = _resolve_repo_path(repo_root, expected.vendor_workbook_path)
+        genbank_dir_path = _resolve_repo_path(repo_root, expected.genbank_dir_path)
+        genbank_feature_table_path = _resolve_repo_path(repo_root, expected.genbank_feature_table_path)
         row: dict[str, Any] = {
             "campaign_slug": expected.campaign_slug,
             "expected_rows": int(expected.expected_rows),
             "manifest_path": str(manifest_path),
             "vendor_workbook_path": str(workbook_path),
+            "genbank_dir_path": str(genbank_dir_path),
+            "genbank_feature_table_path": str(genbank_feature_table_path),
             "manifest_exists": manifest_path.exists(),
             "vendor_workbook_exists": workbook_path.exists(),
+            "genbank_dir_exists": genbank_dir_path.is_dir(),
+            "genbank_feature_table_exists": genbank_feature_table_path.exists(),
             "manifest_sha256": None,
             "vendor_workbook_sha256": None,
+            "genbank_dir_sha256": None,
+            "genbank_feature_table_sha256": None,
             "manifest_hash_matches_record": None,
             "vendor_workbook_hash_matches_record": None,
+            "genbank_dir_hash_matches_record": None,
+            "genbank_feature_table_hash_matches_record": None,
             "manifest_row_count": None,
             "manifest_row_count_matches_record": None,
             "workbook_readback_status": None,
+            "genbank_readback_status": None,
         }
         manifest: pd.DataFrame | None = None
         if manifest_path.exists():
@@ -388,6 +432,16 @@ def artifact_status_for_handoff_record(
                 row["vendor_workbook_hash_matches_record"] = (
                     row["vendor_workbook_sha256"] == expected.vendor_workbook_sha256
                 )
+        if genbank_dir_path.is_dir():
+            row["genbank_dir_sha256"] = _sha256_genbank_dir(genbank_dir_path)
+            if expected.genbank_dir_sha256 is not None:
+                row["genbank_dir_hash_matches_record"] = row["genbank_dir_sha256"] == expected.genbank_dir_sha256
+        if genbank_feature_table_path.exists():
+            row["genbank_feature_table_sha256"] = _sha256_file(genbank_feature_table_path)
+            if expected.genbank_feature_table_sha256 is not None:
+                row["genbank_feature_table_hash_matches_record"] = (
+                    row["genbank_feature_table_sha256"] == expected.genbank_feature_table_sha256
+                )
         if manifest is not None and workbook_path.exists():
             try:
                 readback = validate_azenta_workbook(manifest, workbook_path)
@@ -395,17 +449,33 @@ def artifact_status_for_handoff_record(
             except ValueError as exc:
                 row["workbook_readback_status"] = "fail"
                 row["workbook_readback_error"] = str(exc)
-        if row["manifest_exists"] and row["vendor_workbook_exists"]:
+        if manifest is not None and genbank_dir_path.is_dir():
+            try:
+                genbank_readback = validate_genbank_record_set(manifest, genbank_dir_path)
+                row["genbank_readback_status"] = genbank_readback["status"]
+            except ValueError as exc:
+                row["genbank_readback_status"] = "fail"
+                row["genbank_readback_error"] = str(exc)
+        if (
+            row["manifest_exists"]
+            and row["vendor_workbook_exists"]
+            and row["genbank_dir_exists"]
+            and row["genbank_feature_table_exists"]
+        ):
             present_campaigns += 1
         if row["workbook_readback_status"] == "pass":
-            readback_pass_count += 1
+            workbook_readback_pass_count += 1
+        if row["genbank_readback_status"] == "pass":
+            genbank_readback_pass_count += 1
         rows.append(row)
 
     return {
         "summary": {
             "expected_campaign_count": int(len(record.expected_campaigns)),
             "present_campaign_count": int(present_campaigns),
-            "readback_pass_count": int(readback_pass_count),
+            "readback_pass_count": int(workbook_readback_pass_count),
+            "workbook_readback_pass_count": int(workbook_readback_pass_count),
+            "genbank_readback_pass_count": int(genbank_readback_pass_count),
         },
         "campaigns": rows,
     }
