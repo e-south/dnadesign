@@ -14,8 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..notebook_set_template import render_campaign_set_notebook
-from ..notebook_set_template.cells import OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION
+from ..notebook_set_template import OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION, render_campaign_set_notebook
 
 
 def render_campaign_notebook(config_path: Path, *, round_selector: str, run_id: str | None = None) -> str:

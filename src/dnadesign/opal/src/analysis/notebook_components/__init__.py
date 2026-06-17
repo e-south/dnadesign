@@ -48,6 +48,10 @@ from .campaign_set_visuals import (
     build_notebook_collection_visual_choices,
     build_notebook_collection_visual_description,
 )
+from .evidence import (
+    build_notebook_evidence_rows,
+    build_notebook_metric_definition_rows,
+)
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
     build_notebook_at_a_glance_rows,
@@ -55,8 +59,6 @@ from .overview import (
     build_notebook_campaign_summary_row,
     build_notebook_distrust_lines,
     build_notebook_distrust_rows,
-    build_notebook_evidence_rows,
-    build_notebook_metric_definition_rows,
     build_notebook_status_line,
     build_notebook_trust_rows,
     build_notebook_validity_lines,

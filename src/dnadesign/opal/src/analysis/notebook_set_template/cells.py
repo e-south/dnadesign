@@ -7,7 +7,7 @@ from .details_cells import render_details_cells
 from .setup_cells import render_setup_cells
 from .visual_cells import render_visual_cells
 
-OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_notebook.v2"
+OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_review_notebook.v3"
 
 
 def render_campaign_set_template() -> str:

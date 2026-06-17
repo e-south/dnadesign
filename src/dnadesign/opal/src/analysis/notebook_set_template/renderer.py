@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ...core.utils import ExitCodes, OpalError
 from .cells import OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION, render_campaign_set_template
 
 
@@ -15,15 +16,15 @@ def render_campaign_set_notebook(
 ) -> str:
     """Render a marimo notebook template for an OPAL campaign set."""
 
+    config_path_literals = _campaign_review_config_path_literals(config_paths)
     try:
         import marimo as _marimo
     except Exception:
         _marimo = None
     marimo_version = "unknown" if _marimo is None else getattr(_marimo, "__version__", "unknown")
-    path_literals = repr([str(Path(path)) for path in config_paths])
     return (
         render_campaign_set_template()
-        .replace("__CONFIG_PATHS__", path_literals)
+        .replace("__CONFIG_PATHS__", config_path_literals)
         .replace(
             "__COLLECTION_MANIFEST_PATH__",
             repr(str(Path(collection_manifest_path))) if collection_manifest_path is not None else "None",
@@ -38,6 +39,20 @@ def render_campaign_set_notebook(
         .replace("__GENERATED_WITH__", str(marimo_version))
         + "\n"
     )
+
+
+def _campaign_review_config_path_literals(config_paths: list[Path]) -> str:
+    paths = [Path(path) for path in config_paths]
+    if not paths:
+        raise OpalError("Campaign review notebooks require at least one campaign config.", ExitCodes.BAD_ARGS)
+    resolved = [str(path.resolve()) for path in paths]
+    duplicates = sorted({path for path in resolved if resolved.count(path) > 1})
+    if duplicates:
+        raise OpalError(
+            "Campaign review notebooks require distinct campaign configs; duplicates: " + ", ".join(duplicates),
+            ExitCodes.BAD_ARGS,
+        )
+    return repr([str(path) for path in paths])
 
 
 __all__ = ["render_campaign_set_notebook"]

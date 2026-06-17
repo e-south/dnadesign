@@ -118,6 +118,13 @@ def test_notebook_set_template_is_semantic_package_modules() -> None:
     assert max(module_lengths.values()) <= 180
 
 
+def test_single_campaign_notebook_uses_public_campaign_review_template_seam() -> None:
+    renderer_text = (OPAL_SOURCE_ROOT / "analysis" / "notebook_template" / "renderer.py").read_text()
+
+    assert "from ..notebook_set_template import" in renderer_text
+    assert "notebook_set_template.cells" not in renderer_text
+
+
 def test_generated_notebook_templates_do_not_import_dashboard_internals() -> None:
     dashboard_package = OPAL_SOURCE_ROOT / "analysis" / "dashboard"
     template_packages = [

@@ -50,6 +50,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
 from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, list_plot_kinds
 
 
@@ -85,7 +86,7 @@ def test_notebook_template_has_visual_surface() -> None:
 def test_notebook_template_has_opal_schema_sentinel() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v2"' in text
+    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"' in text
 
 
 def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> None:
@@ -1065,6 +1066,31 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "LatentDNA" not in text
     assert "UMAP" not in text
     ast.parse(text)
+
+
+def test_campaign_review_notebook_schema_matches_single_or_set_surface() -> None:
+    single = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    campaign_set = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="latest",
+    )
+
+    schema_line = '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"'
+    assert schema_line in single
+    assert schema_line in campaign_set
+    assert "opal.generated_campaign_notebook" not in single
+    assert "opal.generated_campaign_notebook" not in campaign_set
+
+
+def test_campaign_set_notebook_render_fails_without_distinct_campaign_configs() -> None:
+    with pytest.raises(OpalError, match="at least one campaign config"):
+        render_campaign_set_notebook([], round_selector="latest")
+
+    with pytest.raises(OpalError, match="distinct campaign configs"):
+        render_campaign_set_notebook(
+            [Path("campaign.yaml"), Path("campaign.yaml")],
+            round_selector="latest",
+        )
 
 
 def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
