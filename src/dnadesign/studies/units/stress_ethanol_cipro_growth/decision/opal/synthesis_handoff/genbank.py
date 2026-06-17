@@ -337,7 +337,13 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
             continue
         if part_kind == "fixed_element" and str(item.get("constraint_name") or "") == "sigma70_core":
             role = str(item.get("role") or "").strip()
-            label = "-35" if role == "upstream" else "-10" if role == "downstream" else "sigma70 core"
+            variant_id = str(item.get("variant_id") or "").strip()
+            if role == "upstream":
+                label = f"-35 ({variant_id})" if variant_id else "-35"
+            elif role == "downstream":
+                label = f"-10 ({variant_id})" if variant_id else "-10"
+            else:
+                label = "sigma70 core"
             start, end = _densegen_span(
                 item,
                 core_sequence=core_sequence,
@@ -360,7 +366,7 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
                     densegen_part_kind=part_kind,
                     role=role,
                     constraint_name="sigma70_core",
-                    variant_id=item.get("variant_id", ""),
+                    variant_id=variant_id,
                     spacer_length=item.get("spacer_length", ""),
                 )
             )
@@ -503,6 +509,19 @@ def _feature_qualifiers(manifest_row: pd.Series, feature_row: pd.Series) -> dict
                 "spacer_length": "spacer_len",
             }.get(key, key)
             qualifiers[qualifier_key] = [value]
+    constraint = str(feature_row.get("constraint_name", "") or "").strip()
+    role = str(feature_row.get("role", "") or "").strip()
+    variant_id = str(feature_row.get("variant_id", "") or "").strip()
+    if constraint == "sigma70_core" and variant_id:
+        feature_sequence = str(feature_row.get("sequence", "") or "").strip().upper()
+        if role == "upstream":
+            qualifiers["sigma35_variant"] = [variant_id]
+            if feature_sequence:
+                qualifiers["sigma35_sequence"] = [feature_sequence]
+        elif role == "downstream":
+            qualifiers["sigma10_variant"] = [variant_id]
+            if feature_sequence:
+                qualifiers["sigma10_sequence"] = [feature_sequence]
     return qualifiers
 
 

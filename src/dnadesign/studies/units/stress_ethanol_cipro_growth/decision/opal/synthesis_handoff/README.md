@@ -156,8 +156,11 @@ Each folder contains:
 - `<batch_id>__<campaign_slug>__genbank_inserts/`: directory containing one
   GenBank file per final 90 nt order insert, with flank, promoter-core,
   DenseGen TFBS, sigma-35, sigma-10, alias, hash, and campaign provenance
-  qualifiers when DenseGen annotations are available. Individual filenames are
-  prefixed by `<batch_id>__<campaign_slug>__<synthesis_name>__`.
+  qualifiers when DenseGen annotations are available. Sigma-35 feature labels
+  include the DenseGen categorical variant, for example `-35 (f)`, and carry
+  `sigma35_variant` plus `sigma35_sequence` qualifiers for detached GenBank
+  review. Individual filenames are prefixed by
+  `<batch_id>__<campaign_slug>__<synthesis_name>__`.
 - `<batch_id>__<campaign_slug>__genbank_features.csv`: tabular feature sidecar
   used to render and audit the GenBank coordinates.
 

@@ -482,7 +482,12 @@ def test_campaign_scoped_exports_write_per_sequence_genbank_files_and_feature_ta
     record = records[0]
     assert str(record.seq).upper() == manifest.loc[0, "final_sequence"].upper()
     labels = {value for feature in record.features for value in feature.qualifiers.get("label", [])}
-    assert {"5' cloning flank", "60 nt promoter core", "3' cloning flank", "BaeR TFBS", "-35", "-10"}.issubset(labels)
+    assert {"5' cloning flank", "60 nt promoter core", "3' cloning flank", "BaeR TFBS"}.issubset(labels)
+    assert "-35 (f)" in labels
+    assert "-10 (consensus)" in labels
+    sigma35_feature = next(feature for feature in record.features if feature.qualifiers.get("label") == ["-35 (f)"])
+    assert sigma35_feature.qualifiers["sigma35_variant"] == ["f"]
+    assert sigma35_feature.qualifiers["sigma35_sequence"] == [CORE_A[20:26]]
     source_qualifiers = record.features[0].qualifiers
     assert source_qualifiers["campaign_slug"] == ["stress_eth_cip_ethanol_rf_sfxi_topn"]
     assert source_qualifiers["batch_id"] == ["stress-opal-batch0-sfxi-v1"]
@@ -494,13 +499,12 @@ def test_campaign_scoped_exports_write_per_sequence_genbank_files_and_feature_ta
         "60 nt promoter core",
         "3' cloning flank",
         "BaeR TFBS",
-        "-35",
-        "-10",
     }
+    assert "-35 (f)" in set(feature_rows["label"])
+    assert "-10 (consensus)" in set(feature_rows["label"])
     assert set(feature_rows.loc[feature_rows["label"] == "BaeR TFBS", "densegen_coordinate_key"]) == {"offset"}
-    assert set(feature_rows.loc[feature_rows["label"].isin(["-35", "-10"]), "densegen_coordinate_key"]) == {
-        "offset_raw"
-    }
+    fixed_mask = feature_rows["label"].astype(str).str.startswith(("-35", "-10"))
+    assert set(feature_rows.loc[fixed_mask, "densegen_coordinate_key"]) == {"offset_raw"}
 
 
 def test_genbank_feature_projection_fails_fast_on_densegen_coordinate_mismatch(tmp_path: Path) -> None:
@@ -664,7 +668,9 @@ def test_genbank_feature_projection_records_fixed_element_offset_raw_source(tmp_
 
     features = build_genbank_feature_table(manifest, candidate_records_path=candidate_records_path)
 
-    fixed = features.loc[features["label"] == "-35"].iloc[0]
+    fixed = features.loc[features["label"].astype(str).str.startswith("-35")].iloc[0]
+    assert fixed["label"] == "-35 (f)"
+    assert fixed["variant_id"] == "f"
     assert fixed["densegen_coordinate_key"] == "offset_raw"
     assert fixed["start_0"] == len(LEFT_FLANK) + 20
     assert fixed["end_0"] == len(LEFT_FLANK) + 26
