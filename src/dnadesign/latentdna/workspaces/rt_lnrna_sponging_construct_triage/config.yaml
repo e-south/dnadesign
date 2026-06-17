@@ -14,7 +14,7 @@ defaults:
 sources:
   dual_cassette_2000bp_seq_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -30,7 +30,7 @@ sources:
       view_name: dual_cassette_2000bp_seq_mean
   dual_cassette_2000bp_seq_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -45,7 +45,7 @@ sources:
       view_name: dual_cassette_2000bp_seq_mean
   dual_cassette_2000bp_seq_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -59,7 +59,7 @@ sources:
       view_name: dual_cassette_2000bp_seq_mean
   dual_cassette_2000bp_seq_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -73,7 +73,7 @@ sources:
       view_name: dual_cassette_2000bp_seq_mean
   dual_cassette_2000bp_reverse_complement_seq_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -89,7 +89,7 @@ sources:
       view_name: dual_cassette_2000bp_reverse_complement_seq_mean
   dual_cassette_2000bp_reverse_complement_seq_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -104,7 +104,7 @@ sources:
       view_name: dual_cassette_2000bp_reverse_complement_seq_mean
   dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -118,7 +118,7 @@ sources:
       view_name: dual_cassette_2000bp_reverse_complement_seq_mean
   dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -132,7 +132,7 @@ sources:
       view_name: dual_cassette_2000bp_reverse_complement_seq_mean
   lnrna_fixed_384bp_window_in_construct_anchor_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -148,7 +148,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
   lnrna_fixed_384bp_window_in_construct_anchor_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -163,7 +163,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
   lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -177,7 +177,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
   lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -191,7 +191,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
   lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -207,7 +207,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
   lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -222,7 +222,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
   lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -236,7 +236,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
   lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -250,7 +250,7 @@ sources:
       view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_anchor_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -266,7 +266,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_anchor_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -281,7 +281,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -295,7 +295,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -309,7 +309,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -325,7 +325,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
     kind: infer_feature_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -340,7 +340,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id
@@ -354,7 +354,7 @@ sources:
       view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
   rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
     kind: infer_feature_scalar_sidecar
-    root: ../../../../../workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+    root: ../../../usr/datasets
     dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     record_key: construct_subject__id
     subject_key: construct_subject__id

@@ -176,7 +176,7 @@ datasets:
     lifecycle: construct_materialization_input
     status: persistent_control_dataset_id
     dataset_id: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
-    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
+    path: src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
     row_identity: usr_canonical_sequence_id
     semantic_identity: construct_subject__id
     notes: >-
@@ -265,7 +265,7 @@ datasets:
     lifecycle: construct_materialization_output
     status: persistent_control_dataset_id
     dataset_id: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
-    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    path: src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
     row_identity: usr_canonical_emitted_sequence_id
     expected_sequence_views:
       - dual_cassette_2000bp_seq_mean
@@ -332,7 +332,7 @@ datasets:
     lifecycle: opal_training_examples
     status: blocked_until_infer_features_and_sponging_labels
     dataset_id: rt_lnrna_sponging_construct_triage_opal_training_examples_v1
-    path: workspaces/studies/rt_lnrna_sponging_construct_triage/usr/rt_lnrna_sponging_construct_triage_opal_training_examples_v1
+    path: src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_opal_training_examples_v1
     row_identity: study_construct_subject_id
     notes: >-
       Future OPAL-ready table for this study only. Rows require one selected

@@ -3,7 +3,7 @@ source_owner: construct
 execution_owner: infer
 writeback_owner: infer
 source_dataset:
-  usr_root: workspaces/studies/rt_lnrna_sponging_construct_triage/usr
+  usr_root: src/dnadesign/usr/datasets
   dataset_id: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
 feature_bundle_ref: ../infer/evo2-7b-six-view-feature-bundle.yaml
 sequence_view_selectors:

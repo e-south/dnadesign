@@ -1551,34 +1551,21 @@ docs/studies/rt_lnrna_sponging_construct_triage/
 ```
 
 Generated or larger runtime artifacts should not be checked in by default.
-They should live under an explicit workspace or output root, for example:
+Generated USR datasets live under `src/dnadesign/usr/datasets`; Infer and
+LatentDNA runtime artifacts live under their package-owned workspace
+`outputs/` folders. Avoid creating repo-root `workspaces/` trees.
 
 ```text
-workspaces/studies/rt_lnrna_sponging_construct_triage/
-  candidates/
-    synthetic_rt_lnrna_sponging_constructs.tsv
-    msd_design_specs.tsv
-    rt_provenance.tsv
-    lnrna_provenance.tsv
-  construct/
-    construct_projection_manifest.yaml
-    representability_report.tsv
-    _views/sequence_views.parquet
-  infer/
-    configs/
-    feature_aliases.parquet
-    feature_vectors.parquet
-  overlays/
-    khan_overlay_join_report.tsv
-    crawford_overlay_join_report.tsv
-  analysis/
-    candidate_geometry_metrics.tsv
-    overlay_regime_metrics.tsv
-    confound_audit.tsv
-    triage_decision_report.md
-  handoff/
-    wet_lab_candidate_handoff.tsv
-    opal_ready_candidate_table.parquet
+src/dnadesign/usr/datasets/
+  rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1/
+  rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1/
+src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/outputs/
+  feature_aliases.parquet
+  feature_vectors.parquet
+src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/outputs/
+  plots/
+  notebooks/
+  scalars/
 ```
 
 If the representation review uses LatentDNA, the checked-in workspace config
