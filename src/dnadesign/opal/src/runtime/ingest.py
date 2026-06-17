@@ -58,6 +58,53 @@ def _vec_len(v: Any) -> int:
     return 1
 
 
+def _non_empty_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    text = str(value).strip()
+    return text or None
+
+
+def _assert_label_identity_matches_records(records_df: pd.DataFrame, labels: pd.DataFrame) -> None:
+    if "id" not in labels.columns or "sequence" not in labels.columns:
+        return
+    if "id" not in records_df.columns or "sequence" not in records_df.columns:
+        return
+
+    id_to_sequence: dict[str, str] = {}
+    for candidate_id, sequence in records_df[["id", "sequence"]].itertuples(index=False, name=None):
+        candidate_id_text = _non_empty_text(candidate_id)
+        sequence_text = _non_empty_text(sequence)
+        if candidate_id_text is not None and sequence_text is not None:
+            id_to_sequence[candidate_id_text] = sequence_text
+
+    mismatches: list[dict[str, str]] = []
+    for label_id, sequence in labels[["id", "sequence"]].itertuples(index=False, name=None):
+        label_id_text = _non_empty_text(label_id)
+        sequence_text = _non_empty_text(sequence)
+        if label_id_text is None or sequence_text is None:
+            continue
+        expected = id_to_sequence.get(label_id_text)
+        if expected is not None and expected != sequence_text:
+            mismatches.append(
+                {
+                    "id": label_id_text,
+                    "expected_sequence": expected,
+                    "observed_sequence": sequence_text,
+                }
+            )
+            if len(mismatches) >= 10:
+                break
+
+    if mismatches:
+        raise OpalError(f"Label id/sequence mismatch against records.parquet (sample={mismatches}).")
+
+
 def _apply_transform_via_registry(
     name: str,
     params: Dict[str, Any],
@@ -152,6 +199,7 @@ def run_ingest(
         missing_ids = labels["id"].isna()
         if missing_ids.any():
             labels.loc[missing_ids, "id"] = labels.loc[missing_ids, "sequence"].map(seq2id)
+    _assert_label_identity_matches_records(records_df=records_df, labels=labels)
 
     # 3) Duplicate handling (assertive, policy-driven)
     policy = str(duplicate_policy or "error").strip().lower()

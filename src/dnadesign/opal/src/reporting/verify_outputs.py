@@ -35,6 +35,30 @@ def read_selection_table(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def read_selection_artifact(path: Path, *, required_columns: tuple[str, ...] = ("id",)) -> pd.DataFrame:
+    """Read a selection artifact with lightweight ID-contract validation."""
+
+    df = read_selection_table(path)
+    missing = [column for column in required_columns if column not in df.columns]
+    if missing:
+        raise OpalError(f"Selection data missing required columns: {missing}")
+    if "id" in df.columns:
+        out = df.copy()
+        if out["id"].isna().any():
+            raise OpalError(f"Selection data contains null IDs: {path}")
+        out["id"] = out["id"].astype(str).str.strip()
+        if out["id"].eq("").any():
+            raise OpalError(f"Selection data contains blank IDs: {path}")
+        dup_mask = out["id"].duplicated(keep=False)
+        if bool(dup_mask.any()):
+            dup_ids = sorted(out.loc[dup_mask, "id"].astype(str).unique().tolist())
+            preview = dup_ids[:10]
+            suffix = "..." if len(dup_ids) > len(preview) else ""
+            raise OpalError(f"Selection data contains duplicate IDs: {preview}{suffix}")
+        return out
+    return df
+
+
 def resolve_selection_score_column(df: pd.DataFrame) -> str:
     if "pred__score_selected" in df.columns:
         return "pred__score_selected"

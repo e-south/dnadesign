@@ -27,6 +27,18 @@ def _test_shared_scalar_labels(df_tidy: pd.DataFrame, params: dict, *, ctx=None)
     )
 
 
+@register_transform_y("test_shared_scalar_labels_with_sequence")
+def _test_shared_scalar_labels_with_sequence(df_tidy: pd.DataFrame, params: dict, *, ctx=None) -> pd.DataFrame:
+    _unused = (params, ctx)
+    return pd.DataFrame(
+        {
+            "id": df_tidy["id"].astype(str),
+            "sequence": df_tidy["sequence"].astype(str),
+            "y": df_tidy["y_val"].map(lambda v: [float(v)]),
+        }
+    )
+
+
 def _write_records(path: Path, *, ids: list[str], sequences: list[str], x_values: list[list[float]]) -> None:
     row_count = len(ids)
     if len(sequences) != row_count or len(x_values) != row_count:
@@ -323,3 +335,68 @@ selection:
     assert "fixed candidate universe" in res.output
     assert not (dataset_root / "_opal" / "observed_labels.parquet").exists()
     assert pd.read_parquet(records)["id"].tolist() == ["a"]
+
+
+def test_ingest_y_rejects_id_sequence_mismatch_for_shared_label_source(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr" / "datasets"
+    dataset_root = usr_root / "demo_candidates"
+    dataset_root.mkdir(parents=True)
+    records = dataset_root / "records.parquet"
+    _write_records(records, ids=["a", "b"], sequences=["AAA", "BBB"], x_values=[[0.1], [0.2]])
+
+    workdir = tmp_path / "campaign"
+    workdir.mkdir()
+    campaign = workdir / "campaign.yaml"
+    campaign.write_text(
+        f"""
+campaign:
+  name: Demo
+  slug: demo
+  workdir: "{workdir}"
+data:
+  location: {{ kind: usr, path: "{usr_root}", dataset: demo_candidates }}
+  x_column_name: X
+  y_column_name: opal__demo__y
+  y_expected_length: 1
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: demo_candidates
+    path: _opal/observed_labels.parquet
+  y_space: scalar_test
+writeback:
+  prediction_records: ledger_only
+transforms_x: {{ name: identity, params: {{}} }}
+transforms_y: {{ name: test_shared_scalar_labels_with_sequence, params: {{}} }}
+model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
+objectives:
+  - {{ name: scalar_identity_v1, params: {{}} }}
+selection:
+  name: top_n
+  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+""".strip()
+    )
+    labels = workdir / "labels.parquet"
+    pd.DataFrame({"id": ["a"], "sequence": ["BBB"], "y_val": [0.2]}).to_parquet(labels, index=False)
+
+    res = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels),
+            "--unknown-sequences",
+            "error",
+            "--apply",
+        ],
+    )
+
+    assert res.exit_code != 0
+    assert "id/sequence mismatch" in res.output
+    assert "a" in res.output
+    assert not (dataset_root / "_opal" / "observed_labels.parquet").exists()
