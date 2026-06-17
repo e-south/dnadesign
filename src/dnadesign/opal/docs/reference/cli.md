@@ -1,7 +1,7 @@
 ## OPAL Command Line Interface
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-25
+**Last verified:** 2026-06-17
 
 
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
@@ -375,6 +375,34 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 * If the selected round has multiple runs, pass `--run-id` to disambiguate.
 * Reads from `outputs/ledger/runs.parquet` and `outputs/ledger/predictions/`.
 * `--json` writes JSON to stdout; redirect to a file when you need a saved report.
+
+---
+
+### `selection-set`
+
+Inspect or export the canonical selected-row contract for downstream consumers
+such as study-owned synthesis handoffs or probe analysis.
+
+**Usage**
+
+```bash
+opal selection-set show --config <yaml> [--round <k|latest>] [--run-id <id>] [--json]
+opal selection-set export --config <yaml> [--round <k|latest>] [--run-id <id>] \
+  --out <csv|json> [--format csv|json] [--json]
+```
+
+**Notes**
+
+* Reads campaign ledgers and verifies the matching `selection_top_k` artifact
+  before returning rows.
+* Returns `schema_version: opal.selection_set.v1` for `show` and
+  `opal.selection_set_export.v1` for `export`.
+* Rows preserve OPAL candidate `id`, `sequence`, rank, score metadata,
+  `run_id`, and `as_of_round`.
+* If a round has multiple run IDs, pass `--run-id`; OPAL fails fast instead of
+  guessing which rerun a downstream handoff should use.
+* Missing ledgers or mismatched selection artifacts are structured JSON errors
+  when `--json` is requested.
 
 ---
 

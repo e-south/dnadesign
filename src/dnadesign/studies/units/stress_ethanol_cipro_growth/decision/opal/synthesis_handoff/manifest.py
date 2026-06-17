@@ -9,6 +9,8 @@ from typing import Any
 
 import pandas as pd
 
+from dnadesign.opal import scan_restriction_sites
+
 from .contracts import CloningStrategy, SelectedCandidate, validate_promoter_core
 
 
@@ -60,6 +62,12 @@ def _optional_int(value: Any) -> int | None:
     return int(value)
 
 
+def _restriction_site_summary(report: Any) -> str:
+    return "; ".join(
+        f"{hit.enzyme}:{hit.motif}@{hit.start_0}-{hit.end_0}:{hit.region}" for hit in report.unexpected_hits
+    )
+
+
 def build_synthesis_manifest(
     *,
     selected: Iterable[SelectedCandidate | Mapping[str, Any]],
@@ -86,6 +94,20 @@ def build_synthesis_manifest(
         )
         final_sequence = f"{strategy.left_flank}{core_sequence}{strategy.right_flank}"
         core_end = core_start + len(core_sequence)
+        if strategy.restriction_sites:
+            restriction_report = scan_restriction_sites(
+                candidate_id=candidate.id,
+                core_sequence=core_sequence,
+                left_flank=strategy.left_flank,
+                right_flank=strategy.right_flank,
+                expected_core_length=strategy.expected_core_length,
+                forbidden_sites=strategy.restriction_sites,
+            )
+            if restriction_report.unexpected_hits:
+                raise ValueError(
+                    f"candidate {candidate.id} has unexpected restriction site(s) in assembled insert: "
+                    f"{_restriction_site_summary(restriction_report)}"
+                )
         rows.append(
             {
                 "batch_id": batch,
@@ -114,6 +136,7 @@ def build_synthesis_manifest(
                 "core_sha256": _sha256_text(core_sequence),
                 "final_sha256": _sha256_text(final_sequence),
                 "validation_status": "pass",
+                "restriction_site_validation_status": "pass" if strategy.restriction_sites else "not_configured",
             }
         )
 

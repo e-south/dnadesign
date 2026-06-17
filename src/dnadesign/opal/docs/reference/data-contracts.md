@@ -1,7 +1,7 @@
 ## OPAL Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-25
+**Last verified:** 2026-06-17
 
 
 This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, shared label sidecars, label history, and append-only ledger sinks.
@@ -28,6 +28,13 @@ OPAL is assertive by default and fails fast on inconsistent inputs.
 - `verify-outputs` is strict: selection IDs must be unique, selected IDs must
   exist in the target run ledger predictions, and run-scoped ledger prediction
   IDs must be unique before score comparisons are trusted.
+- `selection-set show/export` is the public selected-row projection over
+  campaign ledgers and the verified selection artifact. Downstream study
+  logistics should consume this contract instead of parsing `selection_top_k.csv`
+  or run ledgers directly.
+- `candidate_eligibility` reports are validation/runtime evidence. They record
+  input rows, output rows, filtered counts, rule ids, parameter hashes, and
+  violation previews, but they do not rewrite the source candidate table.
 - Batched scoring is ID-strict. Candidate X may be streamed from Parquet in
   storage order and coalesced into score-sized chunks, but model predictions are
   realigned to the requested candidate ID order before objective scoring,

@@ -93,7 +93,7 @@ def build_batch0_selected_candidates(
     config = load_sampling_config(cfg_path)
     candidate_table_report = validate_configured_candidate_feature_table(config, repo_root=root)
     candidates = build_candidate_frame(config, repo_root=root)
-    review = select_batch0(candidates, config)
+    review = select_batch0(candidates, config, repo_root=root)
     selection_table_report = validate_selected_ids_against_candidate_feature_table(
         review,
         config,

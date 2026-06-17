@@ -1,0 +1,21 @@
+"""Candidate eligibility primitives for OPAL."""
+
+from .contracts import (
+    CandidateEligibilityResult,
+    CandidateEligibilityRuleResult,
+    RestrictionSiteHit,
+    RestrictionSiteScanReport,
+    RestrictionSiteSpec,
+)
+from .restriction_sites import scan_restriction_sites
+from .runtime import apply_candidate_eligibility
+
+__all__ = [
+    "CandidateEligibilityResult",
+    "CandidateEligibilityRuleResult",
+    "RestrictionSiteHit",
+    "RestrictionSiteScanReport",
+    "RestrictionSiteSpec",
+    "apply_candidate_eligibility",
+    "scan_restriction_sites",
+]

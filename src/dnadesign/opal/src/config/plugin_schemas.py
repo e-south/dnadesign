@@ -21,6 +21,7 @@ _SCHEMAS: Dict[str, Dict[str, Type[BaseModel]]] = {
     "model": {},
     "objective": {},
     "selection": {},
+    "candidate_eligibility": {},
 }
 
 
@@ -438,3 +439,88 @@ class _ExpectedImprovementParams(BaseModel):
         if x < 0.0:
             raise ValueError("weights must be >= 0")
         return x
+
+
+class _RestrictionSiteParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enzyme: str
+    motif: str
+    allowed_regions: List[Literal["left_flank", "core", "right_flank"]]
+
+    @field_validator("enzyme")
+    @classmethod
+    def _enzyme_non_empty(cls, v: str) -> str:
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("enzyme must be non-empty")
+        return vv
+
+    @field_validator("motif")
+    @classmethod
+    def _motif_upper_dna(cls, v: str) -> str:
+        vv = str(v).strip().upper()
+        if not vv or any(base not in {"A", "C", "G", "T"} for base in vv):
+            raise ValueError("motif must be uppercase ACGT")
+        return vv
+
+    @field_validator("allowed_regions")
+    @classmethod
+    def _allowed_regions_non_empty(cls, v):
+        if not v:
+            raise ValueError("allowed_regions must contain at least one region")
+        return v
+
+
+@register_param_schema("candidate_eligibility", "restriction_site_exclusion")
+class _RestrictionSiteExclusionParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sequence_column: str = "sequence"
+    scan_space: Literal["final_assembled_insert"] = "final_assembled_insert"
+    assembly_strategy_ref: str
+    left_flank: str
+    right_flank: str
+    expected_core_length: int
+    min_remaining_candidates: Optional[int] = None
+    on_violation: Literal["exclude"] = "exclude"
+    forbidden_sites: List[_RestrictionSiteParams]
+
+    @field_validator("sequence_column", "assembly_strategy_ref")
+    @classmethod
+    def _text_non_empty(cls, v: str) -> str:
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("text fields must be non-empty")
+        return vv
+
+    @field_validator("left_flank", "right_flank")
+    @classmethod
+    def _flank_lower_dna(cls, v: str) -> str:
+        vv = str(v).strip()
+        if vv != vv.lower() or any(base not in {"a", "c", "g", "t"} for base in vv):
+            raise ValueError("flanks must be lowercase acgt")
+        return vv
+
+    @field_validator("expected_core_length")
+    @classmethod
+    def _expected_core_length_positive(cls, v: int) -> int:
+        out = int(v)
+        if out <= 0:
+            raise ValueError("expected_core_length must be positive")
+        return out
+
+    @field_validator("min_remaining_candidates")
+    @classmethod
+    def _min_remaining_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        out = int(v)
+        if out <= 0:
+            raise ValueError("min_remaining_candidates must be positive when provided")
+        return out
+
+    @field_validator("forbidden_sites")
+    @classmethod
+    def _forbidden_sites_non_empty(cls, v):
+        if not v:
+            raise ValueError("forbidden_sites must contain at least one site")
+        return v

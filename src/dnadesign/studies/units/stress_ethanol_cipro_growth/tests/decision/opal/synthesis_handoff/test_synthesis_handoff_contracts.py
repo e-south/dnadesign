@@ -5,6 +5,7 @@ import json
 import shutil
 import textwrap
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -27,20 +28,32 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.cli import (
     main as synthesis_handoff_main,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.strategy import (
+    load_cloning_strategy,
+)
 
 LEFT_FLANK = "accgggatcctgcag"
 RIGHT_FLANK = "tgagggaattcgcga"
 CORE_A = "ACGT" * 15
 CORE_B = "TGCA" * 15
+CORE_ECORI_LEFT_JUNCTION = "AATTC" + "A" * 55
+
+
+def _json_cli_error(stderr: str) -> dict[str, Any]:
+    payload = json.loads(stderr)
+    assert payload["status"] == "error"
+    assert payload["context"] == "synthesis_handoff"
+    assert "Traceback" not in stderr
+    assert "usage:" not in stderr
+    return payload
 
 
 def _strategy() -> CloningStrategy:
-    return CloningStrategy(
-        name="sfxi_promoter_insert",
-        version="v1",
-        left_flank=LEFT_FLANK,
-        right_flank=RIGHT_FLANK,
-        expected_core_length=60,
+    return load_cloning_strategy(
+        Path(
+            "src/dnadesign/studies/units/stress_ethanol_cipro_growth/"
+            "decision/opal/synthesis_handoff/configs/sfxi_promoter_insert_v1.yaml"
+        )
     )
 
 
@@ -122,6 +135,35 @@ def test_manifest_fails_fast_on_invalid_promoter_core(sequence: str, message: st
             strategy=_strategy(),
             batch_id="stress-opal-r0-20260617",
         )
+
+
+def test_manifest_fails_fast_on_unexpected_restriction_site_in_assembled_insert() -> None:
+    candidate = SelectedCandidate(
+        campaign_slug="stress_eth_cip_and_rf_sfxi_topn",
+        as_of_round=0,
+        run_id="run-and-r0",
+        selection_rank=1,
+        id="opal-candidate-extra-ecori",
+        sequence=CORE_ECORI_LEFT_JUNCTION,
+        synthesis_name="SECG-B0-AND-99",
+    )
+
+    with pytest.raises(ValueError, match="unexpected restriction site"):
+        build_synthesis_manifest(
+            selected=[candidate],
+            strategy=_strategy(),
+            batch_id="stress-opal-batch0-sfxi-v1",
+        )
+
+
+def test_strategy_yaml_declares_expected_sfxi_restriction_site_policy() -> None:
+    strategy = _strategy()
+
+    assert strategy.strategy_id == "sfxi_promoter_insert:v1"
+    assert [(site.enzyme, site.motif, site.allowed_regions) for site in strategy.restriction_sites] == [
+        ("BamHI", "GGATCC", ("left_flank",)),
+        ("EcoRI", "GAATTC", ("right_flank",)),
+    ]
 
 
 def test_manifest_rejects_duplicate_candidate_ids_and_duplicate_order_aliases() -> None:
@@ -1085,9 +1127,8 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
         )
 
     assert exc_info.value.code == 2
-    stderr = capsys.readouterr().err
-    assert "requires explicit run_id" in stderr
-    assert "Traceback" not in stderr
+    payload = _json_cli_error(capsys.readouterr().err)
+    assert "requires explicit run_id" in payload["error"]["message"]
 
 
 def test_cli_handoff_record_rejects_campaign_count_drift(
@@ -1134,10 +1175,9 @@ def test_cli_handoff_record_rejects_campaign_count_drift(
         )
 
     assert exc_info.value.code == 2
-    stderr = capsys.readouterr().err
-    assert "handoff record campaign row mismatch" in stderr
-    assert "stress_eth_cip_ethanol_rf_sfxi_topn" in stderr
-    assert "Traceback" not in stderr
+    payload = _json_cli_error(capsys.readouterr().err)
+    assert "handoff record campaign row mismatch" in payload["error"]["message"]
+    assert "stress_eth_cip_ethanol_rf_sfxi_topn" in payload["error"]["message"]
 
 
 def test_cli_opal_round_missing_ledger_exits_without_traceback(
@@ -1161,6 +1201,5 @@ def test_cli_opal_round_missing_ledger_exits_without_traceback(
         )
 
     assert exc_info.value.code == 2
-    stderr = capsys.readouterr().err
-    assert "required OPAL parquet artifact is missing" in stderr
-    assert "Traceback" not in stderr
+    payload = _json_cli_error(capsys.readouterr().err)
+    assert "required OPAL parquet artifact is missing" in payload["error"]["message"]

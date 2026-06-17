@@ -60,6 +60,11 @@ class PluginRef:
     params: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class CandidateEligibilityBlock:
+    rules: List[PluginRef] = field(default_factory=list)
+
+
 # ---- Blocks ----
 @dataclass
 class DataBlock:
@@ -170,6 +175,7 @@ class RootConfig:
     ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
+    candidate_eligibility: CandidateEligibilityBlock = field(default_factory=CandidateEligibilityBlock)
     labels: LabelsBlock = field(default_factory=LabelsBlock)
     writeback: WritebackBlock = field(default_factory=WritebackBlock)
     artifact_retention: ArtifactRetentionBlock = field(default_factory=ArtifactRetentionBlock)

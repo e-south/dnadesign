@@ -16,6 +16,7 @@ from pathlib import Path
 import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...eligibility.runtime import apply_candidate_eligibility
 from ...registries.models import get_model
 from ...registries.objectives import get_objective_declared_channels
 from ...storage.data_access import ESSENTIAL_COLS
@@ -209,6 +210,7 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
         raise OpalError(f"label source validation failed: {labels_status.get('error')}")
 
     _validate_selection_channel_refs(cfg)
+    candidate_eligibility = _validate_candidate_eligibility(cfg=cfg, store=store, df=df)
 
     cwd = str(Path.cwd().resolve())
     cwd_outside_workdir = False
@@ -243,6 +245,18 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
             "x_dim": int(x_report.x_dim),
         },
         "label_source": _json_label_source_rows(labels_status, prediction_records=cfg.writeback.prediction_records),
+        "candidate_eligibility": candidate_eligibility,
+    }
+
+
+def _validate_candidate_eligibility(*, cfg, store, df) -> dict[str, object]:
+    candidate_frame = store.candidate_universe(df, 0)
+    result = apply_candidate_eligibility(candidate_frame, getattr(cfg, "candidate_eligibility", None))
+    return {
+        "input_rows": int(len(candidate_frame)),
+        "output_rows": int(len(result.frame)),
+        "filtered_rows": int(len(candidate_frame) - len(result.frame)),
+        "rules": [dict(report) for report in result.reports],
     }
 
 

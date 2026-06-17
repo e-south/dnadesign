@@ -10,11 +10,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from ..core.leakage import assert_no_leakage_violations, build_train_eval_leakage_report
+from ..eligibility.runtime import apply_candidate_eligibility
 from ..storage.candidate_scope import apply_candidate_scope
 from ..storage.data_access import RecordsStore
 from ..storage.label_sources import CampaignHistoryLabelSource, TrainingLabelSource
@@ -25,6 +26,9 @@ class RoundPlan:
     as_of_round: int
     training_df: pd.DataFrame
     candidate_df: pd.DataFrame
+    candidate_total_before_eligibility: int
+    candidate_eligibility_filtered_out: int
+    candidate_eligibility_reports: List[Dict[str, Any]]
     candidate_total_before_filter: int
     candidate_filtered_out: int
     training_policy: Dict[str, object]
@@ -56,7 +60,11 @@ def plan_round(
         dedup_policy=dedup_policy,
     )
 
-    cand_df = apply_candidate_scope(store.candidate_universe(df, int(as_of_round)), cfg.data.candidate_scope)
+    scoped_df = apply_candidate_scope(store.candidate_universe(df, int(as_of_round)), cfg.data.candidate_scope)
+    eligibility_result = apply_candidate_eligibility(scoped_df, getattr(cfg, "candidate_eligibility", None))
+    cand_df = eligibility_result.frame
+    total_before_eligibility = int(len(scoped_df))
+    eligibility_filtered_out = total_before_eligibility - int(len(cand_df))
     total_before = int(len(cand_df))
 
     sel_params = dict(cfg.selection.selection.params)
@@ -84,6 +92,9 @@ def plan_round(
         as_of_round=int(as_of_round),
         training_df=train_df,
         candidate_df=cand_df,
+        candidate_total_before_eligibility=total_before_eligibility,
+        candidate_eligibility_filtered_out=eligibility_filtered_out,
+        candidate_eligibility_reports=[dict(report) for report in eligibility_result.reports],
         candidate_total_before_filter=total_before,
         candidate_filtered_out=filtered_out,
         training_policy=dict(policy),

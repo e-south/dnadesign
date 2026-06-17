@@ -26,6 +26,7 @@ from .plugin_schemas import validate_params
 from .types import (
     ArtifactRetentionBlock,
     CampaignBlock,
+    CandidateEligibilityBlock,
     CandidateScope,
     DataBlock,
     IngestBlock,
@@ -98,6 +99,11 @@ class PPluginRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PCandidateEligibility(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rules: List[PPluginRef] = Field(default_factory=list)
 
 
 class PCandidateScope(BaseModel):
@@ -244,6 +250,7 @@ class PRoot(BaseModel):
     model_config = ConfigDict(extra="forbid")
     campaign: PCampaign
     data: PData
+    candidate_eligibility: PCandidateEligibility = Field(default_factory=PCandidateEligibility)
     transforms_x: PPluginRef
     transforms_y: PPluginRef
     model: PPluginRef
@@ -272,6 +279,7 @@ def _require_registered_plugin(*, category: str, name: str, available: set[str])
 
 
 def _validate_registered_plugin_names(pyd: PRoot) -> None:
+    from ..registries.eligibility import list_candidate_eligibility_rules
     from ..registries.models import list_models
     from ..registries.objectives import list_objectives
     from ..registries.selection import list_selections
@@ -315,6 +323,14 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
             available=available_y_ops,
         )
 
+    available_eligibility = set(list_candidate_eligibility_rules())
+    for rule in pyd.candidate_eligibility.rules:
+        _require_registered_plugin(
+            category="candidate_eligibility",
+            name=str(rule.name),
+            available=available_eligibility,
+        )
+
 
 def load_config(path: Path | str) -> RootConfig:
     cfg_path = Path(path).resolve()
@@ -355,6 +371,13 @@ def load_config(path: Path | str) -> RootConfig:
         obj_refs = [PluginRef(o.name, validate_params("objective", o.name, o.params)) for o in pyd.objectives]
     except Exception as e:
         raise ConfigError(f"Invalid campaign.yaml objective params: {e}")
+    try:
+        eligibility_rules = [
+            PluginRef(rule.name, validate_params("candidate_eligibility", rule.name, rule.params))
+            for rule in pyd.candidate_eligibility.rules
+        ]
+    except Exception as e:
+        raise ConfigError(f"Invalid campaign.yaml candidate_eligibility params: {e}")
 
     # Build dataclasses
     def _abs(v: str, *, base_dir: Path | None = None) -> str:
@@ -424,6 +447,7 @@ def load_config(path: Path | str) -> RootConfig:
 
     selection_dc = SelectionBlock(selection=PluginRef(sel.name, sel_params))
     objectives_dc = ObjectivesBlock(objectives=obj_refs)
+    candidate_eligibility_dc = CandidateEligibilityBlock(rules=eligibility_rules)
     training_dc = TrainingBlock(
         policy=pyd.training.policy or {},
         y_ops=[PluginRef(t.name, t.params) for t in pyd.training.y_ops],
@@ -474,6 +498,7 @@ def load_config(path: Path | str) -> RootConfig:
         model=PluginRef(mdl.name, mdl_params),
         selection=selection_dc,
         objectives=objectives_dc,
+        candidate_eligibility=candidate_eligibility_dc,
         training=training_dc,
         ingest=ingest_dc,
         scoring=scoring_dc,

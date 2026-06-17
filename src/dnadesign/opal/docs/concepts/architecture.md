@@ -1,7 +1,7 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-06-17
 
 
 This page describes how OPAL executes one round and how config keys map to runtime behavior.
@@ -12,11 +12,13 @@ This page describes how OPAL executes one round and how config keys map to runti
 2. Resolve labels up to `--labels-as-of` from the configured `labels` source.
    Legacy/local campaigns use `opal__<slug>__label_hist`; shared USR
    campaigns can use a sidecar such as `_opal/observed_labels.parquet`.
-3. Build feature matrices with `transforms_x`.
-4. Fit `model` and predict `y_pred` (and optional predictive std-dev).
-5. Apply `training.y_ops` inversion to both mean and std-dev when configured.
-6. Evaluate configured `objectives` into named score and uncertainty channels.
-7. Run `selection` using explicit refs (`score_ref`, optional `uncertainty_ref`) and persist outputs.
+3. Apply candidate-scope and candidate-eligibility rules before scoring. These
+   rules filter rows but do not mutate `records.parquet`.
+4. Build feature matrices with `transforms_x`.
+5. Fit `model` and predict `y_pred` (and optional predictive std-dev).
+6. Apply `training.y_ops` inversion to both mean and std-dev when configured.
+7. Evaluate configured `objectives` into named score and uncertainty channels.
+8. Run `selection` using explicit refs (`score_ref`, optional `uncertainty_ref`) and persist outputs.
 
 ### Runtime surfaces
 
@@ -35,6 +37,9 @@ This page describes how OPAL executes one round and how config keys map to runti
 - `campaign`, `data`: workspace and dataset resolution.
 - `labels`: training-label source resolution and batch/round label semantics.
 - `transforms_y`: ingest-only label construction.
+- `candidate_eligibility`: generic pre-selection exclusion rules and audit
+  reports; study-specific cloning or ordering semantics must enter through
+  rule parameters, not OPAL candidate records.
 - `transforms_x`: feature matrix for training/scoring.
 - `training.y_ops`: fit-time Y transforms and inference-time inversion.
 - `model`: fit/predict implementation.
@@ -55,6 +60,8 @@ This page describes how OPAL executes one round and how config keys map to runti
 
 OPAL is fail-fast by design:
 - unknown plugins fail at config load/validation
+- unknown candidate-eligibility rules or invalid rule parameters fail during
+  config validation before round execution
 - unresolved score/uncertainty refs fail before selection
 - non-finite/invalid model/objective/selection outputs fail before writeback
 - ledger schema violations fail at write time

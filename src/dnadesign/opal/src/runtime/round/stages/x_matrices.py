@@ -56,6 +56,12 @@ def stage_x_matrices(
             f"[candidates] pool={plan.candidate_total_before_filter} → {len(cand_df)} after excluding already-labeled "
             f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
         )
+    if plan.candidate_eligibility_reports:
+        log(
+            req.verbose,
+            "[candidates] eligibility "
+            f"{plan.candidate_total_before_eligibility} → {plan.candidate_total_before_filter} before scoring",
+        )
 
     if cand_df.shape[0] == 0:
         raise OpalError("Candidate pool is empty after filtering; nothing to score.")
@@ -102,6 +108,18 @@ def stage_x_matrices(
     rctx.set_core("core/data/n_scored", int(len(id_order_pool)))
     rctx.set_core("core/data/candidate_pool_total", int(plan.candidate_total_before_filter))
     rctx.set_core("core/data/candidate_pool_filtered_out", int(plan.candidate_filtered_out))
+    rctx.set_core("core/data/candidate_pool_total_before_eligibility", int(plan.candidate_total_before_eligibility))
+    rctx.set_core("core/data/candidate_eligibility_filtered_out", int(plan.candidate_eligibility_filtered_out))
+    for report in plan.candidate_eligibility_reports:
+        append_round_log_event(
+            inputs.rdir / "logs" / "round.log.jsonl",
+            {
+                "ts": now_iso(),
+                "round": int(req.as_of_round),
+                "stage": "candidate_eligibility_done",
+                **dict(report),
+            },
+        )
     if X_train.shape[0] != Y_train.shape[0]:
         raise OpalError(f"Training X/Y row mismatch: X_train={X_train.shape[0]} Y_train={Y_train.shape[0]}.")
     log(

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from dnadesign.opal import RestrictionSiteSpec
 
 _LOWER_DNA = re.compile(r"[acgt]+")
 _UPPER_DNA = re.compile(r"[ACGT]+")
@@ -25,6 +27,7 @@ class CloningStrategy:
     left_flank: str
     right_flank: str
     expected_core_length: int
+    restriction_sites: tuple[RestrictionSiteSpec, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "name", _require_non_empty_text(self.name, field="name"))
@@ -38,6 +41,14 @@ class CloningStrategy:
         if int(self.expected_core_length) <= 0:
             raise ValueError("expected_core_length must be positive")
         object.__setattr__(self, "expected_core_length", int(self.expected_core_length))
+        object.__setattr__(
+            self,
+            "restriction_sites",
+            tuple(
+                site if isinstance(site, RestrictionSiteSpec) else RestrictionSiteSpec.from_mapping(site)
+                for site in self.restriction_sites
+            ),
+        )
 
     @property
     def strategy_id(self) -> str:

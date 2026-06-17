@@ -21,6 +21,9 @@ operation.
   - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --json`
   - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --json`
   - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml --json`
+  - The JSON report must include `candidate_eligibility` with the
+    `restriction_site_exclusion` rule, filtered-row count, min-remaining guard,
+    and violation preview.
 - Pre-run campaign viewer generation: `uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force`
 - Campaign notebook run: `uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
 - Label ingest for a measured assay round: `uv run opal ingest-y -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <observed_round> --in <labels.parquet-or-csv> --unknown-sequences error --apply --json`
@@ -59,7 +62,9 @@ source flags. Batch zero currently has the checked-in handoff id
 campaign-scoped paths, row counts, hashes, and workbook readback status. The
 batch-0 selector is the refined BaeR-forward pre-assay plan and requires actual
 parsed TFBS regulators, f/e strong sigma-35 slots, d/c exploratory slots, and
-16-19 bp spacers.
+16-19 bp spacers. It also applies the SFXI restriction-site eligibility rule
+before slot ranking: BamHI is allowed only in the 5 prime flank and EcoRI only
+in the 3 prime flank of the final assembled insert.
 Measured rounds should follow the same record-driven path after their lifecycle
 row exists. Use raw `--source opal-round --round <as_of_round>` only while
 drafting a new record or in fixtures.

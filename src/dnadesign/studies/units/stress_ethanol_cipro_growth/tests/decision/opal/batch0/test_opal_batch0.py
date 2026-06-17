@@ -95,6 +95,7 @@ def _row(
     cipro: float = 0.2,
     dual: float = 0.2,
     tier: int = 1,
+    sequence: str = "ACGT" * 15,
 ) -> dict[str, object]:
     if tfbs_regulators == "none":
         tfbs_summary = "none"
@@ -102,7 +103,7 @@ def _row(
         tfbs_summary = ";".join(f"{regulator}@{spacer}" for regulator in (tfbs_regulators or regulators).split("+"))
     return {
         "id": row_id,
-        "sequence": "ACGT" * 15,
+        "sequence": sequence,
         "canonical_densegen_plan": plan,
         "regulator_composition": regulators,
         "sigma35_variant": sigma,
@@ -275,6 +276,7 @@ def _write_provenance_fixture(tmp_path: Path) -> dict[str, object]:
 
 def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     config = load_sampling_config(SAMPLING)
+    config["synthesis_eligibility"]["min_remaining_candidates"] = 1
     rows = [
         _row("eth_baer_f1", plan="ethanol", regulators="baeR", sigma="f", ethanol=0.91),
         _row("eth_baer_no_tfbs", plan="ethanol", regulators="baeR", tfbs_regulators="none", sigma="f", ethanol=0.99),
@@ -307,6 +309,14 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         _row("and_baer_2", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", dual=0.92),
         _row("and_baer_3", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="c", dual=0.91),
         _row("and_baer_4", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="f", dual=0.90),
+        _row(
+            "and_baer_unclonable_left_junction",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            sigma="f",
+            dual=1.25,
+            sequence="AATTC" + "A" * 55,
+        ),
         _row("negative_prior", plan="ethanol", regulators="baeR", sigma="f", ethanol=-0.1),
     ]
 
@@ -320,6 +330,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     }
     assert not selected["id"].duplicated().any()
     assert "negative_prior" not in set(selected["id"])
+    assert "and_baer_unclonable_left_junction" not in set(selected["id"])
     assert "eth_baer_no_tfbs" not in set(selected["id"])
     assert "eth_baer_with_cpxr_tfbs" not in set(selected["id"])
     assert "cip_lexa_spacer20_high" not in set(selected["id"])

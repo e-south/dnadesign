@@ -1,7 +1,7 @@
 ## OPAL Configuration (v2)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-21
+**Last verified:** 2026-06-17
 
 
 This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
@@ -15,6 +15,8 @@ Use it as the source of truth for required keys, defaults, and model/objective/s
 - `ownership`: optional owner metadata for non-portable study fixtures
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`,
   optional `candidate_scope`
+- `candidate_eligibility`: optional pre-selection rule block for generic
+  candidate-level exclusion contracts
 - `labels`: optional training-label source contract; defaults to
   campaign-scoped label history
 - `transforms_x`: `{ name, params }` (raw X -> model-ready X)
@@ -102,6 +104,50 @@ IDs. They do not change label-source validation, training labels, or X
 transforms. This is the preferred way to run split-specific campaigns over a
 large shared candidate table without physically copying that table for each
 split.
+
+### Candidate eligibility
+
+`candidate_eligibility` is an optional pre-selection contract. OPAL applies
+these rules after `candidate_scope` and before excluding already-labeled IDs,
+scoring, objective ranking, or selection. Use it for generic, auditable
+candidate exclusion rules that should affect every future round. OPAL records
+input rows, output rows, filtered counts, rule ids, and parameter hashes in
+validation and runtime context reports. A rule that leaves too few candidates
+must fail fast rather than silently changing selection behavior.
+
+The first built-in rule is `restriction_site_exclusion`. It scans the assembled
+insert defined by a study- or campaign-owned strategy and excludes candidates
+with unexpected restriction enzyme motifs. OPAL owns the generic scan/report
+contract; the study owns the concrete cloning strategy, flank sequences, and
+allowed motif regions.
+
+```yaml
+candidate_eligibility:
+  rules:
+    - name: restriction_site_exclusion
+      params:
+        sequence_column: sequence
+        scan_space: final_assembled_insert
+        assembly_strategy_ref: sfxi_promoter_insert:v1
+        left_flank: accgggatcctgcag
+        right_flank: tgagggaattcgcga
+        expected_core_length: 60
+        min_remaining_candidates: 1000
+        forbidden_sites:
+          - enzyme: BamHI
+            motif: GGATCC
+            allowed_regions: [left_flank]
+          - enzyme: EcoRI
+            motif: GAATTC
+            allowed_regions: [right_flank]
+```
+
+For this rule, `sequence_column` must contain the candidate core sequence, not
+a context window or final insert. Flanks must be lowercase `acgt`; motifs are
+uppercase `ACGT`; `scan_space` currently supports only
+`final_assembled_insert`; `on_violation` currently supports only `exclude`.
+Allowed regions are exact flank/core regions. A motif spanning a flank/core
+junction is not allowed unless a future rule explicitly models that region.
 
 `safety.max_x_matrix_gib` is a fail-fast memory budget for model-ready X batches
 during `opal run`. For `writeback.prediction_records: ledger_only`, OPAL loads

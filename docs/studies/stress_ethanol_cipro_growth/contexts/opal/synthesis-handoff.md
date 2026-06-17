@@ -96,6 +96,11 @@ Required invariants:
 - Final sequence is exactly
   `left_flank.lower() + core_sequence.upper() + right_flank.lower()`.
 - Final length equals `left_flank_len + core_len + right_flank_len`.
+- The current SFXI strategy declares BamHI `GGATCC` as allowed only in the
+  5 prime flank and EcoRI `GAATTC` as allowed only in the 3 prime flank.
+  Validation scans the final assembled insert, so core hits and flank/core
+  junction-spanning hits are ineligible even if the isolated promoter core
+  would appear acceptable.
 - Every canonical `id` is unique in a synthesis batch unless a deduplication
   policy is explicitly configured.
 - Every order alias is globally unique within the study alias ledger.
@@ -136,7 +141,10 @@ CpxR TFBS except for explicit CpxR comparator slots. Strong slots use sigma-35
 `f/e`; exploratory slots use `d/c`; spacers are constrained to 16-19 bp. The
 current DenseGen sigma-70 core map is `f=TTGACA`, `e=TAGACA`, `d=TTTACA`,
 `c=TTGTGA`, and `b=CTGACA`; batch zero excludes `b`. All current batch-0
-promoter cores carry the `TATAAT` sigma-10 sequence.
+promoter cores carry the `TATAAT` sigma-10 sequence. The selector also applies
+the SFXI restriction-site eligibility rule after configured DenseGen/archive
+population filters and before slot ranking; auxiliary LatentDNA review rows are
+not scanned unless they survive the declared candidate filters.
 
 The manifest records `selection_source=batch0_pre_assay`,
 `selection_epoch=pre_assay_seed`, `assay_batch_index=0`,
@@ -151,6 +159,9 @@ There are three nearby surfaces, but only two are synthesis sources:
 
 - Canonical pre-assay physical source: `decision/opal/batch0/select.py`.
   Synthesis handoff calls this selector and does not reimplement its row choice.
+- Canonical candidate-eligibility guard: OPAL `candidate_eligibility` with
+  `restriction_site_exclusion` in each stress campaign config. It removes
+  physically unclonable candidates before measured-round scoring and selection.
 - Canonical measured-round physical source: OPAL `selection-set`, backed by
   campaign ledgers under
   `src/dnadesign/opal/campaigns/<campaign_slug>/outputs/ledger/`, resolved by

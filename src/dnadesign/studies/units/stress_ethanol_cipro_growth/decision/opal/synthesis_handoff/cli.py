@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ from .batch0_source import (
     build_batch0_selected_candidates,
 )
 from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS
-from .contracts import CloningStrategy, SelectedCandidate
+from .contracts import SelectedCandidate
 from .exports import campaign_synthesis_output_dir, render_campaign_scoped_exports
 from .manifest import build_synthesis_manifest
 from .opal_round_source import selected_candidates_from_opal_round_campaigns
@@ -32,20 +33,7 @@ from .records import (
     source_mode_from_handoff_record,
     validate_manifest_against_handoff_record,
 )
-
-
-def _load_strategy(path: Path) -> CloningStrategy:
-    with path.open("r", encoding="utf-8") as handle:
-        raw = yaml.safe_load(handle) or {}
-    if not isinstance(raw, dict):
-        raise ValueError(f"strategy config must be a mapping: {path}")
-    return CloningStrategy(
-        name=str(raw["name"]),
-        version=str(raw["version"]),
-        left_flank=str(raw["left_flank"]),
-        right_flank=str(raw["right_flank"]),
-        expected_core_length=int(raw["expected_core_length"]),
-    )
+from .strategy import load_cloning_strategy
 
 
 def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
@@ -207,6 +195,24 @@ def _summary(payload: dict[str, Any], *, as_json: bool) -> None:
         print(f"{key}: {value}")
 
 
+def _parser_error(parser: argparse.ArgumentParser, args: argparse.Namespace, message: str) -> None:
+    if bool(getattr(args, "json", False)):
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "context": "synthesis_handoff",
+                    "error": {"message": message},
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    parser.error(message)
+
+
 def _record_path_for(repo_root: Path, explicit_path: Path | None) -> Path:
     if explicit_path is not None:
         if explicit_path.is_absolute():
@@ -337,18 +343,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             handoff_record=handoff_record,
         )
     except ValueError as exc:
-        parser.error(str(exc))
+        _parser_error(parser, args, str(exc))
     as_of_round = args.as_of_round if args.as_of_round is not None else inferred_as_of_round
     if handoff_record is not None and inferred_as_of_round is not None and args.as_of_round is not None:
         if int(args.as_of_round) != int(inferred_as_of_round):
-            parser.error(
-                f"--round {args.as_of_round} conflicts with handoff record model_as_of_round {inferred_as_of_round}"
+            _parser_error(
+                parser,
+                args,
+                f"--round {args.as_of_round} conflicts with handoff record model_as_of_round {inferred_as_of_round}",
             )
 
     if source is None:
         if args.write:
-            parser.error("--source batch0, --source opal-round, or --selected-csv is required when --write is set")
-        strategy = _load_strategy(args.strategy_yaml)
+            _parser_error(
+                parser,
+                args,
+                "--source batch0, --source opal-round, or --selected-csv is required when --write is set",
+            )
+        strategy = load_cloning_strategy(args.strategy_yaml)
         _summary(
             {
                 "status": "ok",
@@ -362,7 +374,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
-    strategy = _load_strategy(args.strategy_yaml)
+    strategy = load_cloning_strategy(args.strategy_yaml)
     try:
         batch_id = _batch_id_from_source(
             source=source,
@@ -371,7 +383,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             as_of_round=as_of_round,
         )
     except ValueError as exc:
-        parser.error(str(exc))
+        _parser_error(parser, args, str(exc))
 
     source_report: dict[str, Any] = {}
     candidate_records_path: Path | None = None
@@ -387,7 +399,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 repo_root=repo_root,
             )
         except ValueError as exc:
-            parser.error(str(exc))
+            _parser_error(parser, args, str(exc))
     elif source == "opal-round":
         repo_root = args.repo_root or _repo_root_from(Path.cwd())
         campaign_configs = args.campaign_config or [repo_root / path for path in DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS]
@@ -398,7 +410,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 handoff_record=handoff_record,
             )
         except ValueError as exc:
-            parser.error(str(exc))
+            _parser_error(parser, args, str(exc))
         try:
             selected, source_report = selected_candidates_from_opal_round_campaigns(
                 campaign_configs,
@@ -408,15 +420,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 repo_root=repo_root,
             )
         except ValueError as exc:
-            parser.error(str(exc))
+            _parser_error(parser, args, str(exc))
     else:
         if args.selected_csv is None:
-            parser.error("--selected-csv is required when --source selected-csv")
+            _parser_error(parser, args, "--selected-csv is required when --source selected-csv")
         repo_root = args.repo_root
         try:
             selected = _selected_from_csv(args.selected_csv)
         except ValueError as exc:
-            parser.error(str(exc))
+            _parser_error(parser, args, str(exc))
 
     if handoff_record is not None:
         selected = apply_handoff_record_lifecycle(selected, handoff_record)
@@ -429,7 +441,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             strategy_id=strategy.strategy_id,
         )
     except ValueError as exc:
-        parser.error(str(exc))
+        _parser_error(parser, args, str(exc))
     campaign_counts = manifest.groupby("campaign_slug", sort=False).size().astype(int).to_dict()
     payload: dict[str, Any] = {
         "status": "ok",
@@ -455,7 +467,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload["mode"] = "written"
             payload["campaign_exports"] = campaign_exports.to_dict("records")
         elif args.output_dir is None:
-            parser.error("--output-dir is required when --write is set")
+            _parser_error(parser, args, "--output-dir is required when --write is set")
         else:
             args.output_dir.mkdir(parents=True, exist_ok=True)
             manifest_path = args.output_dir / "synthesis_manifest.csv"

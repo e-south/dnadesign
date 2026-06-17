@@ -116,6 +116,24 @@ The review table is study-generated until labels are measured. Do not treat
 LatentDNA margins as phenotype evidence, and do not promote UMAP placement or
 centroid-nearest rank into the selection rule.
 
+Before campaign slot ranking, the selector applies the configured
+`synthesis_eligibility` rule from `sampling.yaml`. That rule loads the
+versioned SFXI cloning strategy and uses OPAL's generic
+`restriction_site_exclusion` primitive to scan the final assembled insert:
+
+- candidate core sequence: 60 nt uppercase promoter core from `sequence`
+- 5 prime flank: `accgggatcctgcag`
+- 3 prime flank: `tgagggaattcgcga`
+- BamHI `GGATCC` is allowed only in the 5 prime flank
+- EcoRI `GAATTC` is allowed only in the 3 prime flank
+
+Any extra BamHI/EcoRI site in the core or across a flank/core junction is
+ineligible. The selector applies this after the configured densegen/archive
+population filters and before campaign slot ranking, so auxiliary LatentDNA
+review rows are not scanned unless they survive the declared candidate filters.
+The live min-remaining guard is `1000` candidates; tiny unit tests must lower
+that value explicitly instead of weakening the production rule.
+
 The current batch-0 selector is BaeR-forward for ethanol and dual-response
 coverage while retaining CpxR comparators:
 

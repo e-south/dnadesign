@@ -59,6 +59,11 @@ filters:
   exploratory_sigma35_variants: ["d", "c"]
   note: LatentDNA margins are pre-assay priors only; do not treat them as phenotype claims.
 
+synthesis_eligibility:
+  strategy_yaml: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/sfxi_promoter_insert_v1.yaml
+  sequence_column: sequence
+  min_remaining_candidates: 1000
+
 diversity:
   keys:
     - regulator_composition

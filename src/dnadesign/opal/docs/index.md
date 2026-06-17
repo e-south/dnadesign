@@ -1,7 +1,7 @@
 ## OPAL Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-20
+**Last verified:** 2026-06-17
 
 
 This documentation covers end-to-end workflows, plugin contracts and math, runtime concepts, and exact configuration and CLI references. Use the workflow guides for operational command order, then use plugin/concept/reference pages for deeper details.
@@ -11,6 +11,10 @@ This documentation covers end-to-end workflows, plugin contracts and math, runti
 1. Only if infer has already written the chosen feature column into USR, start with [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md).
 2. If you want a tool-local baseline campaign, start with [RF + SFXI + top_n](./workflows/rf-sfxi-topn.md).
 3. If you need config or CLI lookup before running a workflow, jump to [Configuration (`campaign.yaml`)](./reference/configuration.md) or [CLI commands](./reference/cli.md).
+4. If a downstream study needs physically valid selected sequences, check the
+   generic [candidate eligibility contract](./reference/configuration.md#candidate-eligibility)
+   and the public [`selection-set`](./reference/cli.md#selection-set) surface
+   before adding study-owned logistics.
 
 ### Workflows
 
@@ -44,7 +48,7 @@ These pages describe runtime architecture and RoundCtx contract auditing behavio
 These pages are contract-oriented lookups for schema, data surfaces, CLI behavior, and plotting.
 - [Configuration (`campaign.yaml`)](./reference/configuration.md): campaign schema and field meanings.
 - [Data contracts and ledgers](./reference/data-contracts.md): artifact schemas, ledgers, and persistence surfaces.
-- [CLI commands](./reference/cli.md): command interfaces and argument contracts.
+- [CLI commands](./reference/cli.md): command interfaces and argument contracts, including `selection-set` inspection/export for downstream handoffs.
 - [Plots](./reference/plots.md): plotting outputs, expectations, and usage.
 - [Review manifests](./reference/review-manifests.md): campaign review bundle schema and stale-artifact behavior.
 - [Notebooks](./reference/notebooks.md): generated marimo notebook contract and public view-model surface.

@@ -14,6 +14,10 @@ manifest into vendor-specific formats such as an Azenta/GeneWiz workbook.
 - Keep `id` as the canonical OPAL candidate identifier.
 - Keep `synthesis_name` as a vendor/order alias.
 - Treat rendered manifests and workbooks as generated `outputs/**` artifacts.
+- Treat cloning restriction-site policy as a strategy-level physical-order
+  constraint. OPAL can use the same generic eligibility primitive before
+  selection, but this package still revalidates the assembled insert before
+  writing vendor files.
 
 ## Batch Zero
 
@@ -70,6 +74,13 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 batch zero it resolves to the checked-in batch-0 selector, validates the
 expected campaign row counts and lifecycle fields, and reports the exact
 campaign-local artifact paths plus current hash/readback status.
+
+The current strategy config
+`configs/sfxi_promoter_insert_v1.yaml` declares the cloning restriction policy:
+BamHI `GGATCC` is allowed only in the 5 prime flank and EcoRI `GAATTC` is
+allowed only in the 3 prime flank. Manifest construction scans the final
+assembled insert, not just the 60 nt core, so a junction-spanning site fails
+before any workbook or GenBank output is trusted.
 
 After measured labels exist, use the same handoff command with a new checked-in
 lifecycle record. The measured-round record should set
@@ -137,7 +148,8 @@ Each folder contains:
 - `<batch_id>__<campaign_slug>__synthesis_manifest.csv`: canonical manifest
   with candidate IDs, aliases,
   campaign/round/source provenance, `selection_epoch`, `assay_batch_index`,
-  `model_as_of_round`, core and final sequence hashes, and flank spans.
+  `model_as_of_round`, core and final sequence hashes, flank spans, and
+  restriction-site validation status.
 - `<batch_id>__<campaign_slug>__azenta_gene_synthesis.xlsx`:
   GeneWiz/Azenta-ready workbook projection with `Sequence Name` and `Sequence`
   columns.

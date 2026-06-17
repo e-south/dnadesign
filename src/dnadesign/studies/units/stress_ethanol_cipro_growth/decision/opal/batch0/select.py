@@ -19,6 +19,9 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from dnadesign.opal import CandidateEligibilityBlock, PluginRef, apply_candidate_eligibility
+
+from ..synthesis_handoff.strategy import load_cloning_strategy
 from .candidate_table import (
     validate_configured_candidate_feature_table,
     validate_selected_ids_against_candidate_feature_table,
@@ -70,6 +73,64 @@ def _resolve_repo_path(repo_root: Path, value: str | Path) -> Path:
     if path.is_absolute():
         return path
     return repo_root / path
+
+
+def _strategy_eligibility_params(
+    *,
+    strategy_path: Path,
+    sequence_column: str,
+    min_remaining_candidates: int | None,
+) -> dict[str, Any]:
+    strategy = load_cloning_strategy(strategy_path)
+    if not strategy.restriction_sites:
+        raise ValueError(f"synthesis eligibility strategy has no restriction_sites: {strategy_path}")
+    params: dict[str, Any] = {
+        "sequence_column": sequence_column,
+        "scan_space": "final_assembled_insert",
+        "assembly_strategy_ref": strategy.strategy_id,
+        "left_flank": strategy.left_flank,
+        "right_flank": strategy.right_flank,
+        "expected_core_length": strategy.expected_core_length,
+        "forbidden_sites": [site.to_json() for site in strategy.restriction_sites],
+    }
+    if min_remaining_candidates is not None:
+        params["min_remaining_candidates"] = int(min_remaining_candidates)
+    return params
+
+
+def _apply_synthesis_eligibility(
+    frame: pd.DataFrame,
+    config: Mapping[str, Any],
+    *,
+    repo_root: Path,
+) -> pd.DataFrame:
+    raw = config.get("synthesis_eligibility")
+    if raw is None:
+        return frame
+    if not isinstance(raw, Mapping):
+        raise ValueError("synthesis_eligibility must be a mapping")
+    strategy_yaml = raw.get("strategy_yaml")
+    if strategy_yaml is None or not str(strategy_yaml).strip():
+        raise ValueError("synthesis_eligibility.strategy_yaml must be non-empty")
+    params = _strategy_eligibility_params(
+        strategy_path=_resolve_repo_path(repo_root, str(strategy_yaml)),
+        sequence_column=str(raw.get("sequence_column", "sequence")),
+        min_remaining_candidates=(
+            None if raw.get("min_remaining_candidates") is None else int(raw["min_remaining_candidates"])
+        ),
+    )
+    result = apply_candidate_eligibility(
+        frame,
+        CandidateEligibilityBlock(
+            rules=[
+                PluginRef(
+                    name="restriction_site_exclusion",
+                    params=params,
+                )
+            ]
+        ),
+    )
+    return result.frame
 
 
 def _is_missing(value: Any) -> bool:
@@ -444,9 +505,15 @@ def _select_for_slot(
     return ranked.head(count).copy()
 
 
-def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.DataFrame:
+def select_batch0(
+    candidates: pd.DataFrame,
+    config: Mapping[str, Any],
+    *,
+    repo_root: str | Path | None = None,
+) -> pd.DataFrame:
     """Select reviewed batch-0 rows for all configured OPAL campaigns."""
 
+    root = Path(repo_root) if repo_root is not None else _repo_root_from(Path(__file__))
     frame = _ensure_candidate_columns(candidates)
     filters = dict(config.get("filters", {}) or {})
     diversity = dict(config.get("diversity", {}) or {})
@@ -467,6 +534,7 @@ def select_batch0(candidates: pd.DataFrame, config: Mapping[str, Any]) -> pd.Dat
     if allowed_spacers:
         wanted_spacers = {int(value) for value in allowed_spacers}
         frame = frame[pd.to_numeric(frame["spacer_length"], errors="coerce").isin(wanted_spacers)].copy()
+    frame = _apply_synthesis_eligibility(frame, config, repo_root=root)
     selected_frames: list[pd.DataFrame] = []
     used_ids: set[str] = set()
 
@@ -546,7 +614,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     repo_root = args.repo_root or _repo_root_from(args.config)
     candidate_table_report = validate_configured_candidate_feature_table(config, repo_root=repo_root)
     candidates = build_candidate_frame(config, repo_root=repo_root)
-    selected = select_batch0(candidates, config)
+    selected = select_batch0(candidates, config, repo_root=repo_root)
     selection_table_report = validate_selected_ids_against_candidate_feature_table(
         selected,
         config,

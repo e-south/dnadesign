@@ -56,6 +56,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   appendix visualizations do not gate OPAL campaign readiness.
 - Shared labels: `_opal/observed_labels.parquet` under the candidate table
   dataset.
+- Candidate eligibility: stress OPAL campaign configs apply OPAL's generic
+  `restriction_site_exclusion` rule before scoring/selection. The study-owned
+  SFXI strategy allows BamHI only in the 5 prime flank and EcoRI only in the
+  3 prime flank of the final assembled insert.
 
 ### Physical Synthesis Handoff
 
@@ -67,6 +71,10 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   Azenta workbook, per-sequence GenBank directory, and GenBank feature table.
 - Batch-0 handoffs come from the checked-in pre-assay selector; measured-round
   handoffs must cite OPAL `run_id`, `model_as_of_round`, and assay batch index.
+- Synthesis handoff revalidates the same SFXI restriction-site policy before
+  writing vendor workbooks or GenBank files. This is the last-mile guard; OPAL
+  campaign eligibility is the first place future measured rounds should exclude
+  unclonable candidates.
 
 ### Boundaries
 

@@ -26,6 +26,25 @@ data:
   y_column_name: "opal__stress_eth_cip_cipro_rf_sfxi_topn__y"
   y_expected_length: 8
 
+candidate_eligibility:
+  rules:
+    - name: restriction_site_exclusion
+      params:
+        sequence_column: sequence
+        scan_space: final_assembled_insert
+        assembly_strategy_ref: sfxi_promoter_insert:v1
+        left_flank: accgggatcctgcag
+        right_flank: tgagggaattcgcga
+        expected_core_length: 60
+        min_remaining_candidates: 1000
+        forbidden_sites:
+          - enzyme: BamHI
+            motif: GGATCC
+            allowed_regions: [left_flank]
+          - enzyme: EcoRI
+            motif: GAATTC
+            allowed_regions: [right_flank]
+
 labels:
   source:
     kind: usr_sidecar

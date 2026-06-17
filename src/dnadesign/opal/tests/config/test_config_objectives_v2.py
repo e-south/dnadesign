@@ -127,6 +127,60 @@ selection:
     assert cfg.data.candidate_scope.id_column == "id"
 
 
+def test_load_config_accepts_candidate_eligibility_restriction_site_rule(tmp_path: Path) -> None:
+    cfg_path = _write_config(
+        tmp_path / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: local, path: "./records.parquet" }
+  x_column_name: "X"
+  y_column_name: "Y"
+candidate_eligibility:
+  rules:
+    - name: restriction_site_exclusion
+      params:
+        sequence_column: sequence
+        scan_space: final_assembled_insert
+        assembly_strategy_ref: sfxi_promoter_insert:v1
+        left_flank: accgggatcctgcag
+        right_flank: tgagggaattcgcga
+        expected_core_length: 60
+        min_remaining_candidates: 1
+        forbidden_sites:
+          - enzyme: BamHI
+            motif: GGATCC
+            allowed_regions: [left_flank]
+          - enzyme: EcoRI
+            motif: GAATTC
+            allowed_regions: [right_flank]
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params:
+    top_k: 2
+    score_ref: "scalar_identity_v1/scalar"
+    objective_mode: maximize
+    tie_handling: competition_rank
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+
+    assert len(cfg.candidate_eligibility.rules) == 1
+    rule = cfg.candidate_eligibility.rules[0]
+    assert rule.name == "restriction_site_exclusion"
+    assert rule.params["assembly_strategy_ref"] == "sfxi_promoter_insert:v1"
+    assert rule.params["forbidden_sites"][0]["enzyme"] == "BamHI"
+
+
 def test_load_config_accepts_sfxi_uncertainty_method(tmp_path: Path) -> None:
     cfg_path = _write_config(
         tmp_path / "campaign.yaml",
