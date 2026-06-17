@@ -1,7 +1,7 @@
 ## Construct Template Contexts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-06-17
 
 Use this page when construct is supplying larger resolved contexts for infer or other downstream tools.
 

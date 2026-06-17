@@ -35,6 +35,53 @@ def test_resolve_test_targets_skips_tools_without_tests(tmp_path: Path) -> None:
     assert targets == []
 
 
+def test_resolve_test_targets_includes_changed_study_unit_tests(tmp_path: Path) -> None:
+    shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
+    stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
+    retron_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "retron_hairpin_design" / "tests"
+    shared_tests.mkdir(parents=True, exist_ok=True)
+    stress_tests.mkdir(parents=True, exist_ok=True)
+    retron_tests.mkdir(parents=True, exist_ok=True)
+
+    targets = resolve_test_targets(
+        repo_root=tmp_path,
+        tool_names=["studies"],
+        changed_files=[
+            "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/candidate_table.py",
+        ],
+    )
+
+    assert targets == [str(shared_tests), str(stress_tests)]
+
+
+def test_resolve_test_targets_includes_all_study_units_for_shared_studies_change(tmp_path: Path) -> None:
+    shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
+    retron_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "retron_hairpin_design" / "tests"
+    stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
+    shared_tests.mkdir(parents=True, exist_ok=True)
+    retron_tests.mkdir(parents=True, exist_ok=True)
+    stress_tests.mkdir(parents=True, exist_ok=True)
+
+    targets = resolve_test_targets(
+        repo_root=tmp_path,
+        tool_names=["studies"],
+        changed_files=["src/dnadesign/studies/README.md"],
+    )
+
+    assert targets == [str(shared_tests), str(retron_tests), str(stress_tests)]
+
+
+def test_resolve_test_targets_includes_all_study_units_when_changed_file_context_is_missing(tmp_path: Path) -> None:
+    shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
+    stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
+    shared_tests.mkdir(parents=True, exist_ok=True)
+    stress_tests.mkdir(parents=True, exist_ok=True)
+
+    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["studies"])
+
+    assert targets == [str(shared_tests), str(stress_tests)]
+
+
 def test_main_fails_for_unknown_tool(tmp_path: Path) -> None:
     (tmp_path / "src" / "dnadesign" / "usr" / "tests").mkdir(parents=True, exist_ok=True)
 
@@ -81,3 +128,30 @@ def test_main_prints_one_target_per_line(tmp_path: Path, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     assert captured.out == f"{usr_tests}\n"
+
+
+def test_main_uses_changed_file_context_for_study_unit_targets(tmp_path: Path, capsys) -> None:
+    shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
+    stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
+    shared_tests.mkdir(parents=True, exist_ok=True)
+    stress_tests.mkdir(parents=True, exist_ok=True)
+    changed_files = tmp_path / "changed-files.txt"
+    changed_files.write_text(
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/snapshot.py\n",
+        encoding="utf-8",
+    )
+
+    rc = main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--affected-tools-csv",
+            "studies",
+            "--changed-files-file",
+            str(changed_files),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert captured.out == f"{shared_tests}\n{stress_tests}\n"

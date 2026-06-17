@@ -22,6 +22,7 @@ Use this index to find maintainer workflows, checks, and planning records.
 | OPS native gate stderr or audit-fidelity behavior | `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr` |
 | OPS orchestration state or active-job discovery | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"` |
 | OPS status aggregation semantics | `uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py` |
+| study-unit code under `src/dnadesign/studies/units/<study-id>/` | `printf '%s\n' <changed-paths> > .ci_changed_files.txt && uv run python -m dnadesign.devtools.ci.test_targets --repo-root . --affected-tools-csv studies --changed-files-file .ci_changed_files.txt` then run `uv run pytest -q` on the printed targets |
 | code in one tool | `uv run pytest -q <tool test path>` and then broaden to the repo-level checks when the slice is stable |
 
 ### Day-to-day tasks
@@ -53,7 +54,8 @@ Use this index to find maintainer workflows, checks, and planning records.
 
 ### Repo-local maintainer gate
 
-Run this from the repo root for tracked changes in `dnadesign`:
+Run this from the repo root for merge-depth validation of tracked changes in
+`dnadesign`:
 
 ```bash
 uv sync --locked --group dev
@@ -62,6 +64,25 @@ uv run ruff format --check .
 uv run pytest -q
 uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
+
+For tactical agent work, start with the smallest targeted suite and then run the
+repo-level static gates that match the touched surface. Full `pytest -q` is a
+merge-depth check for broad or risky changes, not the default inner loop for
+every monorepo edit.
+
+To mirror CI scope locally from a known changed-file list:
+
+```bash
+uv run python -m dnadesign.devtools.ci.test_targets \
+  --repo-root . \
+  --affected-tools-csv "<tool1,tool2>" \
+  --changed-files-file .ci_changed_files.txt
+```
+
+When `studies` is affected, the resolver includes `src/dnadesign/studies/tests`
+plus the changed `src/dnadesign/studies/units/<study-id>/tests` directories. If
+the changed-file context is unavailable or shared `studies` code changed, it
+broadens to every study-unit test directory.
 
 ### CI and quality checks
 

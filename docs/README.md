@@ -159,6 +159,8 @@ contract artifacts or bundle manifest.
 ### Maintainer references
 
 - [Developer docs](dev/README.md): CI/testing contracts and maintainer operations.
+- [Repo change gate](repo-change-gate.md): tactical validation route for local code, docs, and study changes.
+- [Repo maintenance](repo-maintenance.md): compact route map for broad maintainer work.
 - [Execution plans index](exec-plans/README.md): active and completed execution-plan records.
 - [Study records index](studies/README.md): checked-in live study manifests, affiliated-dataset registries, and status notes for real cross-tool efforts.
 - [Templates index](templates/README.md): reusable templates for runbooks, plans, and records.

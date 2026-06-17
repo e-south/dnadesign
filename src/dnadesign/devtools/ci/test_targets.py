@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+_STUDIES_TOOL_NAME = "studies"
+
 
 def parse_tools_csv(value: str) -> list[str]:
     tools: list[str] = []
@@ -31,19 +33,62 @@ def parse_tools_csv(value: str) -> list[str]:
     return tools
 
 
-def resolve_test_targets(*, repo_root: Path, tool_names: list[str]) -> list[str]:
+def _load_changed_files(path: Path | None) -> list[str]:
+    if path is None:
+        return []
+    if not path.exists():
+        raise FileNotFoundError(f"Changed-files input is missing: {path}")
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _study_unit_test_dirs(*, studies_root: Path, changed_files: list[str]) -> list[Path]:
+    units_root = studies_root / "units"
+    if not units_root.is_dir():
+        return []
+
+    changed_study_ids: set[str] = set()
+    shared_studies_change = not changed_files
+    for raw_path in changed_files:
+        parts = Path(raw_path).parts
+        if len(parts) < 3 or parts[:3] != ("src", "dnadesign", "studies"):
+            continue
+        if len(parts) >= 5 and parts[3] == "units":
+            changed_study_ids.add(parts[4])
+            continue
+        shared_studies_change = True
+
+    if shared_studies_change:
+        unit_roots = sorted(path for path in units_root.iterdir() if path.is_dir())
+    else:
+        unit_roots = [units_root / study_id for study_id in sorted(changed_study_ids)]
+
+    return [unit_root / "tests" for unit_root in unit_roots if (unit_root / "tests").is_dir()]
+
+
+def _append_existing_target(targets: list[str], target: Path) -> None:
+    if target.is_dir():
+        target_value = str(target)
+        if target_value not in targets:
+            targets.append(target_value)
+
+
+def resolve_test_targets(
+    *, repo_root: Path, tool_names: list[str], changed_files: list[str] | None = None
+) -> list[str]:
     src_root = repo_root / "src" / "dnadesign"
     if not src_root.exists():
         raise FileNotFoundError(f"Expected dnadesign source root at {src_root}")
 
+    changed_files = changed_files or []
     targets: list[str] = []
     for tool_name in tool_names:
         tool_root = src_root / tool_name
         if not tool_root.is_dir():
             raise ValueError(f"Unknown tool in affected set: {tool_name}")
-        test_dir = tool_root / "tests"
-        if test_dir.is_dir():
-            targets.append(str(test_dir))
+        _append_existing_target(targets, tool_root / "tests")
+        if tool_name == _STUDIES_TOOL_NAME:
+            for test_dir in _study_unit_test_dirs(studies_root=tool_root, changed_files=changed_files):
+                _append_existing_target(targets, test_dir)
 
     return targets
 
@@ -52,6 +97,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Resolve affected tool test directories for CI pytest invocations.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--affected-tools-csv", required=True)
+    parser.add_argument("--changed-files-file", type=Path, default=None)
     return parser
 
 
@@ -59,7 +105,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         tool_names = parse_tools_csv(args.affected_tools_csv)
-        targets = resolve_test_targets(repo_root=args.repo_root, tool_names=tool_names)
+        changed_files = _load_changed_files(args.changed_files_file)
+        targets = resolve_test_targets(repo_root=args.repo_root, tool_names=tool_names, changed_files=changed_files)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1

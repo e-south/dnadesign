@@ -1,7 +1,7 @@
 ## Cluster verification contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-06-17
 
 Use this page when you are changing `cluster` code, docs, or checked-in workspaces/presets and want the smallest deterministic verification path.
 

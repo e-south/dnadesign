@@ -231,7 +231,8 @@ jobs:
           mapfile -t targets < <(
             PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
               --repo-root . \
-              --affected-tools-csv "$affected_csv"
+              --affected-tools-csv "$affected_csv" \
+              --changed-files-file .ci_changed_files.txt
           )
 
           if [ "${#targets[@]}" -eq 0 ]; then
@@ -359,7 +360,8 @@ jobs:
             mapfile -t targets < <(
               PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
                 --repo-root . \
-                --affected-tools-csv "$affected_csv"
+                --affected-tools-csv "$affected_csv" \
+                --changed-files-file .ci_changed_files.txt
             )
 
             if [ "${#targets[@]}" -eq 0 ]; then
