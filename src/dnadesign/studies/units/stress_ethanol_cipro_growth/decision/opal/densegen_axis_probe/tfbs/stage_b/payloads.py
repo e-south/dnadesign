@@ -84,11 +84,11 @@ def tfbs_stage_b_campaign_config_payload(
     )
     return {
         "campaign": {
-            "name": f"DenseGen TFBS learnability: {target_label}, {role_label}, seed {int(cfg.seed)}",
+            "name": f"Dense Array TFBS metadata probe: {target_label}, {role_label}, seed {int(cfg.seed)}",
             "slug": slug,
             "description": (
-                "Stage B sentinel OPAL campaign for a synthetic DenseGen TFBS construction label. "
-                "The label is a pre-assay learnability target, not a wet-lab phenotype."
+                "Pre-assay TFBS metadata probe for a Dense Array construction label. "
+                "This tests metadata learnability from promoter embeddings, not wet-lab phenotype prediction."
             ),
             "workdir": str(workdir.resolve()),
             "metadata": {
@@ -241,7 +241,7 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
                     "title": f"Predicted selected label value by round: {target_label}",
                     "surface_label": f"Predicted selected label value: {target_label}",
                     "caption": (
-                        "Selected-candidate mean predicted expected scalar label by OPAL round. "
+                        "Selected-candidate mean predicted expected scalar label by selection round. "
                         "This is a synthetic construction-label objective, not a measured biological phenotype."
                     ),
                 },
@@ -256,10 +256,10 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
 
 def _role_label(*, oracle_role: str, pair_row: Mapping[str, Any]) -> str:
     if oracle_role == "positive":
-        return "DenseGen label"
+        return "sequence-matched metadata"
     null_role = str(pair_row.get("null_control_role") or "")
     if null_role == "count_fixed_shuffled_slot_negative_control":
-        return "count-fixed shuffled-slot control"
+        return "slot-shuffled control"
     if null_role == "count_preserving_slot_confound_control":
-        return "count-preserving slot confound control"
-    return "matched scrambled-label control"
+        return "count-preserving diagnostic"
+    return "row-shuffled control"

@@ -10,8 +10,9 @@ import pandas as pd
 REALIZED_REVIEW_PLOT_MANIFEST_SCHEMA_VERSION = "stress_ethanol_cipro_growth.tfbs_stage_b_review_plots.v1"
 REALIZED_REVIEW_PLOT_MANIFEST_FILENAME = "tfbs_stage_b_realized_label_plot_manifest.json"
 REALIZED_REVIEW_INTERPRETATION_BOUNDARY = (
-    "These plots use selected label values from DenseGen and profile-specific control label tables. For shuffled "
-    "controls, control values are control-label values; post hoc DenseGen-truth checks must be named separately. "
+    "These plots use selected label values from sequence-matched construction metadata and profile-specific "
+    "control label tables. For shuffled controls, control values are control-label values; post hoc "
+    "sequence-matched metadata checks must be named separately. "
     "These are selected-batch enrichment review surfaces, not acquisition-score traces or monotonic model-learning "
     "curves."
 )
@@ -22,9 +23,10 @@ REALIZED_REVIEW_STYLE_CONTRACT = {
     "visible_spines": ["left", "bottom"],
     "tick_style": "styled_outward_ticks",
     "font_scale": "unified_review_body_font_for_ticks_axes_subtitle_legend",
+    "title_anchor": "axes_center",
     "square_axes": "where_data_shape_supports_it",
     "trajectory_axes": "square",
-    "trajectory_reference_lines": ["baseline", "same_batch_top_k_reference"],
+    "trajectory_reference_lines": ["pool_average", "best_possible_single_batch_reference"],
 }
 
 RealizedReviewRenderer = Callable[[pd.DataFrame, pd.DataFrame, Path, str], None]

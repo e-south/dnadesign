@@ -43,7 +43,7 @@ def _details_cell() -> str:
             if _metric_rows:
                 metric_definitions_panel = opal_table(pl.DataFrame(_metric_rows), page_size=10)
             else:
-                metric_definitions_panel = mo.md("No manifest-backed plot metric definitions are available.")
+                metric_definitions_panel = mo.md("No plot metric definitions are available.")
 
             _change_rows = build_notebook_change_rows(selected_campaign_model)
             if _change_rows:
@@ -106,14 +106,14 @@ def _layout_cell() -> str:
                 _top_control_items.append(collection_set_ui)
             _items.append(mo.vstack(_top_control_items, gap=0.20))
             if active_view_mode != "Campaign set": _items.append(selected_campaign_header_md)
-            _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "OPAL campaigns at a glance"
+            _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "Campaigns at a glance"
             _accordion_items = {
                 _campaign_inventory_label: opal_table(campaign_summary_df, page_size=12),
             }
             if active_view_mode != "Campaign set":
                 _accordion_items.update(
                     {
-                        "Selected OPAL campaign": selected_overview_panel,
+                        "Selected campaign": selected_overview_panel,
                         "Validity": selected_validity_md,
                         "Changes": changes_panel,
                         "Metric definitions": metric_definitions_panel,

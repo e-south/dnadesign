@@ -22,7 +22,7 @@ from .contracts import (
 )
 from .frames import claim_interpretation_frame, cumulative_lift_trajectory, endpoint_summary_frame
 from .plots import materialize_frozen_replay_plots
-from .replay import frozen_rank_chunks, top_budget_chunks
+from .replay import frozen_rank_chunks, known_label_rank_chunks
 from .sources import (
     active_selection_frame,
     campaign_label_table,
@@ -68,7 +68,7 @@ def build_learning_loop_baseline_review(
     out_dir: str | Path,
     spec: LearningLoopBaselineSpec,
 ) -> FrozenReplayResult:
-    """Write active/frozen/top-budget baseline artifacts for completed TFBS Stage B campaigns."""
+    """Write active/frozen/known-label ranking artifacts for completed TFBS Stage B campaigns."""
 
     manifests = load_learning_loop_manifests([Path(path) for path in config_manifest_paths], spec=spec)
     for manifest in manifests:
@@ -84,7 +84,7 @@ def build_learning_loop_baseline_review(
     for campaign in all_campaigns:
         trajectories.append(_active_trajectory(campaign, rounds=rounds, selection_k=selection_k))
         trajectories.append(_frozen_trajectory(campaign, rounds=rounds, selection_k=selection_k))
-        trajectories.append(_top_budget_trajectory(campaign, rounds=rounds, selection_k=selection_k))
+        trajectories.append(_known_label_ranking_trajectory(campaign, rounds=rounds, selection_k=selection_k))
     trajectory = pd.concat(trajectories, ignore_index=True)
     endpoint_summary = endpoint_summary_frame(trajectory, pairs=all_pairs)
     claim_interpretation = claim_interpretation_frame(endpoint_summary)
@@ -163,12 +163,12 @@ def _frozen_trajectory(campaign: Mapping[str, Any], *, rounds: int, selection_k:
     )
 
 
-def _top_budget_trajectory(campaign: Mapping[str, Any], *, rounds: int, selection_k: int) -> pd.DataFrame:
+def _known_label_ranking_trajectory(campaign: Mapping[str, Any], *, rounds: int, selection_k: int) -> pd.DataFrame:
     label_name = str(campaign["label_name"])
     labels = campaign_label_table(campaign)
     pool_baseline = float(labels[label_name].mean())
     seed_ids = initial_seed_ids(Path(str(campaign["initial_label_input_path"])))
-    selections = top_budget_chunks(
+    selections = known_label_rank_chunks(
         labels,
         label_name=label_name,
         selection_k=selection_k,

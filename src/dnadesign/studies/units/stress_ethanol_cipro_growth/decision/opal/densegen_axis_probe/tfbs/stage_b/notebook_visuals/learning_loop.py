@@ -12,25 +12,25 @@ from .specs import slug_token
 
 
 @dataclass(frozen=True)
-class TfbsStageBLearningLoopPortfolioSource:
-    """One learning-loop baseline review surface to expose in an OPAL portfolio notebook."""
+class TfbsProbeQuestionLearningLoopSource:
+    """One learning-loop baseline for a named probe question in an OPAL portfolio notebook."""
 
-    surface_id: str
-    surface_label: str
+    question_id: str
+    question_label: str
     evidence_tier: str
     replay_manifest_json_path: Path | str
 
 
 def namespaced_learning_loop_visuals(
-    source: TfbsStageBLearningLoopPortfolioSource,
+    source: TfbsProbeQuestionLearningLoopSource,
     *,
     evidence_tier_labels: Mapping[str, str],
     evidence_tier_ranks: Mapping[str, int],
 ) -> list[dict[str, Any]]:
     """Return namespaced portfolio entries for one learning-loop baseline surface."""
 
-    source_id = _required_token(source.surface_id, field="surface_id")
-    source_label = _required_text(source.surface_label, field="surface_label")
+    question_id = _required_token(source.question_id, field="question_id")
+    question_label = _required_text(source.question_label, field="question_label")
     evidence_tier = _required_evidence_tier(source.evidence_tier, labels=evidence_tier_labels)
     manifest_path = Path(source.replay_manifest_json_path)
     manifest_tier = _manifest_visual_tier(manifest_path)
@@ -39,21 +39,21 @@ def namespaced_learning_loop_visuals(
             "TFBS learning-loop evidence_tier must match the source manifest visual_tier: "
             f"requested={evidence_tier!r} manifest={manifest_tier!r}"
         )
-    namespace = slug_token(source_id)
+    namespace = slug_token(question_id)
     out: list[dict[str, Any]] = []
     for raw in learning_loop_visual_entries(manifest_path):
         comparison_set_key = f"{namespace}__{raw['comparison_set_key']}"
         visual = dict(raw)
         visual["visual_id"] = f"{namespace}__{raw.get('visual_id') or slug_token(str(raw.get('label') or 'visual'))}"
         visual["comparison_set_key"] = comparison_set_key
-        visual["comparison_set_label"] = f"{source_label}: {raw['comparison_set_label']}"
+        visual["comparison_set_label"] = _prefixed_label(question_label, str(raw["comparison_set_label"]))
         visual["comparison_set_match"] = {
-            "source_review_surface_id": source_id,
+            "probe_question_id": question_id,
             "evidence_tier": evidence_tier,
             **dict(raw.get("comparison_set_match") or {}),
         }
-        visual["source_review_surface_id"] = source_id
-        visual["source_review_surface_label"] = source_label
+        visual["probe_question_id"] = question_id
+        visual["probe_question_label"] = question_label
         visual["source_review_summary_json_path"] = str(manifest_path)
         visual["evidence_tier"] = evidence_tier
         visual["evidence_tier_label"] = evidence_tier_labels[evidence_tier]
@@ -92,4 +92,14 @@ def _manifest_visual_tier(path: Path) -> str:
     return tier
 
 
-__all__ = ["TfbsStageBLearningLoopPortfolioSource", "namespaced_learning_loop_visuals"]
+def _prefixed_label(source_label: str, raw_label: str) -> str:
+    """Prefix namespaced learning-loop labels without duplicating identical text."""
+
+    source = source_label.strip()
+    raw = raw_label.strip()
+    if raw == source or raw in {"Learning-loop baseline", "Baseline review"}:
+        return source
+    return f"{source}: {raw}"
+
+
+__all__ = ["TfbsProbeQuestionLearningLoopSource", "namespaced_learning_loop_visuals"]

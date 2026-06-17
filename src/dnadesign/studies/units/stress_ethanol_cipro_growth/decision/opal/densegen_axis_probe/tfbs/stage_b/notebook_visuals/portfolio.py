@@ -11,38 +11,43 @@ from typing import Any, Iterable, Mapping
 from .contracts import COLLECTION_VISUAL_MANIFEST_INDEX_SCHEMA_VERSION
 from .entries import visual_entries
 from .io import read_json, read_realized_plot_manifest, require_existing_file
-from .learning_loop import TfbsStageBLearningLoopPortfolioSource, namespaced_learning_loop_visuals
+from .learning_loop import TfbsProbeQuestionLearningLoopSource, namespaced_learning_loop_visuals
 from .specs import slug_token
 
 REPLICATED_REVIEW_SCHEMA_VERSION = "stress_ethanol_cipro_growth.tfbs_stage_b_replicated_review.v1"
 MIN_REPLICATE_COUNT = 2
 EVIDENCE_TIER_LABELS = {
-    "current_claim": "Current claim",
-    "current_boundary": "Current boundary",
-    "diagnostic": "Diagnostic",
+    "composition_campaign": "Composition campaigns",
+    "placement_campaign": "Placement campaigns",
+    "composition_learning_loop": "Learning-loop baselines",
+    "placement_learning_loop": "Learning-loop baselines",
+    "control_diagnostic": "Control diagnostics",
     "historical_precedent": "Historical precedent",
 }
 EVIDENCE_TIER_RANKS = {
-    "current_claim": 10,
-    "current_boundary": 20,
-    "diagnostic": 70,
+    "composition_campaign": 10,
+    "placement_campaign": 20,
+    "composition_learning_loop": 40,
+    "placement_learning_loop": 41,
+    "control_diagnostic": 70,
     "historical_precedent": 90,
 }
-_CURRENT_TIER_PROFILE_ROLES = {
-    "current_claim": {"canonical_stage_b_probe"},
-    "current_boundary": {
+_TIER_PROFILE_ROLES = {
+    "composition_campaign": {"canonical_stage_b_probe"},
+    "placement_campaign": {
         "boundary_stage_b_count_fixed_minimal_placement_probe",
         "boundary_stage_b_count_fixed_sentinel_probe",
     },
 }
+_CLAIM_READY_REQUIRED_TIERS = frozenset({"composition_campaign"})
 
 
 @dataclass(frozen=True)
-class TfbsStageBReviewPortfolioSource:
-    """One replicated TFBS Stage B review surface to expose in an OPAL portfolio notebook."""
+class TfbsProbeQuestionReviewSource:
+    """One replicated review for a named probe question in an OPAL portfolio notebook."""
 
-    surface_id: str
-    surface_label: str
+    question_id: str
+    question_label: str
     evidence_tier: str
     review_summary_json_path: Path | str
 
@@ -66,17 +71,17 @@ class TfbsStageBReviewPortfolioResult:
 
 
 def write_tfbs_stage_b_review_portfolio(
-    sources: Iterable[TfbsStageBReviewPortfolioSource],
+    sources: Iterable[TfbsProbeQuestionReviewSource],
     *,
     out_dir: str | Path,
     collection_id: str,
-    learning_loop_sources: Iterable[TfbsStageBLearningLoopPortfolioSource] = (),
+    learning_loop_sources: Iterable[TfbsProbeQuestionLearningLoopSource] = (),
 ) -> TfbsStageBReviewPortfolioResult:
     """Write a combined OPAL collection manifest and visual index for replicated TFBS reviews."""
 
     source_rows = list(sources)
     if not source_rows:
-        raise ValueError("TFBS Stage B review portfolio requires at least one source review")
+        raise ValueError("TFBS Stage B review portfolio requires at least one probe question")
     output_dir = Path(out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     collection_manifest_path = output_dir / "campaign_collection.json"
@@ -128,9 +133,9 @@ def write_tfbs_stage_b_review_portfolio(
     )
 
 
-def _namespaced_source_visuals(source: TfbsStageBReviewPortfolioSource) -> list[dict[str, Any]]:
-    source_id = _required_token(source.surface_id, field="surface_id")
-    source_label = _required_text(source.surface_label, field="surface_label")
+def _namespaced_source_visuals(source: TfbsProbeQuestionReviewSource) -> list[dict[str, Any]]:
+    question_id = _required_token(source.question_id, field="question_id")
+    question_label = _required_text(source.question_label, field="question_label")
     evidence_tier = _required_evidence_tier(source.evidence_tier)
     summary_path = Path(source.review_summary_json_path)
     summary = _replicated_review_summary(summary_path)
@@ -147,28 +152,28 @@ def _namespaced_source_visuals(source: TfbsStageBReviewPortfolioSource) -> list[
         trajectory_csv_path=trajectory_path,
         pair_summary_csv_path=pair_summary_path,
     )
-    namespace = slug_token(source_id)
+    namespace = slug_token(question_id)
     out: list[dict[str, Any]] = []
     for raw in raw_visuals:
         comparison_set_key = f"{namespace}__{raw['comparison_set_key']}"
         visual = dict(raw)
         visual["visual_id"] = f"{namespace}__{raw.get('visual_id') or slug_token(str(raw.get('label') or 'visual'))}"
         visual["comparison_set_key"] = comparison_set_key
-        visual["comparison_set_label"] = f"{source_label}: {raw['comparison_set_label']}"
+        visual["comparison_set_label"] = f"{question_label}: {raw['comparison_set_label']}"
         visual["comparison_set_match"] = {
-            "source_review_surface_id": source_id,
+            "probe_question_id": question_id,
             "evidence_tier": evidence_tier,
             **dict(raw.get("comparison_set_match") or {}),
         }
-        visual["source_review_surface_id"] = source_id
-        visual["source_review_surface_label"] = source_label
+        visual["probe_question_id"] = question_id
+        visual["probe_question_label"] = question_label
         visual["evidence_tier"] = evidence_tier
         visual["evidence_tier_label"] = EVIDENCE_TIER_LABELS[evidence_tier]
         visual["evidence_tier_rank"] = EVIDENCE_TIER_RANKS[evidence_tier]
         visual["source_review_summary_json_path"] = str(summary_path)
         visual["replicate_count"] = int(summary["replicate_count"])
         visual["replicate_seeds"] = list(summary["replicate_seeds"])
-        _apply_evidence_tier_narrative(visual, source_label=source_label, evidence_tier=evidence_tier)
+        _apply_evidence_tier_narrative(visual, question_label=question_label, evidence_tier=evidence_tier)
         out.append(visual)
     return out
 
@@ -206,7 +211,7 @@ def _replicated_review_summary(path: Path) -> dict[str, Any]:
 
 
 def _validate_evidence_tier_contract(summary: Mapping[str, Any], *, evidence_tier: str, path: Path) -> None:
-    allowed_profile_roles = _CURRENT_TIER_PROFILE_ROLES.get(evidence_tier)
+    allowed_profile_roles = _TIER_PROFILE_ROLES.get(evidence_tier)
     if allowed_profile_roles is None:
         return
     target_profile = summary.get("target_profile")
@@ -218,6 +223,8 @@ def _validate_evidence_tier_contract(summary: Mapping[str, Any], *, evidence_tie
             "TFBS review portfolio evidence tier/profile_role mismatch: "
             f"tier={evidence_tier!r} profile_role={profile_role!r} source={path}"
         )
+    if evidence_tier not in _CLAIM_READY_REQUIRED_TIERS:
+        return
     claim_readiness = summary.get("claim_readiness")
     if not isinstance(claim_readiness, Mapping):
         raise ValueError(f"TFBS review portfolio current-tier source is missing claim_readiness: {path}")
@@ -268,11 +275,12 @@ def _surface_kinds(visuals: list[Mapping[str, Any]]) -> list[str]:
     return sorted({str(visual.get("surface_kind") or "").strip() for visual in visuals if visual.get("surface_kind")})
 
 
-def _apply_evidence_tier_narrative(visual: dict[str, Any], *, source_label: str, evidence_tier: str) -> None:
-    if evidence_tier != "diagnostic":
+def _apply_evidence_tier_narrative(visual: dict[str, Any], *, question_label: str, evidence_tier: str) -> None:
+    if evidence_tier != "control_diagnostic":
         return
     visual["premise"] = (
-        f"Diagnostic surface: {source_label} documents a control or confound check, not the current claim evidence."
+        f"Diagnostic check: {question_label} documents a control or confound check, not the main composition or "
+        "placement result."
     )
     visual["claim_boundary"] = (
         "Diagnostic only: use this surface to explain probe limitations, boundary cases, and design choices; do not "
@@ -320,8 +328,8 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 __all__ = [
-    "TfbsStageBLearningLoopPortfolioSource",
+    "TfbsProbeQuestionLearningLoopSource",
     "TfbsStageBReviewPortfolioResult",
-    "TfbsStageBReviewPortfolioSource",
+    "TfbsProbeQuestionReviewSource",
     "write_tfbs_stage_b_review_portfolio",
 ]

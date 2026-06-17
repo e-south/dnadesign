@@ -59,7 +59,7 @@ def frozen_rank_chunks(
     ]
 
 
-def top_budget_chunks(
+def known_label_rank_chunks(
     labels: pd.DataFrame,
     *,
     label_name: str,
@@ -71,38 +71,39 @@ def top_budget_chunks(
     """Return deterministic chunks selected by the known label under the same budget."""
 
     if selection_k <= 0:
-        raise ValueError("top-budget replay requires positive selection_k")
+        raise ValueError("known-label ranking replay requires positive selection_k")
     if rounds <= 0:
-        raise ValueError("top-budget replay requires positive rounds")
+        raise ValueError("known-label ranking replay requires positive rounds")
     required = {id_column, label_name}
     missing = sorted(required - set(labels.columns))
     if missing:
-        raise ValueError(f"top-budget label table missing column(s): {missing}")
+        raise ValueError(f"known-label ranking table missing column(s): {missing}")
 
     frame = labels.loc[:, [id_column, label_name]].copy()
     frame[id_column] = frame[id_column].astype(str)
     if frame[id_column].duplicated().any():
         duplicates = frame.loc[frame[id_column].duplicated(), id_column].drop_duplicates().head(5).tolist()
-        raise ValueError(f"top-budget label table contains duplicate id(s): {duplicates}")
+        raise ValueError(f"known-label ranking table contains duplicate id(s): {duplicates}")
 
     excluded = {str(value) for value in excluded_ids}
     frame = frame.loc[~frame[id_column].isin(excluded)].copy()
     frame[label_name] = pd.to_numeric(frame[label_name], errors="raise")
     if not np.isfinite(frame[label_name].to_numpy(dtype=float)).all():
-        raise ValueError("top-budget label table contains non-finite label values")
+        raise ValueError("known-label ranking table contains non-finite label values")
 
     required_count = int(selection_k) * int(rounds)
     if len(frame) < required_count:
         raise ValueError(
-            f"top-budget replay has insufficient candidates: need {required_count}, found {len(frame)} after exclusions"
+            f"known-label ranking replay has insufficient candidates: need {required_count}, "
+            f"found {len(frame)} after exclusions"
         )
 
     frame["_ordinal"] = np.arange(len(frame), dtype=int)
     ranked = frame.sort_values([label_name, "_ordinal"], ascending=[False, True], kind="mergesort").head(required_count)
     ranked = ranked.reset_index(drop=True)
     ranked["round"] = ranked.index // int(selection_k)
-    ranked["top_budget_rank"] = ranked.index + 1
-    ranked["selection_source"] = "top_budget_ceiling"
+    ranked["known_label_rank"] = ranked.index + 1
+    ranked["selection_source"] = "known_label_ranking"
     return ranked.rename(columns={id_column: "id", label_name: "label_value"})[
-        ["round", "id", "top_budget_rank", "label_value", "selection_source"]
+        ["round", "id", "known_label_rank", "label_value", "selection_source"]
     ]

@@ -5,7 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from ...label_text import tfbs_control_display_label, tfbs_control_pair_label, tfbs_label_title
+from ...label_text import (
+    DENSE_ARRAY_METADATA_LABEL,
+    tfbs_control_display_label,
+    tfbs_control_pair_label,
+    tfbs_label_title,
+)
 from .contracts import (
     REALIZED_REVIEW_COMPARISON_SET_PREFIX,
     REALIZED_REVIEW_SURFACE_KIND,
@@ -25,8 +30,11 @@ def visual_entries(
     pair_summary_csv_path: Path,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    plot_manifest_path = Path(plot_manifest_path).resolve()
+    trajectory_csv_path = Path(trajectory_csv_path).resolve()
+    pair_summary_csv_path = Path(pair_summary_csv_path).resolve()
     for plot in mapping_list(plot_manifest.get("plots"), field="plots"):
-        plot_path = Path(str(plot.get("path") or ""))
+        plot_path = Path(str(plot.get("path") or "")).resolve()
         require_existing_file(plot_path, role="review plot")
         kind = str(plot.get("kind") or "")
         label_name = str(plot.get("label_name") or "").strip()
@@ -105,7 +113,7 @@ def realized_comparison_set_key(label_name: str) -> str:
 
 
 def realized_comparison_set_label(label_name: str, *, control_role: object | None = None) -> str:
-    return f"{tfbs_label_title(label_name)} {tfbs_control_pair_label(control_role, label_name=label_name)} pair"
+    return f"{tfbs_label_title(label_name)}: {tfbs_control_pair_label(control_role, label_name=label_name)}"
 
 
 def _realized_visual_premise(label_name: str, *, control_role: object | None = None) -> str:
@@ -120,7 +128,10 @@ def _realized_visual_premise(label_name: str, *, control_role: object | None = N
             "Diagnostic check: count-preserving slot controls test how much target motif count can explain "
             f"slot-label enrichment for {tfbs_label_title(label_name)}."
         )
-    return f"Compares DenseGen-label enrichment for {tfbs_label_title(label_name)} against its matched control."
+    return (
+        f"Compares enrichment for the {tfbs_label_title(label_name)} sequence-matched metadata value against "
+        "its row-shuffled control."
+    )
 
 
 def _realized_visual_math_note(label_name: str) -> str:
@@ -137,9 +148,26 @@ def _realized_visual_math_note(label_name: str) -> str:
 
 def _realized_visual_design_note(*, control_role: object | None = None) -> str:
     control = tfbs_control_display_label(control_role)
+    role = str(control_role or "")
+    base = (
+        f"{DENSE_ARRAY_METADATA_LABEL} and {control} campaigns share candidate scope, initial selected IDs, "
+        "rounds, selection budget, and model settings. Sequence-matched metadata means the label value belongs "
+        "to the same sequence ID. The initial IDs are label-value stratified, not a uniform random pool sample, "
+        "so each seed batch contains learnable positive and negative evidence."
+    )
+    if role == "count_fixed_shuffled_slot_negative_control":
+        return (
+            f"{base} The control shuffles the slot-position label within the count-fixed candidate scope, preserving "
+            "the positive rate while breaking the row-level sequence-to-slot-label association."
+        )
+    if role == "count_preserving_slot_confound_control":
+        return (
+            f"{base} This diagnostic preserves target-family count structure, so it can remain learnable from motif "
+            "count and is not a clean negative control for placement."
+        )
     return (
-        f"DenseGen and {control} campaigns share candidate scope, initial selected IDs, rounds, selection budget, "
-        "and model settings; only the label table differs."
+        f"{base} The row-shuffled control preserves the label distribution but assigns label values to different "
+        "sequence IDs, breaking the row-level sequence-to-metadata association."
     )
 
 
@@ -157,8 +185,8 @@ def _realized_visual_claim_boundary(*, control_role: object | None = None) -> st
             "is not valid as negative-control evidence for the slot-position selection claim."
         )
     return (
-        "This is a synthetic DenseGen metadata learnability surface, not a biological binding, mechanism, or "
-        "phenotype claim."
+        "This is a synthetic Dense Array construction-metadata learnability surface, not a biological binding, "
+        "mechanism, or phenotype claim."
     )
 
 
@@ -171,8 +199,12 @@ def slot_visual_entries(
     count_distribution_csv_path: Path,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    plot_manifest_path = Path(plot_manifest_path).resolve()
+    trajectory_csv_path = Path(trajectory_csv_path).resolve()
+    pair_summary_csv_path = Path(pair_summary_csv_path).resolve()
+    count_distribution_csv_path = Path(count_distribution_csv_path).resolve()
     for plot in mapping_list(plot_manifest.get("plots"), field="plots"):
-        plot_path = Path(str(plot.get("path") or ""))
+        plot_path = Path(str(plot.get("path") or "")).resolve()
         require_existing_file(plot_path, role="slot diagnostic plot")
         kind = str(plot.get("kind") or "")
         spec = slot_visual_spec(kind)

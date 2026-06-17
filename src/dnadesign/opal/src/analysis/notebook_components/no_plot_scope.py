@@ -42,7 +42,7 @@ def build_notebook_no_plot_scope_rows(view_model: Mapping[str, Any]) -> list[dic
         {
             "field": "evidence boundary",
             "value": (
-                "No manifest-backed plot media are available for the selected round; "
+                "No plot media are available for the selected round; "
                 "do not draw visual or biological conclusions from this notebook state."
             ),
         },

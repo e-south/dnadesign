@@ -11,6 +11,7 @@ from .contracts import (
     LEARNING_LOOP_BASELINE_PLOT_MANIFEST_SCHEMA_VERSION,
     LEARNING_LOOP_BASELINE_SCHEMA_VERSION,
     LEARNING_LOOP_BASELINE_SURFACE_KIND,
+    validate_learning_loop_source_profiles,
 )
 
 
@@ -33,7 +34,7 @@ def learning_loop_visual_entries(manifest_path: Path) -> list[dict[str, Any]]:
             rows.append(_visual_entry(plot, manifest, manifest_path, trajectory_path=trajectory_path))
         elif kind == "frozen_round0_endpoint_adaptive_gain":
             rows.append(_visual_entry(plot, manifest, manifest_path, trajectory_path=claim_path))
-        elif kind == "top_budget_signal_recovery":
+        elif kind == "known_label_gain_recovery":
             rows.append(_visual_entry(plot, manifest, manifest_path, trajectory_path=claim_path))
         else:
             raise ValueError(f"Unsupported frozen replay plot kind: {kind!r}")
@@ -49,7 +50,7 @@ def _visual_entry(
 ) -> dict[str, Any]:
     kind = str(plot["kind"])
     is_endpoint = kind == "frozen_round0_endpoint_adaptive_gain"
-    is_ceiling = kind == "top_budget_signal_recovery"
+    is_known_label_reference = kind == "known_label_gain_recovery"
     review_id = str(manifest["review_id"])
     source_profile_ids = [str(value) for value in manifest.get("source_profile_ids") or []]
     profile_id = source_profile_ids[0] if len(source_profile_ids) == 1 else "multiple_tfbs_profiles"
@@ -75,17 +76,19 @@ def _visual_entry(
         "group_key": "learning_loop_baseline",
         "metric": _metric_id(kind),
         "metric_label": "Cumulative enrichment vs candidate pool"
-        if not (is_endpoint or is_ceiling)
-        else ("Active minus frozen final lift" if is_endpoint else "Recovered reference gain"),
+        if not (is_endpoint or is_known_label_reference)
+        else ("Final active-minus-frozen cumulative lift" if is_endpoint else "Fraction of known-label gain recovered"),
         "metric_expression": _metric_expression(kind),
         "cohort": "selected",
-        "summary": "cumulative_trajectory" if not (is_endpoint or is_ceiling) else "final_acquired_budget",
+        "summary": "cumulative_trajectory"
+        if not (is_endpoint or is_known_label_reference)
+        else "final_acquired_budget",
         "interval_kind": str(plot.get("interval_kind") or "none"),
         "interval": dict(plot.get("interval") or {}),
         "interpretation_note": str(manifest.get("interpretation_boundary") or ""),
         "premise": (
-            "If active retraining is higher than the frozen round-0 ranking, later model updates improved "
-            "selected label enrichment."
+            "This asks whether retraining after each acquisition improves cumulative selected-label enrichment "
+            "over a ranking frozen after the initial seed batch."
         ),
         "math_note": (
             "Lift is cumulative mean selected label divided by the candidate-pool mean for the same label table."
@@ -114,6 +117,11 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     for key in ("review_id", "comparison_set_key", "comparison_set_label", "visual_tier", "source_profile_ids"):
         if key not in payload:
             raise ValueError(f"Frozen replay visual source is missing {key}: {path}")
+    validate_learning_loop_source_profiles(
+        visual_tier=payload.get("visual_tier"),
+        source_profile_ids=payload.get("source_profile_ids"),
+        path=path,
+    )
     return payload
 
 
@@ -126,23 +134,23 @@ def _read_plot_manifest(path: Path) -> dict[str, Any]:
 
 def _visual_label(kind: str) -> str:
     if kind == "frozen_round0_endpoint_adaptive_gain":
-        return "Adaptive-loop gain"
-    if kind == "top_budget_signal_recovery":
-        return "Same-budget reference recovery"
-    return "Active vs frozen enrichment"
+        return "Final active-minus-frozen lift"
+    if kind == "known_label_gain_recovery":
+        return "Known-label gain recovered"
+    return "Active vs frozen cumulative enrichment"
 
 
 def _metric_id(kind: str) -> str:
     if kind == "frozen_round0_endpoint_adaptive_gain":
         return "active_minus_frozen_final_cumulative_lift"
-    if kind == "top_budget_signal_recovery":
-        return "active_fraction_of_top_budget_gain_recovered"
+    if kind == "known_label_gain_recovery":
+        return "active_fraction_of_known_label_gain_recovered"
     return "cumulative_lift_ratio"
 
 
 def _metric_expression(kind: str) -> str:
     if kind == "frozen_round0_endpoint_adaptive_gain":
         return "active final cumulative lift - frozen final cumulative lift"
-    if kind == "top_budget_signal_recovery":
-        return "(active final cumulative lift - 1) / (same-budget reference final cumulative lift - 1)"
+    if kind == "known_label_gain_recovery":
+        return "(active final cumulative lift - 1) / (same-budget known-label final cumulative lift - 1)"
     return "cumulative mean(selected label) / mean(candidate-pool label)"

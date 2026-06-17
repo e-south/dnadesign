@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-import pandas as pd
+from dnadesign.opal import read_selection_artifact
 
 from ..semantics import (
     TFBS_STAGE_B_EXACT_BUDGET_TIE_HANDLING,
@@ -23,7 +23,7 @@ def selected_ids_from_round(
     path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
     if not path.exists():
         raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    frame = pd.read_csv(path, usecols=["id"])
+    frame = read_selection_artifact(path, required_columns=("id",))
     ids = tuple(str(value).strip() for value in frame["id"].tolist())
     if not ids or any(not value for value in ids):
         raise ValueError(f"Stage B selection artifact has blank or empty ids: {path}")
@@ -47,7 +47,7 @@ def assert_selection_budget(*, workdir: Path, round_index: int, selection_k: int
     path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
     if not path.exists():
         raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    frame = pd.read_csv(path, usecols=["id"])
+    frame = read_selection_artifact(path, required_columns=("id",))
     assert_selected_count(
         selected_count=len(frame),
         path=path,

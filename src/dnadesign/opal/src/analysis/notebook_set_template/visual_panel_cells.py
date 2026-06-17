@@ -55,9 +55,9 @@ def render_visual_panel_cell() -> str:
 
             if selected_visual_choice is None:
                 if active_view_mode == "Campaign set":
-                    _lines = ["No manifest-backed campaign-set comparison visuals are available."]
+                    _lines = ["No campaign-set comparison visuals are available."]
                 else:
-                    _lines = ["No written manifest-backed plot media are available for this campaign."]
+                    _lines = ["No plot media are available for this campaign."]
                     if plot_inventory_counts:
                         _parts = [f"{key}={value}" for key, value in sorted(plot_inventory_counts.items())]
                         _lines.append("Plot inventory: " + ", ".join(_parts))

@@ -82,7 +82,7 @@ SUMMARY_CELLS = dedent(
         if metric_definition_rows:
             metric_definitions_panel = mo.ui.table(pl.DataFrame(metric_definition_rows), page_size=10)
         else:
-            metric_definitions_panel = mo.md("No manifest-backed plot metric definitions are available.")
+            metric_definitions_panel = mo.md("No plot metric definitions are available.")
 
         artifact_garden_rows = build_notebook_artifact_garden_rows(notebook_view_model)
         artifact_summary_rows = build_notebook_artifact_garden_summary_rows(notebook_view_model)

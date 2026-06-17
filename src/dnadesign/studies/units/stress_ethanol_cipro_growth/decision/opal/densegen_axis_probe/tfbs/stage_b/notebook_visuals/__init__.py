@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from .learning_loop import TfbsProbeQuestionLearningLoopSource
 from .portfolio import (
-    TfbsStageBLearningLoopPortfolioSource,
+    TfbsProbeQuestionReviewSource,
     TfbsStageBReviewPortfolioResult,
-    TfbsStageBReviewPortfolioSource,
     write_tfbs_stage_b_review_portfolio,
 )
 from .registration import (
@@ -23,9 +23,9 @@ from .specs import (
 
 __all__ = [
     "StageBNotebookVisualSpec",
-    "TfbsStageBLearningLoopPortfolioSource",
+    "TfbsProbeQuestionLearningLoopSource",
+    "TfbsProbeQuestionReviewSource",
     "TfbsStageBReviewPortfolioResult",
-    "TfbsStageBReviewPortfolioSource",
     "maybe_register_tfbs_stage_b_realized_review_visuals",
     "maybe_register_tfbs_stage_b_slot_diagnostic_visuals",
     "realized_visual_spec",

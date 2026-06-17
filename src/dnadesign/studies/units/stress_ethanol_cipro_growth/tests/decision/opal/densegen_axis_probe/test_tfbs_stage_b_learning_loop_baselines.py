@@ -50,7 +50,7 @@ def test_frozen_rank_chunks_fail_fast_on_duplicate_or_insufficient_ids() -> None
         replay.frozen_rank_chunks(short_scores, selection_k=2, rounds=1, excluded_ids=set())
 
 
-def test_top_budget_chunks_are_deterministic_and_exclude_seed_ids() -> None:
+def test_known_label_rank_chunks_are_deterministic_and_exclude_seed_ids() -> None:
     labels = pd.DataFrame(
         {
             "id": ["seed", "b", "a", "c", "d"],
@@ -58,7 +58,7 @@ def test_top_budget_chunks_are_deterministic_and_exclude_seed_ids() -> None:
         }
     )
 
-    chunks = replay.top_budget_chunks(
+    chunks = replay.known_label_rank_chunks(
         labels,
         label_name="target",
         selection_k=2,
@@ -66,13 +66,13 @@ def test_top_budget_chunks_are_deterministic_and_exclude_seed_ids() -> None:
         excluded_ids={"seed"},
     )
 
-    assert chunks[["round", "id", "top_budget_rank", "label_value"]].to_dict(orient="records") == [
-        {"round": 0, "id": "b", "top_budget_rank": 1, "label_value": 0.8},
-        {"round": 0, "id": "a", "top_budget_rank": 2, "label_value": 0.8},
-        {"round": 1, "id": "c", "top_budget_rank": 3, "label_value": 0.6},
-        {"round": 1, "id": "d", "top_budget_rank": 4, "label_value": 0.4},
+    assert chunks[["round", "id", "known_label_rank", "label_value"]].to_dict(orient="records") == [
+        {"round": 0, "id": "b", "known_label_rank": 1, "label_value": 0.8},
+        {"round": 0, "id": "a", "known_label_rank": 2, "label_value": 0.8},
+        {"round": 1, "id": "c", "known_label_rank": 3, "label_value": 0.6},
+        {"round": 1, "id": "d", "known_label_rank": 4, "label_value": 0.4},
     ]
-    assert chunks["selection_source"].unique().tolist() == ["top_budget_ceiling"]
+    assert chunks["selection_source"].unique().tolist() == ["known_label_ranking"]
 
 
 def test_cumulative_lift_trajectory_uses_acquired_budget_not_round_rows() -> None:
@@ -110,12 +110,12 @@ def test_cumulative_lift_trajectory_uses_acquired_budget_not_round_rows() -> Non
     assert trajectory["cumulative_lift_ratio"].tolist() == pytest.approx([1.25, 1.875])
 
 
-def test_claim_interpretation_reports_top_budget_signal_recovery() -> None:
+def test_claim_interpretation_reports_known_label_gain_recovery() -> None:
     rows = []
     sources = {
         "active_retraining": 2.5,
         "frozen_round0": 1.5,
-        "top_budget_ceiling": 3.0,
+        "known_label_ranking": 3.0,
     }
     for campaign_key, oracle_role in [("positive", "positive"), ("control", "matched_null")]:
         for source, lift in sources.items():
@@ -148,9 +148,9 @@ def test_claim_interpretation_reports_top_budget_signal_recovery() -> None:
     interpretation = frames.claim_interpretation_frame(endpoint)
 
     row = interpretation.iloc[0]
-    assert row["top_budget_final_cumulative_lift_mean"] == pytest.approx(3.0)
-    assert row["active_fraction_of_top_budget_final_lift_mean"] == pytest.approx(2.5 / 3.0)
-    assert row["active_fraction_of_top_budget_gain_recovered_mean"] == pytest.approx((2.5 - 1.0) / (3.0 - 1.0))
+    assert row["known_label_final_cumulative_lift_mean"] == pytest.approx(3.0)
+    assert row["active_fraction_of_known_label_final_lift_mean"] == pytest.approx(2.5 / 3.0)
+    assert row["active_fraction_of_known_label_gain_recovered_mean"] == pytest.approx((2.5 - 1.0) / (3.0 - 1.0))
 
 
 def test_learning_loop_plots_use_square_review_panels_without_edge_clipping(tmp_path: Path) -> None:
@@ -164,7 +164,7 @@ def test_learning_loop_plots_use_square_review_panels_without_edge_clipping(tmp_
             for selection_source, oracle_role, lift in (
                 ("active_retraining", "positive", 3.0 + seed / 100),
                 ("frozen_round0", "positive", 1.5 + seed / 100),
-                ("top_budget_ceiling", "positive", 5.0),
+                ("known_label_ranking", "positive", 5.0),
                 ("active_retraining", "matched_null", 1.2),
                 ("frozen_round0", "matched_null", 1.0),
             ):
@@ -187,7 +187,7 @@ def test_learning_loop_plots_use_square_review_panels_without_edge_clipping(tmp_
                         }
                     )
     pd.DataFrame(trajectory_rows).to_csv(trajectory_path, index=False)
-    assert plots._control_roles(pd.DataFrame(trajectory_rows)) == (  # noqa: SLF001
+    assert plots.control_roles(pd.DataFrame(trajectory_rows)) == (
         "matched_null",
         "count_fixed_shuffled_slot_negative_control",
     )
@@ -197,8 +197,8 @@ def test_learning_loop_plots_use_square_review_panels_without_edge_clipping(tmp_
             "label_name": ["baeR_count_fraction", "cpxR_count_fraction", "lexA_count_fraction"],
             "active_minus_frozen_final_cumulative_lift_mean": [2.3, 1.8, 2.1],
             "active_minus_frozen_final_cumulative_lift_sample_sd": [0.3, 0.2, 0.25],
-            "active_fraction_of_top_budget_gain_recovered_mean": [0.49, 0.36, 0.81],
-            "active_fraction_of_top_budget_gain_recovered_sample_sd": [0.17, 0.06, 0.07],
+            "active_fraction_of_known_label_gain_recovered_mean": [0.49, 0.36, 0.81],
+            "active_fraction_of_known_label_gain_recovered_sample_sd": [0.17, 0.06, 0.07],
         }
     ).to_csv(claim_path, index=False)
 
@@ -212,25 +212,40 @@ def test_learning_loop_plots_use_square_review_panels_without_edge_clipping(tmp_
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["style_contract"]["subplot_layout"] == "single_row_square_panels_for_label_trajectories"
+    assert manifest["style_contract"]["categorical_encoding"] == {
+        "color": "label_source",
+        "line_style": "active_retraining_vs_frozen_round0_vs_reference",
+        "marker_shape": "active_retraining_vs_frozen_round0_vs_reference",
+        "palette": "colorblind_review_palette",
+    }
+    assert manifest["style_contract"]["label_order"] == "composition_regulator_order_or_placement_left_middle_right"
     assert manifest["style_contract"]["trajectory_reference_series"] == [
-        "pool_baseline",
-        "same_budget_top_label_reference",
+        "pool_average",
+        "same_budget_known_label_ranking",
     ]
     by_kind = {plot["kind"]: plot for plot in manifest["plots"]}
     cumulative_text = " ".join(
         str(by_kind["frozen_round0_cumulative_enrichment"][field]) for field in ("title", "caption", "alt_text")
     )
-    assert "best possible same-budget ceiling" in cumulative_text
+    assert "Active retraining adds count-fraction enrichment beyond the initial ranking" in cumulative_text
+    assert "same-budget known-label reference" in cumulative_text
+    assert "best possible" not in cumulative_text
+    assert "ceiling" not in cumulative_text
     assert "theoretical maximum" not in cumulative_text
-    assert by_kind["top_budget_signal_recovery"]["title"] == "Fraction of achievable enrichment recovered"
+    assert by_kind["known_label_gain_recovery"]["title"] == ("Active retraining recovers part of the known-label gain")
+    assert plots.ordered_label_names(["cpxR_or_baeR_in_slot2", "lexA_in_slot0", "baeR_in_slot1"]) == [
+        "lexA_in_slot0",
+        "baeR_in_slot1",
+        "cpxR_or_baeR_in_slot2",
+    ]
 
     cumulative = Image.open(by_kind["frozen_round0_cumulative_enrichment"]["path"]).convert("RGB")
     assert cumulative.size[0] > cumulative.size[1] * 1.75
     assert _dark_edge_pixel_count(cumulative) == 0
 
     endpoint = Image.open(by_kind["frozen_round0_endpoint_adaptive_gain"]["path"]).convert("RGB")
-    ceiling = Image.open(by_kind["top_budget_signal_recovery"]["path"]).convert("RGB")
+    reference = Image.open(by_kind["known_label_gain_recovery"]["path"]).convert("RGB")
     assert endpoint.size == (1152, 1152)
-    assert ceiling.size == (1152, 1152)
+    assert reference.size == (1152, 1152)
     assert _dark_edge_pixel_count(endpoint) == 0
-    assert _dark_edge_pixel_count(ceiling) == 0
+    assert _dark_edge_pixel_count(reference) == 0

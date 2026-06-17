@@ -13,5 +13,12 @@ FROZEN_REPLAY_STYLE_CONTRACT = {
     "interval_is_confidence_interval": False,
     "subplot_layout": "single_row_square_panels_for_label_trajectories",
     "bar_summary_axes": "square",
-    "trajectory_reference_series": ["pool_baseline", "same_budget_top_label_reference"],
+    "trajectory_reference_series": ["pool_average", "same_budget_known_label_ranking"],
+    "categorical_encoding": {
+        "color": "label_source",
+        "line_style": "active_retraining_vs_frozen_round0_vs_reference",
+        "marker_shape": "active_retraining_vs_frozen_round0_vs_reference",
+        "palette": "colorblind_review_palette",
+    },
+    "label_order": "composition_regulator_order_or_placement_left_middle_right",
 }

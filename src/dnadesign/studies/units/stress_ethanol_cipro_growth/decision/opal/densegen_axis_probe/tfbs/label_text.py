@@ -15,10 +15,13 @@ _COMPOSITE_REGULATOR_LABELS = {
 }
 
 _CONTROL_LABELS = {
-    "matched_label_permutation_negative_control": "scrambled control",
-    "count_preserving_slot_confound_control": "count-preserving slot diagnostic control",
-    "count_fixed_shuffled_slot_negative_control": "count-fixed shuffled-slot control",
+    "matched_label_permutation_negative_control": "row-shuffled control",
+    "count_preserving_slot_confound_control": "count-preserving diagnostic",
+    "count_fixed_shuffled_slot_negative_control": "slot-shuffled control",
 }
+
+SEQUENCE_MATCHED_METADATA_LABEL = "Sequence-matched metadata"
+DENSE_ARRAY_METADATA_LABEL = SEQUENCE_MATCHED_METADATA_LABEL
 
 
 def tfbs_label_display(label_name: object) -> str:
@@ -96,9 +99,9 @@ def tfbs_control_display_label(control_role: object, *, label_name: object | Non
 
 
 def tfbs_control_pair_label(control_role: object, *, label_name: object | None = None) -> str:
-    """Return a compact DenseGen-vs-control comparison label."""
+    """Return a compact sequence-matched-vs-control comparison label."""
 
-    return f"DenseGen label vs {tfbs_control_display_label(control_role, label_name=label_name)}"
+    return f"{SEQUENCE_MATCHED_METADATA_LABEL} vs {tfbs_control_display_label(control_role, label_name=label_name)}"
 
 
 def _display_regulator(value: str) -> str:

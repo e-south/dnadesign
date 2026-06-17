@@ -55,7 +55,7 @@ from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, li
 
 def test_notebook_template_data_source_options() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign"' in text
     assert 'label="Round"' not in text
     assert "predictions (selected run)" not in text
     assert "labels (all rounds)" not in text
@@ -102,7 +102,7 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert render_visual_surface_cells.__module__.endswith(".notebook_components.visual_surface")
     assert "def render_visual_surface_cells" not in text
     assert surface_text not in text
-    assert "manifest-backed plot media are available" in text
+    assert "plot media are available" in text
     assert "build_notebook_no_plot_scope_rows" in text
     assert "Current campaign and plot evidence" in text
     assert 'label="Visual surface"' in text
@@ -131,8 +131,8 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     assert "Campaign analysis command surface" not in text
     assert "mo.accordion(" in text
     for section in [
-        "OPAL campaigns at a glance",
-        "Selected OPAL campaign",
+        "Campaigns at a glance",
+        "Selected campaign",
         "Validity",
         "Changes",
         "Metric definitions",
@@ -160,7 +160,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
 def test_notebook_template_degrades_without_runs() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "No written manifest-backed plot media are available" in text
+    assert "No plot media are available" in text
     assert "mo.stop(len(rounds) == 0" not in text
 
 
@@ -266,7 +266,7 @@ def test_campaign_set_metric_comparison_uses_campaign_metadata(tmp_path: Path) -
     )
     assert payload is not None
     assert payload["image_bytes"].startswith(b"\x89PNG")
-    assert "Oracle role" in payload["alt_text"]
+    assert "Label source" in payload["alt_text"]
     assert "Selected n=6" in payload["alt_text"]
     mixed_rows = [
         {**row, "cohort": "all_pool" if row["campaign"] == "cipro_null_random_id" else row["cohort"]} for row in rows
@@ -418,7 +418,7 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
     assert 'default_view_mode = "Campaign set" if collection_set_choices else "Campaign"' in text
     assert "value=default_view_mode" in text
     assert 'label="Campaign set"' in text
-    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign"' in text
     assert 'label="Collection visual"' in text
     assert "build_notebook_collection_set_choices" in text
     assert "_top_control_items = [view_mode_ui]" in text
@@ -523,9 +523,10 @@ def test_collection_set_choices_surface_evidence_tiers() -> None:
 
     assert [choice["key"] for choice in choices] == ["count_fraction", "slot_position_count_fixed"]
     assert [choice["label"] for choice in choices] == [
-        "Current claim: Count-fraction composition",
-        "Current boundary: Count-fixed slot sentinel",
+        "Count-fraction composition",
+        "Count-fixed slot sentinel",
     ]
+    assert [choice["evidence_tier_label"] for choice in choices] == ["Current claim", "Current boundary"]
 
 
 def test_collection_visual_choices_require_surface_kind() -> None:
@@ -905,6 +906,38 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert [row["source"] for row in artifact_rows] == ["artifact_root", "stale_artifact", "prune_plan"]
 
 
+def test_notebook_campaign_description_prefers_structured_target_metadata() -> None:
+    view_model = {
+        "campaign": {
+            "slug": "tfbs_baeR_count_fraction_positive_random_id_seed7",
+            "name": "Dense Array TFBS metadata probe: BaeR count fraction, metadata, seed 7",
+            "description": "Stage B sentinel OPAL campaign for a synthetic DenseGen TFBS construction label.",
+            "metadata": {
+                "target_dropdown_label": "BaeR count fraction (count / 3)",
+                "label_oracle_kind": "positive",
+                "replicate_seed": 7,
+                "rounds": 24,
+                "selection_k": 6,
+            },
+        },
+        "status": {},
+        "runs": [],
+        "rounds": [],
+        "selection_summary": {"row_count": 0},
+    }
+
+    rows = build_notebook_at_a_glance_rows(view_model)
+    description = next(row["value"] for row in rows if row["field"] == "description")
+    assert description == (
+        "Pre-assay metadata probe for BaeR count fraction (count / 3) using the "
+        "sequence-matched metadata table, seed 7. It tests whether the X representation supports active enrichment "
+        "for this metadata, not measured phenotype prediction. The selection budget is 24 rounds x 6 records."
+    )
+    assert "sentinel" not in description
+    assert "OPAL" not in description
+    assert "DenseGen" not in description
+
+
 def test_registered_plot_kinds_have_explicit_math_disclosure() -> None:
     fallback = "See the plot kind metadata"
 
@@ -992,7 +1025,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
         round_selector="latest",
     )
 
-    assert "# OPAL Campaign Review" in text
+    assert "# Campaign Review" in text
     assert "from dnadesign.opal.notebooks.api.generated import (" in text
     assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
@@ -1003,7 +1036,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "Generated with marimo: `{__generated_with}`" not in text
     assert 'label="Round"' not in text
     assert "selected_round_selector = 'latest'" in text
-    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
     assert 'label="Visual surface"' in text
@@ -1011,8 +1044,8 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "_preferred_visual_label = visual_label_memory()" in text
     assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
-    assert "OPAL campaigns at a glance" in text
-    assert "Selected OPAL campaign" in text
+    assert "Campaigns at a glance" in text
+    assert "Selected campaign" in text
     assert "Validity" in text
     assert "Changes" in text
     assert "build_notebook_artifact_garden_rows" in text
@@ -1098,18 +1131,15 @@ def test_collection_baserender_role_choices_follow_selected_campaign_set() -> No
             {
                 "kind": "control_pair",
                 "left_role": "positive",
+                "left_role_label": "Dense Array metadata",
                 "right_role": "null",
+                "right_role_label": "row-shuffled metadata control",
                 "pairs": [
                     {
                         "left": "tfbs_lexA_positive",
                         "right": "tfbs_lexA_matched_null",
                         "match": {"target": "lexA_count_fraction", "seed": "7"},
-                    },
-                    {
-                        "left": "tfbs_lexA_positive",
-                        "right": "tfbs_lexA_matched_null",
-                        "match": {"target": "lexA_in_slot0", "seed": "7"},
-                    },
+                    }
                 ],
             }
         ]
@@ -1121,13 +1151,31 @@ def test_collection_baserender_role_choices_follow_selected_campaign_set() -> No
     )
 
     assert choices == [
-        {"label": "DenseGen label", "role": "positive", "campaign_slug": "tfbs_lexA_positive"},
-        {"label": "Scrambled control", "role": "null", "campaign_slug": "tfbs_lexA_matched_null"},
+        {"label": "Sequence-matched metadata", "role": "positive", "campaign_slug": "tfbs_lexA_positive"},
+        {"label": "Row-shuffled control", "role": "null", "campaign_slug": "tfbs_lexA_matched_null"},
     ]
 
+    count_fixed_collection = {
+        "comparison_lenses": [
+            {
+                "kind": "control_pair",
+                "left_role": "positive",
+                "left_role_label": "Dense Array metadata",
+                "right_role": "null",
+                "right_role_label": "count-fixed slot-shuffle control",
+                "pairs": [
+                    {
+                        "left": "tfbs_lexA_positive",
+                        "right": "tfbs_lexA_matched_null",
+                        "match": {"target": "lexA_in_slot0", "seed": "7"},
+                    }
+                ],
+            }
+        ]
+    }
     count_fixed_choices = build_notebook_collection_baserender_role_choices(
         campaigns,
-        collection,
+        count_fixed_collection,
         {
             "match": {
                 "label_name": "lexA_in_slot0",
@@ -1136,7 +1184,123 @@ def test_collection_baserender_role_choices_follow_selected_campaign_set() -> No
             }
         },
     )
-    assert count_fixed_choices[1]["label"] == "Count-fixed shuffled-slot control"
+    assert count_fixed_choices[0]["label"] == "Sequence-matched metadata"
+    assert count_fixed_choices[1]["label"] == "Slot-shuffled control"
+
+
+def test_collection_baserender_role_choices_fall_back_to_selected_set_metadata() -> None:
+    campaigns = [
+        {
+            "campaign": {
+                "slug": "lexA_positive_seed7",
+                "metadata": {
+                    "label_name": "lexA_count_fraction",
+                    "label_oracle_kind": "positive",
+                    "seed": 7,
+                },
+            }
+        },
+        {
+            "campaign": {
+                "slug": "lexA_control_seed7",
+                "metadata": {
+                    "label_name": "lexA_count_fraction",
+                    "label_oracle_kind": "null",
+                    "seed": 7,
+                },
+            }
+        },
+        {
+            "campaign": {
+                "slug": "slot_positive_seed7",
+                "metadata": {
+                    "label_name": "lexA_in_slot0",
+                    "label_oracle_kind": "positive",
+                    "seed": 7,
+                    "candidate_scope_policy_id": "tfbs_slot_position_target_count_eq_1_v1",
+                },
+            }
+        },
+        {
+            "campaign": {
+                "slug": "slot_control_seed7",
+                "metadata": {
+                    "label_name": "lexA_in_slot0",
+                    "label_oracle_kind": "null",
+                    "seed": 7,
+                    "candidate_scope_policy_id": "tfbs_slot_position_target_count_eq_1_v1",
+                },
+            }
+        },
+        {
+            "campaign": {
+                "slug": "old_slot_positive_seed7",
+                "metadata": {
+                    "label_name": "lexA_in_slot0",
+                    "label_oracle_kind": "positive",
+                    "seed": 7,
+                },
+            }
+        },
+    ]
+
+    composition_choices = build_notebook_collection_baserender_role_choices(
+        campaigns,
+        {"comparison_lenses": []},
+        {
+            "match": {
+                "label_name": "lexA_count_fraction",
+                "control_role": "matched_label_permutation_negative_control",
+            }
+        },
+    )
+    placement_choices = build_notebook_collection_baserender_role_choices(
+        campaigns,
+        {"comparison_lenses": []},
+        {
+            "match": {
+                "label_name": "lexA_in_slot0",
+                "control_role": "count_fixed_shuffled_slot_negative_control",
+            }
+        },
+    )
+
+    assert composition_choices == [
+        {"label": "Sequence-matched metadata", "role": "positive", "campaign_slug": "lexA_positive_seed7"},
+        {"label": "Row-shuffled control", "role": "null", "campaign_slug": "lexA_control_seed7"},
+    ]
+    assert placement_choices == [
+        {"label": "Sequence-matched metadata", "role": "positive", "campaign_slug": "slot_positive_seed7"},
+        {"label": "Slot-shuffled control", "role": "null", "campaign_slug": "slot_control_seed7"},
+    ]
+
+
+def test_collection_baserender_role_choices_use_generic_fallback_labels() -> None:
+    campaigns = [
+        {"campaign": {"slug": "positive", "metadata": {"label_oracle_kind": "positive", "target": "label"}}},
+        {"campaign": {"slug": "control", "metadata": {"label_oracle_kind": "null", "target": "label"}}},
+    ]
+    collection = {
+        "comparison_lenses": [
+            {
+                "kind": "control_pair",
+                "left_role": "positive",
+                "right_role": "null",
+                "pairs": [{"left": "positive", "right": "control", "match": {"target": "label"}}],
+            }
+        ]
+    }
+
+    choices = build_notebook_collection_baserender_role_choices(
+        campaigns,
+        collection,
+        {"match": {"target": "label"}},
+    )
+
+    assert choices == [
+        {"label": "Positive label source", "role": "positive", "campaign_slug": "positive"},
+        {"label": "Control label source", "role": "null", "campaign_slug": "control"},
+    ]
 
 
 def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
@@ -1346,7 +1510,7 @@ def test_collection_visual_description_explains_metric_and_interval() -> None:
             "caption": "Realized selected-label lift by round.",
             "metric_label": "Selected-label lift ratio",
             "metric_expression": "mean(selected label) / mean(candidate-pool label)",
-            "premise": "Active selection should enrich the DenseGen label.",
+            "premise": "Active selection should enrich sequence-matched metadata.",
             "math_note": "Enrichment is mean(y_selected) / mean(y_candidate_pool).",
             "design_note": "Campaigns share initial IDs; only the label table differs.",
             "claim_boundary": "Synthetic metadata learnability only.",
@@ -1357,7 +1521,7 @@ def test_collection_visual_description_explains_metric_and_interval() -> None:
     )
 
     assert "BaeR count fraction lift" in text
-    assert "Premise: Active selection should enrich the DenseGen label." in text
+    assert "Premise: Active selection should enrich sequence-matched metadata." in text
     assert "mean(selected label) / mean(candidate-pool label)" in text
     assert "Math: Enrichment is mean(y_selected) / mean(y_candidate_pool)." in text
     assert "Design: Campaigns share initial IDs; only the label table differs." in text

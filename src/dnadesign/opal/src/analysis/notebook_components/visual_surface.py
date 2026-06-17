@@ -70,7 +70,7 @@ def render_visual_surface_cells() -> str:
                 )
                 _lines = []
                 if not plot_choices:
-                    _lines.append(f"No manifest-backed plot outputs found in `{plots_dir}`.")
+                    _lines.append(f"No plot outputs found in `{plots_dir}`.")
                     _lines.append("Run `uv run opal plot -c <campaign.yaml>` to generate plots.")
                 if missing_outputs:
                     _lines.append(f"Configured plots without outputs: {', '.join(missing_outputs)}")

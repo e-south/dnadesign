@@ -124,7 +124,7 @@ def endpoint_summary_frame(
 
 
 def claim_interpretation_frame(endpoint_summary: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate replicate-level active/frozen/ceiling evidence by TFBS label."""
+    """Aggregate replicate-level active/frozen/known-label-reference evidence by TFBS label."""
 
     pairs = endpoint_summary.loc[endpoint_summary["row_type"] == "pair_endpoint"].copy()
     if pairs.empty:
@@ -133,7 +133,7 @@ def claim_interpretation_frame(endpoint_summary: pd.DataFrame) -> pd.DataFrame:
     for label_name, sub_label in pairs.groupby("label_name", sort=True):
         active = _source_pairs(sub_label, "active_retraining")
         frozen = _source_pairs(sub_label, "frozen_round0")
-        top_budget = _source_pairs(sub_label, "top_budget_ceiling")
+        known_label = _source_pairs(sub_label, "known_label_ranking")
         merged = active.merge(
             frozen,
             on=["label_name", "seed"],
@@ -141,7 +141,7 @@ def claim_interpretation_frame(endpoint_summary: pd.DataFrame) -> pd.DataFrame:
             validate="one_to_one",
         )
         merged = merged.merge(
-            top_budget,
+            known_label,
             on=["label_name", "seed"],
             validate="one_to_one",
         )
@@ -154,15 +154,15 @@ def claim_interpretation_frame(endpoint_summary: pd.DataFrame) -> pd.DataFrame:
         )
         active_minus_control = merged["positive_minus_control_final_cumulative_lift_ratio_active"]
         frozen_minus_control = merged["positive_minus_control_final_cumulative_lift_ratio_frozen"]
-        top_budget_final = merged["positive_final_cumulative_lift_ratio"]
-        top_budget_auc = merged["positive_cumulative_auc_lift_ratio"]
-        active_fraction_of_top_budget = _safe_ratio(
+        known_label_final = merged["positive_final_cumulative_lift_ratio"]
+        known_label_auc = merged["positive_cumulative_auc_lift_ratio"]
+        active_fraction_of_known_label = _safe_ratio(
             merged["positive_final_cumulative_lift_ratio_active"],
-            top_budget_final,
+            known_label_final,
         )
         active_gain_recovered = _safe_ratio(
             merged["positive_final_cumulative_lift_ratio_active"] - 1.0,
-            top_budget_final - 1.0,
+            known_label_final - 1.0,
         )
         rows.append(
             {
@@ -178,12 +178,12 @@ def claim_interpretation_frame(endpoint_summary: pd.DataFrame) -> pd.DataFrame:
                 "active_minus_frozen_final_cumulative_lift_sample_sd": _sample_sd(active_gain),
                 "active_minus_frozen_cumulative_auc_lift_mean": float(active_auc_gain.mean()),
                 "active_minus_frozen_cumulative_auc_lift_sample_sd": _sample_sd(active_auc_gain),
-                "top_budget_final_cumulative_lift_mean": float(top_budget_final.mean()),
-                "top_budget_cumulative_auc_lift_mean": float(top_budget_auc.mean()),
-                "active_fraction_of_top_budget_final_lift_mean": float(active_fraction_of_top_budget.mean()),
-                "active_fraction_of_top_budget_final_lift_sample_sd": _sample_sd(active_fraction_of_top_budget),
-                "active_fraction_of_top_budget_gain_recovered_mean": float(active_gain_recovered.mean()),
-                "active_fraction_of_top_budget_gain_recovered_sample_sd": _sample_sd(active_gain_recovered),
+                "known_label_final_cumulative_lift_mean": float(known_label_final.mean()),
+                "known_label_cumulative_auc_lift_mean": float(known_label_auc.mean()),
+                "active_fraction_of_known_label_final_lift_mean": float(active_fraction_of_known_label.mean()),
+                "active_fraction_of_known_label_final_lift_sample_sd": _sample_sd(active_fraction_of_known_label),
+                "active_fraction_of_known_label_gain_recovered_mean": float(active_gain_recovered.mean()),
+                "active_fraction_of_known_label_gain_recovered_sample_sd": _sample_sd(active_gain_recovered),
                 "seeds_supporting_adaptive_final_gain": int((active_gain > 0).sum()),
                 "seeds_supporting_adaptive_auc_gain": int((active_auc_gain > 0).sum()),
                 "active_positive_minus_control_final_lift_mean": float(active_minus_control.mean()),

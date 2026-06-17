@@ -102,8 +102,8 @@ def _plot_target_count_mean(frame: pd.DataFrame, path: Path) -> None:
     axes[0].set_ylabel("Selected target-family mean count", fontsize=REVIEW_AXIS_LABEL_FONTSIZE)
     _legend_below(fig, axes)
     fig.suptitle("Selected target-family count over rounds", fontsize=REVIEW_TITLE_FONTSIZE, y=0.975)
-    fig.subplots_adjust(left=0.12, right=0.985, top=0.82, bottom=0.24, wspace=0.34)
-    fig.savefig(path, dpi=160, facecolor="white")
+    fig.subplots_adjust(left=0.14, right=0.92, top=0.82, bottom=0.24, wspace=0.34)
+    fig.savefig(path, dpi=160, facecolor="white", edgecolor="white", bbox_inches=None, pad_inches=0.0)
     plt.close(fig)
 
 
@@ -156,8 +156,8 @@ def _plot_count_stratified_lift(frame: pd.DataFrame, path: Path) -> None:
         fontsize=REVIEW_TITLE_FONTSIZE,
         y=0.975,
     )
-    fig.subplots_adjust(left=0.16, right=0.94, top=0.78, bottom=0.25, wspace=0.34)
-    fig.savefig(path, dpi=160, facecolor="white")
+    fig.subplots_adjust(left=0.17, right=0.91, top=0.78, bottom=0.25, wspace=0.34)
+    fig.savefig(path, dpi=160, facecolor="white", edgecolor="white", bbox_inches=None, pad_inches=0.0)
     plt.close(fig)
 
 
@@ -179,7 +179,7 @@ def _plot_count_stratified_summary(frame: pd.DataFrame, path: Path) -> None:
     final_delta = pd.to_numeric(df["final_positive_minus_null_count_stratified_lift_ratio"], errors="coerce")
     auc_delta = pd.to_numeric(df["auc_positive_minus_null_count_stratified_lift_ratio"], errors="coerce")
     colors = [_status_color(value) for value in df["slot_diagnostic_status"].astype(str).tolist()]
-    fig, ax = plt.subplots(figsize=REVIEW_SQUARE_FIGSIZE, constrained_layout=True)
+    fig, ax = plt.subplots(figsize=REVIEW_SQUARE_FIGSIZE, constrained_layout=False)
     style_review_axis(ax, square=True)
     width = 0.38
     ax.bar([index - width / 2 for index in x], final_delta, width=width, color=colors, label="final delta")
@@ -189,10 +189,17 @@ def _plot_count_stratified_summary(frame: pd.DataFrame, path: Path) -> None:
     ax.set_xticklabels(
         [tfbs_label_title(value) for value in df["label_name"].astype(str).tolist()], rotation=20, ha="right"
     )
-    ax.set_ylabel("DenseGen lift minus scrambled-control lift", fontsize=REVIEW_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel("Lift difference (sequence-matched - control)", fontsize=REVIEW_AXIS_LABEL_FONTSIZE)
     ax.set_title("Count-stratified slot-position diagnostic", fontsize=REVIEW_TITLE_FONTSIZE)
-    ax.legend(frameon=False, fontsize=REVIEW_LEGEND_FONTSIZE)
-    fig.savefig(path, dpi=160)
+    ax.legend(
+        frameon=False,
+        fontsize=REVIEW_LEGEND_FONTSIZE,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.14),
+        ncols=1,
+    )
+    fig.subplots_adjust(left=0.20, right=0.90, top=0.84, bottom=0.34)
+    fig.savefig(path, dpi=160, facecolor="white", edgecolor="white", bbox_inches=None, pad_inches=0.0)
     plt.close(fig)
 
 
@@ -207,9 +214,9 @@ def _status_color(value: str) -> str:
 def _role_label(role: object) -> str:
     role_text = str(role)
     if role_text == "positive":
-        return "DenseGen label"
+        return "Sequence-matched metadata"
     if role_text == "matched_null":
-        return "scrambled control"
+        return "row-shuffled control"
     return role_text.replace("_", " ")
 
 
@@ -233,11 +240,11 @@ def _legend_below(fig: object, axes: list[object]) -> None:
         by_label.values(),
         by_label.keys(),
         frameon=False,
-        fontsize=REVIEW_LEGEND_FONTSIZE,
+        fontsize=REVIEW_LEGEND_FONTSIZE - 1,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.045),
-        ncols=min(3, max(1, len(by_label))),
-        columnspacing=1.0,
+        ncols=min(2, max(1, len(by_label))),
+        columnspacing=0.8,
         handlelength=1.5,
         handletextpad=0.5,
     )

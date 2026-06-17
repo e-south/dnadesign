@@ -91,7 +91,7 @@ def build_notebook_collection_visual_card_rows(choice: Mapping[str, Any]) -> lis
         {"field": "surface", "value": choice.get("surface_kind") or "not recorded"},
         {"field": "source plot", "value": choice.get("source_plot_name") or "not recorded"},
         {"field": "relationship", "value": choice.get("relationship_id") or "not recorded"},
-        {"field": "group key", "value": choice.get("group_key") or "not recorded"},
+        {"field": "grouping", "value": _group_key_text(choice.get("group_key"))},
         {"field": "metric", "value": choice.get("metric") or "not recorded"},
         {"field": "metric label", "value": choice.get("metric_label") or "not recorded"},
         {"field": "metric expression", "value": choice.get("metric_expression") or "not recorded"},
@@ -104,8 +104,8 @@ def build_notebook_collection_visual_card_rows(choice: Mapping[str, Any]) -> lis
         {"field": "summary", "value": choice.get("summary") or "not recorded"},
         {"field": "interval", "value": choice.get("interval_kind") or "not recorded"},
         {"field": "rows", "value": choice.get("row_count") if choice.get("row_count") is not None else "not recorded"},
-        {"field": "freshness", "value": mapping(choice.get("freshness")).get("status") or "not recorded"},
-        {"field": "manifest", "value": choice.get("manifest_path") or "not generated"},
+        {"field": "artifact freshness", "value": mapping(choice.get("freshness")).get("status") or "not recorded"},
+        {"field": "provenance file", "value": choice.get("manifest_path") or "not generated"},
         {"field": "tidy csv", "value": choice.get("tidy_csv") or "not generated"},
     ]
     if interval:
@@ -175,6 +175,20 @@ def _axis_scale_text(axis_scale: Mapping[str, Any]) -> str:
     return "; ".join(parts) if parts else "not recorded"
 
 
+def _group_key_text(value: Any) -> str:
+    key = str(value or "").strip()
+    if not key:
+        return "not recorded"
+    labels = {
+        "label_oracle_kind": "label source",
+        "probe_oracle_kind": "label source",
+        "peer_review_claim_status": "claim status",
+        "learning_loop_baseline": "learning-loop comparison",
+        "slot_diagnostic_status": "slot diagnostic status",
+    }
+    return labels.get(key, _description_label(key))
+
+
 def _interval_description(interval: Mapping[str, Any]) -> str:
     unit = str(interval.get("unit") or "").strip()
     kind = str(interval.get("kind") or "").strip()
@@ -211,10 +225,6 @@ def _unique_label(label: str, seen: set[str]) -> str:
 
 
 def _set_choice_label(label: str, tier_label: str | None) -> str:
+    del tier_label
     base = str(label or "Campaign set").strip() or "Campaign set"
-    tier = str(tier_label or "").strip()
-    if not tier:
-        return base
-    if base.lower().startswith(f"{tier.lower()}:"):
-        return base
-    return f"{tier}: {base}"
+    return base

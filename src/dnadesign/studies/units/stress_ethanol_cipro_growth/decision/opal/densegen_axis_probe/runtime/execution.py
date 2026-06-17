@@ -192,33 +192,36 @@ def selected_ids_from_round(
     *,
     expected_k: int | None = None,
 ) -> list[str]:
-    import pandas as pd
+    from dnadesign.opal import read_selection_artifact
 
     selection_path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
     if not selection_path.exists():
         raise RuntimeError(f"selection artifact missing for {run_key} round {int(round_index)}: {selection_path}")
     try:
-        frame = pd.read_csv(selection_path, usecols=["id"])
-    except ValueError as exc:
+        frame = read_selection_artifact(selection_path, required_columns=("id",))
+    except Exception as exc:
+        message = str(exc)
+        if "duplicate IDs" in message:
+            raise RuntimeError(
+                f"selection artifact contains duplicate selected id(s) for {run_key} round {int(round_index)}: "
+                f"{selection_path}: {message}"
+            ) from exc
+        if "null IDs" in message:
+            raise RuntimeError(
+                f"selection artifact contains null id values for {run_key} round {int(round_index)}: "
+                f"{selection_path}: {message}"
+            ) from exc
+        if "blank IDs" in message:
+            raise RuntimeError(
+                f"selection artifact contains blank id values for {run_key} round {int(round_index)}: "
+                f"{selection_path}: {message}"
+            ) from exc
         raise RuntimeError(
-            f"selection artifact missing id column for {run_key} round {int(round_index)}: {selection_path}"
+            f"selection artifact invalid for {run_key} round {int(round_index)}: {selection_path}: {exc}"
         ) from exc
-    if frame["id"].isna().any():
-        raise RuntimeError(f"selection artifact contains null id values for {run_key} round {int(round_index)}")
     ids = [str(value).strip() for value in frame["id"].tolist()]
-    if any(not candidate_id for candidate_id in ids):
-        raise RuntimeError(f"selection artifact contains blank id values for {run_key} round {int(round_index)}")
     if not ids:
         raise RuntimeError(f"selection artifact contains no selected ids for {run_key} round {int(round_index)}")
-    id_series = pd.Series(ids, dtype="string")
-    duplicated = id_series.loc[id_series.duplicated()].drop_duplicates().sort_values()
-    if not duplicated.empty:
-        preview = ", ".join(duplicated.head(5).tolist())
-        suffix = "" if len(duplicated) <= 5 else f", ... ({len(duplicated)} total)"
-        raise RuntimeError(
-            f"selection artifact contains duplicate selected id(s) for {run_key} round {int(round_index)}: "
-            f"{preview}{suffix}"
-        )
     if expected_k is not None and len(ids) != int(expected_k):
         raise RuntimeError(
             f"selection artifact for {run_key} round {int(round_index)} expected {int(expected_k)} "

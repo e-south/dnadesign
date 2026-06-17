@@ -71,7 +71,7 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
     txt = out_path.read_text()
     assert "marimo.App" in txt
     assert "build_campaign_set_notebook_view_model" in txt
-    assert 'label="OPAL campaign"' in txt
+    assert 'label="Campaign"' in txt
     assert "opal" in txt.lower()
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
@@ -115,7 +115,7 @@ def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) ->
     assert out_path.exists()
     text = out_path.read_text()
     assert "build_campaign_set_notebook_view_model" in text
-    assert "No written manifest-backed plot media are available" in text
+    assert "No plot media are available" in text
 
 
 def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:
@@ -231,9 +231,9 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert out_path.exists()
     assert smoke_checked == [out_path]
     text = out_path.read_text()
-    assert "# OPAL Campaign Review" in text
+    assert "# Campaign Review" in text
     assert "build_campaign_set_notebook_view_model" in text
-    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign"' in text
     assert 'label="Visual surface"' in text
 
 

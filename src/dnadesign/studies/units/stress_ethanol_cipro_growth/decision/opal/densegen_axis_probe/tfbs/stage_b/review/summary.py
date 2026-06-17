@@ -77,7 +77,7 @@ def summary_payload(
         "interpretation_boundary": (
             "Realized selected label enrichment ratio is the primary ML learnability endpoint. "
             "Predicted selected score is an acquisition diagnostic and must not be used alone as evidence "
-            "that the DenseGen label is learned better than its matched scrambled-label control."
+            "that sequence-matched metadata is learned better than its row-shuffled control."
         ),
     }
 

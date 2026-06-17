@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from ..claims import (
     build_tfbs_stage_b_claim_assessment,
@@ -37,6 +38,7 @@ def build_tfbs_stage_b_realized_label_review(
     trajectory = trajectory_frame(campaigns, rounds=int(manifest["rounds"]))
     pair_summary = pair_summary_frame(trajectory, campaigns=campaigns, pairs=pair_rows(manifest))
     claim_assessment = build_tfbs_stage_b_claim_assessment(pair_summary)
+    review_status = _review_status_from_trajectory(trajectory)
     trajectory_path = review_dir / "tfbs_stage_b_realized_label_trajectory.csv"
     pair_summary_path = review_dir / "tfbs_stage_b_positive_null_pair_summary.csv"
     claim_assessment_path = review_dir / "tfbs_stage_b_claim_assessment.csv"
@@ -57,29 +59,41 @@ def build_tfbs_stage_b_realized_label_review(
         if has_slot_pairs(manifest)
         else None
     )
-    realized_visual_registration = maybe_register_tfbs_stage_b_realized_review_visuals(
-        config_manifest_path=manifest_path,
-        plot_manifest_json_path=plot_manifest_path,
-        trajectory_csv_path=trajectory_path,
-        pair_summary_csv_path=pair_summary_path,
-        collection_visual_index_path=collection_visual_index_path,
-    )
-    slot_visual_registration = (
-        maybe_register_tfbs_stage_b_slot_diagnostic_visuals(
+    if review_status == "PASS":
+        realized_visual_registration = maybe_register_tfbs_stage_b_realized_review_visuals(
             config_manifest_path=manifest_path,
-            plot_manifest_json_path=slot_diagnostics.plot_manifest_json_path,
-            trajectory_csv_path=slot_diagnostics.trajectory_csv_path,
-            pair_summary_csv_path=slot_diagnostics.pair_summary_csv_path,
-            count_distribution_csv_path=slot_diagnostics.count_distribution_csv_path,
+            plot_manifest_json_path=plot_manifest_path,
+            trajectory_csv_path=trajectory_path,
+            pair_summary_csv_path=pair_summary_path,
             collection_visual_index_path=collection_visual_index_path,
         )
-        if slot_diagnostics is not None
-        else {
-            "status": "SKIPPED_NO_SLOT_LABELS",
-            "collection_visual_index_path": None,
-            "registered_visual_count": 0,
-        }
-    )
+        slot_visual_registration = (
+            maybe_register_tfbs_stage_b_slot_diagnostic_visuals(
+                config_manifest_path=manifest_path,
+                plot_manifest_json_path=slot_diagnostics.plot_manifest_json_path,
+                trajectory_csv_path=slot_diagnostics.trajectory_csv_path,
+                pair_summary_csv_path=slot_diagnostics.pair_summary_csv_path,
+                count_distribution_csv_path=slot_diagnostics.count_distribution_csv_path,
+                collection_visual_index_path=collection_visual_index_path,
+            )
+            if slot_diagnostics is not None
+            else {
+                "status": "SKIPPED_NO_SLOT_LABELS",
+                "collection_visual_index_path": None,
+                "registered_visual_count": 0,
+            }
+        )
+    else:
+        realized_visual_registration = _skipped_registration(review_status=review_status)
+        slot_visual_registration = (
+            _skipped_registration(review_status=review_status)
+            if slot_diagnostics is not None
+            else {
+                "status": "SKIPPED_NO_SLOT_LABELS",
+                "collection_visual_index_path": None,
+                "registered_visual_count": 0,
+            }
+        )
     notebook_visual_registration = {
         "realized_label_review": dict(realized_visual_registration),
         "slot_count_diagnostics": dict(slot_visual_registration),
@@ -115,3 +129,17 @@ def build_tfbs_stage_b_realized_label_review(
         notebook_visual_registration=notebook_visual_registration,
         summary_json_path=summary_path,
     )
+
+
+def _review_status_from_trajectory(trajectory: Any) -> str:
+    budget_failures = int((trajectory["selection_budget_status"] != "PASS").sum()) if not trajectory.empty else 0
+    return "PASS" if budget_failures == 0 else "FAIL_SELECTION_BUDGET"
+
+
+def _skipped_registration(*, review_status: str) -> dict[str, Any]:
+    return {
+        "status": "SKIPPED_REVIEW_NOT_PASS",
+        "review_status": review_status,
+        "collection_visual_index_path": None,
+        "registered_visual_count": 0,
+    }

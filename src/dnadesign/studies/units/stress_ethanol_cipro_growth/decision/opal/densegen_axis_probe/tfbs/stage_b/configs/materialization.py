@@ -31,6 +31,7 @@ from .campaign_artifacts import write_campaign_artifacts
 from .contracts import TfbsStageBConfig, TfbsStageBResult
 from .scopes import (
     control_pair_label,
+    control_role_display_label,
     materialize_label_scope_artifacts,
     select_shared_initial_ids,
     uses_count_fixed_scope,
@@ -161,6 +162,7 @@ def materialize_tfbs_stage_b_sentinel_configs(config: TfbsStageBConfig) -> TfbsS
         split_id=cfg.split_id,
         seed=cfg.seed,
         control_pair_label=control_pair_label(target_profile_id=target_profile.profile_id),
+        control_role_label=control_role_display_label(target_profile_id=target_profile.profile_id),
     )
     write_stage_b_json(layout.collection_manifest_path, collection_manifest)
     manifest = _build_config_manifest(

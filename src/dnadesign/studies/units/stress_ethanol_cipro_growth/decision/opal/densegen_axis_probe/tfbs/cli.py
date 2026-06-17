@@ -90,7 +90,7 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
 
     tfbs_stage_b = subparsers.add_parser(
         "tfbs-stage-b-configs",
-        help="Generate and optionally validate DenseGen TFBS learnability Stage B sentinel OPAL configs.",
+        help="Generate and optionally validate Dense Array TFBS probe Stage B configs.",
     )
     tfbs_stage_b.add_argument("--stage-a-run-root", required=True)
     tfbs_stage_b.add_argument("--out-dir", default=None)
@@ -139,7 +139,7 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
         "--validate-configs",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Run `uv run opal validate` for each generated sentinel config.",
+        help="Run `uv run opal validate` for each generated probe config.",
     )
     tfbs_stage_b.add_argument(
         "--replace-out-dir",
@@ -155,7 +155,7 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
 
     tfbs_stage_b_run = subparsers.add_parser(
         "tfbs-stage-b-run",
-        help="Run validated DenseGen TFBS learnability Stage B sentinel OPAL campaigns.",
+        help="Run validated Dense Array TFBS probe Stage B campaigns.",
     )
     tfbs_stage_b_run.add_argument("--config-manifest", required=True)
     tfbs_stage_b_run.add_argument(
@@ -198,7 +198,7 @@ def add_tfbs_subcommands(subparsers: argparse._SubParsersAction[argparse.Argumen
 
     tfbs_stage_b_review = subparsers.add_parser(
         "tfbs-stage-b-review",
-        help="Write realized true-label lift and positive/null review artifacts for Stage B sentinel campaigns.",
+        help="Write realized metadata-enrichment review artifacts for Stage B probe campaigns.",
     )
     tfbs_stage_b_review.add_argument("--config-manifest", required=True)
     tfbs_stage_b_review.add_argument("--out-dir", default=None)

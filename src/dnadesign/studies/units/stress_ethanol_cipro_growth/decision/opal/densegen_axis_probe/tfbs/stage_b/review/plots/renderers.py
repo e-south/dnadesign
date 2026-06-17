@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from textwrap import fill
 
 import pandas as pd
 
 from ....plot_style import (
+    KNOWN_LABEL_REFERENCE_COLOR,
+    POOL_AVERAGE_COLOR,
     REVIEW_AXIS_LABEL_FONTSIZE,
     REVIEW_LEGEND_FONTSIZE,
     REVIEW_SQUARE_FIGSIZE,
     REVIEW_TITLE_FONTSIZE,
     role_color,
+    role_marker,
     style_review_axis,
 )
 from ...notebook_visuals.specs import StageBNotebookVisualSpec
@@ -24,10 +26,17 @@ from .display_text import (
     TRAJECTORY_X_AXIS_LABEL,
     plot_manifest_title,
     positive_null_summary_subtitle,
-    role_display_label,
     seed_pair_sample_sd_label,
     trajectory_plot_subtitle,
     trajectory_y_axis_label,
+)
+from .helpers import (
+    control_role_for_label,
+    legend_below_figure,
+    legend_role_label,
+    plot_title,
+    same_batch_top_k_lift,
+    title_x,
 )
 from .registry import build_realized_review_renderer_registry
 from .statistics import (
@@ -39,10 +48,10 @@ from .statistics import (
     trajectory_replicate_count,
 )
 
-_TITLE_Y = 0.965
-_SUBTITLE_Y = 0.855
-_TRAJECTORY_LAYOUT = {"left": 0.27, "right": 0.84, "top": 0.79, "bottom": 0.29}
-_SUMMARY_LAYOUT = {"left": 0.18, "right": 0.93, "top": 0.79, "bottom": 0.25}
+_TITLE_Y = 0.952
+_SUBTITLE_Y = 0.850
+_TRAJECTORY_LAYOUT = {"left": 0.20, "right": 0.91, "top": 0.86, "bottom": 0.29}
+_SUMMARY_LAYOUT = {"left": 0.18, "right": 0.93, "top": 0.86, "bottom": 0.27}
 
 
 def realized_review_renderer(spec: StageBNotebookVisualSpec) -> RealizedReviewRenderer:
@@ -94,17 +103,26 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
         raise ValueError(f"Stage B lift trajectory has no rows for label {label_name!r}")
 
     replicate_count = trajectory_replicate_count(sub_label)
-    control_role = _control_role_for_label(sub_label)
+    control_role = control_role_for_label(sub_label)
+    title_text = plot_title(
+        plot_manifest_title(
+            "realized_label_lift_trajectory",
+            label_name=label_name,
+            replicate_count=replicate_count,
+            control_role=control_role,
+        )
+    )
+    layout = dict(_TRAJECTORY_LAYOUT)
     fig, ax = plt.subplots(figsize=REVIEW_SQUARE_FIGSIZE, constrained_layout=False)
-    fig.subplots_adjust(**_TRAJECTORY_LAYOUT)
+    fig.subplots_adjust(**layout)
     for role, sub_role in sorted(sub_label.groupby("oracle_role"), key=lambda item: role_sort_key(item[0])):
         role_summary = replicate_round_summary(sub_role)
         has_spread = bool(role_summary["replicate_count"].max() > 1)
         seed_lift = seed_lift_summary(sub_role)
-        role_label = _legend_role_label(
+        role_label = legend_role_label(
             role,
             label_name=label_name,
-            control_role=_control_role_for_label(sub_role),
+            control_role=control_role_for_label(sub_role),
         )
         if has_spread:
             for _, sub_replicate in sub_role.groupby(replicate_column(sub_role), dropna=False):
@@ -120,10 +138,13 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
         ax.plot(
             role_summary["round"],
             role_summary["lift_mean"],
-            marker="o",
+            marker=role_marker(role),
             markersize=5.0,
             linewidth=1.8,
             color=role_color(role),
+            markeredgecolor=role_color(role),
+            markerfacecolor="white" if str(role) == "matched_null" else role_color(role),
+            markeredgewidth=1.0,
             label=role_label,
             zorder=3,
         )
@@ -141,7 +162,7 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
         ax.scatter(
             [-1],
             [seed_lift["mean"]],
-            marker="s",
+            marker="D",
             s=46,
             color=role_color(role),
             edgecolor="#2E3135",
@@ -158,11 +179,11 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
                 alpha=0.72,
                 zorder=3,
             )
-    top_lift = _same_batch_top_k_lift(sub_label)
-    ax.axhline(1.0, color="#222222", linewidth=0.9, linestyle="--", label=NO_ENRICHMENT_BASELINE_LABEL)
+    top_lift = same_batch_top_k_lift(sub_label)
+    ax.axhline(1.0, color=POOL_AVERAGE_COLOR, linewidth=0.9, linestyle="--", label=NO_ENRICHMENT_BASELINE_LABEL)
     ax.axhline(
         top_lift,
-        color="#5F7F5F",
+        color=KNOWN_LABEL_REFERENCE_COLOR,
         linewidth=1.2,
         linestyle=":",
         label=SAME_BATCH_TOP_K_REFERENCE_LABEL,
@@ -174,28 +195,26 @@ def _plot_lift_trajectory(frame: pd.DataFrame, path: Path, *, label_name: str) -
     ax.set_xlabel(TRAJECTORY_X_AXIS_LABEL, fontsize=REVIEW_AXIS_LABEL_FONTSIZE)
     ax.set_ylabel(trajectory_y_axis_label(label_name), fontsize=REVIEW_AXIS_LABEL_FONTSIZE)
     fig.text(
-        0.50,
+        title_x(layout),
         _TITLE_Y,
-        _plot_title(
-            plot_manifest_title(
-                "realized_label_lift_trajectory", label_name=label_name, replicate_count=replicate_count
-            )
-        ),
+        title_text,
         ha="center",
         va="top",
         fontsize=REVIEW_TITLE_FONTSIZE,
     )
-    fig.text(
-        0.50,
-        _SUBTITLE_Y,
-        trajectory_plot_subtitle(label_name, replicate_count=replicate_count, control_role=control_role),
-        ha="center",
-        va="top",
-        fontsize=REVIEW_LEGEND_FONTSIZE,
-        color="#4D555C",
-    )
+    subtitle = trajectory_plot_subtitle(label_name, replicate_count=replicate_count, control_role=control_role)
+    if subtitle:
+        fig.text(
+            title_x(layout),
+            _SUBTITLE_Y,
+            subtitle,
+            ha="center",
+            va="top",
+            fontsize=REVIEW_LEGEND_FONTSIZE,
+            color="#4D555C",
+        )
     _set_trajectory_round_ticks(ax, df)
-    _legend_below_figure(fig, ax, ncols=2)
+    legend_below_figure(fig, ax, ncols=4)
     fig.savefig(path, dpi=160, facecolor="white")
     plt.close(fig)
 
@@ -245,30 +264,37 @@ def _plot_positive_null_summary(frame: pd.DataFrame, path: Path, *, label_name: 
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["Final round", "Trajectory AUC"], rotation=0, ha="center")
     ax.set_ylabel(
-        "DenseGen - control enrichment",
+        "Lift difference (sequence-matched - control)",
         fontsize=REVIEW_AXIS_LABEL_FONTSIZE,
     )
     fig.text(
-        0.50,
+        title_x(_SUMMARY_LAYOUT),
         _TITLE_Y,
-        _plot_title(
-            plot_manifest_title("positive_null_lift_summary", label_name=label_name, replicate_count=replicate_count)
+        plot_title(
+            plot_manifest_title(
+                "positive_null_lift_summary",
+                label_name=label_name,
+                replicate_count=replicate_count,
+                control_role=control_role_for_label(df),
+            )
         ),
         ha="center",
         va="top",
         fontsize=REVIEW_TITLE_FONTSIZE,
     )
-    fig.text(
-        0.50,
-        _SUBTITLE_Y,
-        positive_null_summary_subtitle(replicate_count=replicate_count),
-        ha="center",
-        va="top",
-        fontsize=REVIEW_LEGEND_FONTSIZE,
-        color="#4D555C",
-    )
+    subtitle = positive_null_summary_subtitle(replicate_count=replicate_count)
+    if subtitle:
+        fig.text(
+            title_x(_SUMMARY_LAYOUT),
+            _SUBTITLE_Y,
+            subtitle,
+            ha="center",
+            va="top",
+            fontsize=REVIEW_LEGEND_FONTSIZE,
+            color="#4D555C",
+        )
     if final_summary["replicate_count"] > 1 or auc_summary["replicate_count"] > 1:
-        _legend_below_figure(fig, ax, ncols=1)
+        legend_below_figure(fig, ax, ncols=1)
     fig.savefig(path, dpi=160, facecolor="white")
     plt.close(fig)
 
@@ -287,58 +313,3 @@ def _set_trajectory_round_ticks(ax: object, df: pd.DataFrame) -> None:
         tick_rounds.append(round_values[-1])
     ax.set_xticks([-1, *tick_rounds])
     ax.set_xticklabels([INITIAL_BATCH_TICK_LABEL, *(str(value) for value in tick_rounds)])
-
-
-def _plot_title(text: str) -> str:
-    return fill(str(text), width=34, break_long_words=False)
-
-
-def _single_nonempty(values: object) -> str:
-    series = pd.Series(values, dtype="object")
-    clean = sorted({str(value) for value in series.tolist() if str(value) not in {"", "nan", "None"}})
-    return clean[0] if len(clean) == 1 else ""
-
-
-def _control_role_for_label(frame: pd.DataFrame) -> str:
-    if "null_control_role" not in frame.columns:
-        return ""
-    matched_null = frame.loc[frame["oracle_role"].astype(str) == "matched_null", "null_control_role"]
-    role = _single_nonempty(matched_null)
-    if role:
-        return role
-    return _single_nonempty(frame["null_control_role"])
-
-
-def _legend_role_label(role: object, *, label_name: object, control_role: object | None = None) -> str:
-    role_text = str(role)
-    if role_text == "matched_null" and str(control_role or "") == "count_fixed_shuffled_slot_negative_control":
-        return "Shuffled-slot control"
-    return role_display_label(role, label_name=label_name, control_role=control_role)
-
-
-def _legend_below_figure(fig: object, ax: object, *, ncols: int) -> None:
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles, strict=False))
-    fig.legend(
-        by_label.values(),
-        by_label.keys(),
-        frameon=False,
-        fontsize=REVIEW_LEGEND_FONTSIZE,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.040),
-        ncols=min(int(ncols), max(1, len(by_label))),
-        columnspacing=0.9,
-        handlelength=1.4,
-        handletextpad=0.45,
-    )
-
-
-def _same_batch_top_k_lift(frame: pd.DataFrame) -> float:
-    """Return the plotted same-batch top-label lift for a label trajectory."""
-
-    positive = frame.loc[frame["oracle_role"].astype(str) == "positive", "same_batch_top_lift_ratio"]
-    source = positive if not positive.empty else frame["same_batch_top_lift_ratio"]
-    values = pd.to_numeric(source, errors="raise").dropna()
-    if values.empty:
-        raise ValueError("Stage B lift trajectory has no same_batch_top_lift_ratio values")
-    return float(values.mean())

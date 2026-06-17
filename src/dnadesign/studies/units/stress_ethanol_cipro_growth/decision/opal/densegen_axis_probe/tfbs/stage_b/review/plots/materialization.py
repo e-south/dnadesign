@@ -124,7 +124,12 @@ def _materialize_plot(
     replicate_count = int(interval["replicate_count"])
     return {
         "kind": spec.kind,
-        "title": plot_manifest_title(spec.kind, label_name=label_name, replicate_count=replicate_count),
+        "title": plot_manifest_title(
+            spec.kind,
+            label_name=label_name,
+            replicate_count=replicate_count,
+            control_role=control_role,
+        ),
         "label_name": label_name,
         "path": str(path),
         "sha256": file_sha256(path),
@@ -159,8 +164,8 @@ def _plot_interval_contract(
         sub = pair_summary.loc[pair_summary["label_name"].astype(str) == label_name]
         return _sample_sd_interval_contract(
             replicate_count=int(len(sub)),
-            unit="DenseGen/control seed pair",
-            applies_to="DenseGen-minus-control lift summary",
+            unit="sequence-matched/control seed pair",
+            applies_to="sequence-matched-minus-control lift summary",
         )
     return {
         "kind": "none",

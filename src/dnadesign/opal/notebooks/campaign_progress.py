@@ -120,7 +120,7 @@ def _(
     campaign_rows = [build_notebook_campaign_summary_row(campaign_model) for campaign_model in campaigns]
     if campaign_rows:
         campaign_labels = [f"{index + 1}. {row['label']}" for index, row in enumerate(campaign_rows)]
-        campaign_ui = mo.ui.dropdown(campaign_labels, value=campaign_labels[0], label="OPAL campaign")
+        campaign_ui = mo.ui.dropdown(campaign_labels, value=campaign_labels[0], label="Campaign")
         campaign_summary_df = pl.DataFrame(campaign_rows)
     else:
         campaign_labels = []
@@ -139,8 +139,8 @@ def _(
         else ""
     )
     header_md = mo.md(
-        "# OPAL Campaign Review\n\n"
-        f"There are `{campaign_set_view_model['campaign_count']}` OPAL campaigns available for "
+        "# Campaign Review\n\n"
+        f"There are `{campaign_set_view_model['campaign_count']}` campaigns available for "
         f"review scope `{selected_round_selector}`.{collection_clause}"
     )
     return campaign_labels, campaign_summary_df, campaign_ui, header_md
@@ -400,9 +400,9 @@ def _(
 
     if selected_visual_choice is None:
         if active_view_mode == "Campaign set":
-            _lines = ["No manifest-backed campaign-set comparison visuals are available."]
+            _lines = ["No campaign-set comparison visuals are available."]
         else:
-            _lines = ["No written manifest-backed plot media are available for this campaign."]
+            _lines = ["No plot media are available for this campaign."]
             if plot_inventory_counts:
                 _parts = [f"{key}={value}" for key, value in sorted(plot_inventory_counts.items())]
                 _lines.append("Plot inventory: " + ", ".join(_parts))
@@ -499,7 +499,7 @@ def _(
                 show_column_summaries=False,
             )
             if metric_rows
-            else mo.md("No manifest-backed plot metric definitions are available.")
+            else mo.md("No plot metric definitions are available.")
         )
 
         change_rows = build_notebook_change_rows(selected_campaign_model)
@@ -575,7 +575,7 @@ def _(
     if active_view_mode != "Campaign set":
         _items.append(selected_campaign_header_md)
     _accordion_items = {
-        "OPAL campaigns at a glance": mo.ui.table(
+        "Campaigns at a glance": mo.ui.table(
             campaign_summary_df,
             page_size=12,
             show_column_summaries=False,
@@ -584,7 +584,7 @@ def _(
     if active_view_mode != "Campaign set":
         _accordion_items.update(
             {
-                "Selected OPAL campaign": selected_overview_panel,
+                "Selected campaign": selected_overview_panel,
                 "Validity": selected_validity_md,
                 "Changes": changes_panel,
                 "Metric definitions": metric_definitions_panel,

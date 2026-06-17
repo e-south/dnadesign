@@ -24,7 +24,7 @@ def _campaign_selector_cell() -> str:
         ):
             _rows = [build_notebook_campaign_summary_row(campaign_model) for campaign_model in campaigns]
             campaign_labels = [f"{index + 1}. {row['label']}" for index, row in enumerate(_rows)]
-            campaign_ui = mo.ui.dropdown(campaign_labels, value=campaign_labels[0], label="OPAL campaign")
+            campaign_ui = mo.ui.dropdown(campaign_labels, value=campaign_labels[0], label="Campaign")
             campaign_summary_df = pl.DataFrame(_rows)
             _collection_keys = {str(visual.get("comparison_set_key") or "") for visual in collection_visuals}
             _collection_set_count = len(_collection_keys - {""})
@@ -34,9 +34,9 @@ def _campaign_selector_cell() -> str:
                 if collection_visuals
                 else ""
             )
-            _campaign_inventory_label = "raw campaign artifacts" if collection_visuals else "OPAL campaigns"
+            _campaign_inventory_label = "raw campaign artifacts" if collection_visuals else "campaigns"
             header_md = mo.md(
-                "# OPAL Campaign Review\\n\\n"
+                "# Campaign Review\\n\\n"
                 f"There are `{campaign_set_view_model['campaign_count']}` {_campaign_inventory_label} available for "
                 f"review scope `{selected_round_selector}`.{_collection_clause}"
             )

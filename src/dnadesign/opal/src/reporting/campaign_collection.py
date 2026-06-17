@@ -122,7 +122,7 @@ def _relationship_payload(
             f"Campaign collection relationship {relationship_id!r} matched no campaign pairs.",
             ExitCodes.CONTRACT_VIOLATION,
         )
-    return {
+    payload = {
         "id": relationship_id,
         "kind": kind,
         "label": str(row.get("label") or _relationship_label(kind=kind, role_dimension=role_dimension)),
@@ -134,6 +134,13 @@ def _relationship_payload(
         "pair_count": len(pairs),
         "pairs": pairs,
     }
+    left_role_label = _optional_string(row.get("left_role_label"))
+    if left_role_label:
+        payload["left_role_label"] = left_role_label
+    right_role_label = _optional_string(row.get("right_role_label"))
+    if right_role_label:
+        payload["right_role_label"] = right_role_label
+    return payload
 
 
 def _relationship_pairs(
@@ -178,7 +185,7 @@ def _relationship_pairs(
 
 
 def _comparison_lens(relationship: Mapping[str, Any]) -> dict[str, Any]:
-    return {
+    payload = {
         "id": relationship["id"],
         "kind": relationship["kind"],
         "label": _relationship_label(
@@ -194,6 +201,11 @@ def _comparison_lens(relationship: Mapping[str, Any]) -> dict[str, Any]:
         "pair_count": int(relationship["pair_count"]),
         "pairs": list(relationship.get("pairs") or []),
     }
+    if relationship.get("left_role_label"):
+        payload["left_role_label"] = relationship["left_role_label"]
+    if relationship.get("right_role_label"):
+        payload["right_role_label"] = relationship["right_role_label"]
+    return payload
 
 
 def _comparison_view_payload(
@@ -480,6 +492,10 @@ def _required_string(value: Any, *, field: str) -> str:
     if not text:
         raise OpalError(f"Campaign collection field {field} must be a non-empty string.", ExitCodes.CONTRACT_VIOLATION)
     return text
+
+
+def _optional_string(value: Any) -> str:
+    return str(value or "").strip()
 
 
 def _require_declared_dimensions(values: list[str], dimensions: list[str], *, field: str) -> None:

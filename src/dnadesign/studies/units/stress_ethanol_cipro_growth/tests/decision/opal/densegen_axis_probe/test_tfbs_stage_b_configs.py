@@ -101,8 +101,8 @@ def test_tfbs_stage_b_generates_sentinel_configs_from_stage_a_artifacts(tmp_path
         label_name = campaign["label_name"]
         role = campaign["oracle_role"]
         target_label = tfbs_label_title(label_name)
-        role_label = "DenseGen label" if role == "positive" else "matched scrambled-label control"
-        assert cfg["campaign"]["name"] == f"DenseGen TFBS learnability: {target_label}, {role_label}, seed 7"
+        role_label = "sequence-matched metadata" if role == "positive" else "row-shuffled control"
+        assert cfg["campaign"]["name"] == f"Dense Array TFBS metadata probe: {target_label}, {role_label}, seed 7"
         assert label_name not in cfg["campaign"]["name"]
         assert cfg["campaign"]["metadata"]["probe_family"] == "densegen_tfbs_learnability_probe_v1"
         assert cfg["campaign"]["metadata"]["probe_stage"] == "B"
@@ -196,10 +196,12 @@ def test_tfbs_stage_b_generates_sentinel_configs_from_stage_a_artifacts(tmp_path
         {
             "id": "positive_vs_null",
             "kind": "control_pair",
-            "label": "DenseGen label vs matched scrambled-label control",
+            "label": "Sequence-matched metadata vs row-shuffled control",
             "role_dimension": "label_oracle_kind",
             "left_role": "positive",
+            "left_role_label": "Sequence-matched metadata",
             "right_role": "null",
+            "right_role_label": "Row-shuffled control",
             "match_on": ["target", "label_family_id", "label_split_id", "seed"],
             "replicate_on": ["seed"],
         }
@@ -256,7 +258,9 @@ def test_tfbs_stage_b_count_fixed_profile_writes_label_specific_scopes(tmp_path:
     assert manifest["candidate_scope_mode"] == "label_specific_count_fixed"
     assert manifest["collection_manifest_path"] == str(result.collection_manifest_path)
     collection = _read_json(result.collection_manifest_path)
-    assert collection["relationships"][0]["label"] == "DenseGen label vs count-fixed shuffled-slot control"
+    assert collection["relationships"][0]["label"] == "Sequence-matched metadata vs slot-shuffled control"
+    assert collection["relationships"][0]["left_role_label"] == "Sequence-matched metadata"
+    assert collection["relationships"][0]["right_role_label"] == "Slot-shuffled control"
     assert {row["label_name"] for row in manifest["candidate_scopes"]} == set(SLOT_POSITION_COUNT_FIXED_SENTINEL_LABELS)
     assert {row["candidate_scope_policy_id"] for row in manifest["candidate_scopes"]} == {
         "tfbs_slot_position_target_count_eq_1_v1"
@@ -285,7 +289,7 @@ def test_tfbs_stage_b_count_fixed_profile_writes_label_specific_scopes(tmp_path:
         cfg = yaml.safe_load(Path(control["config_path"]).read_text(encoding="utf-8"))
         assert cfg["campaign"]["metadata"]["candidate_scope_policy_id"] == "tfbs_slot_position_target_count_eq_1_v1"
         assert cfg["data"]["candidate_scope"]["path"] == str(Path(control["candidate_scope_path"]).resolve())
-        assert "count-fixed shuffled-slot control" in cfg["campaign"]["name"]
+        assert "slot-shuffled control" in cfg["campaign"]["name"]
 
 
 def test_tfbs_stage_b_fails_closed_when_stage_a_retention_failed(tmp_path: Path) -> None:

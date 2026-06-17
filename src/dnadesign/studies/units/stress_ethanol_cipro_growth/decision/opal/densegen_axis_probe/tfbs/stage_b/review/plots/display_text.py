@@ -3,24 +3,26 @@
 from __future__ import annotations
 
 from ....label_text import (
+    SEQUENCE_MATCHED_METADATA_LABEL,
     tfbs_control_display_label,
     tfbs_label_compact_title,
     tfbs_label_expression,
     tfbs_label_title,
 )
 
-NO_ENRICHMENT_BASELINE_LABEL = "Baseline"
-NO_ENRICHMENT_BASELINE_CONTRACT = "No enrichment: selected mean = full candidate-pool mean"
-SAME_BATCH_TOP_K_REFERENCE_LABEL = "Same-batch top-K reference"
+NO_ENRICHMENT_BASELINE_LABEL = "Pool average"
+NO_ENRICHMENT_BASELINE_CONTRACT = "No enrichment: selected mean equals the same label-table pool mean"
+SAME_BATCH_TOP_K_REFERENCE_LABEL = "Best possible batch"
 SAME_BATCH_TOP_K_REFERENCE_CONTRACT = (
-    "Same-batch top-K reference: mean of the top selection_k label values in the candidate pool divided by "
-    "the same pool mean used for plotted lift. This is a reference ceiling, not an observed campaign."
+    "Best possible single batch: mean of the top selection_k label values in the same label table divided by the "
+    "same label-table pool mean. This is a full-pool reference, not an observed campaign and not the multi-round "
+    "same-budget known-label ranking."
 )
 TRAJECTORY_X_AXIS_LABEL = "Round"
-INITIAL_BATCH_TICK_LABEL = "Shared\nstart"
+INITIAL_BATCH_TICK_LABEL = "Initial seed\nbatch"
 TRAILING_TRAJECTORY_NOTE = (
-    "Faint lines = individual seeds; bold line = mean selected batch; squares = shared start; dashed = baseline; "
-    "dotted = same-batch top-K reference."
+    "Faint lines = seed runs; bold line = mean selected batch; diamond = initial seed batch; "
+    "dashed = pool average; dotted = best possible batch."
 )
 REALIZED_REVIEW_TEXT_CONTRACT = {
     "baseline": NO_ENRICHMENT_BASELINE_CONTRACT,
@@ -28,22 +30,24 @@ REALIZED_REVIEW_TEXT_CONTRACT = {
         "count_fraction label = target TFBS count / 3 per sequence; plotted values are enrichment ratios, "
         "not raw counts"
     ),
-    "initial_batch": "square markers are the same initial IDs scored by each label source before round 0",
+    "initial_batch": "diamond markers are the same initial seed-batch IDs scored by each label table before round 0",
     "interval": "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI",
     "legend_layout": "legend below the plot; wrap when needed to avoid clipping",
-    "pairing": ("DenseGen-label and control campaigns share initial selected IDs; only the label table differs"),
-    "role_labels": "DenseGen label versus profile-appropriate matched control",
+    "pairing": (
+        "sequence-matched metadata and control campaigns share initial selected IDs; only the label table differs"
+    ),
+    "role_labels": "sequence-matched metadata versus profile-appropriate matched control",
     "selected_label_values": (
         "selected_true_* artifact columns are selected values from that campaign's label table; for shuffled "
-        "controls this is a control-label value, not post hoc DenseGen truth"
+        "controls this is a control-label value, not post hoc sequence-matched metadata truth"
     ),
     "trajectory_semantics": (
         "line points are per-round top-k selected batches; round 0 is the first acquired batch after the "
-        "shared initial IDs, not the initial seed batch"
+        "initial seed-batch IDs, not the initial seed batch itself"
     ),
     "same_batch_top_k_reference": SAME_BATCH_TOP_K_REFERENCE_CONTRACT,
     "subtitle_layout": "centered single-line subtitle",
-    "title_alignment": "centered title; title may wrap, subtitle must not wrap",
+    "title_alignment": "title centered over the axes frame; title may wrap, subtitle must not wrap",
     "type_scale": "axis labels, tick labels, subtitle, and legend use the same review body size",
 }
 
@@ -53,17 +57,25 @@ def role_display_label(role: object, *, label_name: object, control_role: object
 
     role_text = str(role)
     if role_text == "positive":
-        return "DenseGen label"
+        return SEQUENCE_MATCHED_METADATA_LABEL
     if role_text == "matched_null":
         default_role = "" if _is_slot_label(label_name) else "matched_label_permutation_negative_control"
         return tfbs_control_display_label(control_role or default_role, label_name=label_name).capitalize()
     return role_text.replace("_", " ")
 
 
-def trajectory_plot_title(label_name: object, *, replicate_count: int) -> str:
+def trajectory_plot_title(
+    label_name: object,
+    *,
+    replicate_count: int,
+    control_role: object | None = None,
+) -> str:
     """Return the visible title for the round trajectory plot."""
 
-    return f"{_trajectory_title_label(label_name)} enrichment from promoter embeddings"
+    del replicate_count
+    if _is_slot_label(label_name):
+        return f"Active selection enriches {_trajectory_title_label(label_name)} over slot-shuffled control"
+    return f"Active selection enriches {_trajectory_title_label(label_name)} over row-shuffled control"
 
 
 def trajectory_plot_subtitle(
@@ -74,13 +86,8 @@ def trajectory_plot_subtitle(
 ) -> str:
     """Return the visible subtitle carrying pairing and interval semantics."""
 
-    seed_phrase = _paired_seed_run_phrase(replicate_count)
-    if _is_slot_label(label_name):
-        if str(control_role or "") == "count_fixed_shuffled_slot_negative_control":
-            return f"DenseGen vs shuffled-slot control; count fixed; {seed_phrase}"
-        control = tfbs_control_display_label(control_role, label_name=label_name)
-        return f"DenseGen vs {control}; {seed_phrase}"
-    return f"DenseGen vs scrambled control; {seed_phrase}"
+    del label_name, replicate_count, control_role
+    return ""
 
 
 def label_definition(label_name: object) -> str:
@@ -102,8 +109,8 @@ def enrichment_formula_text(label_name: object) -> str:
     """Return visible wording for the plotted enrichment ratio."""
 
     if tfbs_label_expression(label_name):
-        return "y = selected mean fraction / pool mean fraction"
-    return "y = selected mean label value / pool mean label value"
+        return "y = selected mean fraction / same label-table pool mean fraction"
+    return "y = selected mean label value / same label-table pool mean"
 
 
 def trajectory_encoding_note(*, replicate_count: int) -> str:
@@ -112,8 +119,8 @@ def trajectory_encoding_note(*, replicate_count: int) -> str:
     if replicate_count > 1:
         return TRAILING_TRAJECTORY_NOTE
     return (
-        "Line = selected batch trajectory; square = shared initial IDs before round 0; "
-        "dashed = baseline; dotted = same-batch top-K reference."
+        "Line = selected batch trajectory; diamond = initial seed-batch IDs before round 0; "
+        "dashed = pool average; dotted = best possible batch."
     )
 
 
@@ -129,30 +136,40 @@ def seed_pair_sample_sd_label(*, replicate_count: int) -> str:
     return f"Mean +/- SD (n={int(replicate_count)})"
 
 
-def positive_null_summary_title(label_name: object, *, replicate_count: int) -> str:
-    """Return the visible title for the DenseGen-minus-control endpoint summary."""
+def positive_null_summary_title(
+    label_name: object,
+    *,
+    replicate_count: int,
+    control_role: object | None = None,
+) -> str:
+    """Return the visible title for the sequence-matched-minus-control endpoint summary."""
 
-    label = tfbs_label_compact_title(label_name)
-    return f"{label} enrichment over control"
+    del replicate_count
+    if _is_slot_label(label_name):
+        return f"Sequence-matched metadata beats slot-shuffled control for {_summary_title_label(label_name)}"
+    return f"Sequence-matched metadata beats row-shuffled control for {_summary_title_label(label_name)}"
 
 
 def positive_null_summary_subtitle(*, replicate_count: int) -> str:
     """Return the visible subtitle for the endpoint summary."""
 
-    if replicate_count > 1:
-        interval = f"Bars = mean; whiskers = SD across {int(replicate_count)} paired seed runs"
-    else:
-        interval = "Single paired seed run; no seed-pair spread"
-    return interval
+    del replicate_count
+    return ""
 
 
-def plot_manifest_title(kind: str, *, label_name: object, replicate_count: int) -> str:
+def plot_manifest_title(
+    kind: str,
+    *,
+    label_name: object,
+    replicate_count: int,
+    control_role: object | None = None,
+) -> str:
     """Return the manifest title that mirrors the visible plot title."""
 
     if kind == "realized_label_lift_trajectory":
-        return trajectory_plot_title(label_name, replicate_count=replicate_count)
+        return trajectory_plot_title(label_name, replicate_count=replicate_count, control_role=control_role)
     if kind == "positive_null_lift_summary":
-        return positive_null_summary_title(label_name, replicate_count=replicate_count)
+        return positive_null_summary_title(label_name, replicate_count=replicate_count, control_role=control_role)
     return tfbs_label_title(label_name)
 
 
@@ -171,8 +188,8 @@ def plot_manifest_alt_text(
         interval = "band=SD" if replicate_count > 1 else "single seed run"
         return (
             f"{label_title} selected-batch enrichment vs pool. "
-            f"Round 0 follows the shared start. "
-            f"Lines show DenseGen label and {control}; dotted = same-batch top-K reference; "
+            f"Round 0 follows the initial seed batch. "
+            f"Lines show sequence-matched metadata and {control}; dotted = best possible single batch; "
             f"{interval}, not CI."
         )
     if kind == "positive_null_lift_summary":
@@ -181,21 +198,38 @@ def plot_manifest_alt_text(
             if replicate_count > 1
             else "single seed pair"
         )
-        return f"{label_title} DenseGen-minus-control enrichment for final round and trajectory AUC; {interval}."
+        return (
+            f"{label_title} sequence-matched-minus-control enrichment for final round and trajectory AUC; {interval}."
+        )
     return f"Review plot for {label_title}."
 
 
 def _paired_seed_run_phrase(replicate_count: int) -> str:
     count = int(replicate_count)
-    noun = "run" if count == 1 else "runs"
-    return f"{count} paired seed {noun}"
+    noun = "start" if count == 1 else "starts"
+    return f"{count} paired {noun}"
 
 
 def _trajectory_title_label(label_name: object) -> str:
-    label = tfbs_label_compact_title(label_name)
-    if tfbs_label_expression(label_name):
-        return label.replace(" count-fraction", " motif-count")
-    return label
+    text = str(label_name or "")
+    if text == "lexA_in_slot0":
+        return "LexA in the leftmost slot"
+    if text == "cpxR_or_baeR_in_slot2":
+        return "CpxR/BaeR in the rightmost slot"
+    if text == "baeR_in_slot1":
+        return "BaeR in the middle slot"
+    return tfbs_label_compact_title(label_name)
+
+
+def _summary_title_label(label_name: object) -> str:
+    text = str(label_name or "")
+    if text == "cpxR_or_baeR_in_slot2":
+        return "CpxR/BaeR rightmost placement"
+    if text == "lexA_in_slot0":
+        return "LexA leftmost placement"
+    if text == "baeR_in_slot1":
+        return "BaeR middle placement"
+    return tfbs_label_compact_title(label_name)
 
 
 def _is_slot_label(label_name: object) -> bool:

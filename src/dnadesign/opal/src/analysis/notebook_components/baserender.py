@@ -56,7 +56,7 @@ def build_notebook_baserender_contract(
             records_path=records_path,
             metadata_records_path=metadata_records_path if has_metadata_annotations else None,
             metadata_required_columns=metadata_required if has_metadata_annotations else [],
-            caption="BaseRender DenseGen TFBS view.",
+            caption="BaseRender TFBS metadata view.",
             style_overrides=dict(densegen_config.style_overrides or {}),
             target_width_px=int(densegen_config.target_width_px),
             target_height_px=int(densegen_config.target_height_px),

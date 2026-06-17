@@ -115,8 +115,14 @@ def uses_count_fixed_scope(target_profile_id: str) -> bool:
 
 def control_pair_label(*, target_profile_id: str) -> str:
     if uses_count_fixed_scope(target_profile_id):
-        return "DenseGen label vs count-fixed shuffled-slot control"
-    return "DenseGen label vs matched scrambled-label control"
+        return "Sequence-matched metadata vs slot-shuffled control"
+    return "Sequence-matched metadata vs row-shuffled control"
+
+
+def control_role_display_label(*, target_profile_id: str) -> str:
+    if uses_count_fixed_scope(target_profile_id):
+        return "Slot-shuffled control"
+    return "Row-shuffled control"
 
 
 def _validate_count_fixed_label_table(

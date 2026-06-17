@@ -86,7 +86,8 @@ def write_learning_loop_source(
     *,
     review_id: str = "count_fraction_learning_loop",
     profile_id: str = "tfbs_count_fraction_probe_v1",
-    visual_tier: str = "current_claim",
+    visual_tier: str = "composition_learning_loop",
+    comparison_set_label: str | None = None,
 ) -> Path:
     root = tmp_path / review_id
     root.mkdir(parents=True)
@@ -109,13 +110,16 @@ def write_learning_loop_source(
                 "plots": [
                     {"kind": "frozen_round0_cumulative_enrichment", "path": str(cumulative_path)},
                     {"kind": "frozen_round0_endpoint_adaptive_gain", "path": str(endpoint_plot_path)},
-                    {"kind": "top_budget_signal_recovery", "path": str(endpoint_plot_path)},
+                    {"kind": "known_label_gain_recovery", "path": str(endpoint_plot_path)},
                 ],
             }
         ),
         encoding="utf-8",
     )
     manifest_path = root / "learning_loop_baseline_manifest.json"
+    resolved_comparison_set_label = comparison_set_label or (
+        "Placement learning loop" if visual_tier == "placement_learning_loop" else "Composition learning loop"
+    )
     manifest_path.write_text(
         json.dumps(
             {
@@ -123,7 +127,7 @@ def write_learning_loop_source(
                 "status": "PASS",
                 "review_id": review_id,
                 "comparison_set_key": f"{review_id}_baseline",
-                "comparison_set_label": "Learning-loop baseline",
+                "comparison_set_label": resolved_comparison_set_label,
                 "visual_tier": visual_tier,
                 "source_profile_ids": [profile_id],
                 "claim_boundary": (

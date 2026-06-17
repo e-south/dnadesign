@@ -52,7 +52,9 @@ def test_stage_b_replicated_review_aggregates_seed_pair_rows_before_claims(tmp_p
     assert plot_manifest["plot_count"] == 2
     assert {plot["interval"]["replicate_count"] for plot in plot_manifest["plots"]} == {3}
     assert {plot["interval_kind"] for plot in plot_manifest["plots"]} == {"sample_sd"}
-    assert plot_manifest["plots"][0]["title"] == "LexA motif-count enrichment from promoter embeddings"
+    assert plot_manifest["plots"][0]["title"] == (
+        "Active selection enriches LexA count-fraction over row-shuffled control"
+    )
     assert plot_manifest["text_contract"]["interval"] == (
         "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI"
     )
@@ -60,13 +62,16 @@ def test_stage_b_replicated_review_aggregates_seed_pair_rows_before_claims(tmp_p
         plot_manifest["text_contract"]["legend_layout"] == "legend below the plot; wrap when needed to avoid clipping"
     )
     assert plot_manifest["text_contract"]["subtitle_layout"] == "centered single-line subtitle"
-    assert plot_manifest["text_contract"]["title_alignment"] == "centered title; title may wrap, subtitle must not wrap"
+    assert plot_manifest["text_contract"]["title_alignment"] == (
+        "title centered over the axes frame; title may wrap, subtitle must not wrap"
+    )
     assert "selected-batch enrichment vs pool" in plot_manifest["plots"][0]["alt_text"]
-    assert "Round 0 follows the shared start" in plot_manifest["plots"][0]["alt_text"]
-    assert "same-batch top-K reference" in plot_manifest["plots"][0]["alt_text"]
+    assert "Round 0 follows the initial seed batch" in plot_manifest["plots"][0]["alt_text"]
+    assert "best possible single batch" in plot_manifest["plots"][0]["alt_text"]
     assert len(plot_manifest["plots"][0]["alt_text"]) < 220
     visible_text = " ".join(str(plot[field]) for plot in plot_manifest["plots"] for field in ("title", "alt_text"))
     assert "oracle" not in visible_text.lower()
+    assert "densegen label" not in visible_text.lower()
 
 
 def test_stage_b_replicated_review_accepts_slot_position_profile_as_limited_boundary(

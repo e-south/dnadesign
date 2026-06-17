@@ -76,9 +76,9 @@ def _visual_choices_cell() -> str:
                 if baserender_role_ui is not None and selected_campaign_baserender_contract.get("available"):
                     visual_choices.append(
                         {
-                            "label": "Selected DenseGen sequence render",
+                            "label": "Selected sequence render",
                             "surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
-                            "title": "Selected DenseGen sequence render",
+                            "title": "Selected sequence render",
                         }
                     )
             else:

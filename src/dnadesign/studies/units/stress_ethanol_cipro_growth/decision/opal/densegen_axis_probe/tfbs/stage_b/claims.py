@@ -110,7 +110,7 @@ def _claim_status(
     if peer_review_claim_status == PEER_STATUS_POSITIVE_EXCEEDS_NULL:
         return (
             CLAIM_READY,
-            "Eligible for a cautious synthetic-oracle learnability claim against a valid matched null.",
+            "Eligible for a cautious construction-metadata learnability claim against a valid matched control.",
         )
     return (
         CLAIM_BLOCKED_NOT_SEPARATED,

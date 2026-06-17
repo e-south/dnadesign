@@ -72,51 +72,59 @@ def test_stage_b_realized_review_reports_true_label_lift_and_pair_deltas(tmp_pat
         "visible_spines": ["left", "bottom"],
         "tick_style": "styled_outward_ticks",
         "font_scale": "unified_review_body_font_for_ticks_axes_subtitle_legend",
+        "title_anchor": "axes_center",
         "square_axes": "where_data_shape_supports_it",
         "trajectory_axes": "square",
-        "trajectory_reference_lines": ["baseline", "same_batch_top_k_reference"],
+        "trajectory_reference_lines": ["pool_average", "best_possible_single_batch_reference"],
     }
     assert plot_manifest["text_contract"] == {
-        "baseline": "No enrichment: selected mean = full candidate-pool mean",
+        "baseline": "No enrichment: selected mean equals the same label-table pool mean",
         "count_fraction_label": (
             "count_fraction label = target TFBS count / 3 per sequence; plotted values are enrichment ratios, "
             "not raw counts"
         ),
-        "initial_batch": "square markers are the same initial IDs scored by each label source before round 0",
+        "initial_batch": (
+            "diamond markers are the same initial seed-batch IDs scored by each label table before round 0"
+        ),
         "interval": "mean plus/minus sample SD across seed runs; n is recorded; not an inferential CI",
         "legend_layout": "legend below the plot; wrap when needed to avoid clipping",
-        "pairing": "DenseGen-label and control campaigns share initial selected IDs; only the label table differs",
-        "role_labels": "DenseGen label versus profile-appropriate matched control",
+        "pairing": (
+            "sequence-matched metadata and control campaigns share initial selected IDs; only the label table differs"
+        ),
+        "role_labels": "sequence-matched metadata versus profile-appropriate matched control",
         "selected_label_values": (
             "selected_true_* artifact columns are selected values from that campaign's label table; for shuffled "
-            "controls this is a control-label value, not post hoc DenseGen truth"
+            "controls this is a control-label value, not post hoc sequence-matched metadata truth"
         ),
         "trajectory_semantics": (
             "line points are per-round top-k selected batches; round 0 is the first acquired batch after the "
-            "shared initial IDs, not the initial seed batch"
+            "initial seed-batch IDs, not the initial seed batch itself"
         ),
         "same_batch_top_k_reference": (
-            "Same-batch top-K reference: mean of the top selection_k label values in the candidate pool divided "
-            "by the same pool mean used for plotted lift. This is a reference ceiling, not an observed campaign."
+            "Best possible single batch: mean of the top selection_k label values in the same label table divided by "
+            "the same label-table pool mean. This is a full-pool reference, not an observed campaign and not the "
+            "multi-round same-budget known-label ranking."
         ),
         "subtitle_layout": "centered single-line subtitle",
-        "title_alignment": "centered title; title may wrap, subtitle must not wrap",
+        "title_alignment": "title centered over the axes frame; title may wrap, subtitle must not wrap",
         "type_scale": "axis labels, tick labels, subtitle, and legend use the same review body size",
     }
     assert [plot["kind"] for plot in plot_manifest["plots"]] == [
         "realized_label_lift_trajectory",
         "positive_null_lift_summary",
     ]
-    assert plot_manifest["plots"][0]["title"] == "LexA presence enrichment from promoter embeddings"
+    assert plot_manifest["plots"][0]["title"] == "Active selection enriches LexA presence over row-shuffled control"
     assert "selected-batch enrichment vs pool" in plot_manifest["plots"][0]["alt_text"]
-    assert "Round 0 follows the shared start" in plot_manifest["plots"][0]["alt_text"]
-    assert "same-batch top-K reference" in plot_manifest["plots"][0]["alt_text"]
+    assert "Round 0 follows the initial seed batch" in plot_manifest["plots"][0]["alt_text"]
+    assert "best possible single batch" in plot_manifest["plots"][0]["alt_text"]
     assert "active-learning rounds" not in plot_manifest["plots"][0]["alt_text"]
     assert "LexA presence" in plot_manifest["plots"][0]["alt_text"]
     assert all("each sentinel label" not in plot["alt_text"] for plot in plot_manifest["plots"])
     visible_text = " ".join(str(plot[field]) for plot in plot_manifest["plots"] for field in ("title", "alt_text"))
     assert "oracle" not in visible_text.lower()
     assert "pool baseline" not in visible_text.lower()
+    assert "densegen label" not in visible_text.lower()
+    assert "same-batch top-k" not in visible_text.lower()
 
 
 def test_stage_b_realized_review_fails_fast_on_selected_ids_missing_from_label_table(tmp_path: Path) -> None:
@@ -173,7 +181,9 @@ def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path:
     assert refreshed["comparison_set_count"] == 1
     assert refreshed["visual_count"] == 2
     assert refreshed["comparison_sets"][0]["key"] == "stage_b_realized_label_review__lexA_present"
-    assert refreshed["comparison_sets"][0]["label"] == "LexA presence DenseGen label vs scrambled control pair"
+    assert refreshed["comparison_sets"][0]["label"] == (
+        "LexA presence: Sequence-matched metadata vs row-shuffled control"
+    )
     assert {visual["surface_kind"] for visual in refreshed["visuals"]} == {"study_realized_label_review"}
     assert {visual["target_label"] for visual in refreshed["visuals"]} == {"LexA presence"}
     assert all("each sentinel label" not in visual["alt_text"] for visual in refreshed["visuals"])
@@ -190,18 +200,22 @@ def test_stage_b_realized_review_registers_notebook_collection_visuals(tmp_path:
 
 
 def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
-    assert review_plot_text.role_display_label("positive", label_name="baeR_count_fraction") == "DenseGen label"
-    assert review_plot_text.role_display_label("matched_null", label_name="baeR_count_fraction") == "Scrambled control"
+    assert (
+        review_plot_text.role_display_label("positive", label_name="baeR_count_fraction") == "Sequence-matched metadata"
+    )
+    assert (
+        review_plot_text.role_display_label("matched_null", label_name="baeR_count_fraction") == "Row-shuffled control"
+    )
     assert (
         review_plot_text.role_display_label(
             "matched_null",
             label_name="lexA_in_slot0",
             control_role="count_fixed_shuffled_slot_negative_control",
         )
-        == "Count-fixed shuffled-slot control"
+        == "Slot-shuffled control"
     )
     assert review_plot_text.trajectory_plot_title("baeR_count_fraction", replicate_count=3) == (
-        "BaeR motif-count enrichment from promoter embeddings"
+        "Active selection enriches BaeR count-fraction over row-shuffled control"
     )
     assert review_plot_text.label_definition("baeR_count_fraction") == (
         "BaeR count-fraction = BaeR count / 3 per sequence"
@@ -210,25 +224,24 @@ def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
         r"Enrichment vs pool ($\bar{y}_{sel}/\bar{y}_{pool}$)"
     )
     assert review_plot_text.enrichment_formula_text("baeR_count_fraction") == (
-        "y = selected mean fraction / pool mean fraction"
+        "y = selected mean fraction / same label-table pool mean fraction"
     )
-    assert review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3) == (
-        "DenseGen vs scrambled control; 3 paired seed runs"
+    assert review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3) == ""
+    assert (
+        review_plot_text.trajectory_plot_subtitle(
+            "lexA_in_slot0",
+            replicate_count=3,
+            control_role="count_fixed_shuffled_slot_negative_control",
+        )
+        == ""
     )
-    assert review_plot_text.trajectory_plot_subtitle(
-        "lexA_in_slot0",
-        replicate_count=3,
-        control_role="count_fixed_shuffled_slot_negative_control",
-    ) == ("DenseGen vs shuffled-slot control; count fixed; 3 paired seed runs")
     assert "\n" not in review_plot_text.trajectory_plot_subtitle("baeR_count_fraction", replicate_count=3)
     assert review_plot_text.seed_run_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
     assert review_plot_text.seed_pair_sample_sd_label(replicate_count=3) == "Mean +/- SD (n=3)"
     assert review_plot_text.positive_null_summary_title("baeR_count_fraction", replicate_count=3) == (
-        "BaeR count-fraction enrichment over control"
+        "Sequence-matched metadata beats row-shuffled control for BaeR count-fraction"
     )
-    assert review_plot_text.positive_null_summary_subtitle(replicate_count=3) == (
-        "Bars = mean; whiskers = SD across 3 paired seed runs"
-    )
+    assert review_plot_text.positive_null_summary_subtitle(replicate_count=3) == ""
     assert "\n" not in review_plot_text.positive_null_summary_subtitle(replicate_count=3)
     trajectory_alt = review_plot_text.plot_manifest_alt_text(
         "realized_label_lift_trajectory",
@@ -242,17 +255,17 @@ def test_stage_b_review_plot_display_text_is_manuscript_safe() -> None:
         replicate_count=3,
     )
     assert "selected-batch enrichment vs pool" in trajectory_alt
-    assert "Round 0 follows the shared start" in trajectory_alt
-    assert "Lines show DenseGen label and scrambled control" in trajectory_alt
-    assert "same-batch top-K reference" in trajectory_alt
+    assert "Round 0 follows the initial seed batch" in trajectory_alt
+    assert "Lines show sequence-matched metadata and row-shuffled control" in trajectory_alt
+    assert "best possible single batch" in trajectory_alt
     assert "not CI" in trajectory_alt
     assert len(trajectory_alt) < 240
     assert "final round and trajectory AUC" in summary_alt
     assert len(summary_alt) < 170
-    assert review_plot_text.TRAILING_TRAJECTORY_NOTE.startswith("Faint lines = individual seeds; bold line = mean")
-    assert "squares = shared start" in review_plot_text.TRAILING_TRAJECTORY_NOTE
-    assert review_plot_text.NO_ENRICHMENT_BASELINE_LABEL == "Baseline"
-    assert review_plot_text.SAME_BATCH_TOP_K_REFERENCE_LABEL == "Same-batch top-K reference"
+    assert review_plot_text.TRAILING_TRAJECTORY_NOTE.startswith("Faint lines = seed runs; bold line = mean")
+    assert "diamond = initial seed batch" in review_plot_text.TRAILING_TRAJECTORY_NOTE
+    assert review_plot_text.NO_ENRICHMENT_BASELINE_LABEL == "Pool average"
+    assert review_plot_text.SAME_BATCH_TOP_K_REFERENCE_LABEL == "Best possible batch"
 
 
 def test_stage_b_review_plots_record_sample_sd_interval_when_seed_replicates_exist(tmp_path: Path) -> None:
@@ -308,13 +321,13 @@ def test_stage_b_review_plots_record_sample_sd_interval_when_seed_replicates_exi
         "unit": "seed replicate",
     }
     assert summary_interval == {
-        "applies_to": "DenseGen-minus-control lift summary",
+        "applies_to": "sequence-matched-minus-control lift summary",
         "estimator": "mean_plus_minus_sample_standard_deviation",
         "is_confidence_interval": False,
         "kind": "sample_sd",
         "replicate_count": 2,
         "status": "available",
-        "unit": "DenseGen/control seed pair",
+        "unit": "sequence-matched/control seed pair",
     }
 
 

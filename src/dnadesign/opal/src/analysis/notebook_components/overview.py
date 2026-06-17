@@ -64,6 +64,10 @@ def _campaign_title(campaign: Mapping[str, Any]) -> str:
 
 
 def _campaign_description(campaign: Mapping[str, Any]) -> str:
+    metadata_description = _campaign_metadata_description(campaign)
+    if metadata_description:
+        return metadata_description
+
     description = str(campaign.get("description") or "").strip()
     if description:
         return description
@@ -77,6 +81,38 @@ def _campaign_description(campaign: Mapping[str, Any]) -> str:
         f"Campaign ID `{slug}`. {title} scores the configured OPAL records table with `{campaign.get('model')}` "
         f"and selects candidates by `{campaign.get('selection')}` against `{objective}`.{x_clause}"
     )
+
+
+def _campaign_metadata_description(campaign: Mapping[str, Any]) -> str:
+    metadata = mapping(campaign.get("metadata"))
+    target = str(
+        metadata.get("target_dropdown_label") or metadata.get("target_label") or metadata.get("target") or ""
+    ).strip()
+    if not target:
+        return ""
+    role = _metadata_role_label(metadata)
+    seed = metadata.get("replicate_seed") if metadata.get("replicate_seed") is not None else metadata.get("seed")
+    seed_clause = f", seed {seed}" if seed is not None else ""
+    rounds = metadata.get("rounds")
+    selection_k = metadata.get("selection_k")
+    budget_clause = ""
+    if rounds is not None and selection_k is not None:
+        budget_clause = f" The selection budget is {rounds} rounds x {selection_k} records."
+    return (
+        f"Pre-assay metadata probe for {target} using the {role}{seed_clause}. "
+        "It tests whether the X representation supports active enrichment for this metadata, "
+        f"not measured phenotype prediction.{budget_clause}"
+    )
+
+
+def _metadata_role_label(metadata: Mapping[str, Any]) -> str:
+    role = str(metadata.get("label_oracle_kind") or metadata.get("oracle_role") or "").strip()
+    labels = {
+        "positive": "sequence-matched metadata table",
+        "null": "control label table",
+        "matched_null": "control label table",
+    }
+    return labels.get(role, display_name(role) if role else "configured label table")
 
 
 def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -107,7 +143,7 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         rows.append({"field": "selected count", "value": selected_count})
     rows.extend(
         (
-            {"field": "manifest-backed plots", "value": row["plots"]},
+            {"field": "configured plots", "value": row["plots"]},
             {"field": "warnings", "value": row["warnings"]},
             {"field": "stale artifacts", "value": row["stale"]},
         )
@@ -259,7 +295,7 @@ def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str
         },
     ]
     if not visual_surface["choices"]:
-        rows.append({"field": "plot evidence", "value": "no written manifest-backed plot media"})
+        rows.append({"field": "plot evidence", "value": "no plot media"})
     if warnings:
         rows.append({"field": "warnings", "value": len(warnings)})
     if stale:

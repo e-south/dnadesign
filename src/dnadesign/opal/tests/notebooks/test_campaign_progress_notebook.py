@@ -31,11 +31,11 @@ def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
 
 def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "# OPAL Campaign Review" in text
+    assert "# Campaign Review" in text
     assert "mo.accordion(" in text
     assert "mo.ui.table" in text
-    assert "OPAL campaigns at a glance" in text
-    assert "Selected OPAL campaign" in text
+    assert "Campaigns at a glance" in text
+    assert "Selected campaign" in text
     assert "Validity" in text
     assert "Visual surface" in text
 
@@ -57,7 +57,7 @@ def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     assert "build_campaign_set_round_options" not in text
     assert 'label="Round"' not in text
     assert 'selected_round_selector = "all"' in text
-    assert 'label="OPAL campaign"' in text
+    assert 'label="Campaign"' in text
     assert 'label="Campaign set"' in text
     assert 'label="Visual surface"' in text
     assert 'label="Review surface"' in text

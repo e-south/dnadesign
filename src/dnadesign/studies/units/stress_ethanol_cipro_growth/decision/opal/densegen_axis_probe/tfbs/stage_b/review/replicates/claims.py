@@ -116,5 +116,5 @@ def _claim_status(raw: pd.Series) -> tuple[str, str]:
         )
     return (
         CLAIM_READY_REPLICATED,
-        "Eligible for a cautious replicated synthetic-oracle learnability claim against matched valid nulls.",
+        "Eligible for a cautious replicated construction-metadata learnability claim against matched controls.",
     )

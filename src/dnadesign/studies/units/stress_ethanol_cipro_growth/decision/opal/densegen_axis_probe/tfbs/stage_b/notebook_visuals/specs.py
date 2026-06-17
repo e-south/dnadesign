@@ -217,7 +217,7 @@ REALIZED_REVIEW_VISUAL_SPECS = build_visual_spec_registry(
             kind="realized_label_lift_trajectory",
             visual_id_template="tfbs_stage_b_{label_slug}_selected_label_lift_trajectory",
             label="Selected label enrichment trajectory",
-            group_key="label_oracle_kind",
+            group_key="label_source_kind",
             metric_name="selected_label_lift_ratio",
             metric_label="Enrichment vs candidate pool",
             metric_expression="mean(selected label) / mean(candidate-pool label)",
@@ -225,34 +225,35 @@ REALIZED_REVIEW_VISUAL_SPECS = build_visual_spec_registry(
             tidy_source="trajectory",
             caption=(
                 "Per-round top-k selected-batch label mean divided by candidate-pool label mean. Round 0 is the "
-                "first acquired batch after the shared initial IDs. Count-fraction labels use target TFBS count / "
+                "first acquired batch after the initial seed batch. Count-fraction labels use target TFBS count / "
                 "3; slot-position labels use y=1 when the target family is in the requested slot. Encoding: "
-                "bold line = mean, band = sample SD, faint lines = seeds, dotted line = same-batch top-K reference."
+                "bold line = mean, band = sample SD, faint lines = seeds, dashed line = pool average, dotted line "
+                "= best possible single batch."
             ),
             plot_filename_template="{label_slug}__selected_label_lift_trajectory.png",
             plot_title_template="{label_title} enrichment vs candidate pool",
             alt_text=(
-                "{label_title} selected-batch enrichment vs pool; round 0 follows the shared start; dotted line is "
-                "the same-batch top-K reference."
+                "{label_title} selected-batch enrichment vs pool average; round 0 follows the initial seed batch; "
+                "dotted line is the best possible single-batch reference."
             ),
         ),
         StageBNotebookVisualSpec(
             kind="positive_null_lift_summary",
             visual_id_template="tfbs_stage_b_{label_slug}_positive_null_lift_summary",
-            label="DenseGen-minus-control enrichment summary",
+            label="Sequence-matched minus control enrichment summary",
             group_key="peer_review_claim_status",
             metric_name="positive_minus_null_lift_ratio",
-            metric_label="DenseGen minus control enrichment",
-            metric_expression="DenseGen lift ratio - control lift ratio",
+            metric_label="Sequence-matched minus control enrichment",
+            metric_expression="sequence-matched lift ratio - control lift ratio",
             summary_name="final_and_normalized_auc",
             tidy_source="pair_summary",
             caption=(
-                "DenseGen minus control enrichment at final round and trajectory AUC. Bars show mean across paired "
+                "Sequence-matched minus control enrichment at final round and trajectory AUC. Bars show mean across "
                 "seed runs; whiskers show sample SD."
             ),
             plot_filename_template="{label_slug}__positive_minus_null_lift_summary.png",
-            plot_title_template="{label_title} DenseGen-control enrichment summary",
-            alt_text=("{label_title} DenseGen-minus-control enrichment for final round and trajectory AUC."),
+            plot_title_template="{label_title} sequence-matched control summary",
+            alt_text=("{label_title} sequence-matched minus control enrichment for final round and trajectory AUC."),
         ),
     ),
     surface="Stage B realized review",
@@ -264,7 +265,7 @@ SLOT_DIAGNOSTIC_VISUAL_SPECS = build_visual_spec_registry(
             kind="slot_target_count_mean_trajectory",
             visual_id_template="tfbs_stage_b_slot_target_count_mean_trajectory",
             label="Slot selected target-family count trajectory",
-            group_key="label_oracle_kind",
+            group_key="label_source_kind",
             metric_name="selected_target_count_mean",
             metric_label="Selected target-family count mean",
             metric_expression="mean(selected target-family count)",
@@ -285,7 +286,7 @@ SLOT_DIAGNOSTIC_VISUAL_SPECS = build_visual_spec_registry(
             kind="slot_count_stratified_lift_trajectory",
             visual_id_template="tfbs_stage_b_slot_count_stratified_lift_trajectory",
             label="Slot count-stratified lift trajectory",
-            group_key="label_oracle_kind",
+            group_key="label_source_kind",
             metric_name="count_stratified_lift_ratio",
             metric_label="Count-stratified slot-label lift ratio",
             metric_expression="selected_nondeterministic_true_mean / selected_count_stratum_baseline",

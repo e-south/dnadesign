@@ -85,7 +85,7 @@ _PRETTY_LABELS = {
     "feature_id": "Feature ID",
     "AB interaction": "AB interaction",
     "reference_mse": "MSE to reference vector",
-    "label_oracle_kind": "Oracle role",
+    "label_oracle_kind": "Label source",
     "label_family_id": "Label family",
     "label_split_id": "Label split",
     "target_label": "Target",

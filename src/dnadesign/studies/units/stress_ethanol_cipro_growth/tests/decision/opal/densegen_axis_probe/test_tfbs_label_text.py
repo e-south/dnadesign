@@ -26,12 +26,12 @@ def test_tfbs_label_text_prettifies_literal_labels_without_losing_math() -> None
 
 
 def test_tfbs_control_text_distinguishes_count_fixed_slot_controls() -> None:
-    assert tfbs_control_display_label("matched_label_permutation_negative_control") == "scrambled control"
+    assert tfbs_control_display_label("matched_label_permutation_negative_control") == "row-shuffled control"
     assert (
         tfbs_control_display_label("count_fixed_shuffled_slot_negative_control", label_name="lexA_in_slot0")
-        == "count-fixed shuffled-slot control"
+        == "slot-shuffled control"
     )
     assert (
         tfbs_control_pair_label("count_fixed_shuffled_slot_negative_control", label_name="lexA_in_slot0")
-        == "DenseGen label vs count-fixed shuffled-slot control"
+        == "Sequence-matched metadata vs slot-shuffled control"
     )

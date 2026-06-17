@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from dnadesign.opal import read_selection_artifact
+
 from ..slot_diagnostics.contracts import SLOT_LABEL_SPECS
 
 
@@ -72,11 +74,7 @@ def selection_table(workdir: Path, *, round_index: int) -> pd.DataFrame:
     path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
     if not path.exists():
         raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    frame = pd.read_csv(path)
-    if "id" not in frame.columns:
-        raise ValueError(f"Stage B selection artifact missing id column: {path}")
-    frame["id"] = frame["id"].astype(str)
-    return frame
+    return read_selection_artifact(path, required_columns=("id",))
 
 
 def campaign_workdir(config_path: Path) -> Path:
