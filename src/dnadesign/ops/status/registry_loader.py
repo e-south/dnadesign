@@ -211,11 +211,12 @@ def _expected_provider_ref_prefix(*, fragment_path: Path, dnadesign_root: Path) 
     if (
         len(relative_parts) >= 6
         and relative_parts[0] == "studies"
-        and relative_parts[1] == "studies"
-        and relative_parts[3] == "status"
-        and relative_parts[4] == "ops"
+        and relative_parts[1] == "units"
+        and relative_parts[-2] == "ops"
+        and relative_parts[-1] == _STATUS_REGISTRY_FILENAME
     ):
-        return f"dnadesign.studies.units.{relative_parts[2]}.status.ops."
+        owner_package = ".".join(relative_parts[:-1])
+        return f"dnadesign.{owner_package}."
     if len(relative_parts) >= 4 and relative_parts[1] == "src" and relative_parts[2] == "ops":
         return f"dnadesign.{relative_parts[0]}.src.ops."
     if len(relative_parts) >= 3 and relative_parts[1] == "ops":

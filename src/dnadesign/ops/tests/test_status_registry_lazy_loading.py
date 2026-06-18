@@ -259,16 +259,33 @@ entries:
 
 def test_status_registry_fragment_owner_prefix_handles_nested_concrete_study_packages() -> None:
     dnadesign_root = _repo_root() / "src" / "dnadesign"
-    fragment_path = (
-        dnadesign_root / "studies" / "studies" / "retron_hairpin_design" / "status" / "ops" / "status.registry.yaml"
-    )
 
     assert (
         registry_loader._expected_provider_ref_prefix(  # noqa: SLF001 - regression coverage for owner-boundary guard
-            fragment_path=fragment_path,
+            fragment_path=dnadesign_root
+            / "studies"
+            / "units"
+            / "retron_hairpin_design"
+            / "status"
+            / "ops"
+            / "status.registry.yaml",
             dnadesign_root=dnadesign_root,
         )
         == "dnadesign.studies.units.retron_hairpin_design.status.ops."
+    )
+    assert (
+        registry_loader._expected_provider_ref_prefix(  # noqa: SLF001 - regression coverage for owner-boundary guard
+            fragment_path=dnadesign_root
+            / "studies"
+            / "units"
+            / "stress_ethanol_cipro_growth"
+            / "operations"
+            / "status"
+            / "ops"
+            / "status.registry.yaml",
+            dnadesign_root=dnadesign_root,
+        )
+        == "dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops."
     )
 
 
@@ -276,7 +293,39 @@ def test_nested_study_status_registry_rejects_provider_ref_outside_concrete_stud
     tmp_path: Path,
 ) -> None:
     dnadesign_root = tmp_path / "src" / "dnadesign"
-    fragment = dnadesign_root / "studies" / "studies" / "demo_study" / "status" / "ops" / "status.registry.yaml"
+    fragment = dnadesign_root / "studies" / "units" / "demo_study" / "status" / "ops" / "status.registry.yaml"
+    fragment.parent.mkdir(parents=True, exist_ok=True)
+    fragment.write_text(
+        """
+version: 1
+provider_id: demo-study.provider
+entries:
+  - status_kind: demo-study-status
+    owner_boundary: studies
+    observes_plane: record
+    provider_ref: dnadesign.ops.providers.builtin.status_provider:provide_ops_audit_status
+    description: Demo study status.
+    surface_type: study_record
+    cost_class: cheap
+    summary_scope: repo
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="provider_ref must stay under the fragment owner package"):
+        registry_loader._load_status_kind_specs(  # noqa: SLF001 - fail-fast owner-boundary regression
+            fragment_paths=(fragment,),
+            dnadesign_root=dnadesign_root,
+        )
+
+
+def test_operations_status_registry_rejects_provider_ref_outside_concrete_study_owner(
+    tmp_path: Path,
+) -> None:
+    dnadesign_root = tmp_path / "src" / "dnadesign"
+    fragment = (
+        dnadesign_root / "studies" / "units" / "demo_study" / "operations" / "status" / "ops" / "status.registry.yaml"
+    )
     fragment.parent.mkdir(parents=True, exist_ok=True)
     fragment.write_text(
         """
