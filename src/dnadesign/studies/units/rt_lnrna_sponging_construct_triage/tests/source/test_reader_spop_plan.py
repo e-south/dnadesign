@@ -590,10 +590,22 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
             "reader_spop_label_materialization.yaml"
         ).read_text(encoding="utf-8")
     )
+    readiness_checks = readiness["checks"]["phase_6_wet_lab_handoff"]
     assert any(
-        "20260529_retron_Eco1_26_43_177_186_benchmark" in path for path in readiness["inputs"]["reader_experiments"]
+        check["check_id"] == "rt_lnrna.reader_spop.label_contract"
+        and check["check_group"] == "reader_spop_label_materialization"
+        and check["artifact"] == "reader_spop_label_contract"
+        for check in readiness_checks
     )
-    assert "score_spop_endpoint" in " ".join(readiness["rules"])
+
+    datasets = yaml.safe_load(
+        (repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml").read_text(encoding="utf-8")
+    )
+    reader_spop_dataset = next(
+        dataset for dataset in datasets["datasets"] if dataset["role"] == "reader_spop_label_plan"
+    )
+    assert "20260529_retron_Eco1_26_43_177_186_benchmark" in reader_spop_dataset["reader_experiment_ids"]
+    assert reader_spop_dataset["source_of_truth_api"] == "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
 
     pipeline = yaml.safe_load(
         (
