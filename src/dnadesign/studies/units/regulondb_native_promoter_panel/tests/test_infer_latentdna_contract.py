@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import yaml
@@ -12,6 +11,24 @@ def _repo_root() -> Path:
         if (parent / "pyproject.toml").exists():
             return parent
     raise RuntimeError("repo root not found")
+
+
+def _decision_deliverables_from_workspace_config(config: dict) -> list[str]:
+    plots = config.get("plots") or {}
+    ladder: list[str] = []
+    for deliverable_id, deliverable in (config.get("deliverables") or {}).items():
+        section = str(deliverable.get("section") or "").strip().lower()
+        if section == "gate":
+            continue
+        plot_ids = [str(plot_id) for plot_id in (deliverable.get("outputs") or {}).get("plots", [])]
+        if plot_ids:
+            visibility_tiers = {
+                str((plots.get(plot_id) or {}).get("visibility_tier") or "primary") for plot_id in plot_ids
+            }
+            if visibility_tiers.isdisjoint({"primary"}):
+                continue
+        ladder.append(deliverable_id)
+    return ladder
 
 
 def test_regulondb_infer_lanes_request_vector_and_scalar_bundle() -> None:
@@ -87,13 +104,7 @@ def test_regulondb_latentdna_binding_decision_deliverables_match_workspace_ladde
             encoding="utf-8"
         )
     )
-    snapshot = json.loads(
-        (
-            repo_root
-            / "src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel"
-            / "outputs/status/workspace_snapshot.json"
-        ).read_text(encoding="utf-8")
-    )
+    config = yaml.safe_load((repo_root / binding["workspace_ref"] / "config.yaml").read_text(encoding="utf-8"))
 
-    assert binding["decision_deliverables"] == snapshot["decision_ladder"]
-    assert set(binding["decision_deliverables"]) <= set(snapshot["deliverables"])
+    assert binding["decision_deliverables"] == _decision_deliverables_from_workspace_config(config)
+    assert set(binding["decision_deliverables"]) <= set(config["deliverables"])
