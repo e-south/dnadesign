@@ -101,6 +101,8 @@ def test_fresh_ci_lanes_recreate_changed_file_list_before_resolving_test_targets
             if "--changed-files-file .ci_changed_files.txt" in str(step.get("run", ""))
         )
         collect_run = str(steps[collect_index].get("run", ""))
+        checkout_step = next(step for step in steps[:collect_index] if step.get("uses") == "actions/checkout@v5")
+        assert checkout_step.get("with", {}).get("fetch-depth") == 0
         assert "dnadesign.devtools.ci.changed_files" in collect_run
         assert "--output-file .ci_changed_files.txt" in collect_run
         assert collect_index < target_index
