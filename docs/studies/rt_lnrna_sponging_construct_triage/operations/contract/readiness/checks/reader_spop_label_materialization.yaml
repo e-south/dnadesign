@@ -1,34 +1,8 @@
-id: reader_spop_label_materialization
-status: materialized_for_latentdna_overlay
-owner: study_reader_bridge
-phase: phase_6_label_materialization
-inputs:
-  reader_experiments:
-    - ../reader/experiments/2025/20250622_retron_Eco1_26_43_benchmark
-    - ../reader/experiments/2025/20250707_retron_Eco1_26_43_45_46_benchmark
-    - ../reader/experiments/2025/20250718_retron_Eco1_26_45_47_48_benchmark
-    - ../reader/experiments/2025/20251105_retron_Eco1_RT_variants
-    - ../reader/experiments/2026/20260418_retron_Eco1_26_43_170_171_benchmark
-    - ../reader/experiments/2026/20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
-    - ../reader/experiments/2026/20260529_retron_Eco1_26_43_177_186_benchmark
-  schema: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
-  contract: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md
-outputs:
-  observations: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
-  candidate_summary: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
-rules:
-  - Resolve Reader ratio artifacts only through outputs/manifests/records.json latest ratio_reporter_normalizer/df.
-  - Parse pES-retron plus pBbS2c-rfp design ids case-insensitively.
-  - Parse treatment strings into explicit aTc nM and IPTG uM values before scoring.
-  - Require zero-inducer baseline, aTc positive control, OD600 baseline, and at least one nonzero IPTG dose.
-  - Reject labels when the configured endpoint is absent, except for named single-point Reader artifact overrides that record the artifact row time, inferred elapsed endpoint, configured report time, and caveat metadata.
-  - Reject labels when the aTc positive control is not above the zero-inducer baseline, unless the assay subject is a named no-strain/no-call exclusion that must be omitted with warning severity.
-  - Emit assay_subject_key, reader_design_id, proposed_construct_subject_id, construct_subject_id, and construct_subject_bridge_status separately.
-  - Treat 20251105_retron_Eco1_RT_variants as a single-point mid-log read at approximately 10 h after seeding; do not interpret artifact time 0 h as a true biological endpoint.
-  - Omit retron176 from 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark because no actual strain was present in those wells.
-  - Keep unresolved retron variants out of Construct-backed construct subject ids until explicit RT plus lnRNA sequence authority exists.
-  - Treat Reader, not the dnadesign study, as the source-of-truth owner for SPOP metric semantics.
-  - Delegate SPOP scoring to reader.domains.plate_reader.analysis.spop.score_spop_endpoint; dnadesign must not reimplement the SPOP equation.
-  - Publish reader_spop_endpoint_dose_mean_v1 as LatentDNA overlay metadata and as OPAL spop_v1/spop label input only after selected X and real labels exist.
-validation:
-  command: uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --write-label-tables src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs --json
+checks:
+  phase_6_wet_lab_handoff:
+    - kind: path_exists
+      check_id: rt_lnrna.reader_spop.label_contract
+      check_group: reader_spop_label_materialization
+      summary: Reader SPOP label-materialization contract is present.
+      required: true
+      artifact: reader_spop_label_contract

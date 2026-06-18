@@ -1,24 +1,20 @@
-id: genbank_source_authority
-status: pass
-owner: study
-phase: phase_0_contracts
-inputs:
-  registry: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
-  audit: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
-  variant_metadata: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
-  variant_catalog: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
-  tests:
-    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py
-    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
-rules:
-  - Parse registered GenBank files through dnadesign.usr.BiopythonGenBankParser.
-  - Fail when required labels are missing or ambiguous.
-  - Require two tet operator placements for anchor vectors and retron26 a1-a2.
-  - Require `2000bp-region.gb` containment in pES retron-26 at the audited target-context offset.
-  - Require RT CDS sequence and translation identity across retron26 vector, retron43 vector, and standalone Eco1 RT.
-  - Require retron26 a1-a2 sequence containment in the full retron26 vector.
-  - Require explicit left base, right base, foldback, cap, payload, and payload-complement labels in the retron179 orientation reference.
-  - Require every variant GenBank source to have metadata with source kind, expected RT mode, and preserved user comment; whole-plasmid rows also carry antibiotic marker and available Benchling URL.
-  - Extract lnRNA and RT slot spans from variant GenBanks before Construct promotion; require full biological slots to fit after symmetric prefix/suffix flank adjustment inside the 2,000 bp context.
-validation:
-  command: uv run pytest src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
+checks:
+  phase_0_contracts:
+    - kind: path_exists
+      check_id: rt_lnrna.genbank_source_authority.registry
+      check_group: genbank_source_authority
+      summary: GenBank source-authority registry is present.
+      required: true
+      artifact: genbank_source_authority_registry
+    - kind: path_exists
+      check_id: rt_lnrna.genbank_source_authority.offset_audit
+      check_group: genbank_source_authority
+      summary: GenBank feature-offset audit is present.
+      required: true
+      artifact: genbank_feature_offset_audit
+    - kind: path_exists
+      check_id: rt_lnrna.genbank_source_authority.variant_catalog
+      check_group: genbank_source_authority
+      summary: Variant GenBank catalog is present.
+      required: true
+      artifact: variant_genbank_catalog

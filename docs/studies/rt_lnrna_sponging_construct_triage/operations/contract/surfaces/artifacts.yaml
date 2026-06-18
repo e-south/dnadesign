@@ -1,20 +1,52 @@
-artifacts:
-  checked_in:
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-overview.md
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
-    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/genbank_authority.py
-    - repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/representation_contract.py
-    - repo:src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml
-    - repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
-    - repo:src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml
-  generated_not_checked_in_by_default:
-    - repo:src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
-    - repo:src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
-    - repo:src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/outputs
-    - repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/outputs
-    - repo:src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_opal_training_examples_v1
+status_note:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md
+datasets_registry:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml
+routes_doc:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
+construct_overview:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-overview.md
+construct_contract:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-contract.md
+representation_contract:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/representation-contract.md
+source_overlays_context:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
+reader_spop_label_contract:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md
+opal_handoff_context:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/opal-handoff.md
+contract_schemas:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas
+contract_fixtures:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures
+construct_projection_manifest:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct/construct-projection-manifest.yaml
+construct_subject_schema:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/construct-subject-table.schema.yaml
+construct_subject_fixture_retron26:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron26-working-anchor.yaml
+construct_subject_fixture_retron43:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
+representation_schema:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/representation-table.schema.yaml
+infer_feature_bundle_fixture:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-feature-bundle.yaml
+genbank_source_authority_registry:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
+genbank_feature_offset_audit:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-feature-offset-audit.md
+variant_genbank_metadata:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
+variant_genbank_catalog:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+genbank_authority_module:
+  ref: repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/genbank_authority.py
+representation_contract_module:
+  ref: repo:src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/representation_contract.py
+infer_six_view_config:
+  ref: repo:src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml
+latentdna_config:
+  ref: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
+infer_six_view_runbook:
+  ref: repo:src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml

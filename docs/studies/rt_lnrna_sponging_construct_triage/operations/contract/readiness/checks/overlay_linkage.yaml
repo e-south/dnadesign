@@ -1,13 +1,14 @@
-id: overlay_linkage
-status: planned
-owner: study
-phase: phase_4_overlay_linkage
-inputs:
-  datasets: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/datasets.yaml
-rules:
-  - Preserve raw_value and normalized_value for Khan and Crawford abundance priors.
-  - Keep Khan and Crawford regimes separate.
-  - Treat ordinal_bin as derived metadata, not a replacement for raw numeric values.
-  - Promote source rows into construct subjects only when both construct_subject__lnrna_sequence and construct_subject__rt_cds_sequence are explicit.
-  - Route promoted rows through rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1 with all six source sequence views before Infer.
-  - Do not export any abundance prior as normalized_TF_sponging_label.
+checks:
+  phase_4_overlay_linkage:
+    - kind: path_exists
+      check_id: rt_lnrna.overlay.source_context
+      check_group: overlay_linkage
+      summary: Source-overlay boundary context is present.
+      required: true
+      artifact: source_overlays_context
+    - kind: path_exists
+      check_id: rt_lnrna.overlay.datasets_registry
+      check_group: overlay_linkage
+      summary: Study dataset registry is present.
+      required: true
+      artifact: datasets_registry

@@ -15,8 +15,16 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.core.record_loader import load_study_ops_contract
 from dnadesign.studies.core.record_locator import discover_active_study_selection
 from dnadesign.studies.core.registry import load_study_index
+
+
+def _repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise AssertionError("Could not locate repository root")
 
 
 def _write_repo(tmp_path: Path) -> Path:
@@ -59,6 +67,15 @@ def test_load_study_index_reads_flat_study_first_layout(tmp_path: Path) -> None:
 
     assert index.active_study_id == "demo_study"
     assert index.studies[0].record_root == (repo_root / "docs" / "studies" / "demo_study").resolve()
+
+
+def test_indexed_study_records_have_loadable_ops_contracts() -> None:
+    index = load_study_index(_repo_root())
+
+    for entry in index.studies:
+        contract = load_study_ops_contract(entry.record_root)
+
+        assert contract.study_id == entry.study_id
 
 
 def test_discover_active_study_selection_uses_top_level_studies_index(tmp_path: Path) -> None:

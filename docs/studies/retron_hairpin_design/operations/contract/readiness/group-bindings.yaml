@@ -1,7 +1,7 @@
 group_track_bindings:
   study_record: context_consolidation
   msd_reference_compile: msd_design_reference_catalog
-  msd_materialize_readiness: msd_single_unit_materialize
+  msd_materialize_readiness: msd_design_reference_catalog
   snapback_workspace: snapback_released_probe
   snapback_probe: snapback_released_probe
   yiu_workspace: yiu_boundary_check

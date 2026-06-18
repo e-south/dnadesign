@@ -1,17 +1,20 @@
-id: construct_subject_contract
-status: planned
-owner: study
-phase: phase_1_construct_subject_table
-inputs:
-  source_authority: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
-  schema: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/construct-subject-table.schema.yaml
-  fixtures:
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron26-working-anchor.yaml
-    - repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
-rules:
-  - Reject duplicate construct_subject_id values.
-  - Reject unknown payload_program_id values.
-  - Reject candidate core fields named perturbation_class, cloning_constraint_set, or representation_result.
-  - Require sequence authorities to resolve through GenBank source authority or remain paired with explicit blockers.
-  - Require USR construct-subject-envelope overlays to declare construct_subject__record_kind, construct_subject__sequence_authority, and construct_subject__biological_sequence_fields.
-  - Require abundance_prior_overlay_ids and sponging_assay_observation_ids to remain separate.
+checks:
+  phase_1_construct_subject_table:
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.schema
+      check_group: construct_subject_contract
+      summary: Construct-subject table schema is present.
+      required: true
+      artifact: construct_subject_schema
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.retron26_fixture
+      check_group: construct_subject_contract
+      summary: Working-anchor construct-subject fixture is present.
+      required: true
+      artifact: construct_subject_fixture_retron26
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.retron43_fixture
+      check_group: construct_subject_contract
+      summary: Failed-anchor construct-subject fixture is present.
+      required: true
+      artifact: construct_subject_fixture_retron43

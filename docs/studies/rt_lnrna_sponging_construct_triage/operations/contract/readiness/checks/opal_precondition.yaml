@@ -1,13 +1,8 @@
-id: opal_precondition
-status: blocked
-owner: opal
-phase: phase_7_opal_readiness
-blocked_by:
-  - rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent
-  - fixed_size_vector_x_absent
-  - sponging_assay_observations_absent
-rules:
-  - OPAL training-example rows must expose id, bio_type, sequence, alphabet, and length.
-  - X column must be one explicit Arrow fixed-size-list float vector.
-  - OPAL run and explain are blocked before real SpongingAssayObservation labels exist.
-  - Shared labels should use usr_sidecar plus ledger_only prediction writeback.
+checks:
+  phase_7_opal_readiness:
+    - kind: path_exists
+      check_id: rt_lnrna.opal.handoff_context
+      check_group: opal_precondition
+      summary: OPAL handoff context is present while labels and selected X remain blocked.
+      required: true
+      artifact: opal_handoff_context

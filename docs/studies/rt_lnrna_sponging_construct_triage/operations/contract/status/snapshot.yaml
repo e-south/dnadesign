@@ -1,3 +1,4 @@
+summary_scope: repo
 snapshot:
   kind: latentdna_current
   study_id: rt_lnrna_sponging_construct_triage

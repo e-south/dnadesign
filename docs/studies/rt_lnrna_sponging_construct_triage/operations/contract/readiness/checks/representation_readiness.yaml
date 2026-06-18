@@ -1,24 +1,20 @@
-id: representation_readiness
-status: active
-owner: construct_usr_infer
-phase: phase_3_infer_handoff
-blocked_by:
-  - future_infer_refresh_only
-rules:
-  - Use the GenBank offset audit as the source for cassette boundaries and the 2,000 bp target context.
-  - Treat `2000bp-region.gb` as pES-retron-26 `[56,2056)`, with candidate-specific lnRNA or RT length deltas handled by symmetric prefix/suffix flank adjustment until the emitted view is exactly 2,000 bp.
-  - Use Construct named slots for lnRNA and RT CDS; do not precompose them into one hidden anchor.
-  - Validate product_kind remains realized_context for emitted construct contexts.
-  - Validate context_kind is template_custom for the 2,000 bp construct views.
-  - Validate forward and reverse-complement source views are explicitly declared before LatentDNA derives post-inference concat aliases.
-  - Validate lnRNA and RT CDS anchor_mean pooling bounds before Infer.
-  - Reject RT-lnRNA Infer configs that select by product_kind plus orientation without explicit view_name.
-  - Collect intermediate_embedding block26_mlp_out means, output_layer_mean vectors, log_likelihood total, and log_likelihood mean_per_token per selected view.
-  - Validate LatentDNA dataset overview, representation health, source/design structure, Khan/Crawford ordinal audit, abundance margins, slot/context robustness, candidate-X decision, PCA scree, and appendix UMAP recipe surfaces before OPAL handoff.
-  - Require Khan/Crawford source rows to be construct-promoted through the consolidated 2,000 bp Construct output dataset before they can appear in Infer-backed LatentDNA overlays.
-  - Export OPAL X candidates as Arrow fixed-size-list float32 columns only after LatentDNA gallery health review selects one view.
-  - Fail on lnRNA or RT slot clipping, arbitrary filler padding, invalid alphabet, or missing constants; prefix/suffix flank truncation is allowed only when full biological slots remain inside the emitted view.
-contracts:
-  representation_table: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/representation-table.schema.yaml
-  infer_feature_bundle_fixture: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/infer/evo2-7b-six-view-feature-bundle.yaml
-  latentdna_workspace: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
+checks:
+  phase_3_infer_handoff:
+    - kind: path_exists
+      check_id: rt_lnrna.representation.schema
+      check_group: representation_readiness
+      summary: Representation-table schema is present.
+      required: true
+      artifact: representation_schema
+    - kind: path_exists
+      check_id: rt_lnrna.representation.infer_fixture
+      check_group: representation_readiness
+      summary: Explicit six-view Infer feature-bundle fixture is present.
+      required: true
+      artifact: infer_feature_bundle_fixture
+    - kind: path_exists
+      check_id: rt_lnrna.representation.latentdna_config
+      check_group: representation_readiness
+      summary: LatentDNA review workspace config is present.
+      required: true
+      artifact: latentdna_config
