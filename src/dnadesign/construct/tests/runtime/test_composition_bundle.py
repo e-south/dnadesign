@@ -19,8 +19,28 @@ from dnadesign.construct.src.composition.runtime import run_linear_ssdna_composi
 from dnadesign.construct.src.contracts.errors import ValidationError
 
 
-def _write_minimal_composition_config(tmp_path: Path, *, artifact_bundle: Path) -> Path:
+def _write_minimal_composition_config(
+    tmp_path: Path,
+    *,
+    artifact_bundle: Path,
+    folding_enabled: bool = False,
+) -> Path:
     config_path = tmp_path / "minimal_composition.yaml"
+    folding_block = ""
+    if folding_enabled:
+        folding_block = """
+folding:
+  enabled: true
+  required: false
+  scope: canonical_component_unit
+  backend:
+    name: ViennaRNA
+    interface: cli
+    executable: definitely-missing-rnafold-for-dnadesign-test
+    backend_contract: secondary_structure_prediction_v1
+  dna_policy:
+    mode: convert_t_to_u_for_rna_backend
+"""
     config_path.write_text(
         f"""
 contract: linear_ssdna_composition_v1
@@ -49,6 +69,7 @@ units:
           segment_id: payload
           start: 0
           end: 4
+{folding_block}
 output:
   artifact_bundle: {artifact_bundle.as_posix()}
 """,
@@ -72,6 +93,23 @@ def test_composition_bundle_rejects_nonempty_deprecated_visual_contract_dir(tmp_
 
     assert stale_contract.is_file()
     assert not (artifact_bundle / "manifest.json").exists()
+
+
+def test_composition_bundle_clears_stale_folding_mirror_when_folding_disabled(tmp_path: Path) -> None:
+    artifact_bundle = tmp_path / "artifacts" / "synthetic_x3"
+    first_config = _write_minimal_composition_config(
+        tmp_path,
+        artifact_bundle=artifact_bundle,
+        folding_enabled=True,
+    )
+    run_linear_ssdna_composition(first_config)
+    stale_folding_mirror = artifact_bundle / "manifest" / "folding"
+    assert (stale_folding_mirror / "secondary_structure_prediction_v1.json").is_file()
+
+    second_config = _write_minimal_composition_config(tmp_path, artifact_bundle=artifact_bundle)
+    run_linear_ssdna_composition(second_config)
+
+    assert not stale_folding_mirror.exists()
 
 
 def test_linear_ssdna_composition_rejects_product_basis_annotations(tmp_path: Path) -> None:

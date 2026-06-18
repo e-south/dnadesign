@@ -30,6 +30,7 @@ from .visual import (
 
 _DEPRECATED_GENERATED_DIR_PATHS = (Path("folding/src"),)
 _OPTIONAL_GENERATED_DIR_PATHS = (
+    Path("manifest/folding"),
     Path("visual/viennarna_secondary_structure"),
     Path("manifest/visual/secondary_structure"),
 )
@@ -53,7 +54,7 @@ def write_composition_bundle(composed: ComposedLinearSsdna, *, artifact_bundle: 
     write_baserender_jobs(artifact_bundle, composed)
     write_sequence_exports(artifact_bundle, composed)
     _write_json(artifact_bundle / "manifest.json", _manifest_payload(composed, artifact_bundle=artifact_bundle))
-    _write_semantic_manifest_mirror(artifact_bundle)
+    _write_semantic_manifest_mirror(composed, artifact_bundle=artifact_bundle)
 
 
 def _remove_deprecated_generated_artifacts(artifact_bundle: Path) -> None:
@@ -110,7 +111,7 @@ def _remove_empty_deprecated_directory(artifact_bundle: Path, relative_path: Pat
     path.rmdir()
 
 
-def _write_semantic_manifest_mirror(artifact_bundle: Path) -> None:
+def _write_semantic_manifest_mirror(composed: ComposedLinearSsdna, *, artifact_bundle: Path) -> None:
     mirrored_paths = [
         ("manifest.json", "manifest/bundle/manifest.json"),
         ("assembled_sequence.json", "manifest/composition/assembled_sequence.json"),
@@ -119,33 +120,46 @@ def _write_semantic_manifest_mirror(artifact_bundle: Path) -> None:
         ("validation_report.json", "manifest/composition/validation_report.json"),
         ("provenance.json", "manifest/provenance/provenance.json"),
         ("visual/sequence_evidence_map_v1.json", "manifest/visual/sequence_evidence_map_v1.json"),
-        ("folding/folding_preflight.json", "manifest/folding/folding_preflight.json"),
-        (
-            "folding/secondary_structure_prediction_request_v1.yaml",
-            "manifest/folding/secondary_structure_prediction_request_v1.yaml",
-        ),
-        ("folding/secondary_structure_prediction_v1.json", "manifest/folding/secondary_structure_prediction_v1.json"),
-        (
-            "folding/secondary_structure_input_sequence.json",
-            "manifest/folding/secondary_structure_input_sequence.json",
-        ),
-        (
-            "visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json",
-            "manifest/visual/secondary_structure/viennarna_secondary_structure_svg_v1.json",
-        ),
-        (
-            "visual/viennarna_secondary_structure/secondary_structure.annotation_manifest.json",
-            "manifest/visual/secondary_structure/annotation_manifest.json",
-        ),
-        (
-            "visual/viennarna_secondary_structure/secondary_structure.native.svg",
-            "manifest/visual/secondary_structure/native.svg",
-        ),
-        (
-            "visual/viennarna_secondary_structure/secondary_structure.annotated.svg",
-            "manifest/visual/secondary_structure/annotated.svg",
-        ),
     ]
+    if composed.config.folding.enabled:
+        mirrored_paths.extend(
+            [
+                ("folding/folding_preflight.json", "manifest/folding/folding_preflight.json"),
+                (
+                    "folding/secondary_structure_prediction_request_v1.yaml",
+                    "manifest/folding/secondary_structure_prediction_request_v1.yaml",
+                ),
+                (
+                    "folding/secondary_structure_prediction_v1.json",
+                    "manifest/folding/secondary_structure_prediction_v1.json",
+                ),
+                (
+                    "folding/secondary_structure_input_sequence.json",
+                    "manifest/folding/secondary_structure_input_sequence.json",
+                ),
+            ]
+        )
+    if "viennarna_secondary_structure_svg_v1" in set(composed.config.visual.emit):
+        mirrored_paths.extend(
+            [
+                (
+                    "visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json",
+                    "manifest/visual/secondary_structure/viennarna_secondary_structure_svg_v1.json",
+                ),
+                (
+                    "visual/viennarna_secondary_structure/secondary_structure.annotation_manifest.json",
+                    "manifest/visual/secondary_structure/annotation_manifest.json",
+                ),
+                (
+                    "visual/viennarna_secondary_structure/secondary_structure.native.svg",
+                    "manifest/visual/secondary_structure/native.svg",
+                ),
+                (
+                    "visual/viennarna_secondary_structure/secondary_structure.annotated.svg",
+                    "manifest/visual/secondary_structure/annotated.svg",
+                ),
+            ]
+        )
     for source_name, destination_name in mirrored_paths:
         source = artifact_bundle / source_name
         if not source.is_file():
