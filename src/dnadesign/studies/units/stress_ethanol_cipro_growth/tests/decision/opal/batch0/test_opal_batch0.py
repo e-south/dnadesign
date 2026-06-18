@@ -315,6 +315,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="baeR",
             slot_pattern=("background", "baeR", "background"),
             sigma="e",
+            spacer=17,
             ethanol=0.91,
         ),
         _row(
@@ -331,14 +332,16 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="baeR",
             slot_pattern=("baeR", "baeR", "baeR"),
             sigma="e",
+            spacer=19,
             ethanol=0.89,
         ),
         _row(
             "eth_expl_single",
             plan="ethanol",
             regulators="baeR",
-            slot_pattern=("background", "background", "baeR"),
+            slot_pattern=("background", "baeR", "background"),
             sigma="d",
+            spacer=18,
             ethanol=0.87,
         ),
         _row(
@@ -347,6 +350,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="cpxR",
             slot_pattern=("background", "cpxR", "background"),
             sigma="f",
+            spacer=17,
             ethanol=0.86,
         ),
         _row(
@@ -379,7 +383,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             plan="ciprofloxacin",
             regulators="lexA",
             slot_pattern=("background", "lexA", "background"),
-            sigma="e",
+            sigma="f",
             cipro=0.90,
         ),
         _row(
@@ -396,6 +400,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="lexA",
             slot_pattern=("lexA", "lexA", "lexA"),
             sigma="e",
+            spacer=18,
             cipro=0.88,
         ),
         _row(
@@ -404,6 +409,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="lexA",
             slot_pattern=("background", "lexA", "lexA"),
             sigma="f",
+            spacer=18,
             cipro=0.87,
         ),
         _row(
@@ -412,6 +418,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             regulators="lexA",
             slot_pattern=("background", "lexA", "background"),
             sigma="d",
+            spacer=18,
             cipro=0.86,
         ),
         _row(
@@ -427,23 +434,25 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             plan="ethanol_ciprofloxacin",
             regulators="baeR+lexA",
             slot_pattern=("lexA", "baeR", "background"),
-            sigma="e",
+            sigma="f",
             dual=0.95,
         ),
         _row(
             "and_baer_lexa_dense",
             plan="ethanol_ciprofloxacin",
             regulators="baeR+lexA",
-            slot_pattern=("lexA", "baeR", "lexA"),
+            slot_pattern=("lexA", "baeR", "baeR"),
             sigma="f",
+            spacer=18,
             dual=0.94,
         ),
         _row(
             "and_baer_lexa_expl",
             plan="ethanol_ciprofloxacin",
             regulators="baeR+lexA",
-            slot_pattern=("lexA", "lexA", "baeR"),
+            slot_pattern=("baeR", "lexA", "background"),
             sigma="d",
+            spacer=19,
             dual=0.93,
         ),
         _row(
@@ -451,7 +460,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
             plan="ethanol_ciprofloxacin",
             regulators="cpxR+lexA",
             slot_pattern=("cpxR", "lexA", "background"),
-            sigma="e",
+            sigma="f",
             dual=0.92,
         ),
         _row(
@@ -607,6 +616,191 @@ def test_select_batch0_supports_exact_slot_patterns_and_signal_tfbs_count() -> N
     assert selected["slot"].tolist() == ["ethanol_baer_middle_only"]
 
 
+def test_select_batch0_supports_slot_level_spacer_constraints_and_metadata() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "setpoint_vector": [0, 1, 0, 1],
+                "target_margin_column": "synthetic_margin_ethanol_vs_background",
+                "slots": [
+                    {
+                        "name": "ethanol_baer_middle_only",
+                        "count": 1,
+                        "plan": "ethanol",
+                        "regulator_compositions": ["baeR"],
+                        "slot_regulator_pattern": ["background", "baeR", "background"],
+                        "signal_tfbs_count": 1,
+                        "allowed_sigma35_variants": ["f", "e"],
+                        "allowed_spacer_lengths": [17],
+                        "design_hypothesis": "BaeR middle slot tunes -35-side RNAP geometry.",
+                        "primary_comparison": "ethanol_baer_upstream_only",
+                        "geometry_hypothesis": "functional_realignment",
+                        "interpretation_limit": "Fixed TATAAT -10; not a -10-strength test.",
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "wrong_spacer_high_margin",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            spacer=16,
+            ethanol=0.99,
+        ),
+        _row(
+            "matched_spacer",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            spacer=17,
+            ethanol=0.50,
+        ),
+    ]
+
+    selected = select_batch0(pd.DataFrame(rows), config)
+
+    assert selected["id"].tolist() == ["matched_spacer"]
+    assert selected["spacer_length"].tolist() == [17]
+    assert selected["design_hypothesis"].tolist() == ["BaeR middle slot tunes -35-side RNAP geometry."]
+    assert selected["primary_comparison"].tolist() == ["ethanol_baer_upstream_only"]
+    assert selected["geometry_hypothesis"].tolist() == ["functional_realignment"]
+    assert selected["interpretation_limit"].tolist() == ["Fixed TATAAT -10; not a -10-strength test."]
+
+
+def test_select_batch0_fails_when_slot_level_spacer_constraint_exhausts_pool() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "setpoint_vector": [0, 1, 0, 1],
+                "target_margin_column": "synthetic_margin_ethanol_vs_background",
+                "slots": [
+                    {
+                        "name": "ethanol_baer_middle_only",
+                        "count": 1,
+                        "plan": "ethanol",
+                        "regulator_compositions": ["baeR"],
+                        "slot_regulator_pattern": ["background", "baeR", "background"],
+                        "signal_tfbs_count": 1,
+                        "allowed_spacer_lengths": [19],
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "only_wrong_spacer",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            spacer=17,
+            ethanol=0.9,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="requires 1 rows but only 0 candidates passed filters"):
+        select_batch0(pd.DataFrame(rows), config)
+
+
+def test_select_batch0_applies_off_target_margin_constraints() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_and_rf_sfxi_topn",
+                "setpoint_vector": [0, 0, 0, 1],
+                "target_margin_column": "synthetic_margin_dual_vs_background",
+                "off_target_margin_columns": [
+                    "synthetic_margin_ethanol_vs_background",
+                    "synthetic_margin_cipro_vs_background",
+                ],
+                "off_target_margin_constraints": {"max_each": 0.3},
+                "slots": [
+                    {
+                        "name": "and_baer_lexa_baer_before_lexa",
+                        "count": 1,
+                        "plan": "ethanol_ciprofloxacin",
+                        "regulator_compositions": ["baeR+lexA"],
+                        "slot_regulator_pattern": ["baeR", "lexA", "background"],
+                        "signal_tfbs_count": 2,
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "generic_dual_positive_high_margin",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("baeR", "lexA", "background"),
+            ethanol=0.70,
+            cipro=0.65,
+            dual=0.95,
+        ),
+        _row(
+            "and_specific_lower_margin",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("baeR", "lexA", "background"),
+            ethanol=0.20,
+            cipro=0.25,
+            dual=0.55,
+        ),
+    ]
+
+    selected = select_batch0(pd.DataFrame(rows), config)
+
+    assert selected["id"].tolist() == ["and_specific_lower_margin"]
+
+
+def test_select_batch0_applies_campaign_target_margin_minimum() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_and_rf_sfxi_topn",
+                "setpoint_vector": [0, 0, 0, 1],
+                "target_margin_column": "synthetic_margin_dual_vs_background",
+                "target_margin_min": 0.2,
+                "slots": [
+                    {
+                        "name": "and_baer_lexa_baer_before_lexa",
+                        "count": 1,
+                        "plan": "ethanol_ciprofloxacin",
+                        "regulator_compositions": ["baeR+lexA"],
+                        "slot_regulator_pattern": ["baeR", "lexA", "background"],
+                        "signal_tfbs_count": 2,
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "barely_positive_dual_margin",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("baeR", "lexA", "background"),
+            dual=0.05,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="requires 1 rows but only 0 candidates passed filters"):
+        select_batch0(pd.DataFrame(rows), config)
+
+
 def test_select_batch0_fails_fast_when_slot_predicate_cannot_parse_densegen_detail() -> None:
     config = {
         "allow_duplicate_ids": False,
@@ -650,8 +844,15 @@ def test_select_batch0_fails_fast_when_slot_predicate_cannot_parse_densegen_deta
 def test_configured_sampling_yaml_declares_granular_batch0_composition() -> None:
     config = load_sampling_config(SAMPLING)
     campaigns = {campaign["objective"]: campaign for campaign in config["campaigns"]}
+    required_metadata = {
+        "design_hypothesis",
+        "primary_comparison",
+        "geometry_hypothesis",
+        "interpretation_limit",
+    }
 
     ethanol_slots = campaigns["ethanol_factor"]["slots"]
+    assert all(required_metadata.issubset(slot) for slot in ethanol_slots)
     assert [slot["name"] for slot in ethanol_slots] == [
         "ethanol_baer_middle_only",
         "ethanol_baer_upstream_only",
@@ -671,11 +872,20 @@ def test_configured_sampling_yaml_declares_granular_batch0_composition() -> None
     assert all(slot["plan"] == "ethanol" for slot in ethanol_slots)
     assert not any("lexA" in "+".join(slot["regulator_compositions"]) for slot in ethanol_slots)
     assert ethanol_slots[0]["slot_regulator_pattern"] == ["background", "baeR", "background"]
+    assert ethanol_slots[0]["allowed_spacer_lengths"] == [17]
     assert ethanol_slots[1]["slot_regulator_pattern"] == ["baeR", "background", "background"]
-    assert ethanol_slots[2]["signal_tfbs_count"] == {"min": 2}
+    assert ethanol_slots[1]["allowed_spacer_lengths"] == [16]
+    assert ethanol_slots[2]["slot_regulator_pattern"] == ["baeR", "baeR", "baeR"]
+    assert ethanol_slots[2]["signal_tfbs_count"] == 3
+    assert ethanol_slots[2]["allowed_spacer_lengths"] == [19]
+    assert ethanol_slots[3]["slot_regulator_pattern"] == ["background", "baeR", "background"]
     assert ethanol_slots[3]["signal_tfbs_count"] == 1
+    assert ethanol_slots[3]["allowed_spacer_lengths"] == [18]
+    assert ethanol_slots[4]["allowed_spacer_lengths"] == [17]
+    assert ethanol_slots[5]["allowed_spacer_lengths"] == [16]
 
     cipro_slots = campaigns["cipro_factor"]["slots"]
+    assert all(required_metadata.issubset(slot) for slot in cipro_slots)
     assert [slot["name"] for slot in cipro_slots] == [
         "cipro_lexa_slot0",
         "cipro_lexa_slot1",
@@ -689,11 +899,22 @@ def test_configured_sampling_yaml_declares_granular_batch0_composition() -> None
     assert cipro_slots[0]["slot_regulator_pattern"] == ["lexA", "background", "background"]
     assert cipro_slots[1]["slot_regulator_pattern"] == ["background", "lexA", "background"]
     assert cipro_slots[2]["slot_regulator_pattern"] == ["background", "background", "lexA"]
-    assert cipro_slots[3]["signal_tfbs_count"] == {"min": 3}
+    assert [slot["allowed_spacer_lengths"] for slot in cipro_slots[:3]] == [[16], [16], [16]]
+    assert all(slot["allowed_sigma35_variants"] == ["f"] for slot in cipro_slots[:3])
+    assert cipro_slots[3]["slot_regulator_pattern"] == ["lexA", "lexA", "lexA"]
+    assert cipro_slots[3]["signal_tfbs_count"] == 3
+    assert cipro_slots[3]["allowed_spacer_lengths"] == [18]
+    assert cipro_slots[4]["slot_regulator_pattern"] == ["background", "lexA", "lexA"]
     assert cipro_slots[4]["signal_tfbs_count"] == 2
+    assert cipro_slots[4]["allowed_spacer_lengths"] == [18]
+    assert cipro_slots[5]["slot_regulator_pattern"] == ["background", "lexA", "background"]
     assert cipro_slots[5]["signal_tfbs_count"] == 1
+    assert cipro_slots[5]["allowed_spacer_lengths"] == [18]
 
     and_slots = campaigns["and"]["slots"]
+    assert campaigns["and"]["target_margin_min"] == 0.2
+    assert campaigns["and"]["off_target_margin_constraints"] == {"max_each": 0.3}
+    assert all(required_metadata.issubset(slot) for slot in and_slots)
     assert [slot["name"] for slot in and_slots] == [
         "and_baer_lexa_baer_before_lexa",
         "and_baer_lexa_lexa_before_baer",
@@ -712,9 +933,18 @@ def test_configured_sampling_yaml_declares_granular_batch0_composition() -> None
     ]
     assert and_slots[0]["slot_regulator_pattern"] == ["baeR", "lexA", "background"]
     assert and_slots[1]["slot_regulator_pattern"] == ["lexA", "baeR", "background"]
-    assert and_slots[2]["signal_tfbs_count"] == {"min": 3}
+    assert and_slots[0]["allowed_spacer_lengths"] == [16]
+    assert and_slots[1]["allowed_spacer_lengths"] == [16]
+    assert and_slots[2]["slot_regulator_pattern"] == ["lexA", "baeR", "baeR"]
+    assert and_slots[2]["signal_tfbs_count"] == 3
+    assert and_slots[2]["allowed_spacer_lengths"] == [18]
+    assert and_slots[3]["slot_regulator_pattern"] == ["baeR", "lexA", "background"]
+    assert and_slots[3]["signal_tfbs_count"] == 2
+    assert and_slots[3]["allowed_spacer_lengths"] == [19]
     assert and_slots[4]["slot_regulator_pattern"] == ["cpxR", "lexA", "background"]
     assert and_slots[5]["slot_regulator_pattern"] == ["lexA", "cpxR", "background"]
+    assert and_slots[4]["allowed_spacer_lengths"] == [16]
+    assert and_slots[5]["allowed_spacer_lengths"] == [16]
 
 
 def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_alignment(

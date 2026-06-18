@@ -136,8 +136,8 @@ that value explicitly instead of weakening the production rule.
 
 The current batch-0 selector is a granular pre-assay seed. Ethanol and
 ciprofloxacin lean into their single-axis priors while varying placement,
-count, and sigma strength; mixed activator-plus-LexA logic is reserved for the
-AND objective in batch zero only:
+count, spacer class, and sigma strength; mixed activator-plus-LexA logic is
+reserved for the AND objective in batch zero only:
 
 - ethanol-factor: 4 `baeR` and 2 `cpxR`
 - ciprofloxacin-factor: 6 `lexA`
@@ -150,3 +150,21 @@ BaeR slots exclude CpxR TFBS, CpxR comparator slots exclude BaeR TFBS, dual
 AND slots require the matching stress regulator plus LexA, and batch-0 spacers
 are constrained to 16-19 bp. Strong slots use the `f/e` sigma-35 variants;
 exploratory slots are explicitly limited to `d/c`.
+
+The promoter-geometry rationale is intentionally narrower than a causal DOE.
+Batch 0 treats activator behavior as functional realignment of RNAP access and
+geometry around the -35 side, not literal DNA shortening. The selected rows keep
+the DenseGen `TATAAT` -10 context fixed, so they do not test -10 strength. The
+activator rows ask whether BaeR/CpxR placement, spacer class, and copy-number
+representatives can move low-basal designs across an ethanol ON-state prior
+threshold. The LexA rows ask placement/count questions for cipro
+derepression-like architecture, not LexA-present/absent repression causality.
+Dense rows are stress-test comparators; they are less clean than single-site
+placement rows because slot occupancy changes in multiple places.
+
+The AND rows are still pre-assay dual-logic probes, not post-batch OPAL
+constraints and not measured Boolean gates. Their selector adds batch0-only
+single-stress prior caps plus a minimum dual-margin floor so the seed set does
+not collapse into generic dual-positive rows with weak dual signal. After labels
+exist, OPAL is free to select any eligible candidate architecture supported by
+the measured model.

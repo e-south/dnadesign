@@ -33,6 +33,10 @@ from .candidate_table import (
 REQUIRED_REVIEW_COLUMNS: tuple[str, ...] = (
     "campaign",
     "slot",
+    "design_hypothesis",
+    "primary_comparison",
+    "geometry_hypothesis",
+    "interpretation_limit",
     "id",
     "sequence",
     "setpoint",
@@ -45,6 +49,12 @@ REQUIRED_REVIEW_COLUMNS: tuple[str, ...] = (
     "tfbs_summary",
     "motif_score_summary",
     "x_provenance",
+)
+SLOT_METADATA_COLUMNS: tuple[str, ...] = (
+    "design_hypothesis",
+    "primary_comparison",
+    "geometry_hypothesis",
+    "interpretation_limit",
 )
 
 _SIGMA35_STRENGTH_RANK = {"f": 0, "e": 1, "d": 2, "c": 3, "b": 4}
@@ -366,6 +376,24 @@ def _count_constraint_matches(value: int, raw: Any) -> bool:
     return value == int(raw)
 
 
+def _requested_int_set(raw: Any, *, field_name: str) -> set[int]:
+    if not isinstance(raw, Sequence) or isinstance(raw, bytes | bytearray | str):
+        raise ValueError(f"{field_name} must be a sequence of integers")
+    return {int(value) for value in raw}
+
+
+def _metadata_value(value: Any) -> str:
+    if _is_missing(value):
+        return ""
+    if isinstance(value, Mapping) or (isinstance(value, Sequence) and not isinstance(value, bytes | bytearray | str)):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
+def _slot_review_metadata(slot: Mapping[str, Any]) -> dict[str, str]:
+    return {column: _metadata_value(slot.get(column)) for column in SLOT_METADATA_COLUMNS}
+
+
 def _ensure_candidate_columns(candidates: pd.DataFrame) -> pd.DataFrame:
     out = candidates.copy()
     if "id" not in out.columns:
@@ -513,9 +541,16 @@ def _slot_matches(frame: pd.DataFrame, slot: Mapping[str, Any]) -> pd.Series:
     if allowed_sigma:
         mask &= frame["sigma35_variant"].isin([str(value).lower() for value in allowed_sigma])
 
+    allowed_spacers = slot.get("allowed_spacer_lengths")
+    if allowed_spacers:
+        wanted_spacers = _requested_int_set(allowed_spacers, field_name="allowed_spacer_lengths")
+        mask &= pd.to_numeric(frame["spacer_length"], errors="coerce").isin(wanted_spacers)
+
     requested_pattern = _requested_slot_pattern(slot)
     requested_count = slot.get("signal_tfbs_count")
     if requested_pattern is not None or requested_count is not None:
+        if not mask.any():
+            return mask
         pattern_by_index = frame.loc[mask].apply(_strict_slot_regulator_pattern, axis=1)
         if requested_pattern is not None:
             pattern_mask = pattern_by_index == requested_pattern
@@ -564,6 +599,34 @@ def _ranked_slot_candidates(
     )
 
 
+def _apply_off_target_margin_constraints(
+    pool: pd.DataFrame,
+    *,
+    campaign: Mapping[str, Any],
+    slot: Mapping[str, Any],
+) -> pd.DataFrame:
+    raw = slot.get("off_target_margin_constraints", campaign.get("off_target_margin_constraints"))
+    if raw is None:
+        return pool
+    if not isinstance(raw, Mapping):
+        raise ValueError("off_target_margin_constraints must be a mapping")
+    if "max_each" not in raw:
+        raise ValueError("off_target_margin_constraints must define max_each")
+    off_target_cols = list(slot.get("off_target_margin_columns", campaign.get("off_target_margin_columns", [])))
+    if not off_target_cols:
+        raise ValueError("off_target_margin_constraints requires off_target_margin_columns")
+
+    out = pool.copy()
+    max_each = float(raw["max_each"])
+    for column in off_target_cols:
+        column_name = str(column)
+        if column_name not in out.columns:
+            raise ValueError(f"missing off-target margin column {column_name!r}")
+        values = pd.to_numeric(out[column_name], errors="coerce")
+        out = out[values.notna() & (values <= max_each)].copy()
+    return out
+
+
 def _select_for_slot(
     candidates: pd.DataFrame,
     *,
@@ -585,6 +648,10 @@ def _select_for_slot(
     pool = pool[pool[target_col].notna()]
     if require_positive_target_margin:
         pool = pool[pool[target_col] > 0]
+    target_margin_min = slot.get("target_margin_min", campaign.get("target_margin_min"))
+    if target_margin_min is not None:
+        pool = pool[pool[target_col] >= float(target_margin_min)]
+    pool = _apply_off_target_margin_constraints(pool, campaign=campaign, slot=slot)
     if not allow_duplicate_ids:
         pool = pool[~pool["id"].isin(used_ids)]
 
@@ -662,6 +729,8 @@ def select_batch0(
                 chosen["slot"] = slot_name
             else:
                 chosen["slot"] = [f"{slot_name}_{idx + 1}" for idx in range(len(chosen))]
+            for column, value in _slot_review_metadata(slot).items():
+                chosen[column] = value
             chosen["campaign"] = str(campaign["slug"])
             chosen["setpoint"] = [list(campaign["setpoint_vector"]) for _ in range(len(chosen))]
             chosen["target_margin"] = pd.to_numeric(chosen[campaign["target_margin_column"]], errors="coerce")
