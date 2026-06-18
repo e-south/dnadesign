@@ -11,7 +11,7 @@
 **Status-kind:** cluster-run-index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-06-17
 
 Use this workflow when one feature column or exported matrix already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
 

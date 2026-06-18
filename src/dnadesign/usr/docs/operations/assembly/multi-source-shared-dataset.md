@@ -11,7 +11,7 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-06-17
 
 Use this runbook when inputs already span multiple USR-backed datasets, but downstream consumers should still see one consolidated construct-backed dataset plus one event stream.
 

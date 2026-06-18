@@ -11,7 +11,7 @@
 **Status-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-06-17
 
 
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.

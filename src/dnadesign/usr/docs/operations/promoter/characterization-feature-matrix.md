@@ -11,7 +11,7 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-06-17
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
