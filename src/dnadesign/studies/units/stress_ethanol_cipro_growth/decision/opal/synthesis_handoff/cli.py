@@ -335,6 +335,21 @@ def _run_ids_for_opal_round_source(
     return None, run_id_by_campaign_from_handoff_record(handoff_record)
 
 
+def _is_handoff_record_only_preview(
+    *,
+    args: argparse.Namespace,
+    handoff_record: SynthesisHandoffRecord | None,
+) -> bool:
+    return (
+        handoff_record is not None
+        and not bool(args.write)
+        and args.source is None
+        and args.selected_csv is None
+        and args.campaign_config is None
+        and not args.run_id
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -383,7 +398,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
-    strategy = load_cloning_strategy(args.strategy_yaml)
     try:
         batch_id = _batch_id_from_source(
             source=source,
@@ -394,6 +408,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         _parser_error(parser, args, str(exc))
 
+    if _is_handoff_record_only_preview(args=args, handoff_record=handoff_record):
+        root = args.repo_root or fallback_repo_root
+        _summary(
+            {
+                "status": "ok",
+                "mode": "handoff_record_preview",
+                "source": source,
+                "batch_id": batch_id,
+                "strategy_id": handoff_record.strategy_id,
+                "handoff_record": handoff_record_payload(handoff_record, repo_root=root),
+            },
+            as_json=bool(args.json),
+        )
+        return 0
+
+    strategy = load_cloning_strategy(args.strategy_yaml)
     source_report: dict[str, Any] = {}
     candidate_records_path: Path | None = None
     if source == "batch0":

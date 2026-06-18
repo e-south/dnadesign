@@ -176,8 +176,10 @@ physical order batch is being previewed, generated, accepted, ordered, or
 assayed:
 
 - `--handoff-id stress-opal-batch0-sfxi-v1`: resolve the checked-in batch-0
-  lifecycle record, infer the source authority, validate expected campaign row
-  counts and lifecycle fields, and report exact campaign-scoped artifact paths.
+  lifecycle record and report exact campaign-scoped artifact paths plus current
+  hash/readback status without rebuilding selector inputs. Add `--source
+  batch0` when a no-write run should explicitly rebuild the selector and
+  validate expected campaign row counts against the lifecycle record.
 
 The lower-level source modes remain available for implementation, fixtures, and
 drafting new measured-round records:

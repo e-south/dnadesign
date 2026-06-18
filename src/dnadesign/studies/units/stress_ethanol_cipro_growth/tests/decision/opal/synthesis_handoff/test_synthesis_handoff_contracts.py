@@ -1072,6 +1072,33 @@ def test_cli_resolves_batch0_from_checked_in_handoff_record(
     )
 
 
+def test_cli_handoff_record_preview_does_not_rebuild_batch0_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_if_batch0_is_rebuilt(*, config_path: Path, repo_root: Path | None = None):
+        raise ValueError("batch0 selected candidates should not be rebuilt for record preview")
+
+    monkeypatch.setattr(synthesis_handoff_cli, "build_batch0_selected_candidates", fail_if_batch0_is_rebuilt)
+
+    exit_code = synthesis_handoff_main(
+        [
+            "--handoff-id",
+            "stress-opal-batch0-sfxi-v1",
+            "--json",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["mode"] == "handoff_record_preview"
+    assert payload["source"] == "batch0"
+    assert payload["batch_id"] == "stress-opal-batch0-sfxi-v1"
+    assert payload["handoff_record"]["handoff_id"] == "stress-opal-batch0-sfxi-v1"
+    assert payload["handoff_record"]["artifact_status"]["summary"]["expected_campaign_count"] == 3
+
+
 def test_cli_handoff_record_resolves_opal_round_per_campaign_run_ids(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1246,6 +1273,8 @@ def test_cli_handoff_record_rejects_campaign_count_drift(
             [
                 "--handoff-id",
                 "stress-opal-batch0-sfxi-v1",
+                "--source",
+                "batch0",
                 "--record-yaml",
                 str(record_path),
                 "--json",

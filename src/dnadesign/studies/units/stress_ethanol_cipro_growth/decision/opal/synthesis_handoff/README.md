@@ -54,7 +54,8 @@ stress ethanol/ciprofloxacin growth, `B0` is the pre-assay batch-zero seed, and
 
 ## Operator Commands
 
-Preview the batch-0 synthesis handoff without writing generated artifacts:
+Preview the checked-in batch-0 lifecycle record and artifact status without
+rebuilding batch-0 selector inputs or writing generated artifacts:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
@@ -74,9 +75,10 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 
 `--handoff-id` reads the checked-in lifecycle record at
 `docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`. For
-batch zero it resolves to the checked-in batch-0 selector, validates the
-expected campaign row counts and lifecycle fields, and reports the exact
-campaign-local artifact paths plus current hash/readback status.
+batch zero, preview mode reports lifecycle fields plus the exact campaign-local
+artifact paths and current hash/readback status. Add `--source batch0` when a
+no-write run should explicitly rebuild the current selector and validate
+expected campaign row counts against the lifecycle record.
 
 The current strategy config
 `configs/sfxi_promoter_insert_v1.yaml` declares the cloning restriction policy:
