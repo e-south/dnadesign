@@ -1392,6 +1392,79 @@ def test_candidate_table_materializer_filters_dense_plan_subset_and_writes_x(tmp
     assert records["opal_candidate__sfxi_ref__collection_id"].isna().all()
 
 
+def test_candidate_table_write_reuses_configured_validation_guards(tmp_path: Path) -> None:
+    rows_path = tmp_path / "view_rows.parquet"
+    matrix_path = tmp_path / "matrix.npy"
+    source_path = tmp_path / "anchor" / "records.parquet"
+    densegen_sidecar_path = tmp_path / "anchor" / "_derived" / "densegen.parquet"
+    config_path = tmp_path / "sampling.yaml"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+
+    pd.DataFrame(
+        {
+            "construct__anchor_id": ["a", "b"],
+            "source_class": ["densegen", "densegen"],
+            "design_family": ["ethanol", "ciprofloxacin"],
+            "sfxi_ref__collection_id": [None, None],
+        }
+    ).to_parquet(rows_path)
+    np.save(matrix_path, np.asarray([[1, 2], [3, 4]], dtype=np.float32))
+    source_path.parent.mkdir()
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "bio_type": ["dna", "dna"],
+            "sequence": ["AAAA", "CCCC"],
+            "alphabet": ["dna_4", "dna_4"],
+            "densegen__plan": ["ethanol", "ciprofloxacin"],
+            "densegen__run_id": ["run-a", "run-b"],
+            "densegen__sampling_library_hash": ["hash-a", "hash-b"],
+        }
+    ).to_parquet(source_path, index=False)
+    densegen_sidecar_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "densegen__plan": ["ethanol", "ciprofloxacin"],
+            "densegen__run_id": ["run-a", "run-b"],
+            "densegen__sampling_library_hash": ["hash-a", "hash-b"],
+        }
+    ).to_parquet(densegen_sidecar_path, index=False)
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "campaigns": [],
+                "candidate_feature_table": {
+                    "records_path": "opal/records.parquet",
+                    "expected_rows": 3,
+                    "x_column": x_col,
+                    "x_source": {
+                        "rows_path": "view_rows.parquet",
+                        "matrix_path": "matrix.npy",
+                    },
+                    "materialization": {
+                        "source_records_path": "anchor/records.parquet",
+                        "densegen_sidecar_path": "anchor/_derived/densegen.parquet",
+                        "densegen_sidecar_columns": [
+                            "densegen__plan",
+                            "densegen__run_id",
+                            "densegen__sampling_library_hash",
+                        ],
+                        "view_row_id_column": "construct__anchor_id",
+                        "include_source_class": ["densegen"],
+                        "allowed_design_families": ["ethanol", "ciprofloxacin"],
+                        "exclude_non_null_columns": ["sfxi_ref__collection_id"],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="row count 2 does not equal expected 3"):
+        candidate_table_main(["--config", str(config_path), "--repo-root", str(tmp_path), "--write"])
+
+
 def test_candidate_table_materializer_fails_fast_on_incomplete_densegen_sidecar(tmp_path: Path) -> None:
     rows_path = tmp_path / "view_rows.parquet"
     matrix_path = tmp_path / "matrix.npy"

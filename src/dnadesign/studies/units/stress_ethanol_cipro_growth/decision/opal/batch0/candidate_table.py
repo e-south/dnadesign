@@ -716,12 +716,7 @@ def materialize_configured_candidate_feature_table(
             positions=positions,
             chunk_size=int(chunk_size),
         )
-        report["validation"] = validate_candidate_feature_table(
-            records_path=records_path,
-            x_column=x_column,
-            view_rows_path=view_rows_path,
-            view_row_id_column=view_row_id_column,
-        )
+        report["validation"] = validate_configured_candidate_feature_table(config, repo_root=root)
         report["written"] = True
     return report
 
