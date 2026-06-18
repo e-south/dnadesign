@@ -21,7 +21,7 @@ from dnadesign.ops.catalog import discover_repo_root
 from dnadesign.ops.status import resolve_path_ref
 from dnadesign.studies.core.models import StudyOpsContract
 from dnadesign.studies.core.record_loader import load_study_ops_contract
-from dnadesign.studies.core.record_locator import discover_active_study_selection
+from dnadesign.studies.core.record_locator import discover_study_selection_for_status_kind
 
 _REQUIRED_RECORD_FILES = {
     "campaign.yaml": "record/campaign.yaml",
@@ -93,9 +93,9 @@ def resolve_retron_hairpin_design_context(
     active_study_id: str | None = None
 
     if requested_study_dir is None:
-        selection = discover_active_study_selection(repo_root=repo_root, status_kind=status_kind)
+        selection = discover_study_selection_for_status_kind(repo_root=repo_root, status_kind=status_kind)
         resolved_study_dir = selection.study_root
-        selection_source = "active_registry"
+        selection_source = "status_kind_registry"
         registry_path = selection.index_path
         active_study_id = selection.active_study_id
         resolved_repo_root = selection.repo_root

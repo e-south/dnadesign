@@ -416,6 +416,69 @@ def _write_retron_hairpin_design_record(tmp_path: Path) -> Path:
     return study_root
 
 
+def _write_stress_record_with_status_surface(repo_root: Path) -> Path:
+    study_root = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+    (study_root / "operations").mkdir(parents=True, exist_ok=True)
+    (study_root / "operations" / "ops.study.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "study_id": "stress_ethanol_cipro_growth",
+                "ops_surfaces": {
+                    "status_kind": "stress-ethanol-cipro-growth-status",
+                    "preflight_kind": "stress-ethanol-cipro-growth-preflight",
+                },
+                "lifecycle": {
+                    "phase_order": ["ready"],
+                    "current_phase": {"strategy": "explicit", "id": "ready"},
+                },
+                "phases": [{"id": "ready", "status": "ready"}],
+                "snapshot": {"summary_scope": "repo"},
+                "preflight": {
+                    "default_scope": "next",
+                    "scopes": {"next": {"include_phases": ["current_phase"]}},
+                    "group_phase_bindings": {"study_record": "ready"},
+                    "next_scope": {
+                        "target_phase_groups": {"ready": ["study_record"]},
+                        "runtime_phase_groups": [],
+                        "runtime_shared_groups": [],
+                    },
+                    "checks": {},
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return study_root
+
+
+def _write_study_index_with_active_stress(repo_root: Path) -> None:
+    (repo_root / "docs" / "studies").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "studies" / "index.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "active_study_id": "stress_ethanol_cipro_growth",
+                "studies": [
+                    {
+                        "study_id": "stress_ethanol_cipro_growth",
+                        "title": "Stress / ethanol / ciprofloxacin growth study",
+                        "record_root": "docs/studies/stress_ethanol_cipro_growth",
+                    },
+                    {
+                        "study_id": "retron_hairpin_design",
+                        "title": "Retron hairpin design",
+                        "record_root": "docs/studies/retron_hairpin_design",
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_provide_retron_hairpin_design_status_exposes_command_groups_and_agent_bootstrap(tmp_path: Path) -> None:
     study_root = _write_retron_hairpin_design_record(tmp_path)
 
@@ -450,6 +513,25 @@ def test_provide_retron_hairpin_design_status_exposes_command_groups_and_agent_b
         "- Primary workspace: `src/dnadesign/cruncher/workspaces/de033`",
         "- Contrast workspace: `src/dnadesign/cruncher/workspaces/demo_monotypic_tetr`",
     ]
+
+
+def test_provide_retron_hairpin_design_status_without_study_dir_uses_retron_surface(
+    tmp_path: Path,
+) -> None:
+    _write_retron_hairpin_design_record(tmp_path)
+    _write_stress_record_with_status_surface(tmp_path)
+    _write_study_index_with_active_stress(tmp_path)
+
+    state, summary, evidence = provide_retron_hairpin_design_status(
+        repo_root=tmp_path,
+        inputs={},
+    )
+
+    assert state == "ok"
+    assert "primary lane released-product snapback" in summary
+    assert evidence["selection_source"] == "status_kind_registry"
+    assert evidence["active_study_id"] == "stress_ethanol_cipro_growth"
+    assert evidence["record_root"] == str(tmp_path / "docs" / "studies" / "retron_hairpin_design")
 
 
 def test_provide_retron_hairpin_design_status_uses_track_language_for_nonsequential_records(tmp_path: Path) -> None:
