@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from dnadesign.contracts.sequence.msd_design_reference_v1 import compute_scar_nick_profile_s3s2s1s0
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.construct_materialization import (
     ControlConstructMaterializationReport,
 )
@@ -14,12 +16,27 @@ _CONSTRUCT_SUBJECT_SEQUENCE_FIELDS = ("construct_subject__lnrna_sequence", "cons
 _WT_RT_CDS_SEQUENCE = "ATG" * 320 + "TAA"
 _TETO_PAYLOAD = "tccctatcagtgatagaga"
 _SNAPBACK_FOLDBACK = "GAGAGACTC"
-_SNAPBACK_CAP_PRIMITIVE_RUN_DIR = "src/dnadesign/cruncher/workspaces/de033/outputs/released_solve"
-_SCAR_NICK_STEM_BASE_PRIMITIVE_RUN_DIR = (
-    "src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf"
-)
 _ALL_SNAPBACK_CAP_RANKS = (1, 2, 3, 4, 5)
 _ALL_SCAR_NICK_STEM_BASE_RANKS = tuple(range(1, 17))
+_BASES = "ACGT"
+_SCAR_NICK_STEM_BASE_PRIMITIVE_PAIRS = (
+    ("AGTG", "CAAT"),
+    ("AGTG", "CATG"),
+    ("AGTG", "CTTT"),
+    ("AGTG", "CGAT"),
+    ("AATG", "CGTG"),
+    ("AGTG", "CATT"),
+    ("AATG", "CGTT"),
+    ("AGTG", "CGTT"),
+    ("AGTG", "CAAG"),
+    ("AATG", "CTTG"),
+    ("AATG", "CAGT"),
+    ("AGTG", "CAGT"),
+    ("AATG", "CAAT"),
+    ("AATG", "CACT"),
+    ("CTCT", "AGTG"),
+    ("CTCA", "TGTG"),
+)
 
 
 def _repo_root() -> Path:
@@ -92,6 +109,7 @@ def _write_msd_compiler_pool_spec(
     extra_cap_sequences: dict[str, str] | None = None,
     extra_stem_base_fields: str = "",
 ) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     cap_sequences = {"C26": "AGGC", **(extra_cap_sequences or {})}
     if not use_primitive_sources:
         cap_sequences = {
@@ -110,6 +128,11 @@ def _write_msd_compiler_pool_spec(
         "docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml#pES-retron-179"
     )
     if use_primitive_sources:
+        primitive_sources = _write_msd_primitive_source_fixtures(
+            root=path.parent / f"{path.stem}_primitive_sources",
+            max_cap_rank=max(cap_ranks),
+            max_stem_base_rank=max(stem_base_ranks),
+        )
         design_space_block = f"""design_space:
   construct_id_prefix: {construct_id_prefix}
   payload_ids:
@@ -117,7 +140,7 @@ def _write_msd_compiler_pool_spec(
   cap_primitives:
     - source_id: de033_released_snapback_cap_primitives_v1
       kind: snapback_released_solve_cap
-      run_dir: {_SNAPBACK_CAP_PRIMITIVE_RUN_DIR}
+      run_dir: {primitive_sources["snapback_run_dir"]}
       cap_id_prefix: {cap_id_prefix}
       ranks:
 {cap_rank_lines}
@@ -125,14 +148,14 @@ def _write_msd_compiler_pool_spec(
   stem_base_primitives:
     - source_id: scar_nick_teto_bbsI_hf_stem_base_primitives_v1
       kind: scar_nick_stem_bases
-      run_dir: {_SCAR_NICK_STEM_BASE_PRIMITIVE_RUN_DIR}
+      run_dir: {primitive_sources["scar_nick_run_dir"]}
       stem_base_id_prefix: {stem_base_id_prefix}
       ranks:
 {stem_base_rank_lines}
       expected_primitive_count: {len(stem_base_ranks)}
 source_refs:
-  - {_SNAPBACK_CAP_PRIMITIVE_RUN_DIR}
-  - {_SCAR_NICK_STEM_BASE_PRIMITIVE_RUN_DIR}
+  - {primitive_sources["snapback_run_dir"]}
+  - {primitive_sources["scar_nick_run_dir"]}
 """
     else:
         design_space_block = f"""design_space:
@@ -185,6 +208,90 @@ compiler_inputs:
         encoding="utf-8",
     )
     return path
+
+
+def _write_msd_primitive_source_fixtures(*, root: Path, max_cap_rank: int, max_stem_base_rank: int) -> dict[str, str]:
+    snapback_run = root / "snapback_run"
+    scar_nick_run = root / "scar_nick_run"
+    _write_snapback_cap_primitive_fixture(snapback_run, max_rank=max_cap_rank)
+    _write_scar_nick_stem_base_primitive_fixture(scar_nick_run, max_rank=max_stem_base_rank)
+    return {
+        "snapback_run_dir": snapback_run.resolve().as_posix(),
+        "scar_nick_run_dir": scar_nick_run.resolve().as_posix(),
+    }
+
+
+def _write_snapback_cap_primitive_fixture(run_dir: Path, *, max_rank: int) -> None:
+    report_path = run_dir / "analysis" / "solve_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    hits = [
+        {
+            "rank": rank,
+            "hit_kind": "exact",
+            "nickase_variant_id": "Nb.BtsI",
+            "release_variant_id": "BspQI",
+            "target_search_hit": {
+                "final_candidate": {
+                    "designed_sequence": _snapback_cap_sequence_for_rank(rank),
+                    "paired_bp": 3,
+                    "cap_nt": 3,
+                }
+            },
+        }
+        for rank in range(1, max_rank + 1)
+    ]
+    report_path.write_text(
+        json.dumps({"workflow": "snapback_released_solve", "hits": hits}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _snapback_cap_sequence_for_rank(rank: int) -> str:
+    if rank == 1:
+        return _SNAPBACK_FOLDBACK
+    value = rank - 1
+    encoded = []
+    for _ in range(9):
+        encoded.append(_BASES[value % len(_BASES)])
+        value //= len(_BASES)
+    return "".join(encoded)
+
+
+def _write_scar_nick_stem_base_primitive_fixture(run_dir: Path, *, max_rank: int) -> None:
+    table_path = run_dir / "export" / "table__scar_nick_candidates.csv"
+    table_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for rank, (left_base, right_base) in enumerate(_stem_base_pairs(max_rank), start=1):
+        rows.append(
+            ",".join(
+                [
+                    str(rank),
+                    f"scar-rank-{rank:02d}",
+                    left_base,
+                    right_base,
+                    compute_scar_nick_profile_s3s2s1s0(left_base=left_base, right_base=right_base),
+                    "Nb.BtsI",
+                    "bottom",
+                    "top",
+                ]
+            )
+        )
+    table_path.write_text(
+        "\n".join(
+            [
+                "rank,candidate_id,left_base,right_base,profile_s3s2s1s0,nickase_variant_id,nicked_strand,surviving_strand",
+                *rows,
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _stem_base_pairs(count: int) -> tuple[tuple[str, str], ...]:
+    if count <= len(_SCAR_NICK_STEM_BASE_PRIMITIVE_PAIRS):
+        return _SCAR_NICK_STEM_BASE_PRIMITIVE_PAIRS[:count]
+    raise AssertionError(f"Scar-nick primitive fixture only defines {len(_SCAR_NICK_STEM_BASE_PRIMITIVE_PAIRS)} ranks.")
 
 
 def _reverse_complement(sequence: str) -> str:
