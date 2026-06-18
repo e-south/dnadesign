@@ -32,17 +32,20 @@ handoff does not import that probe. The probe is an in-silico learning-loop
 harness. Physical ordering uses either the canonical batch-0 selector here or,
 after assays begin, OPAL `selection-set` records backed by campaign ledgers.
 
-The current checked-in batch-0 source resolves 18 promoters:
+The current checked-in batch-0 source resolves 18 promoters. Ethanol and
+ciprofloxacin use single-axis pre-assay priors; mixed activator-plus-LexA rows
+are reserved for the AND objective in batch zero only:
 
-- ethanol-factor: 3 `baeR`, 1 `cpxR`, 1 `baeR+lexA`, and 1 `cpxR+lexA`
-- ciprofloxacin-factor: 4 `lexA`, 1 `baeR+lexA`, and 1 `cpxR+lexA`
+- ethanol-factor: 4 `baeR` and 2 `cpxR`
+- ciprofloxacin-factor: 6 `lexA`
 - AND-objective: 4 `baeR+lexA` and 2 `cpxR+lexA`
 
 The selector requires actual parsed TFBS regulators for these slots. It does
 not treat a broad DenseGen composition label as enough evidence for a
-motif-bearing order candidate. Strong slots use sigma-35 `f/e`, exploratory
-slots use `d/c`, spacers are constrained to 16-19 bp, and all current selected
-promoters carry the `TATAAT` sigma-10 core.
+motif-bearing order candidate. Exact slot-pattern predicates use DenseGen
+zero-based slots ordered by `offset_raw`, strong slots use sigma-35 `f/e`,
+exploratory slots use `d/c`, spacers are constrained to 16-19 bp, and all
+current selected promoters carry the `TATAAT` sigma-10 core.
 
 The handoff assigns deterministic aliases like `SECG-B0-ETH-01` while
 preserving the canonical OPAL candidate `id` in the manifest. `SECG` means

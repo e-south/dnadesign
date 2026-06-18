@@ -60,8 +60,11 @@ For checked-in lifecycle records, prefer `--handoff-id <handoff_id>` over raw
 source flags. Batch zero currently has the checked-in handoff id
 `stress-opal-batch0-sfxi-v1`; preview it without `--write` to see exact
 campaign-scoped paths, row counts, hashes, and workbook readback status. The
-batch-0 selector is the refined BaeR-forward pre-assay plan and requires actual
-parsed TFBS regulators, f/e strong sigma-35 slots, d/c exploratory slots, and
+batch-0 selector is the granular pre-assay plan: ethanol uses BaeR/CpxR
+single-axis activator priors, ciprofloxacin uses LexA-only repression
+architecture priors, and AND owns mixed activator-plus-LexA rows for this seed
+batch. It requires actual parsed TFBS regulators, exact zero-based slot
+patterns where declared, f/e strong sigma-35 slots, d/c exploratory slots, and
 16-19 bp spacers. It also applies the SFXI restriction-site eligibility rule
 before slot ranking: BamHI is allowed only in the 5 prime flank and EcoRI only
 in the 3 prime flank of the final assembled insert.

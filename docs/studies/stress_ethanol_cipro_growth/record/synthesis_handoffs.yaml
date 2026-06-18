@@ -96,4 +96,4 @@ handoffs:
         genbank_feature_table_sha256: null
         workbook_readback_status: null
         genbank_readback_status: null
-    note: Refined in place as the BaeR-forward pre-assay seed order before acceptance; generated local artifacts must be hashed and readback-validated before changing lifecycle_status to accepted_for_order.
+    note: Refined in place as the granular single-axis/AND pre-assay seed order before acceptance; generated local artifacts must be hashed and readback-validated before changing lifecycle_status to accepted_for_order.

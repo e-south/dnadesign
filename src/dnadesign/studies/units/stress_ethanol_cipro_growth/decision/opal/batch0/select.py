@@ -168,6 +168,25 @@ def _regulator_base(value: Any) -> str:
     return raw.split("_", 1)[0]
 
 
+def _slot_regulator(value: Any) -> str:
+    raw = _normal_text(value)
+    if not raw:
+        return "background"
+    lowered = raw.lower()
+    if lowered in {"background", "bg", "none", "null"} or "background" in lowered:
+        return "background"
+    if lowered.startswith("baer"):
+        return "baeR"
+    if lowered.startswith("cpxr"):
+        return "cpxR"
+    if lowered.startswith("lexa"):
+        return "lexA"
+    regulator = _regulator_base(raw)
+    if regulator in _REGULATOR_ORDER:
+        return regulator
+    raise ValueError(f"unknown TFBS regulator for slot pattern: {value!r}")
+
+
 def _normalize_regulator_composition(value: Any) -> str:
     raw = _normal_text(value)
     if not raw:
@@ -198,6 +217,48 @@ def _normalize_detail_cell(cell: Any) -> list[dict[str, Any]]:
     if isinstance(cell, Sequence) and not isinstance(cell, bytes | bytearray | str):
         return [item for item in cell if isinstance(item, dict)]
     return []
+
+
+def _strict_detail_entries(cell: Any, *, row_id: str) -> list[dict[str, Any]]:
+    if _is_missing(cell):
+        raise ValueError(f"{row_id}: missing densegen__used_tfbs_detail")
+    if isinstance(cell, str):
+        stripped = cell.strip()
+        if not stripped:
+            raise ValueError(f"{row_id}: missing densegen__used_tfbs_detail")
+        try:
+            cell = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{row_id}: densegen__used_tfbs_detail is not valid JSON: {exc}") from exc
+    if isinstance(cell, np.ndarray):
+        cell = cell.tolist()
+    if isinstance(cell, tuple):
+        cell = list(cell)
+    if not isinstance(cell, list):
+        raise ValueError(f"{row_id}: densegen__used_tfbs_detail must be a list")
+    entries: list[dict[str, Any]] = []
+    for item in cell:
+        if not isinstance(item, dict):
+            raise ValueError(f"{row_id}: densegen__used_tfbs_detail entries must be mappings")
+        entries.append(item)
+    return entries
+
+
+def _strict_slot_regulator_pattern(row: Mapping[str, Any]) -> tuple[str, str, str]:
+    row_id = _normal_text(row.get("id")) or "<unknown>"
+    entries = _strict_detail_entries(row.get("densegen__used_tfbs_detail"), row_id=row_id)
+    tfbs_entries = [entry for entry in entries if entry.get("part_kind") == "tfbs"]
+    if len(tfbs_entries) != 3:
+        raise ValueError(f"{row_id}: expected exactly 3 TFBS entries for slot_regulator_pattern")
+    offsets: list[int] = []
+    for entry in tfbs_entries:
+        if "offset_raw" not in entry or _is_missing(entry.get("offset_raw")):
+            raise ValueError(f"{row_id}: offset_raw is required for slot_regulator_pattern")
+        offsets.append(int(entry["offset_raw"]))
+    if len(set(offsets)) != 3:
+        raise ValueError(f"{row_id}: ambiguous slot_regulator_pattern from tied offset_raw values")
+    ordered = [entry for _, entry in sorted(zip(offsets, tfbs_entries), key=lambda item: item[0])]
+    return tuple(_slot_regulator(entry.get("regulator")) for entry in ordered)  # type: ignore[return-value]
 
 
 def _signal_tfbs(detail: Any) -> list[dict[str, Any]]:
@@ -273,6 +334,33 @@ def _tfbs_regulator_set_from_summary(summary: Any) -> str:
         if regulator:
             regulators.add(regulator)
     return "+".join(sorted(regulators, key=lambda item: _REGULATOR_ORDER.get(item, 99)))
+
+
+def _slot_signal_tfbs_count(pattern: Sequence[str]) -> int:
+    return sum(1 for regulator in pattern if regulator != "background")
+
+
+def _requested_slot_pattern(slot: Mapping[str, Any]) -> tuple[str, str, str] | None:
+    raw = slot.get("slot_regulator_pattern")
+    if raw is None:
+        return None
+    if not isinstance(raw, Sequence) or isinstance(raw, bytes | bytearray | str) or len(raw) != 3:
+        raise ValueError("slot_regulator_pattern must be a 3-item sequence")
+    return tuple(_slot_regulator(value) for value in raw)  # type: ignore[return-value]
+
+
+def _count_constraint_matches(value: int, raw: Any) -> bool:
+    if raw is None:
+        return True
+    if isinstance(raw, Mapping):
+        if "eq" in raw and value != int(raw["eq"]):
+            return False
+        if "min" in raw and value < int(raw["min"]):
+            return False
+        if "max" in raw and value > int(raw["max"]):
+            return False
+        return True
+    return value == int(raw)
 
 
 def _ensure_candidate_columns(candidates: pd.DataFrame) -> pd.DataFrame:
@@ -421,6 +509,19 @@ def _slot_matches(frame: pd.DataFrame, slot: Mapping[str, Any]) -> pd.Series:
     allowed_sigma = slot.get("allowed_sigma35_variants")
     if allowed_sigma:
         mask &= frame["sigma35_variant"].isin([str(value).lower() for value in allowed_sigma])
+
+    requested_pattern = _requested_slot_pattern(slot)
+    requested_count = slot.get("signal_tfbs_count")
+    if requested_pattern is not None or requested_count is not None:
+        pattern_by_index = frame.loc[mask].apply(_strict_slot_regulator_pattern, axis=1)
+        if requested_pattern is not None:
+            pattern_mask = pattern_by_index == requested_pattern
+            mask &= pattern_mask.reindex(frame.index, fill_value=False)
+        if requested_count is not None:
+            count_mask = pattern_by_index.map(
+                lambda pattern: _count_constraint_matches(_slot_signal_tfbs_count(pattern), requested_count)
+            )
+            mask &= count_mask.reindex(frame.index, fill_value=False)
     return mask
 
 

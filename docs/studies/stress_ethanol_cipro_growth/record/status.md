@@ -84,8 +84,9 @@ Completed 7B sidecar lanes:
   shared candidate feature table is materialized. The observed-label sidecar
   and campaign state remain absent until round-0 assay labels are ingested.
 - Synthesis handoff: `generated_pending_acceptance` scaffold exists in
-  `synthesis_handoffs.yaml`; batch zero is the refined BaeR-forward pre-assay
-  seed order with actual parsed TFBS regulator checks. Preview it with
+  `synthesis_handoffs.yaml`; batch zero is the granular single-axis/AND
+  pre-assay seed order with actual parsed TFBS regulator and slot-pattern
+  checks. Preview it with
   `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --json`.
   Batch-0 generated files are campaign-scoped `outputs/**` artifacts and need
   manifest/workbook hashes plus workbook readback status recorded before

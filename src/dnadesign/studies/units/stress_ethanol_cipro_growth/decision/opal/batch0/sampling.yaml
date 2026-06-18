@@ -87,44 +87,63 @@ campaigns:
       - synthetic_margin_cipro_vs_background
       - synthetic_margin_dual_vs_background
     slots:
-      - name: ethanol_baer_strong
-        count: 2
-        plan: ethanol
-        regulator_compositions: ["baeR"]
-        require_tfbs_regulators_all: ["baeR"]
-        exclude_tfbs_regulators: ["cpxR", "lexA"]
-        allowed_sigma35_variants: ["f", "e"]
-        sigma35_mode: strong
-      - name: ethanol_baer_exploratory
+      - name: ethanol_baer_middle_only
         count: 1
         plan: ethanol
         regulator_compositions: ["baeR"]
         require_tfbs_regulators_all: ["baeR"]
         exclude_tfbs_regulators: ["cpxR", "lexA"]
+        slot_regulator_pattern: ["background", "baeR", "background"]
+        signal_tfbs_count: 1
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: ethanol_baer_upstream_only
+        count: 1
+        plan: ethanol
+        regulator_compositions: ["baeR"]
+        require_tfbs_regulators_all: ["baeR"]
+        exclude_tfbs_regulators: ["cpxR", "lexA"]
+        slot_regulator_pattern: ["baeR", "background", "background"]
+        signal_tfbs_count: 1
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: ethanol_baer_dense
+        count: 1
+        plan: ethanol
+        regulator_compositions: ["baeR"]
+        require_tfbs_regulators_all: ["baeR"]
+        exclude_tfbs_regulators: ["cpxR", "lexA"]
+        signal_tfbs_count:
+          min: 2
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: ethanol_baer_exploratory_low_copy
+        count: 1
+        plan: ethanol
+        regulator_compositions: ["baeR"]
+        require_tfbs_regulators_all: ["baeR"]
+        exclude_tfbs_regulators: ["cpxR", "lexA"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["d", "c"]
         sigma35_mode: exploratory
-      - name: ethanol_cpxr_comparator
+      - name: ethanol_cpxr_middle_only
         count: 1
         plan: ethanol
         regulator_compositions: ["cpxR"]
         require_tfbs_regulators_all: ["cpxR"]
         exclude_tfbs_regulators: ["baeR", "lexA"]
+        slot_regulator_pattern: ["background", "cpxR", "background"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
-      - name: ethanol_baer_dual_carrier
+      - name: ethanol_cpxr_upstream_only
         count: 1
-        plan: ethanol_ciprofloxacin
-        regulator_compositions: ["baeR+lexA"]
-        require_tfbs_regulators_all: ["baeR", "lexA"]
-        exclude_tfbs_regulators: ["cpxR"]
-        allowed_sigma35_variants: ["f", "e"]
-        sigma35_mode: strong
-      - name: ethanol_cpxr_dual_comparator
-        count: 1
-        plan: ethanol_ciprofloxacin
-        regulator_compositions: ["cpxR+lexA"]
-        require_tfbs_regulators_all: ["cpxR", "lexA"]
-        exclude_tfbs_regulators: ["baeR"]
+        plan: ethanol
+        regulator_compositions: ["cpxR"]
+        require_tfbs_regulators_all: ["cpxR"]
+        exclude_tfbs_regulators: ["baeR", "lexA"]
+        slot_regulator_pattern: ["cpxR", "background", "background"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
 
@@ -137,30 +156,64 @@ campaigns:
       - synthetic_margin_ethanol_vs_background
       - synthetic_margin_dual_vs_background
     slots:
-      - name: cipro_lexa
-        count: 4
+      - name: cipro_lexa_slot0
+        count: 1
         plan: ciprofloxacin
         regulator_compositions: ["lexA"]
         require_tfbs_regulators_all: ["lexA"]
         exclude_tfbs_regulators: ["baeR", "cpxR"]
+        slot_regulator_pattern: ["lexA", "background", "background"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
-      - name: cipro_baer_dual_carrier
+      - name: cipro_lexa_slot1
         count: 1
-        plan: ethanol_ciprofloxacin
-        regulator_compositions: ["baeR+lexA"]
-        require_tfbs_regulators_all: ["baeR", "lexA"]
-        exclude_tfbs_regulators: ["cpxR"]
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        require_tfbs_regulators_all: ["lexA"]
+        exclude_tfbs_regulators: ["baeR", "cpxR"]
+        slot_regulator_pattern: ["background", "lexA", "background"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
-      - name: cipro_cpxr_dual_comparator
+      - name: cipro_lexa_slot2
         count: 1
-        plan: ethanol_ciprofloxacin
-        regulator_compositions: ["cpxR+lexA"]
-        require_tfbs_regulators_all: ["cpxR", "lexA"]
-        exclude_tfbs_regulators: ["baeR"]
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        require_tfbs_regulators_all: ["lexA"]
+        exclude_tfbs_regulators: ["baeR", "cpxR"]
+        slot_regulator_pattern: ["background", "background", "lexA"]
+        signal_tfbs_count: 1
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
+      - name: cipro_lexa_dense
+        count: 1
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        require_tfbs_regulators_all: ["lexA"]
+        exclude_tfbs_regulators: ["baeR", "cpxR"]
+        signal_tfbs_count:
+          min: 3
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: cipro_lexa_two_site
+        count: 1
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        require_tfbs_regulators_all: ["lexA"]
+        exclude_tfbs_regulators: ["baeR", "cpxR"]
+        signal_tfbs_count: 2
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: cipro_lexa_exploratory_single
+        count: 1
+        plan: ciprofloxacin
+        regulator_compositions: ["lexA"]
+        require_tfbs_regulators_all: ["lexA"]
+        exclude_tfbs_regulators: ["baeR", "cpxR"]
+        signal_tfbs_count: 1
+        allowed_sigma35_variants: ["d", "c"]
+        sigma35_mode: exploratory
 
   - slug: stress_eth_cip_and_rf_sfxi_topn
     name: Stress ethanol/ciprofloxacin AND RF SFXI top-n
@@ -171,12 +224,34 @@ campaigns:
       - synthetic_margin_ethanol_vs_background
       - synthetic_margin_cipro_vs_background
     slots:
-      - name: and_baer_lexa_strong
-        count: 3
+      - name: and_baer_lexa_baer_before_lexa
+        count: 1
         plan: ethanol_ciprofloxacin
         regulator_compositions: ["baeR+lexA"]
         require_tfbs_regulators_all: ["baeR", "lexA"]
         exclude_tfbs_regulators: ["cpxR"]
+        slot_regulator_pattern: ["baeR", "lexA", "background"]
+        signal_tfbs_count: 2
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: and_baer_lexa_lexa_before_baer
+        count: 1
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA"]
+        require_tfbs_regulators_all: ["baeR", "lexA"]
+        exclude_tfbs_regulators: ["cpxR"]
+        slot_regulator_pattern: ["lexA", "baeR", "background"]
+        signal_tfbs_count: 2
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong
+      - name: and_baer_lexa_dense
+        count: 1
+        plan: ethanol_ciprofloxacin
+        regulator_compositions: ["baeR+lexA"]
+        require_tfbs_regulators_all: ["baeR", "lexA"]
+        exclude_tfbs_regulators: ["cpxR"]
+        signal_tfbs_count:
+          min: 3
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
       - name: and_baer_lexa_exploratory
@@ -185,21 +260,27 @@ campaigns:
         regulator_compositions: ["baeR+lexA"]
         require_tfbs_regulators_all: ["baeR", "lexA"]
         exclude_tfbs_regulators: ["cpxR"]
+        signal_tfbs_count:
+          min: 2
         allowed_sigma35_variants: ["d", "c"]
         sigma35_mode: exploratory
-      - name: and_cpxr_lexa_strong
+      - name: and_cpxr_lexa_cpxr_before_lexa
         count: 1
         plan: ethanol_ciprofloxacin
         regulator_compositions: ["cpxR+lexA"]
         require_tfbs_regulators_all: ["cpxR", "lexA"]
         exclude_tfbs_regulators: ["baeR"]
+        slot_regulator_pattern: ["cpxR", "lexA", "background"]
+        signal_tfbs_count: 2
         allowed_sigma35_variants: ["f", "e"]
         sigma35_mode: strong
-      - name: and_cpxr_lexa_exploratory
+      - name: and_cpxr_lexa_lexa_before_cpxr
         count: 1
         plan: ethanol_ciprofloxacin
         regulator_compositions: ["cpxR+lexA"]
         require_tfbs_regulators_all: ["cpxR", "lexA"]
         exclude_tfbs_regulators: ["baeR"]
-        allowed_sigma35_variants: ["d", "c"]
-        sigma35_mode: exploratory
+        slot_regulator_pattern: ["lexA", "cpxR", "background"]
+        signal_tfbs_count: 2
+        allowed_sigma35_variants: ["f", "e"]
+        sigma35_mode: strong

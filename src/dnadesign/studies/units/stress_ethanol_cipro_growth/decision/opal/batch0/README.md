@@ -134,15 +134,19 @@ review rows are not scanned unless they survive the declared candidate filters.
 The live min-remaining guard is `1000` candidates; tiny unit tests must lower
 that value explicitly instead of weakening the production rule.
 
-The current batch-0 selector is BaeR-forward for ethanol and dual-response
-coverage while retaining CpxR comparators:
+The current batch-0 selector is a granular pre-assay seed. Ethanol and
+ciprofloxacin lean into their single-axis priors while varying placement,
+count, and sigma strength; mixed activator-plus-LexA logic is reserved for the
+AND objective in batch zero only:
 
-- ethanol-factor: 3 `baeR`, 1 `cpxR`, 1 `baeR+lexA`, and 1 `cpxR+lexA`
-- ciprofloxacin-factor: 4 `lexA`, 1 `baeR+lexA`, and 1 `cpxR+lexA`
+- ethanol-factor: 4 `baeR` and 2 `cpxR`
+- ciprofloxacin-factor: 6 `lexA`
 - AND-objective: 4 `baeR+lexA` and 2 `cpxR+lexA`
 
 Slot filters require parsed DenseGen TFBS regulators, not only
-`regulator_composition` labels. BaeR slots exclude CpxR TFBS, CpxR comparator
-slots exclude BaeR TFBS, dual slots require the matching stress regulator plus
-LexA, and batch-0 spacers are constrained to 16-19 bp. Strong slots use the
-`f/e` sigma-35 variants; exploratory slots are explicitly limited to `d/c`.
+`regulator_composition` labels. Exact slot-pattern predicates use DenseGen
+zero-based slots ordered by `offset_raw`, so `slot1` is the middle TFBS slot.
+BaeR slots exclude CpxR TFBS, CpxR comparator slots exclude BaeR TFBS, dual
+AND slots require the matching stress regulator plus LexA, and batch-0 spacers
+are constrained to 16-19 bp. Strong slots use the `f/e` sigma-35 variants;
+exploratory slots are explicitly limited to `d/c`.

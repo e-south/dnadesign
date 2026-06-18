@@ -89,6 +89,7 @@ def _row(
     plan: str,
     regulators: str,
     tfbs_regulators: str | None = None,
+    slot_pattern: tuple[str, str, str] | None = None,
     sigma: str = "f",
     spacer: int = 16,
     ethanol: float = 0.2,
@@ -99,9 +100,13 @@ def _row(
 ) -> dict[str, object]:
     if tfbs_regulators == "none":
         tfbs_summary = "none"
+    elif slot_pattern is not None:
+        tfbs_summary = ";".join(
+            f"{regulator}@{idx * 20}" for idx, regulator in enumerate(slot_pattern) if regulator != "background"
+        )
     else:
         tfbs_summary = ";".join(f"{regulator}@{spacer}" for regulator in (tfbs_regulators or regulators).split("+"))
-    return {
+    row: dict[str, object] = {
         "id": row_id,
         "sequence": sequence,
         "canonical_densegen_plan": plan,
@@ -120,6 +125,25 @@ def _row(
         "motif_tier_summary": str(tier),
         "x_provenance": "intermediate_embedding_7b_context_anchor_mean_bidir_concat",
     }
+    if slot_pattern is not None:
+        row["densegen__used_tfbs_detail"] = _densegen_tfbs_detail(slot_pattern)
+    return row
+
+
+def _densegen_tfbs_detail(pattern: tuple[str, str, str]) -> list[dict[str, object]]:
+    return [
+        {
+            "part_kind": "tfbs",
+            "regulator": regulator,
+            "offset_raw": idx * 20,
+            "offset": idx * 20,
+            "length": 10,
+            "end": idx * 20 + 10,
+            "orientation": "fwd",
+            "tier": 1,
+        }
+        for idx, regulator in enumerate(pattern)
+    ]
 
 
 def _write_provenance_fixture(tmp_path: Path) -> dict[str, object]:
@@ -278,46 +302,176 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     config = load_sampling_config(SAMPLING)
     config["synthesis_eligibility"]["min_remaining_candidates"] = 1
     rows = [
-        _row("eth_baer_f1", plan="ethanol", regulators="baeR", sigma="f", ethanol=0.91),
-        _row("eth_baer_no_tfbs", plan="ethanol", regulators="baeR", tfbs_regulators="none", sigma="f", ethanol=0.99),
         _row(
-            "eth_baer_with_cpxr_tfbs",
+            "eth_baer_middle",
             plan="ethanol",
             regulators="baeR",
-            tfbs_regulators="baeR+cpxR",
-            sigma="f",
-            ethanol=0.98,
+            slot_pattern=("background", "baeR", "background"),
+            sigma="e",
+            ethanol=0.91,
         ),
-        _row("eth_cpxr_e1", plan="ethanol", regulators="cpxR", sigma="e", ethanol=0.90),
-        _row("eth_baer_e2", plan="ethanol", regulators="baeR", sigma="e", ethanol=0.89),
-        _row("eth_cpxr_f2", plan="ethanol", regulators="cpxR", sigma="f", ethanol=0.88),
-        _row("eth_expl_d", plan="ethanol", regulators="baeR", sigma="d", ethanol=0.87),
-        _row("eth_dual_cpxr", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="f", ethanol=0.86),
-        _row("eth_dual_baer", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", ethanol=0.85),
-        _row("cip_lexa_f1", plan="ciprofloxacin", regulators="lexA", sigma="f", cipro=0.91),
-        _row("cip_lexa_spacer20_high", plan="ciprofloxacin", regulators="lexA", sigma="f", spacer=20, cipro=1.5),
-        _row("cip_lexa_e1", plan="ciprofloxacin", regulators="lexA", sigma="e", cipro=0.90),
-        _row("cip_lexa_f2", plan="ciprofloxacin", regulators="lexA", sigma="f", cipro=0.89),
-        _row("cip_lexa_e2", plan="ciprofloxacin", regulators="lexA", sigma="e", cipro=0.88),
-        _row("cip_lexa_d", plan="ciprofloxacin", regulators="lexA", sigma="d", cipro=0.87),
-        _row("cip_dual_cpxr", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="f", cipro=0.86),
-        _row("cip_dual_baer", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", cipro=0.85),
-        _row("and_cpxr_1", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="f", dual=0.96),
-        _row("and_cpxr_2", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="e", dual=0.95),
-        _row("and_cpxr_3", plan="ethanol_ciprofloxacin", regulators="cpxR+lexA", sigma="d", dual=0.94),
-        _row("and_baer_1", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="f", dual=0.93),
-        _row("and_baer_2", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="e", dual=0.92),
-        _row("and_baer_3", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="c", dual=0.91),
-        _row("and_baer_4", plan="ethanol_ciprofloxacin", regulators="baeR+lexA", sigma="f", dual=0.90),
+        _row(
+            "eth_baer_upstream",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "background", "background"),
+            sigma="f",
+            ethanol=0.90,
+        ),
+        _row(
+            "eth_baer_dense",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "baeR", "baeR"),
+            sigma="e",
+            ethanol=0.89,
+        ),
+        _row(
+            "eth_expl_single",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "background", "baeR"),
+            sigma="d",
+            ethanol=0.87,
+        ),
+        _row(
+            "eth_cpxr_middle",
+            plan="ethanol",
+            regulators="cpxR",
+            slot_pattern=("background", "cpxR", "background"),
+            sigma="f",
+            ethanol=0.86,
+        ),
+        _row(
+            "eth_cpxr_upstream",
+            plan="ethanol",
+            regulators="cpxR",
+            slot_pattern=("cpxR", "background", "background"),
+            sigma="e",
+            ethanol=0.85,
+        ),
+        _row(
+            "cip_lexa_slot0",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("lexA", "background", "background"),
+            sigma="f",
+            cipro=0.91,
+        ),
+        _row(
+            "cip_lexa_spacer20_high",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("lexA", "background", "background"),
+            sigma="f",
+            spacer=20,
+            cipro=1.5,
+        ),
+        _row(
+            "cip_lexa_slot1",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("background", "lexA", "background"),
+            sigma="e",
+            cipro=0.90,
+        ),
+        _row(
+            "cip_lexa_slot2",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("background", "background", "lexA"),
+            sigma="f",
+            cipro=0.89,
+        ),
+        _row(
+            "cip_lexa_dense",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("lexA", "lexA", "lexA"),
+            sigma="e",
+            cipro=0.88,
+        ),
+        _row(
+            "cip_lexa_two_site",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("background", "lexA", "lexA"),
+            sigma="f",
+            cipro=0.87,
+        ),
+        _row(
+            "cip_lexa_expl",
+            plan="ciprofloxacin",
+            regulators="lexA",
+            slot_pattern=("background", "lexA", "background"),
+            sigma="d",
+            cipro=0.86,
+        ),
+        _row(
+            "and_baer_lexa_order_a",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("baeR", "lexA", "background"),
+            sigma="f",
+            dual=0.96,
+        ),
+        _row(
+            "and_baer_lexa_order_b",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("lexA", "baeR", "background"),
+            sigma="e",
+            dual=0.95,
+        ),
+        _row(
+            "and_baer_lexa_dense",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("lexA", "baeR", "lexA"),
+            sigma="f",
+            dual=0.94,
+        ),
+        _row(
+            "and_baer_lexa_expl",
+            plan="ethanol_ciprofloxacin",
+            regulators="baeR+lexA",
+            slot_pattern=("lexA", "lexA", "baeR"),
+            sigma="d",
+            dual=0.93,
+        ),
+        _row(
+            "and_cpxr_lexa_order_a",
+            plan="ethanol_ciprofloxacin",
+            regulators="cpxR+lexA",
+            slot_pattern=("cpxR", "lexA", "background"),
+            sigma="e",
+            dual=0.92,
+        ),
+        _row(
+            "and_cpxr_lexa_order_b",
+            plan="ethanol_ciprofloxacin",
+            regulators="cpxR+lexA",
+            slot_pattern=("lexA", "cpxR", "background"),
+            sigma="f",
+            dual=0.91,
+        ),
         _row(
             "and_baer_unclonable_left_junction",
             plan="ethanol_ciprofloxacin",
             regulators="baeR+lexA",
+            slot_pattern=("baeR", "lexA", "background"),
             sigma="f",
             dual=1.25,
             sequence="AATTC" + "A" * 55,
         ),
-        _row("negative_prior", plan="ethanol", regulators="baeR", sigma="f", ethanol=-0.1),
+        _row(
+            "negative_prior",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            sigma="f",
+            ethanol=-0.1,
+        ),
     ]
 
     selected = select_batch0(pd.DataFrame(rows), config)
@@ -331,8 +485,6 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     assert not selected["id"].duplicated().any()
     assert "negative_prior" not in set(selected["id"])
     assert "and_baer_unclonable_left_junction" not in set(selected["id"])
-    assert "eth_baer_no_tfbs" not in set(selected["id"])
-    assert "eth_baer_with_cpxr_tfbs" not in set(selected["id"])
     assert "cip_lexa_spacer20_high" not in set(selected["id"])
     assert "none" not in set(selected["tfbs_summary"])
     assert selected["spacer_length"].isin([16, 17, 18, 19]).all()
@@ -340,27 +492,37 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     ethanol = selected[selected["campaign"] == "stress_eth_cip_ethanol_rf_sfxi_topn"]
     assert ethanol["setpoint"].map(tuple).unique().tolist() == [(0, 1, 0, 1)]
     assert ethanol["canonical_densegen_plan"].value_counts().to_dict() == {
-        "ethanol": 4,
-        "ethanol_ciprofloxacin": 2,
+        "ethanol": 6,
     }
     assert ethanol["regulator_composition"].value_counts().to_dict() == {
-        "baeR": 3,
-        "baeR+lexA": 1,
-        "cpxR": 1,
-        "cpxR+lexA": 1,
+        "baeR": 4,
+        "cpxR": 2,
     }
+    assert ethanol["slot"].tolist() == [
+        "ethanol_baer_middle_only",
+        "ethanol_baer_upstream_only",
+        "ethanol_baer_dense",
+        "ethanol_baer_exploratory_low_copy",
+        "ethanol_cpxr_middle_only",
+        "ethanol_cpxr_upstream_only",
+    ]
 
     cipro = selected[selected["campaign"] == "stress_eth_cip_cipro_rf_sfxi_topn"]
     assert cipro["setpoint"].map(tuple).unique().tolist() == [(0, 0, 1, 1)]
     assert cipro["canonical_densegen_plan"].value_counts().to_dict() == {
-        "ciprofloxacin": 4,
-        "ethanol_ciprofloxacin": 2,
+        "ciprofloxacin": 6,
     }
     assert cipro["regulator_composition"].value_counts().to_dict() == {
-        "lexA": 4,
-        "baeR+lexA": 1,
-        "cpxR+lexA": 1,
+        "lexA": 6,
     }
+    assert cipro["slot"].tolist() == [
+        "cipro_lexa_slot0",
+        "cipro_lexa_slot1",
+        "cipro_lexa_slot2",
+        "cipro_lexa_dense",
+        "cipro_lexa_two_site",
+        "cipro_lexa_exploratory_single",
+    ]
 
     and_gate = selected[selected["campaign"] == "stress_eth_cip_and_rf_sfxi_topn"]
     assert and_gate["setpoint"].map(tuple).unique().tolist() == [(0, 0, 0, 1)]
@@ -369,12 +531,183 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         "baeR+lexA": 4,
         "cpxR+lexA": 2,
     }
+    assert and_gate["slot"].tolist() == [
+        "and_baer_lexa_baer_before_lexa",
+        "and_baer_lexa_lexa_before_baer",
+        "and_baer_lexa_dense",
+        "and_baer_lexa_exploratory",
+        "and_cpxr_lexa_cpxr_before_lexa",
+        "and_cpxr_lexa_lexa_before_cpxr",
+    ]
 
     exploratory = selected[selected["slot"].str.contains("exploratory")]
     strong = selected[~selected["slot"].str.contains("exploratory")]
     assert exploratory["sigma35_variant"].isin(["c", "d"]).all()
     assert strong["sigma35_variant"].isin(["f", "e"]).all()
     assert "b" not in set(selected["sigma35_variant"])
+
+
+def test_select_batch0_supports_exact_slot_patterns_and_signal_tfbs_count() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "setpoint_vector": [0, 1, 0, 1],
+                "target_margin_column": "synthetic_margin_ethanol_vs_background",
+                "slots": [
+                    {
+                        "name": "ethanol_baer_middle_only",
+                        "count": 1,
+                        "plan": "ethanol",
+                        "regulator_compositions": ["baeR"],
+                        "slot_regulator_pattern": ["background", "baeR", "background"],
+                        "signal_tfbs_count": 1,
+                        "allowed_sigma35_variants": ["f", "e"],
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "dense_high_margin_wrong_count",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "baeR", "baeR"),
+            ethanol=0.99,
+        ),
+        _row(
+            "upstream_high_margin_wrong_slot",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "background", "background"),
+            ethanol=0.98,
+        ),
+        _row(
+            "middle_only_expected",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            ethanol=0.50,
+        ),
+    ]
+
+    selected = select_batch0(pd.DataFrame(rows), config)
+
+    assert selected["id"].tolist() == ["middle_only_expected"]
+    assert selected["slot"].tolist() == ["ethanol_baer_middle_only"]
+
+
+def test_select_batch0_fails_fast_when_slot_predicate_cannot_parse_densegen_detail() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_cipro_rf_sfxi_topn",
+                "setpoint_vector": [0, 0, 1, 1],
+                "target_margin_column": "synthetic_margin_cipro_vs_background",
+                "slots": [
+                    {
+                        "name": "cipro_lexa_slot0",
+                        "count": 1,
+                        "plan": "ciprofloxacin",
+                        "regulator_compositions": ["lexA"],
+                        "slot_regulator_pattern": ["lexA", "background", "background"],
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    row = _row("missing_detail", plan="ciprofloxacin", regulators="lexA", cipro=0.9)
+    row.pop("densegen__used_tfbs_detail", None)
+
+    with pytest.raises(ValueError, match="missing_detail: missing densegen__used_tfbs_detail"):
+        select_batch0(pd.DataFrame([row]), config)
+
+    malformed = _row(
+        "two_slot_detail",
+        plan="ciprofloxacin",
+        regulators="lexA",
+        slot_pattern=("lexA", "background", "background"),
+        cipro=0.9,
+    )
+    malformed["densegen__used_tfbs_detail"] = malformed["densegen__used_tfbs_detail"][:2]  # type: ignore[index]
+
+    with pytest.raises(ValueError, match="two_slot_detail: expected exactly 3 TFBS entries"):
+        select_batch0(pd.DataFrame([malformed]), config)
+
+
+def test_configured_sampling_yaml_declares_granular_batch0_composition() -> None:
+    config = load_sampling_config(SAMPLING)
+    campaigns = {campaign["objective"]: campaign for campaign in config["campaigns"]}
+
+    ethanol_slots = campaigns["ethanol_factor"]["slots"]
+    assert [slot["name"] for slot in ethanol_slots] == [
+        "ethanol_baer_middle_only",
+        "ethanol_baer_upstream_only",
+        "ethanol_baer_dense",
+        "ethanol_baer_exploratory_low_copy",
+        "ethanol_cpxr_middle_only",
+        "ethanol_cpxr_upstream_only",
+    ]
+    assert [slot["regulator_compositions"] for slot in ethanol_slots] == [
+        ["baeR"],
+        ["baeR"],
+        ["baeR"],
+        ["baeR"],
+        ["cpxR"],
+        ["cpxR"],
+    ]
+    assert all(slot["plan"] == "ethanol" for slot in ethanol_slots)
+    assert not any("lexA" in "+".join(slot["regulator_compositions"]) for slot in ethanol_slots)
+    assert ethanol_slots[0]["slot_regulator_pattern"] == ["background", "baeR", "background"]
+    assert ethanol_slots[1]["slot_regulator_pattern"] == ["baeR", "background", "background"]
+    assert ethanol_slots[2]["signal_tfbs_count"] == {"min": 2}
+    assert ethanol_slots[3]["signal_tfbs_count"] == 1
+
+    cipro_slots = campaigns["cipro_factor"]["slots"]
+    assert [slot["name"] for slot in cipro_slots] == [
+        "cipro_lexa_slot0",
+        "cipro_lexa_slot1",
+        "cipro_lexa_slot2",
+        "cipro_lexa_dense",
+        "cipro_lexa_two_site",
+        "cipro_lexa_exploratory_single",
+    ]
+    assert all(slot["plan"] == "ciprofloxacin" for slot in cipro_slots)
+    assert all(slot["regulator_compositions"] == ["lexA"] for slot in cipro_slots)
+    assert cipro_slots[0]["slot_regulator_pattern"] == ["lexA", "background", "background"]
+    assert cipro_slots[1]["slot_regulator_pattern"] == ["background", "lexA", "background"]
+    assert cipro_slots[2]["slot_regulator_pattern"] == ["background", "background", "lexA"]
+    assert cipro_slots[3]["signal_tfbs_count"] == {"min": 3}
+    assert cipro_slots[4]["signal_tfbs_count"] == 2
+    assert cipro_slots[5]["signal_tfbs_count"] == 1
+
+    and_slots = campaigns["and"]["slots"]
+    assert [slot["name"] for slot in and_slots] == [
+        "and_baer_lexa_baer_before_lexa",
+        "and_baer_lexa_lexa_before_baer",
+        "and_baer_lexa_dense",
+        "and_baer_lexa_exploratory",
+        "and_cpxr_lexa_cpxr_before_lexa",
+        "and_cpxr_lexa_lexa_before_cpxr",
+    ]
+    assert [slot["regulator_compositions"] for slot in and_slots] == [
+        ["baeR+lexA"],
+        ["baeR+lexA"],
+        ["baeR+lexA"],
+        ["baeR+lexA"],
+        ["cpxR+lexA"],
+        ["cpxR+lexA"],
+    ]
+    assert and_slots[0]["slot_regulator_pattern"] == ["baeR", "lexA", "background"]
+    assert and_slots[1]["slot_regulator_pattern"] == ["lexA", "baeR", "background"]
+    assert and_slots[2]["signal_tfbs_count"] == {"min": 3}
+    assert and_slots[4]["slot_regulator_pattern"] == ["cpxR", "lexA", "background"]
+    assert and_slots[5]["slot_regulator_pattern"] == ["lexA", "cpxR", "background"]
 
 
 def test_candidate_feature_table_validation_requires_fixed_length_x_and_view_alignment(
