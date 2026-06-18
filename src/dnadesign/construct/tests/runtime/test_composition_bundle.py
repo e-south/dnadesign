@@ -72,3 +72,36 @@ def test_composition_bundle_rejects_nonempty_deprecated_visual_contract_dir(tmp_
 
     assert stale_contract.is_file()
     assert not (artifact_bundle / "manifest.json").exists()
+
+
+def test_linear_ssdna_composition_rejects_product_basis_annotations(tmp_path: Path) -> None:
+    artifact_bundle = tmp_path / "artifacts" / "product_basis_annotation"
+    config_path = tmp_path / "product_basis_annotation.yaml"
+    config_path.write_text(
+        f"""
+contract: linear_ssdna_composition_v1
+schema_version: 1
+composition_id: product_basis_annotation
+units:
+  - unit_id: synthetic_unit
+    repeat_count: 2
+    segments:
+      - segment_id: left
+        sequence: AAAA
+      - segment_id: right
+        sequence: CCCC
+    annotations:
+      - annotation_id: product_span
+        role: product_span
+        location:
+          basis: product
+          start: 6
+          end: 10
+output:
+  artifact_bundle: {artifact_bundle.as_posix()}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="product-basis annotations are not supported"):
+        run_linear_ssdna_composition(config_path)

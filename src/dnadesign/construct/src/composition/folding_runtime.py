@@ -85,7 +85,11 @@ def folding_artifact_refs(composed: ComposedLinearSsdna) -> dict[str, str]:
     }
 
 
-def viennarna_structure_plot_artifacts(artifact_bundle: Path) -> dict[str, str]:
+def viennarna_structure_plot_artifacts(composed: ComposedLinearSsdna, *, artifact_bundle: Path) -> dict[str, str]:
+    if not composed.config.folding.enabled:
+        return {}
+    if "viennarna_secondary_structure_svg_v1" not in set(composed.config.visual.emit):
+        return {}
     plot_manifest = (
         artifact_bundle / "visual" / "viennarna_secondary_structure" / "viennarna_secondary_structure_svg_v1.json"
     )

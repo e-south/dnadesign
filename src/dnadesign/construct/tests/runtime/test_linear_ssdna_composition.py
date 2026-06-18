@@ -739,6 +739,71 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert "viennarna_structure_plot" not in manifest["artifacts"]
 
 
+def test_run_linear_ssdna_composition_does_not_manifest_stale_viennarna_plot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        """
+__version__ = "2.7.2"
+
+class fold_compound:
+    def __init__(self, sequence):
+        self.sequence = sequence
+
+    def mfe(self):
+        return "." * len(self.sequence), -7.04
+
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<?xml version="1.0" encoding="UTF-8"?>\\n')
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80">\\n')
+        handle.write('<g id="pairs"></g>\\n')
+        handle.write('<g id="seq">\\n')
+        for index, base in enumerate(sequence):
+            handle.write(f'<text class="nucleotide" x="{index}" y="0">{base}</text>\\n')
+        handle.write('</g>\\n</svg>\\n')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+    first_config = _write_retron43_config(
+        tmp_path,
+        folding_backend_name="ViennaRNA",
+        folding_interface="python_api",
+        folding_python_module="RNA",
+        emit_structure_plot=True,
+    )
+    first_result = run_linear_ssdna_composition(first_config)
+    stale_plot_manifest = (
+        first_result.artifact_bundle
+        / "visual"
+        / "viennarna_secondary_structure"
+        / "viennarna_secondary_structure_svg_v1.json"
+    )
+    assert stale_plot_manifest.is_file()
+
+    second_config = _write_retron43_config(
+        tmp_path,
+        folding_backend_name="ViennaRNA",
+        folding_interface="python_api",
+        folding_python_module="RNA",
+        emit_structure_plot=False,
+    )
+    second_result = run_linear_ssdna_composition(second_config)
+
+    manifest = json.loads((second_result.artifact_bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert "viennarna_structure_plot" not in manifest["artifacts"]
+    assert not stale_plot_manifest.exists()
+
+
 def test_run_linear_ssdna_composition_writes_baserender_component_span_job(tmp_path: Path) -> None:
     config_path = _write_retron43_config(tmp_path)
 

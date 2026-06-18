@@ -29,6 +29,10 @@ from .visual import (
 )
 
 _DEPRECATED_GENERATED_DIR_PATHS = (Path("folding/src"),)
+_OPTIONAL_GENERATED_DIR_PATHS = (
+    Path("visual/viennarna_secondary_structure"),
+    Path("manifest/visual/secondary_structure"),
+)
 
 
 def write_composition_bundle(composed: ComposedLinearSsdna, *, artifact_bundle: Path, config_path: Path) -> None:
@@ -38,6 +42,7 @@ def write_composition_bundle(composed: ComposedLinearSsdna, *, artifact_bundle: 
     (artifact_bundle / "visual").mkdir(parents=True, exist_ok=True)
     (artifact_bundle / "visual" / "renders").mkdir(parents=True, exist_ok=True)
     _remove_deprecated_generated_artifacts(artifact_bundle)
+    _remove_optional_generated_artifacts(artifact_bundle)
     _write_json(artifact_bundle / "assembled_sequence.json", _assembled_sequence_payload(composed))
     _write_json(artifact_bundle / "segment_spans.json", _segment_spans_payload(composed))
     _write_json(artifact_bundle / "annotation_spans.json", _annotation_spans_payload(composed))
@@ -71,6 +76,18 @@ def _remove_deprecated_generated_artifacts(artifact_bundle: Path) -> None:
                 "Remove the stale path or choose a fresh artifact bundle."
             )
     _remove_empty_deprecated_directory(artifact_bundle, Path("visual/contracts"))
+
+
+def _remove_optional_generated_artifacts(artifact_bundle: Path) -> None:
+    for relative_path in _OPTIONAL_GENERATED_DIR_PATHS:
+        path = artifact_bundle / relative_path
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            raise ValidationError(
+                f"Optional generated artifact path '{relative_path.as_posix()}' is not a directory. "
+                "Remove the stale path or choose a fresh artifact bundle."
+            )
 
 
 def _remove_empty_deprecated_directory(artifact_bundle: Path, relative_path: Path) -> None:
@@ -256,7 +273,7 @@ def _manifest_payload(composed: ComposedLinearSsdna, *, artifact_bundle: Path) -
             "reverse_complement_genbank": "sequence.reverse_complement.gb",
             "features_csv": "features.csv",
             **folding_artifact_refs(composed),
-            **viennarna_structure_plot_artifacts(artifact_bundle),
+            **viennarna_structure_plot_artifacts(composed, artifact_bundle=artifact_bundle),
             "visual_contract": SEQUENCE_EVIDENCE_MAP_PATH.as_posix(),
             **baserender_job_artifacts(composed),
         },

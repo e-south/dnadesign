@@ -314,7 +314,12 @@ def _resolve_annotation_bounds(
         if unit_start + location.end > unit_end:
             raise ValidationError(f"annotation '{annotation.annotation_id}' exceeds unit bounds.")
         return unit_start + location.start, unit_start + location.end
-    return location.start, location.end
+    if location.basis == "product":
+        raise ValidationError(
+            f"annotation '{annotation.annotation_id}' uses product basis, but product-basis annotations are not "
+            "supported by the per-copy linear ssDNA composition runtime."
+        )
+    raise ValidationError(f"annotation '{annotation.annotation_id}' uses unsupported basis '{location.basis}'.")
 
 
 def _check_reverse_complement(*, left: str, right: str) -> bool:
