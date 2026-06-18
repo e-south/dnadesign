@@ -25,6 +25,12 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
     validate_azenta_workbook,
     validate_genbank_record_set,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff import (
+    cli as synthesis_handoff_cli,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.batch0_source import (
+    batch0_synthesis_name,
+)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.cli import (
     main as synthesis_handoff_main,
 )
@@ -78,6 +84,53 @@ def _selected_candidates() -> list[SelectedCandidate]:
             synthesis_name="ES-promoter-33",
         ),
     ]
+
+
+def _batch0_cli_source_fixture() -> list[SelectedCandidate]:
+    campaigns = (
+        "stress_eth_cip_ethanol_rf_sfxi_topn",
+        "stress_eth_cip_cipro_rf_sfxi_topn",
+        "stress_eth_cip_and_rf_sfxi_topn",
+    )
+    selected: list[SelectedCandidate] = []
+    for campaign_slug in campaigns:
+        for rank in range(1, 7):
+            selected.append(
+                SelectedCandidate(
+                    campaign_slug=campaign_slug,
+                    as_of_round=0,
+                    run_id="batch0_pre_assay_review",
+                    selection_rank=rank,
+                    id=f"{campaign_slug}-batch0-{rank:02d}",
+                    sequence=CORE_A if rank % 2 else CORE_B,
+                    synthesis_name=batch0_synthesis_name(campaign_slug, rank),
+                    selection_source="batch0_pre_assay",
+                    selection_epoch="pre_assay_seed",
+                    assay_batch_index=0,
+                    model_as_of_round=None,
+                )
+            )
+    return selected
+
+
+def _patch_batch0_cli_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    selected = _batch0_cli_source_fixture()
+
+    def fake_build_batch0_selected_candidates(*, config_path: Path, repo_root: Path | None = None):
+        return selected, {
+            "source": "batch0_pre_assay",
+            "config_path": str(config_path),
+            "campaign_counts": {
+                "stress_eth_cip_ethanol_rf_sfxi_topn": 6,
+                "stress_eth_cip_cipro_rf_sfxi_topn": 6,
+                "stress_eth_cip_and_rf_sfxi_topn": 6,
+            },
+            "row_count": len(selected),
+        }
+
+    monkeypatch.setattr(
+        synthesis_handoff_cli, "build_batch0_selected_candidates", fake_build_batch0_selected_candidates
+    )
 
 
 def test_build_synthesis_manifest_preserves_ids_and_applies_case_aware_flanks() -> None:
@@ -963,7 +1016,12 @@ def test_cli_writes_opal_round_handoff_from_campaign_ledgers(
     assert validate_azenta_workbook(manifest, workbook_path)["status"] == "pass"
 
 
-def test_cli_resolves_batch0_from_checked_in_handoff_record(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_resolves_batch0_from_checked_in_handoff_record(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_batch0_cli_source(monkeypatch)
+
     exit_code = synthesis_handoff_main(
         [
             "--handoff-id",
@@ -1139,8 +1197,11 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
 
 def test_cli_handoff_record_rejects_campaign_count_drift(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    _patch_batch0_cli_source(monkeypatch)
+
     record_path = tmp_path / "synthesis_handoffs.yaml"
     record_path.write_text(
         textwrap.dedent(
