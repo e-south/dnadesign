@@ -1,4 +1,13 @@
-"""Plot-contract tests for hue configuration on live scatter surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_plot_shape_contract.py
+
+Plot-contract tests for hue configuration on live scatter surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

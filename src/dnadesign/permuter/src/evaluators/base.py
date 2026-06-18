@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/base.py
+
+Evaluator adapters for base Permuter evaluators.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

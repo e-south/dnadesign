@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/store/lockfile.py
 
-Author(s): Eric J. South
+Lockfile helpers for Cruncher store.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

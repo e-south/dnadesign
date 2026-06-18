@@ -1,4 +1,13 @@
-"""Decision-report writing for the DenseGen axis probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/evaluation/decision_report.py
+
+Decision-report writing for the DenseGen axis probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

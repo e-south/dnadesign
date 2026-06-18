@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/usr_genbank_annotations_v1.py
 
 Adapter for USR GenBank annotation overlays projected into Record v1 features.

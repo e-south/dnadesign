@@ -1,4 +1,13 @@
-"""Public helpers for the checked-in OPAL campaign progress notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_progress/__init__.py
+
+Public helpers for the checked-in OPAL campaign progress notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/cli/test_cli_ingest_shared_label_source.py
+
 CLI ingest contracts for shared observed-label sources.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

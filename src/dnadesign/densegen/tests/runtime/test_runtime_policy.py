@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/runtime/test_runtime_policy.py
+
+Regression tests for runtime policy DenseGen runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 # ABOUTME: Tests runtime policy stall and warning timing behavior.
 # ABOUTME: Ensures stall timers reset on solver progress signals.
 

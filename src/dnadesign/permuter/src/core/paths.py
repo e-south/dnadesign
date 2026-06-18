@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/paths.py
+
+Core runtime primitives for paths Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

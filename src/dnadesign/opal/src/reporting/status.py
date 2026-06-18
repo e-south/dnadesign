@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/status.py
+
+Reporting helpers for status OPAL reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

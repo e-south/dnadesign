@@ -1,4 +1,13 @@
-"""Label humanization coverage for notebook-facing text."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_labels.py
+
+Label humanization coverage for notebook-facing text.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

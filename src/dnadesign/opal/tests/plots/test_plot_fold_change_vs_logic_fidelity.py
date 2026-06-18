@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/plots/test_plot_fold_change_vs_logic_fidelity.py
+
+Regression tests for plot fold change vs logic fidelity OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

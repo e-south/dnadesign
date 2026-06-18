@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/config/__init__.py
+dnadesign
+src/dnadesign/densegen/src/config/__init__.py
 
 Strict, versioned config schema for DenseGen (breaking changes, no fallbacks).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

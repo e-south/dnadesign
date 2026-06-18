@@ -1,4 +1,13 @@
-"""Scalar builder coverage for notebook-facing cohort inventory tables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_scalar_build.py
+
+Scalar builder coverage for notebook-facing cohort inventory tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

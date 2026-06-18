@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/cli/test_evaluate.py
 
-Module Author(s): OpenAI Codex
+CLI evaluation replacement and metric-materialization contracts.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

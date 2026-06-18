@@ -1,11 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/materialize_source_record_sequence_views.py
+
 Materialize generic source-record sequence views for USR source datasets.
 
-This helper is intentionally conservative: datasets with existing non-source
-sequence-view sidecars keep their domain-specific semantics. Datasets without
-sidecars receive one `source_record` view and one mutable view-semantics row per
-base record so every non-archived local USR dataset has an explicit semantic
-surface.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

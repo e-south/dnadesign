@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/src/__init__.py
+
+Package exports for USR.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

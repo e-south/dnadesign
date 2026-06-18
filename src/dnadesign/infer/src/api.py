@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/api.py
 
+Focused helpers for API infer.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,4 +1,13 @@
-"""Review artifact API for the study-owned DenseGen axis OPAL probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/__init__.py
+
+Review artifact API for the study-owned DenseGen axis OPAL probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

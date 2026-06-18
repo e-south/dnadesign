@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/synergy_scatter.py
+
+Plot builders for synergy scatter Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

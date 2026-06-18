@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/sequence_rows.py
 
 Sequence-row renderer for Record v1 with kmer features, effects, overlays, and legend.

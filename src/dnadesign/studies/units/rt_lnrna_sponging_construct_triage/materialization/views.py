@@ -1,4 +1,13 @@
-"""Construct config and view declaration builders for RT-lnRNA materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/views.py
+
+Construct config and view declaration builders for RT-lnRNA materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

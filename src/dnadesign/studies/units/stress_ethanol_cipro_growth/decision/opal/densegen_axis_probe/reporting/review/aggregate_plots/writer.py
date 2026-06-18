@@ -1,4 +1,13 @@
-"""Writer for registry-backed DenseGen axis probe aggregate plots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/aggregate_plots/writer.py
+
+Writer for registry-backed DenseGen axis probe aggregate plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

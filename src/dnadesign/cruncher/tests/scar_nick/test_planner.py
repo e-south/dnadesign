@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/scar_nick/test_planner.py
 
 Planning, rejection, and ranking tests for scar-nick candidates.

@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/contracts/__init__.py
 
-Module Author(s): OpenAI Codex
+Metric-contract facade for canonical Permuter column helpers.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

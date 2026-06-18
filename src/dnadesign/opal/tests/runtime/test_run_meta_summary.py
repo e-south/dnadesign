@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_run_meta_summary.py
+
+Regression tests for run meta summary OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -3,17 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/adapters/evo2.py
 
-This module adapts the Arc Institute "Evo 2" DNA language model to the
-dnadesign.infer engine.
-
-Primary source (API reference snippets used here):
-  - https://github.com/ArcInstitute/evo2
-  - README examples (as of Feb 2025):
-      from evo2 import Evo2
-      model = Evo2("evo2_7b")
+This module adapts the Arc Institute "Evo 2" DNA language model to the.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

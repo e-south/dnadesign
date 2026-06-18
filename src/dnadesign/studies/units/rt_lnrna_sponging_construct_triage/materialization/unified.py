@@ -1,4 +1,13 @@
-"""Unified construct-subject source selection for RT-lnRNA materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/unified.py
+
+Unified construct-subject source selection for RT-lnRNA materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

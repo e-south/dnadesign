@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/views/derived_metrics.py
 
 Builds derived dashboard metrics that join prediction history with view data.
-Includes nearest logic class, logic-space support distance, and uncertainty.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

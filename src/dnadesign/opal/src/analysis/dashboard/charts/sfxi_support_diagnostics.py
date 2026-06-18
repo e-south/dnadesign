@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_support_diagnostics.py
 
 Support/extrapolation diagnostics charts for SFXI logic space.

@@ -1,4 +1,13 @@
-"""Metadata-axis style contract tests for generic LatentDNA runtimes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_metadata_axis_contracts.py
+
+Metadata-axis style contract tests for generic LatentDNA runtimes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

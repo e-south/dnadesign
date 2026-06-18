@@ -1,4 +1,13 @@
-"""Per-campaign OPAL execution orchestration for Stage B."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/execution/campaigns.py
+
+Per-campaign OPAL execution orchestration for Stage B.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

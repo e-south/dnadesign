@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/visuals.py
 
 Thin Cruncher wrapper over the public BaseRender job API.

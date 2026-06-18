@@ -1,4 +1,13 @@
-"""Contracts for LatentDNA Infer feature sidecar sources."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/sources/test_infer_feature_sidecar_source.py
+
+Contracts for LatentDNA Infer feature sidecar sources.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

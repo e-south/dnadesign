@@ -1,4 +1,13 @@
-"""Trait-axis projection scalar contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_trait_axis_projection.py
+
+Trait-axis projection scalar contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

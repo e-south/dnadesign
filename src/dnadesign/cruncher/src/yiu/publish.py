@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/publish.py
 
 Publish YIU v4 bundles and BaseRender-ready view contracts.

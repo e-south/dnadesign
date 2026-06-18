@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/example.py
+dnadesign
+src/dnadesign/aligner/example.py
+
+Example workflow for aligner.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

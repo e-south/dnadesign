@@ -1,4 +1,13 @@
-"""Selection artifact contracts for Stage B execution."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/execution/selection.py
+
+Selection artifact contracts for Stage B execution.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

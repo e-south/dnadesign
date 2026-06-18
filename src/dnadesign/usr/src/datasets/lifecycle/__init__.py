@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/usr/src/datasets/lifecycle/__init__.py
 
-Dataset lifecycle helper package for registry freeze/state and write-session
-coordination.
+Dataset lifecycle helper package for registry freeze/state and write-session.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

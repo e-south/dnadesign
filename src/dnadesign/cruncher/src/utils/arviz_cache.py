@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/utils/arviz_cache.py
 
 Configure a writable ArviZ data directory for runtime imports.

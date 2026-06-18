@@ -1,4 +1,13 @@
-"""Guardrails for the destructive promoter-study refactor."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_refactor_guardrails.py
+
+Guardrails for the destructive promoter-study refactor.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/tests/test_visual_contracts.py
 
 Shared cassette visual-contract validation tests.

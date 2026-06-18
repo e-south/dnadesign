@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/workspaces/families.py
 
 Typed workflow-family registration for family-aware workspace discovery and docs.

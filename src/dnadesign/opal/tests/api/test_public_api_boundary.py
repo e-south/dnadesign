@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/api/test_public_api_boundary.py
+
+Regression tests for public API boundary OPAL API.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import json
 import subprocess
 import sys

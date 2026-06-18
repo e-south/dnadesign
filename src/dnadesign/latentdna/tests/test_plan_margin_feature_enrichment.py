@@ -1,4 +1,13 @@
-"""Plan-margin feature-enrichment contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_plan_margin_feature_enrichment.py
+
+Plan-margin feature-enrichment contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/viz/test_mpl_cache.py
 
 Validate Matplotlib cache contracts for Cruncher runtime commands.

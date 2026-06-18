@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_fimo_runtime_integration.py
 
 Runs a real MEME Suite FIMO execution against generated motif and FASTA inputs.

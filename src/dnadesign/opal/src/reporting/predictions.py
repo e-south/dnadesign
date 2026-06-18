@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/predictions.py
 
 Public reporting helper for run-scoped OPAL campaign predictions.

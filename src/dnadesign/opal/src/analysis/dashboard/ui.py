@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/ui.py
 
-Builds reusable UI widgets for dashboard notebooks. Keeps UI wiring thin by
-centralizing control construction.
+Builds reusable UI widgets for dashboard notebooks. Keeps UI wiring thin by.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

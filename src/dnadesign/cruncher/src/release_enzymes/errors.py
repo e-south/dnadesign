@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/release_enzymes/errors.py
 
 Explicit error contracts for release-enzyme catalog workflows.

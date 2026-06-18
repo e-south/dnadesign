@@ -1,4 +1,13 @@
-"""Source, split, and plan-render helpers for the DenseGen OPAL probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/evaluation/decision_inputs.py
+
+Source, split, and plan-render helpers for the DenseGen OPAL probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

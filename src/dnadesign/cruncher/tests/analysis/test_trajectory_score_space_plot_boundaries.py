@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_trajectory_score_space_plot_boundaries.py
 
 Characterization tests for trajectory score-space plot orchestration boundaries.

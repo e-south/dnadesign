@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/objective_result.py
 
 Defines typed objective result contracts and validation helpers for OPAL.

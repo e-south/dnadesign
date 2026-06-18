@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/objectives/selectors.py
+
+Core runtime primitives for selectors Cruncher core objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

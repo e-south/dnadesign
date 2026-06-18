@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/registry.py
 
+Registry helpers for infer.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_sigma_decoupling.py
 
 Tests for sigma decoupling from core/render and generic sigma transform output.

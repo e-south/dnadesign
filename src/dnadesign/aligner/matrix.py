@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/matrix.py
+dnadesign
+src/dnadesign/aligner/matrix.py
 
 Matrix module for constructing full and condensed pairwise score matrices.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

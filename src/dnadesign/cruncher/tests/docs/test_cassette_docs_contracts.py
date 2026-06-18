@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_cassette_docs_contracts.py
 
 Docs contracts for the cassette workflow and reference routing.

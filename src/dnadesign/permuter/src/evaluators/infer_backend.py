@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/infer_backend.py
 
-Lazy public Infer facade loading for Evo2-backed evaluators.
+Lazy Infer facade loading for Evo2-backed Permuter evaluators.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

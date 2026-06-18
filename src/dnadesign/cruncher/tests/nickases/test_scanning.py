@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/nickases/test_scanning.py
 
 Tests for shared nickase scanning helpers.

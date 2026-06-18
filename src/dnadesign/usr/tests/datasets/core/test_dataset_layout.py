@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/core/test_dataset_layout.py
 
 Tests for namespaced dataset layout and resolution behavior.

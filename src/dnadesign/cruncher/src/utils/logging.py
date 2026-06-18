@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/utils/logging.py
 
-Author(s): Eric J. South
+Utility helpers for logging Cruncher utils.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

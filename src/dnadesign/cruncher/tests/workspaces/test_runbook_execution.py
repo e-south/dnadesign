@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/workspaces/test_runbook_execution.py
 
 Validate machine runbook loading and fail-fast execution contracts.

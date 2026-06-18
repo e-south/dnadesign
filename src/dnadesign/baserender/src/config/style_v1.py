@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/style_v1.py
 
 Style v1 schema, preset resolution, and strict style mapping validation.

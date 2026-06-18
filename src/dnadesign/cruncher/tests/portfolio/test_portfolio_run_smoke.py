@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/portfolio/test_portfolio_run_smoke.py
 
 Smoke tests for Portfolio run aggregation workflow.

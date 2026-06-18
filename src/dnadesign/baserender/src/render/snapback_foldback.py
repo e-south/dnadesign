@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/snapback_foldback.py
 
 Foldback-specific snapback rendering helpers for compact corner-triloop views.

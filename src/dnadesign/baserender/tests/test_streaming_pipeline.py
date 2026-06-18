@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_streaming_pipeline.py
 
 Streaming orchestration tests for short-circuit row consumption and record counts.

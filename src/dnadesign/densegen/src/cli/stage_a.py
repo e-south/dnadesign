@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/stage_a.py
+dnadesign
+src/dnadesign/densegen/src/cli/stage_a.py
 
 Stage-A CLI command registration for building TFBS pools.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/workspaces/loader.py
 
-Workspace discovery and config loading.
+Workspace discovery and strict config loading for Permuter runs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

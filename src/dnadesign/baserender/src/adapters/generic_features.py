@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/generic_features.py
 
 Generic adapter for pre-normalized feature/effect/display columns.

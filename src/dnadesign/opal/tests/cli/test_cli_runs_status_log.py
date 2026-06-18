@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_runs_status_log.py
+
+Regression tests for CLI runs status log OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

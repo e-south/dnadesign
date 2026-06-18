@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/artifacts.py
 
 CLI commands for manifest-authoritative artifact gardening.

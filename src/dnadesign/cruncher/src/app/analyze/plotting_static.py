@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/plotting_static.py
 
 Render static analysis plots and optional optimizer-vs-FIMO concordance plots.

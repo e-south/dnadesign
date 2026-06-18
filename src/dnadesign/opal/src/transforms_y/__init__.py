@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/transforms_y/__init__.py
+
+Package exports for OPAL transforms y.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

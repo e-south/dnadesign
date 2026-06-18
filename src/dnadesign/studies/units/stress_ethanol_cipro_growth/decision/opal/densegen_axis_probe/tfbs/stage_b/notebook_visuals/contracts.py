@@ -1,4 +1,13 @@
-"""Shared notebook visual registration constants."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/notebook_visuals/contracts.py
+
+Shared notebook visual registration constants.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

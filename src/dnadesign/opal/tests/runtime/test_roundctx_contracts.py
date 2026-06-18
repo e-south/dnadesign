@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_roundctx_contracts.py
+
+Regression tests for roundctx OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

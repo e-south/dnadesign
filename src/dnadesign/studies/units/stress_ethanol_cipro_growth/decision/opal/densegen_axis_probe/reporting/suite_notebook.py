@@ -1,4 +1,13 @@
-"""OPAL campaign-set notebook generation across DenseGen probe seed roots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/suite_notebook.py
+
+OPAL campaign-set notebook generation across DenseGen probe seed roots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

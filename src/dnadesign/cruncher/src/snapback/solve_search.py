@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/solve_search.py
 
 Frontier enumeration and co-design input ordering for v3 snapback solve.

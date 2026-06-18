@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/binding_sites.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/binding_sites.py
 
 Binding-site table input source (CSV/Parquet).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

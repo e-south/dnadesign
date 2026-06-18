@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/objectives/test_scalar_plugins.py
+
+Regression tests for scalar plugins OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

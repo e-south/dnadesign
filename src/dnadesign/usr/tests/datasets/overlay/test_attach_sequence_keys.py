@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/overlay/test_attach_sequence_keys.py
 
 Attach sequence key constraints for bio_type and uniqueness.

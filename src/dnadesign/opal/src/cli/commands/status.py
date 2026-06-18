@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/status.py
+
+CLI wiring for status OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

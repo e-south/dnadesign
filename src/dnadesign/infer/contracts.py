@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/infer/contracts.py
 
-Public infer contracts for USR write-back destination resolution and default
-notify profile path derivation.
+Public infer contracts for USR write-back destination resolution and default.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

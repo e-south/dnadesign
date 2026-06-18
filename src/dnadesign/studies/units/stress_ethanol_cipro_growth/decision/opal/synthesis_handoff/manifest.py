@@ -1,4 +1,13 @@
-"""Vendor-neutral synthesis manifest construction."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/manifest.py
+
+Vendor-neutral synthesis manifest construction.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

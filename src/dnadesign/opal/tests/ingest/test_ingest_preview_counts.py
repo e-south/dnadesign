@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/ingest/test_ingest_preview_counts.py
+
+Regression tests for ingest preview counts OPAL ingest.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

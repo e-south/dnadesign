@@ -1,4 +1,13 @@
-"""Documentation routing contracts for LatentDNA."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_docs_contract.py
+
+Documentation routing contracts for LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

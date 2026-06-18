@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/__init__.py
+
+Package exports for OPAL registries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

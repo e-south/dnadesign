@@ -1,4 +1,13 @@
-"""USR dataset and overlay writers for RT-lnRNA Construct materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/usr_io.py
+
+USR dataset and overlay writers for RT-lnRNA Construct materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

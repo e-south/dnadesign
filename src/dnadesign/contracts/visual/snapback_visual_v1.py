@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/snapback_visual_v1.py
 
 Shared snapback visual contract for nucleotide-resolution QA rendering.

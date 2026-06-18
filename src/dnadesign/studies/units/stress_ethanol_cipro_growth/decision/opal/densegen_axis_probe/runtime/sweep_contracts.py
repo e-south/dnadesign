@@ -1,4 +1,13 @@
-"""Execution contracts for DenseGen probe sweep planning."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/runtime/sweep_contracts.py
+
+Execution contracts for DenseGen probe sweep planning.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

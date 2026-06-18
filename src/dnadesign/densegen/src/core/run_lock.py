@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/run_lock.py
+dnadesign
+src/dnadesign/densegen/src/core/run_lock.py
 
 Workspace-scoped run lock for DenseGen execution.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_factorial_effects.py
 
 Plots factorial effects for SFXI logic vectors from ledger predictions.

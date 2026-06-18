@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_workspaces_run_cli.py
 
 CLI contract tests for `cruncher workspaces run`.

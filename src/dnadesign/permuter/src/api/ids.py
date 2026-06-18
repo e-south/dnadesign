@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/api/ids.py
 
-Stable identifiers for pure Permuter API results.
+Stable request identifiers for pure Permuter API workflows.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

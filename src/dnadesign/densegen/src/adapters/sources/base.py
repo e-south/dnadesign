@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/base.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/base.py
 
 Source abstractions for DenseGen inputs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

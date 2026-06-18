@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/hairpin_length_vs_metric.py
+
+Plot builders for hairpin length vs metric Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

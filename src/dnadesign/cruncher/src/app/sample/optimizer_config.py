@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/optimizer_config.py
 
 Resolve optimizer configuration and summarize sampling settings.

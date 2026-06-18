@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/stage_b/test_sampling_fraction.py
+
+Regression tests for sampling fraction DenseGen stage b.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.pipeline.stage_b import _compute_sampling_fraction, _compute_sampling_fraction_pairs

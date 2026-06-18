@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_projection.py
 
 Projection and evaluator-reuse tests for released-product snapback workflows.

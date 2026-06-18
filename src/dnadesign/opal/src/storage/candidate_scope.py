@@ -1,4 +1,13 @@
-"""Candidate-scope helpers for OPAL runs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/storage/candidate_scope.py
+
+Candidate-scope helpers for OPAL runs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

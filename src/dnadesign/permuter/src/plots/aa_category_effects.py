@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/aa_category_effects.py
 
 Category-level summary for amino-acid substitutions.
-
-Top: mean Δ per biochemical class (IQR whiskers) + fraction |Δ| ≥ thresh.
-Bottom: mean Δ per residue (grouped by class order).
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

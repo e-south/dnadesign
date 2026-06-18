@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/models.py
 
-Loads model artifacts and round context for dashboard overlays. Centralizes
-artifact resolution and validation for model-based plots.
+Loads model artifacts and round context for dashboard overlays. Centralizes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

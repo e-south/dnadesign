@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/artifacts/pool.py
+dnadesign
+src/dnadesign/densegen/src/core/artifacts/pool.py
 
 Stage-A TFBS pool artifacts.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

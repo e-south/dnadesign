@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_api_import_coupling.py
 
 Regression test preventing render-stack imports during API module import.

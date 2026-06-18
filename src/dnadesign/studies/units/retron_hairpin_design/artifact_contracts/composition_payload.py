@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/artifact_contracts/composition_payload.py
+src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py
 
 Retron MSD single-unit composition payload construction.
 

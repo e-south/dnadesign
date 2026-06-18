@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/mmr_sweep_service.py
 
 Service entrypoints to replay MMR sweep diagnostics from a sample run directory.

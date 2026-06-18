@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/tests/test_preflight_contract_checks.py
 
-Focused tests for generic OPS execution of contract-declared study preflight
-checks.
+Focused tests for generic OPS execution of contract-declared study preflight.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

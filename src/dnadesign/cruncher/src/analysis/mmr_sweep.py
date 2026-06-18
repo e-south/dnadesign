@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/mmr_sweep.py
 
 Replay MMR elite selection over parameter grids using saved sampling artifacts.

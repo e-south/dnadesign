@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/protocols/test_scan_codon.py
+
+Regression tests for scan codon Permuter protocols.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

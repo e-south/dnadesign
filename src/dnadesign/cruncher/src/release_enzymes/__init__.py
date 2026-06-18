@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/release_enzymes/__init__.py
 
 Shared release-enzyme catalog and scanning contracts.

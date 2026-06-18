@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/run.py
+dnadesign
+src/dnadesign/densegen/src/cli/run.py
 
 Run execution CLI command registration.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

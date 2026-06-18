@@ -1,33 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/multisite_select/main.py
 
-Multi-site mutant variant selection.
-
-High-level algorithm (see markdown spec):
-
-  1. Load & validate source dataset (records.parquet from combine_aa + evaluate).
-  2. Compute robust z-scores for observed fitness (LLR) and epistasis.
-  3. Build composite score(v) = alpha · z_llr(v) + β · z_epi(v).
-  4. Apply score-based gating to form a high-score candidate pool.
-  5. Summarize clusters and compute medoids in embedding space.
-  6. Run greedy score-ordered, diversity-aware selection within the pool:
-       • obey per-cluster caps (if configured),
-       • enforce minimum angular separation (if enabled),
-       • stop when total_variants picks are accepted or pool is exhausted.
-  7. Emit artifacts:
-       • MULTISITE_SELECT.parquet / .csv
-       • CLUSTER_SUMMARY.parquet
-       • SELECT_SUMMARY.md
-       • diagnostics plots & HEB tables (optional)
-  8. Yield selected variants into this run's records.parquet.
-
-All invariants from the spec are enforced:
-  • only non-negative epistasis enter the scoring pipeline,
-  • higher epistasis → higher composite score when alpha=0, β>0,
-  • selection order respects composite score; diversity can only disqualify
-    a candidate, never reorder them.
+--------------------------------------------------------------------------------.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

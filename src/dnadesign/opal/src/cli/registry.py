@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/registry.py
 
-Registers and installs OPAL CLI commands and command groups. Supports hidden
-commands and deferred import error handling.
+Registers and installs OPAL CLI commands and command groups. Supports hidden.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

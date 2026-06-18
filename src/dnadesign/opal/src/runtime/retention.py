@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/runtime/retention.py
+
 Runtime artifact-retention enforcement for OPAL campaigns.
 
-The policy is generic: it knows about OPAL ledgers and round artifacts, not
-study-specific labels or biological interpretation.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

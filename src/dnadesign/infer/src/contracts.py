@@ -6,7 +6,6 @@ src/dnadesign/infer/src/contracts.py
 Explicit runtime contracts for infer namespaces and USR output column naming.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,4 +1,13 @@
-"""Source-surface contract checks for the DenseGen axis probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/core/source_contract.py
+
+Source-surface contract checks for the DenseGen axis probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

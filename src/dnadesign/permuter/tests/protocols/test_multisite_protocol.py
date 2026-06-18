@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/protocols/test_multisite_protocol.py
 
-Integration tests for the multisite_select protocol:
-
-  • end-to-end run on a tiny synthetic dataset
-  • invariants on epistasis, scores, diversity, and cluster caps
-  • tie-breaker behaviour (prefer fewer mutations, then higher delta, etc.)
+Integration tests for the multisite_select protocol:.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

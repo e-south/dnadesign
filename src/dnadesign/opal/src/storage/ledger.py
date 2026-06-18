@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/ledger.py
 
-Handles append-only ledger sinks and schema validation for OPAL. Reads/writes
-run metadata, predictions, and label events.
+Handles append-only ledger sinks and schema validation for OPAL. Reads/writes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

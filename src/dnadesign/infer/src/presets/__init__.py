@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/presets/__init__.py
 
+Package exports for infer presets.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

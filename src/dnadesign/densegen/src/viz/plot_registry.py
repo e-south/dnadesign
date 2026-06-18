@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/viz/plot_registry.py
+dnadesign
+src/dnadesign/densegen/src/viz/plot_registry.py
 
 Plot registry metadata (names + descriptions) without importing matplotlib.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

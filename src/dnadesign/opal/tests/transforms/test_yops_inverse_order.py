@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/transforms/test_yops_inverse_order.py
+
+Regression tests for yops inverse order OPAL transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

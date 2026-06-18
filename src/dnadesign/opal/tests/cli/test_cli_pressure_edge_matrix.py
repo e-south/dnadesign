@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_pressure_edge_matrix.py
+
+Regression tests for CLI pressure edge matrix OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

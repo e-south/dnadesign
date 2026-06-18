@@ -1,4 +1,13 @@
-"""Registry for OPAL candidate eligibility rules."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/registries/eligibility.py
+
+Registry for OPAL candidate eligibility rules.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

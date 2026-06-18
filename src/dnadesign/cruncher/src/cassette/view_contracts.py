@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/view_contracts.py
 
 Neutral shared-view publication for cassette explicit and solve workflows.

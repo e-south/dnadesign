@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/yiu_payload_motif_overlay.py
 
 Motif-overlay assembly helpers for YIU payload visual contracts.

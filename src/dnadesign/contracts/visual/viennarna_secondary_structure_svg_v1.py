@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/viennarna_secondary_structure_svg_v1.py
 
 Manifest for ViennaRNA-native secondary-structure SVG artifacts.

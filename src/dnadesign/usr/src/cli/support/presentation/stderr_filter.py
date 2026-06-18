@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/src/cli/support/presentation/stderr_filter.py
+
+CLI wiring for stderr filter USR CLI support presentation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

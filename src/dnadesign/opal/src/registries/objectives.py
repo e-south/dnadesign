@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/objectives.py
 
-Registers objective functions and loads built-in and plugin objectives. Provides
-objective access with PluginCtx contract enforcement.
+Registers objective functions and loads built-in and plugin objectives. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

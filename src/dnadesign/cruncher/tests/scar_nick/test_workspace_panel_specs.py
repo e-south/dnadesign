@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/scar_nick/test_workspace_panel_specs.py
 
 Workspace-level scar_nick panel config tests.

@@ -1,4 +1,13 @@
-"""OPAL-owned frozen round-0 scoring primitives."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/learning_loop_baselines/frozen_round0.py
+
+OPAL-owned frozen round-0 scoring primitives.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

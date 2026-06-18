@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/scripts/test_build_reader_sfxi_reference_overlay.py
+
+Regression tests for build reader SFXI reference overlay USR scripts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import math

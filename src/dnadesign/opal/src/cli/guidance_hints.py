@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/guidance_hints.py
 
 Shared helpers for readable next-step hints printed by CLI commands.

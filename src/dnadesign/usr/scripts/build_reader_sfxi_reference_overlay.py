@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/build_reader_sfxi_reference_overlay.py
+
 Build a provenance-aware USR SFXI reference metric overlay from Reader vec8 outputs.
 
-The default CLI mode is a dry run. Writing the additive ``sfxi_ref`` overlay requires
-``--write`` and refuses to append over an existing overlay namespace.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

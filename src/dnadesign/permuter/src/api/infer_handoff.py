@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/api/infer_handoff.py
 
-Non-executing Infer feature request handoff contracts.
+Non-executing Infer feature request manifests for Permuter handoffs.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

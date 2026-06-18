@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/cli/test_json_outputs.py
 
-Machine-readable CLI output contracts.
+Machine-readable CLI output contracts for core Permuter commands.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

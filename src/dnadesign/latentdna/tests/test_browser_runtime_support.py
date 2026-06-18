@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_browser_runtime_support.py
+
+Regression tests for browser runtime support LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 from types import SimpleNamespace
 

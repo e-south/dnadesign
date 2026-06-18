@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/cli/commands/ingest_y/policy.py
+
 Unknown-sequence policy orchestration for `opal ingest-y`.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

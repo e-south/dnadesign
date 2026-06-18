@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/scar_nick.py
 
 CLI entrypoints for terminal scar-nick processing design.

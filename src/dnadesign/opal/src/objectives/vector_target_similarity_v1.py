@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/objectives/vector_target_similarity_v1.py
+
+Objective plugin logic for vector target similarity v1 OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

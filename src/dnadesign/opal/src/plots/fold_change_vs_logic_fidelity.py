@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/fold_change_vs_logic_fidelity.py
 
-Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes
-ledger predictions with setpoint joins from run metadata.
+Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

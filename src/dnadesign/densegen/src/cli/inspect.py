@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/inspect.py
+dnadesign
+src/dnadesign/densegen/src/cli/inspect.py
 
 Inspect subcommands for the DenseGen CLI.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

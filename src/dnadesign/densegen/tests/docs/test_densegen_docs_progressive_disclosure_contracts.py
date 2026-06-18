@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-densegen project
+dnadesign
 src/dnadesign/densegen/tests/docs/test_densegen_docs_progressive_disclosure_contracts.py
 
 Contract checks that DenseGen operator docs keep progressive-disclosure structure.

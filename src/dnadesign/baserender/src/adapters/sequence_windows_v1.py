@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/sequence_windows_v1.py
 
-Adapter for sequence-window payloads that map sequence + regulator windows +
-motif references into Record features/effects.
+Adapter for sequence-window payloads that map sequence + regulator windows +.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

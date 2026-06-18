@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/src/adapters/sources/pwm_sampling.py
 
 Shared Stage-A PWM sampling utilities.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

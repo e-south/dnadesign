@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/parse_signature.py
 
 Compute deterministic parse signatures from lockfile + motif-store config.

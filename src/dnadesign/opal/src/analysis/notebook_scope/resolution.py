@@ -1,4 +1,13 @@
-"""Notebook round/run scope resolution."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_scope/resolution.py
+
+Notebook round/run scope resolution.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

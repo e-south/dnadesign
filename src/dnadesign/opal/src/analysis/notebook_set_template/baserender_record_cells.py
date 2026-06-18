@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_set_template/baserender_record_cells.py
+
+Notebook-set template builders for BaseRender record cells OPAL analysis notebook set.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from ._support import block

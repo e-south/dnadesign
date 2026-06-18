@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/__init__.py
+
+Package exports for studies core.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from .models import (
     StudyOpsContract,
     StudyPhaseContract,

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/explain.py
+
+Runtime helpers for explain OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

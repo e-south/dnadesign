@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/solve_filters.py
 
 Solve-only blacklist, quality, and occurrence helpers for cassette search.

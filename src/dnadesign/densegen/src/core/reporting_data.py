@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/reporting_data.py
+dnadesign
+src/dnadesign/densegen/src/core/reporting_data.py
 
 Report data collection helpers for DenseGen runs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/effects/motif_logo.py
 
 Motif-logo effect drawer using stacked vector glyphs aligned to the base grid.

@@ -1,4 +1,13 @@
-"""Notebook runtime assembly helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_browser_runtime.py
+
+Notebook runtime assembly helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

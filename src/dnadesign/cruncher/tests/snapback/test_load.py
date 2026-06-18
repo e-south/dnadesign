@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/snapback/test_load.py
 
 Load and schema tests for snapback explicit and solve specs.

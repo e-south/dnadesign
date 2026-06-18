@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/bio/__init__.py
 
 Shared biology helpers reused across explicit Cruncher workflow families.

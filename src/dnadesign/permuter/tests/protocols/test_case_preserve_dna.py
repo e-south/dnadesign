@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/protocols/test_case_preserve_dna.py
+
+Regression tests for case preserve DNA Permuter protocols.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

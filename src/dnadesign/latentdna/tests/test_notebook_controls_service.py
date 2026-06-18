@@ -1,4 +1,13 @@
-"""Contract tests for workspace notebook control-plane assembly."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_notebook_controls_service.py
+
+Contract tests for workspace notebook control-plane assembly.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

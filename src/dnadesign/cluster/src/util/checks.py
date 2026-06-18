@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/util/checks.py
 
+Utility helpers for checks cluster util.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

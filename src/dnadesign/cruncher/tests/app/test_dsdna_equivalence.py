@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_dsdna_equivalence.py
 
 Validate dsDNA equivalence resolution for bidirectional scoring.

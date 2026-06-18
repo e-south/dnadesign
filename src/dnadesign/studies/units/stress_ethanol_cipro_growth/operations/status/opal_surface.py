@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/opal_surface.py
 
-Study-owned status surface helpers for the stress / ethanol / ciprofloxacin
-growth study.
+Study-owned status surface helpers for the stress / ethanol / ciprofloxacin.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

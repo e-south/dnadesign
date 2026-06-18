@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/integrations/meme_suite.py
 
-Author(s): Eric J. South
+Integration adapters for meme suite Cruncher integrations.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

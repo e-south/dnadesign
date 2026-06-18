@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/viz/logos.py
 
-Author(s): Eric J. South
+Visualization helpers for logos Cruncher viz.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

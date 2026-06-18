@@ -1,4 +1,13 @@
-"""Study-owned synthetic label-family contracts for the DenseGen motif QA probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/plan_logic/label_families.py
+
+Study-owned synthetic label-family contracts for the DenseGen motif QA probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

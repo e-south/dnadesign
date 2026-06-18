@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/ingest.py
 
-Validates and ingests label data into records with transform handling. Produces
-ingest reports and contract checks for label integrity.
+Validates and ingests label data into records with transform handling. Produces.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

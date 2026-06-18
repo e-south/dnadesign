@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/storage/test_record_show_events.py
+
+Regression tests for record show events OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

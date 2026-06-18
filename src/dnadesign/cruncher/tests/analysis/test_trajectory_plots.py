@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_trajectory_plots.py
 
 Validate optimization trajectory scatter and sweep plot semantics and metadata.

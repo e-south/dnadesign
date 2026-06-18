@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_campaign_progress.py
+
+Regression tests for campaign progress OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

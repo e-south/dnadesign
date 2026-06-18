@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/ingest/test_label_hist_validation.py
+
+Regression tests for label hist validation OPAL ingest.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

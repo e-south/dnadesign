@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/cli/plot.py
+
+CLI wiring for plot Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

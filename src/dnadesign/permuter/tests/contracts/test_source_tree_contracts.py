@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/contracts/test_source_tree_contracts.py
 
 Permuter source-tree information architecture contracts.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -22,6 +22,19 @@ from dnadesign.permuter.src.workspaces.loader import load_workspace
 
 def _permuter_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def test_python_module_headers_do_not_claim_agent_authorship() -> None:
+    forbidden = ("Codex", "ChatGPT", "OpenAI", "Open AI")
+    invalid: list[str] = []
+    for path in sorted(_permuter_root().rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        header = "\n".join(path.read_text(encoding="utf-8").splitlines()[:12])
+        if any(token in header for token in forbidden):
+            invalid.append(path.relative_to(_permuter_root()).as_posix())
+
+    assert invalid == []
 
 
 def test_permuter_has_no_root_level_entrypoint_or_legacy_runtime_dirs() -> None:

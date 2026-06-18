@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_projection_candidate.py
 
 Candidate reconstruction helpers for released-product projection.

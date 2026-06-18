@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/transforms_x.py
 
-Registers X transforms and loads built-in transform modules. Wraps transforms
-with validation and PluginCtx enforcement.
+Registers X transforms and loads built-in transform modules. Wraps transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

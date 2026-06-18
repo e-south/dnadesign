@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/scoring.py
 
 PWM-aware scoring primitives for YIU v4 optimization.

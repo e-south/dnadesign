@@ -1,4 +1,13 @@
-"""RegulonDB promoter payload normalization helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoter_payloads.py
+
+RegulonDB promoter payload normalization helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

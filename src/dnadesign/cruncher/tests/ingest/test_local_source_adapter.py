@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/ingest/test_local_source_adapter.py
 
-Author(s): Eric J. South
+Regression tests for local source adapter Cruncher ingest.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

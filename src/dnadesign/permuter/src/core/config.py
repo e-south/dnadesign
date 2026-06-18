@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/config.py
+
+Core runtime primitives for config Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

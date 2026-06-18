@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/objectives/scalar_identity_v1.py
+
+Objective plugin logic for scalar identity v1 OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

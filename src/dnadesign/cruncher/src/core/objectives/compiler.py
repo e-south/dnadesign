@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/objectives/compiler.py
+
+Core runtime primitives for compiler Cruncher core objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

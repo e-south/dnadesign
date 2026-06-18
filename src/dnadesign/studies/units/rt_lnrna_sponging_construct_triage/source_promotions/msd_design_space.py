@@ -1,4 +1,13 @@
-"""Primitive-backed MSD design-space expansion for RT-lnRNA promotions."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/source_promotions/msd_design_space.py
+
+Primitive-backed MSD design-space expansion for RT-lnRNA promotions.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

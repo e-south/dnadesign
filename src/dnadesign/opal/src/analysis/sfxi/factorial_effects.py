@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/factorial_effects.py
 
 Factorial effects (A, B, interaction) for logic vectors.

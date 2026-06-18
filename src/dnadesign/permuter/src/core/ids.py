@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/ids.py
+
+Core runtime primitives for ids Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/planner.py
 
-Deterministic validation and reporting for v2 explicit single-nick snapback
-specs.
+Deterministic validation and reporting for v2 explicit single-nick snapback.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

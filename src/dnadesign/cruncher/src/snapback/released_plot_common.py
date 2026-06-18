@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_plot_common.py
 
 Shared constants and drawing helpers for released-product snapback hit plots.

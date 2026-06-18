@@ -1,4 +1,13 @@
-"""Configured OPAL plot generation for DenseGen axis probe run roots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/plotting.py
+
+Configured OPAL plot generation for DenseGen axis probe run roots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_logic_fidelity_closeness.py
 
-Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads
-ledger labels and run metadata for setpoint context.
+Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

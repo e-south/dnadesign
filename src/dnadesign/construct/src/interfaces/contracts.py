@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/interfaces/contracts.py
 
-Public construct contracts for USR output resolution and workspace registry
-lookup.
+Public construct contracts for USR output resolution and workspace registry.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

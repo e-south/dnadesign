@@ -1,4 +1,13 @@
-"""Human-readable labels for DenseGen TFBS probe surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/label_text.py
+
+Human-readable labels for DenseGen TFBS probe surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

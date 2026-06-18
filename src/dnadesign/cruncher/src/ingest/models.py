@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/ingest/models.py
 
-Author(s): Eric J. South
+Ingest helpers for models Cruncher ingest.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

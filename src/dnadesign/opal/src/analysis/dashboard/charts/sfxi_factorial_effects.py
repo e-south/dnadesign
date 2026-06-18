@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_factorial_effects.py
 
 Matplotlib chart for SFXI factorial-effects diagnostics.

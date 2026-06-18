@@ -1,4 +1,13 @@
-"""Checked-in synthesis handoff lifecycle record helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/records.py
+
+Checked-in synthesis handoff lifecycle record helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

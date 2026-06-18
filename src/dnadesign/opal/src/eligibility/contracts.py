@@ -1,4 +1,13 @@
-"""Candidate eligibility contracts used before OPAL selection."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/eligibility/contracts.py
+
+Candidate eligibility contracts used before OPAL selection.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

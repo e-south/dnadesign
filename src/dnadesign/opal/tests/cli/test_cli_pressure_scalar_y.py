@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_pressure_scalar_y.py
+
+Regression tests for CLI pressure scalar y OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

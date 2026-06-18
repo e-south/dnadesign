@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/optimizers.py
 
-Author(s): Eric J. South
+CLI wiring for optimizers Cruncher CLI commands.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

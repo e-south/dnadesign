@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_demo_matrix.py
 
 CLI tests for demo workflow matrix command wiring and summary output.

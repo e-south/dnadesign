@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/transient.py
 
-Builds overlay scoring charts for the promoter dashboard. Generates transient
-score histograms and feature importance views.
+Builds overlay scoring charts for the promoter dashboard. Generates transient.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/repair_sequence_view_alias_conflicts.py
+
 Repair non-unique aliases in a USR sequence-view sidecar.
 
-The repair removes aliases that resolve to more than one view_id. It does not
-rewrite records.parquet, view IDs, lineage, bounds, or Infer sidecars.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

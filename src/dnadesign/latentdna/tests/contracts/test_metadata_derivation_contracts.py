@@ -1,4 +1,13 @@
-"""Metadata derivation contract tests for source-backed view rows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_metadata_derivation_contracts.py
+
+Metadata derivation contract tests for source-backed view rows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

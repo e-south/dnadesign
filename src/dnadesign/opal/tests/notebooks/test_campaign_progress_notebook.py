@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/notebooks/test_campaign_progress_notebook.py
+
+Tests OPAL campaign progress notebook structure.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

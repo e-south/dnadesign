@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/store_factory.py
+
+Storage helpers for store factory OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

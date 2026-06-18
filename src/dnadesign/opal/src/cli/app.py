@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/app.py
+
+CLI wiring for app OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

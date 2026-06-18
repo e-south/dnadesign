@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_adapter_runtime.py
+src/dnadesign/infer/tests/runtime/test_adapter_runtime.py
 
 Contract tests for infer adapter runtime cache/loading helpers.
 

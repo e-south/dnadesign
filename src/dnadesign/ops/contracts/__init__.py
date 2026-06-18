@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/contracts/__init__.py
 
-Public Ops contracts for producer destination resolution and resume-readiness
-policy.
+Public Ops contracts for producer destination resolution and resume-readiness.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

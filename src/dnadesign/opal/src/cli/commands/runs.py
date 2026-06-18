@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/runs.py
+
+CLI wiring for runs OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

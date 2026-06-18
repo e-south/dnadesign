@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/infer_runtime.py
 
-Study-owned infer-runtime projection for checked-in
-stress_ethanol_cipro_growth status surfaces.
+Study-owned infer-runtime projection for checked-in.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

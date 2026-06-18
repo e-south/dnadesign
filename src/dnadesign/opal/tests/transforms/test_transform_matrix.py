@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/transforms/test_transform_matrix.py
+
+Regression tests for transform matrix OPAL transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

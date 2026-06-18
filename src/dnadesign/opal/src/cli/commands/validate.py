@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/validate.py
+
+CLI wiring for validate OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

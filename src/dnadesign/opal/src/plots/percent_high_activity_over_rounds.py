@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/percent_high_activity_over_rounds.py
 
 Plots percent high-activity designs over rounds from ledger predictions.
-Consumes outputs/ledger/predictions for per-round summaries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

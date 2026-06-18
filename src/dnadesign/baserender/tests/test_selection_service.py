@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_selection_service.py
 
 Selection service tests for strict filtering and keep_order behavior.

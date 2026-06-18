@@ -1,4 +1,13 @@
-"""SFXI reference-overlay helpers for OPAL plot primitives."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/sfxi_reference_overlay.py
+
+SFXI reference-overlay helpers for OPAL plot primitives.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

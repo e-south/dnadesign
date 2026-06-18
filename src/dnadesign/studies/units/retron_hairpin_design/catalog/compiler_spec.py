@@ -1,4 +1,13 @@
-"""Typed Retron MSD compiler-spec boundary."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec.py
+
+Typed Retron MSD compiler-spec boundary.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,11 +1,14 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/__init__.py
+
+Package exports for OPAL.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
+
 
 # Plugin modules are loaded lazily by registries to avoid import-time side effects.
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_setpoint_sweep.py
 
 Setpoint sweep diagnostics for SFXI objectives (labels-only).

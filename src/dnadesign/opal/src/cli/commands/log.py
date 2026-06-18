@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/log.py
 
-CLI command to summarize per-round log events. Loads round log artifacts and
-prints a compact summary.
+CLI command to summarize per-round log events. Loads round log artifacts and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/run_paths.py
+dnadesign
+src/dnadesign/densegen/src/core/run_paths.py
 
 Run-scoped path helpers for canonical workspace layout.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

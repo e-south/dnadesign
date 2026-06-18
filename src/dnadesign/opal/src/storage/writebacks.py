@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/writebacks.py
+
+Storage helpers for writebacks OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

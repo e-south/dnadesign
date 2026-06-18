@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/fimo_concordance.py
 
 Plot descriptive concordance between Cruncher optimizer scores and FIMO scores.

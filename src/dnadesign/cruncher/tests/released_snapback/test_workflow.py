@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_workflow.py
 
 Bundle and show-path tests for released-product snapback workflows.

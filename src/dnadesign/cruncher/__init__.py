@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/__init__.py
 
-Author(s): Eric J. South
+Package exports for Cruncher.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

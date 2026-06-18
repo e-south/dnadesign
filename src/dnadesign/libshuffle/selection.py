@@ -1,17 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/selection.py
+dnadesign
+src/dnadesign/libshuffle/selection.py
 
-Select the best subsample based on
-  1.  per-sequence TF richness ≥ cfg.min_tf_richness
-  2.  semantic diversity          (mean-cosine threshold)
-  3.  literal diversity           (Hamming / Levenshtein / Jaccard / NW)
-  4.  Leiden-cluster uniqueness
-then maximise the minimum Euclidean gap.
+Select the best subsample based on.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_yiu_docs_routing.py
 
 Routing contracts for payload-centric YIU docs surfaces.

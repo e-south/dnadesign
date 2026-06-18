@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/context.py
+dnadesign
+src/dnadesign/densegen/src/cli/context.py
 
 Shared CLI wiring context for command registration.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

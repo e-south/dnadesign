@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/runtime/test_source_cache.py
 
 Pipeline source cache behavior tests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

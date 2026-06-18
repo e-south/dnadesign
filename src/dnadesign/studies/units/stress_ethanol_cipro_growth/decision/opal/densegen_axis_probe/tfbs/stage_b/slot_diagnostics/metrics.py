@@ -1,4 +1,13 @@
-"""Trajectory and count-stratified lift calculations for slot diagnostics."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/slot_diagnostics/metrics.py
+
+Trajectory and count-stratified lift calculations for slot diagnostics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

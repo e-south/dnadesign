@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/evo2_logits.py
+
+Evaluator adapters for Evo2 logits Permuter evaluators.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

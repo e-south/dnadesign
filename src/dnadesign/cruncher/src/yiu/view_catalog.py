@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_catalog.py
 
 Canonical view registry and render-job planning for payload-centric YIU bundles.

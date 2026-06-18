@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/selection.py
 
-Registers selection strategies and loads built-in selection modules. Provides
-selection lookup and contract enforcement helpers.
+Registers selection strategies and loads built-in selection modules. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/composition_review_svg_v1.py
 
 Manifest for generated composition review SVG panels.

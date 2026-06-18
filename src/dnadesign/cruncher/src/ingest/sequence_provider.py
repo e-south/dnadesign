@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/ingest/sequence_provider.py
 
-Author(s): Eric J. South
+Ingest helpers for sequence provider Cruncher ingest.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

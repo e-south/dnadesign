@@ -1,4 +1,13 @@
-"""Retention preflight estimates for DenseGen TFBS learnability campaigns."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/retention.py
+
+Retention preflight estimates for DenseGen TFBS learnability campaigns.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

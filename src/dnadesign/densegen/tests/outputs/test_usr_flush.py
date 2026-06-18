@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/tests/test_usr_flush.py
+src/dnadesign/densegen/tests/outputs/test_usr_flush.py
 
-Transactional flush tests for DenseGen USR output writing.
+Tests transactional DenseGen USR output flushing.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

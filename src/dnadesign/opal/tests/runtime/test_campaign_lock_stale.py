@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_campaign_lock_stale.py
+
+Regression tests for campaign lock stale OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

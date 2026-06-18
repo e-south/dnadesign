@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/annotations/features.py
 
-Helpers for reading and matching USR-backed sequence annotations inside
-Construct.
+Helpers for reading and matching USR-backed sequence annotations inside.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

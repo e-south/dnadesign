@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/scripts/test_materialize_promoter_anchor_sequence_views.py
+
+Regression tests for materialize promoter anchor sequence views USR scripts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import shutil

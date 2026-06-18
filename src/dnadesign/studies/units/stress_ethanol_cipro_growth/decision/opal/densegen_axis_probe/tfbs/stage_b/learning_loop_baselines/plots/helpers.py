@@ -1,4 +1,13 @@
-"""Shared helpers for frozen replay plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/learning_loop_baselines/plots/helpers.py
+
+Shared helpers for frozen replay plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/render_plan.py
 
-Render preflight, runtime loading, and plan models for payload-centric YIU
-bundles.
+Render preflight, runtime loading, and plan models for payload-centric YIU.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

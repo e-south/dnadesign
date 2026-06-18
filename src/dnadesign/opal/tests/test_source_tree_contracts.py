@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/test_source_tree_contracts.py
+
+Regression tests for source tree OPAL.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -9,7 +20,10 @@ OPAL_SOURCE_ROOT = OPAL_ROOT / "src"
 
 
 def _line_count(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8").splitlines())
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) >= 10 and lines[0] == '"""' and lines[1] == "-" * 80 and lines[8] == "-" * 80 and lines[9] == '"""':
+        return len(lines) - 10
+    return len(lines)
 
 
 def test_opal_package_root_has_no_ad_hoc_python_modules() -> None:
@@ -67,9 +81,7 @@ def test_notebook_components_are_semantic_package_modules() -> None:
     assert not component_file.exists()
     assert component_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in component_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in component_package.glob("*.py") if path.name != "__init__.py"
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 360
@@ -82,9 +94,7 @@ def test_notebook_template_is_semantic_package_modules() -> None:
     assert not template_file.exists()
     assert template_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in template_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in template_package.glob("*.py") if path.name != "__init__.py"
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 220
@@ -97,9 +107,7 @@ def test_notebook_set_template_is_semantic_package_modules() -> None:
     assert not template_file.exists()
     assert template_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in template_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in template_package.glob("*.py") if path.name != "__init__.py"
     }
     assert {
         "_support.py",
@@ -158,7 +166,7 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     assert "analysis.dashboard.api" in progress_api.read_text()
     assert "build_records_preview" not in aggregate_api.read_text()
     assert notebook_api.__all__ == ()
-    module_lengths = {path.name: len(path.read_text().splitlines()) for path in api_package.glob("*.py")}
+    module_lengths = {path.name: _line_count(path) for path in api_package.glob("*.py")}
     assert max(module_lengths.values()) <= 160
     for name in [
         "build_notebook_campaign_set_metric_comparison_rows",
@@ -198,9 +206,7 @@ def test_analysis_core_concepts_are_semantic_package_modules() -> None:
         package = analysis_package / package_name
         assert package.is_dir()
         assert (package / "__init__.py").is_file()
-        module_lengths = {
-            path.name: len(path.read_text().splitlines()) for path in package.glob("*.py") if path.name != "__init__.py"
-        }
+        module_lengths = {path.name: _line_count(path) for path in package.glob("*.py") if path.name != "__init__.py"}
         assert expected_modules.issubset(module_lengths)
         assert max(module_lengths.values()) <= 220
 
@@ -212,9 +218,7 @@ def test_campaign_progress_analysis_is_semantic_package_modules() -> None:
     assert not progress_file.exists()
     assert progress_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in progress_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in progress_package.glob("*.py") if path.name != "__init__.py"
     }
     assert {"content.py", "ledger.py", "models.py", "records.py"}.issubset(module_lengths)
     assert max(module_lengths.values()) <= 180
@@ -227,9 +231,7 @@ def test_label_history_is_semantic_package_modules() -> None:
     assert not history_file.exists()
     assert history_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in history_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in history_package.glob("*.py") if path.name != "__init__.py"
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 260
@@ -242,9 +244,7 @@ def test_ingest_y_command_is_semantic_package_modules() -> None:
     assert not command_file.exists()
     assert command_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in command_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in command_package.glob("*.py") if path.name != "__init__.py"
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 280
@@ -263,9 +263,7 @@ def test_round_stages_are_semantic_package_modules() -> None:
     assert not stages_file.exists()
     assert stages_package.is_dir()
     module_lengths = {
-        path.name: len(path.read_text().splitlines())
-        for path in stages_package.glob("*.py")
-        if path.name != "__init__.py"
+        path.name: _line_count(path) for path in stages_package.glob("*.py") if path.name != "__init__.py"
     }
     assert module_lengths
     assert max(module_lengths.values()) <= 260

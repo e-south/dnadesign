@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py
+src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py
 
 Information-architecture contract tests for infer docs progressive disclosure.
 

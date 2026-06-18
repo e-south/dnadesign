@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/yiu_workflow/__init__.py
 
 Payload-centric YIU workflow validation, publication, and inspection.

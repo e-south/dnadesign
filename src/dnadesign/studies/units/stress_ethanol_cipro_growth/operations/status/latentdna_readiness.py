@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/latentdna_readiness.py
 
-Read-only LatentDNA readiness inspection for stress_ethanol_cipro_growth
-status surfaces.
+Read-only LatentDNA readiness inspection for stress_ethanol_cipro_growth.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

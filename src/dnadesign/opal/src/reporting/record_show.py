@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/record_show.py
+
+Reporting helpers for record show OPAL reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

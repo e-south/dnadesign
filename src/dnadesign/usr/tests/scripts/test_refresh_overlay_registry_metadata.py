@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/scripts/test_refresh_overlay_registry_metadata.py
+
+Regression tests for refresh overlay registry metadata USR scripts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import shutil

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_package_layout.py
 
 Tests for package-root path resolution after baserender internal src/ consolidation.

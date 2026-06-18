@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/models/random_forest.py
+
+Typed models for random forest OPAL models.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/config/loader.py
 
-Loads and validates OPAL campaign YAML into typed config objects. Resolves
-paths relative to campaign root and config location.
+Loads and validates OPAL campaign YAML into typed config objects. Resolves.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

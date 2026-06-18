@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/pwm/test_pwm_sampling_time_limit.py
+
+Regression tests for PWM sampling time limit DenseGen PWM.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import logging

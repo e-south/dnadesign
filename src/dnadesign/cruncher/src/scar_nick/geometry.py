@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/geometry.py
 
 Coordinate-domain helpers for terminal scar-nick enzyme geometry.

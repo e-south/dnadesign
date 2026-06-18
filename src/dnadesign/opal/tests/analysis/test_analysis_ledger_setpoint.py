@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_analysis_ledger_setpoint.py
+
+Regression tests for analysis ledger setpoint OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

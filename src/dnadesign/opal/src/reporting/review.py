@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/review.py
 
 Builds campaign-scoped review artifacts from OPAL ledgers and per-round outputs.
-The module is intentionally campaign-generic so study probes can reuse the same
-manifest, progress, and plot primitives without owning OPAL review semantics.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

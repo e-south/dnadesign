@@ -1,4 +1,13 @@
-"""Native RegulonDB promoter metadata profile coverage for LatentDNA."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_regulondb_native_promoter_profile.py
+
+Native RegulonDB promoter metadata profile coverage for LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

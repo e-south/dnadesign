@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/pwm_context_sample_context.py
 
 Sample-backed PWM context resolution for payload-centric YIU workflows.

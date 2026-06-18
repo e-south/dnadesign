@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/sigma70.py
 
 Sigma70 transform that emits generic kmer features and span_link effects.

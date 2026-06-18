@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/persistence.py
+dnadesign
+src/dnadesign/nmf/persistence.py
+
+Persistence helpers for NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

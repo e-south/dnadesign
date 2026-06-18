@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/tests/test_workflow_metadata.py
 
-Contract tests for explicit orchestration workflow metadata and notify-policy
-rules.
+Contract tests for explicit orchestration workflow metadata and notify-policy.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

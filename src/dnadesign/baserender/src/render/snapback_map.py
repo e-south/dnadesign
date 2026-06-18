@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/snapback_map.py
 
 Snapback-specific nucleotide-resolution renderer for Cruncher QA views.

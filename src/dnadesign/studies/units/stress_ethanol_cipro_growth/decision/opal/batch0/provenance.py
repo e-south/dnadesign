@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/provenance.py
+
 Sidecar-aware provenance checks for the stress/ethanol/ciprofloxacin OPAL handoff.
 
-The OPAL candidate table is intentionally narrow from OPAL's point of view, but
-this study still needs a clean ID through-line back through DenseGen, Construct,
-Infer, and the selected LatentDNA X view.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

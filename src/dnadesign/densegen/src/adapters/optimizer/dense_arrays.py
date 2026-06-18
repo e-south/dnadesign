@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/optimizer/dense_arrays.py
+dnadesign
+src/dnadesign/densegen/src/adapters/optimizer/dense_arrays.py
 
 Dense-arrays optimizer adapter and helpers.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

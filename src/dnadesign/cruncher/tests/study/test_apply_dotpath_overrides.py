@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_apply_dotpath_overrides.py
 
 Validate Study dot-path override behavior.

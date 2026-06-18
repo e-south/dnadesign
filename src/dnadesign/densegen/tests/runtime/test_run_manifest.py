@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/runtime/test_run_manifest.py
+
+Regression tests for run manifest DenseGen runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.run_manifest import PlanManifest, RunManifest, load_run_manifest

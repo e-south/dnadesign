@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_optimizer_stats_sidecar.py
 
 Validates strict loading of optimizer move-stats sidecar data during analysis.

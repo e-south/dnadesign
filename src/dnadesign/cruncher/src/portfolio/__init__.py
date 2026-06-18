@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/__init__.py
 
 Portfolio workflow package for cross-workspace elite aggregation outputs.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/config/test_config_objectives_v2.py
 
 Validates v2 config parsing for multi-objective score channel selection.

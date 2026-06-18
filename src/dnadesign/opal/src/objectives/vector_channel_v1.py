@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/objectives/vector_channel_v1.py
+
+Objective plugin logic for vector channel v1 OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

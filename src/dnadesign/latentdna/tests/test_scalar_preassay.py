@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_scalar_preassay.py
+
+Regression tests for scalar preassay LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from dnadesign.latentdna.src.scalars.preassay import PREASSAY_BUILDER_KINDS
 
 

@@ -1,4 +1,13 @@
-"""Per-campaign artifact writers for Stage B TFBS config generation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/configs/campaign_artifacts.py
+
+Per-campaign artifact writers for Stage B TFBS config generation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

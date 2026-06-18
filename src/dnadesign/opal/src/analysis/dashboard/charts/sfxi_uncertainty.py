@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_uncertainty.py
 
 Uncertainty diagnostics charts for SFXI dashboards.

@@ -1,4 +1,13 @@
-"""Project-scope discovery helpers for OPAL notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/project.py
+
+Project-scope discovery helpers for OPAL notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

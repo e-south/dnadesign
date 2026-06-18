@@ -1,4 +1,13 @@
-"""Null-label provenance helpers for the DenseGen motif QA probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/plan_logic/nulls.py
+
+Null-label provenance helpers for the DenseGen motif QA probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

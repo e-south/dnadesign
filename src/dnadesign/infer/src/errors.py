@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/errors.py
 
+Focused helpers for errors infer.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

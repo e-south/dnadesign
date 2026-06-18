@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/plots/test_plot_meta.py
+
+Regression tests for plot meta OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

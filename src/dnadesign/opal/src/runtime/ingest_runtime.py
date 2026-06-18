@@ -1,4 +1,13 @@
-"""Runtime contract for OPAL label ingest memory posture."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/runtime/ingest_runtime.py
+
+Runtime contract for OPAL label ingest memory posture.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

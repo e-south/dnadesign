@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_workspace_demos.py
 
 Tests for curated baserender workspace demos and their self-contained IO assets.

@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/usr/src/sequence_views/models.py
 
-Sequence-view contracts for semantically distinct products that may share one
-base USR sequence id.
+Sequence-view contracts for semantically distinct products that may share one.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

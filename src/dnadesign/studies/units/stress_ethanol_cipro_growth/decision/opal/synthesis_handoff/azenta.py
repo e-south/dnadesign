@@ -1,4 +1,13 @@
-"""Azenta/GeneWiz workbook projection for synthesis manifests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/azenta.py
+
+Azenta/GeneWiz workbook projection for synthesis manifests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

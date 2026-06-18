@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/ranked_variants.py
+
+Plot builders for ranked variants Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

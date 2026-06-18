@@ -1,4 +1,13 @@
-"""Contracts for latentdna view metadata materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/views/test_materialization.py
+
+Contracts for latentdna view metadata materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

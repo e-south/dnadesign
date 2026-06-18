@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_run_round_integrity.py
+
+Regression tests for run round integrity OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

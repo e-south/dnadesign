@@ -1,4 +1,13 @@
-"""Runtime application of candidate eligibility rules."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/eligibility/runtime.py
+
+Runtime application of candidate eligibility rules.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

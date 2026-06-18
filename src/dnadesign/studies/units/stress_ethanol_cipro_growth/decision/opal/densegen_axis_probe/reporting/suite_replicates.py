@@ -1,4 +1,13 @@
-"""Seed-replicate summaries for DenseGen OPAL probe suites."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/suite_replicates.py
+
+Seed-replicate summaries for DenseGen OPAL probe suites.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

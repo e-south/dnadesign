@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_pvalue_cache.py
 
 Validates log-odds p-value lookup caching behavior.

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/metadata.py
+dnadesign
+src/dnadesign/densegen/src/core/metadata.py
 
 Centralized metadata derivation for DenseGen outputs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

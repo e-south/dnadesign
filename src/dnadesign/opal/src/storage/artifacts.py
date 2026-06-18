@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/artifacts.py
 
-Defines round artifact paths and write helpers for OPAL outputs. Provides
-consistent filesystem write utilities for round artifacts.
+Defines round artifact paths and write helpers for OPAL outputs. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

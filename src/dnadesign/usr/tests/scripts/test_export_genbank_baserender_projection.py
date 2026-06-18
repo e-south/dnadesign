@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/scripts/test_export_genbank_baserender_projection.py
 
 Tests for USR-owned GenBank BaseRender projection helpers.

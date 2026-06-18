@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-billboard/main.py
+dnadesign
+src/dnadesign/billboard/main.py
+
+CLI entrypoint for billboard.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

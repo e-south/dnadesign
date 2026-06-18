@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_dashboard_utils.py
+
+Regression tests for dashboard utils OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

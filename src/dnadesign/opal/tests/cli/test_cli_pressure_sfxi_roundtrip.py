@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_pressure_sfxi_roundtrip.py
+
+Regression tests for CLI pressure SFXI roundtrip OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

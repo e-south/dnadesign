@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/run_set_execution.py
 
 Execution-stage implementation for running a sample set and persisting artifacts.

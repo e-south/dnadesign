@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/runs.py
 
 Renders runs list output for OPAL CLI. Formats list of run metadata entries.

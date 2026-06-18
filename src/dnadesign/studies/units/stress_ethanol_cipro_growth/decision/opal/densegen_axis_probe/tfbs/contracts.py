@@ -1,4 +1,13 @@
-"""DenseGen TFBS learnability parser and row-level contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/contracts.py
+
+DenseGen TFBS learnability parser and row-level contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

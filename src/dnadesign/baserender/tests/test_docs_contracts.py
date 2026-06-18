@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_docs_contracts.py
 
 Guardrails for compact, operator-first baserender documentation.

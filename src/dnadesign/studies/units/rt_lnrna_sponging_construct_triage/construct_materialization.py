@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py
 
-Construct materialization helpers for the RT-lnRNA sponging construct triage
-study.
+Construct materialization helpers for the RT-lnRNA sponging construct triage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

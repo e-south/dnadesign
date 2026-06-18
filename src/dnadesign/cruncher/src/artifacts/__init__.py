@@ -1,8 +1,10 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/artifacts/__init__.py
 
-Author(s): Eric J. South
+Package exports for Cruncher artifacts.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

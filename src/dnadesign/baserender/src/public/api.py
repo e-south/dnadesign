@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/public/api.py
 
 Baserender vNext public API for job execution and record rendering helpers.

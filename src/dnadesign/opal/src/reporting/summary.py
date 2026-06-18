@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/summary.py
 
-Summarizes run logs and run metadata for reporting commands. Provides helpers
-for CLI status and log summaries.
+Summarizes run logs and run metadata for reporting commands. Provides helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_empty_elites_fail.py
 
 Ensures empty elite pools fail the run and mark status as failed.

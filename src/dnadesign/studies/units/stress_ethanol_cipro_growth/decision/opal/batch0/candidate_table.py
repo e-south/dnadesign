@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/candidate_table.py
+
 Candidate feature-table contract for the stress/ethanol/ciprofloxacin OPAL handoff.
 
-The OPAL candidate table is a generated USR records table. It is intentionally
-smaller than the full LatentDNA view: batch-0 and the first OPAL campaigns use
-the dense generated promoter population with one chosen LatentDNA X vector.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_projection.py
 
-Construct projection manifest validation for the RT-lnRNA sponging construct
-triage study.
+Construct projection manifest validation for the RT-lnRNA sponging construct.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

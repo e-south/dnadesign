@@ -1,4 +1,13 @@
-"""Contracts for notebook context-audit summary aggregation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_notebook_context_audit_contract.py
+
+Contracts for notebook context-audit summary aggregation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

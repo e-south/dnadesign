@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/config/moves.py
 
-Author(s): Eric J. South
+Configuration contracts for moves Cruncher config.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/layout.py
 
 Path and filename layout helpers for Portfolio aggregation artifacts.

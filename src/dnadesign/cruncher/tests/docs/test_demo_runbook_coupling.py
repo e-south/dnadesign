@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_demo_runbook_coupling.py
 
 Couple demo doc command flows to workspace machine runbook contracts.

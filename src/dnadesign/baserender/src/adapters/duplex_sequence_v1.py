@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/duplex_sequence_v1.py
 
 Adapter from shared linear-duplex cassette contracts to baserender Record v1.

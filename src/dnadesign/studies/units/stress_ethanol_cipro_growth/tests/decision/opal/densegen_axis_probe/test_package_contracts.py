@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_package_contracts.py
+
+Regression tests for package studies units stress ethanol cipro growth decision.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from .helpers import (
@@ -10,7 +21,10 @@ from .probe_modules import PROBE_PACKAGE
 
 
 def _line_count(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8").splitlines())
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) >= 10 and lines[0] == '"""' and lines[1] == "-" * 80 and lines[8] == "-" * 80 and lines[9] == '"""':
+        return len(lines) - 10
+    return len(lines)
 
 
 def test_probe_package_root_exports_no_flat_api_surface() -> None:
@@ -46,7 +60,7 @@ def test_probe_review_is_semantic_package() -> None:
     assert review_package.is_dir()
     assert (review_package / "aggregate_plots").is_dir()
     module_lengths = {
-        path.relative_to(review_package).as_posix(): len(path.read_text(encoding="utf-8").splitlines())
+        path.relative_to(review_package).as_posix(): _line_count(path)
         for path in review_package.rglob("*.py")
         if path.name != "__init__.py"
     }
@@ -89,7 +103,7 @@ def test_tfbs_null_and_slot_diagnostics_are_semantic_packages() -> None:
     assert (slot_diagnostics_package / "plots").is_dir()
 
     module_lengths = {
-        path.relative_to(probe_root).as_posix(): len(path.read_text(encoding="utf-8").splitlines())
+        path.relative_to(probe_root).as_posix(): _line_count(path)
         for package in (
             nulls_package,
             candidate_scopes_package,
@@ -126,7 +140,7 @@ def test_tfbs_stage_b_configs_and_review_are_semantic_packages() -> None:
     assert all(path.is_dir() for path in semantic_packages)
 
     module_lengths = {
-        path.relative_to(probe_root).as_posix(): len(path.read_text(encoding="utf-8").splitlines())
+        path.relative_to(probe_root).as_posix(): _line_count(path)
         for package in semantic_packages
         for path in package.glob("*.py")
         if path.name != "__init__.py"
@@ -158,10 +172,6 @@ def test_probe_tests_are_semantic_package() -> None:
     assert not legacy_flat_file.exists()
     assert not (tests_root / "stress_ethanol_cipro_growth").exists()
     assert test_package.is_dir()
-    module_lengths = {
-        path.name: len(path.read_text(encoding="utf-8").splitlines())
-        for path in test_package.glob("*.py")
-        if path.name != "__init__.py"
-    }
+    module_lengths = {path.name: _line_count(path) for path in test_package.glob("*.py") if path.name != "__init__.py"}
     assert module_lengths
     assert max(module_lengths.values()) <= 360

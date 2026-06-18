@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
 
-Reader-derived SPOP planning checks for the RT-lnRNA sponging construct triage
-study.
+Reader-derived SPOP planning checks for the RT-lnRNA sponging construct triage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

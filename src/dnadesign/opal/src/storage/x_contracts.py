@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/x_contracts.py
 
 Validation helpers for OPAL feature-vector columns.

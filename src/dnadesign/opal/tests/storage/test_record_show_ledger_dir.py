@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/storage/test_record_show_ledger_dir.py
+
+Regression tests for record show ledger dir OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/selection/test_selection_contracts.py
+
+Regression tests for selection OPAL selection.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

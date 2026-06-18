@@ -1,4 +1,13 @@
-"""Plot contracts for TFBS learning-loop baseline reviews."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/learning_loop_baselines/plots/contracts.py
+
+Plot contracts for TFBS learning-loop baseline reviews.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

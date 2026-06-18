@@ -1,4 +1,13 @@
-"""Campaign-set visual surface models."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_set/visuals.py
+
+Campaign-set visual surface models.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

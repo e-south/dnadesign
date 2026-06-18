@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/cli/console.py
 
+CLI wiring for console infer CLI.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

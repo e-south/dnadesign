@@ -1,4 +1,13 @@
-"""Public builders for DenseGen TFBS matched null label tables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/nulls/builders.py
+
+Public builders for DenseGen TFBS matched null label tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

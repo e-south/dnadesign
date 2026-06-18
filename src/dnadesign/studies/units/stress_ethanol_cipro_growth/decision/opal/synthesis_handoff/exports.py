@@ -1,4 +1,13 @@
-"""Generated synthesis-handoff output layout."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/exports.py
+
+Generated synthesis-handoff output layout.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

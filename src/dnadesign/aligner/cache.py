@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/cache.py
+dnadesign
+src/dnadesign/aligner/cache.py
 
 Cache module for storing and retrieving computed alignment scores.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

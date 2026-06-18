@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/cruncher_showcase_job.py
 
 Generic Render Job v3 schema and loader with strict nested key validation.
-This module remains as a compatibility path; the organized namespace is
-`dnadesign.baserender.src.config.jobs.sequence_rows_v3`.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

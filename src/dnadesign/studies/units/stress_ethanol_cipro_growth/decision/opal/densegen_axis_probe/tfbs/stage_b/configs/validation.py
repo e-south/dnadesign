@@ -1,4 +1,13 @@
-"""Fail-fast validation for DenseGen TFBS Stage B sentinel config generation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/configs/validation.py
+
+Fail-fast validation for DenseGen TFBS Stage B sentinel config generation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

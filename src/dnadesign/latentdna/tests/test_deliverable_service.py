@@ -1,4 +1,13 @@
-"""Deliverable status service contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_deliverable_service.py
+
+Deliverable status service contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/stage_a/test_data_ingestor_strict.py
 
 Input table validation tests for DenseGen sources.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

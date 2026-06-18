@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_annotation_layout.py
+
+Regression tests for annotation LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from matplotlib.transforms import Bbox
 
 from dnadesign.latentdna.src.presentation.annotation_layout import choose_annotation_placement

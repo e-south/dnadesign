@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/ingest/test_regulondb_promoters.py
+
+Regression tests for RegulonDB promoters Cruncher ingest.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json

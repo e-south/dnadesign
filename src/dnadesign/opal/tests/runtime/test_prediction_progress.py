@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_prediction_progress.py
+
+Regression tests for prediction progress OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

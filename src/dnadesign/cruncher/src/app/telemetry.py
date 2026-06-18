@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/telemetry.py
 
 Bridge optimizer telemetry updates to run status writers.

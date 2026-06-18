@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/pipeline/run_setup.py
+dnadesign
+src/dnadesign/densegen/src/core/pipeline/run_setup.py
 
 Run setup helpers for plan tracking and display mapping.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

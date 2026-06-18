@@ -1,4 +1,13 @@
-"""Record-contract helpers for campaign progress notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_progress/records.py
+
+Record-contract helpers for campaign progress notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

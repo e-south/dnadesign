@@ -1,4 +1,13 @@
-"""Study-owned DenseGen axis OPAL probe package."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/plan_logic/axis_oracle.py
+
+Study-owned DenseGen axis OPAL probe package.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

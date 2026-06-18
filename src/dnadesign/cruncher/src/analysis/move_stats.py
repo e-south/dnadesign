@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/move_stats.py
 
 Normalize optimizer move-stat rows into a strict typed frame for downstream analysis.

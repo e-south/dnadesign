@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/init.py
 
-Initializes OPAL campaign workspaces and validates records layout. Writes
-state.json and ensures campaign directories exist.
+Initializes OPAL campaign workspaces and validates records layout. Writes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

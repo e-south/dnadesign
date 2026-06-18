@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/workspace.py
+dnadesign
+src/dnadesign/densegen/src/cli/workspace.py
 
 Workspace scaffolding CLI command registration.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

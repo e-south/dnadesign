@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_visual_style.py
+
+Regression tests for visual style LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from dnadesign.latentdna.src.presentation.visual_style import scatter_style
 
 

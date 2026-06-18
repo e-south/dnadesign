@@ -1,17 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/cds_score.py
+dnadesign
+src/dnadesign/libshuffle/cds_score.py
 
-Provides a wrapper function to compute the Composite Diversity Score (CDS)
-from a subsample of sequence entries. Each sequence is expected to contain a
-meta_nmf dictionary with a "program_composition" key (a row-normalized vector).
-
-The CDS is computed using the function compute_composite_diversity_score from
-dnadesign.nmf.diagnostics.
+Provides a wrapper function to compute the Composite Diversity Score (CDS).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

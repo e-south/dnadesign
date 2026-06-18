@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_plot_config_contracts.py
+
+Regression tests for plot config studies units stress ethanol cipro growth.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from .helpers import ORACLE_ID, Path, RunSpec, build_plan, json, write_campaign_plot_config, yaml

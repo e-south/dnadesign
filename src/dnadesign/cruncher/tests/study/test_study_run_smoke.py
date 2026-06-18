@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_run_smoke.py
 
 Smoke test for end-to-end Study execution with aggregate outputs.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_run_renderer.py
 
 Validates strict run summary rendering contract for selection mode/tie fields.

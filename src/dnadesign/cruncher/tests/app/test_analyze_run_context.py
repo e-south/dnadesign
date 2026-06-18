@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_analyze_run_context.py
 
 Validates run-context resolution used by analyze plotting/publication orchestration.

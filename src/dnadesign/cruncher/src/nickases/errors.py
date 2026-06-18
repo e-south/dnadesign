@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/errors.py
 
 Shared explicit error contracts for normalized nickase catalog workflows.

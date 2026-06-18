@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_snapback_map_renderer.py
 
 Direct renderer tests for snapback_map foldback semantics and layout behavior.

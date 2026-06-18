@@ -1,4 +1,13 @@
-"""Materialize realized-label review artifacts for DenseGen TFBS Stage B campaigns."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/review/materialization.py
+
+Materialize realized-label review artifacts for DenseGen TFBS Stage B campaigns.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

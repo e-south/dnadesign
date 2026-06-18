@@ -1,4 +1,13 @@
-"""Fail-fast validation for replicated Stage B review inputs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/review/replicates/validation.py
+
+Fail-fast validation for replicated Stage B review inputs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

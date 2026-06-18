@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/plot.py
 
-CLI plotting command for OPAL campaign outputs and ledgers. Resolves plot
-configs, rounds, and output locations for charts.
+CLI plotting command for OPAL campaign outputs and ledgers. Resolves plot.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

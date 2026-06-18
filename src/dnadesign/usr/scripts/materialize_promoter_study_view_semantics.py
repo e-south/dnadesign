@@ -1,10 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/materialize_promoter_study_view_semantics.py
+
 Materialize mutable sequence-view semantics for the promoter study.
 
-The stable sequence-view sidecar answers "what sequence product is this?".
-This helper writes the companion addendum that answers study/provenance
-questions such as source family, selection basis, and view collection without
-changing `view_id`.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

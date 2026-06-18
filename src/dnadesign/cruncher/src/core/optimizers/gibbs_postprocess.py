@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/gibbs_postprocess.py
 
 Provide Gibbs optimiser postprocess helpers for trace assembly and elite picking.

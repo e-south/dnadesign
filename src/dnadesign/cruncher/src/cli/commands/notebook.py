@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/notebook.py
 
-Author(s): Eric J. South
+CLI wiring for notebook Cruncher CLI commands.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

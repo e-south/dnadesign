@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/objectives/aggregators.py
+
+Core runtime primitives for aggregators Cruncher core objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

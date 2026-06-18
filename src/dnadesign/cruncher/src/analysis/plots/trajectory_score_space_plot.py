@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/trajectory_score_space_plot.py
 
 Orchestrate trajectory score-space plotting modes and metadata assembly.

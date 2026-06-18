@@ -1,4 +1,13 @@
-"""Public helper surface for generated OPAL campaign notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/notebooks/api/generated.py
+
+Re-exports helpers used by generated OPAL notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

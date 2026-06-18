@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/policy.py
 
 Ligation-aware profile policy for terminal scar-nick panel selection.

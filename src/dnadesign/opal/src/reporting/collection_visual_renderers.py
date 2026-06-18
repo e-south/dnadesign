@@ -1,4 +1,13 @@
-"""Renderer registry for materialized campaign-set collection visuals."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/reporting/collection_visual_renderers.py
+
+Renderer registry for materialized campaign-set collection visuals.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

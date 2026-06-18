@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/models.py
 
 Schema and reporting contracts for v2 explicit snapback workflows.

@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/stage_a/test_stage_a_progress.py
 
 Stage-A progress line formatting tests.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

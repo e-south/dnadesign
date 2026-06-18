@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/viz/mpl.py
 
-Author(s): Eric J. South
+Visualization helpers for mpl Cruncher viz.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

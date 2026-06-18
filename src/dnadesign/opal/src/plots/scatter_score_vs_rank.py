@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/scatter_score_vs_rank.py
 
-Plots objective score vs selection rank from ledger predictions. Reads
-outputs/ledger/predictions for scatter plots.
+Plots objective score vs selection rank from ledger predictions. Reads.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

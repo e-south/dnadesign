@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/guide.py
 
-CLI command group for guided workflow runbooks and state-aware next-step
-recommendations.
+CLI command group for guided workflow runbooks and state-aware next-step.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

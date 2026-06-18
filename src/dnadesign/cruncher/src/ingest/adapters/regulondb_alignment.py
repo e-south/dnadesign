@@ -1,4 +1,13 @@
-"""Alignment matrix parsing helpers for RegulonDB motif intake."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/adapters/regulondb_alignment.py
+
+Alignment matrix parsing helpers for RegulonDB motif intake.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

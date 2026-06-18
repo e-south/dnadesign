@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/nmf_train.py
+dnadesign
+src/dnadesign/nmf/nmf_train.py
+
+Focused helpers for NMF train NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/__init__.py
+
 DenseGen input sources package.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from ...core.stage_a.stage_a_types import PWMMotif

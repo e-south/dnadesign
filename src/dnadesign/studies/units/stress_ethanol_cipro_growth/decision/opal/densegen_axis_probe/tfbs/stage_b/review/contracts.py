@@ -1,4 +1,13 @@
-"""Contracts for DenseGen TFBS Stage B realized-label review artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/review/contracts.py
+
+Contracts for DenseGen TFBS Stage B realized-label review artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

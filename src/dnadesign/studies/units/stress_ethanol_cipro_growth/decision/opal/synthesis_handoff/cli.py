@@ -1,4 +1,13 @@
-"""CLI for stress-study OPAL synthesis handoff fixture flows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/cli.py
+
+CLI for stress-study OPAL synthesis handoff fixture flows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

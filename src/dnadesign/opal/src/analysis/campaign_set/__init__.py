@@ -1,4 +1,13 @@
-"""Campaign-set semantic view-model helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_set/__init__.py
+
+Campaign-set semantic view-model helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

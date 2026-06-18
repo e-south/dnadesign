@@ -1,4 +1,13 @@
-"""Artifact-contract checks for DenseGen axis probe status."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/status_contracts.py
+
+Artifact-contract checks for DenseGen axis probe status.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

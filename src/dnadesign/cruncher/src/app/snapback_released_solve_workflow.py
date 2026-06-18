@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/snapback_released_solve_workflow.py
 
 Application orchestration for released-product snapback solve/materialization.

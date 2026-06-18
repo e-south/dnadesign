@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_plot_models.py
 
 Typed plot-context contracts for released-product snapback hit rendering.

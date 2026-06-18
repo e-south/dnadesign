@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/api/coding_dna.py
 
-Coding-DNA-backed DMS generation for the public API.
+Coding-DNA DMS generation backed by explicit codon-table semantics.
 
-Module Author(s): OpenAI Codex
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

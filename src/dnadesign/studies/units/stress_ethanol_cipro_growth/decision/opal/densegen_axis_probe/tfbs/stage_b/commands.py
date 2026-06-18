@@ -1,4 +1,13 @@
-"""OPAL command contracts for Stage B TFBS campaign artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/commands.py
+
+OPAL command contracts for Stage B TFBS campaign artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

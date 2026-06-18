@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/portfolio_execution.py
 
 Execution helpers for Portfolio preparation and aggregation flows.

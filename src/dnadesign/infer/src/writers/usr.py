@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/writers/usr.py
 
+Writer helpers for USR infer writers.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

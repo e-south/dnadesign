@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/_events_util.py
 
-Loads ledger-backed event data for plot plugins. Resolves output paths
-for predictions and run metadata.
+Loads ledger-backed event data for plot plugins. Resolves output paths.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

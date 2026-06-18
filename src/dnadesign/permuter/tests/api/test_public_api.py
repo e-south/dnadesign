@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/api/test_public_api.py
 
-Module Author(s): OpenAI Codex
+Public API behavior contracts for in-memory Permuter workflows.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/bio/iupac.py
 
 Shared DNA/IUPAC normalization and matching helpers.

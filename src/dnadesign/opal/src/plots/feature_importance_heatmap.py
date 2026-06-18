@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/feature_importance_heatmap.py
 
 Generic attribution-matrix heatmap over OPAL rounds.

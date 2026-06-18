@@ -6,7 +6,6 @@ src/dnadesign/cluster/src/__init__.py
 Cluster runtime package.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

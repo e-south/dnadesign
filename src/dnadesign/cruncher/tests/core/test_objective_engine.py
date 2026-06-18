@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_objective_engine.py
+
+Regression tests for objective engine Cruncher core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

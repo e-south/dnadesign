@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/plotting/test_plot_inventory.py
 
-Coverage for shared plot inventory helpers used by plotting and notebook
-gallery discovery.
+Coverage for shared plot inventory helpers used by plotting and notebook.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

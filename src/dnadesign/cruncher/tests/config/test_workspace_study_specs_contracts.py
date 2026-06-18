@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_workspace_study_specs_contracts.py
 
 Contract tests for workspace study specs used by portfolio orchestration.

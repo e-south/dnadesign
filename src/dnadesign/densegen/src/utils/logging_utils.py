@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/src/utils/logging_utils.py
 
 Logging setup and stderr filtering utilities.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

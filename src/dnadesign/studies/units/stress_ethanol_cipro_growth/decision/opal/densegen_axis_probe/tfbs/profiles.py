@@ -1,4 +1,13 @@
-"""Target-profile contracts for DenseGen TFBS learnability probe campaigns."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/profiles.py
+
+Target-profile contracts for DenseGen TFBS learnability probe campaigns.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

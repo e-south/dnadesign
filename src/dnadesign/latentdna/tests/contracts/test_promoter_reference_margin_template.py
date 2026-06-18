@@ -1,4 +1,13 @@
-"""Contracts for the promoter-study pre-assay representation-triage template."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_promoter_reference_margin_template.py
+
+Contracts for the promoter-study pre-assay representation-triage template.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/records_io.py
+
+Storage helpers for records IO OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,4 +1,13 @@
-"""Shared helpers for OPAL notebook generation CLI contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/cli/commands/notebook_generation.py
+
+Shared helpers for OPAL notebook generation CLI contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

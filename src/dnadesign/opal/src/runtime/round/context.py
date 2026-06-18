@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round/context.py
 
-Builds the round context and registry view for OPAL runs. Centralizes run_id
-creation and RoundCtx initialization.
+Builds the round context and registry view for OPAL runs. Centralizes run_id.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

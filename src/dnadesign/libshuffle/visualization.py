@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/visualization.py
+dnadesign
+src/dnadesign/libshuffle/visualization.py
+
+Focused helpers for visualization libshuffle.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/util/normalize.py
 
+Utility helpers for normalize cluster util.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

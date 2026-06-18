@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/workspaces/test_family_registry.py
 
-Contracts for typed workflow-family registration and family-aware workspace
-discovery.
+Contracts for typed workflow-family registration and family-aware workspace.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

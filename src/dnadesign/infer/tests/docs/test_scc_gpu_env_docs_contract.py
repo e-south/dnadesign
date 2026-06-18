@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py
 
-Docs contract checks for infer SCC Evo2 GPU environment runbook discoverability
-and deterministic build controls.
+Docs contract checks for infer SCC Evo2 GPU environment runbook discoverability.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

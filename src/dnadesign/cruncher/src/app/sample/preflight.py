@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/preflight.py
 
 Validate sample-run preconditions and derive scheduling metadata.

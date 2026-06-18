@@ -1,16 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/metrics.py
+dnadesign
+src/dnadesign/libshuffle/metrics.py
 
 Utility functions that let **libshuffle** call **billboard** on-the-fly.
 
-- compute_pairwise_stats: returns mean/min for cosine & Euclidean.
-- compute_evo2_pairwise_matrix: full NxN cosine-dissimilarity for selection.
-- compute_billboard_metric: runs Billboard and filters metrics, mapping nw.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

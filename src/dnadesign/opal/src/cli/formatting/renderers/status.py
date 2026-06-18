@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/status.py
 
-Renders status command output for OPAL CLI. Formats campaign status summaries
-and round details.
+Renders status command output for OPAL CLI. Formats campaign status summaries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

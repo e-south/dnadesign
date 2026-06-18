@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/portfolio.py
 
 CLI entrypoints for cross-workspace Portfolio aggregation workflows.

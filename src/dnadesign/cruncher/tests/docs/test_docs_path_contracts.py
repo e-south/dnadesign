@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_docs_path_contracts.py
 
 Validate public docs against the current run-artifact path contract.

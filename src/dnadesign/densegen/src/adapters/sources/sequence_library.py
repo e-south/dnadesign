@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/sequence_library.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/sequence_library.py
 
 Sequence library input source (CSV/Parquet).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

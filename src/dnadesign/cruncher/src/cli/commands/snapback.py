@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/snapback.py
 
 CLI entrypoints for explicit v2 and co-design solve v3 snapback workflows.

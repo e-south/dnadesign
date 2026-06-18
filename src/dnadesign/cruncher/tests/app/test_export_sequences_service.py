@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_export_sequences_service.py
 
 Validate sequence export artifacts and strict contracts.

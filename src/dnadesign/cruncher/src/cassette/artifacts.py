@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/artifacts.py
 
 Artifact paths and persistence helpers for cassette design runs.

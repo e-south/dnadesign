@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/hairpin_topology_v1.py
 
 Adapter from shared hairpin-topology cassette contracts to baserender Record v1.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/outputs.py
 
 Build analysis table entries, artifact entries, and summary payloads.

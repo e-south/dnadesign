@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/notebook_set.py
 
 Manifest-backed view-model helpers for generated OPAL campaign-set notebooks.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/manifests.py
 
 Lightweight manifest contracts for configured OPAL plot artifacts.

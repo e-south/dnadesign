@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_workspace_sequence_length_bounds.py
 
 Contracts for workspace sequence-length defaults and study length ranges.

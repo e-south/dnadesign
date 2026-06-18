@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/locks.py
 
-Provides filesystem locks for write operations. Detects stale locks and guides
-remediation to avoid silent failures.
+Provides filesystem locks for write operations. Detects stale locks and guides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

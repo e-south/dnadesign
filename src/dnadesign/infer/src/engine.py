@@ -6,7 +6,6 @@ src/dnadesign/infer/src/engine.py
 Inference execution orchestration for extract and generate jobs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

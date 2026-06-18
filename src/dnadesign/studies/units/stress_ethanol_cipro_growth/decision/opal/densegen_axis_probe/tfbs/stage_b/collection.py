@@ -1,4 +1,13 @@
-"""Stage B campaign-collection ontology for TFBS learnability review."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/collection.py
+
+Stage B campaign-collection ontology for TFBS learnability review.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

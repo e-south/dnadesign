@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_resume_semantics.py
 
 Validate Study resume behavior from partially-complete manifest state.

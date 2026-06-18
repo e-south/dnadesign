@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_yiu_demo_workspace_contracts.py
 
 Checked-in demo workspace contracts for payload-centric YIU docs surfaces.

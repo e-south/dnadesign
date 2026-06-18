@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/sequence_evidence_meta.py
 
 Shared helpers for producer metadata attached to sequence-evidence contracts.

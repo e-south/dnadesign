@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/elites_persistence.py
 
 Persistence and metadata helpers for sampled elite outputs.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/record_show.py
+
+CLI wiring for record show OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

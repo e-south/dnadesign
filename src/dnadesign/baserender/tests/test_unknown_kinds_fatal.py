@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_unknown_kinds_fatal.py
 
 Tests that unknown feature/effect kinds fail fast during rendering.

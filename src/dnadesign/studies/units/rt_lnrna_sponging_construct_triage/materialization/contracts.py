@@ -1,4 +1,13 @@
-"""Contracts and constants for RT-lnRNA Construct materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/contracts.py
+
+Contracts and constants for RT-lnRNA Construct materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

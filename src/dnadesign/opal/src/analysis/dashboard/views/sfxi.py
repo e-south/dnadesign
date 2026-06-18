@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/views/sfxi.py
 
-Computes SFXI scoring metrics for dashboard views. Provides label/prediction
-SFXI view data for charts.
+Computes SFXI scoring metrics for dashboard views. Provides label/prediction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

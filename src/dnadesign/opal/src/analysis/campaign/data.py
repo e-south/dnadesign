@@ -1,4 +1,13 @@
-"""Campaign data containers for analysis consumers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign/data.py
+
+Campaign data containers for analysis consumers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

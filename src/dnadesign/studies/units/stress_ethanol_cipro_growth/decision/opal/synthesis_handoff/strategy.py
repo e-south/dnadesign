@@ -1,4 +1,13 @@
-"""Cloning-strategy config loading for synthesis handoff."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/strategy.py
+
+Cloning-strategy config loading for synthesis handoff.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

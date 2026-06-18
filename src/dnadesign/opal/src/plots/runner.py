@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/runner.py
 
-Executes configured plots for OPAL campaigns using PlotContext. Owns plot
-dispatch, output resolution, and error handling.
+Executes configured plots for OPAL campaigns using PlotContext. Owns plot.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

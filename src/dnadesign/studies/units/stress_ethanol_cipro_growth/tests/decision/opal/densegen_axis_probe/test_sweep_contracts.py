@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_sweep_contracts.py
+
+Regression tests for sweep studies units stress ethanol cipro growth decision.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from .helpers import Path, build_plan, build_sweep_execution_contract, enforce_sweep_apply_contract, pytest

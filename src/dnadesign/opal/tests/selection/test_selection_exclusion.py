@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/selection/test_selection_exclusion.py
+
+Regression tests for selection exclusion OPAL selection.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

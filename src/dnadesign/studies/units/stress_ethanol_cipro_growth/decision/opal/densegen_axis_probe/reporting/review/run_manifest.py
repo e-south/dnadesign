@@ -1,4 +1,13 @@
-"""Run-manifest assembly for DenseGen axis probe reviews."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/run_manifest.py
+
+Run-manifest assembly for DenseGen axis probe reviews.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/cli/app.py
 
 Baserender vNext CLI for BaseRender v3 render configs.

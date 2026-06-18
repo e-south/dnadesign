@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/public_visuals.py
 
 Public snapback visual-contract publication for renderer-facing artifacts.

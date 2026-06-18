@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_extract_ingest_helper.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_extract_ingest_helper.py
 
 Parity tests for extract ingest loading helper.
 

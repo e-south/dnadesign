@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/cluster/src/analysis/composition.py
 
+Analysis helpers for composition cluster analysis.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/core/test_import_strict.py
+
+Regression tests for import strict USR datasets core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,4 +1,13 @@
-"""Collection visual-kind contracts for campaign-set notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_set/visual_kinds.py
+
+Collection visual-kind contracts for campaign-set notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

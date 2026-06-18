@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/storage/test_ledger_dataset_writes.py
+
+Regression tests for ledger dataset writes OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

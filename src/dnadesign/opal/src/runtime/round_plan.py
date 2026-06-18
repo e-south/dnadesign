@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round_plan.py
+
+Runtime helpers for round plan OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

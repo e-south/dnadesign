@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_scar_nick_cli.py
 
 CLI smoke tests for the scar-nick command group.

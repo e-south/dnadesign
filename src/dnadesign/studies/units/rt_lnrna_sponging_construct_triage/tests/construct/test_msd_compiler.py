@@ -1,4 +1,13 @@
-"""MSD compiler promotion tests for RT-lnRNA Construct materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_msd_compiler.py
+
+MSD compiler promotion tests for RT-lnRNA Construct materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

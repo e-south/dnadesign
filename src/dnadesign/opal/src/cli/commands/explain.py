@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/explain.py
+
+CLI wiring for explain OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

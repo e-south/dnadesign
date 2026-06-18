@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_uncertainty.py
 
 Uncertainty diagnostics using artifact model ensemble spread (RF).

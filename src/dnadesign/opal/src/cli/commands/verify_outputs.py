@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/verify_outputs.py
 
-CLI for validating selection outputs against ledger predictions. Resolves
-selection artifacts and reports mismatches for a run.
+CLI for validating selection outputs against ledger predictions. Resolves.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

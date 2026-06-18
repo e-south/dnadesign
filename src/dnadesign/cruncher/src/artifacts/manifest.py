@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/artifacts/manifest.py
 
 Read and write run manifest artifacts for Cruncher runs.

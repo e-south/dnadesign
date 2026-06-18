@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/densegen/tests/runtime/test_dense_arrays_versioning.py
 
 Validate strict dense-arrays version resolution contracts.

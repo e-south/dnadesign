@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/api/sfxi.py
+
 Public SFXI scoring API.
 
-This module is the supported cross-package boundary for consumers that need
-OPAL-compatible SFXI scores without importing OPAL internals.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_portfolio_docs_contracts.py
 
 Docs contracts for Portfolio aggregation flow and CLI references.

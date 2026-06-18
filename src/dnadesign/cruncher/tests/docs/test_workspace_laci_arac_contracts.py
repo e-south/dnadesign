@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_workspace_laci_arac_contracts.py
 
 Docs/workspace contracts for the pairwise lacI+araC workspace.

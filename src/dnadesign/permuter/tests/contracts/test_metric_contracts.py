@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/contracts/test_metric_contracts.py
 
-Module Author(s): OpenAI Codex
+Metric-column and plotting normalization contract tests.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

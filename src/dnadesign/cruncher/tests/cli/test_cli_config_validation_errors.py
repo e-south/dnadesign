@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_cli_config_validation_errors.py
 
 CLI contract tests for config-schema validation failures.

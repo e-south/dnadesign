@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/contracts/test_path_contracts.py
 
-Module Author(s): OpenAI Codex
+Path-resolution contracts for workspaces and materialized datasets.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

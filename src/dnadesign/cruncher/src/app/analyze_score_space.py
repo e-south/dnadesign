@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze_score_space.py
 
-Resolve score-space context and project trajectory/baseline/elites objective
-views for analyze workflows.
+Resolve score-space context and project trajectory/baseline/elites objective.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

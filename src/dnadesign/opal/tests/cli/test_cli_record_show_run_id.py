@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_record_show_run_id.py
+
+Regression tests for CLI record show run id OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

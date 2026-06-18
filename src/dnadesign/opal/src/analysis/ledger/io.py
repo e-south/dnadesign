@@ -1,4 +1,13 @@
-"""Ledger sink validation and read helpers for OPAL analysis consumers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/io.py
+
+Ledger sink validation and read helpers for OPAL analysis consumers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

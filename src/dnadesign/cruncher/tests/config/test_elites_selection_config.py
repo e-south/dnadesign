@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_elites_selection_config.py
 
 Validates elite selection configuration defaults and constraints.

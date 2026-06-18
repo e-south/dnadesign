@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/record_normalizer.py
 
-Checked-in record normalization for the stress_ethanol_cipro_growth status
-surfaces.
+Checked-in record normalization for the stress_ethanol_cipro_growth status.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

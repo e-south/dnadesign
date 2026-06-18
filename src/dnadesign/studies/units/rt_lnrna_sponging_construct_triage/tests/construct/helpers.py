@@ -1,4 +1,13 @@
-"""Shared fixtures for RT-lnRNA Construct materialization tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/helpers.py
+
+Shared fixtures for RT-lnRNA Construct materialization tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

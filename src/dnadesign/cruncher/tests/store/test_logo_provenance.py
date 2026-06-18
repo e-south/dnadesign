@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/store/test_logo_provenance.py
 
-Author(s): Eric J. South
+Regression tests for logo provenance Cruncher store.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

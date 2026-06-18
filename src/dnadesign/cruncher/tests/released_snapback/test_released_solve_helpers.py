@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_released_solve_helpers.py
 
 Focused helper tests for released-product Snapback solve seams.

@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_projection.py
 
-Construct projection contract checks for the RT-lnRNA sponging construct triage
-study.
+Construct projection contract checks for the RT-lnRNA sponging construct triage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/demo_matrix.py
 
-Runs canonical OPAL demo workflows in isolated temp directories for pressure
-testing and CI-style smoke validation.
+Runs canonical OPAL demo workflows in isolated temp directories for pressure.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

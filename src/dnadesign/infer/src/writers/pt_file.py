@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/writers/pt_file.py
 
+Writer helpers for PT file infer writers.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

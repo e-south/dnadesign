@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/select.py
+
 Batch-0 selector for the stress / ethanol / ciprofloxacin OPAL campaigns.
 
-The selector is intentionally pre-assay: it chooses a small reviewed seed set
-from LatentDNA prior margins and DenseGen design metadata. OPAL owns model-based
-selection after measured round-0 labels have been ingested.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

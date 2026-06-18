@@ -1,4 +1,13 @@
-"""Configured OPAL plot review and quality checks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/configured_plots.py
+
+Configured OPAL plot review and quality checks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

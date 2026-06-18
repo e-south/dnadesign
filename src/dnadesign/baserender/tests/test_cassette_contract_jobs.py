@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_cassette_contract_jobs.py
 
-Tests for direct JSON/JSONL cassette visual-contract rendering through the
-public baserender job surface.
+Tests for direct JSON/JSONL cassette visual-contract rendering through the.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/studies/retron_hairpin_design/artifact_contracts/output_guards.py
+src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/output_guards.py
 
 Fail-fast output-layout guards for Retron MSD compiler bundles.
 

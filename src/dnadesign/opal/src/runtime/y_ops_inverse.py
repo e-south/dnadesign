@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/y_ops_inverse.py
 
 Y-ops normalization and inverse-transform helpers for runtime scoring.

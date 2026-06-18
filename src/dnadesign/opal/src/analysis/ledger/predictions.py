@@ -1,4 +1,13 @@
-"""Manifest-ledger prediction reads with explicit round and run contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/predictions.py
+
+Manifest-ledger prediction reads with explicit round and run contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

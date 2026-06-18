@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/utils.py
+dnadesign
+src/dnadesign/nmf/utils.py
+
+Utility helpers for utils nmf.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

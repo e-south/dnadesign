@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/metrics.py
+dnadesign
+src/dnadesign/aligner/metrics.py
 
 Metrics module for high-level swtools functions.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

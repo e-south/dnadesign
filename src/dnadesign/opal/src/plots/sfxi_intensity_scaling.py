@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_intensity_scaling.py
 
 Intensity scaling diagnostics for SFXI setpoints.

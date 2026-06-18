@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/subsampler.py
+dnadesign
+src/dnadesign/libshuffle/subsampler.py
+
+Focused helpers for subsampler libshuffle.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

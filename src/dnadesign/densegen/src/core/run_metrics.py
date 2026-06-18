@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/run_metrics.py
+dnadesign
+src/dnadesign/densegen/src/core/run_metrics.py
 
 Run-level diagnostics metrics for Stage-A/Stage-B sampling and solver outcomes.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<densegen project>
+dnadesign
 src/dnadesign/densegen/tests/docs/test_densegen_docs_ia_contracts.py
 
 Contract checks for DenseGen docs navigation and workspace runbook discoverability.

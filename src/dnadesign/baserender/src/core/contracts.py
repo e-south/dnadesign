@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/core/contracts.py
 
 Small contract helpers for strict validation and unknown-key rejection.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_elites_hits_contract.py
+
+Regression tests for elites hits Cruncher analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

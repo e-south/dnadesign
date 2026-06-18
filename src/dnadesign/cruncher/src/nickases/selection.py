@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/selection.py
 
 Central nickase selection helpers for downstream workflow ranking/reporting.

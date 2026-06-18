@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_common.py
 
 Shared contract fragments for payload-centric YIU view builders.

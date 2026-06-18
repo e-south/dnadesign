@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/release_enzymes/models.py
 
 Normalized release-enzyme contracts and resolved site/cut models.

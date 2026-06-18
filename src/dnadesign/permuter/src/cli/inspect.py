@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/cli/inspect.py
+
+CLI wiring for inspect Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

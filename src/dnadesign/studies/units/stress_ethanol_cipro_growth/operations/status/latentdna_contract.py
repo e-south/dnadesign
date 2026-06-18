@@ -1,6 +1,12 @@
 """
-LatentDNA binding and snapshot helpers for the stress_ethanol_cipro_growth
-study.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/latentdna_contract.py
+
+LatentDNA binding and snapshot helpers for the stress_ethanol_cipro_growth.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

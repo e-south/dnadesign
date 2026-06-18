@@ -1,4 +1,13 @@
-"""Hard-prune confounded DenseGen TFBS Stage B campaigns from generated artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/prune.py
+
+Hard-prune confounded DenseGen TFBS Stage B campaigns from generated artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

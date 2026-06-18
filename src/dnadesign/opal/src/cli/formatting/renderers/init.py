@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/init.py
 
-Renders init command output for OPAL CLI. Formats campaign initialization
-summaries.
+Renders init command output for OPAL CLI. Formats campaign initialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

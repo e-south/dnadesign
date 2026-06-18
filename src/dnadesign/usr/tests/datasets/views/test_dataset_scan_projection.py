@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/datasets/views/test_dataset_scan_projection.py
+
 Tests for bounded overlay projection planning in USR dataset scans.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

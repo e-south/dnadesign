@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_support_diagnostics.py
 
 Logic-space support diagnostics for SFXI predictions.

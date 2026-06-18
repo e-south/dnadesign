@@ -1,4 +1,13 @@
-"""Generic categorical enrichment primitive contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_categorical_enrichment.py
+
+Generic categorical enrichment primitive contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

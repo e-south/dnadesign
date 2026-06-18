@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/pwm/test_pwm_meme_set_source.py
 
 PWM MEME set data source sampling tests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

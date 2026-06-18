@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_run_id_round_resolution.py
+
+Regression tests for run id round resolution OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

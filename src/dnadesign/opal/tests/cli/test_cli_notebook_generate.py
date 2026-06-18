@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_notebook_generate.py
+
+Regression tests for CLI notebook generate OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

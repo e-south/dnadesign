@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/__init__.py
 
 Lazy rendering exports to avoid eager matplotlib import in non-render code paths.

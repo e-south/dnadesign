@@ -1,4 +1,13 @@
-"""Metrics artifact validation for DenseGen probe run-root audits."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/status_metrics.py
+
+Metrics artifact validation for DenseGen probe run-root audits.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/overrides.py
 
 Apply and flatten Study dot-path factors against Cruncher config objects.

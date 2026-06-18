@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/logging_setup.py
 
 Rich logging configuration for the Permuter CLI.
-• Non-protocol logs → stderr (level controlled by -v)
-• Protocol logs (permuter.protocol.*) → stdout, pretty, INFO by default
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

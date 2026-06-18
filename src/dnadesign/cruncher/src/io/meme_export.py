@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/io/meme_export.py
 
 Helpers for writing minimal MEME motif files from Cruncher PWMs.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/preflight.py
+
+Runtime helpers for preflight OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

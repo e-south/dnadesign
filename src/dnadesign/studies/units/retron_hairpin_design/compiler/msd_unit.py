@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/retron_hairpin_design/compiler/msd_unit.py
+
 Pure Retron MSD unit compilation for downstream source promotion.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

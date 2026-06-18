@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_snapback_contract_jobs.py
 
-Tests for snapback visual-contract rendering through the public baserender job
-surface.
+Tests for snapback visual-contract rendering through the public baserender job.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

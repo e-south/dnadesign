@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_cruncher_showcase_job_schema.py
 
 Tests for cruncher showcase job strict schema validation behavior.

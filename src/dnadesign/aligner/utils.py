@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/utils.py
+dnadesign
+src/dnadesign/aligner/utils.py
+
+Utility helpers for utils aligner.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

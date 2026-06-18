@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/pwm_context_io.py
 
 Shared file-loading and path-policy helpers for YIU PWM context sources.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_plot.py
+
+Regression tests for CLI plot OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

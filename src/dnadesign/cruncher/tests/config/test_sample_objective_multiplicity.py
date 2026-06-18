@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_sample_objective_multiplicity.py
+
+Regression tests for sample objective multiplicity Cruncher config.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_plot_released.py
 
 Released-fragment panel renderer for released-product snapback hit plots.

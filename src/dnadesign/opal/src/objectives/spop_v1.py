@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/objectives/spop_v1.py
+
+Objective plugin logic for spop v1 OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

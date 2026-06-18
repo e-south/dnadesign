@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_campaign_reset.py
+
+Regression tests for CLI campaign reset OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_motif_library_transform.py
 
-Tests for motif library transform that rewrites motif_logo matrices from a
-tool-provided motif primitives artifact.
+Tests for motif library transform that rewrites motif_logo matrices from a.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

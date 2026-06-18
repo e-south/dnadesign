@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/utils.py
 
+Utility helpers for utils infer.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

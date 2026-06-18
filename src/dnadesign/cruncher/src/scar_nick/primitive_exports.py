@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/primitive_exports.py
 
 Public primitive export helpers for scar_nick retained base-junction bundles.

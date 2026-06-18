@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/selection_set.py
 
-Public selection-set contract for OPAL run outputs. Downstream study handoffs
-and probes should consume this surface instead of parsing ledgers ad hoc.
+Public selection-set contract for OPAL run outputs. Downstream study handoffs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

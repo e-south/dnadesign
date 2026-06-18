@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/trajectory_sweep.py
 
 Render sweep-space trajectory plots for optimization chains.

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/record_values.py
+dnadesign
+src/dnadesign/densegen/src/core/record_values.py
 
 Record value coercion helpers for DenseGen tables.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

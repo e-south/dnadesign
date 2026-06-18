@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/feature_importance_bars.py
 
-Aggregates per-round feature importance artifacts into plots. Discovers
-round artifacts under outputs/rounds for visualization.
+Aggregates per-round feature importance artifacts into plots. Discovers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

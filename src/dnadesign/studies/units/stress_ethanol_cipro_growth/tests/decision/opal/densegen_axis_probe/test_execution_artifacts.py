@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_execution_artifacts.py
+
+Regression tests for execution artifacts studies units stress ethanol cipro growth.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -122,13 +133,8 @@ def test_materialize_probe_inputs_writes_shared_records(tmp_path: Path, monkeypa
     collection = json.loads(layout.campaign_collection_manifest_path.read_text(encoding="utf-8"))
     assert collection["schema_version"] == "opal.campaign_collection.v2"
     assert collection["collection_id"] == "densegen_motif_qa_k12_s3_v1_seed7"
-    assert [row["id"] for row in collection["dimensions"]] == [
-        "target",
-        "label_oracle_kind",
-        "label_family_id",
-        "label_split_id",
-        "seed",
-    ]
+    expected_dimension_ids = ["target", "label_oracle_kind", "label_family_id", "label_split_id", "seed"]
+    assert [row["id"] for row in collection["dimensions"]] == expected_dimension_ids
     assert collection["relationships"] == [
         {
             "id": "positive_vs_null",

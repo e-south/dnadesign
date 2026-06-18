@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/utils.py
+
+Core runtime primitives for utils OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

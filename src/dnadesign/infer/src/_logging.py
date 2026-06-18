@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/_logging.py
 
+Focused helpers for logging infer.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

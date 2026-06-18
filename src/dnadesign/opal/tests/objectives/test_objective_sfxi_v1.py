@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py
+
+Regression tests for objective SFXI v1 OPAL objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

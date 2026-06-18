@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/cli/validate.py
+
+CLI wiring for validate Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

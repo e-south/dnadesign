@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/config_resolve.py
+
+Core runtime primitives for config resolve OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

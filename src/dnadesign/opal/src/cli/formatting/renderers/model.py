@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/model.py
 
-Renders model command output for OPAL CLI. Formats model metadata and feature
-importance summaries.
+Renders model command output for OPAL CLI. Formats model metadata and feature.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

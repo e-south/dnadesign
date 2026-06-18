@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/orchestrator/workflow_tools.py
 
-Shared workflow-tool contracts for adapter registration and runbook-tool
-resolution.
+Shared workflow-tool contracts for adapter registration and runbook-tool.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

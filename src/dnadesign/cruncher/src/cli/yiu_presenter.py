@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/yiu_presenter.py
 
 Presentation helpers for the YIU CLI surface.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_plot_precursor.py
 
 Precursor-panel renderer for released-product snapback hit plots.

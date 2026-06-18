@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/snapback_workflow.py
 
 Application orchestration for v2 explicit snapback workflows.

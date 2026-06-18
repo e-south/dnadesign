@@ -1,4 +1,13 @@
-"""Learning-loop baseline adapters for TFBS portfolio notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/notebook_visuals/learning_loop.py
+
+Learning-loop baseline adapters for TFBS portfolio notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

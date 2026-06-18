@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/genbank_authority.py
 
-GenBank source-authority validation for the RT-lnRNA sponging construct triage
-study.
+GenBank source-authority validation for the RT-lnRNA sponging construct triage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

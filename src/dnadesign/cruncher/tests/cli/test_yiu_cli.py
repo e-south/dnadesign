@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_yiu_cli.py
 
 CLI contracts for the payload-centric YIU surface.

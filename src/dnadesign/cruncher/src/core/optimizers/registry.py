@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/registry.py
 
-Author(s): Eric J. South
+Core runtime primitives for registry Cruncher core optimizers.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

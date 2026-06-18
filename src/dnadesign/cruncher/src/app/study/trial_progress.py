@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study/trial_progress.py
 
 Provide shared trial progress and worker lifecycle helpers for study execution.

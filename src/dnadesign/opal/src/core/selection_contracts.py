@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/selection_contracts.py
 
-Shared fail-fast parsers for selection contract fields used by runtime, CLI,
-and analysis views.
+Shared fail-fast parsers for selection contract fields used by runtime, CLI,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

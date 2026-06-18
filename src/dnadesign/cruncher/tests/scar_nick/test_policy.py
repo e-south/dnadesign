@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/scar_nick/test_policy.py
 
 Profile policy tests for ligation-aware scar-nick panel selection.

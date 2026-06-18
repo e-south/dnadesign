@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_selection_set.py
 
-Tests for the public OPAL selection-set contract used by downstream study
-handoffs and probes.
+Tests for the public OPAL selection-set contract used by downstream study.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

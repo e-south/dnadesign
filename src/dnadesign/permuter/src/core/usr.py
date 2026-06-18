@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/usr.py
+
+Core runtime primitives for USR Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

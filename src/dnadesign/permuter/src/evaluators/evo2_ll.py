@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/evo2_ll.py
+
+Evaluator adapters for Evo2 ll Permuter evaluators.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

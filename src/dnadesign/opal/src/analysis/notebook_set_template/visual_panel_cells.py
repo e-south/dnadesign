@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_set_template/visual_panel_cells.py
+
+Notebook-set template builders for visual panel cells OPAL analysis notebook set.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 # ruff: noqa: E501
 
 from __future__ import annotations

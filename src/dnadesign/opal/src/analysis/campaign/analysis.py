@@ -1,4 +1,13 @@
-"""Campaign-scoped analysis reader object."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign/analysis.py
+
+Campaign-scoped analysis reader object.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

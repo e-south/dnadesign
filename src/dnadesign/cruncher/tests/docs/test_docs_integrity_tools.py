@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_docs_integrity_tools.py
 
 Regression contracts for Cruncher docs integrity tooling.

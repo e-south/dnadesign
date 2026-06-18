@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/cli/support/test_stderr_filter.py
 
 Decision logic tests for stderr filtering behavior.

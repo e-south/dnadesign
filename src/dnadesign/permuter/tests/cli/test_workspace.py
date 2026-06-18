@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/cli/test_workspace.py
 
-Module Author(s): OpenAI Codex
+Workspace CLI validation contracts for minimal Permuter configs.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

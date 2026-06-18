@@ -1,4 +1,13 @@
-"""Data context for DenseGen axis probe aggregate plot plugins."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/aggregate_plots/context.py
+
+Data context for DenseGen axis probe aggregate plot plugins.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

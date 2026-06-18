@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_grid_and_preflight.py
 
 Validate Study trial-grid expansion and parse-readiness preflight contracts.

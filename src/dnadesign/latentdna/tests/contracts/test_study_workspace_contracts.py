@@ -1,4 +1,13 @@
-"""Contracts for the checked-in promoter-study pre-assay workspace surface."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_study_workspace_contracts.py
+
+Contracts for the checked-in promoter-study pre-assay workspace surface.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

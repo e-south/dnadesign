@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_public_import_policy.py
 
 Import policy tests ensuring sibling tools use only baserender public exports.

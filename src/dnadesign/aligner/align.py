@@ -1,25 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/align.py
+dnadesign
+src/dnadesign/aligner/align.py
 
-Alignment module using Bio.Align.PairwiseAligner for global alignment
-with affine gap penalties.
-
-This module replaces the deprecated Bio.pairwise2 interface with the recommended
-PairwiseAligner class from Biopython. For further details, see:
-    https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html#pairwise-alignments
-
-The aligner is configured to perform **global alignment** (Needleman–Wunsch) with the following:
-  - match_score: Awarded for a match (default: 2)
-  - mismatch_score: Penalty for a mismatch (default: -1)
-  - gap_open: Gap-opening penalty (provided as a positive value by the API but internally converted to negative).
-              Default is 10 (affine gap open = -10).
-  - gap_extend: Gap-extension penalty (provided as a positive value by the API but internally converted to negative).
-                Default is 1 (affine gap extension = -1).
+Alignment module using Bio.Align.PairwiseAligner for global alignment.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

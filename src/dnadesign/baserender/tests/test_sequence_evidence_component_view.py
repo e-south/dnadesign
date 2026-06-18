@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_sequence_evidence_component_view.py
 
 Component-unit sequence evidence rendering tests.

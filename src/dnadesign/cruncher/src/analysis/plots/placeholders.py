@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/placeholders.py
 
-Author(s): Eric J. South
+Plot builders for placeholders Cruncher analysis plots.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

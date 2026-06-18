@@ -1,4 +1,13 @@
-"""Round selector parsing and run-ledger round helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/rounds.py
+
+Round selector parsing and run-ledger round helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

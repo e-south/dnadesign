@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/artifacts.py
 
-Resolves round artifact locations for dashboard notebooks. Translates campaign
-workdir + round into artifact paths.
+Resolves round artifact locations for dashboard notebooks. Translates campaign.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

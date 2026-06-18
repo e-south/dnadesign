@@ -1,29 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/src/cli/main.py
+dnadesign
+src/dnadesign/densegen/src/cli/main.py
 
-Typer/Rich CLI entrypoint for DenseGen.
-
-Commands:
-  - validate-config : Validate YAML config (schema + sanity).
-  - inspect inputs  : Show resolved inputs + Stage-A PWM sampling.
-  - inspect plan    : Show resolved per-constraint quota plan.
-  - inspect config  : Describe resolved config (inputs/outputs/solver).
-  - inspect run     : Summarize run manifest or list workspaces.
-  - workspace init  : Scaffold a new workspace with config.yaml + subfolders.
-  - stage-a build-pool : Build Stage-A TFBS pools from inputs.
-  - stage-b build-libraries : Build Stage-B libraries from pools/inputs.
-  - run             : Execute generation pipeline; optionally auto-plot.
-  - plot            : Generate plots from outputs using config YAML.
-  - ls-plots         : List available plot names and descriptions.
-  - notebook        : Generate/run workspace-scoped marimo notebooks.
-
-Run:
-  python -m dnadesign.densegen --help
+--------------------------------------------------------------------------------.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

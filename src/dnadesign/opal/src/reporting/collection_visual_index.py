@@ -1,4 +1,13 @@
-"""Loaded collection-visual index contracts for OPAL campaign-set notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/reporting/collection_visual_index.py
+
+Loaded collection-visual index contracts for OPAL campaign-set notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

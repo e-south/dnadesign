@@ -1,4 +1,13 @@
-"""Outcome summaries for DenseGen axis probe review artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/outcomes.py
+
+Outcome summaries for DenseGen axis probe review artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

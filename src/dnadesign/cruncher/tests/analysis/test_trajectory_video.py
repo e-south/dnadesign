@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_trajectory_video.py
 
 Unit tests for chain trajectory video selection and timeline sampling helpers.

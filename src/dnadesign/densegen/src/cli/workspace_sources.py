@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/workspace_sources.py
+dnadesign
+src/dnadesign/densegen/src/cli/workspace_sources.py
 
 Workspace source resolution helpers for the DenseGen CLI.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

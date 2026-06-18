@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/stage_a/test_pool_manifest_sampling.py
 
 Stage-A sampling metadata is persisted in pool manifests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

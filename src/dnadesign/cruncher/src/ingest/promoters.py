@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoters.py
+
 RegulonDB promoter intake contracts and deterministic export helpers.
 
-This module is intentionally source-facing only: it normalizes promoter-shaped
-source payloads for Cruncher and writes a stable export/cache for USR to import
-offline. It does not create USR datasets or study records.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

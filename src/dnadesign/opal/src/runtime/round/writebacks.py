@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round/writebacks.py
 
-Handles round artifact persistence and ledger/state writebacks. Centralizes run
-meta/pred event construction and record updates.
+Handles round artifact persistence and ledger/state writebacks. Centralizes run.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

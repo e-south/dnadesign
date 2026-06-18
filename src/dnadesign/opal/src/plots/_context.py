@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/_context.py
+
+Plot builders for context OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

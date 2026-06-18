@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/lifecycle/test_materialize_snapshot_streaming.py
 
 Ensure materialize and snapshot avoid full-table reads.

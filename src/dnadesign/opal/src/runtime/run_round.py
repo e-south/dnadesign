@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/run_round.py
 
 Executes one Opal round from training through selection and writebacks.
-Coordinates round stages, artifacts, ledgers, and state updates.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

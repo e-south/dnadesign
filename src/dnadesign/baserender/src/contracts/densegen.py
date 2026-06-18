@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/contracts/densegen.py
 
 DenseGen adapter contract constants shared across runtime, tests, and docs checks.

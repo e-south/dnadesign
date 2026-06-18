@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/latentdna/tests/integrations/test_multiview_extensions_workflow.py
 
-Workflow tests for matrix-bundle views and extended derived/scalar
-operations.
+Workflow tests for matrix-bundle views and extended derived/scalar.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/schema_models.py
 
 Defines strict schemas for Portfolio aggregation specifications.

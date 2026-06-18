@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/solve_models.py
 
 Schema and report contracts for v3 co-design snapback solve workflows.

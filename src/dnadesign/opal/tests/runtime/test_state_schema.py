@@ -1,4 +1,13 @@
-"""State schema fail-fast contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/runtime/test_state_schema.py
+
+State schema fail-fast contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

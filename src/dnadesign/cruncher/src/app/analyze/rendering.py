@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/rendering.py
 
 Orchestrate analysis plot and video rendering for a resolved run context.

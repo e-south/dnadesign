@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_io.py
 
 Shared JSON/JSONL helpers for published YIU view contracts.

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/run_manifest.py
+dnadesign
+src/dnadesign/densegen/src/core/run_manifest.py
 
 Run-level manifest summaries for DenseGen.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

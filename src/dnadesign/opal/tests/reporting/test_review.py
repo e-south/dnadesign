@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/reporting/test_review.py
+
+Regression tests for review OPAL reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

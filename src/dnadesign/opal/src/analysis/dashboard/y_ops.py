@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/y_ops.py
 
 Y-ops helpers used by dashboard scoring and overlays.

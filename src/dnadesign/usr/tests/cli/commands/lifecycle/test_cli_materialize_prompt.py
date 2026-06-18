@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/cli/commands/lifecycle/test_cli_materialize_prompt.py
 
 Materialize CLI prompt behavior tests.

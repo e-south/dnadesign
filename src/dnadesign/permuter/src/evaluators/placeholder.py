@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/placeholder.py
+
+Evaluator adapters for placeholder Permuter evaluators.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

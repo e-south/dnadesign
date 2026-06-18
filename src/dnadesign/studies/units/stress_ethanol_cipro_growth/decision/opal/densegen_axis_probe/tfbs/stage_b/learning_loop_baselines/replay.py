@@ -1,4 +1,13 @@
-"""Deterministic replay primitives for frozen learning-loop baselines."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/learning_loop_baselines/replay.py
+
+Deterministic replay primitives for frozen learning-loop baselines.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

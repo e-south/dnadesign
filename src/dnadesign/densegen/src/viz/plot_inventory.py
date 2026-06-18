@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/densegen/src/viz/plot_inventory.py
 
-Shared plot inventory helpers for manifest metadata, notebook gallery discovery,
-and availability status resolution.
+Shared plot inventory helpers for manifest metadata, notebook gallery discovery,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round/contracts.py
 
-Defines round-level data contracts for OPAL execution stages. Provides
-dataclasses for round inputs, outputs, and stage bundles.
+Defines round-level data contracts for OPAL execution stages. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

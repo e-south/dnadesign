@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/config/test_demo_config_selection_policy.py
 
 Ensures the demo config declares Stage-A selection policy explicitly.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

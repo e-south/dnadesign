@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/notebooks/test_notebook_template.py
+
+Tests OPAL generated notebook template behavior.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import ast
 from io import BytesIO
 from pathlib import Path

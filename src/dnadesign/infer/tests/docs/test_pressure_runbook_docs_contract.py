@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_pressure_runbook_docs_contract.py
+dnadesign
+src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py
 
 Docs contract test for infer pressure-test runbook command coverage.
 

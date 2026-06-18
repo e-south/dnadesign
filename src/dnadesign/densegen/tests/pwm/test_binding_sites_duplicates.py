@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/pwm/test_binding_sites_duplicates.py
 
 Binding-sites duplicate handling tests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

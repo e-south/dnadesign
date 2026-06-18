@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/plots/test_tmpdir_and_mpl.py
+
+Regression tests for tmpdir and mpl OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

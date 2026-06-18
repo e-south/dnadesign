@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/cluster/src/analysis/differential.py
 
+Analysis helpers for differential cluster analysis.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

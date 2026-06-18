@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/outputs/names.py
 
-Filename helpers for BaseRender output writers.
+Builds deterministic filenames for BaseRender output writers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

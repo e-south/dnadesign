@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/guidance.py
 
-Builds guided workflow runbooks and state-aware next-step recommendations for
-OPAL campaigns.
+Builds guided workflow runbooks and state-aware next-step recommendations for.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

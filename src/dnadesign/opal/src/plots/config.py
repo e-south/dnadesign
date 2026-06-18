@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/config.py
 
 Parses plot configuration for OPAL campaigns and validates plot entries.
-Provides helpers for resolving plot config sources and defaults.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

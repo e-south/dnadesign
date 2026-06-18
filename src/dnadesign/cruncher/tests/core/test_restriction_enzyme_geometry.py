@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_restriction_enzyme_geometry.py
 
 Regression tests for shared restriction-enzyme cut geometry.

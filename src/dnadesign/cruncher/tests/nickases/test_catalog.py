@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/nickases/test_catalog.py
 
 Contract tests for the shared nickase catalog seam.

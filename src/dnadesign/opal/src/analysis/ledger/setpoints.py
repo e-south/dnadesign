@@ -1,4 +1,13 @@
-"""Prediction reads joined with objective setpoint metadata."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/setpoints.py
+
+Prediction reads joined with objective setpoint metadata.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

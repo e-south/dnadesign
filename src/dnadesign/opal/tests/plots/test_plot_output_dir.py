@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/plots/test_plot_output_dir.py
+
+Regression tests for plot output dir OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

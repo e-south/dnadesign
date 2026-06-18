@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_diagnostics_altair.py
 
 Altair chart builders for SFXI diagnostics scatter plots.

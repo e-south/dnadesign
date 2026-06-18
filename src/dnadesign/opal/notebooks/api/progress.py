@@ -1,4 +1,13 @@
-"""Public helper surface for the checked-in OPAL campaign progress notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/notebooks/api/progress.py
+
+Re-exports helpers used by OPAL campaign progress notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/cli/test_help.py
+
+Regression tests for help Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

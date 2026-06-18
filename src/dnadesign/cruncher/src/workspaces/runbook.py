@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/workspaces/runbook.py
 
 Strict schema/load/execute contracts for machine workspace runbooks.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_explicit_evaluation.py
 
 Explicit released-product Snapback evaluation and report shaping.

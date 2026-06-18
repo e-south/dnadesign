@@ -1,15 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/metric_by_mutation_count.py
 
 Round-separated swarms with population indication (transparent violins).
-X = round (R1, R2, ...), Y = metric/objective. Color encodes mutation count.
-
-Single metric → axis label is that metric; multi → 'Objective'.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

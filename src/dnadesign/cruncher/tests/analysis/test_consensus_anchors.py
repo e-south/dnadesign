@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_consensus_anchors.py
 
 Validate consensus-anchor contracts for score-space maxima references.

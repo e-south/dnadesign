@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/cli/test_cli_stage_a_summary.py
 
 CLI coverage for Stage-A build-pool summaries.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/densegen/tests/stage_b/test_required_regulators.py
 
 Regulator group constraint coverage for DenseGen.

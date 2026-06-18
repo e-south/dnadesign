@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/progress.py
 
-Builds machine-readable OPAL campaign progress summaries from campaign state and
-round logs. This module is campaign-generic; study probes should adapt this
-surface instead of parsing OPAL scratch directories directly.
+Builds machine-readable OPAL campaign progress summaries from campaign state and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

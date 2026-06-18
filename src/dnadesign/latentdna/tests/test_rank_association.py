@@ -1,4 +1,13 @@
-"""Generic rank-association primitive contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_rank_association.py
+
+Generic rank-association primitive contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/primitive_exports.py
 
 Public primitive export helpers for released-product snapback solve bundles.

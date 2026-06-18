@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/reporting/test_progress.py
+
+Regression tests for progress OPAL reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

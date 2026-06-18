@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/objectives/engine.py
+
+Core runtime primitives for engine Cruncher core objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

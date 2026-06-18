@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/pretty.py
+
+Core runtime primitives for pretty OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

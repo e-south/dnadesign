@@ -1,4 +1,13 @@
-"""Primitive-backed MSD compiler combinatorics tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_msd_compiler_primitives.py
+
+Primitive-backed MSD compiler combinatorics tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

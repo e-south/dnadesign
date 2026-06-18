@@ -1,4 +1,13 @@
-"""RegulonDB regulator plan-margin enrichment contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_regulatory_plan_margin_enrichment.py
+
+RegulonDB regulator plan-margin enrichment contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

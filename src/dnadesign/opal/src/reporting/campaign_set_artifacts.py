@@ -1,4 +1,13 @@
-"""Materialized campaign-set visual artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/reporting/campaign_set_artifacts.py
+
+Materialized campaign-set visual artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

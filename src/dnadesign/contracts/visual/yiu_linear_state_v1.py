@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/yiu_linear_state_v1.py
 
 Shared YIU linear-state visual contract.

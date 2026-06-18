@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/registry.py
+
+Core runtime primitives for registry Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

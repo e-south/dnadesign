@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/diagnostics_guidance.py
 
 Diagnostics chart assembly helpers for the Promoter60 dashboard.

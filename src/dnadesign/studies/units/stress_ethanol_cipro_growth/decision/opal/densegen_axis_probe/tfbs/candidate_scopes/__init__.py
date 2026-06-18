@@ -1,4 +1,13 @@
-"""Candidate-scope contracts for DenseGen TFBS probe campaign surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/candidate_scopes/__init__.py
+
+Candidate-scope contracts for DenseGen TFBS probe campaign surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

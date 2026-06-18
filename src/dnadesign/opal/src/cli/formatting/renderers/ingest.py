@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/ingest.py
 
-Renders ingest-y command output for OPAL CLI. Formats ingest preview and commit
-summaries.
+Renders ingest-y command output for OPAL CLI. Formats ingest preview and commit.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

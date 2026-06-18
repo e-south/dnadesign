@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/model_show.py
 
-CLI command to inspect stored model artifacts and parameters. Resolves model
-paths from state or explicit paths for reporting.
+CLI command to inspect stored model artifacts and parameters. Resolves model.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

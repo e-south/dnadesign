@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/notebooks/test_notebooks_dir_layout.py
+
+Tests OPAL notebook directory layout contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

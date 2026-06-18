@@ -1,4 +1,13 @@
-"""Reference-set selector coverage for promoted promoter controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_reference_sets.py
+
+Reference-set selector coverage for promoted promoter controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

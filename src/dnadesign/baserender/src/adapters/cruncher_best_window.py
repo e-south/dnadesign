@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/cruncher_best_window.py
 
 Cruncher adapter mapping elite best-window hits into kmer features and motif_logo effects.

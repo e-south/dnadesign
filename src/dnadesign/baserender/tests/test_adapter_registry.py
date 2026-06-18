@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_adapter_registry.py
 
 Adapter registry tests for centralized factory and required-source-column contracts.

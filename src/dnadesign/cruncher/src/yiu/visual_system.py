@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/visual_system.py
 
 Named visual-system policy for payload-centric YIU bundle views.

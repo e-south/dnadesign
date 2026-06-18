@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/ingest/test_local_site_adapter.py
 
 Tests for ingesting local binding-site FASTA sources.

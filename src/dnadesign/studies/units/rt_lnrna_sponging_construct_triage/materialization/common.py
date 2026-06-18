@@ -1,4 +1,13 @@
-"""Shared validation helpers for RT-lnRNA Construct materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/common.py
+
+Shared validation helpers for RT-lnRNA Construct materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/nickases/test_scan_plan.py
 
 Tests for precomputed nickase motif scan plans.

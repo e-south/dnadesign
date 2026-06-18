@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/src/sequence_views/maintenance.py
+
 Sequence-view maintenance helpers.
 
-These helpers repair sidecar-level metadata without mutating canonical USR
-records or feature sidecars. They are intentionally explicit maintenance tools,
-not fallbacks in the sequence-view writer.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

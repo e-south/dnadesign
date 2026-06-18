@@ -1,18 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/usr_writer.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/usr_writer.py
 
-USR adapter: buffered import + overlay-part writes for DenseGen.
-
-- Ensures a USR dataset exists (creates if missing).
-    - Buffers sequences (essential columns) and derived metadata (namespaced).
-    - De-duplicates against existing ids in records.parquet before import.
-    - Imports via Dataset.import_rows (no JSONL intermediates).
-    - Writes namespaced columns keyed by 'id' as overlay parts.
+Writes DenseGen records and metadata into USR datasets.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

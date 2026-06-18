@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/densegen/tests/pwm/test_pwm_log_odds_smoothing.py
 
 Checks PWM log-odds smoothing and sampling stability.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

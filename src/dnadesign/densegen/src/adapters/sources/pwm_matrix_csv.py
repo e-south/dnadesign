@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_matrix_csv.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_matrix_csv.py
 
 PWM input source (CSV matrix with A/C/G/T columns).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

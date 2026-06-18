@@ -1,30 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/position_scatter_and_heatmap.py
 
-Combined figure with shared X:
-  • Top: round-1 scatter (mean±SD) with optional baseline
-  • Middle: reference sequence strip (monospace), one char per position
-  • Bottom: heatmap (mutated residue x position) with 1:1 squares
-  • Colorbar spans the full height of the superplot (right side, extra narrow)
-  • Subtitle shows evaluator(s)
-
-Baselines:
-  • 'log_likelihood' → y=0 (gray line)
-  • 'log_likelihood_ratio' or 'llr' → y=1 (gray line)
-
-Single metric → axis label = that metric; multi-metric → 'Objective'.
-
-AA-aware:
-  • If AA signals are present (aa_pos/aa_alt or 'aa pos=.. wt=X alt=Y' tokens),
-    the plot switches to amino-acid mode:
-      - X axis indexes amino-acid positions.
-      - Middle strip shows the protein sequence (translated from ref DNA).
-      - Heatmap rows are amino acids.
+--------------------------------------------------------------------------------.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/spec_models.py
 
 Public YIU spec-model exports.
-Prefer the focused helper modules for implementation changes:
-- `spec_input_models.py`
-- `spec_pwm_models.py`
-- `spec_rendering_models.py`
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

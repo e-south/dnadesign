@@ -1,4 +1,13 @@
-"""Active target declarations for DenseGen TFBS learnability v1 labels."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/active_targets.py
+
+Active target declarations for DenseGen TFBS learnability v1 labels.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

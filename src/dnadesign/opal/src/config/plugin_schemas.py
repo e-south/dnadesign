@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/config/plugin_schemas.py
+
+Configuration contracts for plugin schemas OPAL config.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/portfolio_studies.py
 
 Helpers for portfolio study-spec resolution and study-derived summary extraction.

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/usr_sequences.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/usr_sequences.py
 
 USR sequences input source.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

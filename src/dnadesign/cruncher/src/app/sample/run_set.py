@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/run_set.py
 
 Public sampling entrypoint that delegates to run-set execution stages.

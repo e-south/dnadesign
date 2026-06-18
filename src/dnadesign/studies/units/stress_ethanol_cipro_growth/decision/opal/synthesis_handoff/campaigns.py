@@ -1,4 +1,13 @@
-"""Stress OPAL campaign identity helpers for synthesis handoffs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/campaigns.py
+
+Stress OPAL campaign identity helpers for synthesis handoffs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

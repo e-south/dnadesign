@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_gibbs_trace_semantics.py
 
 Validates gibbs annealing trace metadata semantics.

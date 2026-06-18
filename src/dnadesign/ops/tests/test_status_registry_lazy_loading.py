@@ -307,15 +307,19 @@ def test_status_registry_fragments_are_included_as_package_data() -> None:
     package_data = pyproject["tool"]["setuptools"]["package-data"]
 
     expected_patterns = {
-        "dnadesign.cluster": "ops/status.registry.yaml",
-        "dnadesign.latentdna": "ops/status.registry.yaml",
-        "dnadesign.opal": "src/ops/status.registry.yaml",
-        "dnadesign.ops": "providers/*/status.registry.yaml",
-        "dnadesign.studies": "studies/retron_hairpin_design/status/ops/status.registry.yaml",
-        "dnadesign.usr": "ops/status.registry.yaml",
+        "dnadesign.cluster": ("ops/status.registry.yaml",),
+        "dnadesign.latentdna": ("ops/status.registry.yaml",),
+        "dnadesign.opal": ("src/ops/status.registry.yaml",),
+        "dnadesign.ops": ("providers/*/status.registry.yaml",),
+        "dnadesign.studies": (
+            "units/retron_hairpin_design/status/ops/status.registry.yaml",
+            "units/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
+        ),
+        "dnadesign.usr": ("ops/status.registry.yaml",),
     }
-    for package_name, pattern in expected_patterns.items():
-        assert pattern in package_data[package_name]
+    for package_name, patterns in expected_patterns.items():
+        for pattern in patterns:
+            assert pattern in package_data[package_name]
 
 
 def test_root_ops_cli_import_stays_on_lazy_dispatch_path() -> None:

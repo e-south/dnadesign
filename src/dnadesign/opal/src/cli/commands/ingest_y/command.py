@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
- src/dnadesign/opal/src/cli/commands/ingest_y/command.py
+dnadesign
+src/dnadesign/opal/src/cli/commands/ingest_y/command.py
 
-CLI command to ingest labels into OPAL campaigns. Validates inputs, applies
-transforms, and writes the configured label source.
+CLI command to ingest labels into OPAL campaigns. Validates inputs, applies.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

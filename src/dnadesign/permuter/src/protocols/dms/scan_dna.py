@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/dms/scan_dna.py
+
+Permutation protocol logic for scan DNA Permuter protocols dms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

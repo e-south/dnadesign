@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/mutation_summary.py
 
-Given a dataset (DataFrame) and a metric id, compute the per-mutation
-effects (Δ vs reference if available; for LLR this equals the value),
-extract the Top +K and Bottom -K events, and write a tidy CSV next to
-the dataset's plots directory (i.e., in the dataset directory itself).
+Given a dataset (DataFrame) and a metric id, compute the per-mutation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

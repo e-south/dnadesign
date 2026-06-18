@@ -1,35 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/multisite_select/__init__.py
 
-Multi-site mutant variant selection protocol.
-
-Implements a score-gated, diversity-constrained selection over multi-mutant
-variants using:
-
-  • robust median/MAD scaling of observed fitness (LLR) and epistasis,
-  • a composite per-variant score (alpha · z_llr + β · z_epi),
-  • a high-score candidate pool,
-  • greedy score-first, diversity-second selection in Evo-2 logits space,
-  • optional per-cluster capacity caps,
-  • strict row-level validation and deterministic tie-breaking.
-
-This protocol expects a source dataset (records.parquet) produced upstream by
-combine_aa + evaluate, with:
-
-  • observed fitness:    permuter__observed__<metric_id>
-  • expected baseline:   permuter__expected__<metric_id>
-  • epistasis:           permuter__interaction__epistasis__<metric_id>
-  • logits embedding:    permuter__observed__logits_mean (list<item: double>)
-  • cluster ids:         configured by select.clusters.column; use null only
-                         for explicit no-cluster selection without cluster caps
-
-Run via:
-
-    permuter run \
-      --workspace rt_multisite_select \
-      --ref retron_Eco1_RT_wt
+--------------------------------------------------------------------------------.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

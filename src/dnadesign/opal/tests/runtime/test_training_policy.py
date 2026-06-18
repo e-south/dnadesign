@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_training_policy.py
+
+Regression tests for training policy OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,14 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/hairpins/scan_stem_loop.py
 
-Stem-loop (hairpin) generator: (re)build or extend a seeded hairpin inside a
-region. GC-aware base sampling and optional mismatches (per stratum) on newly
-added paired columns. Deterministic RNG and hairpin-only dedupe per length.
+Stem-loop (hairpin) generator: (re)build or extend a seeded hairpin inside a.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

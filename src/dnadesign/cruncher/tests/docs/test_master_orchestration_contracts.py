@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_master_orchestration_contracts.py
 
 Contracts for workspace study wiring and master portfolio orchestration.

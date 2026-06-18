@@ -1,4 +1,13 @@
-"""Registry-backed visual vocabulary for TFBS Stage B review surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_b/notebook_visuals/specs.py
+
+Registry-backed visual vocabulary for TFBS Stage B review surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

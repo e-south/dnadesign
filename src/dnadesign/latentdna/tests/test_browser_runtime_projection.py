@@ -1,4 +1,13 @@
-"""Projection rendering regression tests for notebook geometry browser surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_browser_runtime_projection.py
+
+Projection rendering regression tests for notebook geometry browser surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

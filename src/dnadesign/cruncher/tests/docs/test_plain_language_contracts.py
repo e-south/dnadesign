@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_plain_language_contracts.py
 
 Docs language contracts for plain terminology in Cruncher markdown docs.

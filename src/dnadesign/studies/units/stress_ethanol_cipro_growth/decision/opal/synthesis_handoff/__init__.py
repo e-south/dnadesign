@@ -1,4 +1,13 @@
-"""Study-owned OPAL synthesis handoff public facade."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/__init__.py
+
+Study-owned OPAL synthesis handoff public facade.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/execution.py
 
 Builds run-scoped analysis execution context (metadata and artifact handles).

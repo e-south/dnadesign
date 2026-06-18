@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_writeback_dispatch.py
+src/dnadesign/infer/tests/runtime/test_writeback_dispatch.py
 
 Contract tests for extract final write-back dispatch.
 

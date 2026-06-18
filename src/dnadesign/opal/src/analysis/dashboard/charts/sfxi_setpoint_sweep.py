@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_setpoint_sweep.py
 
 Setpoint sweep heatmap for SFXI diagnostics.

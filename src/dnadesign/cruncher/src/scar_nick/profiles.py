@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/profiles.py
 
 Pair-profile helpers for 4-bp terminal scar-nick junctions.

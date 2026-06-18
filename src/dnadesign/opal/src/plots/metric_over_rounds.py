@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/metric_over_rounds.py
 
 Generic scalar-over-rounds plot primitive for OPAL ledger predictions.

@@ -1,4 +1,13 @@
-"""Ledger analysis ontology: rounds, run scope, prediction rows, and labels."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/__init__.py
+
+Ledger analysis ontology: rounds, run scope, prediction rows, and labels.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

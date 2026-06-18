@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/representation_contract.py
 
-Representation-table and Infer handoff validation for the RT-lnRNA sponging
-construct triage study.
+Representation-table and Infer handoff validation for the RT-lnRNA sponging.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

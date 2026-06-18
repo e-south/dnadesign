@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/catalog_targets.py
 
 Resolve catalog target selections for matrix and site export flows.

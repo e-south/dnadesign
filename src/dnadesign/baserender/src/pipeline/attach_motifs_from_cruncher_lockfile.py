@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/attach_motifs_from_cruncher_lockfile.py
 
-Transform that rewrites motif_logo matrices from lockfile-resolved Cruncher motif
-artifacts.
+Transform that rewrites motif_logo matrices from lockfile-resolved Cruncher motif.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

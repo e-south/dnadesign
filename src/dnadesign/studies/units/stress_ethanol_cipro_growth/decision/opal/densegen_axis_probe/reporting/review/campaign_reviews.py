@@ -1,4 +1,13 @@
-"""Bridge study probe runs to OPAL campaign review artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/review/campaign_reviews.py
+
+Bridge study probe runs to OPAL campaign review artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Small table-normalization helpers shared by promoter ingest modules."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoter_tables.py
+
+Small table-normalization helpers shared by promoter ingest modules.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Matched null construction for the DenseGen TFBS learnability probe v1."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/nulls/__init__.py
+
+Matched null construction for the DenseGen TFBS learnability probe v1.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

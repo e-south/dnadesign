@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/__init__.py
 
 Focused terminal Type IIS scar plus nickase processing-design surface.

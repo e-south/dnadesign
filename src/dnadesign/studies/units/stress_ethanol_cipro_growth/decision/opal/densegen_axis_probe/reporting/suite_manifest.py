@@ -1,4 +1,13 @@
-"""Manifest-backed suite planning for the DenseGen motif QA probe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/reporting/suite_manifest.py
+
+Manifest-backed suite planning for the DenseGen motif QA probe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

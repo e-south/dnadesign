@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_usr_docs_contract.py
+src/dnadesign/infer/tests/docs/test_usr_docs_contract.py
 
 Infer docs contract tests for USR write-back naming.
 

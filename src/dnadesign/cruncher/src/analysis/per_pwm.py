@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/per_pwm.py
 
 Compute per-TF score snapshots across draw sequences.

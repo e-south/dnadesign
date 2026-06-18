@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/cluster/src/analysis/intra_similarity.py
 
+Analysis helpers for intra similarity cluster analysis.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

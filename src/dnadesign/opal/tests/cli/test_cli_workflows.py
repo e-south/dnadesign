@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_workflows.py
+
+Regression tests for CLI workflows OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

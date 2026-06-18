@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_trajectory_score_space_panel_boundaries.py
 
 Characterization tests for trajectory score-space panel rendering boundaries.

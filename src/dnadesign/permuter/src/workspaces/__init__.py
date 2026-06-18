@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/workspaces/__init__.py
 
-Module Author(s): OpenAI Codex
+Workspace facade for Permuter config discovery.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

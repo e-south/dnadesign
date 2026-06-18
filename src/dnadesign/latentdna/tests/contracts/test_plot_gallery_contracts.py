@@ -1,4 +1,13 @@
-"""Contracts for multi-panel scalar and agreement plot galleries."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_plot_gallery_contracts.py
+
+Contracts for multi-panel scalar and agreement plot galleries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

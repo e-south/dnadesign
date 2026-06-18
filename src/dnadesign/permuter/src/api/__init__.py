@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/api/__init__.py
 
-Module Author(s): OpenAI Codex
+Public facade for Permuter generation, evaluation, validation, and handoffs.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

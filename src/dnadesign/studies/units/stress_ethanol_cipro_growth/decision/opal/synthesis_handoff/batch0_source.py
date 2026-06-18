@@ -1,4 +1,13 @@
-"""Batch-0 selected-candidate source for synthesis handoff."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/batch0_source.py
+
+Batch-0 selected-candidate source for synthesis handoff.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

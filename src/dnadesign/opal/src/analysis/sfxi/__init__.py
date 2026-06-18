@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/__init__.py
 
 SFXI diagnostics helpers for analysis workflows (non-UI, non-plotting).

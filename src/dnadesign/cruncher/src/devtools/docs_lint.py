@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/devtools/docs_lint.py
 
-Lint Cruncher docs for catalog completeness, structure, links, schema contract
-consistency, and workspace runbook step coupling.
+Lint Cruncher docs for catalog completeness, structure, links, schema contract.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

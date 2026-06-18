@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/data_access.py
+
+Storage helpers for data access OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/yiu.py
 
 CLI entrypoints for the payload-centric YIU workflow family.

@@ -1,4 +1,13 @@
-"""Fixture writers for TFBS Stage B portfolio tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/stage_b_portfolio_fixtures.py
+
+Fixture writers for TFBS Stage B portfolio tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

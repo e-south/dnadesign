@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/_mpl_utils.py
+
+Plot builders for mpl utils OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

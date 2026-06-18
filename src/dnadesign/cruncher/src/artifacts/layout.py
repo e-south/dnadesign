@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/artifacts/layout.py
 
-Author(s): Eric J. South
+Artifact contracts for Cruncher artifacts.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

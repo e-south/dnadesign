@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/snapshot.py
 
-Study-owned snapshot enrichment and summary assembly for the
-stress_ethanol_cipro_growth status surface.
+Study-owned snapshot enrichment and summary assembly for the.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

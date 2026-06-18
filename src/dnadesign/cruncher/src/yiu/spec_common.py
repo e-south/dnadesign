@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/spec_common.py
 
 Shared validation helpers for payload-centric YIU spec models.

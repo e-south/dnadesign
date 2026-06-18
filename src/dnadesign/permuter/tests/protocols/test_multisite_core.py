@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/protocols/test_multisite_core.py
 
-Focused unit tests for multisite_select core helpers:
-
-  • geometry: angular distance + medoids
-  • scoring: robust median/MAD scaling + composite scores
-  • utils:   parsing, validation, embedding coercion, and sequence decoration
+Focused unit tests for multisite_select core helpers:.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,4 +1,13 @@
-"""Data contracts for the checked-in campaign progress notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_progress/models.py
+
+Data contracts for the checked-in campaign progress notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

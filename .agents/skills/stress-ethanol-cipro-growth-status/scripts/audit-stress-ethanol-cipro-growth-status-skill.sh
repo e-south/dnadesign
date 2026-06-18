@@ -49,12 +49,26 @@ require_tree_absent() {
   if rg -n "$pattern" "$path" -g '*.py' >/dev/null; then fail "$label"; else pass "$label"; fi
 }
 
+effective_line_count() {
+  local path="$1"
+  local line_count
+  line_count="$(wc -l < "$path" | tr -d ' ')"
+  if [[ "$path" == *.py ]] \
+    && [[ "$(sed -n '1p' "$path")" == '"""' ]] \
+    && [[ "$(sed -n '2p' "$path")" == "--------------------------------------------------------------------------------" ]] \
+    && [[ "$(sed -n '9p' "$path")" == "--------------------------------------------------------------------------------" ]] \
+    && [[ "$(sed -n '10p' "$path")" == '"""' ]]; then
+    line_count=$((line_count - 10))
+  fi
+  printf '%s\n' "$line_count"
+}
+
 require_max_lines() {
   local path="$1"
   local max_lines="$2"
   local label="$3"
   local line_count
-  line_count="$(wc -l < "$path" | tr -d ' ')"
+  line_count="$(effective_line_count "$path")"
   if [[ "$line_count" -le "$max_lines" ]]; then
     pass "$label (${line_count}/${max_lines})"
   else

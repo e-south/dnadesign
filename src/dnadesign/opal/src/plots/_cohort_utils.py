@@ -1,4 +1,13 @@
-"""Shared cohort validation helpers for ledger-backed OPAL plots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/_cohort_utils.py
+
+Shared cohort validation helpers for ledger-backed OPAL plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

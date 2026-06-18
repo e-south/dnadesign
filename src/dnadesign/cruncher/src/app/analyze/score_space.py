@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/score_space.py
 
 Resolve score-space projection modes and TF-axis selections for analysis plots.

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/run.py
 
-Renders run-related command output for OPAL CLI. Formats run summaries and
-run metadata displays.
+Renders run-related command output for OPAL CLI. Formats run summaries and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

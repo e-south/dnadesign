@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_runtime_and_public_api.py
 
 Tests for explicit runtime bootstrap and stable public API helpers.

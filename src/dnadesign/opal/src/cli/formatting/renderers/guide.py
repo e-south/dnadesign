@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/guide.py
 
 Renders guided workflow reports and next-step recommendations for OPAL CLI.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_diag_data.py
 
 Shared helpers for SFXI diagnostic plot plugins.

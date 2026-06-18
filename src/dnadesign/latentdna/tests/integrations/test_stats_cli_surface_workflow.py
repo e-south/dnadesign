@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/latentdna/tests/integrations/test_stats_cli_surface_workflow.py
 
-Workflow tests for view stats, scalar-table joins, and common CLI
-preview/quiet behavior.
+Workflow tests for view stats, scalar-table joins, and common CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

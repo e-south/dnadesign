@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_pipeline_round_ctx.py
+
+Regression tests for pipeline round ctx OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

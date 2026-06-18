@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/catalog_sources.py
 
 Shared source-label helpers for snapback catalog resolution.

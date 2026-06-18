@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/label_hist.py
+
+CLI wiring for label hist OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

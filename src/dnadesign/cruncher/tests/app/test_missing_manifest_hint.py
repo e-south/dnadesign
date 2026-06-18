@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_missing_manifest_hint.py
 
 Validate manifest-missing hints for interrupted runs.

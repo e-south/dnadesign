@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_elites_nn_distance_plot.py
 
 Validates elite NN-distance plotting edge cases.

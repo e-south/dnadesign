@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/usr/src/contracts/__init__.py
 
-Shared USR contract surfaces for errors, schema, API types, and sequence
-normalization rules.
+Shared USR contract surfaces for errors, schema, API types, and sequence.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

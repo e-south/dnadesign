@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/presets/schema.py
 
+Schema definitions for cluster presets.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

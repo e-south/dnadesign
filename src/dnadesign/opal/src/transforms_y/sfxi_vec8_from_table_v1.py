@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/transforms_y/sfxi_vec8_from_table_v1.py
+
+Label-transform plugin logic for SFXI vec8 from table v1 OPAL transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

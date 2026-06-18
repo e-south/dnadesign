@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/config/schema_v3.py
 
 Defines the Cruncher v3 configuration schema.

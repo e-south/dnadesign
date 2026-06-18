@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_meme_set.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_meme_set.py
 
 PWM input source for multiple MEME files merged into a single TF pool.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

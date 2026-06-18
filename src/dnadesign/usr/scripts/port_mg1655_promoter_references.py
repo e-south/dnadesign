@@ -1,11 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/port_mg1655_promoter_references.py
+
 Curated projected GenBank port for promoter reference controls.
 
-This one-off USR migration helper builds ``usr_promoter_references`` from
-source-backed GenBank inputs. It strips cloning/primer flanks from archived
-MG1655 noncoding records, imports synthetic promoter standards as promoter
-inserts, and writes Construct-facing USR rows with source annotations, strength
-metadata, and sequence views.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

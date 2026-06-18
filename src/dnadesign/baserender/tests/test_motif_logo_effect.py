@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_motif_logo_effect.py
 
 Motif-logo effect rendering smoke test.

@@ -319,9 +319,22 @@ budgets = {
     "catalog/compiler_spec_io.py": 140,
     "catalog/sequence_inputs.py": 120,
 }
+
+def implementation_line_count(path: Path) -> int:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if (
+        len(lines) >= 10
+        and lines[0] == '"""'
+        and lines[1] == "-" * 80
+        and lines[8] == "-" * 80
+        and lines[9] == '"""'
+    ):
+        return len(lines) - 10
+    return len(lines)
+
 violations = []
 for filename, budget in budgets.items():
-    line_count = len((source_root / filename).read_text(encoding="utf-8").splitlines())
+    line_count = implementation_line_count(source_root / filename)
     if line_count > budget:
         violations.append(f"{filename} has {line_count} lines > {budget}")
 if violations:

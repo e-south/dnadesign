@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/densegen_tfbs.py
 
 DenseGen TFBS adapter converting DenseGen annotation rows into Record v1 features.

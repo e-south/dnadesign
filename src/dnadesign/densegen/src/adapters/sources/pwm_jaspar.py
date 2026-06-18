@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_jaspar.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_jaspar.py
 
 PWM input source (JASPAR PFM format) with explicit Stage-A sampling policies.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

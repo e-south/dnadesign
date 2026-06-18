@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/load.py
 
 Load payload-centric YIU v4 specs and resolve workspace-relative paths.

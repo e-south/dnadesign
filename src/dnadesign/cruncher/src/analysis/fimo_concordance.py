@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/fimo_concordance.py
 
 Compute descriptive optimizer-vs-FIMO concordance metrics from saved run artifacts.

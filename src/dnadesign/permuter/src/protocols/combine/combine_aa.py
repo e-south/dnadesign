@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/combine/combine_aa.py
 
-Takes a dataset of single-AA DMS results, selects an elite set of single AA
-events under strict rules, samples multi-AA combinations from that elite,
-converts AAs to codons (top or weighted policy) while preserving DNA letter-case,
-and emits rows with a canonical AA combo string plus an additive “expected” score
-equal to the sum of the single scores.
+Takes a dataset of single-AA DMS results, selects an elite set of single AA.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/diagnostics_style.py
 
 Shared sizing helpers for dashboard diagnostics charts.

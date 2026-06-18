@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/vector_summary_heatmap.py
 
 Generic vector-over-rounds heatmap primitive for OPAL ledger predictions.

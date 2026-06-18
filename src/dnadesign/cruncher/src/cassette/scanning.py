@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/scanning.py
 
 Compatibility wrapper around the shared nickase scanning seam.

@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/regulondb_native_promoter_panel/tests/test_infer_latentdna_contract.py
+
+Regression tests for infer LatentDNA studies units RegulonDB native promoter panel.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

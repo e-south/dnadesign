@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_batch_policy.py
+src/dnadesign/infer/tests/runtime/test_batch_policy.py
 
 Contract tests for infer runtime batch-size policy helpers.
 

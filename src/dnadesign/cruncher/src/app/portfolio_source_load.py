@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/portfolio_source_load.py
 
 Helpers for loading one Portfolio source run into typed aggregation rows.

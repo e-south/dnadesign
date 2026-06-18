@@ -1,4 +1,13 @@
-"""Stable candidate-scope ontology for DenseGen TFBS probe campaigns."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/candidate_scopes/contracts.py
+
+Stable candidate-scope ontology for DenseGen TFBS probe campaigns.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

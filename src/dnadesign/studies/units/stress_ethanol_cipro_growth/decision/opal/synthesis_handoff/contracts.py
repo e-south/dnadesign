@@ -1,4 +1,13 @@
-"""Contracts for selected OPAL candidates and cloning strategies."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/contracts.py
+
+Contracts for selected OPAL candidates and cloning strategies.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/computation.py
 
 Compute and persist analysis tables/metrics used by reports and plots.

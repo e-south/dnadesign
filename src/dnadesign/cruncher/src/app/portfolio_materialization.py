@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/portfolio_materialization.py
 
 Materialize portfolio aggregate tables, plots, and manifest entries.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/io/parquet_source.py
 
 Thin Parquet row reader that validates required columns and yields python dict rows.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/tests/protocols/test_combine_aa.py
+
+Regression tests for combine aa Permuter protocols.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

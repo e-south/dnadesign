@@ -1,4 +1,13 @@
-"""Execution workflow for RT-lnRNA Construct materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/execution.py
+
+Execution workflow for RT-lnRNA Construct materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

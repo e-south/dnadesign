@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/staging.py
 
 Stage analysis outputs safely while coordinating process-level analyze locks.

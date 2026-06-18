@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/yiu_payload_sequence_projection.py
 
 Sequence-evidence projection helpers for YIU payload visual contracts.

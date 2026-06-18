@@ -1,4 +1,13 @@
-"""Candidate eligibility primitives for OPAL."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/eligibility/__init__.py
+
+Candidate eligibility primitives for OPAL.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .contracts import (
     CandidateEligibilityResult,

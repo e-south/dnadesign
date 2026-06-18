@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/selection/test_selection_result_validation.py
+
+Regression tests for selection result validation OPAL selection.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

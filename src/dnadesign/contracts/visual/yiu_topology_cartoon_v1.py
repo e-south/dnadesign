@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/yiu_topology_cartoon_v1.py
 
 Shared YIU topology-cartoon visual contract.

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/outputs/images.py
 
-Image output writer for BaseRender records.
+Writes BaseRender records to deterministic image artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

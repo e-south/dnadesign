@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/trajectory_video_contract.py
 
 Build BaseRender sequence-rows job mappings for chain-trajectory videos.

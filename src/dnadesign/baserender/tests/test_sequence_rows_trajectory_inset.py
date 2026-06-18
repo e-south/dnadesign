@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_sequence_rows_trajectory_inset.py
 
 Tests for sequence_rows trajectory panel rendering behavior.

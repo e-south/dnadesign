@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/cli/dynamic_inputs.py
 
-Shared metadata-driven input parsing and rendering helpers for OPS status
-commands.
+Shared metadata-driven input parsing and rendering helpers for OPS status.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study_compaction.py
 
 Prune transient trial artifacts from Study runs while preserving summary inputs.

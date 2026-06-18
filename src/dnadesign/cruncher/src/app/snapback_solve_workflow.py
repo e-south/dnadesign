@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/snapback_solve_workflow.py
 
 Application orchestration for v3 co-design snapback solve workflows.

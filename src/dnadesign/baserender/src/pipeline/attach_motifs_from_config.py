@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/attach_motifs_from_config.py
 
 Transform that rewrites motif_logo matrices from a Cruncher motif library config.

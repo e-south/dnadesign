@@ -1,4 +1,13 @@
-"""Restriction-site exclusion for assembled DNA candidates."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/eligibility/restriction_sites.py
+
+Restriction-site exclusion for assembled DNA candidates.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

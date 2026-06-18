@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/preflight.py
 
-Study-owned preflight context resolution and orchestration for the
-stress_ethanol_cipro_growth status surface.
+Study-owned preflight context resolution and orchestration for the.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

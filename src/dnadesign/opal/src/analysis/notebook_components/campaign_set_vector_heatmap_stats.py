@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/campaign_set_vector_heatmap_stats.py
+
+Notebook component builders for campaign set vector heatmap stats OPAL analysis.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import textwrap

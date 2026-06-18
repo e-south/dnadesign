@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/objectives/test_sfxi_uncertainty.py
 
 Tests uncertainty contract and RF adapter behavior.

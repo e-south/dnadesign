@@ -1,6 +1,12 @@
 """
-Construct materialization checks for the RT-lnRNA sponging construct triage
-study.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/construct/test_materialization.py
+
+Construct materialization checks for the RT-lnRNA sponging construct triage.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

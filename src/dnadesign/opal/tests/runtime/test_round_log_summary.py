@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_round_log_summary.py
+
+Regression tests for round log summary OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

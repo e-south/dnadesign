@@ -1,4 +1,13 @@
-"""Notebook generation scope helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_scope/__init__.py
+
+Notebook generation scope helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

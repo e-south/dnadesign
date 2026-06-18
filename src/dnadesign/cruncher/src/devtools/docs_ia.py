@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/devtools/docs_ia.py
 
-Generate and sync Cruncher docs map and runbook-step reference sections from a
-catalog and workspace machine runbooks.
+Generate and sync Cruncher docs map and runbook-step reference sections from a.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

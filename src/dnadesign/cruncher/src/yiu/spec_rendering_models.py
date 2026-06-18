@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/spec_rendering_models.py
 
 Rendering-facing YIU spec models and cross-field validation rules.

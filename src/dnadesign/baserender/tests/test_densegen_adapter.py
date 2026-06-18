@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_densegen_adapter.py
 
 DenseGen adapter contract parity smoke test with rendering.

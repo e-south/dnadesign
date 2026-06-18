@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/selection.py
 
 Strict CSV selection service for matching, overlay labeling, and missing-key policy.

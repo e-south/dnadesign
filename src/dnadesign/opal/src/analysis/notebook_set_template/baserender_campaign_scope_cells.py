@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_set_template/baserender_campaign_scope_cells.py
+
+Notebook-set template builders for BaseRender campaign scope cells OPAL analysis notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from ._support import block

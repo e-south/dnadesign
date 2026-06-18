@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/reporting/test_notebook.py
+
+Regression tests for notebook OPAL reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

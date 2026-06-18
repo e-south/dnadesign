@@ -1,4 +1,13 @@
-"""Campaign-collection manifest contracts for OPAL notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/reporting/campaign_collection.py
+
+Campaign-collection manifest contracts for OPAL notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Prediction scoring helpers for DenseGen motif-QA probe metrics."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/evaluation/prediction_scoring.py
+
+Prediction scoring helpers for DenseGen motif-QA probe metrics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

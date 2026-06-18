@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/combine/codon_utils.py
+
+Permutation protocol logic for codon utils Permuter protocols combine.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

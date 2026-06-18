@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_analyze_execution.py
 
 Covers analyze run-execution context resolution and fail-fast lockfile handling.

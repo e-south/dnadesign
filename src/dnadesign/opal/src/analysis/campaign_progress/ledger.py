@@ -1,4 +1,13 @@
-"""Ledger and optional-table helpers for campaign progress notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign_progress/ledger.py
+
+Ledger and optional-table helpers for campaign progress notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

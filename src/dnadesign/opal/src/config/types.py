@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/config/types.py
+
+Configuration contracts for types OPAL config.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

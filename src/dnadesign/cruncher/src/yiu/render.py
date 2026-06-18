@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/render.py
 
 Run published BaseRender jobs for payload-centric YIU bundles.

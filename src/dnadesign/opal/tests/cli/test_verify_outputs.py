@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_verify_outputs.py
+
+Regression tests for verify outputs OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

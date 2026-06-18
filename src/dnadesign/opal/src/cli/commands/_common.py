@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/_common.py
 
-Shared CLI helpers for OPAL commands (path resolution and output). Centralizes
-validation for config, table, and json file inputs.
+Shared CLI helpers for OPAL commands (path resolution and output). Centralizes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

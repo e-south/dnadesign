@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/objective_meta.py
 
-CLI command to inspect objective metadata and diagnostics for runs. Reads
-outputs/ledger predictions and run metadata for reporting.
+CLI command to inspect objective metadata and diagnostics for runs. Reads.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

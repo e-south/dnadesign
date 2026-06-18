@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/objective_sidecars.py
 
 Persist occurrence-aware objective sidecars for sample runs.

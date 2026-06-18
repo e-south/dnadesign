@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/parquet.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/parquet.py
 
-Parquet output sink for DenseGen (dataset directory).
+Writes DenseGen output records to Parquet datasets.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

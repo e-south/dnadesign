@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/bundle_summary.py
 
 Operator-facing summary models and builders for YIU bundles.

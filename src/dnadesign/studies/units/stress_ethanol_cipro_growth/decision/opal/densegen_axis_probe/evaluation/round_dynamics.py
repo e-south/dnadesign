@@ -1,4 +1,13 @@
-"""Round-level dynamics diagnostics for DenseGen axis probe metrics."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/evaluation/round_dynamics.py
+
+Round-level dynamics diagnostics for DenseGen axis probe metrics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/state.py
+
+Storage helpers for state OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

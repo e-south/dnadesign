@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/ensemble.py
 
 Ensemble prediction protocol for streaming per-estimator outputs.

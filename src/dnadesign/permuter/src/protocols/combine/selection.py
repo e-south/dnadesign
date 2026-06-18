@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/combine/selection.py
+
+Permutation protocol logic for selection Permuter protocols combine.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

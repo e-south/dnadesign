@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-densegen project
+dnadesign
 src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py
 
 Contract checks for BU SCC operator guidance discoverability from DenseGen docs.

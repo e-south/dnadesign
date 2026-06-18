@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/selection/mmr_distance.py
 
 Distance and TFBS-core extraction helpers used by MMR selection.

@@ -1,4 +1,13 @@
-"""Campaign configuration and workspace loading for analysis."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/campaign/loading.py
+
+Campaign configuration and workspace loading for analysis.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

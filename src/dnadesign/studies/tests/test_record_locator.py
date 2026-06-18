@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/tests/test_record_locator.py
 
-Focused tests for flat checked-in study index loading and active-study
-resolution.
+Focused tests for flat checked-in study index loading and active-study.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

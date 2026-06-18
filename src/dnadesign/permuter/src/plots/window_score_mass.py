@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/window_score_mass.py
 
 Mass of positive-part scores along the AA axis, with selected windows shaded.
-Split from protocols/multisite_select to central plots/ module.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

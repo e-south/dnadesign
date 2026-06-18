@@ -147,6 +147,15 @@ jobs:
         with:
           python-version-file: ".python-version"
 
+      - name: Collect changed files for test target resolution
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.sha }}" \
+            --output-file .ci_changed_files.txt
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -311,6 +320,15 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
+
+      - name: Collect changed files for test target resolution
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.sha }}" \
+            --output-file .ci_changed_files.txt
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7

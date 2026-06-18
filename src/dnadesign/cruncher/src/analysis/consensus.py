@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/consensus.py
 
 Compute consensus-anchor coordinates for trajectory plots.

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/workspace.py
 
-Resolves canonical campaign workspace paths and output locations. Centralizes
-layout for outputs, ledgers, and per-round artifacts.
+Resolves canonical campaign workspace paths and output locations. Centralizes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

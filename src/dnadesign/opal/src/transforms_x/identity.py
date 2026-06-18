@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/transforms_x/identity.py
+
+Feature-transform plugin logic for identity OPAL transforms x.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

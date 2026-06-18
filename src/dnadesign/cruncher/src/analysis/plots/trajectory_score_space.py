@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/trajectory_score_space.py
 
 Shared helper logic for trajectory score-space elite mapping and sampling.

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/plots.py
 
-Registers plot functions and loads built-in and plugin plot modules. Provides
-plot lookup and metadata for Opal reporting.
+Registers plot functions and loads built-in and plugin plot modules. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,4 +1,13 @@
-"""Artifact writers for DenseGen TFBS learnability null builds."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/null_artifacts.py
+
+Artifact writers for DenseGen TFBS learnability null builds.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

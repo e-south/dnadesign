@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/styles/curated/cruncher_showcase.py
 
 Canonical style helpers for curated showcase-like Sequence Rows renders.

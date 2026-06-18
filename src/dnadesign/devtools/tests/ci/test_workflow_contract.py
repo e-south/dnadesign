@@ -85,6 +85,27 @@ def test_scope_outputs_expose_core_external_integration_keys() -> None:
     assert "external-integration-tools-csv" in outputs
 
 
+def test_fresh_ci_lanes_recreate_changed_file_list_before_resolving_test_targets() -> None:
+    workflow = _workflow()
+
+    for job_name in ("core-lint-test-build", "external-integration"):
+        steps = workflow["jobs"][job_name]["steps"]
+        collect_index = next(
+            index
+            for index, step in enumerate(steps)
+            if step.get("name") == "Collect changed files for test target resolution"
+        )
+        target_index = next(
+            index
+            for index, step in enumerate(steps)
+            if "--changed-files-file .ci_changed_files.txt" in str(step.get("run", ""))
+        )
+        collect_run = str(steps[collect_index].get("run", ""))
+        assert "dnadesign.devtools.ci.changed_files" in collect_run
+        assert "--output-file .ci_changed_files.txt" in collect_run
+        assert collect_index < target_index
+
+
 def test_quality_entropy_job_uses_locked_uv_environment() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["quality-entropy"]["steps"]

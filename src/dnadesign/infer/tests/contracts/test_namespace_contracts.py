@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_namespace_contracts.py
+dnadesign
+src/dnadesign/infer/tests/contracts/test_namespace_contracts.py
 
 Namespace contract and agnostic-model pressure tests for infer runtime.
 

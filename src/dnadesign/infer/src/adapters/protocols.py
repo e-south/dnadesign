@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/adapters/protocols.py
 
+Adapter logic for protocols infer adapters.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

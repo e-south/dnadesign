@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/artifact_garden.py
 
 Manifest-authoritative inventory and cleanup planning for OPAL artifacts.

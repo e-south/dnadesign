@@ -1,4 +1,13 @@
-"""Stage A manifest builders for DenseGen TFBS learnability artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe/tfbs/stage_a/manifests.py
+
+Stage A manifest builders for DenseGen TFBS learnability artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

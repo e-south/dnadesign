@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/verify_outputs.py
 
-Validates selection outputs against ledger predictions for a run. Provides
-strict selection output checks and artifact resolution helpers.
+Validates selection outputs against ledger predictions for a run. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

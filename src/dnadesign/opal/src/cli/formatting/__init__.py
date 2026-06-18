@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/__init__.py
 
-Exposes formatting helpers and renderers for OPAL CLI commands. Aggregates core
-formatting utilities and per-command renderers.
+Exposes formatting helpers and renderers for OPAL CLI commands. Aggregates core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

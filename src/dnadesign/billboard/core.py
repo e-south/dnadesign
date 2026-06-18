@@ -1,24 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-billboard/core.py
+dnadesign
+src/dnadesign/billboard/core.py
 
 Core processing and metric-computation routines for the billboard pipeline.
 
-This module handles:
-  - Loading and validating sequence data.
-  - Parsing TFBS annotations (meta_tfbs_parts).
-  - Building motif-order strings.
-  - Computing positional occupancy matrices.
-  - Calculating core diversity metrics:
-      • tf_richness
-      • 1_minus_gini (inverted Gini)
-      • min_jaccard_dissimilarity
-      • min_tf_entropy
-      • min_motif_string_levenshtein
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

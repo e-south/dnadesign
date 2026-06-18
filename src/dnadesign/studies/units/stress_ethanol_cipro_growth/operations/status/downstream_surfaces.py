@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/downstream_surfaces.py
 
-Study-owned downstream surface inspection for stress_ethanol_cipro_growth
-snapshot evidence.
+Study-owned downstream surface inspection for stress_ethanol_cipro_growth.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

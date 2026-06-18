@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/transforms_y.py
 
-Registers Y transforms and loads built-in transform modules. Provides transform
-factories with schema and PluginCtx handling.
+Registers Y transforms and loads built-in transform modules. Provides transform.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

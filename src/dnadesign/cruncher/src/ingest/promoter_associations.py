@@ -1,4 +1,13 @@
-"""Promoter regulatory-association ingest helpers for Cruncher exports."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoter_associations.py
+
+Promoter regulatory-association ingest helpers for Cruncher exports.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

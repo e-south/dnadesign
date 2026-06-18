@@ -1,7 +1,12 @@
-"""Named OPAL notebook helper modules.
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/notebooks/api/__init__.py
 
-Generated notebooks import from ``dnadesign.opal.notebooks.api.generated``.
-Operator progress surfaces import from ``dnadesign.opal.notebooks.api.progress``.
+Exports helper modules for OPAL notebook surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

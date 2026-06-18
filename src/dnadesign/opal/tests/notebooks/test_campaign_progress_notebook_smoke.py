@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/notebooks/test_campaign_progress_notebook_smoke.py
+
+Smoke-tests OPAL campaign progress notebook imports.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

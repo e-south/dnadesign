@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/objective_labels.py
 
 Shared objective scale and aggregate semantics labels for analysis visuals.

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_guidance.py
+
+Regression tests for SFXI diagnostics guidance OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

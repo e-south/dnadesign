@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/portfolio/test_portfolio_load_and_layout.py
 
 Validate Portfolio spec loading and output layout contracts.

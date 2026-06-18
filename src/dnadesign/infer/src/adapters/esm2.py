@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/adapters/esm2.py
 
+Adapter logic for esm2 infer adapters.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

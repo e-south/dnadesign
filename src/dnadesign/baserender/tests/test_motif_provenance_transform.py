@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_motif_provenance_transform.py
 
 Tests for motif provenance transform that sources PWM matrices from Cruncher config.

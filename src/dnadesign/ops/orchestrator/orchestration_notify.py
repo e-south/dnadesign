@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/orchestrator/orchestration_notify.py
 
-Shared notify runtime and orchestration-notify command contracts for batch
-workflows.
+Shared notify runtime and orchestration-notify command contracts for batch.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

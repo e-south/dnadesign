@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_ingest_missing_x_drop.py
+
+Regression tests for CLI ingest missing x drop OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

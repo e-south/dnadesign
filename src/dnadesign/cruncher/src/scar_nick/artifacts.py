@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/artifacts.py
 
 Artifact paths and persistence helpers for scar-nick runs.

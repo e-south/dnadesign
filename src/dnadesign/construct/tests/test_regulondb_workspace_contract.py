@@ -1,4 +1,13 @@
-"""RegulonDB Construct workspace contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/construct/tests/test_regulondb_workspace_contract.py
+
+RegulonDB Construct workspace contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

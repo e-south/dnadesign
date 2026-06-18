@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_yiu_module_boundaries.py
 
 Architecture invariants for YIU spec and payload-resolution seams.

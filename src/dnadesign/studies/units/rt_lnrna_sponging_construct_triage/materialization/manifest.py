@@ -1,4 +1,13 @@
-"""Projection-manifest loading and source authority checks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/materialization/manifest.py
+
+Projection-manifest loading and source authority checks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

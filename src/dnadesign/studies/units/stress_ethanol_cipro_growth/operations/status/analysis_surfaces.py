@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/operations/status/analysis_surfaces.py
 
-Study-owned exploratory-analysis route inventory for stress_ethanol_cipro_growth
-snapshots.
+Study-owned exploratory-analysis route inventory for stress_ethanol_cipro_growth.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

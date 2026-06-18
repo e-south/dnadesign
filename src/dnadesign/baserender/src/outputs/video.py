@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/outputs/video.py
 
-Video output writer and frame-sizing helpers for BaseRender records.
+Writes BaseRender records to video artifacts with stable frame sizing.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

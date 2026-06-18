@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/bundle_state.py
 
-Shared bundle-state load/persist helpers for YIU publication, rendering, and
-inspection.
+Shared bundle-state load/persist helpers for YIU publication, rendering, and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

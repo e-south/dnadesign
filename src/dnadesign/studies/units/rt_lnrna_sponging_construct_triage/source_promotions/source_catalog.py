@@ -1,5 +1,12 @@
 """
-dnadesign-data source catalog boundary for RT-lnRNA source promotions.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/source_promotions/source_catalog.py
+
+Dnadesign-data source catalog boundary for RT-lnRNA source promotions.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/datasets.py
 
-Dashboard helpers for discovering campaigns and datasets. Resolves campaign
-roots and records paths for notebook UIs.
+Dashboard helpers for discovering campaigns and datasets. Resolves campaign.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

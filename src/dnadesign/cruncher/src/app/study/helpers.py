@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study/helpers.py
 
 Shared Study workflow helpers for target selection, trial expansion, and run resolution.

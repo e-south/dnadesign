@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/notebook.py
 
-Provides notebook CLI commands for campaign analysis workflows. Generates and
-launches marimo notebooks tied to campaigns.
+Provides notebook CLI commands for campaign analysis workflows. Generates and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

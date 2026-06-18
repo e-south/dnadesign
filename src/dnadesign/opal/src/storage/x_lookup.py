@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/x_lookup.py
+
+Storage helpers for x lookup OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

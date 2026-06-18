@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/transforms_y/vector_from_table_v1.py
+
+Label-transform plugin logic for vector from table v1 OPAL transforms y.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

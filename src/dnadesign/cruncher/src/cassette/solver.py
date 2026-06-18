@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/solver.py
 
 Deterministic solve/search layer for hairpin dual-nick cassette design.

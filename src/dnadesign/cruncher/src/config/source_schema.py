@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/config/source_schema.py
 
 Source and IO schema models used by Cruncher configuration v3.
