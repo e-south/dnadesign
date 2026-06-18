@@ -11,7 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 
 from ..dataset import Dataset
 from ..storage.locking import dataset_write_lock
@@ -88,7 +89,57 @@ def repair_sequence_view_alias_conflicts(
 
     dataset._require_exists()  # noqa: SLF001
     path = sequence_views_path(dataset)
+
+    if write:
+        with dataset_write_lock(dataset.dir):
+            result, repaired = _prepare_sequence_view_alias_repair(
+                dataset=dataset,
+                path=path,
+                rows=load_sequence_views(dataset),
+                written=False,
+                example_limit=example_limit,
+            )
+            if result.aliases_removed:
+                _write_sequence_views_atomic(path, _rows_to_table(repaired))
+                dataset._record_event(  # noqa: SLF001
+                    "repair_sequence_view_alias_conflicts",
+                    args={
+                        "policy": "drop_all_non_unique_aliases",
+                        "duplicate_alias_keys": result.duplicate_alias_keys,
+                        "aliases_removed": result.aliases_removed,
+                        "rows_touched": result.rows_touched,
+                    },
+                    metrics={
+                        "duplicate_alias_keys": result.duplicate_alias_keys,
+                        "conflicting_view_rows": result.conflicting_view_rows,
+                        "aliases_removed": result.aliases_removed,
+                        "rows_touched": result.rows_touched,
+                    },
+                    target_path=path,
+                    actor=actor,
+                )
+                return replace(result, written=True)
+            return result
+
     rows = load_sequence_views(dataset)
+    result, _ = _prepare_sequence_view_alias_repair(
+        dataset=dataset,
+        path=path,
+        rows=rows,
+        written=False,
+        example_limit=example_limit,
+    )
+    return result
+
+
+def _prepare_sequence_view_alias_repair(
+    *,
+    dataset: Dataset,
+    path: Path,
+    rows: list[SequenceViewRecord],
+    written: bool,
+    example_limit: int,
+) -> tuple[SequenceViewAliasRepairResult, list[SequenceViewRecord]]:
     view_ids = [str(row.view_id) for row in rows]
     if len(view_ids) != len(set(view_ids)):
         raise ValueError("Cannot repair sequence-view aliases while duplicate view_id rows exist.")
@@ -113,35 +164,17 @@ def repair_sequence_view_alias_conflicts(
         else:
             repaired.append(row)
 
-    if write and removed:
-        with dataset_write_lock(dataset.dir):
-            _write_sequence_views_atomic(path, _rows_to_table(repaired))
-            dataset._record_event(  # noqa: SLF001
-                "repair_sequence_view_alias_conflicts",
-                args={
-                    "policy": "drop_all_non_unique_aliases",
-                    "duplicate_alias_keys": len(conflicts),
-                    "aliases_removed": removed,
-                    "rows_touched": touched,
-                },
-                metrics={
-                    "duplicate_alias_keys": len(conflicts),
-                    "conflicting_view_rows": len(conflicting_view_ids),
-                    "aliases_removed": removed,
-                    "rows_touched": touched,
-                },
-                target_path=path,
-                actor=actor,
-            )
-
-    return SequenceViewAliasRepairResult(
-        dataset=dataset.name,
-        path=str(path),
-        rows_total=len(rows),
-        duplicate_alias_keys=len(conflicts),
-        conflicting_view_rows=len(conflicting_view_ids),
-        aliases_removed=removed,
-        rows_touched=touched,
-        written=bool(write and removed),
-        examples=_conflict_examples(rows, conflicts, limit=example_limit),
+    return (
+        SequenceViewAliasRepairResult(
+            dataset=dataset.name,
+            path=str(path),
+            rows_total=len(rows),
+            duplicate_alias_keys=len(conflicts),
+            conflicting_view_rows=len(conflicting_view_ids),
+            aliases_removed=removed,
+            rows_touched=touched,
+            written=written,
+            examples=_conflict_examples(rows, conflicts, limit=example_limit),
+        ),
+        repaired,
     )

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 from dnadesign.usr.src.dataset import Dataset
@@ -20,6 +21,7 @@ from dnadesign.usr.src.sequence_views import (
     load_sequence_views,
     repair_sequence_view_alias_conflicts,
 )
+from dnadesign.usr.src.sequence_views import maintenance as sequence_view_maintenance
 from dnadesign.usr.src.sequence_views.store import _rows_to_table, _write_sequence_views_atomic, sequence_views_path
 
 
@@ -99,3 +101,47 @@ def test_sequence_view_alias_repair_noops_when_aliases_are_unique(tmp_path: Path
     assert result.aliases_removed == 0
     assert result.written is False
     assert load_sequence_views(dataset)[0].aliases == ["unique_alias"]
+
+
+def test_sequence_view_alias_repair_write_reloads_rows_after_lock(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "datasets"
+    dataset = _make_dataset(
+        root,
+        "late_sequence_view_writer",
+        [
+            {"sequence": "ACGT" * 20, "bio_type": "dna", "alphabet": "dna_4", "source": "fixture"},
+            {"sequence": "TGCA" * 20, "bio_type": "dna", "alphabet": "dna_4", "source": "fixture"},
+            {"sequence": "GATTACA" * 12, "bio_type": "dna", "alphabet": "dna_4", "source": "fixture"},
+            {"sequence": "CAGT" * 20, "bio_type": "dna", "alphabet": "dna_4", "source": "fixture"},
+        ],
+    )
+    ids = [str(row_id) for row_id in dataset.head(4)["id"].tolist()]
+    initial_rows = [
+        _record(ids[0], "legacy_a", ["shared_alias", "a_only"]),
+        _record(ids[1], "legacy_b", ["Shared_Alias", "b_only"]),
+        _record(ids[2], "legacy_c", ["c_only"]),
+    ]
+    late_row = _record(ids[3], "late_view", ["late_only"])
+    _write_sequence_views_atomic(sequence_views_path(dataset), _rows_to_table(initial_rows))
+    injected = {"done": False}
+
+    @contextmanager
+    def _injecting_lock(_dataset_dir: Path):
+        if not injected["done"]:
+            current_rows = load_sequence_views(dataset)
+            _write_sequence_views_atomic(sequence_views_path(dataset), _rows_to_table([*current_rows, late_row]))
+            injected["done"] = True
+        yield
+
+    monkeypatch.setattr(sequence_view_maintenance, "dataset_write_lock", _injecting_lock)
+
+    result = repair_sequence_view_alias_conflicts(dataset, write=True)
+
+    assert result.written is True
+    stored_aliases = {row.view_name: row.aliases for row in load_sequence_views(dataset)}
+    assert stored_aliases == {
+        "legacy_a": ["a_only"],
+        "legacy_b": ["b_only"],
+        "legacy_c": ["c_only"],
+        "late_view": ["late_only"],
+    }
