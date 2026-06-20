@@ -47,12 +47,18 @@ sequence_providers:
     status: selected
     accession_prefixes:
       - WP_
+      - GenBank protein accession
+    accession_patterns:
+      - "WP_[0-9]+\\.[0-9]+"
+      - "[A-Z]{3,4}[0-9]+\\.[0-9]+"
     retrieval: ncbi_eutils_protein_fasta
     failure_policy: explicit_exclude_or_fail
   - id: bv_brc_feature_protein_fasta
     status: selected
     accession_prefixes:
       - fig|
+    accession_patterns:
+      - "fig\\|[0-9]+\\.[0-9]+\\.peg\\.[0-9]+"
     retrieval: bv_brc_genome_feature_accept_application_protein_fasta
     failure_policy: explicit_exclude_or_fail
 

@@ -9,6 +9,7 @@ from typing import Any
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.contracts import (
     ConservationSourceContract,
+    ProviderAccessionPolicy,
     parse_conservation_source_contract,
     require_mapping,
 )
@@ -37,6 +38,7 @@ def collect_source_sequence_sufficiency_issues(
     """Collect source-sequence sufficiency failures without running alignment."""
 
     contract = parse_conservation_source_contract(context.conservation_sources)
+    accession_policy = ProviderAccessionPolicy.from_contract(contract)
     source_records_path = context.source_cache_root / "source_records.yaml"
     provider_cache_root = context.source_cache_root / "provider_caches"
     issues: list[ContractIssue] = []
@@ -81,6 +83,7 @@ def collect_source_sequence_sufficiency_issues(
             source_group=require_mapping(contract.source_groups.get(profile_id), f"source group {profile_id}"),
             profile_id=profile_id,
             contract=contract,
+            accession_policy=accession_policy,
             source_records_path=source_records_path,
             provider_cache_root=provider_cache_root,
             root=context.repo_root,
@@ -130,6 +133,7 @@ def _validate_profile_manifest(
     source_group: Mapping[str, Any],
     profile_id: str,
     contract: ConservationSourceContract,
+    accession_policy: ProviderAccessionPolicy,
     source_records_path: Path,
     provider_cache_root: Path,
     root: Path,
@@ -171,7 +175,7 @@ def _validate_profile_manifest(
         records=included_records,
         profile_id=profile_id,
         manifest_path=manifest_path,
-        provider_ids=contract.provider_ids,
+        accession_policy=accession_policy,
         require_exclusion_reason=False,
     )
     validate_record_accessions(
@@ -179,7 +183,7 @@ def _validate_profile_manifest(
         records=excluded_records,
         profile_id=profile_id,
         manifest_path=manifest_path,
-        provider_ids=contract.provider_ids,
+        accession_policy=accession_policy,
         require_exclusion_reason=True,
     )
     validate_source_fasta(

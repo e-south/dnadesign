@@ -86,6 +86,12 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/
     status: source_sequence_bundle_materializer_and_sufficiency_gate
     description: Study-owned source-sequence primitive with shared source-contract parsing, unaligned FASTA bundle materialization, and pre-alignment sufficiency routing.
+  - id: eco1_rt_conservation_provider_source_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/
+    status: provider_source_materializer
+    description: Study-owned provider-source acquisition package for declared NCBI Protein and BV-BRC protein FASTA source files plus explicit unresolved-provider ledgers.
   - id: eco1_rt_conservation_roster_cache_materializer
     owner: eco1_rt_repack
     kind: checked_in_code
@@ -103,7 +109,7 @@ datasets:
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/
     status: semantic_source_contract_package
-    description: Shared parser/accessor layer for conservation-sources.yaml used by roster-cache, source-bundle, and sufficiency materialization code.
+    description: Shared parser/accessor layer for conservation-sources.yaml, including provider accession policy used by provider-source, roster-cache, source-bundle, and sufficiency materialization code.
   - id: eco1_rt_conservation_source_discovery
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -146,6 +152,24 @@ datasets:
     path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
     status: materialized
     description: Local generated retained-context contact profile with 20 A distance-threshold provenance; 309 resolved rows pass the contact-mask predicate and runtime output is not checked in by default.
+  - id: eco1_rt_conservation_provider_sources
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/
+    status: materialized_local
+    description: Local generated provider-source FASTA root; NCBI returned 350/350 records and BV-BRC returned 1464/1577 records with 113 explicit unresolved-provider ledger entries.
+  - id: eco1_rt_conservation_source_cache
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+    status: materialized_local
+    description: Local generated source_records.yaml plus filtered provider FASTA caches; broad_retron_rt has 1814 included/114 excluded and eco1_like_retron_rt has 46 included/1 excluded.
+  - id: eco1_rt_conservation_source_fastas
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    status: sufficiency_passed_local
+    description: Local generated unaligned source FASTA bundles and manifests that pass the source-sequence sufficiency gate before MAFFT.
   - id: eco1_rt_mask_set
     owner: planned_thread
     kind: planned_artifact

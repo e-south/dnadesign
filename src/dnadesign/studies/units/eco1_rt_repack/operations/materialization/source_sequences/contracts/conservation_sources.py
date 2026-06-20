@@ -17,6 +17,7 @@ class ConservationSourceContract:
     sources: Mapping[str, Any]
     profile_ids: tuple[str, ...]
     provider_ids: tuple[str, ...]
+    provider_accession_patterns: Mapping[str, tuple[str, ...]]
     source_groups: Mapping[str, Mapping[str, Any]]
     target_row_id: str
     target_sequence_hash: str
@@ -40,6 +41,7 @@ def parse_conservation_source_contract(sources: Mapping[str, Any]) -> Conservati
         sources=sources,
         profile_ids=profile_ids,
         provider_ids=provider_ids,
+        provider_accession_patterns=_provider_accession_patterns(sources, provider_ids),
         source_groups=source_groups,
         target_row_id=require_nested_text(sources, ("alignment_policy", "target_row_id")),
         target_sequence_hash=require_nested_text(sources, ("target_sequence", "reference_sequence_hash")),
@@ -83,6 +85,25 @@ def _source_groups_by_id(sources: Mapping[str, Any]) -> dict[str, Mapping[str, A
         mapping = require_mapping(group, "source group")
         grouped[require_text(mapping, "profile_id")] = mapping
     return grouped
+
+
+def _provider_accession_patterns(sources: Mapping[str, Any], provider_ids: Sequence[str]) -> dict[str, tuple[str, ...]]:
+    providers = sources.get("sequence_providers")
+    if not isinstance(providers, list):
+        raise ValueError("conservation-sources.yaml must declare sequence_providers")
+    providers_by_id: dict[str, Mapping[str, Any]] = {}
+    for provider in providers:
+        mapping = require_mapping(provider, "sequence provider")
+        providers_by_id[require_text(mapping, "id")] = mapping
+
+    patterns_by_provider: dict[str, tuple[str, ...]] = {}
+    for provider_id in provider_ids:
+        provider = require_mapping(providers_by_id.get(provider_id), f"sequence provider {provider_id}")
+        patterns = provider.get("accession_patterns")
+        if not isinstance(patterns, list) or not all(isinstance(item, str) and item for item in patterns):
+            raise ValueError(f"sequence provider {provider_id!r} must declare non-empty accession_patterns")
+        patterns_by_provider[provider_id] = tuple(patterns)
+    return patterns_by_provider
 
 
 def _accession_field(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -10,21 +9,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_se
     ProviderCache,
     load_provider_caches,
 )
-
-_PROVIDER_ACCESSION_PATTERNS = {
-    "ncbi_protein_efetch": re.compile(r"^WP_\d+\.\d+$"),
-    "bv_brc_feature_protein_fasta": re.compile(r"^fig\|\d+\.\d+\.peg\.\d+$"),
-}
-
-
-def provider_for_accession(accession: str, provider_ids: Sequence[str]) -> str:
-    """Resolve one accession to a declared provider id."""
-
-    for provider_id in provider_ids:
-        pattern = _PROVIDER_ACCESSION_PATTERNS.get(provider_id)
-        if pattern is not None and pattern.fullmatch(accession):
-            return provider_id
-    raise ValueError(f"unsupported accession provider for {accession!r}")
 
 
 def load_provider_source_records(provider_source_root: Path, provider_ids: Sequence[str]) -> dict[str, ProviderCache]:

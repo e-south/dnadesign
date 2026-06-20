@@ -11,8 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import argparse
-import json
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -21,6 +19,7 @@ from typing import Any
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.contracts import (
+    ProviderAccessionPolicy,
     load_conservation_source_contract,
     require_mapping,
     require_text,
@@ -41,7 +40,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_se
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache.providers import (
     load_provider_source_records,
-    provider_for_accession,
     write_filtered_provider_caches,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache.roster import (
@@ -64,6 +62,7 @@ def materialize_conservation_roster_cache(
     cache_root: Path | None = None,
     created_at: str = _DEFAULT_CREATED_AT,
     require_roster_source_hash: bool = True,
+    provider_failure_ledger: Path | None = None,
 ) -> MaterializedConservationRosterCache:
     """Materialize source_records.yaml and filtered provider FASTA caches."""
 
@@ -78,6 +77,7 @@ def materialize_conservation_roster_cache(
     source_groups = source_contract.source_groups
     profile_ids = source_contract.profile_ids
     provider_ids = source_contract.provider_ids
+    accession_policy = ProviderAccessionPolicy.from_contract(source_contract)
     _validate_roster_source_hashes(
         roster_sha256=roster_sha256,
         source_groups=source_groups,
@@ -87,14 +87,18 @@ def materialize_conservation_roster_cache(
 
     roster_rows = load_roster_rows(roster_path, accession_field=source_contract.accession_field)
     provider_sources = load_provider_source_records(provider_root, provider_ids)
+    provider_failure_reasons = _load_provider_failure_reasons(
+        _resolve_path(root, provider_failure_ledger) if provider_failure_ledger else None
+    )
 
     source_records, provider_accessions = _build_source_records(
         roster_rows=roster_rows,
         source_groups=source_groups,
         profile_ids=profile_ids,
-        provider_ids=provider_ids,
+        accession_policy=accession_policy,
         known_target_accession=source_contract.known_public_target_accession,
         provider_sources=provider_sources,
+        provider_failure_reasons=provider_failure_reasons,
     )
 
     cache.mkdir(parents=True, exist_ok=True)
@@ -140,12 +144,13 @@ def _build_source_records(
     roster_rows: Sequence[RosterRow],
     source_groups: Mapping[str, Mapping[str, Any]],
     profile_ids: Sequence[str],
-    provider_ids: Sequence[str],
+    accession_policy: ProviderAccessionPolicy,
     known_target_accession: str,
     provider_sources: Mapping[str, Any],
+    provider_failure_reasons: Mapping[tuple[str, str], str],
 ) -> tuple[list[SourceRecord], dict[str, list[str]]]:
     source_records: list[SourceRecord] = []
-    provider_accessions: dict[str, list[str]] = {provider_id: [] for provider_id in provider_ids}
+    provider_accessions: dict[str, list[str]] = {provider_id: [] for provider_id in accession_policy.provider_ids}
     seen_records: set[tuple[str, str]] = set()
 
     for profile_id in profile_ids:
@@ -155,7 +160,7 @@ def _build_source_records(
             source_group=require_mapping(source_groups.get(profile_id), f"source group {profile_id}"),
         )
         for row in selected_rows:
-            provider_id = provider_for_accession(row.accession, provider_ids)
+            provider_id = accession_policy.provider_for_accession(row.accession)
             record_id = _record_id(profile_id, row)
             key = (profile_id, row.accession)
             if key in seen_records:
@@ -186,6 +191,19 @@ def _build_source_records(
                 )
                 continue
             if row.accession not in provider_sources[provider_id].records:
+                failure_reason = provider_failure_reasons.get((provider_id, row.accession))
+                if failure_reason:
+                    source_records.append(
+                        SourceRecord(
+                            profile_id=profile_id,
+                            record_id=record_id,
+                            provider_id=provider_id,
+                            accession=row.accession,
+                            status="excluded",
+                            exclusion_reason=failure_reason,
+                        )
+                    )
+                    continue
                 raise ValueError(
                     f"missing provider source sequence {row.accession!r} for provider {provider_id!r}; "
                     "exclude it explicitly before materializing source_records.yaml"
@@ -202,6 +220,26 @@ def _build_source_records(
                 )
             )
     return source_records, provider_accessions
+
+
+def _load_provider_failure_reasons(path: Path | None) -> dict[tuple[str, str], str]:
+    if path is None:
+        return {}
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"provider failure ledger must be a YAML mapping: {path}")
+    failures = payload.get("failures")
+    if not isinstance(failures, list):
+        raise ValueError("provider failure ledger must declare failures as a list")
+    reasons: dict[tuple[str, str], str] = {}
+    for index, failure in enumerate(failures):
+        if not isinstance(failure, Mapping):
+            raise ValueError(f"provider failure ledger failures[{index}] must be a mapping")
+        provider_id = require_text(failure, "provider_id")
+        accession = require_text(failure, "accession")
+        reason = require_text(failure, "exclusion_reason")
+        reasons[(provider_id, accession)] = reason
+    return reasons
 
 
 def _write_source_records(
@@ -255,11 +293,15 @@ def _validate_roster_source_hashes(
             f"source group {profile_id} roster_source",
         )
         expected = require_text(roster_source, "source_sha256")
-        if roster_sha256 != expected:
+        if _normalized_sha256(roster_sha256) != _normalized_sha256(expected):
             raise ValueError(
                 f"roster source hash for {profile_id!r} must match conservation-sources.yaml: "
                 f"expected {expected}, observed {roster_sha256}"
             )
+
+
+def _normalized_sha256(value: str) -> str:
+    return value.removeprefix("sha256:")
 
 
 def _resolve_path(repo_root: Path, path: Path) -> Path:
@@ -272,47 +314,3 @@ def _find_repo_root(start: Path) -> Path:
         if (parent / "pyproject.toml").exists():
             return parent
     raise FileNotFoundError("repo root with pyproject.toml not found")
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Materialize Eco1 conservation roster source cache.")
-    parser.add_argument("--repo-root", type=Path, default=Path("."))
-    parser.add_argument("--roster-table", type=Path, required=True)
-    parser.add_argument("--provider-source-root", type=Path, required=True)
-    parser.add_argument("--cache-root", type=Path, default=_DEFAULT_SOURCE_CACHE_ROOT)
-    parser.add_argument("--created-at", default=_DEFAULT_CREATED_AT)
-    parser.add_argument(
-        "--allow-uncontracted-roster-hash",
-        action="store_true",
-        help="Allow roster table hashes that do not match conservation-sources.yaml; intended for tests only.",
-    )
-    return parser
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
-    result = materialize_conservation_roster_cache(
-        repo_root=args.repo_root,
-        roster_table=args.roster_table,
-        provider_source_root=args.provider_source_root,
-        cache_root=args.cache_root,
-        created_at=args.created_at,
-        require_roster_source_hash=not args.allow_uncontracted_roster_hash,
-    )
-    print(
-        json.dumps(
-            {
-                "cache_root": str(result.cache_root),
-                "manifest_path": str(result.manifest_path),
-                "provider_cache_paths": {key: str(value) for key, value in result.provider_cache_paths.items()},
-                "source_records_path": str(result.source_records_path),
-            },
-            indent=2,
-            sort_keys=True,
-        )
-    )
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

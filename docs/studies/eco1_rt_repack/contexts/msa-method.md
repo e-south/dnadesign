@@ -48,29 +48,33 @@ eco1_like_retron_rt   Mestre II-A3 cluster 42_1 after declared filters
 1. Start from the Mestre S1 roster declared in `conservation-sources.yaml`.
 2. Split the roster into `broad_retron_rt` and `eco1_like_retron_rt`.
 3. Fetch protein sequences through declared providers only:
-   `ncbi_protein_efetch` for `WP_*` accessions and
+   `ncbi_protein_efetch` for NCBI Protein accessions in S1, including
+   `WP_*` and GenBank-style protein ids such as `EIJ70524.1`, and
    `bv_brc_feature_protein_fasta` for `fig|*` feature ids.
 4. Exclude unresolved provider rows only with an explicit reason; do not
    silently drop them.
-5. Materialize the local roster cache from the hash-pinned Mestre roster table
+5. Materialize provider FASTA source files from the hash-pinned Mestre roster
+   table. Provider-missing accessions must be written to an explicit failure
+   ledger before they can become excluded source records.
+6. Materialize the local roster cache from the hash-pinned Mestre roster table
    and explicit provider FASTA sources. This writes `source_records.yaml`,
    filtered provider cache FASTAs, and a cache manifest.
-6. Materialize unaligned source FASTA bundles from the local provider caches
+7. Materialize unaligned source FASTA bundles from the local provider caches
    and `source_records.yaml`; each bundle must insert the ec86kit Eco1 RT
    sequence as the explicit target FASTA row.
-7. Reject `WP_099010551.1` as the target row unless the T301/A301 discrepancy
+8. Reject `WP_099010551.1` as the target row unless the T301/A301 discrepancy
    is explicitly adjudicated.
-8. Run the source-sequence sufficiency gate; reject missing cache roots,
+9. Run the source-sequence sufficiency gate; reject missing cache roots,
    placeholder accessions, undersized profile bundles, missing source hashes,
    provider hash drift, and exclusions without reasons.
-9. Apply the declared filters: query coverage, identity range, length range,
+10. Apply the declared filters: query coverage, identity range, length range,
    required RT/retron motifs, and excluded RT families.
-10. Align proteins with the declared MAFFT command from the source contract
+11. Align proteins with the declared MAFFT command from the source contract
    through `dnadesign.aligner.msa`.
-11. Map alignment columns back to `residue_map.parquet` through canonical Eco1
+12. Map alignment columns back to `residue_map.parquet` through canonical Eco1
    positions, not raw PDB residue ids.
-12. Compute conservation using non-gap rows as the denominator.
-13. Emit `conservation_profile.parquet` only after every row has source hashes,
+13. Compute conservation using non-gap rows as the denominator.
+14. Emit `conservation_profile.parquet` only after every row has source hashes,
     target-row provenance, profile id, WT amino acid, plurality amino acid, WT
     frequency, non-gap count, and pass/fail status.
 
@@ -112,6 +116,48 @@ declares a substitution and updates all linked hashes.
 - No fixed-position conservation rule unless WT is the plurality amino acid.
 - No designability from missing conservation evidence.
 
+### Provider-Source Materializer
+
+The provider-source materializer is:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/
+```
+
+It consumes the hash-pinned Mestre S1 roster table, derives declared NCBI and
+BV-BRC provider accessions from the selected source groups, resolves provider
+identity through `sequence_providers[*].accession_patterns` in
+`conservation-sources.yaml`, and writes explicit provider FASTA source files:
+
+```text
+outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/ncbi_protein_efetch.fasta
+outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/bv_brc_feature_protein_fasta.fasta
+outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_manifest.yaml
+```
+
+If a declared provider does not return requested records, those records may
+only be carried forward through an explicit failure ledger:
+
+```text
+outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_failures.yaml
+```
+
+Current local real-data counts:
+
+```text
+ncbi_protein_efetch requested 350, returned 350
+bv_brc_feature_protein_fasta requested 1577, returned 1464, unresolved 113
+```
+
+Command shape:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.provider_sources \
+  --repo-root . \
+  --roster-table <mestre-s1-roster.xlsx> \
+  --write-unresolved-ledger
+```
+
 ### Roster-Cache Materializer
 
 The roster-cache materializer is:
@@ -131,6 +177,9 @@ It consumes the Mestre S1 roster table plus explicit provider FASTA sources:
 Roster tables may carry optional `source_cache_status` and
 `exclusion_reason` columns. Rows default to `included`; rows marked
 `excluded` must include a reason and do not require a provider FASTA sequence.
+Provider accession shapes are not hard-coded in roster-cache; they are compiled
+from the checked-in conservation source contract and reused by the sufficiency
+gate.
 
 By default it requires the roster-table hash to match
 `conservation-sources.yaml`. Test fixtures may use
@@ -149,7 +198,8 @@ Command shape:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache \
   --repo-root . \
   --roster-table <mestre-s1-roster.csv-or-xlsx> \
-  --provider-source-root <provider-fasta-source-root>
+  --provider-source-root <provider-fasta-source-root> \
+  --provider-failure-ledger <provider-source-root>/provider_source_failures.yaml
 ```
 
 The materializer does not perform live NCBI or BV-BRC network retrieval. It
@@ -188,10 +238,12 @@ Before alignment, run the sufficiency preflight:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency --repo-root .
 ```
 
-This command is expected to fail until real provider caches exist under:
+This command must pass before MAFFT. The current local real-data source bundle
+passes with:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+broad_retron_rt included 1814, excluded 114
+eco1_like_retron_rt included 46, excluded 1
 ```
 
 It rejects source bundles that are fixture-like, under-supported relative to
@@ -237,10 +289,7 @@ create real conservation evidence.
 
 ### Next Slice
 
-The next data slice is the real data run: provide the hash-matching Mestre S1
-roster table and explicit NCBI/BV-BRC provider FASTA source files to the
-roster-cache materializer, then run source-sequence materialization and the
-sufficiency gate until the source FASTA bundle passes. After that, run the
-explicit source FASTA bundles through the public `dnadesign.aligner.msa` API to
-create aligned FASTA bundle manifests, then run the conservation materializer
-and confirm Phase 1 advances to the `mask_set.yaml` blocker only.
+The next data slice is `conservation-alignment-bundle-v1`: run the explicit
+source FASTA bundles through the public `dnadesign.aligner.msa` API to create
+aligned FASTA bundle manifests, then run the conservation materializer and
+confirm Phase 1 advances to the `mask_set.yaml` blocker only.

@@ -11,10 +11,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_se
     RosterRow,
 )
 
-_NODE_ALIASES = ("Node", "node", "Nodo", "node_id")
-_SUBTYPE_ALIASES = ("Retron subtype", "retron_subtype", "Subtype", "Type", "subtype")
-_CLUSTER_ALIASES = ("Cluster/domain", "cluster_domain", "Cluster", "Domain", "domain")
-_CLADE_ALIASES = ("RT clade", "rt_clade", "Clade", "clade")
+_NODE_ALIASES = ("Node", "Nodea", "node", "Nodo", "node_id")
+_SUBTYPE_ALIASES = ("Retron subtype", "Retron (sub)b", "retron_subtype", "Subtype", "Type", "subtype")
+_CLUSTER_ALIASES = ("Cluster/domain", "Cluster/domaind", "cluster_domain", "Cluster", "Domain", "domain")
+_CLADE_ALIASES = ("RT clade", "RT/Cladea", "rt_clade", "Clade", "clade")
 _STATUS_ALIASES = ("source_cache_status", "cache_status", "Status", "status")
 _EXCLUSION_REASON_ALIASES = ("exclusion_reason", "Exclusion reason", "exclude_reason", "reason")
 _RECORD_STATUSES = {"included", "excluded"}
@@ -23,7 +23,7 @@ _RECORD_STATUSES = {"included", "excluded"}
 def load_roster_rows(path: Path, *, accession_field: str) -> list[RosterRow]:
     """Load a CSV/TSV/XLSX roster table into normalized rows."""
 
-    raw_rows = _read_table_rows(path)
+    raw_rows = _read_table_rows(path, accession_field=accession_field)
     if not raw_rows:
         raise ValueError(f"roster table has no rows: {path}")
 
@@ -91,12 +91,12 @@ def select_profile_rows(
     raise ValueError(f"profile {profile_id!r} has unsupported included_records rule {included_records!r}")
 
 
-def _read_table_rows(path: Path) -> list[dict[str, Any]]:
+def _read_table_rows(path: Path, *, accession_field: str) -> list[dict[str, Any]]:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xls"}:
         import pandas as pd
 
-        frame = pd.read_excel(path)
+        frame = _read_excel_with_detected_header(path, accession_field=accession_field, pandas=pd)
         return [_normalize_row(row) for row in frame.to_dict(orient="records")]
     if suffix in {".csv", ".tsv"}:
         import pandas as pd
@@ -105,6 +105,31 @@ def _read_table_rows(path: Path) -> list[dict[str, Any]]:
         frame = pd.read_csv(path, sep=sep)
         return [_normalize_row(row) for row in frame.to_dict(orient="records")]
     raise ValueError(f"unsupported roster table format {suffix!r}; expected .csv, .tsv, .xlsx, or .xls")
+
+
+def _read_excel_with_detected_header(path: Path, *, accession_field: str, pandas: Any) -> Any:
+    raw_frame = pandas.read_excel(path, header=None)
+    expected = {
+        _normalize_column(accession_field),
+        _normalize_column("Retron (sub)b"),
+        _normalize_column("Cluster/domaind"),
+        _normalize_column("RT/Cladea"),
+    }
+    header_index: int | None = None
+    for index, row in raw_frame.iterrows():
+        normalized_cells = {_normalize_column(str(value)) for value in row.tolist() if not _is_nullish(value)}
+        if expected <= normalized_cells:
+            header_index = int(index)
+            break
+    if header_index is None:
+        return pandas.read_excel(path)
+
+    header_values = [
+        "" if _is_nullish(value) else str(value).strip() for value in raw_frame.iloc[header_index].tolist()
+    ]
+    frame = raw_frame.iloc[header_index + 1 :].copy()
+    frame.columns = header_values
+    return frame.loc[:, [column for column in frame.columns if str(column).strip()]]
 
 
 def _normalize_row(row: Mapping[str, Any]) -> dict[str, str]:

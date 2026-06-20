@@ -9,9 +9,11 @@ from .conservation_sources import (
     require_text,
     validate_profile_provider_contract,
 )
+from .provider_accessions import ProviderAccessionPolicy
 
 __all__ = [
     "ConservationSourceContract",
+    "ProviderAccessionPolicy",
     "load_conservation_source_contract",
     "parse_conservation_source_contract",
     "require_mapping",

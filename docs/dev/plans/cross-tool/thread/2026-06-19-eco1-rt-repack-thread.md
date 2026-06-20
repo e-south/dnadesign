@@ -175,6 +175,12 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   exclusions, and emits unaligned source FASTA bundles plus manifests. It does
   not fetch live provider rows, run MAFFT, score conservation, or create
   `dnadesign.thread`.
+- The conservation provider-source slice adds
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`.
+  It remains study-owned because it derives accessions from the Eco1/Mestre
+  source contract and writes explicit unresolved-provider ledgers. It does not
+  belong in `aligner` or future `thread`; those tools consume declared FASTA
+  bundles and evidence artifacts after source authority is already resolved.
 
 ### 4. Contract Objects
 

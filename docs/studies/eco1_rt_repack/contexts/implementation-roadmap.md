@@ -164,9 +164,9 @@ scores each canonical Eco1 position with the Tao-style WT plurality/frequency
 rule. It writes one row per `(profile_id, canonical_position)` and records
 aligned-FASTA hashes in parquet metadata.
 
-This slice deliberately does not fetch provider sequences or run MAFFT. Those
-remain explicit source-sequence and source-alignment curation work because no
-checked-in FASTA, A3M, or MSA source artifact currently exists.
+This slice deliberately does not fetch provider sequences or run MAFFT. Provider
+source acquisition and source-sequence sufficiency are study-owned upstream
+steps; aligned FASTA materialization remains the next blocker.
 
 ### Implemented Cross-Tool Slice: Aligner MSA Backend v1
 
@@ -176,8 +176,7 @@ FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
 Mestre/NCBI/BV-BRC source sequences, adjudicate the T301/A301 target mismatch,
 score conservation, or build masks.
 
-After source FASTA bundles exist, the next Eco1 source-data slice should use
-this public API to produce:
+The next Eco1 source-data slice should use this public API to produce:
 
 ```text
 broad_retron_rt.aligned.fasta
@@ -187,6 +186,21 @@ eco1_like_retron_rt.aligned.fasta
 with bundle manifests, then pass those aligned FASTA files into the study-owned
 conservation-profile materializer.
 
+### Implemented Slice: Conservation Provider Source v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`
+materializes explicit provider FASTA source files from the hash-pinned Mestre
+S1 roster and declared provider endpoints. It writes NCBI Protein and BV-BRC
+protein FASTA sources plus a provider-source manifest. Provider-missing rows
+are not silently dropped; they are recorded in an explicit unresolved-provider
+ledger before roster-cache can mark them excluded. Provider accession shapes
+are compiled from `conservation-sources.yaml` so roster-cache and sufficiency
+cannot drift apart.
+
+The current local real-data run produced 350/350 NCBI Protein records,
+1464/1577 BV-BRC protein records, and 113 explicit BV-BRC unresolved-provider
+entries.
+
 ### Implemented Slice: Conservation Roster Cache v1
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`
@@ -194,8 +208,9 @@ materializes the local source cache from a hash-pinned Mestre roster table and
 explicit provider FASTA source files. It writes `source_records.yaml`, filtered
 provider cache FASTAs, and a cache manifest. It rejects uncontracted roster
 hashes by default, unsupported accession providers, missing included provider
-sequences, and public `WP_099010551.1` target-row leakage by excluding that
-accession with the declared T301/A301 mismatch reason.
+sequences without a passed unresolved-provider ledger, and public
+`WP_099010551.1` target-row leakage by excluding that accession with the
+declared T301/A301 mismatch reason.
 
 This slice deliberately does not fetch live NCBI/BV-BRC records, run MAFFT,
 score conservation, or build masks.
@@ -221,15 +236,17 @@ declared `min_non_gap_count` support floor, provider accessions look real for
 their declared source, and exclusions remain explicit.
 
 The sufficiency gate is split by ontology: context/report models, manifest
-checks, cache/hash checks, provider accession policy, and FASTA content checks.
-Shared conservation-source contract parsing lives under
+checks, cache/hash checks, provider accession validation, and FASTA content
+checks. Shared conservation-source contract parsing and provider accession
+policy live under
 `operations/materialization/source_sequences/contracts/` so roster-cache,
 source-bundle, and sufficiency code do not duplicate the source-authority
 schema.
 
-Current local runtime outputs are expected to fail this gate until real
-provider caches are curated. MAFFT alignment and conservation scoring remain
-blocked until this sufficiency preflight passes.
+Current local runtime source FASTA bundles pass this gate: `broad_retron_rt`
+has 1814 included and 114 excluded rows, while `eco1_like_retron_rt` has 46
+included and 1 excluded row. MAFFT alignment and conservation scoring remain
+blocked until aligned FASTA bundle manifests exist.
 
 ### Implementation Rules
 
@@ -261,12 +278,11 @@ blocked until this sufficiency preflight passes.
   policy are selected and materialized locally as structure artifacts.
 - Contact evidence is materialized locally from the retained DNA/RNA context.
 - Conservation source discovery and source authority are documented and
-  selected, a source-sequence bundle materializer exists for explicit provider
-  caches, and a conservation-profile materializer exists for explicit aligned
-  FASTA inputs. The generic MAFFT execution seam now lives in
-  `dnadesign.aligner.msa`, but no real provider cache, source FASTA bundle,
-  aligned FASTA bundle, materialized conservation profile, mask set, sampling plan, sample table,
-  candidate table, fold-check report, feasibility report, or candidate handoff
-  is materialized.
+  selected, provider-backed source FASTA bundles pass sufficiency, and a
+  conservation-profile materializer exists for explicit aligned FASTA inputs.
+  The generic MAFFT execution seam now lives in `dnadesign.aligner.msa`, but no
+  aligned FASTA bundle, materialized conservation profile, mask set, sampling
+  plan, sample table, candidate table, fold-check report, feasibility report,
+  or candidate handoff is materialized.
 - Readiness checks are still scaffold-level study preflight checks. They must
   grow content validators before Phase 1 can be marked accepted.

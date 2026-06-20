@@ -61,12 +61,21 @@ Source code is organized by ontology:
   structure-authority, structure-artifact, evidence-artifact, and mask-case
   validators.
 - `operations/materialization/<primitive>/`: study-owned runtime artifact
-  materializers split by primitive: `structure`, `contact`, and
-  `source_sequences`, and `conservation`. Nested packages under a primitive
+  materializers split by primitive: `structure`, `contact`, `conservation`,
+  and `source_sequences`. Nested packages under a primitive
   own narrower ontology layers such as `source_sequences/contracts`,
-  `source_sequences/roster_cache`, and `source_sequences/sufficiency`.
+  `source_sequences/provider_sources`, `source_sequences/roster_cache`, and
+  `source_sequences/sufficiency`.
+- Source-sequence provider accession shapes live in
+  `source_sequences/contracts/` and are compiled from
+  `conservation-sources.yaml`; do not duplicate provider regexes in
+  materializers or validators.
+- CLI parsing belongs in each materialization package's `cli.py`; `pipeline.py`
+  owns domain behavior and should remain callable without command-line parsing.
 - `tests/contracts/` and `tests/materialization/<primitive>/`: tests mirror
-  the source ownership boundaries.
+  the source ownership boundaries, including nested
+  `tests/materialization/source_sequences/<subprimitive>/` packages for
+  provider-source, roster-cache, contract, and sufficiency checks.
 
 This package should stay narrow: validate the selected Eco1 structure authority
 and residue-numbering policy, materialize `backbone_bundle.yaml` and

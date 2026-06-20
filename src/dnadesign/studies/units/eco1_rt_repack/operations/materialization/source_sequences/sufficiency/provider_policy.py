@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.contracts import (
+    ProviderAccessionPolicy,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.issues import (
     invalid_manifest_record_issue,
 )
-
-_PROVIDER_ACCESSION_PATTERNS = {
-    "ncbi_protein_efetch": re.compile(r"^WP_\d+\.\d+$"),
-    "bv_brc_feature_protein_fasta": re.compile(r"^fig\|\d+\.\d+\.peg\.\d+$"),
-}
 
 
 def validate_record_accessions(
@@ -24,12 +21,12 @@ def validate_record_accessions(
     records: Sequence[Any],
     profile_id: str,
     manifest_path: Path,
-    provider_ids: Sequence[str],
+    accession_policy: ProviderAccessionPolicy,
     require_exclusion_reason: bool,
 ) -> None:
     """Validate provider ids, accession shape, and explicit exclusion reasons."""
 
-    declared_provider_ids = set(provider_ids)
+    declared_provider_ids = set(accession_policy.provider_ids)
     for record in records:
         if not isinstance(record, Mapping):
             issues.append(invalid_manifest_record_issue(profile_id, manifest_path))
@@ -45,7 +42,7 @@ def validate_record_accessions(
                 )
             )
             continue
-        if not valid_provider_accession(provider_id, accession):
+        if not accession_policy.valid_provider_accession(provider_id, accession):
             issues.append(
                 ContractIssue(
                     check_id="eco1_rt.source_sequences.invalid_provider_accession",
@@ -61,10 +58,3 @@ def validate_record_accessions(
                     path=str(manifest_path),
                 )
             )
-
-
-def valid_provider_accession(provider_id: str, accession: str) -> bool:
-    """Return whether an accession has the declared provider's expected shape."""
-
-    pattern = _PROVIDER_ACCESSION_PATTERNS.get(provider_id)
-    return pattern is not None and pattern.fullmatch(accession) is not None

@@ -37,6 +37,7 @@ study.
 | Contract validator package | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/` |
 | Structure materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/` |
 | Contact profile materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/` |
+| Conservation provider-source materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/` |
 | Conservation roster-cache materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` |
 | Conservation source-sequence materializer and sufficiency gate | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` |
 | Conservation profile materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/` |
@@ -61,9 +62,10 @@ study.
 | Structure materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/` and `../../../outputs/thread/eco1_rt_conservative_v1/` | materialized locally |
 | Contact evidence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/` and `../../../outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet` | materialized locally |
 | MSA/conservation policy | `../contexts/msa-method.md`, `../contexts/residue-mask-policy.md`, and `../workbench/provenance/conservation-sources.yaml` | source authority selected |
-| Conservation roster-cache materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` | materializer implemented; real Mestre roster input and provider FASTA source input still missing |
-| Conservation source-sequence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` | source bundle materializer and sufficiency preflight implemented; sufficiency-passing source FASTA bundle still missing |
-| Generic MSA execution | `../../../src/dnadesign/aligner/msa/` | MAFFT bundle contract implemented; Eco1 source bundle must pass sufficiency first |
+| Conservation provider-source acquisition | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/` | materialized locally with explicit unresolved-provider ledger |
+| Conservation roster-cache materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` | materialized locally from hash-matching Mestre S1 and provider-source ledger |
+| Conservation source-sequence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` | source bundle materializer and sufficiency preflight implemented; local source FASTA bundles pass sufficiency |
+| Generic MSA execution | `../../../src/dnadesign/aligner/msa/` | MAFFT bundle contract implemented; aligned FASTA bundle still missing |
 | Conservation evidence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/` and `../../../outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet` | materializer implemented; aligned FASTA bundle still missing |
 | ProteinMPNN/LigandMPNN sampling | planned `thread` contract | not implemented |
 | Fold validation | `../contexts/fold-validation-policy.md` | planned |

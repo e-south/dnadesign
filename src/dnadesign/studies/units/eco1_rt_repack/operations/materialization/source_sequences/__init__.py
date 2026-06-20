@@ -3,8 +3,10 @@
 __all__ = [
     "MaterializedSourceSequenceBundles",
     "MaterializedConservationRosterCache",
+    "MaterializedProviderSourceFastas",
     "SourceSequenceBundleSufficiencyReport",
     "materialize_conservation_roster_cache",
+    "materialize_provider_source_fastas",
     "materialize_source_sequence_bundles",
     "validate_source_sequence_bundle_sufficiency",
 ]
@@ -30,6 +32,16 @@ def __getattr__(name: str) -> object:
         return {
             "MaterializedConservationRosterCache": MaterializedConservationRosterCache,
             "materialize_conservation_roster_cache": materialize_conservation_roster_cache,
+        }[name]
+    if name in {"MaterializedProviderSourceFastas", "materialize_provider_source_fastas"}:
+        from .provider_sources import (
+            MaterializedProviderSourceFastas,
+            materialize_provider_source_fastas,
+        )
+
+        return {
+            "MaterializedProviderSourceFastas": MaterializedProviderSourceFastas,
+            "materialize_provider_source_fastas": materialize_provider_source_fastas,
         }[name]
     if name in {"SourceSequenceBundleSufficiencyReport", "validate_source_sequence_bundle_sufficiency"}:
         from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency import (
