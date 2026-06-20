@@ -20,8 +20,17 @@ from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
-import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.contracts import (
+    load_conservation_source_contract,
+    require_text,
+    validate_profile_provider_contract,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.io import (
+    load_yaml_mapping,
+    resolve_path,
+    sha256_file,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.manifest import (
     write_index_manifest,
     write_profile_manifest,
@@ -73,30 +82,29 @@ def materialize_source_sequence_bundles(
     source_root = _resolve_path(root, bundle_root or _DEFAULT_SOURCE_BUNDLE_ROOT)
     source_root.mkdir(parents=True, exist_ok=True)
 
-    sources = _load_yaml(root / _CONSERVATION_SOURCES)
+    source_contract = load_conservation_source_contract(root / _CONSERVATION_SOURCES)
     residue_map_path = out_root / "residue_map.parquet"
     if not residue_map_path.exists():
         raise FileNotFoundError(residue_map_path)
 
     target_sequence = _load_target_sequence(residue_map_path)
     target_sequence_hash = "sha256:" + hashlib.sha256(target_sequence.encode("utf-8")).hexdigest()
-    if target_sequence_hash != _require_nested_text(sources, ("target_sequence", "reference_sequence_hash")):
+    if target_sequence_hash != source_contract.target_sequence_hash:
         raise ValueError("residue_map.parquet target sequence hash does not match conservation-sources.yaml")
 
-    target_row_id = _require_nested_text(sources, ("alignment_policy", "target_row_id"))
-    profile_ids = _required_profile_ids(sources)
-    provider_ids = _required_provider_ids(sources)
-    source_groups = _source_groups_by_id(sources)
-    _validate_profile_provider_contract(profile_ids=profile_ids, provider_ids=provider_ids, source_groups=source_groups)
+    target_row_id = source_contract.target_row_id
+    profile_ids = source_contract.profile_ids
+    provider_ids = source_contract.provider_ids
+    validate_profile_provider_contract(source_contract)
 
-    records_payload = _load_yaml(cache_root / "source_records.yaml")
+    records_payload = load_yaml_mapping(cache_root / "source_records.yaml")
     source_records = _load_source_record_rows(records_payload, valid_profile_ids=set(profile_ids))
     provider_caches = load_provider_caches(cache_root / "provider_caches", provider_ids)
 
     base_upstream_hashes = {
-        "conservation_sources_yaml": "sha256:" + _sha256(root / _CONSERVATION_SOURCES),
-        "residue_map": "sha256:" + _sha256(residue_map_path),
-        "source_records_yaml": "sha256:" + _sha256(cache_root / "source_records.yaml"),
+        "conservation_sources_yaml": "sha256:" + sha256_file(root / _CONSERVATION_SOURCES),
+        "residue_map": "sha256:" + sha256_file(residue_map_path),
+        "source_records_yaml": "sha256:" + sha256_file(cache_root / "source_records.yaml"),
     }
     provider_hashes = {f"provider_cache_{provider_id}": cache.sha256 for provider_id, cache in provider_caches.items()}
 
@@ -193,7 +201,7 @@ def _write_profile_bundle(
 
     fasta_path = source_root / f"{profile_id}.source.fasta"
     _write_fasta_records(fasta_path, fasta_records)
-    fasta_sha256 = "sha256:" + _sha256(fasta_path)
+    fasta_sha256 = "sha256:" + sha256_file(fasta_path)
     manifest_path = source_root / f"{profile_id}.source_manifest.yaml"
     write_profile_manifest(
         manifest_path,
@@ -240,49 +248,8 @@ def _load_target_sequence(residue_map_path: Path) -> str:
     return "".join(_require_text(row, "wt_aa") for row in rows)
 
 
-def _validate_profile_provider_contract(
-    *,
-    profile_ids: Sequence[str],
-    provider_ids: Sequence[str],
-    source_groups: Mapping[str, Mapping[str, Any]],
-) -> None:
-    for profile_id in profile_ids:
-        group = _require_mapping(source_groups.get(profile_id), f"source group {profile_id}")
-        group_provider_ids = group.get("provider_ids")
-        if group_provider_ids != list(provider_ids):
-            raise ValueError(f"source group {profile_id!r} provider_ids must match phase1_acceptance")
-
-
-def _required_profile_ids(sources: Mapping[str, Any]) -> list[str]:
-    acceptance = _require_mapping(sources.get("phase1_acceptance"), "phase1_acceptance")
-    profile_ids = acceptance.get("required_profile_ids")
-    if not isinstance(profile_ids, list) or not all(isinstance(item, str) and item for item in profile_ids):
-        raise ValueError("phase1_acceptance.required_profile_ids must be a non-empty list of strings")
-    return list(profile_ids)
-
-
-def _required_provider_ids(sources: Mapping[str, Any]) -> list[str]:
-    acceptance = _require_mapping(sources.get("phase1_acceptance"), "phase1_acceptance")
-    provider_ids = acceptance.get("required_provider_ids")
-    if not isinstance(provider_ids, list) or not all(isinstance(item, str) and item for item in provider_ids):
-        raise ValueError("phase1_acceptance.required_provider_ids must be a non-empty list of strings")
-    return list(provider_ids)
-
-
-def _source_groups_by_id(sources: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
-    groups = sources.get("source_groups")
-    if not isinstance(groups, list):
-        raise ValueError("conservation-sources.yaml must declare source_groups")
-    grouped: dict[str, Mapping[str, Any]] = {}
-    for group in groups:
-        mapping = _require_mapping(group, "source group")
-        grouped[_require_text(mapping, "profile_id")] = mapping
-    return grouped
-
-
 def _resolve_path(repo_root: Path, path: Path) -> Path:
-    resolved = path.expanduser()
-    return resolved if resolved.is_absolute() else (repo_root / resolved).resolve()
+    return resolve_path(repo_root, path)
 
 
 def _write_fasta_records(path: Path, records: Mapping[str, str]) -> None:
@@ -298,43 +265,8 @@ def _write_fasta_records(path: Path, records: Mapping[str, str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _sha256(path: Path) -> str:
-    if not path.exists():
-        raise FileNotFoundError(path)
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _load_yaml(path: Path) -> dict[str, Any]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Expected YAML mapping at {path}")
-    return loaded
-
-
-def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{name} must be a mapping")
-    return value
-
-
-def _require_nested_text(payload: Mapping[str, Any], fields: Sequence[str]) -> str:
-    current: Any = payload
-    for field in fields:
-        current = _require_mapping(current, ".".join(fields)).get(field)
-    if not isinstance(current, str) or not current.strip():
-        raise ValueError(f"{'.'.join(fields)} must be a non-empty string")
-    return current.strip()
-
-
 def _require_text(payload: Mapping[str, Any], field: str) -> str:
-    value = payload.get(field)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field} must be a non-empty string")
-    return value.strip()
+    return require_text(payload, field)
 
 
 def _find_repo_root(start: Path) -> Path:

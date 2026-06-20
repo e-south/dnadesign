@@ -40,6 +40,9 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   contract for `broad_retron_rt` and `eco1_like_retron_rt`.
 - `workbench/provenance/conservation-source-discovery.md`: source-discovery
   note for method and roster priors before MSA materialization.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`:
+  study-owned roster-cache materializer for Mestre roster plus explicit
+  provider FASTA source inputs.
 - `src/dnadesign/aligner/msa/`: generic aligned FASTA bundle API for MAFFT
   preflight/execution; it is not Eco1 source authority or conservation scoring.
 
@@ -78,8 +81,13 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   explicit aligned FASTA inputs.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`:
   study-owned materializer for unaligned source FASTA bundles from explicit
-  provider caches and exclusion ledgers, plus the pre-alignment sufficiency
-  gate for cache/hash/accession/support checks.
+  provider caches and exclusion ledgers.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/`:
+  shared parser/accessor package for `conservation-sources.yaml` so
+  source-sequence materializers do not duplicate source-authority semantics.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/`:
+  pre-alignment gate package for cache/hash/accession/support and target-row
+  checks before MAFFT.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py`:
   semantic validator for materialized conservation-profile metadata, source
   hashes, residue-map joins, and Tao-style conservation rule consistency.

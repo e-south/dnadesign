@@ -19,6 +19,16 @@ _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _ALLOWED_OPERATION_ROOT_FILES = {"__init__.py", "contract_validation.py"}
 _ALLOWED_TEST_ROOT_FILES = {"__init__.py", "_helpers.py"}
 _MATERIALIZATION_PRIMITIVES = {"structure", "contact", "conservation", "source_sequences"}
+_SOURCE_SEQUENCE_ROOT_FILES = {
+    "__init__.py",
+    "__main__.py",
+    "io.py",
+    "issues.py",
+    "manifest.py",
+    "paths.py",
+    "pipeline.py",
+}
+_SOURCE_SEQUENCE_PACKAGES = {"contracts", "providers", "roster_cache", "sufficiency"}
 
 
 def test_operations_root_stays_entrypoint_only() -> None:
@@ -54,6 +64,15 @@ def test_materialization_primitives_are_semantic_packages() -> None:
         assert (source_package / "pipeline.py").is_file()
         assert (test_package / "__init__.py").is_file()
         assert (test_package / "test_materialization.py").is_file()
+
+
+def test_source_sequence_stack_uses_semantic_subpackages() -> None:
+    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/source_sequences"
+
+    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_SOURCE_SEQUENCE_ROOT_FILES)
+    for package in sorted(_SOURCE_SEQUENCE_PACKAGES):
+        assert (source_root / package).is_dir()
+        assert (source_root / package / "__init__.py").is_file()
 
 
 def test_eco1_source_and_test_modules_stay_within_line_budgets() -> None:

@@ -85,13 +85,25 @@ datasets:
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/
     status: source_sequence_bundle_materializer_and_sufficiency_gate
-    description: Study-owned materializer and pre-alignment sufficiency gate for unaligned conservation source FASTA bundles from explicit local provider caches and exclusion ledgers.
+    description: Study-owned source-sequence primitive with shared source-contract parsing, unaligned FASTA bundle materialization, and pre-alignment sufficiency routing.
+  - id: eco1_rt_conservation_roster_cache_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/
+    status: roster_cache_materializer
+    description: Study-owned materializer for source_records.yaml, filtered provider FASTA caches, and source_cache_manifest.yaml from a hash-pinned Mestre roster table plus explicit provider FASTA source files.
   - id: eco1_rt_conservation_source_sequence_sufficiency
     owner: eco1_rt_repack
     kind: checked_in_code
-    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency.py
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/
     status: implemented_fail_fast_preflight
     description: CLI/API gate that rejects missing source caches, placeholder accessions, under-supported profile bundles, hash drift, target drift, and implicit exclusions before MAFFT alignment.
+  - id: eco1_rt_conservation_source_sequence_contracts
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/
+    status: semantic_source_contract_package
+    description: Shared parser/accessor layer for conservation-sources.yaml used by roster-cache, source-bundle, and sufficiency materialization code.
   - id: eco1_rt_conservation_source_discovery
     owner: eco1_rt_repack
     kind: checked_in_record

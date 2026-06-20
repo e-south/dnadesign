@@ -37,12 +37,15 @@ for both `broad_retron_rt` and `eco1_like_retron_rt`, while Tao et al. 2026
 provides the conservation-mask method. The checked-in source contract pins the
 MSA target row to the ec86kit reference sequence and rejects silent replacement
 by the mismatched public NCBI `WP_099010551.1` row. The study-owned
-source-sequence materializer now accepts explicit local provider caches and an
-exclusion ledger to emit unaligned source FASTA bundles. The conservation
-source-sequence package also exposes a sufficiency preflight that rejects
-missing cache roots, placeholder accessions, undersized profile bundles, and
-hash drift before MAFFT. The conservation materializer accepts explicit
-aligned FASTA inputs, but it does not fetch, align, or invent source sequences.
+source-sequence package now includes a roster-cache materializer that ingests a
+hash-pinned Mestre roster table plus explicit provider FASTA sources into the
+local `conservation_source_cache/` contract. The source-sequence materializer
+then accepts those local provider caches and an exclusion ledger to emit
+unaligned source FASTA bundles. The package also exposes a sufficiency
+preflight that rejects missing cache roots, placeholder accessions, undersized
+profile bundles, and hash drift before MAFFT. The conservation materializer
+accepts explicit aligned FASTA inputs, but it does not fetch live provider
+records, align, or invent source sequences.
 Generic aligned FASTA execution routes through the public
 `dnadesign.aligner.msa` MAFFT bundle contract; Eco1 still owns the source
 roster and target-row policy.
@@ -61,8 +64,8 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Curate explicit provider FASTA caches and a `source_records.yaml` ledger for
-   `broad_retron_rt` and `eco1_like_retron_rt`.
+1. Ingest the Mestre S1 roster table and explicit provider FASTA sources with
+   `operations/materialization/source_sequences/roster_cache/`.
 2. Materialize unaligned source FASTA bundles with
    `operations/materialization/source_sequences/`.
 3. Run the source-sequence sufficiency gate; do not align bundles that fail it.
@@ -86,10 +89,11 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   contact evidence is materialized locally from the retained DNA/RNA context;
   reusable `thread.structure` and `thread.evidence` code does not exist yet.
 - MSA/conservation source discovery and source authority are documented and
-  selected; source-sequence bundle, source-bundle sufficiency, and
-  conservation-profile materialization code exists, but no real provider cache,
-  sufficiency-passing source FASTA bundle, aligned FASTA bundle, or
-  materialized conservation profile exists.
+  selected; roster-cache ingestion, source-sequence bundle, source-bundle
+  sufficiency, and conservation-profile materialization code exists, but no
+  real Mestre roster input, provider source FASTA input, sufficiency-passing
+  source FASTA bundle, aligned FASTA bundle, or materialized conservation
+  profile exists.
 - No conservative mask set exists.
 - No sampling plan or backend-ingest contract is materialized.
 - No sample table, candidate table, or backend result manifest exists.

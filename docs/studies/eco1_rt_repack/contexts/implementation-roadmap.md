@@ -187,6 +187,19 @@ eco1_like_retron_rt.aligned.fasta
 with bundle manifests, then pass those aligned FASTA files into the study-owned
 conservation-profile materializer.
 
+### Implemented Slice: Conservation Roster Cache v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`
+materializes the local source cache from a hash-pinned Mestre roster table and
+explicit provider FASTA source files. It writes `source_records.yaml`, filtered
+provider cache FASTAs, and a cache manifest. It rejects uncontracted roster
+hashes by default, unsupported accession providers, missing included provider
+sequences, and public `WP_099010551.1` target-row leakage by excluding that
+accession with the declared T301/A301 mismatch reason.
+
+This slice deliberately does not fetch live NCBI/BV-BRC records, run MAFFT,
+score conservation, or build masks.
+
 ### Implemented Slice: Conservation Source-Sequence Bundle v1
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`
@@ -200,12 +213,19 @@ conservation, or build masks.
 
 ### Implemented Slice: Conservation Source-Sequence Sufficiency v1
 
-`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency.py`
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/`
 is the pre-alignment gate for source FASTA bundles. It validates that provider
 caches exist, `source_records.yaml` and provider FASTA hashes match the bundle
 manifests, target rows are inserted and hash-pinned, profile bundles meet the
 declared `min_non_gap_count` support floor, provider accessions look real for
 their declared source, and exclusions remain explicit.
+
+The sufficiency gate is split by ontology: context/report models, manifest
+checks, cache/hash checks, provider accession policy, and FASTA content checks.
+Shared conservation-source contract parsing lives under
+`operations/materialization/source_sequences/contracts/` so roster-cache,
+source-bundle, and sufficiency code do not duplicate the source-authority
+schema.
 
 Current local runtime outputs are expected to fail this gate until real
 provider caches are curated. MAFFT alignment and conservation scoring remain

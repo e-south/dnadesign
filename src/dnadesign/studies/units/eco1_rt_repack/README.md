@@ -41,6 +41,16 @@ FASTA bundles from explicit local provider caches:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences --repo-root .
 ```
 
+The provider-cache input to that slice is materialized by the study-owned
+roster-cache primitive:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache \
+  --repo-root . \
+  --roster-table <mestre-s1-roster.csv-or-xlsx> \
+  --provider-source-root <provider-fasta-source-root>
+```
+
 Do not add ProteinMPNN, LigandMPNN, AlphaFold, ColabFold, mask algebra,
 candidate-ranking, or fold-normalization implementations here unless they are
 explicitly study-only and cannot graduate to `dnadesign.thread`.
@@ -52,7 +62,9 @@ Source code is organized by ontology:
   validators.
 - `operations/materialization/<primitive>/`: study-owned runtime artifact
   materializers split by primitive: `structure`, `contact`, and
-  `source_sequences`, and `conservation`.
+  `source_sequences`, and `conservation`. Nested packages under a primitive
+  own narrower ontology layers such as `source_sequences/contracts`,
+  `source_sequences/roster_cache`, and `source_sequences/sufficiency`.
 - `tests/contracts/` and `tests/materialization/<primitive>/`: tests mirror
   the source ownership boundaries.
 

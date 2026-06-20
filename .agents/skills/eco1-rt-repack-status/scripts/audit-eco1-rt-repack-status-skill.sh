@@ -120,7 +120,7 @@ flat_materializers = sorted(path.name for path in materialization_root.glob("*.p
 if flat_materializers:
     problems.append(f"flat materialization primitive modules are not allowed: {flat_materializers}")
 
-for primitive in ("structure", "contact", "conservation"):
+for primitive in ("structure", "contact", "conservation", "source_sequences"):
     package = materialization_root / primitive
     if not package.is_dir():
         problems.append(f"missing materialization/{primitive}/ semantic package")
@@ -128,6 +128,31 @@ for primitive in ("structure", "contact", "conservation"):
     for required_name in ("__init__.py", "__main__.py", "pipeline.py"):
         if not (package / required_name).is_file():
             problems.append(f"missing materialization/{primitive}/{required_name}")
+
+source_sequences_root = materialization_root / "source_sequences"
+expected_source_sequence_files = {
+    "__init__.py",
+    "__main__.py",
+    "io.py",
+    "issues.py",
+    "manifest.py",
+    "paths.py",
+    "pipeline.py",
+}
+observed_source_sequence_files = {path.name for path in source_sequences_root.glob("*.py")}
+if observed_source_sequence_files != expected_source_sequence_files:
+    problems.append(
+        "source_sequences root must stay entrypoint/shared-utils only, observed "
+        f"{sorted(observed_source_sequence_files)}"
+    )
+
+for package_name in ("contracts", "providers", "roster_cache", "sufficiency"):
+    package = source_sequences_root / package_name
+    if not package.is_dir():
+        problems.append(f"missing source_sequences/{package_name}/ semantic package")
+        continue
+    if not (package / "__init__.py").is_file():
+        problems.append(f"missing source_sequences/{package_name}/__init__.py")
 
 for dirname in ("contracts", "materialization"):
     if not (tests_root / dirname).is_dir():
@@ -148,7 +173,7 @@ flat_materialization_tests = sorted(
 if flat_materialization_tests:
     problems.append(f"flat materialization tests are not allowed: {flat_materialization_tests}")
 
-for primitive in ("structure", "contact", "conservation"):
+for primitive in ("structure", "contact", "conservation", "source_sequences"):
     package = test_materialization_root / primitive
     if not package.is_dir():
         problems.append(f"missing tests/materialization/{primitive}/ mirrored package")
@@ -223,6 +248,8 @@ require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/materia
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py"
 
@@ -254,6 +281,8 @@ require_pattern 'explicit_no_fallback' "profile fixture declares no-fallback bac
 require_pattern 'broad_retron_rt' "conservation source contract declares broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'eco1_like_retron_rt' "conservation source contract declares Eco1-like profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'materialization/conservation/' "study surfaces route conservation materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'source_sequences/contracts/' "study surfaces route source-sequence contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'source_sequences/sufficiency/' "study surfaces route source-sequence sufficiency package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'conservation_artifacts.py' "study surfaces route conservation artifact validator" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'reject_as_target_without_declared_substitution' "conservation source contract rejects target drift" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 placeholder_pattern='TO''DO|\[''TO''DO'
