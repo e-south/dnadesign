@@ -2,7 +2,9 @@
 
 __all__ = [
     "MaterializedSourceSequenceBundles",
+    "MaterializedConservationRosterCache",
     "SourceSequenceBundleSufficiencyReport",
+    "materialize_conservation_roster_cache",
     "materialize_source_sequence_bundles",
     "validate_source_sequence_bundle_sufficiency",
 ]
@@ -18,6 +20,16 @@ def __getattr__(name: str) -> object:
         return {
             "MaterializedSourceSequenceBundles": MaterializedSourceSequenceBundles,
             "materialize_source_sequence_bundles": materialize_source_sequence_bundles,
+        }[name]
+    if name in {"MaterializedConservationRosterCache", "materialize_conservation_roster_cache"}:
+        from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache import (
+            MaterializedConservationRosterCache,
+            materialize_conservation_roster_cache,
+        )
+
+        return {
+            "MaterializedConservationRosterCache": MaterializedConservationRosterCache,
+            "materialize_conservation_roster_cache": materialize_conservation_roster_cache,
         }[name]
     if name in {"SourceSequenceBundleSufficiencyReport", "validate_source_sequence_bundle_sufficiency"}:
         from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency import (
