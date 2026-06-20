@@ -1,0 +1,140 @@
+version: 1
+study_id: eco1_rt_repack
+contract_id: eco1_rt_conservation_sources_v1
+status: selected
+last_verified: 2026-06-20
+
+source_method:
+  method_id: tao_rt_redesign_plurality_frequency_v1
+  method_ref: doi:10.1038/s41587-026-03149-6
+  conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
+  threshold: 0.25
+  tested_reference_thresholds:
+    - 0.25
+    - 0.50
+  gap_denominator_policy: non_gap_count
+  plurality_rule: wt_aa_must_equal_plurality_aa
+  missing_evidence_policy: fail_closed_no_designability
+
+alignment_policy:
+  alignment_tool: mafft
+  alignment_command: mafft --globalpair --maxiterate 1000 --reorder <input_fasta> > <output_fasta>
+  alignment_scope: protein
+  target_sequence_policy: ec86kit_reference_sequence_must_be_target_row
+  target_row_id: eco1_rt_ec86kit_reference
+  residue_map_join_key: canonical_position
+  output_profile_artifact: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+
+target_sequence:
+  authority: ec86kit_manifest_2025-10-09T17-47-31Z
+  reference_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+  reference_sequence_length: 320
+  canonical_position_basis: reference_sequence_1_based
+  source_ref: sibling:../ec86kit/out/ec86_prot1/runs/2025-10-09T17-47-31Z/manifest.json
+  known_public_accession:
+    accession: WP_099010551.1
+    provider: ncbi_protein_efetch
+    observed_sequence_hash: sha256:49220a2d5627a561264eca48027a7e943fe409d702e39799074120a63171a7db
+    mismatch:
+      canonical_position: 301
+      authority_aa: T
+      public_accession_aa: A
+      policy: reject_as_target_without_declared_substitution
+      note: Public NCBI WP_099010551.1 must not silently replace the ec86kit target sequence.
+
+sequence_providers:
+  - id: ncbi_protein_efetch
+    status: selected
+    accession_prefixes:
+      - WP_
+    retrieval: ncbi_eutils_protein_fasta
+    failure_policy: explicit_exclude_or_fail
+  - id: bv_brc_feature_protein_fasta
+    status: selected
+    accession_prefixes:
+      - fig|
+    retrieval: bv_brc_genome_feature_accept_application_protein_fasta
+    failure_policy: explicit_exclude_or_fail
+
+source_groups:
+  - profile_id: broad_retron_rt
+    status: selected
+    purpose: Protect broadly conserved retron RT positions.
+    roster_source:
+      source_name: Mestre et al. 2020 Supplementary Table S1
+      source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+      source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+      accession_field: Accesione
+      total_roster_count: 1928
+    selection_rule:
+      included_records: all_mestre_s1_rt_records_after_filters
+      query_coverage_minimum: 0.70
+      identity_range:
+        - 0.20
+        - 0.90
+      length_range_aa:
+        - 250
+        - 450
+      required_motifs:
+        - rt_catalytic_dd_or_yadd_like_region
+        - retron_x_naxxH_like_motif
+        - retron_y_vtg_like_motif
+      excluded_families:
+        - group_ii_intron_rt
+        - dgr_rt
+        - fragment
+        - unresolved_long_fusion
+    provider_ids:
+      - ncbi_protein_efetch
+      - bv_brc_feature_protein_fasta
+    min_non_gap_count: 20
+
+  - profile_id: eco1_like_retron_rt
+    status: selected
+    purpose: Protect Eco1-like retron RT recognition and scaffold positions.
+    roster_source:
+      source_name: Mestre et al. 2020 Supplementary Table S1
+      source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+      source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+      accession_field: Accesione
+      total_roster_count: 1928
+    selection_rule:
+      included_records: mestre_s1_retron_subtype_ii_a3_cluster_42_1_after_filters
+      fallback_rule: type_ii_a3_only_if_cluster_42_1_non_gap_support_fails
+      observed_roster_count: 47
+      broader_type_ii_a3_count: 59
+      parent_rt_clade: 9
+      retron_subtype: II-A3
+      cluster_domain: "42_1"
+      query_coverage_minimum: 0.70
+      identity_range:
+        - 0.20
+        - 0.90
+      length_range_aa:
+        - 250
+        - 450
+      required_motifs:
+        - rt_catalytic_dd_or_yadd_like_region
+        - retron_x_naxxH_like_motif
+        - retron_y_vtg_like_motif
+      excluded_families:
+        - group_ii_intron_rt
+        - dgr_rt
+        - fragment
+        - unresolved_long_fusion
+    provider_ids:
+      - ncbi_protein_efetch
+      - bv_brc_feature_protein_fasta
+    min_non_gap_count: 20
+
+phase1_acceptance:
+  required_profile_ids:
+    - broad_retron_rt
+    - eco1_like_retron_rt
+  required_provider_ids:
+    - ncbi_protein_efetch
+    - bv_brc_feature_protein_fasta
+  fail_fast:
+    - no_conservation_profile_without_source_contract
+    - no_target_row_from_mismatched_public_accession
+    - no_missing_evidence_designability

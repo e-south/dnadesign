@@ -1,0 +1,56 @@
+version: 1
+study_id: eco1_rt_repack
+status: contact_profile_materialized
+lanes:
+  - id: refine_dev_spec
+    owner: docs
+    status: active
+    entry: docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md
+  - id: structure_authority
+    owner: eco1_rt_repack
+    status: materialized
+    entry: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+  - id: residue_map
+    owner: planned_thread
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+  - id: evidence_profiles
+    owner: planned_thread
+    status: partially_materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+  - id: contact_profile
+    owner: planned_thread
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+  - id: mask_contract
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+  - id: sampling_plan
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+  - id: sample_ingest
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+  - id: candidate_table
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+  - id: candidate_qa
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+  - id: assembly_feasibility
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+  - id: candidate_handoff
+    owner: planned_thread
+    status: planned
+    entry: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+  - id: rt_lnrna_handoff
+    owner: eco1_rt_repack
+    status: planned
+    downstream: docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md

@@ -1,0 +1,82 @@
+version: 1
+profile_id: eco1_rt_v1
+study_id: eco1_rt_repack
+kind: fixed_backbone_profile
+status: scaffold
+reference:
+  protein_name: Eco1 reverse transcriptase
+  sequence_authority: ec86kit_manifest_2025-10-09T17-47-31Z
+  structure_authority: ec86kit_7v9u_protomer1
+  structure_chain_id: A
+  retained_context_policy: rt_with_msdna_msrna_no_effector
+  residue_numbering_origin: ec86kit_aa_map_chain_a_to_reference_sequence_v1
+  reference_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+thread_contract:
+  planned_tool: thread
+  backbone_bundle: planned
+  residue_map: planned
+  conservation_profile: planned
+  contact_profile: planned
+  mask_set: planned
+  thread_plan: planned
+conservative_policy:
+  status: proposed_until_structure_authority_selected
+  manual_mask_groups:
+    - id: catalytic_core
+      status: pending_residue_numbering_audit
+      policy: fixed
+      proposed_anchors:
+        - YADD catalytic motif
+        - RT1-RT7 core motif residues
+    - id: retron_x_region
+      status: pending_residue_numbering_audit
+      policy: fixed
+      proposed_anchors:
+        - NAxxH retron X motif
+    - id: retron_y_region
+      status: pending_residue_numbering_audit
+      policy: fixed
+      proposed_anchors:
+        - VTG retron Y motif
+    - id: effector_interface
+      status: optional
+      policy: do_not_fix_unless_retained_context_or_manual_decision
+  substrate_contact_threshold_angstrom: 20
+  relaxed_contact_thresholds_angstrom:
+    - 18
+    - 15
+  conservation_threshold: 0.25
+  conservation_profiles:
+    - broad_retron_rt
+    - eco1_like_retron_rt
+  conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
+  cysteine_policy: no_new_cysteine
+  unresolved_residue_policy: fixed
+  designable_rule: mapped_and_not_final_fixed
+sampling_policy:
+  status: planned
+  backends_allowed:
+    - proteinmpnn
+    - ligandmpnn
+  backend_selection_policy: explicit_no_fallback
+  design_contract_owner: thread
+  process_execution_owner: explicit_backend_or_infer_manifest
+  backend_result_ingest_policy: declared_manifest_only
+  temperatures:
+    - 0.1
+    - 0.3
+  seed_policy: explicit_seed_list_required
+fold_validation_policy:
+  status: planned
+  wild_type_baseline_required: true
+  runtime_parameters_hash_required: true
+  threshold_policy_required: true
+  fixture_rows_do_not_satisfy_materialized_handoff: true
+assembly_policy:
+  status: planned
+  first_tier: full_gene_candidate
+  bounded_window_requires_parent_haplotype_trace: true
+downstream:
+  rt_lnrna_sponging_construct_triage:
+    relationship: downstream_candidate_promotion
+    status: planned

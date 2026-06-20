@@ -1,0 +1,33 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.assembly.policy_context
+      check_group: assembly_feasibility
+      summary: Synthesis feasibility policy declares full-gene, bounded-window, and sparse-recombination gates.
+      required: true
+      artifact: synthesis_feasibility_policy
+    - kind: path_exists
+      check_id: eco1_rt.assembly.artifact_chain_schema
+      check_group: assembly_feasibility
+      summary: Artifact chain schema declares feasibility_report fields and handoff dependency.
+      required: true
+      artifact: thread_artifact_chain_schema
+  phase2_real_backend_ingest:
+    - kind: path_exists
+      check_id: eco1_rt.assembly.materialized_feasibility_report
+      check_group: assembly_feasibility
+      summary: Real backend ingest requires feasibility_report rows before candidate_handoff.yaml.
+      required: true
+      artifact: planned_feasibility_report
+      validator_intent:
+        required_state: materialized
+        required_columns:
+          - candidate_id
+          - full_sequence_hash
+          - mutation_windows
+          - window_haplotype_ids
+          - nearest_parent_candidate_id
+          - distance_to_nearest_parent
+          - structural_coupling_flags
+          - recommended_synthesis_tier
+        rejects_unvalidated_cartesian_recombination: true

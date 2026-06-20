@@ -1,0 +1,50 @@
+version: 1
+study_id: eco1_rt_repack
+status: selected
+policy_id: ec86kit_protomer1_chain_a_numbering_v1
+selected_structure_source_id: ec86kit_7v9u_protomer1
+reference_sequence_authority: ec86kit_manifest_2025-10-09T17-47-31Z
+reference_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+residue_numbering_origin: ec86kit_aa_map_chain_a_to_reference_sequence_v1
+canonical_position_basis: reference_sequence_1_based
+structure_position_basis: pdb_auth_seq_id
+design_position_basis: canonical_position
+source_map_ref: sibling:../ec86kit/out/ec86_prot1/runs/2025-10-09T17-47-31Z/artifacts/ec86_prot1_aa_map.csv
+source_map_sha256: 26417e2138a7cd2420a9e4f6e1e1cb332a8f2d32bf90fa2ce02f12d390854e88 # pragma: allowlist secret
+source_distance_profile_ref: sibling:../ec86kit/out/ec86_prot1/runs/2025-10-09T17-47-31Z/artifacts/ec86_prot1_rt_residue_min_distances.csv
+source_distance_profile_sha256: 29fb97933658cc6f62f0cdbb10f86bbad60f5115d56ad017e6cc7222ec640a49 # pragma: allowlist secret
+coverage:
+  reference_sequence_length: 320
+  mapped_residue_count: 309
+  mapped_canonical_start: 3
+  mapped_canonical_end: 311
+  unresolved_canonical_positions:
+    - 1
+    - 2
+    - 312
+    - 313
+    - 314
+    - 315
+    - 316
+    - 317
+    - 318
+    - 319
+    - 320
+required_mapping_columns:
+  - canonical_position
+  - wt_aa
+  - structure_chain_id
+  - structure_residue_id
+  - pdb_insertion_code
+  - cds_codon_index
+  - design_position
+  - mapping_status
+  - mapping_issue
+residue_map_artifact:
+  status: materialized
+  path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+acceptance_rules:
+  unresolved_residue_policy: fixed
+  no_mutable_residue_without_materialized_map: true
+  pdb_residue_ids_and_canonical_positions_are_distinct: true
+  materialized_residue_map_required_for_sampling: true

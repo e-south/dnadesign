@@ -1,0 +1,60 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.mask.profile_schema
+      check_group: mask_contract
+      summary: Eco1 profile schema declares conservative mask policy fields.
+      required: true
+      artifact: eco1_rt_profile_schema
+    - kind: path_exists
+      check_id: eco1_rt.mask.artifact_chain_schema
+      check_group: mask_contract
+      summary: Thread artifact chain schema declares residue-map, evidence, and mask-set contracts.
+      required: true
+      artifact: thread_artifact_chain_schema
+    - kind: path_exists
+      check_id: eco1_rt.mask.policy_context
+      check_group: mask_contract
+      summary: Residue-mask policy context defines mask algebra and fail-fast behavior.
+      required: true
+      artifact: residue_mask_policy
+    - kind: path_exists
+      check_id: eco1_rt.mask.pass_fail_cases
+      check_group: mask_contract
+      summary: Conservative mask pass/fail fixture cases are present.
+      required: true
+      artifact: conservative_mask_cases
+    - kind: path_exists
+      check_id: eco1_rt.mask.materialized_residue_map
+      check_group: mask_contract
+      summary: Mask construction requires materialized residue_map.parquet with canonical design positions.
+      required: true
+      artifact: planned_residue_map
+      validator_intent:
+        required_state: materialized
+        required_columns:
+          - canonical_position
+          - wt_aa
+          - structure_residue_id
+          - design_position
+          - mapping_status
+    - kind: path_exists
+      check_id: eco1_rt.mask.materialized_evidence_profiles
+      check_group: mask_contract
+      summary: Mask construction requires conservation and contact profiles with source hashes; contact is locally materialized and conservation is still planned.
+      required: true
+      artifact: planned_conservation_profile
+      validator_intent:
+        paired_artifact: planned_contact_profile
+        required_state: materialized
+        rejects_missing_source_hashes: true
+    - kind: path_exists
+      check_id: eco1_rt.mask.materialized_mask_set
+      check_group: mask_contract
+      summary: Conservative mask set must be materialized before any backend request is valid.
+      required: true
+      artifact: planned_mask_set
+      validator_intent:
+        required_state: materialized
+        rejects_missing_evidence_designability: true
+        rejects_unresolved_conflicts: true

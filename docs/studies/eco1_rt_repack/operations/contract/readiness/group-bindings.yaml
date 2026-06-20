@@ -1,0 +1,9 @@
+group_phase_bindings:
+  thread_profile: phase0_scaffold
+  structure_authority: phase0_scaffold
+  mask_contract: phase1_thread_contract
+  sampling_plan: phase1_thread_contract
+  candidate_handoff: phase1_thread_contract
+  foldcheck_runtime: phase1_thread_contract
+  assembly_feasibility: phase1_thread_contract
+  downstream_rt_lnrna_handoff: phase3_downstream_promotion

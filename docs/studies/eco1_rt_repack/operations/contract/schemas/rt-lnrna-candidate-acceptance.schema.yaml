@@ -1,0 +1,63 @@
+version: 1
+schema_id: rt_lnrna_candidate_acceptance_v1
+status: scaffold
+purpose: downstream_accept_or_reject_rt_only_candidate_handoff
+required_fields:
+  - schema_id
+  - schema_version
+  - acceptance_id
+  - downstream_study_id
+  - source_handoff_id
+  - source_study_id
+  - source_design_set_id
+  - accepted_candidate_ids
+  - rejected_candidate_ids
+  - decision_status
+  - decision_reason
+  - rt_sequence_authority
+  - downstream_binding_status
+  - accepted_at
+field_contract:
+  root:
+    required:
+      - schema_id
+      - schema_version
+      - acceptance_id
+      - downstream_study_id
+      - source_handoff_id
+      - source_study_id
+      - source_design_set_id
+      - accepted_candidate_ids
+      - rejected_candidate_ids
+      - decision_status
+      - decision_reason
+      - rt_sequence_authority
+      - downstream_binding_status
+      - accepted_at
+  accepted_candidate_ids:
+    source: candidate_handoff.selected_candidate_ids
+    empty_allowed: true
+  rejected_candidate_ids:
+    source: candidate_handoff.selected_candidate_ids
+    empty_allowed: true
+  decision_status:
+    allowed_values:
+      - accepted
+      - rejected
+      - partially_accepted
+  downstream_binding_status:
+    allowed_values:
+      - rt_only_accepted
+      - rt_only_rejected
+      - construct_binding_deferred
+invariants:
+  - accepted_and_rejected_ids_must_partition_selected_candidate_ids
+  - no_construct_subject_id_before_downstream_construct_binding
+  - no_permuter_var_id_before_explicit_permuter_import
+  - rt_sequence_authority_must_match_candidate_handoff_sequence_hashes
+forbidden_fields:
+  - construct_subject_id
+  - permuter__var_id
+notes:
+  - This schema is a local handshake stub until the downstream RT-lnRNA study owns its acceptance record.
+  - It records RT-only promotion status and must not imply lnRNA pairing, construct realization, or assay scheduling.

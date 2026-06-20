@@ -1,0 +1,12 @@
+- id: phase0_scaffold
+  label: Study scaffold and dev spec
+  status: in_progress
+- id: phase1_thread_contract
+  label: Thread contract tracer bullet
+  status: planned
+- id: phase2_real_backend_ingest
+  label: Real MPNN and fold-check artifact ingest
+  status: planned
+- id: phase3_downstream_promotion
+  label: RT-lnRNA promotion handoff
+  status: planned

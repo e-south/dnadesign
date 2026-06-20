@@ -1,0 +1,46 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.sampling.profile_policy
+      check_group: sampling_plan
+      summary: Eco1 profile fixture declares allowed backends, temperatures, seed policy, and no fallback.
+      required: true
+      artifact: eco1_rt_profile_fixture
+    - kind: path_exists
+      check_id: eco1_rt.sampling.artifact_chain_schema
+      check_group: sampling_plan
+      summary: Artifact chain schema declares thread_plan and sample_table requirements.
+      required: true
+      artifact: thread_artifact_chain_schema
+  phase2_real_backend_ingest:
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_thread_plan
+      check_group: sampling_plan
+      summary: Real backend ingest requires thread_plan.yaml with request hash and explicit no-fallback policy.
+      required: true
+      artifact: planned_thread_plan
+      validator_intent:
+        required_state: materialized
+        required_fields:
+          - backend_kind
+          - backend_request_manifest
+          - request_hash
+          - seed_set
+          - temperature_schedule
+          - fallback_policy
+        fallback_policy: explicit_no_fallback
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_sample_table
+      check_group: sampling_plan
+      summary: Real backend ingest requires materialized sample_table.parquet with backend provenance.
+      required: true
+      artifact: planned_sample_table
+      validator_intent:
+        required_state: materialized
+        required_columns:
+          - sample_id
+          - backend_run_id
+          - request_hash
+          - backend_result_hash
+          - sequence_hash
+          - status

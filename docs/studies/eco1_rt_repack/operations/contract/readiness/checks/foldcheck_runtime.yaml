@@ -1,0 +1,33 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.policy_context
+      check_group: foldcheck_runtime
+      summary: Fold-validation policy declares required fields, semantics, and fixture boundaries.
+      required: true
+      artifact: fold_validation_policy
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.handoff_schema
+      check_group: foldcheck_runtime
+      summary: Candidate handoff schema requires foldcheck_report coverage for selected candidates.
+      required: true
+      artifact: thread_candidate_handoff_schema
+  phase2_real_backend_ingest:
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.materialized_report
+      check_group: foldcheck_runtime
+      summary: Real backend ingest requires nonfixture foldcheck_report rows for selected full sequences.
+      required: true
+      artifact: planned_foldcheck_report
+      validator_intent:
+        required_state: materialized
+        fixture_rows_allowed_for_acceptance: false
+        required_columns:
+          - candidate_id
+          - wt_baseline_artifact_id
+          - runtime_parameters_hash
+          - threshold_id
+          - threshold_values
+          - status
+          - rejection_reason
+        runtime_failures_must_be_rows: true

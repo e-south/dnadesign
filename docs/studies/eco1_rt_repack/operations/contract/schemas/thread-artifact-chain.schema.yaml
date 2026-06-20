@@ -1,0 +1,162 @@
+version: 1
+schema_id: thread_artifact_chain_v1
+status: scaffold
+scope: study_local_until_thread_exists
+artifact_order:
+  - backbone_bundle
+  - residue_map
+  - conservation_profile
+  - contact_profile
+  - mask_set
+  - thread_plan
+  - sample_table
+  - candidate_table
+  - foldcheck_report
+  - feasibility_report
+  - candidate_handoff
+shared_required_fields:
+  - schema_id
+  - schema_version
+  - artifact_id
+  - status
+  - created_by
+  - created_at
+  - upstream_artifact_hashes
+artifacts:
+  backbone_bundle:
+    required_fields:
+      - structure_source_id
+      - source_ref
+      - source_format
+      - source_hash
+      - reference_sequence_hash
+      - rt_chain_id
+      - chain_inventory
+      - retained_context_policy
+      - residue_numbering_origin
+      - upstream_artifact_hashes
+  residue_map:
+    required_columns:
+      - canonical_position
+      - wt_aa
+      - structure_chain_id
+      - structure_residue_id
+      - pdb_insertion_code
+      - cds_codon_index
+      - design_position
+      - mapping_status
+      - mapping_issue
+      - is_designable_initially
+      - unresolved_policy
+  conservation_profile:
+    required_columns:
+      - canonical_position
+      - profile_id
+      - non_gap_count
+      - wt_frequency
+      - plurality_aa
+      - passes_threshold
+      - source_hash
+  contact_profile:
+    required_columns:
+      - canonical_position
+      - retained_context_id
+      - nearest_context_atom_distance_angstrom
+      - contact_threshold_angstrom
+      - passes_contact_mask
+      - source_hash
+  mask_set:
+    required_columns:
+      - canonical_position
+      - wt_aa
+      - final_fixed
+      - proteinmpnn_designable
+      - mask_sources
+      - conflict_status
+      - conflict_reason
+  thread_plan:
+    required_fields:
+      - backend_kind
+      - backend_run_id
+      - backend_request_manifest
+      - request_hash
+      - seed_set
+      - temperature_schedule
+      - fixed_position_source
+      - expected_sample_count
+      - fallback_policy
+  sample_table:
+    required_columns:
+      - sample_id
+      - backend_kind
+      - backend_run_id
+      - seed
+      - temperature
+      - sequence_hash
+      - request_hash
+      - backend_result_hash
+      - backend_score
+      - status
+  candidate_table:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - parent_sample_ids
+      - mutation_count
+      - mutation_list
+      - mutation_windows
+      - mask_violation_count
+      - rank
+      - status
+  foldcheck_report:
+    required_columns:
+      - candidate_id
+      - runtime_kind
+      - runtime_version
+      - input_sequence_hash
+      - reference_structure_id
+      - wt_baseline_artifact_id
+      - runtime_parameters_hash
+      - threshold_id
+      - threshold_values
+      - plddt
+      - pae_summary
+      - backbone_rmsd_to_reference
+      - protected_contact_retention
+      - status
+      - rejection_reason
+      - missing_metric_reason
+  feasibility_report:
+    required_columns:
+      - candidate_id
+      - full_sequence_hash
+      - mutation_count
+      - mutation_windows
+      - window_ids
+      - window_haplotype_ids
+      - nearest_parent_candidate_id
+      - distance_to_nearest_parent
+      - structural_coupling_flags
+      - recommended_synthesis_tier
+      - rejection_reason
+  candidate_handoff:
+    required_fields:
+      - handoff_id
+      - source_study_id
+      - profile_id
+      - design_set_id
+      - candidate_table
+      - foldcheck_report
+      - feasibility_report
+      - upstream_artifact_hashes
+      - selected_candidate_ids
+      - downstream_target
+      - acceptance_summary
+invariants:
+  - artifact_order_is_linear_for_phase1_tracer_bullet
+  - every_downstream_artifact_hashes_all_required_upstream_artifacts
+  - candidate_handoff_hashes_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_feasibility
+  - fallback_policy_must_be_explicit_no_fallback_for_sampling
+  - fixture_artifacts_cannot_satisfy_materialized_handoff
+  - missing_metrics_require_reason_fields
+  - no_candidate_handoff_without_foldcheck_and_feasibility_reports

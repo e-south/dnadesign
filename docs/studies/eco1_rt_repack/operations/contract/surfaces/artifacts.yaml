@@ -1,0 +1,75 @@
+status_note:
+  ref: repo:docs/studies/eco1_rt_repack/record/status.md
+datasets_registry:
+  ref: repo:docs/studies/eco1_rt_repack/record/datasets.yaml
+campaign_record:
+  ref: repo:docs/studies/eco1_rt_repack/record/campaign.yaml
+routes_doc:
+  ref: repo:docs/studies/eco1_rt_repack/routes/README.md
+fixed_backbone_method:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/fixed-backbone-method.md
+implementation_roadmap:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/implementation-roadmap.md
+residue_mask_policy:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md
+fold_validation_policy:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/fold-validation-policy.md
+synthesis_feasibility_policy:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/synthesis-feasibility-policy.md
+eco1_rt_profile_fixture:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml
+conservative_mask_cases:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/conservative_mask_cases.yaml
+eco1_rt_profile_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/eco1-rt-profile.schema.yaml
+thread_candidate_handoff_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/thread-candidate-handoff.schema.yaml
+thread_artifact_chain_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/thread-artifact-chain.schema.yaml
+rt_lnrna_candidate_acceptance_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml
+structure_sources:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+residue_numbering_audit:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-audit.md
+residue_numbering_policy:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+rt_lnrna_route_map:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
+planned_runtime_root:
+  status: partially_materialized
+  root_ref: repo:outputs/thread/eco1_rt_conservative_v1
+  commit_policy: ask_before_commit
+planned_backbone_bundle:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+planned_residue_map:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+planned_conservation_profile:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+planned_contact_profile:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+planned_mask_set:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+planned_thread_plan:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+planned_sample_table:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+planned_candidate_table:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+planned_foldcheck_report:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+planned_feasibility_report:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+planned_candidate_handoff:
+  status: planned
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml

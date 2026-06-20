@@ -1,0 +1,22 @@
+next_scope:
+  target_phase_groups:
+    phase0_scaffold:
+      - thread_profile
+      - structure_authority
+    phase1_thread_contract:
+      - thread_profile
+      - structure_authority
+      - mask_contract
+      - sampling_plan
+      - candidate_handoff
+      - foldcheck_runtime
+      - assembly_feasibility
+    phase2_real_backend_ingest:
+      - sampling_plan
+      - candidate_handoff
+      - foldcheck_runtime
+      - assembly_feasibility
+    phase3_downstream_promotion:
+      - downstream_rt_lnrna_handoff
+  runtime_phase_groups: []
+  runtime_shared_groups: []

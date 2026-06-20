@@ -18,3 +18,6 @@ studies:
   - study_id: rt_lnrna_sponging_construct_triage
     title: RT-lnRNA sponging construct triage
     record_root: docs/studies/rt_lnrna_sponging_construct_triage
+  - study_id: eco1_rt_repack
+    title: Eco1 RT repack
+    record_root: docs/studies/eco1_rt_repack

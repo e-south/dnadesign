@@ -1,0 +1,13 @@
+mode: sequential
+phase_order:
+  - phase0_scaffold
+  - phase1_thread_contract
+  - phase2_real_backend_ingest
+  - phase3_downstream_promotion
+current_phase:
+  strategy: explicit
+  id: phase0_scaffold
+provider_registered: false
+notes:
+  - No OPS provider is registered for this study yet.
+  - Use checked-in records and routes for status until executable providers exist.

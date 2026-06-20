@@ -1,0 +1,171 @@
+version: 1
+study_id: eco1_rt_repack
+last_verified: 2026-06-20
+datasets:
+  - id: eco1_rt_v1_profile
+    owner: eco1_rt_repack
+    kind: checked_in_fixture
+    path: docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml
+    status: scaffolded
+    description: Eco1 RT fixed-backbone profile stub and policy anchors.
+  - id: eco1_rt_conservative_mask_cases
+    owner: eco1_rt_repack
+    kind: checked_in_fixture
+    path: docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/conservative_mask_cases.yaml
+    status: scaffolded
+    description: Planned pass/fail cases for conservative residue-mask policy.
+  - id: thread_artifact_chain_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/thread-artifact-chain.schema.yaml
+    status: scaffolded
+    description: Study-local artifact-chain schema until reusable thread contracts exist.
+  - id: eco1_rt_profile_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/eco1-rt-profile.schema.yaml
+    status: scaffolded
+    description: Study-owned Eco1 profile schema with Phase 0 pending-authority limits.
+  - id: thread_candidate_handoff_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/thread-candidate-handoff.schema.yaml
+    status: scaffolded
+    description: Study-local candidate handoff schema until reusable thread contracts exist.
+  - id: rt_lnrna_candidate_acceptance_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml
+    status: scaffolded
+    description: Local RT-only downstream acceptance contract stub until the RT-lnRNA study owns the promotion record.
+  - id: eco1_rt_structure_sources
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+    status: selected_authority
+    description: Selected Eco1/Ec86 structure-authority record using the sibling ec86kit protomer-1 workspace as provenance.
+  - id: eco1_rt_residue_numbering_policy
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+    status: selected_policy
+    description: Selected residue-numbering policy from the ec86kit chain-A amino-acid map; local residue_map.parquet is materialized.
+  - id: eco1_rt_contract_validator
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+    status: phase1_contact_profile_validation
+    description: Study-owned CLI for scaffold contracts, selected authority, materialized structure/contact artifacts, and next conservation/mask blockers.
+  - id: eco1_rt_contract_validator_package
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/
+    status: semantic_validator_package
+    description: Study-owned contract-validation package split by profile, artifact-chain, structure authority, conservation-source, and runtime-artifact ontology.
+  - id: eco1_rt_structure_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/
+    status: phase1_structure_artifact_materializer
+    description: Study-owned materializer for thread-shaped backbone_bundle.yaml and residue_map.parquet from the selected ec86kit authority.
+  - id: eco1_rt_contact_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/
+    status: phase1_contact_profile_materializer
+    description: Study-owned materializer for thread-shaped contact_profile.parquet from the retained ec86kit DNA/RNA context distance profile.
+  - id: eco1_rt_conservation_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/
+    status: phase1_conservation_profile_materializer
+    description: Study-owned materializer for thread-shaped conservation_profile.parquet from explicit aligned FASTA inputs; it does not fetch or align source sequences.
+  - id: eco1_rt_conservation_source_discovery
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
+    status: source_discovery
+    description: Study-owned source-discovery note for broad retron RT and Eco1-like conservation profile authority before MSA materialization.
+  - id: eco1_rt_conservation_sources
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml
+    status: selected_authority
+    description: Study-owned MSA source contract for broad retron RT and Eco1-like conservation profiles, including provider policy and ec86kit target-row pinning.
+  - id: eco1_rt_msa_method
+    owner: eco1_rt_repack
+    kind: checked_in_context
+    path: docs/studies/eco1_rt_repack/contexts/msa-method.md
+    status: method_documented
+    description: Human-readable reproduction method for future MSA curation, Tao-style conservation scoring, and T301/A301 source mismatch handling.
+  - id: eco1_rt_backbone_bundle
+    owner: planned_thread
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+    status: materialized
+    description: Local generated selected structure/reference bundle with typed chain inventory; runtime output is not checked in by default.
+  - id: eco1_rt_residue_map
+    owner: planned_thread
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+    status: materialized
+    description: Local generated all-position residue-numbering map; 309 mapped positions and 11 terminal unresolved fixed positions.
+  - id: eco1_rt_conservation_profile
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    status: not_generated
+    description: Planned MSA-derived conservation profile with source hashes and residue-map coverage; blocked until source-contract-backed aligned FASTA inputs exist.
+  - id: eco1_rt_contact_profile
+    owner: planned_thread
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+    status: materialized
+    description: Local generated retained-context contact profile with 20 A distance-threshold provenance; 309 resolved rows pass the contact-mask predicate and runtime output is not checked in by default.
+  - id: eco1_rt_mask_set
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+    status: not_generated
+    description: Planned conservative fixed/mutable mask set.
+  - id: eco1_rt_thread_plan
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+    status: not_generated
+    description: Planned sampling request contract with backend, request hash, seeds, temperatures, and no-fallback policy.
+  - id: eco1_rt_sample_table
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+    status: not_generated
+    description: Planned raw backend sample table with run id, request hash, sequence hash, score, and status.
+  - id: eco1_rt_candidate_table
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+    status: not_generated
+    description: Planned deduplicated fixed-backbone candidate table.
+  - id: eco1_rt_foldcheck_report
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+    status: not_generated
+    description: Planned fold-validation report for selected full-sequence candidates.
+  - id: eco1_rt_feasibility_report
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+    status: not_generated
+    description: Planned mutation-window and parent-haplotype feasibility report; Eco1 synthesis decisions remain study policy.
+  - id: eco1_rt_candidate_handoff
+    owner: planned_thread
+    kind: planned_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+    status: not_generated
+    description: Planned RT-only handoff bundle emitted by `thread`; Eco1 selection policy and downstream acceptance remain study-owned.
+downstream_collaboration:
+  - study_id: rt_lnrna_sponging_construct_triage
+    relationship: downstream_construct_promotion_candidate
+    required_contract: explicit RT-only candidate promotion handoff
+    status: planned

@@ -1,0 +1,67 @@
+version: 1
+path_base: repo
+campaign_id: eco1_rt_repack
+steps:
+  - label: refine-dev-spec
+    kind: documentation
+    path: docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md
+  - label: select-structure-authority
+    kind: study-record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+  - label: select-residue-numbering-policy
+    kind: study-record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+  - label: audit-residue-numbering
+    kind: study-record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-audit.md
+  - label: define-conservative-mask
+    kind: study-record
+    path: docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md
+  - label: materialize-backbone-bundle
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+  - label: materialize-residue-map
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+  - label: materialize-evidence-profiles
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+  - label: materialize-contact-profile
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+  - label: discover-conservation-sources
+    kind: study-record
+    status: source_discovery
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
+  - label: select-conservation-source-authority
+    kind: study-record
+    status: selected
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml
+  - label: document-msa-method
+    kind: study-context
+    status: documented
+    path: docs/studies/eco1_rt_repack/contexts/msa-method.md
+  - label: materialize-thread-artifact-chain
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+  - label: build-sampling-plan
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+  - label: ingest-thread-samples
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+  - label: build-candidate-table
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+  - label: foldcheck-selected-candidates
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+  - label: assess-assembly-feasibility
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+  - label: tracer-bullet-thread
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml

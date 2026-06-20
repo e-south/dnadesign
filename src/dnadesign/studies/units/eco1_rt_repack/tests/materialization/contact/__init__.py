@@ -1,0 +1,1 @@
+"""Contact-materialization tests."""

@@ -1,0 +1,12 @@
+version: 1
+study_id: eco1_rt_repack
+snapshot:
+  status: contact_profile_materialized
+  phase: phase1_thread_contract
+  current_record: docs/studies/eco1_rt_repack/record/status.md
+  blockers:
+    - thread package not implemented
+    - conservation profile not materialized
+    - mask set not materialized
+    - fold-check runtime report not materialized
+    - downstream RT-only acceptance not materialized
