@@ -11,3 +11,4 @@ pytest = "uv run pytest -q"
 
 [dependencies]
 meme = "*"
+mafft = ">=7.526,<8"

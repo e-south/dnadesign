@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from scipy.stats import entropy as scipy_entropy
 
-from dnadesign.aligner.metrics import compute_alignment_scores
+from dnadesign.aligner import compute_alignment_scores
 
 # set up module‐level logger
 logger = logging.getLogger(__name__)

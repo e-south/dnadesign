@@ -21,7 +21,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from dnadesign.aligner.metrics import compute_alignment_scores
+from dnadesign.aligner import compute_alignment_scores
 from dnadesign.billboard.core import compute_core_metrics, process_sequences
 
 

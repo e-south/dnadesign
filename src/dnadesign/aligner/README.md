@@ -1,11 +1,13 @@
 ![aligner banner](assets/aligner-banner.svg)
 
-Aligner scores pairwise nucleotide alignments and returns summary or matrix
-outputs for sibling analysis tools.
+Aligner exposes public alignment primitives for sibling tools: pairwise
+nucleotide scoring and generic protein MSA bundles.
 
 ## Documentation
 
-- [Aligner docs index](docs/README.md): usage, public functions, caching, and
+- [Aligner docs index](docs/README.md): route into pairwise and MSA surfaces.
+- [Pairwise Alignment](docs/pairwise.md): scoring behavior, examples, and
   output shapes.
-- [Reference](docs/reference.md): scoring behavior, examples, and tuning notes.
+- [Multiple Sequence Alignment](docs/msa.md): MAFFT backend contract and
+  aligned FASTA bundle manifests.
 - [Repository docs index](../../../docs/README.md): cross-tool workflow routing.

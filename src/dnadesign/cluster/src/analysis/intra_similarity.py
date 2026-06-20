@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 
-# We depend on dnadesign.aligner.metrics.score_pairwise
+# We depend on dnadesign.aligner.score_pairwise
 def _score_pairwise(
     seq_i: str,
     seq_j: str,
@@ -28,7 +28,7 @@ def _score_pairwise(
     normalization="max_score",
 ) -> float:
     try:
-        from dnadesign.aligner.metrics import score_pairwise
+        from dnadesign.aligner import score_pairwise
     except Exception as e:
         raise RuntimeError("dnadesign.aligner is required for intra-cluster similarity.") from e
     return score_pairwise(
