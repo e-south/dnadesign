@@ -80,6 +80,18 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/
     status: phase1_conservation_profile_materializer
     description: Study-owned materializer for thread-shaped conservation_profile.parquet from explicit aligned FASTA inputs; it does not fetch or align source sequences.
+  - id: eco1_rt_conservation_source_sequence_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/
+    status: source_sequence_bundle_materializer_and_sufficiency_gate
+    description: Study-owned materializer and pre-alignment sufficiency gate for unaligned conservation source FASTA bundles from explicit local provider caches and exclusion ledgers.
+  - id: eco1_rt_conservation_source_sequence_sufficiency
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency.py
+    status: implemented_fail_fast_preflight
+    description: CLI/API gate that rejects missing source caches, placeholder accessions, under-supported profile bundles, hash drift, target drift, and implicit exclusions before MAFFT alignment.
   - id: eco1_rt_conservation_source_discovery
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -115,7 +127,7 @@ datasets:
     kind: planned_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
     status: not_generated
-    description: Planned MSA-derived conservation profile with source hashes and residue-map coverage; blocked until source-contract-backed aligned FASTA inputs exist.
+    description: Planned MSA-derived conservation profile with source hashes and residue-map coverage; blocked until source-contract-backed source FASTA and aligned FASTA inputs exist.
   - id: eco1_rt_contact_profile
     owner: planned_thread
     kind: generated_artifact

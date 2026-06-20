@@ -34,6 +34,13 @@ contact profile:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact --repo-root .
 ```
 
+The current conservation source slice is study-owned and emits unaligned source
+FASTA bundles from explicit local provider caches:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences --repo-root .
+```
+
 Do not add ProteinMPNN, LigandMPNN, AlphaFold, ColabFold, mask algebra,
 candidate-ranking, or fold-normalization implementations here unless they are
 explicitly study-only and cannot graduate to `dnadesign.thread`.
@@ -45,13 +52,14 @@ Source code is organized by ontology:
   validators.
 - `operations/materialization/<primitive>/`: study-owned runtime artifact
   materializers split by primitive: `structure`, `contact`, and
-  `conservation`.
+  `source_sequences`, and `conservation`.
 - `tests/contracts/` and `tests/materialization/<primitive>/`: tests mirror
   the source ownership boundaries.
 
 This package should stay narrow: validate the selected Eco1 structure authority
 and residue-numbering policy, materialize `backbone_bundle.yaml` and
 `residue_map.parquet`, materialize `contact_profile.parquet` from the retained
-DNA/RNA context, then reject missing conservation and mask artifacts when a
-Phase 1 or later contract is being validated. Generic runtime artifact-chain
-validation belongs in `dnadesign.thread` once that package exists.
+DNA/RNA context, materialize explicit source FASTA bundles before alignment,
+then reject missing conservation and mask artifacts when a Phase 1 or later
+contract is being validated. Generic runtime artifact-chain validation belongs
+in `dnadesign.thread` once that package exists.

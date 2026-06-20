@@ -18,7 +18,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _ALLOWED_OPERATION_ROOT_FILES = {"__init__.py", "contract_validation.py"}
 _ALLOWED_TEST_ROOT_FILES = {"__init__.py", "_helpers.py"}
-_MATERIALIZATION_PRIMITIVES = {"structure", "contact", "conservation"}
+_MATERIALIZATION_PRIMITIVES = {"structure", "contact", "conservation", "source_sequences"}
 
 
 def test_operations_root_stays_entrypoint_only() -> None:

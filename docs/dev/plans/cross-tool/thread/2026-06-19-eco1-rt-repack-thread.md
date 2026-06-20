@@ -42,7 +42,7 @@ interpretation, or OPAL campaign state.
 | --- | --- | --- |
 | `thread` | Generic fixed-backbone protein design contracts, masks, request/result normalization, candidate ids, ranking, fold-check interpretation, and candidate handoff bundles. | Eco1 biological policy, Construct realization, model-process execution ledgers, Infer sidecars, RT-lnRNA labels. |
 | `infer` | Optional model-process execution and writeback for ProteinMPNN, LigandMPNN, AlphaFold, or ColabFold once explicit adapter contracts exist. | Redesign ontology, mask algebra, candidate identity, or study-specific acceptance policy. |
-| `aligner` | Current pairwise nucleotide alignment. Future MSA expansion only after an explicit Aligner modernization contract. | Hidden protein MSA or conservation machinery for this study. |
+| `aligner` | Pairwise nucleotide alignment and generic MSA bundle mechanics through the public `dnadesign.aligner` API. | Eco1 roster curation, provider fetching, target-row adjudication, conservation scoring, or hidden mask machinery. |
 | `construct` | Sequence realization, named slots, placement/window feasibility, and construct-context views. | Deciding which redesigned RT variants are worth ordering or assaying. |
 | `permuter` | DMS and explicit variant intent through public `dnadesign.permuter` APIs. | ProteinMPNN-generated design proposals unless they are intentionally imported as variant records through a later contract. |
 | `eco1_rt_repack` | Eco1 profile, protected-residue policy, source structure choice, candidate batch policy, and downstream handoff decisions. | Reusable MPNN mechanics, generic fold-check adapters, or RT-lnRNA paired-construct semantics. |
@@ -143,12 +143,12 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   structure authority, conservation-source, materialized-artifact, and mask-case
   checks do not accrete into a single module.
 - The second implementation slice is a study-owned structure materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure.py`.
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/`.
   It emits thread-shaped local runtime artifacts for `backbone_bundle.yaml` and
   `residue_map.parquet`. It is not a model-execution framework and does not
   create `dnadesign.thread`.
 - The third implementation slice is a study-owned contact materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact.py`.
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/`.
   It emits thread-shaped local runtime contact evidence for
   `contact_profile.parquet` from the retained DNA/RNA context; Phase 1 now
   fails on missing conservation evidence and `mask_set.yaml`.
@@ -159,11 +159,22 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   sequence hash, gap denominator, threshold, and plurality rule without
   materializing `conservation_profile.parquet`.
 - The fifth implementation slice is a study-owned conservation materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation.py`.
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`.
   It consumes explicit aligned FASTA inputs and emits thread-shaped long-form
   `conservation_profile.parquet` evidence. It does not fetch provider
   sequences, run MAFFT, or create `dnadesign.thread`; the real aligned FASTA
   bundle remains the next source-data blocker.
+- The Aligner modernization slice adds public `dnadesign.aligner.msa` contracts
+  for FASTA validation, MAFFT preflight/execution, and aligned FASTA bundle
+  manifests. Eco1 still owns the source roster, provider policy, target-row
+  hash, and conservation scoring.
+- The conservation source-sequence bundle slice adds
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`.
+  It consumes explicit local provider FASTA caches plus `source_records.yaml`,
+  inserts the ec86kit target row, rejects undeclared providers and unexplained
+  exclusions, and emits unaligned source FASTA bundles plus manifests. It does
+  not fetch live provider rows, run MAFFT, score conservation, or create
+  `dnadesign.thread`.
 
 ### 4. Contract Objects
 
@@ -334,8 +345,9 @@ does not adopt the prime-editing objective.
 - Which first backend result format should `thread` ingest: direct
   ProteinMPNN/LigandMPNN files, `infer` result manifests, or both through
   separate explicit adapters?
-- Should protein MSA/conservation become an Aligner modernization, a `thread`
-  evidence subpackage, or a separate future tool?
+- Which parts of protein MSA evidence should promote from the Eco1 materializer
+  into `thread.evidence` after `dnadesign.aligner.msa` emits aligned FASTA
+  bundles?
 - Which Eco1/Ec86 structural source is the first profile authority?
 - Which fold-check metrics are required for the first real candidate batch?
 - What exact downstream acceptance record will

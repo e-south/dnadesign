@@ -52,16 +52,22 @@ eco1_like_retron_rt   Mestre II-A3 cluster 42_1 after declared filters
    `bv_brc_feature_protein_fasta` for `fig|*` feature ids.
 4. Exclude unresolved provider rows only with an explicit reason; do not
    silently drop them.
-5. Write the ec86kit Eco1 RT sequence as the explicit target FASTA row.
+5. Materialize unaligned source FASTA bundles from explicit local provider
+   caches and `source_records.yaml`; each bundle must insert the ec86kit Eco1
+   RT sequence as the explicit target FASTA row.
 6. Reject `WP_099010551.1` as the target row unless the T301/A301 discrepancy
    is explicitly adjudicated.
-7. Apply the declared filters: query coverage, identity range, length range,
+7. Run the source-sequence sufficiency gate; reject missing cache roots,
+   placeholder accessions, undersized profile bundles, missing source hashes,
+   provider hash drift, and exclusions without reasons.
+8. Apply the declared filters: query coverage, identity range, length range,
    required RT/retron motifs, and excluded RT families.
-8. Align proteins with the declared MAFFT command from the source contract.
-9. Map alignment columns back to `residue_map.parquet` through canonical Eco1
+9. Align proteins with the declared MAFFT command from the source contract
+   through `dnadesign.aligner.msa`.
+10. Map alignment columns back to `residue_map.parquet` through canonical Eco1
    positions, not raw PDB residue ids.
-10. Compute conservation using non-gap rows as the denominator.
-11. Emit `conservation_profile.parquet` only after every row has source hashes,
+11. Compute conservation using non-gap rows as the denominator.
+12. Emit `conservation_profile.parquet` only after every row has source hashes,
     target-row provenance, profile id, WT amino acid, plurality amino acid, WT
     frequency, non-gap count, and pass/fail status.
 
@@ -97,12 +103,57 @@ declares a substitution and updates all linked hashes.
 - No conservation profile without `conservation-sources.yaml`.
 - No target row inferred from a public accession with a sequence mismatch.
 - No provider fallback outside the declared provider ids.
+- No MAFFT alignment from a source bundle that fails the sufficiency gate.
 - No figure-level or prose-only MSA used as materialized evidence.
 - No conservation count with gaps in the denominator.
 - No fixed-position conservation rule unless WT is the plurality amino acid.
 - No designability from missing conservation evidence.
 
-### Executable Materializer
+### Source-Sequence Bundle Materializer
+
+The source-sequence bundle materializer is:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/
+```
+
+It consumes explicit local source caches:
+
+```text
+<source-cache-root>/source_records.yaml
+<source-cache-root>/provider_caches/ncbi_protein_efetch.fasta
+<source-cache-root>/provider_caches/bv_brc_feature_protein_fasta.fasta
+```
+
+The ledger records `profile_id`, `record_id`, `provider_id`, `accession`,
+`status`, and an `exclusion_reason` for excluded rows. The materializer inserts
+`eco1_rt_ec86kit_reference` itself, rejects operator-supplied target rows, and
+writes unaligned source FASTA plus manifests:
+
+```text
+outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+```
+
+It does not fetch live provider records and it does not run MAFFT.
+
+Before alignment, run the sufficiency preflight:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency --repo-root .
+```
+
+This command is expected to fail until real provider caches exist under:
+
+```text
+outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+```
+
+It rejects source bundles that are fixture-like, under-supported relative to
+`min_non_gap_count`, not hash-linked to `source_records.yaml` and provider
+caches, or populated with placeholder accessions such as synthetic `WP_BROAD`
+or `fig|BROAD` records.
+
+### Conservation Profile Materializer
 
 The study-owned materializer is:
 
@@ -134,12 +185,14 @@ FASTA source hashes, and emits long-form rows keyed by
 `profile_id + canonical_position`.
 
 This materializer does not fetch provider sequences or run MAFFT. The next
-source-data slice must materialize the aligned FASTA bundle from the declared
-Mestre roster and provider policies before this can create real conservation
-evidence.
+source-data slice must use the source-sequence bundles and
+`dnadesign.aligner.msa` to materialize the aligned FASTA bundle before this can
+create real conservation evidence.
 
 ### Next Slice
 
-The next data slice should materialize the explicit aligned FASTA bundle from
-the declared source contract. After that, run the conservation materializer and
-confirm Phase 1 advances to the `mask_set.yaml` blocker only.
+The next data slice is real provider-cache curation until the source-sequence
+sufficiency gate passes. After that, run the explicit source FASTA bundles
+through the public `dnadesign.aligner.msa` API to create aligned FASTA bundle
+manifests, then run the conservation materializer and confirm Phase 1 advances
+to the `mask_set.yaml` blocker only.

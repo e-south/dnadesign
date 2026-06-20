@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.6
+  version: 0.1.8
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -78,8 +78,10 @@ Out of scope:
   execution is wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
-- Do not route MSA/conservation work into `aligner` without an explicit future
-  modernization contract.
+- Route generic aligned FASTA generation through public `dnadesign.aligner.msa`
+  when needed; route Eco1 provider-cache/source-sequence bundling through the
+  study materializer, and do not route Eco1 source authority, conservation
+  scoring, or mask policy into `aligner`.
 - Do not infer MSA source authority from review figures, prose, or public
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume

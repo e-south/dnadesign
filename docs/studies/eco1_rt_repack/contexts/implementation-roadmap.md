@@ -165,8 +165,51 @@ rule. It writes one row per `(profile_id, canonical_position)` and records
 aligned-FASTA hashes in parquet metadata.
 
 This slice deliberately does not fetch provider sequences or run MAFFT. Those
-remain explicit source-alignment curation work because no checked-in FASTA,
-A3M, or MSA source artifact currently exists.
+remain explicit source-sequence and source-alignment curation work because no
+checked-in FASTA, A3M, or MSA source artifact currently exists.
+
+### Implemented Cross-Tool Slice: Aligner MSA Backend v1
+
+`src/dnadesign/aligner/msa/` provides the generic alignment seam for the next
+source-data slice: FASTA validation, MAFFT preflight/execution, and aligned
+FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
+Mestre/NCBI/BV-BRC source sequences, adjudicate the T301/A301 target mismatch,
+score conservation, or build masks.
+
+After source FASTA bundles exist, the next Eco1 source-data slice should use
+this public API to produce:
+
+```text
+broad_retron_rt.aligned.fasta
+eco1_like_retron_rt.aligned.fasta
+```
+
+with bundle manifests, then pass those aligned FASTA files into the study-owned
+conservation-profile materializer.
+
+### Implemented Slice: Conservation Source-Sequence Bundle v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`
+materializes unaligned source FASTA bundles from explicit local provider caches
+and a `source_records.yaml` ledger. It validates declared provider ids, rejects
+operator-supplied target rows, requires explicit exclusion reasons, inserts the
+ec86kit target row itself, and writes profile-level and bundle-level manifests.
+
+This slice deliberately does not fetch live provider records, run MAFFT, score
+conservation, or build masks.
+
+### Implemented Slice: Conservation Source-Sequence Sufficiency v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency.py`
+is the pre-alignment gate for source FASTA bundles. It validates that provider
+caches exist, `source_records.yaml` and provider FASTA hashes match the bundle
+manifests, target rows are inserted and hash-pinned, profile bundles meet the
+declared `min_non_gap_count` support floor, provider accessions look real for
+their declared source, and exclusions remain explicit.
+
+Current local runtime outputs are expected to fail this gate until real
+provider caches are curated. MAFFT alignment and conservation scoring remain
+blocked until this sufficiency preflight passes.
 
 ### Implementation Rules
 
@@ -198,9 +241,11 @@ A3M, or MSA source artifact currently exists.
   policy are selected and materialized locally as structure artifacts.
 - Contact evidence is materialized locally from the retained DNA/RNA context.
 - Conservation source discovery and source authority are documented and
-  selected, and a conservation-profile materializer exists for explicit aligned
-  FASTA inputs. No real aligned FASTA bundle, materialized conservation profile,
-  mask set, sampling plan, sample table,
+  selected, a source-sequence bundle materializer exists for explicit provider
+  caches, and a conservation-profile materializer exists for explicit aligned
+  FASTA inputs. The generic MAFFT execution seam now lives in
+  `dnadesign.aligner.msa`, but no real provider cache, source FASTA bundle,
+  aligned FASTA bundle, materialized conservation profile, mask set, sampling plan, sample table,
   candidate table, fold-check report, feasibility report, or candidate handoff
   is materialized.
 - Readiness checks are still scaffold-level study preflight checks. They must

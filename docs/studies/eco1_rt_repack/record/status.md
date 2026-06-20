@@ -37,8 +37,15 @@ for both `broad_retron_rt` and `eco1_like_retron_rt`, while Tao et al. 2026
 provides the conservation-mask method. The checked-in source contract pins the
 MSA target row to the ec86kit reference sequence and rejects silent replacement
 by the mismatched public NCBI `WP_099010551.1` row. The study-owned
-conservation materializer now accepts explicit aligned FASTA inputs, but it
-does not fetch, align, or invent source sequences.
+source-sequence materializer now accepts explicit local provider caches and an
+exclusion ledger to emit unaligned source FASTA bundles. The conservation
+source-sequence package also exposes a sufficiency preflight that rejects
+missing cache roots, placeholder accessions, undersized profile bundles, and
+hash drift before MAFFT. The conservation materializer accepts explicit
+aligned FASTA inputs, but it does not fetch, align, or invent source sequences.
+Generic aligned FASTA execution routes through the public
+`dnadesign.aligner.msa` MAFFT bundle contract; Eco1 still owns the source
+roster and target-row policy.
 
 Validator command:
 
@@ -54,17 +61,21 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Curate or materialize the explicit aligned FASTA bundle for
+1. Curate explicit provider FASTA caches and a `source_records.yaml` ledger for
    `broad_retron_rt` and `eco1_like_retron_rt`.
-2. Materialize `conservation_profile.parquet` from that declared aligned FASTA
+2. Materialize unaligned source FASTA bundles with
+   `operations/materialization/source_sequences/`.
+3. Run the source-sequence sufficiency gate; do not align bundles that fail it.
+4. Align sufficiency-passing source FASTA bundles through `dnadesign.aligner.msa`.
+5. Materialize `conservation_profile.parquet` from that declared aligned FASTA
    bundle.
-3. Materialize the conservative `mask_set.yaml` only after contact and
+6. Materialize the conservative `mask_set.yaml` only after contact and
    conservation evidence are mapped onto `residue_map.parquet`.
-4. Promote only reusable artifact-chain mechanics into `thread` after the
+7. Promote only reusable artifact-chain mechanics into `thread` after the
    study-local validator proves the contract shape.
-5. Generate a small explicit sampling plan with backend, seed, temperature,
+8. Generate a small explicit sampling plan with backend, seed, temperature,
    fixed-position, request-hash, and no-fallback policy.
-6. Define the downstream RT-lnRNA candidate handoff accepted by
+9. Define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers
@@ -75,8 +86,10 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   contact evidence is materialized locally from the retained DNA/RNA context;
   reusable `thread.structure` and `thread.evidence` code does not exist yet.
 - MSA/conservation source discovery and source authority are documented and
-  selected; conservation-profile materialization code exists, but no real
-  aligned FASTA bundle or materialized conservation profile exists.
+  selected; source-sequence bundle, source-bundle sufficiency, and
+  conservation-profile materialization code exists, but no real provider cache,
+  sufficiency-passing source FASTA bundle, aligned FASTA bundle, or
+  materialized conservation profile exists.
 - No conservative mask set exists.
 - No sampling plan or backend-ingest contract is materialized.
 - No sample table, candidate table, or backend result manifest exists.

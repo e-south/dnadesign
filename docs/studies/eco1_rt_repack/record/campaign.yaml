@@ -44,6 +44,12 @@ steps:
     kind: study-context
     status: documented
     path: docs/studies/eco1_rt_repack/contexts/msa-method.md
+  - label: materialize-conservation-source-sequences
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+  - label: materialize-conservation-alignments
+    kind: planned-runtime
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
   - label: materialize-thread-artifact-chain
     kind: planned-runtime
     path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
