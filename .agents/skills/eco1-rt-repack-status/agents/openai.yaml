@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eco1 RT Repack Status"
+  short_description: "Route Eco1 RT repack study status and thread handoffs."
+  default_prompt: "Use this skill to report the Eco1 RT repack study record, route current thread design surfaces, and identify next readiness blockers."

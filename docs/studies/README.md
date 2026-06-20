@@ -2,7 +2,7 @@
 doc_id: study-records-router
 surface: studies-index
 owner: dnadesign-maintainers
-last_verified: 2026-05-18
+last_verified: 2026-06-19
 first_hop: docs/studies/<study-id>/routes/README.md
 record_root_contract: docs/studies/<study-id>
 ---
@@ -10,7 +10,7 @@ record_root_contract: docs/studies/<study-id>
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-06-19
 
 Studies hold cross-tool context, motivation, notes, selected command surfaces,
 and current handoff docs for long-running work. They are not generic workflow
@@ -44,6 +44,7 @@ Use these surfaces by intent:
 | `regulondb_native_promoter_panel` | [docs/studies/regulondb_native_promoter_panel/routes](regulondb_native_promoter_panel/routes/README.md) | Record-only: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | none |
 | `retron_hairpin_design` | [docs/studies/retron_hairpin_design/routes](retron_hairpin_design/routes/README.md) | Route-first for MSD work; use `studies.retron-hairpin-design.status` and `studies.retron-hairpin-design.preflight` only for explicit status or readiness questions. | `.agents/skills/retron-hairpin-study/SKILL.md` |
 | `rt_lnrna_sponging_construct_triage` | [docs/studies/rt_lnrna_sponging_construct_triage/routes](rt_lnrna_sponging_construct_triage/routes/README.md) | Record-only Phase 0/1 study: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | none |
+| `eco1_rt_repack` | [docs/studies/eco1_rt_repack/routes](eco1_rt_repack/routes/README.md) | Record-only Phase 0 study: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | `.agents/skills/eco1-rt-repack-status/SKILL.md` |
 
 ### Authority chain
 
@@ -178,4 +179,5 @@ instead of growing a study-local tool.
 - [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)
 - [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/operations/catalog/contracts/status.md)
 - [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md)
+- [Eco1 RT repack route map](eco1_rt_repack/routes/README.md)
 - [Documentation index](../README.md)
