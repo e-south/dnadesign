@@ -40,6 +40,9 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   contract for `broad_retron_rt` and `eco1_like_retron_rt`.
 - `workbench/provenance/conservation-source-discovery.md`: source-discovery
   note for method and roster priors before MSA materialization.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`:
+  study-owned provider-source acquisition package for declared NCBI Protein and
+  BV-BRC FASTA source files plus explicit unresolved-provider ledgers.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`:
   study-owned roster-cache materializer for Mestre roster plus explicit
   provider FASTA source inputs.
@@ -82,9 +85,14 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`:
   study-owned materializer for unaligned source FASTA bundles from explicit
   provider caches and exclusion ledgers.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`:
+  study-owned materializer for provider FASTA source roots before source-cache
+  filtering; current local run produced 350 NCBI records, 1464 BV-BRC records,
+  and 113 explicit unresolved-provider ledger rows.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/`:
-  shared parser/accessor package for `conservation-sources.yaml` so
-  source-sequence materializers do not duplicate source-authority semantics.
+  shared parser/accessor package for `conservation-sources.yaml`, including
+  provider accession policy, so source-sequence materializers do not duplicate
+  source-authority semantics.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/`:
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MAFFT.

@@ -133,6 +133,7 @@ source_sequences_root = materialization_root / "source_sequences"
 expected_source_sequence_files = {
     "__init__.py",
     "__main__.py",
+    "cli.py",
     "io.py",
     "issues.py",
     "manifest.py",
@@ -146,13 +147,26 @@ if observed_source_sequence_files != expected_source_sequence_files:
         f"{sorted(observed_source_sequence_files)}"
     )
 
-for package_name in ("contracts", "providers", "roster_cache", "sufficiency"):
+for package_name in ("contracts", "provider_sources", "providers", "roster_cache", "sufficiency"):
     package = source_sequences_root / package_name
     if not package.is_dir():
         problems.append(f"missing source_sequences/{package_name}/ semantic package")
         continue
     if not (package / "__init__.py").is_file():
         problems.append(f"missing source_sequences/{package_name}/__init__.py")
+
+for package_name in ("provider_sources", "roster_cache", "sufficiency"):
+    package = source_sequences_root / package_name
+    if package.is_dir() and not (package / "cli.py").is_file():
+        problems.append(f"missing source_sequences/{package_name}/cli.py")
+
+for pipeline_path in (
+    source_sequences_root / "pipeline.py",
+    source_sequences_root / "provider_sources" / "pipeline.py",
+    source_sequences_root / "roster_cache" / "pipeline.py",
+):
+    if pipeline_path.exists() and "argparse" in pipeline_path.read_text(encoding="utf-8"):
+        problems.append(f"pipeline owns CLI parsing instead of cli.py: {pipeline_path.relative_to(repo_root)}")
 
 for dirname in ("contracts", "materialization"):
     if not (tests_root / dirname).is_dir():
@@ -180,6 +194,31 @@ for primitive in ("structure", "contact", "conservation", "source_sequences"):
         continue
     if not (package / "test_materialization.py").is_file():
         problems.append(f"missing tests/materialization/{primitive}/test_materialization.py")
+
+source_sequence_test_root = test_materialization_root / "source_sequences"
+expected_source_sequence_test_files = {"__init__.py", "_fixtures.py", "test_materialization.py"}
+observed_source_sequence_test_files = {path.name for path in source_sequence_test_root.glob("*.py")}
+if observed_source_sequence_test_files != expected_source_sequence_test_files:
+    problems.append(
+        "tests/materialization/source_sequences root must stay package-level only, observed "
+        f"{sorted(observed_source_sequence_test_files)}"
+    )
+
+expected_source_sequence_test_packages = {
+    "contracts": "test_provider_accessions.py",
+    "provider_sources": "test_materialization.py",
+    "roster_cache": "test_materialization.py",
+    "sufficiency": "test_sufficiency.py",
+}
+for package_name, required_test in expected_source_sequence_test_packages.items():
+    package = source_sequence_test_root / package_name
+    if not package.is_dir():
+        problems.append(f"missing tests/materialization/source_sequences/{package_name}/ mirrored package")
+        continue
+    if not (package / "__init__.py").is_file():
+        problems.append(f"missing tests/materialization/source_sequences/{package_name}/__init__.py")
+    if not (package / required_test).is_file():
+        problems.append(f"missing tests/materialization/source_sequences/{package_name}/{required_test}")
 
 cli_lines = len((operations_root / "contract_validation.py").read_text(encoding="utf-8").splitlines())
 if cli_lines > 80:
@@ -250,6 +289,7 @@ require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/ma
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/provider_accessions.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py"
 
@@ -280,9 +320,11 @@ require_pattern 'rt_lnrna_candidate_acceptance_schema' "artifact surface include
 require_pattern 'explicit_no_fallback' "profile fixture declares no-fallback backend policy" "$STUDY_ROOT/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml"
 require_pattern 'broad_retron_rt' "conservation source contract declares broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'eco1_like_retron_rt' "conservation source contract declares Eco1-like profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'accession_patterns' "conservation source contract declares provider accession patterns" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'materialization/conservation/' "study surfaces route conservation materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'source_sequences/contracts/' "study surfaces route source-sequence contract package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'source_sequences/sufficiency/' "study surfaces route source-sequence sufficiency package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'provider accession policy' "study surfaces route provider accession contract policy" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'conservation_artifacts.py' "study surfaces route conservation artifact validator" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'reject_as_target_without_declared_substitution' "conservation source contract rejects target drift" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 placeholder_pattern='TO''DO|\[''TO''DO'
