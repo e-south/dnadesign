@@ -616,6 +616,63 @@ def test_select_batch0_supports_exact_slot_patterns_and_signal_tfbs_count() -> N
     assert selected["slot"].tolist() == ["ethanol_baer_middle_only"]
 
 
+def test_select_batch0_compares_slot_patterns_as_scalar_tuples() -> None:
+    config = {
+        "allow_duplicate_ids": False,
+        "campaigns": [
+            {
+                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "setpoint_vector": [0, 1, 0, 1],
+                "target_margin_column": "synthetic_margin_ethanol_vs_background",
+                "slots": [
+                    {
+                        "name": "ethanol_baer_middle_only",
+                        "count": 1,
+                        "plan": "ethanol",
+                        "regulator_compositions": ["baeR"],
+                        "slot_regulator_pattern": ["background", "baeR", "background"],
+                    }
+                ],
+            }
+        ],
+        "filters": {"require_positive_target_margin": True},
+    }
+    rows = [
+        _row(
+            "wrong_dense",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "baeR", "baeR"),
+            ethanol=0.99,
+        ),
+        _row(
+            "wrong_upstream",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("baeR", "background", "background"),
+            ethanol=0.98,
+        ),
+        _row(
+            "matched_middle",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "baeR", "background"),
+            ethanol=0.50,
+        ),
+        _row(
+            "wrong_downstream",
+            plan="ethanol",
+            regulators="baeR",
+            slot_pattern=("background", "background", "baeR"),
+            ethanol=0.97,
+        ),
+    ]
+
+    selected = select_batch0(pd.DataFrame(rows), config)
+
+    assert selected["id"].tolist() == ["matched_middle"]
+
+
 def test_select_batch0_supports_slot_level_spacer_constraints_and_metadata() -> None:
     config = {
         "allow_duplicate_ids": False,

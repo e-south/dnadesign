@@ -151,6 +151,26 @@ def test_construct_projection_manifest_rejects_missing_rt_cds_anchor_part_mappin
     )
 
 
+def test_construct_projection_manifest_reports_missing_lnrna_slot_without_crashing() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    payload["slots"] = [slot for slot in payload["slots"] if slot["slot_id"] != "lnrna"]
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert "slots must declare required lnrna and rt_cds slots in construct order" in audit.errors
+
+
+def test_construct_projection_manifest_reports_missing_lnrna_binding_without_crashing() -> None:
+    payload = copy.deepcopy(_manifest_payload())
+    del payload["candidates"][0]["slot_bindings"]["lnrna"]
+
+    audit = validate_projection_manifest_payload(payload)
+
+    assert not audit.ok
+    assert any(".slot_bindings.lnrna must be a mapping" in error for error in audit.errors)
+
+
 def test_construct_projection_manifest_rejects_swapped_slot_sequence_fields() -> None:
     payload = copy.deepcopy(_manifest_payload())
     payload["slots"][0]["sequence_field"] = "construct_subject__rt_cds_sequence"

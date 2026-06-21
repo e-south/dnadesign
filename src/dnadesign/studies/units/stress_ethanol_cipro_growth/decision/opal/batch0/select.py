@@ -553,7 +553,7 @@ def _slot_matches(frame: pd.DataFrame, slot: Mapping[str, Any]) -> pd.Series:
             return mask
         pattern_by_index = frame.loc[mask].apply(_strict_slot_regulator_pattern, axis=1)
         if requested_pattern is not None:
-            pattern_mask = pattern_by_index == requested_pattern
+            pattern_mask = pattern_by_index.map(lambda pattern: pattern == requested_pattern)
             mask &= pattern_mask.reindex(frame.index, fill_value=False)
         if requested_count is not None:
             count_mask = pattern_by_index.map(

@@ -231,12 +231,45 @@ class RecordsStore:
         if self.x_col in df.columns:
             keep = df[self.x_col].notna()
         else:
-            if self.x_col not in self.schema_columns():
-                raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
-            keep = pd.Series([True] * len(df), index=df.index)
+            keep = self._x_presence_mask_for_runtime_frame(df)
         cols = ["id", "sequence", self.x_col]
         cols = [c for c in cols if c in df.columns]
         return df.loc[keep, cols].copy()
+
+    def _x_presence_mask_for_runtime_frame(self, df: pd.DataFrame, *, batch_size: int = 2048) -> pd.Series:
+        """Return a runtime-frame-aligned mask from records.parquet X-column nullness."""
+
+        if "id" not in df.columns:
+            raise OpalError("Candidate universe requires column 'id' when runtime frame omits X.")
+        if self.x_col not in self.schema_columns():
+            raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
+        if int(batch_size) <= 0:
+            raise OpalError("X presence batch_size must be positive.")
+
+        runtime_ids = df["id"].astype(str)
+        wanted = set(runtime_ids)
+        presence_by_id: dict[str, bool] = {}
+        try:
+            parquet = pq.ParquetFile(self.records_path)
+        except Exception as exc:
+            raise OpalError(f"Failed to read records.parquet for X presence: {self.records_path}: {exc}") from exc
+
+        for batch in parquet.iter_batches(columns=["id", self.x_col], batch_size=int(batch_size)):
+            id_index = batch.schema.get_field_index("id")
+            x_index = batch.schema.get_field_index(self.x_col)
+            if id_index < 0 or x_index < 0:
+                raise OpalError(f"records.parquet missing id or X column '{self.x_col}'.")
+            ids = batch.column(id_index).to_pylist()
+            x_present = batch.column(x_index).is_valid().to_pylist()
+            for row_id_value, is_present in zip(ids, x_present):
+                row_id = str(row_id_value)
+                if row_id not in wanted:
+                    continue
+                if row_id in presence_by_id:
+                    raise OpalError(f"records.parquet contains duplicate ids (sample={[row_id]}).")
+                presence_by_id[row_id] = bool(is_present)
+
+        return runtime_ids.map(presence_by_id).fillna(False).astype(bool)
 
     def transform_matrix(self, df: pd.DataFrame, ids: Iterable[str], *, ctx: PluginCtx) -> Tuple[np.ndarray, List[str]]:
         """

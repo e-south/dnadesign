@@ -105,6 +105,34 @@ def test_transform_matrix_from_records_reads_only_matching_x_row_groups(tmp_path
     assert len(x_reads) == 2
 
 
+def test_candidate_universe_streams_x_presence_when_runtime_frame_omits_x(tmp_path):
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["a", "b", "c"]),
+            "bio_type": pa.array(["dna", "dna", "dna"]),
+            "sequence": pa.array(["AAA", "BBB", "CCC"]),
+            "alphabet": pa.array(["dna_4", "dna_4", "dna_4"]),
+            "X": pa.array([[1.0], None, [3.0]], type=pa.list_(pa.float32())),
+        }
+    )
+    pq.write_table(table, records_path, row_group_size=1)
+    store = _store(tmp_path)
+    runtime_frame = pd.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "bio_type": ["dna", "dna", "dna"],
+            "sequence": ["AAA", "BBB", "CCC"],
+            "alphabet": ["dna_4", "dna_4", "dna_4"],
+        }
+    )
+
+    universe = store.candidate_universe(runtime_frame, as_of_round=0)
+
+    assert universe["id"].tolist() == ["a", "c"]
+    assert "X" not in universe.columns
+
+
 def test_transform_matrix_from_records_rejects_duplicate_requested_record_ids(tmp_path):
     records_path = tmp_path / "records.parquet"
     table = pa.Table.from_pandas(

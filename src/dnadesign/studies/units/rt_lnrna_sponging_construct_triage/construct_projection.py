@@ -368,6 +368,12 @@ def _computed_candidate_spans(
     if target_end - target_start != target_length:
         errors.append(f"{construct_subject_id}: target context span must equal target_context.length_nt")
         return {}
+    if not any(slot.slot_id == "lnrna" for slot in slots):
+        errors.append(f"{construct_subject_id}: required slot lnrna is missing from projection slots")
+        return {}
+    if "lnrna" not in full_spans:
+        errors.append(f"{construct_subject_id}: required slot lnrna could not be resolved")
+        return {}
     window_start = _candidate_window_start(slots=slots, full_spans=full_spans, target_start=target_start)
     spans: dict[str, tuple[int, int]] = {}
     for slot_id, (start, end) in full_spans.items():
