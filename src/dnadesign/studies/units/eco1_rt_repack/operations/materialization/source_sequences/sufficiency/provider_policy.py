@@ -1,4 +1,13 @@
-"""Provider accession policy checks for Eco1 conservation source FASTA bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/provider_policy.py
+
+Provider accession policy checks for Eco1 conservation source FASTA bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

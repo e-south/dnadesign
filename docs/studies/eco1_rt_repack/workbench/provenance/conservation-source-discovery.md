@@ -49,8 +49,8 @@ The study profile currently declares `conservation_threshold: 0.25` and two
 profile ids:
 
 ```text
-broad_tao_homolog_rt
-eco1_like_retron_rt
+ec86_clade9_conservation_v1
+ec86_iia3_cluster42_1_conservation_v1
 ```
 
 ### Best Broad Source Prior
@@ -72,9 +72,9 @@ Useful observed roster facts:
 
 | Subset | Count | Notes |
 | --- | ---: | --- |
-| All Mestre S1 RT records | 1928 | Candidate `broad_tao_homolog_rt` roster before filtering. |
+| All Mestre S1 RT records | 1928 | Candidate `ec86_clade9_conservation_v1` roster before filtering. |
 | RT clade 9 records | 324 | Broad clade containing Eco1-like type II-A3 records. |
-| Type II-A3 records | 59 | Candidate `eco1_like_retron_rt` roster. |
+| Type II-A3 records | 59 | Candidate `ec86_iia3_cluster42_1_conservation_v1` roster. |
 | Type II-A3, cluster `42_1` records | 47 | Tighter Eco1-like source candidate. |
 
 The Eco1/Ec86 row is:
@@ -156,8 +156,8 @@ contract until the sequence discrepancy is adjudicated.
 
 | Profile id | Roster authority | Sequence providers | Purpose |
 | --- | --- | --- | --- |
-| `broad_tao_homolog_rt` | Mestre S1 candidate pool, then target-centered bounded homolog selector | NCBI E-utilities for `WP_*`; BV-BRC protein FASTA for `fig|*`; explicit reject/exclude for unresolved ids | Protect broadly conserved retron RT positions without making the full Mestre roster the denominator. |
-| `eco1_like_retron_rt` | Mestre S1 type II-A3 cluster `42_1`, or type II-A3 if support is too low | Same providers | Protect Eco1-like recognition/scaffold positions. |
+| `ec86_clade9_conservation_v1` | Mestre S1 RT clade 9 rows after QC | NCBI E-utilities for `WP_*`; BV-BRC protein FASTA for `fig|*`; explicit reject/exclude for unresolved ids | Protect broadly conserved Ec86-clade retron RT positions without making the full Mestre roster the denominator. |
+| `ec86_iia3_cluster42_1_conservation_v1` | Mestre S1 type II-A3 cluster `42_1`, or type II-A3 if support is too low | Same providers | Protect Eco1-like recognition/scaffold positions. |
 
 Minimum contract fields:
 
@@ -175,7 +175,8 @@ min_query_coverage
 min_non_gap_count
 identity_range
 length_range_aa
-required_motifs
+hard_reject_filters
+motif_qc_markers
 excluded_families
 alignment_tool
 alignment_command
@@ -190,8 +191,11 @@ Suggested first filters:
 query_coverage >= 0.70
 identity_range roughly 0.20-0.90
 length_range_aa roughly 250-450 unless a retained fusion is declared
-required_motifs include RT catalytic DD/YADD-like region, retron X NAXXH-like
-motif, and retron Y VTG-like motif
+hard_reject_filters include missing catalytic RT core, below-coverage rows,
+outside-length rows, obvious fragments, and unresolved long fusions
+motif_qc_markers include RT catalytic DD/YADD-like region, retron X NAXXH-like
+motif, and retron Y VTG-like motif; deviations are recorded rather than
+silently treated as regex-only inclusion/exclusion decisions
 exclude obvious group II intron RTs, DGR RTs, fragments, and unresolved long
 fusions unless explicitly retained
 ```
@@ -211,8 +215,8 @@ docs/studies/eco1_rt_repack/contexts/msa-method.md
 ```
 
 The conservation-profile materializer now exists as study-owned code, but it
-requires explicit aligned FASTA inputs for `broad_tao_homolog_rt` and
-`eco1_like_retron_rt`. Phase 1 must continue to fail on
+requires explicit aligned FASTA inputs for `ec86_clade9_conservation_v1` and
+`ec86_iia3_cluster42_1_conservation_v1`. Phase 1 must continue to fail on
 `conservation_profile_not_materialized` until a real
 `conservation_profile.parquet` is generated from those declared sources. It
 must not let review-figure alignments, prose, missing provider rows, or the
@@ -220,9 +224,13 @@ mismatched NCBI Eco1 target row imply designability.
 
 The broad source policy was revised after an interactive full-roster MAFFT run
 proved operationally impractical and methodologically broader than the Tao-style
-homolog MSA requires. The next implementation slice should materialize the
-bounded `broad_tao_homolog_rt` source records with coverage, identity, motif,
-and diversity/cap metadata before any broad alignment is accepted.
+homolog MSA requires. The selected broad source set is now the Mestre
+Ec86-containing RT clade 9 panel after declared QC. The local
+`conservation-clade9-source-cache-v1` run now emits
+`ec86_clade9_conservation_v1` source records with coverage, identity, length,
+motif-QC, and explicit exclusion metadata. The next runtime gate is accepted
+Clustal Omega alignment for both selected profiles before any conservation
+profile is materialized.
 
 ### External Source Links
 

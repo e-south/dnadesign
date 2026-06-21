@@ -84,9 +84,10 @@ Out of scope:
   selections, and panel-display specs through the study surfaces, and do not
   route Eco1 source authority, conservation scoring, or mask policy into
   `aligner`.
-- Report `broad_tao_homolog_rt` as the selected Tao-like bounded broad profile;
-  the full Mestre roster is candidate/context only and must not be described as
-  accepted broad conservation evidence.
+- Report `ec86_clade9_conservation_v1` as the selected Mestre Ec86 RT clade 9
+  conservation profile; Tao is the plurality/frequency masking method, not the
+  source-set name. The full Mestre roster is candidate/context only and must not
+  be described as accepted broad conservation evidence.
 - Preserve the generic MSA visualization ontology: contracts belong under
   `aligner.msa.visualization.contracts`, orchestration and manifests under
   `aligner.msa.visualization.materialization`, and SVG drawing under

@@ -155,15 +155,15 @@ def _write_profile_bundle(
     target_row_id: str,
     target_sequence: str,
     target_sequence_hash: str,
-    records: Sequence[Mapping[str, str]],
+    records: Sequence[Mapping[str, Any]],
     provider_caches: Mapping[str, ProviderCache],
     provider_ids: Sequence[str],
     upstream_hashes: Mapping[str, str],
     created_at: str,
 ) -> tuple[Path, Path]:
     fasta_records: dict[str, str] = {target_row_id: target_sequence}
-    included_records: list[dict[str, str]] = []
-    excluded_records: list[dict[str, str]] = []
+    included_records: list[dict[str, Any]] = []
+    excluded_records: list[dict[str, Any]] = []
     declared_provider_ids = set(provider_ids)
 
     for record in records:
@@ -189,14 +189,7 @@ def _write_profile_bundle(
         if record_id in fasta_records:
             raise ValueError(f"duplicate output FASTA record id {record_id!r} in profile {profile_id!r}")
         fasta_records[record_id] = sequence
-        included_records.append(
-            {
-                "record_id": record_id,
-                "provider_id": provider_id,
-                "accession": accession,
-                "sequence_sha256": "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
-            }
-        )
+        included_records.append(_included_record(record, sequence=sequence))
 
     if not included_records:
         raise ValueError(f"profile {profile_id!r} has no included source records")
@@ -222,26 +215,62 @@ def _write_profile_bundle(
 
 def _excluded_record(record: Mapping[str, str]) -> dict[str, str]:
     exclusion_reason = _require_text(record, "exclusion_reason")
-    return {
+    row: dict[str, Any] = {
         "record_id": _require_text(record, "record_id"),
         "provider_id": _require_text(record, "provider_id"),
         "accession": _require_text(record, "accession"),
         "exclusion_reason": exclusion_reason,
     }
+    sequence_qc = record.get("sequence_qc")
+    if isinstance(sequence_qc, Mapping):
+        row["sequence_qc"] = dict(sequence_qc)
+    return row
 
 
-def _load_source_record_rows(payload: Mapping[str, Any], *, valid_profile_ids: set[str]) -> list[dict[str, str]]:
+def _included_record(record: Mapping[str, Any], *, sequence: str) -> dict[str, Any]:
+    record_id = _require_text(record, "record_id")
+    sequence_qc = record.get("sequence_qc")
+    if not isinstance(sequence_qc, Mapping):
+        raise ValueError(f"included source record {record_id!r} must include sequence_qc metadata")
+    hard_rejects = sequence_qc.get("hard_reject_filters_triggered")
+    if not isinstance(hard_rejects, list):
+        raise ValueError(f"included source record {record_id!r} sequence_qc must declare hard_reject_filters_triggered")
+    if hard_rejects:
+        raise ValueError(f"included source record {record_id!r} has sequence_qc hard-reject filters")
+    for field in (
+        "method_id",
+        "target_sequence_hash",
+        "sequence_length_aa",
+        "query_coverage",
+        "pairwise_identity_to_target",
+        "identity_range_status",
+        "length_status",
+        "query_coverage_status",
+        "motif_qc_markers",
+    ):
+        if field not in sequence_qc:
+            raise ValueError(f"included source record {record_id!r} sequence_qc is missing {field!r}")
+    return {
+        "record_id": record_id,
+        "provider_id": _require_text(record, "provider_id"),
+        "accession": _require_text(record, "accession"),
+        "sequence_sha256": "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
+        "sequence_qc": dict(sequence_qc),
+    }
+
+
+def _load_source_record_rows(payload: Mapping[str, Any], *, valid_profile_ids: set[str]) -> list[dict[str, Any]]:
     records = payload.get("records")
     if not isinstance(records, list):
         raise ValueError("source_records.yaml must declare records as a list")
-    rows: list[dict[str, str]] = []
+    rows: list[dict[str, Any]] = []
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
             raise ValueError(f"source_records.yaml records[{index}] must be a mapping")
         profile_id = _require_text(record, "profile_id")
         if profile_id not in valid_profile_ids:
             raise ValueError(f"profile_id {profile_id!r} is not declared in conservation-sources.yaml")
-        rows.append({str(key): str(value) for key, value in record.items()})
+        rows.append({str(key): value for key, value in record.items()})
     return rows
 
 

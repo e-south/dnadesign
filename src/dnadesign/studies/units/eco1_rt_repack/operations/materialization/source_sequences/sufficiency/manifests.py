@@ -1,4 +1,13 @@
-"""Manifest-level sufficiency checks for Eco1 conservation source bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/manifests.py
+
+Manifest-level sufficiency checks for Eco1 conservation source bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -161,6 +170,12 @@ def _validate_profile_manifest(
         included_records=included_records,
         included_count=included_count,
     )
+    _validate_included_sequence_qc(
+        issues,
+        manifest_path=manifest_path,
+        profile_id=profile_id,
+        included_records=included_records,
+    )
     upstream_hashes = require_mapping(profile_manifest.get("upstream_hashes"), "profile upstream_hashes")
     validate_cache_hashes(
         issues,
@@ -227,6 +242,59 @@ def _validate_record_counts(
                 path=str(manifest_path),
             )
         )
+
+
+def _validate_included_sequence_qc(
+    issues: list[ContractIssue],
+    *,
+    manifest_path: Path,
+    profile_id: str,
+    included_records: Sequence[Any],
+) -> None:
+    required_fields = {
+        "method_id",
+        "target_sequence_hash",
+        "sequence_length_aa",
+        "query_coverage",
+        "pairwise_identity_to_target",
+        "identity_range_status",
+        "length_status",
+        "query_coverage_status",
+        "motif_qc_markers",
+        "hard_reject_filters_triggered",
+    }
+    for index, record in enumerate(included_records):
+        if not isinstance(record, Mapping):
+            continue
+        record_id = str(record.get("record_id", f"record[{index}]"))
+        sequence_qc = record.get("sequence_qc")
+        if not isinstance(sequence_qc, Mapping):
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.source_sequences.sequence_qc_missing",
+                    message=f"{profile_id} included record {record_id!r} is missing sequence_qc metadata",
+                    path=str(manifest_path),
+                )
+            )
+            continue
+        missing = sorted(required_fields - set(sequence_qc))
+        if missing:
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.source_sequences.sequence_qc_incomplete",
+                    message=f"{profile_id} included record {record_id!r} sequence_qc is missing: {', '.join(missing)}",
+                    path=str(manifest_path),
+                )
+            )
+        hard_rejects = sequence_qc.get("hard_reject_filters_triggered")
+        if hard_rejects:
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.source_sequences.sequence_qc_hard_reject_included",
+                    message=f"{profile_id} included record {record_id!r} has sequence_qc hard-reject filters",
+                    path=str(manifest_path),
+                )
+            )
 
 
 def _validate_residue_map_presence(issues: list[ContractIssue], *, output_root: Path) -> None:

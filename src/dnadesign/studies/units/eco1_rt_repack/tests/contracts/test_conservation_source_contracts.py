@@ -1,4 +1,13 @@
-"""Conservation-source contract tests for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/contracts/test_conservation_source_contracts.py
+
+Conservation-source contract tests for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,10 +19,16 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation_so
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import load_yaml
 
 
+def _validation_inputs() -> tuple[dict, dict, dict]:
+    return (
+        load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml"),
+        load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml"),
+        load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml"),
+    )
+
+
 def test_conservation_sources_contract_accepts_selected_mestre_sources() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
 
     report = validate_conservation_sources_payload(
         sources,
@@ -26,9 +41,7 @@ def test_conservation_sources_contract_accepts_selected_mestre_sources() -> None
 
 
 def test_conservation_sources_reject_target_sequence_hash_mismatch() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     changed_sources["target_sequence"]["reference_sequence_hash"] = "sha256:not-the-ec86kit-reference"
 
@@ -44,9 +57,7 @@ def test_conservation_sources_reject_target_sequence_hash_mismatch() -> None:
 
 
 def test_conservation_sources_reject_missing_provider_policy() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     changed_sources["sequence_providers"] = [
         provider
@@ -66,9 +77,7 @@ def test_conservation_sources_reject_missing_provider_policy() -> None:
 
 
 def test_conservation_sources_reject_missing_tao_rule_fields() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     changed_sources["source_method"]["plurality_rule"] = "frequency_only"
     changed_sources["source_method"]["gap_denominator_policy"] = "all_alignment_rows"
@@ -87,13 +96,11 @@ def test_conservation_sources_reject_missing_tao_rule_fields() -> None:
 
 
 def test_conservation_sources_reject_legacy_broad_profile_acceptance() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     changed_sources["phase1_acceptance"]["required_profile_ids"] = [
         "broad_retron_rt",
-        "eco1_like_retron_rt",
+        "ec86_iia3_cluster42_1_conservation_v1",
     ]
 
     report = validate_conservation_sources_payload(
@@ -110,14 +117,12 @@ def test_conservation_sources_reject_legacy_broad_profile_acceptance() -> None:
 
 
 def test_conservation_sources_reject_full_mestre_roster_as_scoring_denominator() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     broad_group = next(
-        group for group in changed_sources["source_groups"] if group["profile_id"] == "broad_tao_homolog_rt"
+        group for group in changed_sources["source_groups"] if group["profile_id"] == "ec86_clade9_conservation_v1"
     )
-    broad_group["selection_rule"]["included_records"] = "all_mestre_s1_rt_records_after_filters"
+    broad_group["selection_rule"]["included_records"] = "mestre_s1_all_retron_rt_records_context"
 
     report = validate_conservation_sources_payload(
         changed_sources,
@@ -129,13 +134,52 @@ def test_conservation_sources_reject_full_mestre_roster_as_scoring_denominator()
     assert report.passed is False
     check_ids = {issue.check_id for issue in report.issues}
     assert "eco1_rt.conservation.forbidden_full_roster_denominator" in check_ids
-    assert "eco1_rt.conservation.broad_tao_roster_scope_mismatch" in check_ids
+    assert "eco1_rt.conservation.ec86_clade9_roster_scope_mismatch" in check_ids
+
+
+def test_conservation_sources_reject_non_clade9_broad_scope() -> None:
+    sources, profile, numbering = _validation_inputs()
+    changed_sources = deepcopy(sources)
+    broad_group = next(
+        group for group in changed_sources["source_groups"] if group["profile_id"] == "ec86_clade9_conservation_v1"
+    )
+    broad_group["selection_rule"]["parent_rt_clade"] = 8
+
+    report = validate_conservation_sources_payload(
+        changed_sources,
+        profile=profile,
+        numbering_policy=numbering,
+        phase="phase1_thread_contract",
+    )
+
+    assert report.passed is False
+    assert "eco1_rt.conservation.ec86_clade9_roster_scope_mismatch" in {issue.check_id for issue in report.issues}
+
+
+def test_conservation_sources_reject_missing_motif_qc_policy() -> None:
+    sources, profile, numbering = _validation_inputs()
+    changed_sources = deepcopy(sources)
+    broad_group = next(
+        group for group in changed_sources["source_groups"] if group["profile_id"] == "ec86_clade9_conservation_v1"
+    )
+    broad_group["selection_rule"].pop("motif_qc_markers")
+    broad_group["selection_rule"]["hard_reject_filters"] = ["missing_catalytic_rt_core"]
+
+    report = validate_conservation_sources_payload(
+        changed_sources,
+        profile=profile,
+        numbering_policy=numbering,
+        phase="phase1_thread_contract",
+    )
+
+    assert report.passed is False
+    check_ids = {issue.check_id for issue in report.issues}
+    assert "eco1_rt.conservation.missing_motif_qc_markers" in check_ids
+    assert "eco1_rt.conservation.missing_hard_reject_filter" in check_ids
 
 
 def test_conservation_sources_reject_silent_alignment_backend_fallback() -> None:
-    sources = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml")
-    profile = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml")
-    numbering = load_yaml("docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml")
+    sources, profile, numbering = _validation_inputs()
     changed_sources = deepcopy(sources)
     changed_sources["alignment_policy"]["alternative_backend_policy"]["fallback_policy"] = "fallback_to_available"
 

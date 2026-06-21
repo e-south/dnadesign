@@ -36,7 +36,7 @@ _SOURCE_SEQUENCE_ROOT_FILES = {
     "pipeline.py",
 }
 _SOURCE_SEQUENCE_PACKAGES = {"contracts", "provider_sources", "providers", "roster_cache", "sufficiency"}
-_SOURCE_SEQUENCE_TEST_ROOT_FILES = {"__init__.py", "_fixtures.py", "test_materialization.py"}
+_SOURCE_SEQUENCE_TEST_ROOT_FILES = {"__init__.py", "_fixtures.py", "_qc_fixtures.py", "test_materialization.py"}
 _SOURCE_SEQUENCE_TEST_PACKAGES = {
     "contracts": "test_provider_accessions.py",
     "provider_sources": "test_materialization.py",

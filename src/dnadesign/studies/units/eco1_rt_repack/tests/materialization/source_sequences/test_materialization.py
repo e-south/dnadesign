@@ -4,6 +4,8 @@ dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/source_sequences/test_materialization.py
 
 Source-sequence bundle materialization tests for Eco1 RT repack.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -44,15 +46,15 @@ def test_source_sequence_materializer_writes_profile_fastas_and_manifests(tmp_pa
     assert result.bundle_manifest_path.parent == tmp_path / "conservation_sources"
     bundle_manifest = yaml.safe_load(result.bundle_manifest_path.read_text(encoding="utf-8"))
     assert bundle_manifest["schema_id"] == "eco1_rt_repack.conservation_source_sequence_bundle.index"
-    assert bundle_manifest["profile_ids"] == ["broad_tao_homolog_rt", "eco1_like_retron_rt"]
+    assert bundle_manifest["profile_ids"] == ["ec86_clade9_conservation_v1", "ec86_iia3_cluster42_1_conservation_v1"]
 
-    broad_records = load_fasta_records(result.fasta_paths["broad_tao_homolog_rt"])
+    broad_records = load_fasta_records(result.fasta_paths["ec86_clade9_conservation_v1"])
     assert list(broad_records)[0] == TARGET_ROW_ID
     assert broad_records[TARGET_ROW_ID] == target
     assert broad_records["broad_ncbi_1"] == target
     assert broad_records["broad_bvbrc_1"] == mutate(target, 8, "A")
 
-    broad_manifest = yaml.safe_load(result.manifest_paths["broad_tao_homolog_rt"].read_text(encoding="utf-8"))
+    broad_manifest = yaml.safe_load(result.manifest_paths["ec86_clade9_conservation_v1"].read_text(encoding="utf-8"))
     assert broad_manifest["schema_id"] == "eco1_rt_repack.conservation_source_sequence_bundle.profile"
     assert broad_manifest["status"] == "materialized"
     assert broad_manifest["target_row_id"] == TARGET_ROW_ID
@@ -66,6 +68,18 @@ def test_source_sequence_materializer_rejects_missing_provider_sequence(tmp_path
     cache_root = write_source_cache(tmp_path, target_sequence(tmp_path), omit_accession="WP_BROAD_1")
 
     with pytest.raises(ValueError, match="missing provider FASTA record"):
+        materialize_source_sequence_bundles(
+            repo_root=repo_root(),
+            output_root=tmp_path,
+            source_cache_root=cache_root,
+        )
+
+
+def test_source_sequence_materializer_rejects_included_record_without_sequence_qc(tmp_path: Path) -> None:
+    materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
+    cache_root = write_source_cache(tmp_path, target_sequence(tmp_path), omit_sequence_qc=True)
+
+    with pytest.raises(ValueError, match="must include sequence_qc metadata"):
         materialize_source_sequence_bundles(
             repo_root=repo_root(),
             output_root=tmp_path,

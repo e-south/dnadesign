@@ -5,7 +5,7 @@ status: selected
 last_verified: 2026-06-20
 
 source_method:
-  method_id: tao_rt_redesign_plurality_frequency_v1
+  method_id: tao_plurality_frequency_mask_v1
   method_ref: doi:10.1038/s41587-026-03149-6
   conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
   threshold: 0.25
@@ -17,26 +17,26 @@ source_method:
   missing_evidence_policy: fail_closed_no_designability
 
 alignment_policy:
-  alignment_tool: mafft
-  alignment_command: mafft --globalpair --maxiterate 1000 --reorder <input_fasta> > <output_fasta>
+  alignment_tool: clustalo
+  alignment_command: clustalo --force --outfmt=fasta --threads=1 -i <input_fasta> -o <output_fasta>
   alignment_scope: protein
   target_sequence_policy: ec86kit_reference_sequence_must_be_target_row
   target_row_id: eco1_rt_ec86kit_reference
   residue_map_join_key: canonical_position
   output_profile_artifact: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
   row_count_guardrail:
-    declared_command_intended_max_records: 250
-    policy: reject_full_mestre_roster_for_declared_high_accuracy_command
+    declared_command_intended_max_records: 500
+    policy: allow_declared_mestre_clade_panel_reject_full_roster_census
     note: >
-      MAFFT --globalpair --maxiterate 1000 is retained for bounded homolog
-      panels. Whole-roster Mestre-scale alignments are classification or
-      visualization context unless a future policy benchmark explicitly selects
-      a scalable backend such as Clustal Omega.
+      Clustal Omega is selected for the Ec86 clade-level homolog panel because
+      it is the declared scalable backend for this MSA contract. Whole-roster
+      Mestre-scale alignments remain classification or visualization context,
+      not Phase 1 conservation evidence.
   alternative_backend_policy:
-    status: planned_benchmark_only
+    status: explicit_contract_update_required
     candidates:
-      - tool: clustalo
-        role: scalable_profile_alignment_candidate
+      - tool: mafft
+        role: high_accuracy_small_panel_candidate
         selection_rule: requires_explicit_contract_update_and_benchmark_evidence
     fallback_policy: no_silent_backend_fallback
 
@@ -78,9 +78,9 @@ sequence_providers:
     failure_policy: explicit_exclude_or_fail
 
 source_groups:
-  - profile_id: broad_tao_homolog_rt
+  - profile_id: ec86_clade9_conservation_v1
     status: selected
-    purpose: Protect broadly conserved RT positions using a Tao-like bounded homolog panel.
+    purpose: Protect broadly conserved Ec86-clade RT positions using a Mestre clade 9 homolog panel.
     roster_source:
       source_name: Mestre et al. 2020 Supplementary Table S1
       source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
@@ -88,10 +88,11 @@ source_groups:
       accession_field: Accesione
       total_roster_count: 1928
     selection_rule:
-      included_records: mestre_s1_target_centered_bounded_homologs_after_filters
-      candidate_pool_records: all_mestre_s1_rt_records_after_filters
+      included_records: mestre_s1_ec86_rt_clade9_after_qc
+      candidate_pool_records: mestre_s1_all_retron_rt_records_context
       full_roster_role: context_only_not_conservation_denominator
-      tao_method_prior: blast_or_equivalent_filtered_homologs_then_msa
+      method_prior: tao_homolog_msa_plurality_frequency_mask
+      parent_rt_clade: 9
       query_coverage_minimum: 0.70
       identity_range:
         - 0.20
@@ -99,15 +100,17 @@ source_groups:
       length_range_aa:
         - 250
         - 450
-      nonredundant_cap: 200
-      cap_policy: deterministic_ranked_cap_after_filters
-      rank_fields:
-        - target_identity_band
-        - query_coverage
-        - motif_completeness
-        - retron_rt_clade_diversity
-        - stable_roster_order_tiebreak
-      required_motifs:
+      runtime_cap_policy:
+        status: not_selected
+        allowed_only_after: explicit_alignment_policy_benchmark
+      hard_reject_filters:
+        - missing_catalytic_rt_core
+        - below_query_coverage_minimum
+        - outside_identity_range
+        - outside_length_range
+        - obvious_fragment
+        - unresolved_long_fusion
+      motif_qc_markers:
         - rt_catalytic_dd_or_yadd_like_region
         - retron_x_naxxH_like_motif
         - retron_y_vtg_like_motif
@@ -121,7 +124,7 @@ source_groups:
       - bv_brc_feature_protein_fasta
     min_non_gap_count: 20
 
-  - profile_id: eco1_like_retron_rt
+  - profile_id: ec86_iia3_cluster42_1_conservation_v1
     status: selected
     purpose: Protect Eco1-like retron RT recognition and scaffold positions.
     roster_source:
@@ -131,7 +134,7 @@ source_groups:
       accession_field: Accesione
       total_roster_count: 1928
     selection_rule:
-      included_records: mestre_s1_retron_subtype_ii_a3_cluster_42_1_after_filters
+      included_records: mestre_s1_ec86_iia3_cluster42_1_after_qc
       fallback_rule: type_ii_a3_only_if_cluster_42_1_non_gap_support_fails
       observed_roster_count: 47
       broader_type_ii_a3_count: 59
@@ -145,7 +148,14 @@ source_groups:
       length_range_aa:
         - 250
         - 450
-      required_motifs:
+      hard_reject_filters:
+        - missing_catalytic_rt_core
+        - below_query_coverage_minimum
+        - outside_identity_range
+        - outside_length_range
+        - obvious_fragment
+        - unresolved_long_fusion
+      motif_qc_markers:
         - rt_catalytic_dd_or_yadd_like_region
         - retron_x_naxxH_like_motif
         - retron_y_vtg_like_motif
@@ -160,7 +170,7 @@ source_groups:
     min_non_gap_count: 20
 
 context_rosters:
-  - roster_id: full_mestre_retron_rt
+  - roster_id: mestre_all_retron_rt_context
     status: context_only
     source_name: Mestre et al. 2020 Supplementary Table S1
     source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
@@ -170,8 +180,8 @@ context_rosters:
 
 phase1_acceptance:
   required_profile_ids:
-    - broad_tao_homolog_rt
-    - eco1_like_retron_rt
+    - ec86_clade9_conservation_v1
+    - ec86_iia3_cluster42_1_conservation_v1
   required_provider_ids:
     - ncbi_protein_efetch
     - bv_brc_feature_protein_fasta

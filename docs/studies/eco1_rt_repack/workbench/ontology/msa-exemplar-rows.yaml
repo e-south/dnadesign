@@ -22,37 +22,37 @@ hallmark_reference_gap:
     - Group II RT-RI
     - DGR bRT
 profiles:
-  broad_tao_homolog_rt:
+  ec86_clade9_conservation_v1:
     rows:
       - record_id: eco1_rt_ec86kit_reference
         label: Eco1/Ec86 reference
         group: target
-      - record_id: broad_tao_homolog_rt__1552__1552
+      - record_id: ec86_clade9_conservation_v1__1552__1552
         label: Node 1552 fig|158822.8.peg.1905
         group: II-A3/42_1
-      - record_id: broad_tao_homolog_rt__1553__1553
+      - record_id: ec86_clade9_conservation_v1__1553__1553
         label: Node 1553 fig|1444060.3.peg.4830
         group: II-A3/42_1
-      - record_id: broad_tao_homolog_rt__1540__1540
+      - record_id: ec86_clade9_conservation_v1__1540__1540
         label: Node 1540 fig|1396.1518.peg.4860
         group: II-A3/42_1
-      - record_id: broad_tao_homolog_rt__1542__1542
+      - record_id: ec86_clade9_conservation_v1__1542__1542
         label: Node 1542 fig|1423.436.peg.4365
         group: II-A3/42_1
-  eco1_like_retron_rt:
+  ec86_iia3_cluster42_1_conservation_v1:
     rows:
       - record_id: eco1_rt_ec86kit_reference
         label: Eco1/Ec86 reference
         group: target
-      - record_id: eco1_like_retron_rt__1552__1552
+      - record_id: ec86_iia3_cluster42_1_conservation_v1__1552__1552
         label: Node 1552 fig|158822.8.peg.1905
         group: II-A3/42_1
-      - record_id: eco1_like_retron_rt__1553__1553
+      - record_id: ec86_iia3_cluster42_1_conservation_v1__1553__1553
         label: Node 1553 fig|1444060.3.peg.4830
         group: II-A3/42_1
-      - record_id: eco1_like_retron_rt__1540__1540
+      - record_id: ec86_iia3_cluster42_1_conservation_v1__1540__1540
         label: Node 1540 fig|1396.1518.peg.4860
         group: II-A3/42_1
-      - record_id: eco1_like_retron_rt__1542__1542
+      - record_id: ec86_iia3_cluster42_1_conservation_v1__1542__1542
         label: Node 1542 fig|1423.436.peg.4365
         group: II-A3/42_1

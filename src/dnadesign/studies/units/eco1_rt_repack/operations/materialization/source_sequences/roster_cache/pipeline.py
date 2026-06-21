@@ -42,6 +42,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_se
     load_provider_source_records,
     write_filtered_provider_caches,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache.qc import (
+    evaluate_sequence_qc,
+    load_target_sequence_from_contract,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache.roster import (
     load_roster_rows,
     select_profile_rows,
@@ -90,6 +94,7 @@ def materialize_conservation_roster_cache(
     provider_failure_reasons = _load_provider_failure_reasons(
         _resolve_path(root, provider_failure_ledger) if provider_failure_ledger else None
     )
+    target_sequence = load_target_sequence_from_contract(root, source_contract)
 
     source_records, provider_accessions = _build_source_records(
         roster_rows=roster_rows,
@@ -99,6 +104,8 @@ def materialize_conservation_roster_cache(
         known_target_accession=source_contract.known_public_target_accession,
         provider_sources=provider_sources,
         provider_failure_reasons=provider_failure_reasons,
+        target_sequence=target_sequence,
+        target_sequence_hash=source_contract.target_sequence_hash,
     )
 
     cache.mkdir(parents=True, exist_ok=True)
@@ -148,6 +155,8 @@ def _build_source_records(
     known_target_accession: str,
     provider_sources: Mapping[str, Any],
     provider_failure_reasons: Mapping[tuple[str, str], str],
+    target_sequence: str,
+    target_sequence_hash: str,
 ) -> tuple[list[SourceRecord], dict[str, list[str]]]:
     source_records: list[SourceRecord] = []
     provider_accessions: dict[str, list[str]] = {provider_id: [] for provider_id in accession_policy.provider_ids}
@@ -190,7 +199,8 @@ def _build_source_records(
                     )
                 )
                 continue
-            if row.accession not in provider_sources[provider_id].records:
+            sequence = provider_sources[provider_id].records.get(row.accession)
+            if sequence is None:
                 failure_reason = provider_failure_reasons.get((provider_id, row.accession))
                 if failure_reason:
                     source_records.append(
@@ -208,6 +218,25 @@ def _build_source_records(
                     f"missing provider source sequence {row.accession!r} for provider {provider_id!r}; "
                     "exclude it explicitly before materializing source_records.yaml"
                 )
+            qc = evaluate_sequence_qc(
+                sequence=sequence,
+                target_sequence=target_sequence,
+                target_sequence_hash=target_sequence_hash,
+                source_group=require_mapping(source_groups.get(profile_id), f"source group {profile_id}"),
+            )
+            if not qc.passed:
+                source_records.append(
+                    SourceRecord(
+                        profile_id=profile_id,
+                        record_id=record_id,
+                        provider_id=provider_id,
+                        accession=row.accession,
+                        status="excluded",
+                        exclusion_reason=qc.exclusion_reason,
+                        sequence_qc=qc.to_yaml_row(),
+                    )
+                )
+                continue
             if row.accession not in provider_accessions[provider_id]:
                 provider_accessions[provider_id].append(row.accession)
             source_records.append(
@@ -217,6 +246,7 @@ def _build_source_records(
                     provider_id=provider_id,
                     accession=row.accession,
                     status="included",
+                    sequence_qc=qc.to_yaml_row(),
                 )
             )
     return source_records, provider_accessions

@@ -132,8 +132,8 @@ This is not a materialized MSA and does not satisfy
 ### Implemented Slice: Conservation Source Contract v1
 
 `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`
-declares the selected MSA source authority for `broad_tao_homolog_rt` and
-`eco1_like_retron_rt`. It uses Mestre et al. 2020 Supplementary Table S1 as
+declares the selected MSA source authority for `ec86_clade9_conservation_v1` and
+`ec86_iia3_cluster42_1_conservation_v1`. It uses Mestre et al. 2020 Supplementary Table S1 as
 the accession roster and candidate pool, declares NCBI and BV-BRC provider
 policies, pins the target row to the ec86kit Eco1 RT reference sequence hash,
 and records the T301/A301 mismatch in public `WP_099010551.1` as a fail-fast
@@ -166,24 +166,24 @@ scores each canonical Eco1 position with the Tao-style WT plurality/frequency
 rule. It writes one row per `(profile_id, canonical_position)` and records
 aligned-FASTA hashes in parquet metadata.
 
-This slice deliberately does not fetch provider sequences or run MAFFT. Provider
+This slice deliberately does not fetch provider sequences or run MSA backends. Provider
 source acquisition and source-sequence sufficiency are study-owned upstream
 steps; aligned FASTA materialization remains the next blocker.
 
 ### Implemented Cross-Tool Slice: Aligner MSA Backend v1
 
 `src/dnadesign/aligner/msa/` provides the generic alignment seam for the next
-source-data slice: FASTA validation, MAFFT preflight/execution, and aligned
-FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
+source-data slice: FASTA validation, MAFFT/Clustal Omega preflight/execution,
+and aligned FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
 Mestre/NCBI/BV-BRC source sequences, adjudicate the T301/A301 target mismatch,
 score conservation, or build masks.
 
-After the bounded broad source records exist, the next Eco1 alignment slice
-should use this public API to produce:
+After the selected source FASTA bundles pass sufficiency, the next Eco1
+alignment slice should use this public API to produce:
 
 ```text
-broad_tao_homolog_rt.aligned.fasta
-eco1_like_retron_rt.aligned.fasta
+ec86_clade9_conservation_v1.aligned.fasta
+ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
 ```
 
 with bundle manifests, then pass those aligned FASTA files into the study-owned
@@ -208,16 +208,16 @@ entries.
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`
 materializes local source records from selected roster rows and explicit
-provider FASTA source files. Under the revised broad profile, it intentionally
-rejects direct full-Mestre roster materialization for `broad_tao_homolog_rt`
-until `conservation-bounded-homolog-selector-v1` emits bounded source records
-with selector metadata. It still rejects uncontracted roster hashes by default,
+provider FASTA source files. Under the revised broad profile, it rejects
+direct full-Mestre roster materialization for `ec86_clade9_conservation_v1`;
+the local real-data run now emits clade 9 source records after declared QC.
+It still rejects uncontracted roster hashes by default,
 unsupported accession providers, missing included provider sequences without a
 passed unresolved-provider ledger, and public `WP_099010551.1` target-row
 leakage by excluding that accession with the declared T301/A301 mismatch
 reason.
 
-This slice deliberately does not fetch live NCBI/BV-BRC records, run MAFFT,
+This slice deliberately does not fetch live NCBI/BV-BRC records, run MSA backends,
 score conservation, or build masks.
 
 ### Implemented Slice: Conservation Source-Sequence Bundle v1
@@ -228,7 +228,7 @@ and a `source_records.yaml` ledger. It validates declared provider ids, rejects
 operator-supplied target rows, requires explicit exclusion reasons, inserts the
 ec86kit target row itself, and writes profile-level and bundle-level manifests.
 
-This slice deliberately does not fetch live provider records, run MAFFT, score
+This slice deliberately does not fetch live provider records, run MSA backends, score
 conservation, or build masks.
 
 ### Implemented Slice: Conservation Source-Sequence Sufficiency v1
@@ -249,23 +249,30 @@ source-bundle, and sufficiency code do not duplicate the source-authority
 schema.
 
 The previous local full-Mestre broad source bundle had 1814 included and 114
-excluded rows, while `eco1_like_retron_rt` had 46 included and 1 excluded row.
-That broad bundle is now superseded candidate-pool context. Source FASTA
-sufficiency must be rerun after the bounded `broad_tao_homolog_rt` source
-records are materialized.
+excluded rows, while `ec86_iia3_cluster42_1_conservation_v1` had 46 included
+and 1 excluded row. That broad bundle is now superseded candidate-pool
+context. The current selected source bundles pass sufficiency locally after
+clade 9 / II-A3 QC, so the next runtime gate is alignment, not source
+reselection.
 
-### Next Slice: Conservation Bounded Homolog Selector v1
+### Implemented Slice: Conservation Clade 9 Source Cache v1
 
-`conservation-bounded-homolog-selector-v1` should consume the full Mestre
-candidate-pool provider cache and emit bounded `broad_tao_homolog_rt` source
-records. It should compute target-centered coverage, identity, length, motif
-support, and deterministic diversity/cap metadata. It must not select rows by
-raw roster order and must not treat the full Mestre roster as the conservation
-scoring denominator.
+`conservation-clade9-source-cache-v1` consumes the full Mestre
+candidate-pool provider cache and emit `ec86_clade9_conservation_v1` source
+records from Mestre RT clade 9 after declared QC. The source-record QC computes
+pairwise target coverage, pairwise identity, length status, motif-QC markers,
+hard-reject status, and explicit exclusion metadata before any MSA backend run.
+The local real-data run produced 302 included and 22 excluded
+`ec86_clade9_conservation_v1` rows, plus 44 included and 3 excluded
+`ec86_iia3_cluster42_1_conservation_v1` rows. A runtime cap or diversity subset
+may be introduced only by
+an explicit benchmark/contract update; it must not be the default explanation
+for the broad panel.
 
-After this slice, regenerate source FASTA sufficiency, run the bounded broad
-alignment through `dnadesign.aligner.msa`, and then materialize
-`conservation_profile.parquet`.
+After this slice, the regenerated source FASTA sufficiency gate passes. The next
+runtime slice is to run both selected source FASTAs through
+`dnadesign.aligner.msa` using the selected Clustal Omega backend, and then
+materialize `conservation_profile.parquet`.
 
 ### Implementation Rules
 
@@ -298,7 +305,7 @@ alignment through `dnadesign.aligner.msa`, and then materialize
 - Contact evidence is materialized locally from the retained DNA/RNA context.
 - Conservation source discovery and source authority are documented and
   selected, provider candidate-pool acquisition exists, and a conservation-profile
-  materializer exists for explicit aligned FASTA inputs. The generic MAFFT
+  materializer exists for explicit aligned FASTA inputs. The generic MSA
   execution seam lives in `dnadesign.aligner.msa`, and the study-owned
   conservation-alignment materializer now orchestrates source sufficiency,
   declared MSA args, selected profile ids, and alignment bundle manifests. The
@@ -306,7 +313,7 @@ alignment through `dnadesign.aligner.msa`, and then materialize
   publishes an accepted aligned FASTA only after validation. The former
   full-roster broad profile ran for roughly four hours under the declared
   high-sensitivity MAFFT policy without a complete broad alignment and is no
-  longer the active denominator. The selected `eco1_like_retron_rt` profile now
+  longer the active denominator. The selected `ec86_iia3_cluster42_1_conservation_v1` profile now
   has accepted local profile-level alignment
   evidence, and generic `aligner.msa` MSA visualization sidecars are
   implemented and materialized locally for that accepted profile. Those

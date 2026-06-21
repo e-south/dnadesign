@@ -39,23 +39,37 @@ II-A3, cluster/domain `42_1`, accession `WP_099010551.1`.
 The selected Phase 1 conservation profiles are:
 
 ```text
-broad_tao_homolog_rt  Tao-like target-centered bounded homolog panel drawn from Mestre S1
-eco1_like_retron_rt   Mestre II-A3 cluster 42_1 after declared filters
+ec86_clade9_conservation_v1               Mestre RT clade 9 homolog panel after QC
+ec86_iia3_cluster42_1_conservation_v1     Mestre II-A3 cluster 42_1 family panel after QC
 ```
 
 The full Mestre roster is also retained as context:
 
 ```text
-full_mestre_retron_rt  classification/candidate-pool context, not the Phase 1 denominator
+mestre_all_retron_rt_context  classification/candidate-pool context, not the Phase 1 denominator
 ```
+
+### Reviewer-Facing Method Logic
+
+Evolutionary conservation is estimated from Mestre-derived homolog panels, not
+from the entire retron RT census. Mestre S1 is the accession and
+classification authority. For Eco1/Ec86, the broad homolog panel is RT clade 9,
+the Mestre-defined RT clade containing Eco1/Ec86; the Eco1-family panel is the
+narrower subtype II-A3, cluster/domain `42_1`. Both panels are filtered for
+coverage, length, source availability, hard-reject structural obviousness, and
+motif QC before alignment. Conservation masking then follows Tao et al.'s
+plurality/frequency rule: an Eco1 residue is fixed when the Eco1 amino acid is
+the plurality amino acid at the aligned column and its non-gap frequency meets
+the declared threshold. The full Mestre roster is retained for context and
+visualization, but is not the Phase 1 conservation denominator.
 
 ### Procedure
 
 1. Start from the Mestre S1 roster declared in `conservation-sources.yaml`.
 2. Treat the full Mestre roster as a candidate pool and context surface, not
    as the conservation-scoring denominator.
-3. Split the active source authority into `broad_tao_homolog_rt` and
-   `eco1_like_retron_rt`.
+3. Split the active source authority into `ec86_clade9_conservation_v1` and
+   `ec86_iia3_cluster42_1_conservation_v1`.
 4. Fetch candidate protein sequences through declared providers only:
    `ncbi_protein_efetch` for NCBI Protein accessions in S1, including
    `WP_*` and GenBank-style protein ids such as `EIJ70524.1`, and
@@ -65,12 +79,12 @@ full_mestre_retron_rt  classification/candidate-pool context, not the Phase 1 de
 6. Materialize provider FASTA source files from the hash-pinned Mestre roster
    table. Provider-missing accessions must be written to an explicit failure
    ledger before they can become excluded source records.
-7. For `broad_tao_homolog_rt`, run a bounded homolog selector over provider
-   sequences before source-record materialization. The selector must compute
-   target-centered coverage, identity, motif support, and deterministic
-   diversity/cap metadata; it must not fall back to raw roster order.
-8. Materialize the local roster/source cache from the bounded broad selector,
-   the Eco1-like roster selector, and explicit provider FASTA sources. This
+7. For `ec86_clade9_conservation_v1`, select Mestre RT clade 9 rows after
+   declared QC. Clade 9 is the natural broad homolog unit because it is the
+   Mestre-defined RT clade containing Eco1/Ec86; do not replace it with a
+   cap-first subset or the full Mestre census.
+8. Materialize the local roster/source cache from the clade 9 selector, the
+   II-A3/`42_1` selector, and explicit provider FASTA sources. This
    writes `source_records.yaml`, filtered provider cache FASTAs, and a cache
    manifest.
 9. Materialize unaligned source FASTA bundles from the local provider caches
@@ -82,7 +96,9 @@ full_mestre_retron_rt  classification/candidate-pool context, not the Phase 1 de
    placeholder accessions, undersized profile bundles, missing source hashes,
    provider hash drift, and exclusions without reasons.
 12. Apply the declared filters: query coverage, identity range, length range,
-   required RT/retron motifs, and excluded RT families.
+   hard-reject filters, motif-QC markers, and excluded RT families. Motif
+   deviations are recorded as QC evidence; they are not silently converted into
+   regex-only inclusion/exclusion decisions.
 13. Align proteins with the declared MSA backend command from the source contract
    through `dnadesign.aligner.msa`.
 14. Map alignment columns back to `residue_map.parquet` through canonical Eco1
@@ -124,7 +140,7 @@ declares a substitution and updates all linked hashes.
 - No conservation profile without `conservation-sources.yaml`.
 - No target row inferred from a public accession with a sequence mismatch.
 - No provider fallback outside the declared provider ids.
-- No MAFFT alignment from a source bundle that fails the sufficiency gate.
+- No MSA alignment from a source bundle that fails the sufficiency gate.
 - No figure-level or prose-only MSA used as materialized evidence.
 - No conservation count with gaps in the denominator.
 - No fixed-position conservation rule unless WT is the plurality amino acid.
@@ -198,12 +214,20 @@ Provider accession shapes are not hard-coded in roster-cache; they are compiled
 from the checked-in conservation source contract and reused by the sufficiency
 gate.
 
-Under the revised source contract, `broad_tao_homolog_rt` cannot be materialized
-directly from the full Mestre roster. Roster-cache materialization now fails
-for that profile until `conservation-bounded-homolog-selector-v1` emits
-bounded source records with selector metadata. This is intentional: the full
-Mestre roster is a candidate pool and display context, not the scoring
-denominator.
+Under the revised source contract, `ec86_clade9_conservation_v1` is
+materialized from Mestre RT clade 9 after QC, not from the full Mestre roster.
+This is intentional: the full Mestre roster is a candidate pool and display
+context, not the scoring denominator. A runtime cap may be introduced only by a
+future benchmarked policy update; it is not part of the biological source-set
+definition.
+
+The source-record QC is a pre-MSA gate. It computes pairwise target coverage,
+pairwise identity-to-target, sequence length status, motif-marker calls, and
+hard-reject filters. Identity is evaluated with a target-vs-provider global
+pairwise alignment rather than raw index-wise comparison, because raw
+positional identity rejects legitimate RT homologs with insertions or terminal
+extensions. Motif deviations are recorded as QC markers; only the declared
+hard-reject filters exclude rows.
 
 By default it requires the roster-table hash to match
 `conservation-sources.yaml`. Test fixtures may use
@@ -248,13 +272,15 @@ It consumes explicit local source caches produced by the roster-cache layer:
 The ledger records `profile_id`, `record_id`, `provider_id`, `accession`,
 `status`, and an `exclusion_reason` for excluded rows. The materializer inserts
 `eco1_rt_ec86kit_reference` itself, rejects operator-supplied target rows, and
-writes unaligned source FASTA plus manifests:
+writes unaligned source FASTA plus manifests. Included-row `sequence_qc`
+metadata is preserved into the profile manifests so the sufficiency gate can
+reject hand-authored or stale bundles before alignment:
 
 ```text
 outputs/thread/eco1_rt_conservative_v1/conservation_sources/
 ```
 
-It does not fetch live provider records and it does not run MAFFT.
+It does not fetch live provider records and it does not run the MSA backend.
 
 Before alignment, run the sufficiency preflight:
 
@@ -262,16 +288,17 @@ Before alignment, run the sufficiency preflight:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency --repo-root .
 ```
 
-This command must pass before MAFFT. The previous full-roster broad source
-bundle passed with:
+This command must pass before alignment. The current selected source bundles
+pass locally with:
 
 ```text
-broad_tao_homolog_rt included 1814, excluded 114
-eco1_like_retron_rt included 46, excluded 1
+ec86_clade9_conservation_v1 included 302, excluded 22
+ec86_iia3_cluster42_1_conservation_v1 included 44, excluded 3
 ```
 
-That broad bundle is now superseded candidate-pool context. It should not be
-aligned or scored as the active `broad_tao_homolog_rt` denominator.
+The older 1814-row full-roster broad bundle is now superseded candidate-pool
+context. It should not be aligned or scored as the active
+`ec86_clade9_conservation_v1` denominator.
 
 It rejects source bundles that are fixture-like, under-supported relative to
 `min_non_gap_count`, not hash-linked to `source_records.yaml` and provider
@@ -286,15 +313,16 @@ The study-owned alignment materializer is:
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/
 ```
 
-It validates the source-sequence sufficiency gate, reads the declared MAFFT
-command from `conservation-sources.yaml`, and delegates generic alignment
-execution to `dnadesign.aligner.msa`. The generic aligner wrapper writes MAFFT
-stdout to a temporary FASTA, validates that aligned FASTA, and publishes the
-final FASTA plus manifest only after validation. Stderr is recorded as an
-explicit sidecar so interrupted or timed-out runs do not masquerade as accepted
-aligned bundles.
+It validates the source-sequence sufficiency gate, reads the declared MSA
+backend command from `conservation-sources.yaml`, and delegates generic
+alignment execution to `dnadesign.aligner.msa`. The generic aligner wrapper
+stages backend output, validates that aligned FASTA, and publishes the final
+FASTA plus manifest only after validation. Stderr is recorded as an explicit
+sidecar so interrupted or timed-out runs do not masquerade as accepted aligned
+bundles.
 
-Run it through Pixi so MAFFT comes from the repository native-tool environment:
+Run it through Pixi so the declared native alignment backend comes from the
+repository tool environment:
 
 ```bash
 pixi run uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation_alignments --repo-root .
@@ -306,36 +334,34 @@ declared profile ids:
 ```bash
 pixi run uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation_alignments \
   --repo-root . \
-  --profile-id eco1_like_retron_rt
+  --profile-id ec86_iia3_cluster42_1_conservation_v1
 ```
 
 The current declared command is:
 
 ```text
-mafft --globalpair --maxiterate 1000 --reorder <input_fasta> > <output_fasta>
+clustalo --force --outfmt=fasta --threads=1 -i <input_fasta> -o <output_fasta>
 ```
 
 An interactive real-data run of the former full-roster broad profile ran for
 roughly four hours of active CPU before being interrupted without producing an
-accepted `broad_tao_homolog_rt.aligned.fasta`. Do not switch to a faster MSA
-backend or preset silently. First materialize the bounded broad homolog source
-records; then either run the declared backend policy or update the source
-contract with an explicit profile-specific alignment policy and benchmark
-evidence.
+accepted broad-profile aligned FASTA. That run used the previous
+high-sensitivity MAFFT policy and the full-roster denominator; it is historical
+runtime evidence, not the selected Phase 1 alignment policy. Do not switch MSA
+backends or presets silently. Clustal Omega is now selected by contract for the
+Mestre clade 9 and II-A3/`42_1` homolog panels.
 
-A selected-profile local run of `eco1_like_retron_rt` completed through the
+A selected-profile local run of `ec86_iia3_cluster42_1_conservation_v1` completed through the
 declared command and published:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/eco1_like_retron_rt.aligned.fasta
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/eco1_like_retron_rt.aligned.manifest.yaml
+outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
+outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.manifest.yaml
 ```
 
-The accepted profile has 47 aligned records, one aligned length of 560 aa, the
-`eco1_rt_ec86kit_reference` target row, MAFFT v7.526, return code 0, and
-hash-linked stdout/stderr provenance. Treat this as accepted profile-level
-evidence only; conservation-profile materialization still requires the broad
-profile alignment as well.
+The accepted profile was generated before the current Clustal Omega policy and
+is retained as local historical evidence only. Regenerate it under the selected
+backend before materializing `conservation_profile.parquet`.
 
 ### MSA Visualization Sidecars
 
@@ -430,8 +456,8 @@ Run a strict complete report after both required profiles exist:
 uv run python -m dnadesign.aligner.msa.visualization \
   --alignment-root outputs/thread/eco1_rt_conservative_v1/conservation_alignments \
   --output-root outputs/thread/eco1_rt_conservative_v1/conservation_visualizations \
-  --profile-id broad_tao_homolog_rt \
-  --profile-id eco1_like_retron_rt \
+  --profile-id ec86_clade9_conservation_v1 \
+  --profile-id ec86_iia3_cluster42_1_conservation_v1 \
   --target-row-id eco1_rt_ec86kit_reference \
   --target-sequence-hash sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb \
   --annotation-tracks-yaml docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml \
@@ -445,8 +471,8 @@ While only one profile is accepted, an explicit partial report can be generated:
 uv run python -m dnadesign.aligner.msa.visualization \
   --alignment-root outputs/thread/eco1_rt_conservative_v1/conservation_alignments \
   --output-root outputs/thread/eco1_rt_conservative_v1/conservation_visualizations \
-  --profile-id broad_tao_homolog_rt \
-  --profile-id eco1_like_retron_rt \
+  --profile-id ec86_clade9_conservation_v1 \
+  --profile-id ec86_iia3_cluster42_1_conservation_v1 \
   --target-row-id eco1_rt_ec86kit_reference \
   --target-sequence-hash sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb \
   --annotation-tracks-yaml docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml \
@@ -483,8 +509,8 @@ src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservati
 It consumes explicit aligned FASTA files, one per selected profile id:
 
 ```text
-<alignment-root>/broad_tao_homolog_rt.aligned.fasta
-<alignment-root>/eco1_like_retron_rt.aligned.fasta
+<alignment-root>/ec86_clade9_conservation_v1.aligned.fasta
+<alignment-root>/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
 ```
 
 Each aligned FASTA must include the target row:
@@ -503,16 +529,15 @@ It validates the target row against `residue_map.parquet`, records aligned
 FASTA source hashes, and emits long-form rows keyed by
 `profile_id + canonical_position`.
 
-This materializer does not fetch provider sequences or run MAFFT. It requires
+This materializer does not fetch provider sequences or run the MSA backend. It requires
 an accepted aligned FASTA bundle from the alignment materializer before it can
 create real conservation evidence.
 
 ### Next Slice
 
-The next data slice is `conservation-bounded-homolog-selector-v1`: materialize
-bounded `broad_tao_homolog_rt` source records from the full Mestre
-candidate-pool provider cache using target-centered coverage, identity, motif
-support, and deterministic diversity/cap metadata. After that, rerun source
-FASTA sufficiency, align the bounded broad profile through `dnadesign.aligner.msa`,
-run the conservation materializer, and confirm Phase 1 advances to the
-`mask_set.yaml` blocker only.
+The clade-9 source cache and source FASTA sufficiency gates now pass locally for
+the selected profile IDs. The next data slice is
+`conservation-alignment-bundle-v1`: align both profiles through
+`dnadesign.aligner.msa` using the selected Clustal Omega command, run the
+conservation materializer, and confirm Phase 1 advances to the `mask_set.yaml`
+blocker only.

@@ -1,4 +1,13 @@
-"""Eco1 RT repack contract validation primitives."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/artifact_chain.py
+
+Eco1 RT repack contract validation primitives.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

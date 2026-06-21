@@ -1,4 +1,13 @@
-"""HTTP helpers for Eco1 provider-source acquisition."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/http.py
+
+HTTP helpers for Eco1 provider-source acquisition.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

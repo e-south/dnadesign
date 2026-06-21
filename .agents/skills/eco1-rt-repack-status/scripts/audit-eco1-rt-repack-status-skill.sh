@@ -93,6 +93,7 @@ operations_root = package_root / "operations"
 tests_root = package_root / "tests"
 visualization_root = repo_root / "src/dnadesign/aligner/msa/visualization"
 visualization_tests_root = repo_root / "src/dnadesign/aligner/tests/msa/visualization"
+msa_backend_root = repo_root / "src/dnadesign/aligner/msa/backends"
 problems: list[str] = []
 
 expected_operation_dirs = {"contracts", "materialization"}
@@ -223,7 +224,7 @@ for primitive in sorted(expected_materialization_primitives):
         problems.append(f"missing tests/materialization/{primitive}/test_materialization.py")
 
 source_sequence_test_root = test_materialization_root / "source_sequences"
-expected_source_sequence_test_files = {"__init__.py", "_fixtures.py", "test_materialization.py"}
+expected_source_sequence_test_files = {"__init__.py", "_fixtures.py", "_qc_fixtures.py", "test_materialization.py"}
 observed_source_sequence_test_files = {path.name for path in source_sequence_test_root.glob("*.py")}
 if observed_source_sequence_test_files != expected_source_sequence_test_files:
     problems.append(
@@ -280,6 +281,23 @@ if observed_visualization_test_files != expected_visualization_test_files:
         "aligner MSA visualization tests must stay mirrored and bounded, observed "
         f"{sorted(observed_visualization_test_files)}"
     )
+
+if not (msa_backend_root / "execution.py").is_file():
+    problems.append("aligner.msa.backends.execution must own shared subprocess execution mechanics")
+
+for backend_module_name in ("mafft.py", "clustalo.py"):
+    backend_module = msa_backend_root / backend_module_name
+    if not backend_module.is_file():
+        problems.append(f"missing aligner/msa/backends/{backend_module_name}")
+        continue
+    backend_text = backend_module.read_text(encoding="utf-8")
+    if "run_staged_backend_alignment" not in backend_text:
+        problems.append(f"{backend_module_name} must call shared backend execution contract")
+    for forbidden_snippet in ("write_bundle_manifest", "perf_counter", "uuid4", "hashlib"):
+        if forbidden_snippet in backend_text:
+            problems.append(
+                f"{backend_module_name} reimplements backend execution detail: {forbidden_snippet}"
+            )
 
 cli_lines = len((operations_root / "contract_validation.py").read_text(encoding="utf-8").splitlines())
 if cli_lines > 80:
@@ -372,6 +390,7 @@ require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/backends/execution.py"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/provider_accessions.py"
@@ -409,11 +428,11 @@ require_pattern 'planned' "artifact surface is planned" "$STUDY_ROOT/operations/
 require_pattern 'thread_artifact_chain_schema' "artifact surface includes artifact-chain schema" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
 require_pattern 'rt_lnrna_candidate_acceptance_schema' "artifact surface includes downstream acceptance schema" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
 require_pattern 'explicit_no_fallback' "profile fixture declares no-fallback backend policy" "$STUDY_ROOT/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml"
-require_pattern 'broad_tao_homolog_rt' "conservation source contract declares Tao-like broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
-require_pattern 'mestre_s1_target_centered_bounded_homologs_after_filters' "conservation source contract requires bounded homolog broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'ec86_clade9_conservation_v1' "conservation source contract declares Ec86 clade 9 profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'mestre_s1_ec86_rt_clade9_after_qc' "conservation source contract requires Mestre clade 9 profile rows" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'context_only_not_conservation_denominator' "conservation source contract keeps full Mestre roster out of scoring denominator" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'no_silent_backend_fallback' "conservation source contract rejects silent alignment backend fallback" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
-require_pattern 'eco1_like_retron_rt' "conservation source contract declares Eco1-like profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'ec86_iia3_cluster42_1_conservation_v1' "conservation source contract declares Eco1-like profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'accession_patterns' "conservation source contract declares provider accession patterns" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'materialization/conservation/' "study surfaces route conservation materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'materialization/conservation_alignments/' "study surfaces route conservation alignment package" "$REFERENCE_DIR/study-surfaces.md"

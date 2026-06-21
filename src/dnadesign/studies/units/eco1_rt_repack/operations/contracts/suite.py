@@ -1,4 +1,13 @@
-"""Top-level checked-in contract validation suite for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/suite.py
+
+Top-level checked-in contract validation suite for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

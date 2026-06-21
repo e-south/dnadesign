@@ -1,4 +1,13 @@
-"""Issue builders for Eco1 source-sequence bundle validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/issues.py
+
+Issue builders for Eco1 source-sequence bundle validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

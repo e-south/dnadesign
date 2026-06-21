@@ -1,4 +1,13 @@
-"""Conservation-profile materialization primitive for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/__init__.py
+
+Conservation-profile materialization primitive for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation.pipeline import (
     MaterializedConservationArtifacts,

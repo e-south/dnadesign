@@ -1,4 +1,13 @@
-"""Materialized conservation-profile validators for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py
+
+Materialized conservation-profile validators for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

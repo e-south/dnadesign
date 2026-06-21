@@ -1,4 +1,13 @@
-"""Sufficiency gate for Eco1 conservation source FASTA bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/__init__.py
+
+Sufficiency gate for Eco1 conservation source FASTA bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency.context import (
     SourceSequenceSufficiencyContext,

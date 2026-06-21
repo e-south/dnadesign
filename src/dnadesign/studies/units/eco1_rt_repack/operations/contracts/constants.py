@@ -1,4 +1,13 @@
-"""Study-local constants for Eco1 RT repack contract validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/constants.py
+
+Study-local constants for Eco1 RT repack contract validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -114,11 +123,11 @@ _REQUIRED_CONSERVATION_PROFILE_COLUMNS = {
     "target_sequence_hash",
     "mapping_status",
 }
-_REQUIRED_CONSERVATION_PROFILE_IDS = {"broad_tao_homolog_rt", "eco1_like_retron_rt"}
+_REQUIRED_CONSERVATION_PROFILE_IDS = {"ec86_clade9_conservation_v1", "ec86_iia3_cluster42_1_conservation_v1"}
 _REQUIRED_CONSERVATION_PROVIDER_IDS = {"ncbi_protein_efetch", "bv_brc_feature_protein_fasta"}
 _CONSERVATION_GAP_DENOMINATOR_POLICY = "non_gap_count"
 _CONSERVATION_PLURALITY_RULE = "wt_aa_must_equal_plurality_aa"
 _CONSERVATION_TARGET_POLICY = "ec86kit_reference_sequence_must_be_target_row"
 _TARGET_MISMATCH_POLICY = "reject_as_target_without_declared_substitution"
 _PROVIDER_FAILURE_POLICY = "explicit_exclude_or_fail"
-_FORBIDDEN_CONSERVATION_DENOMINATOR_RULES = {"all_mestre_s1_rt_records_after_filters"}
+_FORBIDDEN_CONSERVATION_DENOMINATOR_RULES = {"mestre_s1_all_retron_rt_records_context"}

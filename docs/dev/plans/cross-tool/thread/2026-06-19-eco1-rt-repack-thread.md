@@ -162,29 +162,30 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`.
   It consumes explicit aligned FASTA inputs and emits thread-shaped long-form
   `conservation_profile.parquet` evidence. It does not fetch provider
-  sequences, run MAFFT, or create `dnadesign.thread`; the real aligned FASTA
+  sequences, run MSA backends, or create `dnadesign.thread`; the real aligned FASTA
   bundle remains the next source-data blocker.
 - The Aligner modernization slice adds public `dnadesign.aligner.msa` contracts
-  for FASTA validation, MAFFT preflight/execution, atomic aligned FASTA
-  publication, stderr sidecars, and aligned FASTA bundle manifests. Eco1 still
+  for FASTA validation, MAFFT and Clustal Omega preflight/execution, atomic
+  aligned FASTA publication, stderr sidecars, and aligned FASTA bundle manifests. Eco1 still
   owns the source roster, provider policy, target-row hash, and conservation
   scoring.
 - The conservation alignment slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`.
-  It validates Eco1 source FASTA sufficiency, parses declared MAFFT args, calls
+  It validates Eco1 source FASTA sufficiency, parses declared MSA backend args, calls
   the public `dnadesign.aligner.msa` runner, supports selected profile ids for
   operational runs, and writes an Eco1 alignment bundle index. The former
   full-Mestre broad-profile run with the declared high-sensitivity MAFFT policy
   was stopped after roughly four hours and is no longer the active broad
-  denominator. The next study-owned source-data slice is bounded homolog
-  selection for `broad_tao_homolog_rt`; only after that should broad alignment
-  be rerun through `dnadesign.aligner.msa`.
+  denominator. The active broad profile is now the natural Mestre Ec86 RT clade
+  9 panel after declared QC; selected source records and source FASTA
+  sufficiency now pass locally, so the next runtime blocker is accepted
+  Clustal Omega alignment through `dnadesign.aligner.msa`.
 - The conservation source-sequence bundle slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`.
   It consumes explicit local provider FASTA caches plus `source_records.yaml`,
   inserts the ec86kit target row, rejects undeclared providers and unexplained
   exclusions, and emits unaligned source FASTA bundles plus manifests. It does
-  not fetch live provider rows, run MAFFT, score conservation, or create
+  not fetch live provider rows, run an MSA backend, score conservation, or create
   `dnadesign.thread`.
 - The conservation provider-source slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`.
@@ -193,9 +194,10 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   belong in `aligner` or future `thread`; those tools consume declared FASTA
   bundles and evidence artifacts after source authority is already resolved.
 - The broad conservation source policy was revised from a whole-roster Mestre
-  denominator to `broad_tao_homolog_rt`: a Tao-like target-centered bounded
-  homolog panel drawn from Mestre S1. The full Mestre roster remains
-  candidate-pool/classification context, not Phase 1 conservation evidence.
+  denominator to `ec86_clade9_conservation_v1`: the Mestre Ec86-containing RT
+  clade 9 panel after declared QC. Tao remains the masking method prior, not the
+  source-set name. The full Mestre roster remains candidate-pool/classification
+  context, not Phase 1 conservation evidence.
 
 ### 4. Contract Objects
 

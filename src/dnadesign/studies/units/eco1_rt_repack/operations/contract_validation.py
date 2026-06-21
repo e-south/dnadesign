@@ -1,4 +1,13 @@
-"""Command-line entrypoint for Eco1 RT repack contract validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+
+Command-line entrypoint for Eco1 RT repack contract validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

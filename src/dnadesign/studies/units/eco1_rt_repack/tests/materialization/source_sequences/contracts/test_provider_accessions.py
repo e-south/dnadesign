@@ -1,4 +1,13 @@
-"""Provider accession contract tests for Eco1 conservation source sequences."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/source_sequences/contracts/test_provider_accessions.py
+
+Provider accession contract tests for Eco1 conservation source sequences.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

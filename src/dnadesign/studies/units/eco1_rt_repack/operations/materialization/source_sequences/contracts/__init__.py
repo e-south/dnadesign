@@ -1,4 +1,13 @@
-"""Source-sequence contract helpers for Eco1 conservation source materializers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/__init__.py
+
+Source-sequence contract helpers for Eco1 conservation source materializers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .conservation_sources import (
     ConservationSourceContract,

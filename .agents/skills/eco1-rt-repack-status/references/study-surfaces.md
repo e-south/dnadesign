@@ -37,7 +37,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   policy that remains separate from the local materialized
   `residue_map.parquet`.
 - `workbench/provenance/conservation-sources.yaml`: selected MSA source
-  contract for `broad_tao_homolog_rt` and `eco1_like_retron_rt`; full Mestre
+  contract for `ec86_clade9_conservation_v1` and `ec86_iia3_cluster42_1_conservation_v1`; full Mestre
   rows are candidate/context only, not the broad conservation denominator.
 - `workbench/provenance/conservation-source-discovery.md`: source-discovery
   note for method and roster priors before MSA materialization.
@@ -46,10 +46,12 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   BV-BRC FASTA source files plus explicit unresolved-provider ledgers.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`:
   study-owned roster-cache materializer for Mestre roster plus explicit
-  provider FASTA source inputs.
-- `src/dnadesign/aligner/msa/`: generic aligned FASTA bundle API for MAFFT
-  preflight/execution, atomic output publication, stderr sidecars, and run
-  provenance; it is not Eco1 source authority or conservation scoring.
+  provider FASTA source inputs; source records now include pairwise target
+  coverage, pairwise identity, length, motif-marker, and hard-reject QC
+  metadata before MSA execution.
+- `src/dnadesign/aligner/msa/`: generic aligned FASTA bundle API for MAFFT and
+  Clustal Omega preflight/execution, atomic output publication, stderr sidecars,
+  and run provenance; it is not Eco1 source authority or conservation scoring.
 - `src/dnadesign/aligner/msa/visualization/`: generic MSA QC and
   visualization sidecar API for accepted aligned FASTA files; it is not Eco1
   source authority, provider-cache policy, conservation scoring, or mask
@@ -74,7 +76,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   is not a conservation denominator, mask source, or designability rule.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`:
   study-owned orchestration package that validates Eco1 source-bundle
-  sufficiency, parses declared MAFFT args, calls `dnadesign.aligner.msa`,
+  sufficiency, parses declared MSA backend args, calls `dnadesign.aligner.msa`,
   supports selected profile ids, and writes the Eco1 alignment bundle index.
 
 ## Context Pages
@@ -112,10 +114,10 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   explicit aligned FASTA inputs.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`:
   study-owned materializer for alignment bundle manifests from
-  sufficiency-passing source FASTA inputs. The selected `eco1_like_retron_rt`
-  profile has accepted local profile-level alignment evidence, but bounded
-  `broad_tao_homolog_rt` source records and a complete two-profile bundle are
-  not materialized.
+  sufficiency-passing source FASTA inputs. The selected
+  `ec86_clade9_conservation_v1` and
+  `ec86_iia3_cluster42_1_conservation_v1` source FASTAs now pass sufficiency,
+  but a complete accepted two-profile aligned FASTA bundle is not materialized.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`:
   study-owned materializer for unaligned source FASTA bundles from explicit
   provider caches and exclusion ledgers.
@@ -129,8 +131,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   source-authority semantics.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/`:
   pre-alignment gate package for cache/hash/accession/support and target-row
-  checks before MSA execution. It must be rerun after bounded broad source
-  records are materialized.
+  checks before MSA execution. It passes locally for the regenerated Ec86
+  clade 9 and II-A3/`42_1` source FASTA bundles.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py`:
   semantic validator for materialized conservation-profile metadata, source
   hashes, residue-map joins, and Tao-style conservation rule consistency.

@@ -85,7 +85,7 @@ datasets:
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/
     status: phase1_alignment_bundle_materializer_hardened_runtime_blocked
-    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MAFFT command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; the Eco1-like profile is accepted locally, while the bounded broad_tao_homolog_rt source records and complete aligned bundle are still blocked.
+    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MSA backend command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; both selected profiles must be regenerated under the current Clustal Omega policy before conservation scoring.
   - id: aligner_msa_visualization_api
     owner: aligner
     kind: checked_in_code
@@ -133,7 +133,7 @@ datasets:
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/
     status: implemented_fail_fast_preflight
-    description: CLI/API gate that rejects missing source caches, placeholder accessions, under-supported profile bundles, hash drift, target drift, and implicit exclusions before MAFFT alignment.
+    description: CLI/API gate that rejects missing source caches, placeholder accessions, under-supported profile bundles, hash drift, target drift, and implicit exclusions before MSA backend alignment.
   - id: eco1_rt_conservation_source_sequence_contracts
     owner: eco1_rt_repack
     kind: checked_in_code
@@ -145,13 +145,13 @@ datasets:
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
     status: source_discovery
-    description: Study-owned source-discovery note for broad retron RT and Eco1-like conservation profile authority before MSA materialization.
+    description: Study-owned source-discovery note for Ec86 clade 9 and II-A3 cluster 42_1 conservation profile authority before MSA materialization.
   - id: eco1_rt_conservation_sources
     owner: eco1_rt_repack
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml
     status: selected_authority
-    description: Study-owned MSA source contract for broad retron RT and Eco1-like conservation profiles, including provider policy and ec86kit target-row pinning.
+    description: Study-owned MSA source contract for Ec86 clade 9 and II-A3 cluster 42_1 conservation profiles, including provider policy and ec86kit target-row pinning.
   - id: eco1_rt_msa_method
     owner: eco1_rt_repack
     kind: checked_in_context
@@ -192,26 +192,26 @@ datasets:
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
-    status: superseded_candidate_pool_local
-    description: Local generated source_records.yaml plus filtered provider FASTA caches from the former full-Mestre broad run; retained as candidate-pool context only because broad_tao_homolog_rt now requires bounded target-centered source records before conservation scoring.
+    status: materialized_local_qc_passed
+    description: Local generated source_records.yaml plus filtered provider FASTA caches for the selected Ec86 clade 9 and II-A3/42_1 profiles. Current regenerated cache includes 302/22 included/excluded ec86_clade9_conservation_v1 rows and 44/3 included/excluded ec86_iia3_cluster42_1_conservation_v1 rows, with pairwise target coverage, pairwise identity, length, motif-marker, and hard-reject QC metadata.
   - id: eco1_rt_conservation_source_fastas
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
-    status: superseded_candidate_pool_local
-    description: Local generated unaligned source FASTA bundles from the former full-Mestre broad run; the Eco1-like profile remains useful, but the broad FASTA must be regenerated after bounded homolog source records are materialized.
+    status: materialized_local_sufficiency_passed
+    description: Local generated unaligned source FASTA bundles for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1. Source-sequence sufficiency passes for the regenerated selected profiles; the next gate is accepted Clustal Omega alignment.
   - id: eco1_rt_conservation_alignment_bundle
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
     status: partial_profile_materialized_local
-    description: Local generated aligned FASTA area; eco1_like_retron_rt.aligned.fasta is accepted locally with 47 aligned records, target-row provenance, and hash-linked MAFFT stdout/stderr manifests, while broad_tao_homolog_rt.aligned.fasta and the complete two-profile bundle remain blocked until bounded broad source records exist.
+    description: Local generated aligned FASTA area; the older ec86_iia3_cluster42_1_conservation_v1 alignment remains historical local evidence, while both ec86_clade9_conservation_v1.aligned.fasta and ec86_iia3_cluster42_1_conservation_v1.aligned.fasta must be regenerated under the current Clustal Omega policy before the complete two-profile bundle is accepted.
   - id: eco1_rt_conservation_visualizations
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
     status: partial_profile_materialized_local
-    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API with Eco1-owned motif-anchor annotations, exemplar-row windows, selected-row overview panels, and plurality/gap histograms; current report covers accepted eco1_like_retron_rt alignment and explicitly records broad_tao_homolog_rt as missing until bounded source records and alignment exist.
+    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API with Eco1-owned motif-anchor annotations, exemplar-row windows, selected-row overview panels, and plurality/gap histograms; current report covers historical ec86_iia3_cluster42_1_conservation_v1 alignment and explicitly records ec86_clade9_conservation_v1 as missing until clade 9 source records and alignment exist.
   - id: eco1_rt_mask_set
     owner: planned_thread
     kind: planned_artifact

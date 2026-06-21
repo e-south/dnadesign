@@ -1,4 +1,13 @@
-"""Report model for Eco1 source-sequence sufficiency validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/report.py
+
+Report model for Eco1 source-sequence sufficiency validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

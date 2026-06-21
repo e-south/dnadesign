@@ -1,4 +1,13 @@
-"""Manifest helpers for Eco1 conservation alignment bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/manifest.py
+
+Manifest helpers for Eco1 conservation alignment bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

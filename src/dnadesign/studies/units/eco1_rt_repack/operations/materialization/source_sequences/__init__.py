@@ -1,4 +1,13 @@
-"""Conservation source-sequence bundle primitive for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/__init__.py
+
+Conservation source-sequence bundle primitive for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 __all__ = [
     "MaterializedSourceSequenceBundles",

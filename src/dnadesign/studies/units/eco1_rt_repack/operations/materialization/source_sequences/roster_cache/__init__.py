@@ -1,4 +1,13 @@
-"""Conservation roster-cache primitive for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/__init__.py
+
+Conservation roster-cache primitive for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from importlib import import_module
 

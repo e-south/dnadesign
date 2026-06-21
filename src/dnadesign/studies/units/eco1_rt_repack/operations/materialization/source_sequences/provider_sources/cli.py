@@ -1,4 +1,13 @@
-"""CLI for Eco1 provider FASTA source acquisition."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/cli.py
+
+CLI for Eco1 provider FASTA source acquisition.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

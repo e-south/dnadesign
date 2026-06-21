@@ -1,4 +1,13 @@
-"""CLI for Eco1 conservation alignment bundle materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/cli.py
+
+CLI for Eco1 conservation alignment bundle materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

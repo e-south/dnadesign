@@ -1,4 +1,13 @@
-"""Shared contract validation report types."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/models.py
+
+Shared contract validation report types.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

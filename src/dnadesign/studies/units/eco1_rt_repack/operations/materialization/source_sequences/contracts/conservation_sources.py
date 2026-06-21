@@ -1,4 +1,13 @@
-"""Typed accessors for the Eco1 conservation source contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/conservation_sources.py
+
+Typed accessors for the Eco1 conservation source contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

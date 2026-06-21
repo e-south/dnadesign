@@ -19,7 +19,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from dnadesign.aligner.msa import MsaRequest, MsaRunResult, load_fasta_records, run_msa
+from dnadesign.aligner.msa import MsaBackendSpec, MsaRequest, MsaRunResult, load_fasta_records, run_msa
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation_alignments.manifest import (
     write_alignment_index_manifest,
 )
@@ -67,7 +67,7 @@ def materialize_conservation_alignment_bundles(
     created_at: str = DEFAULT_CREATED_AT,
     msa_runner: MsaRunner = run_msa,
 ) -> MaterializedConservationAlignmentBundles:
-    """Run declared MAFFT alignments for sufficiency-passing Eco1 source FASTA bundles."""
+    """Run declared MSA alignments for sufficiency-passing Eco1 source FASTA bundles."""
 
     root = (repo_root or _find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = resolve_path(root, output_root or DEFAULT_OUTPUT_ROOT)
@@ -95,7 +95,7 @@ def materialize_conservation_alignment_bundles(
 
     source_contract = load_conservation_source_contract(root / CONSERVATION_SOURCES)
     command = _declared_alignment_command(source_contract.sources)
-    command_args = parse_declared_mafft_args(command)
+    backend_id, command_args = parse_declared_alignment_command(command)
     target_row_id = source_contract.target_row_id
     target_sequence_hash = source_contract.target_sequence_hash
     selected_profile_ids = _select_profile_ids(
@@ -131,6 +131,7 @@ def materialize_conservation_alignment_bundles(
             output_fasta=output_fasta,
             manifest_path=output_manifest,
             target_row_id=target_row_id,
+            backend=MsaBackendSpec(backend_id=backend_id),
             command_args=command_args,
             run_label=profile_id,
         )
@@ -189,17 +190,42 @@ def materialize_conservation_alignment_bundles(
     )
 
 
-def parse_declared_mafft_args(command: str) -> tuple[str, ...]:
-    """Parse the declared MAFFT command and return explicit backend arguments."""
+def parse_declared_alignment_command(command: str) -> tuple[str, tuple[str, ...]]:
+    """Parse the declared MSA command and return backend id plus explicit arguments."""
 
     tokens = shlex.split(command)
-    if not tokens or tokens[0] != "mafft":
+    if not tokens:
+        raise ValueError("alignment_policy.alignment_command must declare an alignment backend")
+    if tokens[0] == "mafft":
+        if len(tokens) < 4 or tokens[-3:] != ["<input_fasta>", ">", "<output_fasta>"]:
+            raise ValueError("MAFFT alignment_command must use '<input_fasta> > <output_fasta>'")
+        command_args = tuple(tokens[1:-3])
+        if not command_args:
+            raise ValueError("MAFFT alignment_command must declare explicit backend arguments")
+        return "mafft", command_args
+    if tokens[0] == "clustalo":
+        if "-i" not in tokens or "-o" not in tokens:
+            raise ValueError("Clustal Omega alignment_command must declare '-i <input_fasta> -o <output_fasta>'")
+        input_index = tokens.index("-i")
+        output_index = tokens.index("-o")
+        if tokens[input_index + 1 : input_index + 2] != ["<input_fasta>"]:
+            raise ValueError("Clustal Omega alignment_command must use '-i <input_fasta>'")
+        if tokens[output_index + 1 : output_index + 2] != ["<output_fasta>"]:
+            raise ValueError("Clustal Omega alignment_command must use '-o <output_fasta>'")
+        excluded_indexes = {input_index, input_index + 1, output_index, output_index + 1}
+        command_args = tuple(token for index, token in enumerate(tokens[1:], start=1) if index not in excluded_indexes)
+        if not command_args:
+            raise ValueError("Clustal Omega alignment_command must declare explicit backend arguments")
+        return "clustalo", command_args
+    raise ValueError("alignment_policy.alignment_command must start with 'mafft' or 'clustalo'")
+
+
+def parse_declared_mafft_args(command: str) -> tuple[str, ...]:
+    """Parse a declared MAFFT command and return explicit backend arguments."""
+
+    backend_id, command_args = parse_declared_alignment_command(command)
+    if backend_id != "mafft":
         raise ValueError("alignment_policy.alignment_command must start with 'mafft'")
-    if len(tokens) < 4 or tokens[-3:] != ["<input_fasta>", ">", "<output_fasta>"]:
-        raise ValueError("alignment_policy.alignment_command must use '<input_fasta> > <output_fasta>'")
-    command_args = tuple(tokens[1:-3])
-    if not command_args:
-        raise ValueError("alignment_policy.alignment_command must declare explicit MAFFT arguments")
     return command_args
 
 

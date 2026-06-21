@@ -1,4 +1,13 @@
-"""CLI for Eco1 conservation roster source-cache materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/cli.py
+
+CLI for Eco1 conservation roster source-cache materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

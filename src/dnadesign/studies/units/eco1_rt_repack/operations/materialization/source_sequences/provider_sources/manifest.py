@@ -1,4 +1,13 @@
-"""Manifest writer for Eco1 provider-source FASTA acquisition."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/manifest.py
+
+Manifest writer for Eco1 provider-source FASTA acquisition.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

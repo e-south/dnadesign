@@ -20,7 +20,6 @@ import yaml
 from dnadesign.aligner.msa import MsaRequest, MsaRunResult
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation_alignments import (
     materialize_conservation_alignment_bundles,
-    parse_declared_mafft_args,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences import (
     materialize_source_sequence_bundles,
@@ -35,7 +34,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.source_sequenc
 )
 
 
-def test_alignment_materializer_fails_before_mafft_when_source_sufficiency_fails(tmp_path: Path) -> None:
+def test_alignment_materializer_fails_before_msa_when_source_sufficiency_fails(tmp_path: Path) -> None:
     materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
 
     with pytest.raises(ValueError, match="source sequence sufficiency failed"):
@@ -66,28 +65,30 @@ def test_alignment_materializer_runs_each_profile_and_writes_index_manifest(tmp_
         msa_runner=_recording_copy_runner(observed_requests),
     )
 
-    assert sorted(result.aligned_fasta_paths) == ["broad_tao_homolog_rt", "eco1_like_retron_rt"]
+    assert sorted(result.aligned_fasta_paths) == [
+        "ec86_clade9_conservation_v1",
+        "ec86_iia3_cluster42_1_conservation_v1",
+    ]
     assert len(observed_requests) == 2
     assert {request.target_row_id for request in observed_requests} == {"eco1_rt_ec86kit_reference"}
-    assert {request.command_args for request in observed_requests} == {
-        ("--globalpair", "--maxiterate", "1000", "--reorder")
-    }
+    assert {request.backend.backend_id for request in observed_requests} == {"clustalo"}
+    assert {request.command_args for request in observed_requests} == {("--force", "--outfmt=fasta", "--threads=1")}
     assert {request.input_fasta.name for request in observed_requests} == {
-        "broad_tao_homolog_rt.source.fasta",
-        "eco1_like_retron_rt.source.fasta",
+        "ec86_clade9_conservation_v1.source.fasta",
+        "ec86_iia3_cluster42_1_conservation_v1.source.fasta",
     }
     assert {request.output_fasta.name for request in observed_requests} == {
-        "broad_tao_homolog_rt.aligned.fasta",
-        "eco1_like_retron_rt.aligned.fasta",
+        "ec86_clade9_conservation_v1.aligned.fasta",
+        "ec86_iia3_cluster42_1_conservation_v1.aligned.fasta",
     }
 
     bundle_manifest = yaml.safe_load(result.bundle_manifest_path.read_text(encoding="utf-8"))
     assert bundle_manifest["schema_id"] == "eco1_rt_repack.conservation_alignment_bundle.index"
     assert bundle_manifest["status"] == "materialized"
-    assert bundle_manifest["profile_ids"] == ["broad_tao_homolog_rt", "eco1_like_retron_rt"]
+    assert bundle_manifest["profile_ids"] == ["ec86_clade9_conservation_v1", "ec86_iia3_cluster42_1_conservation_v1"]
     assert bundle_manifest["target_row_id"] == "eco1_rt_ec86kit_reference"
-    assert bundle_manifest["alignment_manifests"]["broad_tao_homolog_rt"].endswith(
-        "broad_tao_homolog_rt.aligned.manifest.yaml"
+    assert bundle_manifest["alignment_manifests"]["ec86_clade9_conservation_v1"].endswith(
+        "ec86_clade9_conservation_v1.aligned.manifest.yaml"
     )
     assert bundle_manifest["upstream_hashes"]["conservation_sources_yaml"].startswith("sha256:")
 
@@ -107,15 +108,17 @@ def test_alignment_materializer_can_run_one_declared_profile(tmp_path: Path) -> 
         output_root=tmp_path,
         source_cache_root=cache_root,
         source_bundle_root=source_result.bundle_manifest_path.parent,
-        profile_ids=("eco1_like_retron_rt",),
+        profile_ids=("ec86_iia3_cluster42_1_conservation_v1",),
         msa_runner=_recording_copy_runner(observed_requests),
     )
 
-    assert list(result.aligned_fasta_paths) == ["eco1_like_retron_rt"]
-    assert [request.run_label for request in observed_requests] == ["eco1_like_retron_rt"]
-    assert [request.input_fasta.name for request in observed_requests] == ["eco1_like_retron_rt.source.fasta"]
+    assert list(result.aligned_fasta_paths) == ["ec86_iia3_cluster42_1_conservation_v1"]
+    assert [request.run_label for request in observed_requests] == ["ec86_iia3_cluster42_1_conservation_v1"]
+    assert [request.input_fasta.name for request in observed_requests] == [
+        "ec86_iia3_cluster42_1_conservation_v1.source.fasta"
+    ]
     bundle_manifest = yaml.safe_load(result.bundle_manifest_path.read_text(encoding="utf-8"))
-    assert bundle_manifest["profile_ids"] == ["eco1_like_retron_rt"]
+    assert bundle_manifest["profile_ids"] == ["ec86_iia3_cluster42_1_conservation_v1"]
     assert set(bundle_manifest["profile_runs"][0]) >= {"profile_id", "elapsed_seconds"}
 
 
@@ -139,11 +142,6 @@ def test_alignment_materializer_rejects_unknown_profile_selection(tmp_path: Path
         )
 
 
-def test_declared_mafft_args_rejects_silent_command_drift() -> None:
-    with pytest.raises(ValueError, match="must use '<input_fasta> > <output_fasta>'"):
-        parse_declared_mafft_args("mafft --auto <input_fasta>")
-
-
 def _recording_copy_runner(observed_requests: list[MsaRequest]):
     def runner(request: MsaRequest) -> MsaRunResult:
         observed_requests.append(request)
@@ -158,7 +156,7 @@ def _recording_copy_runner(observed_requests: list[MsaRequest]):
                     "schema_version": 1,
                     "backend_id": request.backend.backend_id,
                     "backend_version": "test",
-                    "command": ["mafft", *request.command_args, str(request.input_fasta)],
+                    "command": [request.backend.backend_id, *request.command_args, str(request.input_fasta)],
                     "input_fasta": str(request.input_fasta),
                     "output_fasta": str(request.output_fasta),
                     "input_fasta_sha256": input_hash,
@@ -177,7 +175,7 @@ def _recording_copy_runner(observed_requests: list[MsaRequest]):
             manifest_path=request.manifest_path,
             backend_id=request.backend.backend_id,
             backend_version="test",
-            command=("mafft", *request.command_args, str(request.input_fasta)),
+            command=(request.backend.backend_id, *request.command_args, str(request.input_fasta)),
             input_fasta_sha256=input_hash,
             output_fasta_sha256=output_hash,
             pixi_lock_sha256="sha256:test",

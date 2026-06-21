@@ -47,8 +47,8 @@ conservative_policy:
     - 15
   conservation_threshold: 0.25
   conservation_profiles:
-    - broad_tao_homolog_rt
-    - eco1_like_retron_rt
+    - ec86_clade9_conservation_v1
+    - ec86_iia3_cluster42_1_conservation_v1
   conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
   cysteine_policy: no_new_cysteine
   unresolved_residue_policy: fixed

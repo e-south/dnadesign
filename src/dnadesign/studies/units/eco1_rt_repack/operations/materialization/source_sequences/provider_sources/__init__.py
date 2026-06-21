@@ -1,4 +1,13 @@
-"""Provider-source acquisition for Eco1 conservation source sequences."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/__init__.py
+
+Provider-source acquisition for Eco1 conservation source sequences.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .pipeline import (
     MaterializedProviderSourceFastas,

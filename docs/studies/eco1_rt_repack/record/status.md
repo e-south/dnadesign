@@ -9,12 +9,13 @@
 Phase 1 contract: structure-authority artifacts, contact evidence,
 conservation source authority, provider-candidate source acquisition, the
 alignment-bundle materializer, and the conservation-profile materializer are
-implemented, selected, or materialized; the Eco1-like aligned FASTA profile is
-accepted locally and has partial generic `aligner.msa` visualization sidecars.
-The broad conservation denominator has been revised to a Tao-like bounded
-homolog profile, so the complete aligned FASTA bundle, conservation profile,
-and mask artifacts remain blocked until bounded-homolog source records are
-materialized.
+implemented, selected, or materialized; the previously accepted Eco1-like
+aligned FASTA profile has partial generic `aligner.msa` visualization sidecars
+but predates the current Clustal Omega policy. The broad conservation
+denominator has been revised to the Mestre Ec86-containing RT clade 9 panel, so
+the complete aligned FASTA bundle, conservation profile, and mask artifacts
+remain blocked until the selected source FASTAs are aligned under the current
+Clustal Omega backend.
 
 The study has a checked-in record root, planned contract fixtures, and a
 selected Eco1/Ec86 structure-authority policy derived from the sibling
@@ -38,41 +39,44 @@ explicitly introduce a relaxed threshold profile.
 
 Conservation source read: local retron-prior PDFs provide method and context
 priors, but no checked-in MSA. Mestre et al. 2020 provides the roster authority
-and candidate pool, Tao et al. 2026 provides the target-centered homolog MSA
+and clade/type hierarchy, Tao et al. 2026 provides the homolog MSA
 and WT/plurality/frequency conservation-mask method, and Simon et al. 2019
 provides the RT-region visual annotation grammar. The selected Phase 1
-conservation profiles are now `broad_tao_homolog_rt` and
-`eco1_like_retron_rt`. The full Mestre S1 roster remains
-`full_mestre_retron_rt` context and candidate-pool evidence; it is not the
+conservation profiles are now `ec86_clade9_conservation_v1` and
+`ec86_iia3_cluster42_1_conservation_v1`. The full Mestre S1 roster remains
+`mestre_all_retron_rt_context` context and candidate-pool evidence; it is not the
 Phase 1 conservation scoring denominator.
 
 The checked-in source contract pins the MSA target row to the ec86kit reference
 sequence and rejects silent replacement by the mismatched public NCBI
 `WP_099010551.1` row. The provider-source acquisition code may fetch full
-Mestre candidate-pool records so the next selector can compute coverage,
-identity, motif support, and diversity, but roster-cache/source-record
-materialization now refuses `broad_tao_homolog_rt` until the bounded homolog
-selector exists. The previous local full-roster run fetched 350 NCBI Protein
-records and 1464 BV-BRC feature protein records, recorded 113 unresolved
-BV-BRC rows as explicit exclusions, and produced a 1814-row broad source FASTA
-bundle. That output is superseded candidate-pool context under the revised
-policy, not accepted conservation-denominator evidence.
+Mestre candidate-pool records, but conservation source-record materialization
+now defines `ec86_clade9_conservation_v1` by the natural Mestre RT clade 9 unit
+rather than by a cap-first selector. The local provider-source run fetched 350
+NCBI Protein records and 1464 BV-BRC feature protein records, with 113
+unresolved BV-BRC rows recorded as explicit exclusions. The selected source
+cache has now been regenerated from Mestre RT clade 9 under declared QC:
+`ec86_clade9_conservation_v1` includes 302 rows and excludes 22 rows, while
+`ec86_iia3_cluster42_1_conservation_v1` includes 44 rows and excludes 3 rows.
+QC records include pairwise target coverage, pairwise identity range status,
+length status, motif-marker calls, and hard-reject filters. The superseded
+1814-row full-roster broad bundle remains candidate-pool context only, not
+accepted conservation-denominator evidence.
 
 The study-owned alignment-bundle materializer routes accepted source FASTAs
-through the public `dnadesign.aligner.msa` MAFFT bundle contract while keeping
-Eco1 profile ids, source paths, and target-row policy in this study. The
-generic MAFFT seam stages stdout to a temporary FASTA, records stderr as a
-sidecar, and publishes an accepted aligned FASTA only after validation; the
-study orchestrator can run either all declared profiles or selected profile
-ids. An interactive real-data attempt using the former full-roster broad
-profile and declared `mafft --globalpair --maxiterate 1000 --reorder` policy
-was interrupted after roughly four hours of active CPU before a complete
-`broad_tao_homolog_rt.aligned.fasta` was produced. A selected-profile run of
-`eco1_like_retron_rt` completed locally through the same declared MAFFT policy
-with 47 aligned records, one aligned length of 560 aa, the pinned
-`eco1_rt_ec86kit_reference` target row present, MAFFT v7.526, return code 0,
-and hash-linked stdout/stderr manifests. This is accepted profile-level
-evidence, not a complete two-profile aligned FASTA bundle. The conservation
+through the public `dnadesign.aligner.msa` bundle contract while keeping Eco1
+profile ids, source paths, and target-row policy in this study. The generic MSA
+backend seam stages output, records stderr as a sidecar, and publishes an
+accepted aligned FASTA only after validation; the study orchestrator can run
+either all declared profiles or selected profile ids. An interactive real-data
+attempt using the former full-roster broad profile and previous
+`mafft --globalpair --maxiterate 1000 --reorder` policy was interrupted after
+roughly four hours of active CPU before a complete broad aligned FASTA was
+produced. The current selected backend is Clustal Omega:
+`clustalo --force --outfmt=fasta --threads=1 -i <input_fasta> -o <output_fasta>`.
+The earlier `ec86_iia3_cluster42_1_conservation_v1` aligned FASTA is retained
+as local historical evidence but should be regenerated under the selected
+backend before conservation-profile materialization. The conservation
 materializer accepts explicit aligned FASTA inputs, but it does not fetch
 provider records, align, or invent source sequences. The generic
 `dnadesign.aligner.msa.visualization` API now writes MSA QC YAML,
@@ -89,8 +93,8 @@ instead of relying only on an opaque global heatmap. These display records are
 context only and do not define plurality or designability. Simon-style
 cross-family controls are documented as a future display-reference bundle, not
 silently inserted into the conservation MSA. The current local visualization output is
-intentionally partial: it covers `eco1_like_retron_rt` and records
-`broad_tao_homolog_rt` as missing. Eco1 owns only the profile IDs, target-row hash
+intentionally partial: it covers `ec86_iia3_cluster42_1_conservation_v1` and records
+`ec86_clade9_conservation_v1` as missing. Eco1 owns only the profile IDs, target-row hash
 policy, annotation/exemplar/panel data, and generated study output location;
 the plotting/QC mechanics stay in `aligner.msa`.
 
@@ -108,27 +112,22 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Implement `conservation-bounded-homolog-selector-v1`: consume the full
-   Mestre candidate-pool provider cache, compute target-centered coverage,
-   identity, motif support, and deterministic diversity/cap metadata, then
-   materialize bounded `broad_tao_homolog_rt` source records. Do not fall back
-   to raw roster order.
-2. Regenerate source FASTA sufficiency for the bounded broad profile, then run
-   `conservation-alignment-bundle-v1` through the hardened
-   `dnadesign.aligner.msa` seam. The smaller `eco1_like_retron_rt` profile has
-   an accepted local aligned FASTA.
-3. Regenerate generic `aligner.msa` MSA visualization sidecars with the Eco1
+1. Run `conservation-alignment-bundle-v1` for the selected
+   `ec86_clade9_conservation_v1` and
+   `ec86_iia3_cluster42_1_conservation_v1` source FASTAs through
+   the hardened `dnadesign.aligner.msa` Clustal Omega seam.
+2. Regenerate generic `aligner.msa` MSA visualization sidecars with the Eco1
    RT annotation-track, exemplar-row, and panel-spec YAML once the broad profile
    is accepted so both profiles are visible in the same QC report.
-4. Materialize `conservation_profile.parquet` from the declared aligned FASTA
+3. Materialize `conservation_profile.parquet` from the declared aligned FASTA
    bundle.
-5. Materialize the conservative `mask_set.yaml` only after contact and
+4. Materialize the conservative `mask_set.yaml` only after contact and
    conservation evidence are mapped onto `residue_map.parquet`.
-6. Promote only reusable artifact-chain mechanics into `thread` after the
+5. Promote only reusable artifact-chain mechanics into `thread` after the
    study-local validator proves the contract shape.
-7. Generate a small explicit sampling plan with backend, seed, temperature,
+6. Generate a small explicit sampling plan with backend, seed, temperature,
    fixed-position, request-hash, and no-fallback policy.
-8. Define the downstream RT-lnRNA candidate handoff accepted by
+7. Define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers
@@ -139,11 +138,12 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   contact evidence is materialized locally from the retained DNA/RNA context;
   reusable `thread.structure` and `thread.evidence` code does not exist yet.
 - MSA/conservation source discovery and source authority are documented and
-  selected. Provider candidate-pool acquisition exists, but the revised
-  `broad_tao_homolog_rt` bounded-homolog source records are not materialized.
-  The selected `eco1_like_retron_rt` profile has an accepted local aligned
-  FASTA, but the complete aligned FASTA bundle and materialized conservation
-  profile do not yet exist.
+  selected. Provider candidate-pool acquisition, clade-9 source-record QC, and
+  source FASTA sufficiency are locally materialized for the selected
+  `ec86_clade9_conservation_v1` and
+  `ec86_iia3_cluster42_1_conservation_v1` profiles, but the accepted aligned
+  FASTA bundle must still be regenerated under the current Clustal Omega policy
+  before the conservation profile can be materialized.
 - Generic `aligner.msa` visualization sidecars are implemented and
   materialized locally for the accepted Eco1-like profile, with an Eco1-owned
   motif-anchor annotation track, exemplar-row windows, selected-row overview

@@ -1,4 +1,13 @@
-"""Shared fail-fast helpers for Eco1 RT repack contract validators."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/common.py
+
+Shared fail-fast helpers for Eco1 RT repack contract validators.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

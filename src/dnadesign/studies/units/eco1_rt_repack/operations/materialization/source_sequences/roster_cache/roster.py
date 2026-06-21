@@ -1,4 +1,13 @@
-"""Mestre roster-table parsing for Eco1 conservation source caches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/roster.py
+
+Mestre roster-table parsing for Eco1 conservation source caches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -72,17 +81,18 @@ def select_profile_rows(
 
     selection_rule = _require_mapping(source_group.get("selection_rule"), "selection_rule")
     included_records = str(selection_rule.get("included_records", ""))
-    if included_records == "all_mestre_s1_rt_records_after_filters":
+    if included_records == "mestre_s1_all_retron_rt_records_context":
         raise ValueError(
-            "all_mestre_s1_rt_records_after_filters is context-only and cannot be used as a "
+            "mestre_s1_all_retron_rt_records_context is context-only and cannot be used as a "
             "Phase 1 conservation denominator"
         )
-    if included_records == "mestre_s1_target_centered_bounded_homologs_after_filters":
-        raise ValueError(
-            "mestre_s1_target_centered_bounded_homologs_after_filters requires the next "
-            "bounded-homolog selector slice; do not fall back to roster order"
-        )
-    if included_records == "mestre_s1_retron_subtype_ii_a3_cluster_42_1_after_filters":
+    if included_records == "mestre_s1_ec86_rt_clade9_after_qc":
+        expected_clade = str(selection_rule.get("parent_rt_clade", ""))
+        selected = [row for row in rows if row.rt_clade == expected_clade]
+        if not selected:
+            raise ValueError(f"profile {profile_id!r} selected zero rows from roster table")
+        return selected
+    if included_records == "mestre_s1_ec86_iia3_cluster42_1_after_qc":
         expected_subtype = str(selection_rule.get("retron_subtype", ""))
         expected_cluster = str(selection_rule.get("cluster_domain", ""))
         expected_clade = str(selection_rule.get("parent_rt_clade", ""))
@@ -111,8 +121,8 @@ def select_candidate_rows(
     included_records = str(selection_rule.get("included_records", ""))
     candidate_pool = str(selection_rule.get("candidate_pool_records", ""))
     if (
-        included_records == "mestre_s1_target_centered_bounded_homologs_after_filters"
-        and candidate_pool == "all_mestre_s1_rt_records_after_filters"
+        included_records == "mestre_s1_ec86_rt_clade9_after_qc"
+        and candidate_pool == "mestre_s1_all_retron_rt_records_context"
     ):
         return list(rows)
     return select_profile_rows(rows, profile_id=profile_id, source_group=source_group)

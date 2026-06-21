@@ -1,4 +1,13 @@
-"""Manifest helpers for Eco1 conservation source-sequence bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/manifest.py
+
+Manifest helpers for Eco1 conservation source-sequence bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

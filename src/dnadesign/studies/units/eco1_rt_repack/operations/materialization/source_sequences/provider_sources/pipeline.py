@@ -1,4 +1,13 @@
-"""Materialize explicit provider FASTA sources for Eco1 conservation source sequences."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/pipeline.py
+
+Materialize explicit provider FASTA sources for Eco1 conservation source sequences.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

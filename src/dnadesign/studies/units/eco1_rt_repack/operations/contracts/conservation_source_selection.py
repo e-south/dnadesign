@@ -1,4 +1,13 @@
-"""Selection-rule checks for Eco1 conservation source groups."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_source_selection.py
+
+Selection-rule checks for Eco1 conservation source groups.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -7,7 +16,6 @@ from typing import Any
 
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.common import (
     _as_string_list,
-    _is_positive_int,
     _is_positive_number,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import (
@@ -36,10 +44,10 @@ def validate_conservation_selection_rule(
         )
         return
     _validate_shared_filter_fields(issues, selection_rule=selection_rule, profile_id=profile_id, index=index)
-    if profile_id == "broad_tao_homolog_rt":
-        _validate_broad_tao_homolog_rule(issues, selection_rule=selection_rule, index=index)
-    if profile_id == "eco1_like_retron_rt":
-        _validate_eco1_like_rule(issues, selection_rule=selection_rule, index=index)
+    if profile_id == "ec86_clade9_conservation_v1":
+        _validate_ec86_clade9_rule(issues, selection_rule=selection_rule, index=index)
+    if profile_id == "ec86_iia3_cluster42_1_conservation_v1":
+        _validate_ec86_iia3_cluster42_1_rule(issues, selection_rule=selection_rule, index=index)
 
 
 def _validate_shared_filter_fields(
@@ -83,29 +91,52 @@ def _validate_shared_filter_fields(
                 path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule",
             )
         )
-    if not _as_string_list(selection_rule.get("required_motifs")):
+    if not _as_string_list(selection_rule.get("motif_qc_markers")):
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.conservation.missing_required_motifs",
-                message=f"source group {profile_id!r} must declare motif requirements",
-                path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule.required_motifs",
+                check_id="eco1_rt.conservation.missing_motif_qc_markers",
+                message=f"source group {profile_id!r} must declare motif QC markers",
+                path=(
+                    "workbench/provenance/conservation-sources.yaml:"
+                    f"source_groups[{index}].selection_rule.motif_qc_markers"
+                ),
             )
         )
+    hard_reject_filters = set(_as_string_list(selection_rule.get("hard_reject_filters")))
+    for required_filter in {
+        "missing_catalytic_rt_core",
+        "below_query_coverage_minimum",
+        "outside_identity_range",
+        "outside_length_range",
+        "obvious_fragment",
+        "unresolved_long_fusion",
+    }:
+        if required_filter not in hard_reject_filters:
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.conservation.missing_hard_reject_filter",
+                    message=f"source group {profile_id!r} must declare hard reject filter {required_filter!r}",
+                    path=(
+                        "workbench/provenance/conservation-sources.yaml:"
+                        f"source_groups[{index}].selection_rule.hard_reject_filters"
+                    ),
+                )
+            )
 
 
-def _validate_broad_tao_homolog_rule(
+def _validate_ec86_clade9_rule(
     issues: list[ContractIssue],
     *,
     selection_rule: Mapping[str, Any],
     index: int,
 ) -> None:
-    if selection_rule.get("included_records") != "mestre_s1_target_centered_bounded_homologs_after_filters":
+    if selection_rule.get("included_records") != "mestre_s1_ec86_rt_clade9_after_qc":
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.conservation.broad_tao_roster_scope_mismatch",
+                check_id="eco1_rt.conservation.ec86_clade9_roster_scope_mismatch",
                 message=(
-                    "broad_tao_homolog_rt must use a target-centered bounded homolog selection, "
-                    "not the full Mestre S1 roster"
+                    "ec86_clade9_conservation_v1 must use the Mestre Ec86 RT clade 9 homolog panel, "
+                    "not the full Mestre S1 roster or an arbitrary cap-first subset"
                 ),
                 path=(
                     "workbench/provenance/conservation-sources.yaml:"
@@ -113,25 +144,14 @@ def _validate_broad_tao_homolog_rule(
                 ),
             )
         )
-    if not _is_positive_int(selection_rule.get("nonredundant_cap")):
+    if selection_rule.get("parent_rt_clade") != 9:
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.conservation.missing_broad_tao_cap",
-                message="broad_tao_homolog_rt must declare a positive nonredundant_cap",
+                check_id="eco1_rt.conservation.ec86_clade9_roster_scope_mismatch",
+                message="ec86_clade9_conservation_v1 must declare parent_rt_clade=9",
                 path=(
                     "workbench/provenance/conservation-sources.yaml:"
-                    f"source_groups[{index}].selection_rule.nonredundant_cap"
-                ),
-            )
-        )
-    elif int(selection_rule["nonredundant_cap"]) > 250:
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.conservation.broad_tao_cap_too_large",
-                message="broad_tao_homolog_rt nonredundant_cap should stay <=250 before alignment",
-                path=(
-                    "workbench/provenance/conservation-sources.yaml:"
-                    f"source_groups[{index}].selection_rule.nonredundant_cap"
+                    f"source_groups[{index}].selection_rule.parent_rt_clade"
                 ),
             )
         )
@@ -139,18 +159,18 @@ def _validate_broad_tao_homolog_rule(
         issues.append(
             ContractIssue(
                 check_id="eco1_rt.conservation.missing_full_roster_context_boundary",
-                message="broad_tao_homolog_rt must state that the full Mestre roster is context-only",
+                message="ec86_clade9_conservation_v1 must state that the full Mestre roster is context-only",
                 path=(
                     "workbench/provenance/conservation-sources.yaml:"
                     f"source_groups[{index}].selection_rule.full_roster_role"
                 ),
             )
         )
-    if selection_rule.get("candidate_pool_records") != "all_mestre_s1_rt_records_after_filters":
+    if selection_rule.get("candidate_pool_records") != "mestre_s1_all_retron_rt_records_context":
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.conservation.missing_broad_tao_candidate_pool",
-                message="broad_tao_homolog_rt must declare the full Mestre roster as a candidate pool only",
+                check_id="eco1_rt.conservation.missing_ec86_clade9_candidate_pool",
+                message="ec86_clade9_conservation_v1 must declare the full Mestre roster as a candidate pool only",
                 path=(
                     "workbench/provenance/conservation-sources.yaml:"
                     f"source_groups[{index}].selection_rule.candidate_pool_records"
@@ -159,7 +179,7 @@ def _validate_broad_tao_homolog_rule(
         )
 
 
-def _validate_eco1_like_rule(
+def _validate_ec86_iia3_cluster42_1_rule(
     issues: list[ContractIssue],
     *,
     selection_rule: Mapping[str, Any],
@@ -174,8 +194,8 @@ def _validate_eco1_like_rule(
         if selection_rule.get(field) != expected:
             issues.append(
                 ContractIssue(
-                    check_id="eco1_rt.conservation.eco1_like_roster_scope_mismatch",
-                    message=f"Eco1-like source group must declare {field}={expected!r}",
+                    check_id="eco1_rt.conservation.ec86_iia3_cluster42_1_roster_scope_mismatch",
+                    message=f"ec86_iia3_cluster42_1_conservation_v1 must declare {field}={expected!r}",
                     path=(
                         f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule.{field}"
                     ),

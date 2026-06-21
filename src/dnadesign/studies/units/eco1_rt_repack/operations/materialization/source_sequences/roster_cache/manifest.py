@@ -1,4 +1,13 @@
-"""Manifest writer for Eco1 conservation roster caches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/manifest.py
+
+Manifest writer for Eco1 conservation roster caches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

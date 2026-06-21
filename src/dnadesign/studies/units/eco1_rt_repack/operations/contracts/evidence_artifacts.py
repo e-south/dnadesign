@@ -1,4 +1,13 @@
-"""Materialized evidence and mask artifact validators for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/evidence_artifacts.py
+
+Materialized evidence and mask artifact validators for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

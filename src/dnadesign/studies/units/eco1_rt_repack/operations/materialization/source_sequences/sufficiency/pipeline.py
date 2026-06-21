@@ -1,4 +1,13 @@
-"""Public sufficiency API for Eco1 conservation source FASTA bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/pipeline.py
+
+Public sufficiency API for Eco1 conservation source FASTA bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -31,7 +40,7 @@ def validate_source_sequence_bundle_sufficiency(
     source_cache_root: Path | None = None,
     bundle_root: Path | None = None,
 ) -> SourceSequenceBundleSufficiencyReport:
-    """Validate source FASTA bundles before any MAFFT alignment run."""
+    """Validate source FASTA bundles before any MSA backend run."""
 
     root = (repo_root or _find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = resolve_path(root, output_root or DEFAULT_OUTPUT_ROOT)
