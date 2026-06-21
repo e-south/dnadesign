@@ -51,6 +51,35 @@ def test_pairwise_cache_key_depends_on_sequence_content(tmp_path) -> None:
     assert len(list(tmp_path.glob("*.pkl"))) == 2
 
 
+def test_pairwise_cache_key_depends_on_output_shape_flags(tmp_path) -> None:
+    sequences = ["AAAA", "AAAT"]
+
+    plain = aligner.compute_alignment_scores(
+        sequences,
+        cache_dir=tmp_path,
+        return_formats=("mean", "condensed"),
+    )
+    raw = aligner.compute_alignment_scores(
+        sequences,
+        cache_dir=tmp_path,
+        return_formats=("mean", "condensed"),
+        return_raw=True,
+    )
+    dissimilarity = aligner.compute_alignment_scores(
+        sequences,
+        cache_dir=tmp_path,
+        return_formats=("mean", "condensed"),
+        return_dissimilarity=True,
+    )
+
+    assert isinstance(plain, dict)
+    assert isinstance(raw, dict)
+    assert "raw" in raw
+    assert isinstance(dissimilarity, dict)
+    assert "dissimilarity" in dissimilarity
+    assert len(list(tmp_path.glob("*.pkl"))) == 3
+
+
 def test_compute_alignment_scores_normalized_matrix_is_symmetric_for_unequal_lengths() -> None:
     forward = aligner.compute_alignment_scores(
         ["AAAA", "AAAAAA"],

@@ -165,9 +165,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         profile_qc_paths={qc.profile_id: qc.profile_qc_path for qc in profile_qcs},
         profile_svg_paths={qc.profile_id: qc.profile_svg_path for qc in profile_qcs},
         profile_exemplar_svg_paths={
-            qc.profile_id: qc.profile_exemplar_svg_path
-            for qc in profile_qcs
-            if request.exemplar_rows_yaml and request.annotation_tracks_yaml
+            qc.profile_id: qc.profile_exemplar_svg_path for qc in profile_qcs if qc.profile_exemplar_svg_path.exists()
         },
         profile_alignment_overview_svg_paths={
             qc.profile_id: qc.profile_alignment_overview_svg_path for qc in profile_qcs if panel_spec.overview_enabled

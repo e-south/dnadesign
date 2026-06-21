@@ -94,44 +94,51 @@ def write_annotation_tracks(
     return path
 
 
-def write_exemplar_rows(tmp_path: Path, *, missing: bool = False) -> Path:
+def write_exemplar_rows(
+    tmp_path: Path,
+    *,
+    missing: bool = False,
+    profile_ids: tuple[str, ...] = ("profile_a", "profile_b"),
+) -> Path:
     """Write profile-scoped exemplar-row selections."""
 
     path = tmp_path / "exemplar_rows.yaml"
     second_record = "missing_record" if missing else "profile_a_homolog_01"
+    profiles = {}
+    if "profile_a" in profile_ids:
+        profiles["profile_a"] = {
+            "rows": [
+                {
+                    "record_id": "target",
+                    "label": "Reference target",
+                    "group": "target",
+                },
+                {
+                    "record_id": second_record,
+                    "label": "Homolog one",
+                    "group": "example",
+                },
+            ],
+        }
+    if "profile_b" in profile_ids:
+        profiles["profile_b"] = {
+            "rows": [
+                {
+                    "record_id": "target",
+                    "label": "Reference target",
+                    "group": "target",
+                },
+                {
+                    "record_id": "profile_b_homolog_01",
+                    "label": "Homolog one",
+                    "group": "example",
+                },
+            ],
+        }
     payload = {
         "schema_id": "dnadesign.aligner.msa.visualization.exemplar_rows",
         "schema_version": 1,
-        "profiles": {
-            "profile_a": {
-                "rows": [
-                    {
-                        "record_id": "target",
-                        "label": "Reference target",
-                        "group": "target",
-                    },
-                    {
-                        "record_id": second_record,
-                        "label": "Homolog one",
-                        "group": "example",
-                    },
-                ],
-            },
-            "profile_b": {
-                "rows": [
-                    {
-                        "record_id": "target",
-                        "label": "Reference target",
-                        "group": "target",
-                    },
-                    {
-                        "record_id": "profile_b_homolog_01",
-                        "label": "Homolog one",
-                        "group": "example",
-                    },
-                ],
-            },
-        },
+        "profiles": profiles,
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     return path

@@ -94,6 +94,8 @@ def compute_alignment_scores(
         gap_extend,
         matrix_id="nt",
         return_formats=return_formats,
+        return_raw=return_raw,
+        return_dissimilarity=return_dissimilarity,
     )
     if use_cache:
         cached_data = load_cache(cache_path, cache_filename)

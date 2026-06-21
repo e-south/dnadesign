@@ -85,6 +85,54 @@ def test_run_msa_dispatches_clustalo_and_writes_manifest(tmp_path: Path) -> None
     assert manifest["stderr_sha256"].startswith("sha256:")
 
 
+def test_clustalo_request_defaults_to_clustal_omega_args(tmp_path: Path) -> None:
+    input_fasta = tmp_path / "input.fasta"
+    output_fasta = tmp_path / "aligned.fasta"
+    manifest_path = tmp_path / "aligned.manifest.yaml"
+    input_fasta.write_text(">target\nACDE\n>other\nACDF\n", encoding="utf-8")
+    fake_clustalo = _write_fake_clustalo(
+        tmp_path / "fake-clustalo",
+        """
+        if [ "$1" = "--version" ]; then
+          echo "1.2.4"
+          exit 0
+        fi
+        for arg in "$@"; do
+          case "$arg" in
+            --globalpair|--maxiterate|--reorder) exit 2 ;;
+          esac
+        done
+        output=""
+        input=""
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            -i) input="$2"; shift 2 ;;
+            -o) output="$2"; shift 2 ;;
+            *) shift ;;
+          esac
+        done
+        cat "$input" > "$output"
+        """,
+    )
+
+    run_msa(
+        MsaRequest(
+            input_fasta=input_fasta,
+            output_fasta=output_fasta,
+            manifest_path=manifest_path,
+            target_row_id="target",
+            backend=MsaBackendSpec(backend_id="clustalo", executable=str(fake_clustalo)),
+        )
+    )
+
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    command = manifest["command"]
+    assert "--globalpair" not in command
+    assert "--maxiterate" not in command
+    assert "--reorder" not in command
+    assert "--outfmt=fasta" in command
+
+
 def test_run_msa_rejects_clustalo_args_with_io_flags(tmp_path: Path) -> None:
     input_fasta = tmp_path / "input.fasta"
     output_fasta = tmp_path / "aligned.fasta"

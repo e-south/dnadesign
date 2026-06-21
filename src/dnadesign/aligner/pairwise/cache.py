@@ -28,11 +28,14 @@ def generate_cache_filename(
     gap_extend: int,
     matrix_id: str = "nt",
     return_formats: tuple[str, ...] = ("mean", "condensed"),
+    return_raw: bool = False,
+    return_dissimilarity: bool = False,
 ) -> str:
     """Generate a human-readable cache filename."""
 
     date_str = datetime.now().strftime("%Y-%m-%d")
     rf = "_".join(return_formats)
+    shape_flags = f"raw{return_raw}_dissim{return_dissimilarity}"
     digest = _cache_digest(
         sequences=sequences,
         normalize=normalize,
@@ -42,10 +45,12 @@ def generate_cache_filename(
         gap_extend=gap_extend,
         matrix_id=matrix_id,
         return_formats=return_formats,
+        return_raw=return_raw,
+        return_dissimilarity=return_dissimilarity,
     )
     return (
         f"swcache_n{len(sequences)}_{digest}_norm{normalize}_match{match}_mismatch{mismatch}"
-        f"_go{gap_open}_ge{gap_extend}_matrix{matrix_id}_{rf}_{date_str}.pkl"
+        f"_go{gap_open}_ge{gap_extend}_matrix{matrix_id}_{rf}_{shape_flags}_{date_str}.pkl"
     )
 
 
@@ -77,6 +82,8 @@ def _cache_digest(
     gap_extend: int,
     matrix_id: str,
     return_formats: tuple[str, ...],
+    return_raw: bool,
+    return_dissimilarity: bool,
 ) -> str:
     payload = "\n".join(
         [
@@ -87,6 +94,8 @@ def _cache_digest(
             f"gap_open={gap_open}",
             f"gap_extend={gap_extend}",
             f"return_formats={','.join(return_formats)}",
+            f"return_raw={return_raw}",
+            f"return_dissimilarity={return_dissimilarity}",
             "sequences:",
             *sequences,
         ]

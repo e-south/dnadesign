@@ -14,6 +14,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+_DEFAULT_COMMAND_ARGS_BY_BACKEND = {
+    "mafft": ("--globalpair", "--maxiterate", "1000", "--reorder"),
+    "clustalo": ("--force", "--outfmt=fasta"),
+}
+
 
 @dataclass(frozen=True)
 class MsaBackendSpec:
@@ -46,12 +51,14 @@ class MsaRequest:
     manifest_path: Path
     target_row_id: str | None = None
     backend: MsaBackendSpec = field(default_factory=MsaBackendSpec)
-    command_args: tuple[str, ...] = ("--globalpair", "--maxiterate", "1000", "--reorder")
+    command_args: tuple[str, ...] | None = None
     timeout_seconds: float | None = None
     stderr_path: Path | None = None
     run_label: str | None = None
 
     def __post_init__(self) -> None:
+        if self.command_args is None:
+            object.__setattr__(self, "command_args", _DEFAULT_COMMAND_ARGS_BY_BACKEND[self.backend.backend_id])
         if not self.command_args:
             raise ValueError("MSA command_args must be explicit and non-empty")
         if any(not arg or not isinstance(arg, str) for arg in self.command_args):

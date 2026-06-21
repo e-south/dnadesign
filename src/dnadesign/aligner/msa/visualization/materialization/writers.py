@@ -133,6 +133,7 @@ def write_html_report(
                 "</figure>"
             )
             for qc in profile_qcs
+            if qc.profile_exemplar_svg_path.exists()
         )
     panel_figures = ""
     if has_alignment_overview or has_consensus_histogram:
