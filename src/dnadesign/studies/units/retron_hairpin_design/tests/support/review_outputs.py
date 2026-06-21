@@ -165,4 +165,8 @@ def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1].upper()
 
 
-__all__ = ["fake_video_writer", "write_fake_materialized_bundle", "write_png"]
+__all__ = [
+    "fake_video_writer",
+    "write_fake_materialized_bundle",
+    "write_png",
+]

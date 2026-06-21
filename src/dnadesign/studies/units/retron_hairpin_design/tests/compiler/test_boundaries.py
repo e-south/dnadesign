@@ -200,7 +200,9 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         "review_outputs/video/test_montage.py": 100,
         "support/cli.py": 40,
         "support/compiler_fixtures.py": 80,
+        "support/pwm_fixtures.py": 70,
         "support/registry.py": 80,
+        "support/review_plans.py": 60,
         "support/review_outputs.py": 180,
         "support/viennarna.py": 100,
     }

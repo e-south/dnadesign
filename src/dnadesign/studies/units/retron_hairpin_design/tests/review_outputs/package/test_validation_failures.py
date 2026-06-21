@@ -23,6 +23,7 @@ from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import
 
 from ...support.paths import repo_root_from
 from ...support.review_outputs import fake_video_writer, write_fake_materialized_bundle
+from ...support.review_plans import write_review_plan_with_test_pwm
 
 
 def test_teto_pwm_trim_review_outputs_fail_fast_on_wrong_row_count(tmp_path: Path) -> None:
@@ -30,7 +31,7 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_wrong_row_count(tmp_path: Pat
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root, row_count=8)
 
     with pytest.raises(RetronMsdCompilerError, match="Expected 9 materialized sequence rows"):
-        _generate(repo_root=repo_root, materialized_root=materialized_root, out_dir=tmp_path / "outputs")
+        _generate(repo_root=repo_root, materialized_root=materialized_root, tmp_path=tmp_path)
 
 
 def test_teto_pwm_trim_review_outputs_fail_fast_on_missing_row_artifact(tmp_path: Path) -> None:
@@ -40,7 +41,7 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_missing_row_artifact(tmp_path
     (materialized_root / rows[0]["genbank"]).unlink()
 
     with pytest.raises(RetronMsdCompilerError, match="Missing materialized review artifact"):
-        _generate(repo_root=repo_root, materialized_root=materialized_root, out_dir=tmp_path / "outputs")
+        _generate(repo_root=repo_root, materialized_root=materialized_root, tmp_path=tmp_path)
 
 
 def test_teto_pwm_trim_review_outputs_fail_fast_on_non_ok_folding(tmp_path: Path) -> None:
@@ -55,7 +56,7 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_non_ok_folding(tmp_path: Path
         writer.writerows(rows)
 
     with pytest.raises(RetronMsdCompilerError, match="folding_status == ok"):
-        _generate(repo_root=repo_root, materialized_root=materialized_root, out_dir=tmp_path / "outputs")
+        _generate(repo_root=repo_root, materialized_root=materialized_root, tmp_path=tmp_path)
 
 
 def test_teto_pwm_trim_review_outputs_fail_fast_on_bad_reverse_complement(tmp_path: Path) -> None:
@@ -68,15 +69,15 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_bad_reverse_complement(tmp_pa
     )
 
     with pytest.raises(RetronMsdCompilerError, match="reverse_complement_fasta does not match"):
-        _generate(repo_root=repo_root, materialized_root=materialized_root, out_dir=tmp_path / "outputs")
+        _generate(repo_root=repo_root, materialized_root=materialized_root, tmp_path=tmp_path)
 
 
-def _generate(*, repo_root: Path, materialized_root: Path, out_dir: Path) -> None:
-    study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
+def _generate(*, repo_root: Path, materialized_root: Path, tmp_path: Path) -> None:
+    deliverable_plan_path = write_review_plan_with_test_pwm(tmp_path / "plan", repo_root=repo_root)
     generate_teto_pwm_trim_rescue_review_outputs(
-        deliverable_plan_path=study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml",
+        deliverable_plan_path=deliverable_plan_path,
         materialized_root=materialized_root,
-        out_dir=out_dir,
+        out_dir=tmp_path / "outputs",
         repo_root=repo_root,
         video_writer=fake_video_writer,
     )

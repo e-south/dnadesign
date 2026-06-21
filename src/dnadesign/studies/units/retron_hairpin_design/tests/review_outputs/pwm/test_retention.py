@@ -19,23 +19,11 @@ from dnadesign.studies.units.retron_hairpin_design.review_outputs.pwm.retention 
     select_best_retained_span,
 )
 
-from ...support.paths import repo_root_from
+from ...support.pwm_fixtures import write_test_tetr_meme_pwm
 
 
-def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows() -> None:
-    repo_root = repo_root_from(__file__)
-    meme_path = (
-        repo_root
-        / "src"
-        / "dnadesign"
-        / "cruncher"
-        / "workspaces"
-        / "demo_monotypic_tetr"
-        / "outputs"
-        / "artifacts"
-        / "meme"
-        / "tetR__westmann_tetr_mitomi__tetR.meme"
-    )
+def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows(tmp_path: Path) -> None:
+    meme_path = write_test_tetr_meme_pwm(tmp_path / "tetR__westmann_tetr_mitomi__tetR.meme")
     motif_bits = load_meme_information_bits(Path(meme_path))
     occurrences = (
         PwmMotifOccurrence(motif_instance_id="tetR:0:17:+:1", start_0=0, end_0=17, strand="+", occurrence_rank=1),

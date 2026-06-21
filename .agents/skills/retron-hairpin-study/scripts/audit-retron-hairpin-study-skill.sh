@@ -216,7 +216,9 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_montage.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/cli.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/compiler_fixtures.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/pwm_fixtures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/registry.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_plans.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/viennarna.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
@@ -449,7 +451,9 @@ budgets = {
     "review_outputs/video/test_montage.py": 100,
     "support/cli.py": 40,
     "support/compiler_fixtures.py": 80,
+    "support/pwm_fixtures.py": 70,
     "support/registry.py": 80,
+    "support/review_plans.py": 60,
     "support/review_outputs.py": 180,
     "support/viennarna.py": 100,
 }

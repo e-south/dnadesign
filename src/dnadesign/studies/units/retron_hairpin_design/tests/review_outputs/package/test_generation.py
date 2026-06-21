@@ -24,16 +24,17 @@ from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import
 
 from ...support.paths import repo_root_from
 from ...support.review_outputs import fake_video_writer, write_fake_materialized_bundle
+from ...support.review_plans import write_review_plan_with_test_pwm
 
 
 def test_teto_pwm_trim_review_outputs_generate_review_package(tmp_path: Path) -> None:
     repo_root = repo_root_from(__file__)
-    study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
+    deliverable_plan_path = write_review_plan_with_test_pwm(tmp_path / "plan", repo_root=repo_root)
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
     out_dir = tmp_path / "workbench" / "outputs" / "teto_pwm_trim_rescue_v1"
 
     result = generate_teto_pwm_trim_rescue_review_outputs(
-        deliverable_plan_path=study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml",
+        deliverable_plan_path=deliverable_plan_path,
         materialized_root=materialized_root,
         out_dir=out_dir,
         repo_root=repo_root,
