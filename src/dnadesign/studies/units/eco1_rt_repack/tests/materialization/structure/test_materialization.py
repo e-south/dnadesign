@@ -14,12 +14,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure import (
     materialize_structure_authority,
 )
-from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
+from dnadesign.studies.units.eco1_rt_repack.tests._helpers import ec86kit_source_artifacts_available, repo_root
+
+pytestmark = pytest.mark.skipif(
+    not ec86kit_source_artifacts_available(),
+    reason="requires sibling ec86kit structure-authority artifacts",
+)
 
 
 def test_materializer_writes_thread_ready_structure_artifacts(tmp_path: Path) -> None:

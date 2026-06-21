@@ -18,7 +18,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact i
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure import (
     materialize_structure_authority,
 )
-from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
+from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root, require_ec86kit_source_artifacts
 
 
 def test_phase0_checked_in_contracts_pass_as_scaffold() -> None:
@@ -45,6 +45,7 @@ def test_phase1_contracts_fail_on_missing_materialized_structure_artifacts(tmp_p
 
 
 def test_phase1_with_materialized_structure_artifacts_reaches_evidence_gate(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
 
     report = validate_checked_in_contracts(repo_root=repo_root(), phase="phase1_thread_contract", output_root=tmp_path)
@@ -59,6 +60,7 @@ def test_phase1_with_materialized_structure_artifacts_reaches_evidence_gate(tmp_
 
 
 def test_phase1_with_contact_profile_reaches_conservation_and_mask_gate(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
     materialize_contact_profile(repo_root=repo_root(), output_root=tmp_path)
 

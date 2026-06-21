@@ -16,10 +16,13 @@ import json
 import re
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.tests._helpers import require_ec86kit_source_artifacts
+
 
 def ec86kit_target_sequence() -> str:
     """Load the selected Eco1/Ec86 reference sequence used by the source contract."""
 
+    require_ec86kit_source_artifacts()
     repo_root = Path(__file__).resolve().parents[9]
     manifest = (repo_root / "../ec86kit/out/ec86_prot1/runs/2025-10-09T17-47-31Z/manifest.json").resolve()
     payload = json.loads(manifest.read_text(encoding="utf-8"))
