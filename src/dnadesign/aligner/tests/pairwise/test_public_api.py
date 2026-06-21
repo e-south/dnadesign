@@ -29,3 +29,30 @@ def test_pairwise_package_exports_public_functions() -> None:
 def test_invalid_nucleotide_sequence_fails_fast() -> None:
     with pytest.raises(ValueError, match="Invalid character"):
         aligner.score_pairwise("ACGT", "ACGU")
+
+
+def test_pairwise_cache_key_depends_on_sequence_content(tmp_path) -> None:
+    first = aligner.mean_pairwise(["AAAA", "AAAA"], cache_dir=tmp_path)
+    second = aligner.mean_pairwise(["AAAA", "TTTT"], cache_dir=tmp_path)
+
+    assert first == 1.0
+    assert second != first
+    assert len(list(tmp_path.glob("*.pkl"))) == 2
+
+
+def test_compute_alignment_scores_normalized_matrix_is_symmetric_for_unequal_lengths() -> None:
+    forward = aligner.compute_alignment_scores(
+        ["AAAA", "AAAAAA"],
+        use_cache=False,
+        return_formats=("matrix", "mean", "condensed"),
+    )
+    reverse = aligner.compute_alignment_scores(
+        ["AAAAAA", "AAAA"],
+        use_cache=False,
+        return_formats=("matrix", "mean", "condensed"),
+    )
+
+    assert forward["matrix"][0, 1] == forward["matrix"][1, 0]
+    assert reverse["matrix"][0, 1] == reverse["matrix"][1, 0]
+    assert forward["mean"] == reverse["mean"]
+    np.testing.assert_allclose(forward["condensed"], reverse["condensed"])

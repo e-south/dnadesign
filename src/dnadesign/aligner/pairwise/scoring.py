@@ -77,8 +77,10 @@ def compute_alignment_scores(
         print(f"Warning: {n} sequences generate ~{est_comparisons} comparisons; performance may be impacted.")
 
     cache_filename = generate_cache_filename(
-        n,
+        clean_seqs,
         normalize,
+        match,
+        mismatch,
         gap_open,
         gap_extend,
         matrix_id="nt",
@@ -97,12 +99,12 @@ def compute_alignment_scores(
     if normalize:
         norm_matrix = np.zeros_like(full_matrix, dtype=np.float32)
         for i in range(n):
-            for j in range(n):
-                if i == j:
-                    norm_matrix[i, j] = 1.0
-                else:
-                    denom = match * len(clean_seqs[i])
-                    norm_matrix[i, j] = full_matrix[i, j] / denom if denom > 0 else 0.0
+            norm_matrix[i, i] = 1.0
+            for j in range(i + 1, n):
+                denom = match * max(len(clean_seqs[i]), len(clean_seqs[j]))
+                value = full_matrix[i, j] / denom if denom > 0 else 0.0
+                norm_matrix[i, j] = value
+                norm_matrix[j, i] = value
     else:
         norm_matrix = full_matrix
 

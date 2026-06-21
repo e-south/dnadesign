@@ -24,6 +24,11 @@ class AlignedFastaBundleManifest:
     environment: str
     pixi_lock_sha256: str | None
     failure_policy: str
+    elapsed_seconds: float
+    return_code: int
+    stderr_path: str
+    stderr_sha256: str
+    run_label: str | None
 
     def to_mapping(self) -> dict[str, object]:
         """Return a YAML-serializable manifest mapping."""

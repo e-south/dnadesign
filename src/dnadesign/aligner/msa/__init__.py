@@ -5,6 +5,11 @@ from dnadesign.aligner.msa.bundles.manifest import AlignedFastaBundleManifest, w
 from dnadesign.aligner.msa.contracts import MsaBackendSpec, MsaRequest, MsaRunResult
 from dnadesign.aligner.msa.fasta import load_fasta_records, write_fasta_records
 from dnadesign.aligner.msa.validation import validate_aligned_fasta_records, validate_fasta_records
+from dnadesign.aligner.msa.visualization import (
+    MsaVisualizationRequest,
+    MsaVisualizationResult,
+    materialize_msa_visualizations,
+)
 
 run_msa = run_mafft
 
@@ -14,7 +19,10 @@ __all__ = [
     "MsaBackendSpec",
     "MsaRequest",
     "MsaRunResult",
+    "MsaVisualizationRequest",
+    "MsaVisualizationResult",
     "load_fasta_records",
+    "materialize_msa_visualizations",
     "preflight_mafft",
     "run_mafft",
     "run_msa",

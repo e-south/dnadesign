@@ -32,12 +32,19 @@ class MsaRequest:
     target_row_id: str | None = None
     backend: MsaBackendSpec = field(default_factory=MsaBackendSpec)
     command_args: tuple[str, ...] = ("--globalpair", "--maxiterate", "1000", "--reorder")
+    timeout_seconds: float | None = None
+    stderr_path: Path | None = None
+    run_label: str | None = None
 
     def __post_init__(self) -> None:
         if not self.command_args:
             raise ValueError("MSA command_args must be explicit and non-empty")
         if any(not arg or not isinstance(arg, str) for arg in self.command_args):
             raise ValueError("MSA command_args must contain only non-empty strings")
+        if self.timeout_seconds is not None and self.timeout_seconds <= 0:
+            raise ValueError("MSA timeout_seconds must be positive when provided")
+        if self.run_label is not None and not self.run_label.strip():
+            raise ValueError("MSA run_label must be non-empty when provided")
 
 
 @dataclass(frozen=True)
@@ -52,3 +59,7 @@ class MsaRunResult:
     input_fasta_sha256: str
     output_fasta_sha256: str
     pixi_lock_sha256: str | None
+    elapsed_seconds: float
+    return_code: int
+    stderr_path: Path | None
+    run_label: str | None

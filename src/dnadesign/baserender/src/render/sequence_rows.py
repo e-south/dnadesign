@@ -133,6 +133,8 @@ class SequenceRowsRenderer:
         hidden_base_indices: Mapping[str, Sequence[int]] = {}
         span_backdrops: Sequence[Mapping[str, object]] = ()
         span_edge_markers: Sequence[Mapping[str, object]] = ()
+        boundary_ticks: Sequence[Mapping[str, object]] = ()
+        span_brackets: Sequence[Mapping[str, object]] = ()
         panel_transition_arrows: Sequence[Mapping[str, object]] = ()
         if isinstance(record.meta, Mapping):
             raw_complement = record.meta.get("complement_sequence")
@@ -162,6 +164,12 @@ class SequenceRowsRenderer:
             raw_span_edge_markers = record.meta.get("span_edge_markers")
             if isinstance(raw_span_edge_markers, Sequence) and not isinstance(raw_span_edge_markers, (str, bytes)):
                 span_edge_markers = raw_span_edge_markers
+            raw_boundary_ticks = record.meta.get("boundary_ticks")
+            if isinstance(raw_boundary_ticks, Sequence) and not isinstance(raw_boundary_ticks, (str, bytes)):
+                boundary_ticks = raw_boundary_ticks
+            raw_span_brackets = record.meta.get("span_brackets")
+            if isinstance(raw_span_brackets, Sequence) and not isinstance(raw_span_brackets, (str, bytes)):
+                span_brackets = raw_span_brackets
             raw_panel_transition_arrows = record.meta.get("panel_transition_arrows")
             if isinstance(raw_panel_transition_arrows, Sequence) and not isinstance(
                 raw_panel_transition_arrows, (str, bytes)
@@ -221,7 +229,7 @@ class SequenceRowsRenderer:
 
         x0 = layout.x_left
         _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
-        _draw_span_edge_markers(ax, layout, span_edge_markers, show_two=show_two)
+        _draw_span_edge_markers(ax, layout, span_edge_markers, show_two=show_two, motif_geometries=motif_geometries)
         _draw_panel_transition_arrows(ax, layout, panel_transition_arrows, show_two=show_two)
         _draw_sequence(
             ax,
@@ -264,7 +272,10 @@ class SequenceRowsRenderer:
         _draw_row_labels(ax, record, layout, style)
         _draw_segment_labels(ax, record, layout, style)
         if bool(style.show_coordinate_ticks):
-            _draw_coordinate_ticks(ax, record, layout, style)
+            if boundary_ticks:
+                _draw_boundary_ticks(ax, boundary_ticks, layout, style, show_two=show_two)
+            else:
+                _draw_coordinate_ticks(ax, record, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
         feature_box_pad = float(style.kmer.pad_x_px)
@@ -358,6 +369,7 @@ class SequenceRowsRenderer:
         for effect in record.effects:
             draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
 
+        _draw_span_brackets(ax, feature_boxes, span_brackets, style)
         _draw_fixed_element_annotations(ax, record, layout, palette, style)
 
         legend_mode = str(style.legend_mode).lower()
@@ -1535,6 +1547,7 @@ def _draw_span_edge_markers(
     span_edge_markers: Sequence[Mapping[str, object]],
     *,
     show_two: bool,
+    motif_geometries: Sequence[MotifLogoGeometry],
 ) -> None:
     for index, raw in enumerate(span_edge_markers):
         if not isinstance(raw, Mapping):
@@ -1551,19 +1564,23 @@ def _draw_span_edge_markers(
         color = str(raw.get("color", "#111827")).strip() or "#111827"
         cover_rows = str(raw.get("cover_rows", "both")).strip().lower()
         row_bounds: list[tuple[float, float]] = []
-        if cover_rows in {"primary", "both"}:
+        if cover_rows in {"primary", "both", "all"}:
             row_bounds.append(
                 (
                     float(layout.y_forward - layout.sequence_extent_down),
                     float(layout.y_forward + layout.sequence_extent_up),
                 )
             )
-        if show_two and cover_rows in {"complement", "both"}:
+        if show_two and cover_rows in {"complement", "both", "all"}:
             row_bounds.append(
                 (
                     float(layout.y_reverse - layout.sequence_extent_down),
                     float(layout.y_reverse + layout.sequence_extent_up),
                 )
+            )
+        if cover_rows == "all" and motif_geometries:
+            row_bounds.extend(
+                (float(geometry.y0), float(geometry.y0 + geometry.height)) for geometry in motif_geometries
             )
         elif not row_bounds and cover_rows == "complement":
             row_bounds.append(
@@ -1589,6 +1606,117 @@ def _draw_span_edge_markers(
                 clip_on=False,
                 gid=f"sequence_span_edge:{index}:{boundary}",
             )
+
+
+def _draw_boundary_ticks(
+    ax,
+    boundary_ticks: Sequence[Mapping[str, object]],
+    layout: LayoutContext,
+    style: Style,
+    *,
+    show_two: bool,
+) -> None:
+    default_font_size = (
+        style.display_font_size() if bool(style.uniform_display_font_size) else max(16, style.font_size_label)
+    )
+    y = (
+        layout.y_reverse - max(20.0, style.font_size_label * 1.8)
+        if show_two
+        else layout.y_forward - max(20.0, style.font_size_label * 1.8)
+    )
+    for index, raw in enumerate(boundary_ticks):
+        if not isinstance(raw, Mapping):
+            continue
+        try:
+            position = int(raw.get("position"))
+        except Exception:
+            continue
+        label = str(raw.get("label", position)).strip() or str(position)
+        emphasis = str(raw.get("emphasis", "active")).strip().lower()
+        color = str(raw.get("color", style.color_ticks)).strip() or style.color_ticks
+        if emphasis == "context":
+            color = str(raw.get("color", "#A7AFBD")).strip() or "#A7AFBD"
+        try:
+            linewidth = float(raw.get("linewidth", 1.05 if emphasis == "active" else 0.8))
+            font_size = float(raw.get("font_size", default_font_size if emphasis == "active" else 14))
+        except Exception:
+            linewidth = 1.05
+            font_size = default_font_size
+        x = layout.x_left + position * layout.cw
+        ax.plot(
+            [x, x],
+            [y + 2.0, y + 9.0],
+            color=color,
+            linewidth=linewidth,
+            zorder=1.35,
+            clip_on=False,
+            gid=f"sequence_boundary_tick:{index}:{position}",
+        )
+        text = ax.text(
+            x,
+            y,
+            label,
+            ha="center",
+            va="top",
+            fontsize=font_size,
+            family=style.font_label,
+            color=color,
+            zorder=1.45,
+            clip_on=False,
+        )
+        text.set_gid(f"sequence_boundary_tick_label:{index}:{position}")
+
+
+def _draw_span_brackets(
+    ax,
+    feature_boxes: Mapping[str, tuple[float, float, float, float]],
+    span_brackets: Sequence[Mapping[str, object]],
+    style: Style,
+) -> None:
+    for index, raw in enumerate(span_brackets):
+        if not isinstance(raw, Mapping):
+            continue
+        feature_id = str(raw.get("target_feature_id", "")).strip()
+        if not feature_id or feature_id not in feature_boxes:
+            continue
+        x0, _y0, x1, y1 = feature_boxes[feature_id]
+        label = str(raw.get("label", "")).strip()
+        color = str(raw.get("color", "#111827")).strip() or "#111827"
+        try:
+            offset = float(raw.get("offset_px", 4.0))
+            height = float(raw.get("height_px", 6.0))
+            linewidth = float(raw.get("linewidth", 1.15))
+            font_size = float(raw.get("font_size", max(13, style.font_size_label)))
+        except Exception:
+            offset = 4.0
+            height = 6.0
+            linewidth = 1.15
+            font_size = max(13, style.font_size_label)
+        y = y1 + offset
+        ax.plot(
+            [x0, x0, x1, x1],
+            [y, y + height, y + height, y],
+            color=color,
+            linewidth=linewidth,
+            zorder=8.6,
+            solid_capstyle="butt",
+            clip_on=False,
+            gid=f"sequence_span_bracket:{index}:{feature_id}",
+        )
+        if label:
+            text = ax.text(
+                (x0 + x1) / 2.0,
+                y + height + max(2.0, font_size * 0.10),
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=font_size,
+                family=style.font_label,
+                color=color,
+                zorder=8.7,
+                clip_on=False,
+            )
+            text.set_gid(f"sequence_span_bracket_label:{index}:{feature_id}")
 
 
 def _draw_panel_transition_arrows(
