@@ -164,6 +164,8 @@ def test_visualization_html_links_only_generated_exemplar_svgs(tmp_path: Path) -
     html_report = result.html_report_path.read_text(encoding="utf-8")
     assert "profile_a.exemplar_windows.svg" in html_report
     assert "profile_b.exemplar_windows.svg" not in html_report
+    index = yaml.safe_load(result.index_manifest_path.read_text(encoding="utf-8"))
+    assert set(index["profile_exemplar_svg_paths"]) == {"profile_a"}
 
 
 def test_visualization_rejects_target_hash_drift(tmp_path: Path) -> None:

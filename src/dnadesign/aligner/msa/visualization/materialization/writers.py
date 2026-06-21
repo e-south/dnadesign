@@ -238,7 +238,7 @@ def write_index_manifest(
         "profile_exemplar_svg_paths": {
             qc.profile_id: str(qc.profile_exemplar_svg_path)
             for qc in profile_qcs
-            if request.exemplar_rows_yaml and request.annotation_tracks_yaml
+            if qc.profile_exemplar_svg_path.exists()
         },
         "profile_alignment_overview_svg_paths": {
             qc.profile_id: str(qc.profile_alignment_overview_svg_path) for qc in profile_qcs if has_alignment_overview
