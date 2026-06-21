@@ -7,7 +7,7 @@
 **Exit artifact:** the next concrete runbook for source assembly, contextualization, Evo2 feature extraction, notification, or downstream analysis
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-20
+**Last verified:** 2026-06-20
 
 Use this page when you need the full promoter-study Evo2 path in one place before choosing a concrete runbook.
 If you are checking the live study record, start with [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md).
