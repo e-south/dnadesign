@@ -20,9 +20,10 @@ Current conservation-source priors:
 - Mestre et al., "Systematic prediction of genes functionally associated with
   bacterial retrons", Nucleic Acids Research, 2020, DOI
   `10.1093/nar/gkaa1149`.
-- Mestre Supplementary Table S1 is the current accession-roster prior for both
-  `broad_retron_rt` and `eco1_like_retron_rt`; it is not itself a materialized
-  MSA or conservation profile.
+- Mestre Supplementary Table S1 is the current accession-roster prior and
+  candidate pool for `broad_tao_homolog_rt` plus the clade-near source for
+  `eco1_like_retron_rt`; it is not itself a materialized MSA, conservation
+  profile, or broad conservation denominator.
 - The selected MSA source policy is recorded in
   `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`.
 - The future-agent reproduction method is recorded in

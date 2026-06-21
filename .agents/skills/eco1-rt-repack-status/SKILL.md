@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.8
+  version: 0.1.9
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -78,10 +78,19 @@ Out of scope:
   execution is wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
-- Route generic aligned FASTA generation through public `dnadesign.aligner.msa`
-  when needed; route Eco1 provider-cache/source-sequence bundling through the
-  study materializer, and do not route Eco1 source authority, conservation
-  scoring, or mask policy into `aligner`.
+- Route generic aligned FASTA generation and generic MSA QC visualization
+  through public `dnadesign.aligner.msa` when needed; route Eco1
+  provider-cache/source-sequence bundling, motif annotation data, exemplar row
+  selections, and panel-display specs through the study surfaces, and do not
+  route Eco1 source authority, conservation scoring, or mask policy into
+  `aligner`.
+- Report `broad_tao_homolog_rt` as the selected Tao-like bounded broad profile;
+  the full Mestre roster is candidate/context only and must not be described as
+  accepted broad conservation evidence.
+- Preserve the generic MSA visualization ontology: contracts belong under
+  `aligner.msa.visualization.contracts`, orchestration and manifests under
+  `aligner.msa.visualization.materialization`, and SVG drawing under
+  `aligner.msa.visualization.renderers`.
 - Do not infer MSA source authority from review figures, prose, or public
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume

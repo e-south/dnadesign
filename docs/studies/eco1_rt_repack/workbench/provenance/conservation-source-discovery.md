@@ -49,7 +49,7 @@ The study profile currently declares `conservation_threshold: 0.25` and two
 profile ids:
 
 ```text
-broad_retron_rt
+broad_tao_homolog_rt
 eco1_like_retron_rt
 ```
 
@@ -72,7 +72,7 @@ Useful observed roster facts:
 
 | Subset | Count | Notes |
 | --- | ---: | --- |
-| All Mestre S1 RT records | 1928 | Candidate `broad_retron_rt` roster before filtering. |
+| All Mestre S1 RT records | 1928 | Candidate `broad_tao_homolog_rt` roster before filtering. |
 | RT clade 9 records | 324 | Broad clade containing Eco1-like type II-A3 records. |
 | Type II-A3 records | 59 | Candidate `eco1_like_retron_rt` roster. |
 | Type II-A3, cluster `42_1` records | 47 | Tighter Eco1-like source candidate. |
@@ -156,7 +156,7 @@ contract until the sequence discrepancy is adjudicated.
 
 | Profile id | Roster authority | Sequence providers | Purpose |
 | --- | --- | --- | --- |
-| `broad_retron_rt` | Mestre S1, all 1928 records after filters | NCBI E-utilities for `WP_*`; BV-BRC protein FASTA for `fig|*`; explicit reject/exclude for unresolved ids | Protect broadly conserved retron RT positions. |
+| `broad_tao_homolog_rt` | Mestre S1 candidate pool, then target-centered bounded homolog selector | NCBI E-utilities for `WP_*`; BV-BRC protein FASTA for `fig|*`; explicit reject/exclude for unresolved ids | Protect broadly conserved retron RT positions without making the full Mestre roster the denominator. |
 | `eco1_like_retron_rt` | Mestre S1 type II-A3 cluster `42_1`, or type II-A3 if support is too low | Same providers | Protect Eco1-like recognition/scaffold positions. |
 
 Minimum contract fields:
@@ -211,12 +211,18 @@ docs/studies/eco1_rt_repack/contexts/msa-method.md
 ```
 
 The conservation-profile materializer now exists as study-owned code, but it
-requires explicit aligned FASTA inputs for `broad_retron_rt` and
+requires explicit aligned FASTA inputs for `broad_tao_homolog_rt` and
 `eco1_like_retron_rt`. Phase 1 must continue to fail on
 `conservation_profile_not_materialized` until a real
 `conservation_profile.parquet` is generated from those declared sources. It
 must not let review-figure alignments, prose, missing provider rows, or the
 mismatched NCBI Eco1 target row imply designability.
+
+The broad source policy was revised after an interactive full-roster MAFFT run
+proved operationally impractical and methodologically broader than the Tao-style
+homolog MSA requires. The next implementation slice should materialize the
+bounded `broad_tao_homolog_rt` source records with coverage, identity, motif,
+and diversity/cap metadata before any broad alignment is accepted.
 
 ### External Source Links
 

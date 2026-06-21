@@ -24,6 +24,21 @@ alignment_policy:
   target_row_id: eco1_rt_ec86kit_reference
   residue_map_join_key: canonical_position
   output_profile_artifact: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+  row_count_guardrail:
+    declared_command_intended_max_records: 250
+    policy: reject_full_mestre_roster_for_declared_high_accuracy_command
+    note: >
+      MAFFT --globalpair --maxiterate 1000 is retained for bounded homolog
+      panels. Whole-roster Mestre-scale alignments are classification or
+      visualization context unless a future policy benchmark explicitly selects
+      a scalable backend such as Clustal Omega.
+  alternative_backend_policy:
+    status: planned_benchmark_only
+    candidates:
+      - tool: clustalo
+        role: scalable_profile_alignment_candidate
+        selection_rule: requires_explicit_contract_update_and_benchmark_evidence
+    fallback_policy: no_silent_backend_fallback
 
 target_sequence:
   authority: ec86kit_manifest_2025-10-09T17-47-31Z
@@ -63,9 +78,9 @@ sequence_providers:
     failure_policy: explicit_exclude_or_fail
 
 source_groups:
-  - profile_id: broad_retron_rt
+  - profile_id: broad_tao_homolog_rt
     status: selected
-    purpose: Protect broadly conserved retron RT positions.
+    purpose: Protect broadly conserved RT positions using a Tao-like bounded homolog panel.
     roster_source:
       source_name: Mestre et al. 2020 Supplementary Table S1
       source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
@@ -73,7 +88,10 @@ source_groups:
       accession_field: Accesione
       total_roster_count: 1928
     selection_rule:
-      included_records: all_mestre_s1_rt_records_after_filters
+      included_records: mestre_s1_target_centered_bounded_homologs_after_filters
+      candidate_pool_records: all_mestre_s1_rt_records_after_filters
+      full_roster_role: context_only_not_conservation_denominator
+      tao_method_prior: blast_or_equivalent_filtered_homologs_then_msa
       query_coverage_minimum: 0.70
       identity_range:
         - 0.20
@@ -81,6 +99,14 @@ source_groups:
       length_range_aa:
         - 250
         - 450
+      nonredundant_cap: 200
+      cap_policy: deterministic_ranked_cap_after_filters
+      rank_fields:
+        - target_identity_band
+        - query_coverage
+        - motif_completeness
+        - retron_rt_clade_diversity
+        - stable_roster_order_tiebreak
       required_motifs:
         - rt_catalytic_dd_or_yadd_like_region
         - retron_x_naxxH_like_motif
@@ -133,9 +159,18 @@ source_groups:
       - bv_brc_feature_protein_fasta
     min_non_gap_count: 20
 
+context_rosters:
+  - roster_id: full_mestre_retron_rt
+    status: context_only
+    source_name: Mestre et al. 2020 Supplementary Table S1
+    source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+    source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+    total_roster_count: 1928
+    role: classification_and_visual_context_not_phase1_conservation_denominator
+
 phase1_acceptance:
   required_profile_ids:
-    - broad_retron_rt
+    - broad_tao_homolog_rt
     - eco1_like_retron_rt
   required_provider_ids:
     - ncbi_protein_efetch

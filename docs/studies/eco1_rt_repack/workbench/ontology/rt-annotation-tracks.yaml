@@ -1,0 +1,92 @@
+schema_id: dnadesign.aligner.msa.visualization.annotation_tracks
+schema_version: 1
+study_id: eco1_rt_repack
+status: motif_anchor_first_pass
+coordinate_space: target_ungapped_position
+target_row_id: eco1_rt_ec86kit_reference
+target_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+source_basis:
+  - id: simon_et_al_2019_supplement_fig_s2
+    note: Small validated retron RT MSA visualization uses boxed conserved RT regions, red retron-specific regions, orange NAXXH/VTG motifs, and a purple catalytic tetrad.
+  - id: mestre_et_al_2020_rt0_rt7_clades
+    note: Broad retron RT clade work uses MAFFT/HMMER-derived RT0-RT7 alignments and labels region X/Y motif context.
+  - id: eco1_rt_v1_profile_manual_mask_anchors
+    note: Checked-in Eco1 profile declares YADD, RT1-RT7, retron X, and retron Y as hard manual mask classes.
+notes:
+  - Exact RT0-RT7 interval boxes are not yet materialized here because they require a dedicated Eco1 numbering/motif audit.
+  - This file provides visualization annotations only; it does not decide mask membership or designability.
+tracks:
+  - id: retron_rt_context_spans
+    label: Mask-context spans
+    color: "#d73027"
+    features:
+      - id: retron_x_context
+        label: Region X context
+        start: 99
+        end: 115
+        color: "#d73027"
+        fill_opacity: 0.08
+        stroke_color: "#d73027"
+        stroke_width: 2
+        text_color: "#d73027"
+        label_position: above
+        mask_relevance: manual_mask_anchor_context_display_only
+      - id: catalytic_context
+        label: Catalytic context
+        start: 189
+        end: 204
+        color: "#7b3294"
+        fill_opacity: 0.08
+        stroke_color: "#7b3294"
+        stroke_width: 2
+        text_color: "#7b3294"
+        label_position: above
+        mask_relevance: manual_mask_anchor_context_display_only
+      - id: retron_y_context
+        label: Region Y context
+        start: 237
+        end: 251
+        color: "#d73027"
+        fill_opacity: 0.08
+        stroke_color: "#d73027"
+        stroke_width: 2
+        text_color: "#d73027"
+        label_position: above
+        mask_relevance: manual_mask_anchor_context_display_only
+  - id: retron_rt_motif_anchors
+    label: RT motif anchors
+    color: "#5b5f97"
+    features:
+      - id: retron_x_naxxh
+        label: NAxxH
+        start: 105
+        end: 109
+        color: "#d95f02"
+        fill_opacity: 0.88
+        stroke_color: "#d95f02"
+        stroke_width: 1
+        text_color: "#d95f02"
+        label_position: below
+        mask_relevance: manual_mask_anchor_display_only
+      - id: catalytic_yadd
+        label: YADD
+        start: 195
+        end: 198
+        color: "#7b3294"
+        fill_opacity: 0.88
+        stroke_color: "#7b3294"
+        stroke_width: 1
+        text_color: "#7b3294"
+        label_position: below
+        mask_relevance: manual_mask_anchor_display_only
+      - id: retron_y_vtg
+        label: VTG
+        start: 243
+        end: 245
+        color: "#d95f02"
+        fill_opacity: 0.88
+        stroke_color: "#d95f02"
+        stroke_width: 1
+        text_color: "#d95f02"
+        label_position: below
+        mask_relevance: manual_mask_anchor_display_only

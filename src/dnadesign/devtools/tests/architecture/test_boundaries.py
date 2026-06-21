@@ -203,6 +203,39 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_densegen_public_ed
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_studies_to_aligner_msa_public_api(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "alignment.py",
+        "from dnadesign.aligner.msa import MsaRequest, run_msa\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "aligner" / "msa" / "__init__.py",
+        "class MsaRequest:\n    pass\n\ndef run_msa(_request):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_studies_to_aligner_internal_backend(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "alignment.py",
+        "from dnadesign.aligner.msa.backends.mafft import run_mafft\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "aligner" / "msa" / "backends" / "mafft.py",
+        "def run_mafft(_request):\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "studies"
+    assert violations[0].imported_tool == "aligner"
+    assert violations[0].import_target == "dnadesign.aligner.msa.backends.mafft"
+
+
 def test_find_undeclared_cross_tool_imports_allows_studies_to_permuter_public_api(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "studies" / "demo_study" / "candidate_expansion.py",

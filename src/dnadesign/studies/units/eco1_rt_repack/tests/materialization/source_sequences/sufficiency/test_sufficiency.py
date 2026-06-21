@@ -22,7 +22,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.source_sequenc
 def test_sufficiency_gate_accepts_realistic_source_bundle(tmp_path: Path) -> None:
     materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
     cache_root = write_sufficient_source_cache(tmp_path, target_sequence(tmp_path))
-    result = materialize_source_sequence_bundles(
+    materialize_source_sequence_bundles(
         repo_root=repo_root(),
         output_root=tmp_path,
         source_cache_root=cache_root,
@@ -32,7 +32,6 @@ def test_sufficiency_gate_accepts_realistic_source_bundle(tmp_path: Path) -> Non
         repo_root=repo_root(),
         output_root=tmp_path,
         source_cache_root=cache_root,
-        bundle_root=result.bundle_manifest_path.parent,
     )
 
     assert report.passed is True
@@ -42,7 +41,7 @@ def test_sufficiency_gate_accepts_realistic_source_bundle(tmp_path: Path) -> Non
 def test_sufficiency_gate_rejects_undersized_fixture_like_bundle(tmp_path: Path) -> None:
     materialize_structure_authority(repo_root=repo_root(), output_root=tmp_path)
     cache_root = write_source_cache(tmp_path, target_sequence(tmp_path))
-    result = materialize_source_sequence_bundles(
+    materialize_source_sequence_bundles(
         repo_root=repo_root(),
         output_root=tmp_path,
         source_cache_root=cache_root,
@@ -52,7 +51,6 @@ def test_sufficiency_gate_rejects_undersized_fixture_like_bundle(tmp_path: Path)
         repo_root=repo_root(),
         output_root=tmp_path,
         source_cache_root=cache_root,
-        bundle_root=result.bundle_manifest_path.parent,
     )
 
     assert "eco1_rt.source_sequences.insufficient_included_records" in _check_ids(report)

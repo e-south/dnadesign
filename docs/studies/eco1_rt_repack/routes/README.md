@@ -41,7 +41,11 @@ study.
 | Conservation roster-cache materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` |
 | Conservation source-sequence materializer and sufficiency gate | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` |
 | Conservation profile materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/` |
+| Generic MSA visualization sidecars | `../../../src/dnadesign/aligner/msa/visualization/` |
 | Vocabulary | `../workbench/ontology/vocabulary.md` |
+| Eco1 RT annotation tracks | `../workbench/ontology/rt-annotation-tracks.yaml` |
+| Eco1 MSA exemplar rows | `../workbench/ontology/msa-exemplar-rows.yaml` |
+| Eco1 MSA panel spec | `../workbench/ontology/msa-panel-spec.yaml` |
 | Design set | `../workbench/design_sets/eco1-rt-conservative-thread-v1.md` |
 | Structure source posture | `../workbench/provenance/structure-sources.yaml` |
 | Residue-numbering policy | `../workbench/provenance/residue-numbering-policy.yaml` |
@@ -63,10 +67,11 @@ study.
 | Contact evidence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/` and `../../../outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet` | materialized locally |
 | MSA/conservation policy | `../contexts/msa-method.md`, `../contexts/residue-mask-policy.md`, and `../workbench/provenance/conservation-sources.yaml` | source authority selected |
 | Conservation provider-source acquisition | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/` | materialized locally with explicit unresolved-provider ledger |
-| Conservation roster-cache materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` | materialized locally from hash-matching Mestre S1 and provider-source ledger |
-| Conservation source-sequence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` | source bundle materializer and sufficiency preflight implemented; local source FASTA bundles pass sufficiency |
-| Generic MSA execution | `../../../src/dnadesign/aligner/msa/` | MAFFT bundle contract implemented; aligned FASTA bundle still missing |
-| Conservation evidence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/` and `../../../outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet` | materializer implemented; aligned FASTA bundle still missing |
+| Conservation roster-cache materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/` | implemented; now rejects direct full-Mestre broad denominator materialization until bounded homolog selector emits source records |
+| Conservation source-sequence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/` | source bundle materializer and sufficiency preflight implemented; broad source FASTA must be regenerated after bounded source records exist |
+| Conservation alignment materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/` with `../../../src/dnadesign/aligner/msa/` | alignment-bundle materializer implemented; Eco1-like profile accepted locally; bounded broad alignment not accepted yet |
+| Conservation MSA visualization | `../../../src/dnadesign/aligner/msa/visualization/` plus `../workbench/ontology/rt-annotation-tracks.yaml`, `../workbench/ontology/msa-exemplar-rows.yaml`, and `../workbench/ontology/msa-panel-spec.yaml` | generic diagnostic sidecar API implemented; current Eco1 local report is partial for accepted Eco1-like profile only and can render Eco1-owned motif-anchor, exemplar-window, selected-row overview, and plurality/gap histogram sidecars |
+| Conservation evidence materialization | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/` and `../../../outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet` | materializer implemented; blocked until accepted aligned FASTA bundle exists |
 | ProteinMPNN/LigandMPNN sampling | planned `thread` contract | not implemented |
 | Fold validation | `../contexts/fold-validation-policy.md` | planned |
 | Full-gene vs pooled-window economics | `../contexts/synthesis-feasibility-policy.md` | planned |

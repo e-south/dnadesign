@@ -80,6 +80,36 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/
     status: phase1_conservation_profile_materializer
     description: Study-owned materializer for thread-shaped conservation_profile.parquet from explicit aligned FASTA inputs; it does not fetch or align source sequences.
+  - id: eco1_rt_conservation_alignment_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/
+    status: phase1_alignment_bundle_materializer_hardened_runtime_blocked
+    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MAFFT command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; the Eco1-like profile is accepted locally, while the bounded broad_tao_homolog_rt source records and complete aligned bundle are still blocked.
+  - id: aligner_msa_visualization_api
+    owner: aligner
+    kind: checked_in_code
+    path: src/dnadesign/aligner/msa/visualization/
+    status: generic_msa_visualization_api
+    description: Generic diagnostic sidecar API for accepted aligned FASTA inputs; writes per-profile QC YAML, per-position QC CSV, SVG, HTML, optional target-position annotation tracks, explicit exemplar-row windows, selected-row overview panels, plurality/gap histograms, and an index manifest without owning Eco1 source authority, conservation scoring, or designability.
+  - id: eco1_rt_annotation_tracks
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml
+    status: motif_anchor_first_pass
+    description: Study-owned target-position annotation tracks for audited Eco1 RT motif anchors rendered by the generic aligner.msa visualization API; not a mask source or designability rule.
+  - id: eco1_rt_msa_exemplar_rows
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/msa-exemplar-rows.yaml
+    status: first_pass_display_exemplars
+    description: Study-owned explicit row selection for motif-window MSA visualization; not used as the conservation denominator or mask evidence.
+  - id: eco1_rt_msa_panel_spec
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/msa-panel-spec.yaml
+    status: first_pass_publication_panel_spec
+    description: Study-owned display contract for Simon/Mestre-inspired selected-row overview and plurality/gap histogram panels; not used as the conservation denominator or mask evidence.
   - id: eco1_rt_conservation_source_sequence_materializer
     owner: eco1_rt_repack
     kind: checked_in_code
@@ -162,14 +192,26 @@ datasets:
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
-    status: materialized_local
-    description: Local generated source_records.yaml plus filtered provider FASTA caches; broad_retron_rt has 1814 included/114 excluded and eco1_like_retron_rt has 46 included/1 excluded.
+    status: superseded_candidate_pool_local
+    description: Local generated source_records.yaml plus filtered provider FASTA caches from the former full-Mestre broad run; retained as candidate-pool context only because broad_tao_homolog_rt now requires bounded target-centered source records before conservation scoring.
   - id: eco1_rt_conservation_source_fastas
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
-    status: sufficiency_passed_local
-    description: Local generated unaligned source FASTA bundles and manifests that pass the source-sequence sufficiency gate before MAFFT.
+    status: superseded_candidate_pool_local
+    description: Local generated unaligned source FASTA bundles from the former full-Mestre broad run; the Eco1-like profile remains useful, but the broad FASTA must be regenerated after bounded homolog source records are materialized.
+  - id: eco1_rt_conservation_alignment_bundle
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+    status: partial_profile_materialized_local
+    description: Local generated aligned FASTA area; eco1_like_retron_rt.aligned.fasta is accepted locally with 47 aligned records, target-row provenance, and hash-linked MAFFT stdout/stderr manifests, while broad_tao_homolog_rt.aligned.fasta and the complete two-profile bundle remain blocked until bounded broad source records exist.
+  - id: eco1_rt_conservation_visualizations
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+    status: partial_profile_materialized_local
+    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API with Eco1-owned motif-anchor annotations, exemplar-row windows, selected-row overview panels, and plurality/gap histograms; current report covers accepted eco1_like_retron_rt alignment and explicitly records broad_tao_homolog_rt as missing until bounded source records and alignment exist.
   - id: eco1_rt_mask_set
     owner: planned_thread
     kind: planned_artifact

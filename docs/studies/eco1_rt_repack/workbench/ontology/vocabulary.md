@@ -11,6 +11,9 @@
 | `ResidueMap` | Generic residue-numbering map across structure, protein, CDS, and design positions. |
 | `ConservationProfile` | Generic per-position conservation evidence mapped to the residue map. |
 | `ContactProfile` | Generic per-position structure-contact evidence mapped to retained context atoms. |
+| `RtAnnotationTracks` | Study-owned target-position motif annotations that can be rendered by generic `aligner.msa.visualization` sidecars without controlling designability. |
+| `MsaExemplarRows` | Study-owned explicit aligned FASTA row selections used to render local motif windows; these rows ground visualization only and are not the denominator for plurality. |
+| `MsaPanelSpec` | Study-owned display contract for selected-row overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
 | `ResidueMaskSet` | Generic mutable/fixed/protected/unresolved mask contract. |
 | `ThreadPlan` | Generic fixed-backbone sampling plan with backend, seeds, temperature, and fixed-position policy. |
 | `BackendRequestManifest` | Declared backend request hash and execution intent produced by `thread` before any model process runs. |
@@ -41,3 +44,12 @@
   artifacts without owning model-process execution.
 - Use `*_acceptance` for downstream accept/reject records that do not create
   new domain subjects by implication.
+- Use `*_annotation_tracks` for visualization annotations over an already
+  selected target coordinate space; these tracks are not evidence profiles or
+  mask sources by themselves. Label placement and border/fill styling are
+  display grammar only.
+- Use `*_exemplar_rows` for explicit row selections in visualization sidecars;
+  never infer representative biological rows from FASTA order.
+- Use `*_panel_spec` for display-only visualization settings such as selected
+  row limits, high-gap trim declarations, and enabled panel types; never use it
+  as a conservation denominator or mask source.

@@ -18,7 +18,13 @@ from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _ALLOWED_OPERATION_ROOT_FILES = {"__init__.py", "contract_validation.py"}
 _ALLOWED_TEST_ROOT_FILES = {"__init__.py", "_helpers.py"}
-_MATERIALIZATION_PRIMITIVES = {"structure", "contact", "conservation", "source_sequences"}
+_MATERIALIZATION_PRIMITIVES = {
+    "structure",
+    "contact",
+    "conservation",
+    "conservation_alignments",
+    "source_sequences",
+}
 _SOURCE_SEQUENCE_ROOT_FILES = {
     "__init__.py",
     "__main__.py",
@@ -62,6 +68,12 @@ def test_materialization_primitives_are_semantic_packages() -> None:
 
     assert sorted(path.name for path in source_root.glob("*.py")) == ["__init__.py"]
     assert sorted(path.name for path in test_root.glob("*.py")) == ["__init__.py"]
+    assert sorted(
+        path.name for path in source_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+    ) == sorted(_MATERIALIZATION_PRIMITIVES)
+    assert sorted(path.name for path in test_root.iterdir() if path.is_dir() and path.name != "__pycache__") == sorted(
+        _MATERIALIZATION_PRIMITIVES
+    )
     for primitive in sorted(_MATERIALIZATION_PRIMITIVES):
         source_package = source_root / primitive
         test_package = test_root / primitive

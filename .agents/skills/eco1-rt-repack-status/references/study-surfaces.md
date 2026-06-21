@@ -37,7 +37,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   policy that remains separate from the local materialized
   `residue_map.parquet`.
 - `workbench/provenance/conservation-sources.yaml`: selected MSA source
-  contract for `broad_retron_rt` and `eco1_like_retron_rt`.
+  contract for `broad_tao_homolog_rt` and `eco1_like_retron_rt`; full Mestre
+  rows are candidate/context only, not the broad conservation denominator.
 - `workbench/provenance/conservation-source-discovery.md`: source-discovery
   note for method and roster priors before MSA materialization.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`:
@@ -47,7 +48,34 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   study-owned roster-cache materializer for Mestre roster plus explicit
   provider FASTA source inputs.
 - `src/dnadesign/aligner/msa/`: generic aligned FASTA bundle API for MAFFT
-  preflight/execution; it is not Eco1 source authority or conservation scoring.
+  preflight/execution, atomic output publication, stderr sidecars, and run
+  provenance; it is not Eco1 source authority or conservation scoring.
+- `src/dnadesign/aligner/msa/visualization/`: generic MSA QC and
+  visualization sidecar API for accepted aligned FASTA files; it is not Eco1
+  source authority, provider-cache policy, conservation scoring, or mask
+  designability.
+- `src/dnadesign/aligner/msa/visualization/contracts/`: generic request/result
+  models and YAML readers for annotation tracks, exemplar rows, and panel
+  specs.
+- `src/dnadesign/aligner/msa/visualization/materialization/`: generic
+  visualization orchestration, QC calculations, bundle manifests, CSV, and HTML
+  report writers.
+- `src/dnadesign/aligner/msa/visualization/renderers/`: generic SVG renderers
+  and label-placement helpers; study-owned biological annotations are inputs,
+  not renderer constants.
+- `workbench/ontology/rt-annotation-tracks.yaml`: Eco1-owned target-position
+  motif annotation tracks that the generic MSA visualization API can render;
+  they are not mask sources or designability rules.
+- `workbench/ontology/msa-exemplar-rows.yaml`: Eco1-owned explicit row
+  selections that ground motif-window visualization; they are not conservation
+  denominators or representative-set claims.
+- `workbench/ontology/msa-panel-spec.yaml`: Eco1-owned display contract for
+  selected-row whole-alignment overview and plurality/gap histogram panels; it
+  is not a conservation denominator, mask source, or designability rule.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`:
+  study-owned orchestration package that validates Eco1 source-bundle
+  sufficiency, parses declared MAFFT args, calls `dnadesign.aligner.msa`,
+  supports selected profile ids, and writes the Eco1 alignment bundle index.
 
 ## Context Pages
 
@@ -82,6 +110,12 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`:
   study-owned materializer for local `conservation_profile.parquet` from
   explicit aligned FASTA inputs.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`:
+  study-owned materializer for alignment bundle manifests from
+  sufficiency-passing source FASTA inputs. The selected `eco1_like_retron_rt`
+  profile has accepted local profile-level alignment evidence, but bounded
+  `broad_tao_homolog_rt` source records and a complete two-profile bundle are
+  not materialized.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`:
   study-owned materializer for unaligned source FASTA bundles from explicit
   provider caches and exclusion ledgers.
@@ -95,7 +129,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   source-authority semantics.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/`:
   pre-alignment gate package for cache/hash/accession/support and target-row
-  checks before MAFFT.
+  checks before MSA execution. It must be rerun after bounded broad source
+  records are materialized.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py`:
   semantic validator for materialized conservation-profile metadata, source
   hashes, residue-map joins, and Tao-style conservation rule consistency.

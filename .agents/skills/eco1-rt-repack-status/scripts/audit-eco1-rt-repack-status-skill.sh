@@ -91,6 +91,8 @@ repo_root = Path(sys.argv[1])
 package_root = repo_root / "src/dnadesign/studies/units/eco1_rt_repack"
 operations_root = package_root / "operations"
 tests_root = package_root / "tests"
+visualization_root = repo_root / "src/dnadesign/aligner/msa/visualization"
+visualization_tests_root = repo_root / "src/dnadesign/aligner/tests/msa/visualization"
 problems: list[str] = []
 
 expected_operation_dirs = {"contracts", "materialization"}
@@ -120,7 +122,23 @@ flat_materializers = sorted(path.name for path in materialization_root.glob("*.p
 if flat_materializers:
     problems.append(f"flat materialization primitive modules are not allowed: {flat_materializers}")
 
-for primitive in ("structure", "contact", "conservation", "source_sequences"):
+expected_materialization_primitives = {
+    "structure",
+    "contact",
+    "conservation",
+    "conservation_alignments",
+    "source_sequences",
+}
+observed_materialization_primitives = {
+    path.name for path in materialization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if observed_materialization_primitives != expected_materialization_primitives:
+    problems.append(
+        "materialization primitives must stay study-owned and semantic, observed "
+        f"{sorted(observed_materialization_primitives)}"
+    )
+
+for primitive in sorted(expected_materialization_primitives):
     package = materialization_root / primitive
     if not package.is_dir():
         problems.append(f"missing materialization/{primitive}/ semantic package")
@@ -187,7 +205,16 @@ flat_materialization_tests = sorted(
 if flat_materialization_tests:
     problems.append(f"flat materialization tests are not allowed: {flat_materialization_tests}")
 
-for primitive in ("structure", "contact", "conservation", "source_sequences"):
+observed_test_materialization_primitives = {
+    path.name for path in test_materialization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if observed_test_materialization_primitives != expected_materialization_primitives:
+    problems.append(
+        "tests/materialization primitives must mirror study-owned materialization packages, observed "
+        f"{sorted(observed_test_materialization_primitives)}"
+    )
+
+for primitive in sorted(expected_materialization_primitives):
     package = test_materialization_root / primitive
     if not package.is_dir():
         problems.append(f"missing tests/materialization/{primitive}/ mirrored package")
@@ -220,6 +247,40 @@ for package_name, required_test in expected_source_sequence_test_packages.items(
     if not (package / required_test).is_file():
         problems.append(f"missing tests/materialization/source_sequences/{package_name}/{required_test}")
 
+expected_visualization_root_files = {"__init__.py", "__main__.py", "cli.py"}
+observed_visualization_root_files = {path.name for path in visualization_root.glob("*.py")}
+if observed_visualization_root_files != expected_visualization_root_files:
+    problems.append(
+        "aligner.msa.visualization root must stay public-entrypoint only, observed "
+        f"{sorted(observed_visualization_root_files)}"
+    )
+
+expected_visualization_packages = {"contracts", "materialization", "renderers"}
+observed_visualization_packages = {
+    path.name for path in visualization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if observed_visualization_packages != expected_visualization_packages:
+    problems.append(
+        "aligner.msa.visualization implementation must stay semantic, observed "
+        f"{sorted(observed_visualization_packages)}"
+    )
+
+for package_name in sorted(expected_visualization_packages):
+    package = visualization_root / package_name
+    if not package.is_dir():
+        problems.append(f"missing aligner/msa/visualization/{package_name}/ semantic package")
+        continue
+    if not (package / "__init__.py").is_file():
+        problems.append(f"missing aligner/msa/visualization/{package_name}/__init__.py")
+
+expected_visualization_test_files = {"__init__.py", "_fixtures.py", "test_materialization.py"}
+observed_visualization_test_files = {path.name for path in visualization_tests_root.glob("*.py")}
+if observed_visualization_test_files != expected_visualization_test_files:
+    problems.append(
+        "aligner MSA visualization tests must stay mirrored and bounded, observed "
+        f"{sorted(observed_visualization_test_files)}"
+    )
+
 cli_lines = len((operations_root / "contract_validation.py").read_text(encoding="utf-8").splitlines())
 if cli_lines > 80:
     problems.append(f"contract_validation.py must stay CLI-thin, observed {cli_lines} lines")
@@ -239,6 +300,22 @@ oversized_tests = [
 ]
 if oversized_tests:
     problems.append(f"test modules exceed 200-line IA budget: {oversized_tests}")
+
+oversized_visualization_source = [
+    f"{path.relative_to(repo_root)}:{len(path.read_text(encoding='utf-8').splitlines())}"
+    for path in visualization_root.rglob("*.py")
+    if len(path.read_text(encoding="utf-8").splitlines()) > 320
+]
+if oversized_visualization_source:
+    problems.append(f"visualization modules exceed 320-line IA budget: {oversized_visualization_source}")
+
+oversized_visualization_tests = [
+    f"{path.relative_to(repo_root)}:{len(path.read_text(encoding='utf-8').splitlines())}"
+    for path in visualization_tests_root.rglob("*.py")
+    if len(path.read_text(encoding="utf-8").splitlines()) > 320
+]
+if oversized_visualization_tests:
+    problems.append(f"visualization tests exceed 320-line IA budget: {oversized_visualization_tests}")
 
 if problems:
     raise SystemExit("\n".join(problems))
@@ -278,6 +355,9 @@ require_file "$STUDY_ROOT/contexts/implementation-roadmap.md"
 require_file "$STUDY_ROOT/contexts/msa-method.md"
 require_file "$STUDY_ROOT/contexts/residue-mask-policy.md"
 require_file "$STUDY_ROOT/contexts/fold-validation-policy.md"
+require_file "$STUDY_ROOT/workbench/ontology/rt-annotation-tracks.yaml"
+require_file "$STUDY_ROOT/workbench/ontology/msa-exemplar-rows.yaml"
+require_file "$STUDY_ROOT/workbench/ontology/msa-panel-spec.yaml"
 require_file "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_file "$REPO_ROOT/docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts"
@@ -287,10 +367,21 @@ require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/materia
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments"
+require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization"
+require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts"
+require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization"
+require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/provider_accessions.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts/annotation_tracks.py"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts/exemplar_rows.py"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers/profile_qc.py"
+require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers/exemplar_windows.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py"
 
 require_frontmatter_yaml
@@ -318,10 +409,18 @@ require_pattern 'planned' "artifact surface is planned" "$STUDY_ROOT/operations/
 require_pattern 'thread_artifact_chain_schema' "artifact surface includes artifact-chain schema" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
 require_pattern 'rt_lnrna_candidate_acceptance_schema' "artifact surface includes downstream acceptance schema" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
 require_pattern 'explicit_no_fallback' "profile fixture declares no-fallback backend policy" "$STUDY_ROOT/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml"
-require_pattern 'broad_retron_rt' "conservation source contract declares broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'broad_tao_homolog_rt' "conservation source contract declares Tao-like broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'mestre_s1_target_centered_bounded_homologs_after_filters' "conservation source contract requires bounded homolog broad profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'context_only_not_conservation_denominator' "conservation source contract keeps full Mestre roster out of scoring denominator" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
+require_pattern 'no_silent_backend_fallback' "conservation source contract rejects silent alignment backend fallback" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'eco1_like_retron_rt' "conservation source contract declares Eco1-like profile" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'accession_patterns' "conservation source contract declares provider accession patterns" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'materialization/conservation/' "study surfaces route conservation materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'materialization/conservation_alignments/' "study surfaces route conservation alignment package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'aligner/msa/visualization' "study surfaces route generic MSA visualization API" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'rt-annotation-tracks.yaml' "study surfaces route Eco1 annotation tracks" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'msa-exemplar-rows.yaml' "study surfaces route Eco1 exemplar rows" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'msa-panel-spec.yaml' "study surfaces route Eco1 panel spec" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'source_sequences/contracts/' "study surfaces route source-sequence contract package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'source_sequences/sufficiency/' "study surfaces route source-sequence sufficiency package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'provider accession policy' "study surfaces route provider accession contract policy" "$REFERENCE_DIR/study-surfaces.md"

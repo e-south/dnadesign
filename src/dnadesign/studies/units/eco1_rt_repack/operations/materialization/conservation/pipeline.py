@@ -68,7 +68,9 @@ def materialize_conservation_profile(
 
     root = (repo_root or _find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = _resolve_path(root, output_root or _DEFAULT_OUTPUT_ROOT)
-    aln_root = _resolve_path(root, alignment_root or _DEFAULT_ALIGNMENT_ROOT)
+    aln_root = (
+        _resolve_path(root, alignment_root) if alignment_root is not None else out_root / "conservation_alignments"
+    )
     out_root.mkdir(parents=True, exist_ok=True)
 
     sources = _load_yaml(root / _CONSERVATION_SOURCES)

@@ -73,7 +73,15 @@ def select_profile_rows(
     selection_rule = _require_mapping(source_group.get("selection_rule"), "selection_rule")
     included_records = str(selection_rule.get("included_records", ""))
     if included_records == "all_mestre_s1_rt_records_after_filters":
-        return list(rows)
+        raise ValueError(
+            "all_mestre_s1_rt_records_after_filters is context-only and cannot be used as a "
+            "Phase 1 conservation denominator"
+        )
+    if included_records == "mestre_s1_target_centered_bounded_homologs_after_filters":
+        raise ValueError(
+            "mestre_s1_target_centered_bounded_homologs_after_filters requires the next "
+            "bounded-homolog selector slice; do not fall back to roster order"
+        )
     if included_records == "mestre_s1_retron_subtype_ii_a3_cluster_42_1_after_filters":
         expected_subtype = str(selection_rule.get("retron_subtype", ""))
         expected_cluster = str(selection_rule.get("cluster_domain", ""))
@@ -89,6 +97,25 @@ def select_profile_rows(
             raise ValueError(f"profile {profile_id!r} selected zero rows from roster table")
         return selected
     raise ValueError(f"profile {profile_id!r} has unsupported included_records rule {included_records!r}")
+
+
+def select_candidate_rows(
+    rows: Sequence[RosterRow],
+    *,
+    profile_id: str,
+    source_group: Mapping[str, Any],
+) -> list[RosterRow]:
+    """Select roster rows that may be fetched before final profile downselection."""
+
+    selection_rule = _require_mapping(source_group.get("selection_rule"), "selection_rule")
+    included_records = str(selection_rule.get("included_records", ""))
+    candidate_pool = str(selection_rule.get("candidate_pool_records", ""))
+    if (
+        included_records == "mestre_s1_target_centered_bounded_homologs_after_filters"
+        and candidate_pool == "all_mestre_s1_rt_records_after_filters"
+    ):
+        return list(rows)
+    return select_profile_rows(rows, profile_id=profile_id, source_group=source_group)
 
 
 def _read_table_rows(path: Path, *, accession_field: str) -> list[dict[str, Any]]:

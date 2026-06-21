@@ -10,7 +10,7 @@ import yaml
 from dnadesign.aligner.msa import write_fasta_records
 
 TARGET_ROW_ID = "eco1_rt_ec86kit_reference"
-PROFILE_IDS = ("broad_retron_rt", "eco1_like_retron_rt")
+PROFILE_IDS = ("broad_tao_homolog_rt", "eco1_like_retron_rt")
 
 
 def target_sequence(output_root: Path) -> str:
@@ -49,7 +49,7 @@ def write_source_cache(
     )
 
     excluded_record = {
-        "profile_id": "broad_retron_rt",
+        "profile_id": "broad_tao_homolog_rt",
         "record_id": "broad_missing",
         "provider_id": "ncbi_protein_efetch",
         "accession": "WP_MISSING",
@@ -60,14 +60,14 @@ def write_source_cache(
 
     records = [
         {
-            "profile_id": "broad_retron_rt",
+            "profile_id": "broad_tao_homolog_rt",
             "record_id": record_id_override or "broad_ncbi_1",
             "provider_id": provider_override or "ncbi_protein_efetch",
             "accession": "WP_BROAD_1",
             "status": "included",
         },
         {
-            "profile_id": "broad_retron_rt",
+            "profile_id": "broad_tao_homolog_rt",
             "record_id": "broad_bvbrc_1",
             "provider_id": "bv_brc_feature_protein_fasta",
             "accession": "fig|BROAD.1",

@@ -1,0 +1,31 @@
+schema_id: dnadesign.aligner.msa.visualization.panel_spec
+schema_version: 1
+study_id: eco1_rt_repack
+status: first_pass_publication_panel_spec
+coordinate_space: target_ungapped_position
+source_basis:
+  - id: simon_et_al_2019_supplement_fig_s2
+    note: Validated retron RT alignment figures show selected named rows with visible gaps and motif/region boxes.
+  - id: mestre_et_al_2020_fig2_and_rt0_rt7_context
+    note: Retron classification figures combine representative rows, RT-region overlays, and consensus/histogram-style summaries.
+display_columns:
+  coordinate_space: target_ungapped_position
+  high_gap_trim_threshold: 0.9
+  trim_policy: display_only_not_scoring
+  note: High-gap trimming is declared for publication display only; conservation scoring must use the untrimmed accepted aligned FASTA.
+overview:
+  enabled: true
+  max_display_rows: 8
+  row_source: docs/studies/eco1_rt_repack/workbench/ontology/msa-exemplar-rows.yaml
+  note: Whole-alignment overview uses explicit exemplar rows only and must not infer biological representatives from FASTA order.
+consensus_histogram:
+  enabled: true
+  metric: plurality_frequency_and_gap_fraction_by_target_position
+  note: Histogram is a visual audit of accepted aligned FASTA records, not a replacement for conservation_profile.parquet.
+sidecar_note: Visualization sidecar only; not a conservation denominator, mask source, or designability rule.
+pending_annotations:
+  - id: rt0_rt7_interval_boxes
+    reason: Exact Eco1 target-position intervals require a dedicated residue-numbering/motif audit before display boxes are materialized.
+notes:
+  - The current RT annotation track intentionally contains only audited motif anchors: NAxxH, YADD, and VTG.
+  - Any future publication panel may add RT1-RT7 and Region X/Y interval boxes only through this ontology surface, not renderer code.

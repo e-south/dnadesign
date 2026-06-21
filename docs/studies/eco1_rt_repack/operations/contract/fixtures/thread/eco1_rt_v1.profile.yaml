@@ -47,7 +47,7 @@ conservative_policy:
     - 15
   conservation_threshold: 0.25
   conservation_profiles:
-    - broad_retron_rt
+    - broad_tao_homolog_rt
     - eco1_like_retron_rt
   conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
   cysteine_policy: no_new_cysteine

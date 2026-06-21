@@ -132,11 +132,13 @@ This is not a materialized MSA and does not satisfy
 ### Implemented Slice: Conservation Source Contract v1
 
 `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`
-declares the selected MSA source authority for `broad_retron_rt` and
+declares the selected MSA source authority for `broad_tao_homolog_rt` and
 `eco1_like_retron_rt`. It uses Mestre et al. 2020 Supplementary Table S1 as
-the accession roster, declares NCBI and BV-BRC provider policies, pins the
-target row to the ec86kit Eco1 RT reference sequence hash, and records the
-T301/A301 mismatch in public `WP_099010551.1` as a fail-fast target-row issue.
+the accession roster and candidate pool, declares NCBI and BV-BRC provider
+policies, pins the target row to the ec86kit Eco1 RT reference sequence hash,
+and records the T301/A301 mismatch in public `WP_099010551.1` as a fail-fast
+target-row issue. The full Mestre roster is context/candidate-pool evidence,
+not the Phase 1 conservation denominator.
 
 `docs/studies/eco1_rt_repack/contexts/msa-method.md` explains the future
 reproduction procedure for roster filtering, sequence retrieval, alignment,
@@ -176,10 +178,11 @@ FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
 Mestre/NCBI/BV-BRC source sequences, adjudicate the T301/A301 target mismatch,
 score conservation, or build masks.
 
-The next Eco1 source-data slice should use this public API to produce:
+After the bounded broad source records exist, the next Eco1 alignment slice
+should use this public API to produce:
 
 ```text
-broad_retron_rt.aligned.fasta
+broad_tao_homolog_rt.aligned.fasta
 eco1_like_retron_rt.aligned.fasta
 ```
 
@@ -204,13 +207,15 @@ entries.
 ### Implemented Slice: Conservation Roster Cache v1
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/`
-materializes the local source cache from a hash-pinned Mestre roster table and
-explicit provider FASTA source files. It writes `source_records.yaml`, filtered
-provider cache FASTAs, and a cache manifest. It rejects uncontracted roster
-hashes by default, unsupported accession providers, missing included provider
-sequences without a passed unresolved-provider ledger, and public
-`WP_099010551.1` target-row leakage by excluding that accession with the
-declared T301/A301 mismatch reason.
+materializes local source records from selected roster rows and explicit
+provider FASTA source files. Under the revised broad profile, it intentionally
+rejects direct full-Mestre roster materialization for `broad_tao_homolog_rt`
+until `conservation-bounded-homolog-selector-v1` emits bounded source records
+with selector metadata. It still rejects uncontracted roster hashes by default,
+unsupported accession providers, missing included provider sequences without a
+passed unresolved-provider ledger, and public `WP_099010551.1` target-row
+leakage by excluding that accession with the declared T301/A301 mismatch
+reason.
 
 This slice deliberately does not fetch live NCBI/BV-BRC records, run MAFFT,
 score conservation, or build masks.
@@ -243,10 +248,24 @@ policy live under
 source-bundle, and sufficiency code do not duplicate the source-authority
 schema.
 
-Current local runtime source FASTA bundles pass this gate: `broad_retron_rt`
-has 1814 included and 114 excluded rows, while `eco1_like_retron_rt` has 46
-included and 1 excluded row. MAFFT alignment and conservation scoring remain
-blocked until aligned FASTA bundle manifests exist.
+The previous local full-Mestre broad source bundle had 1814 included and 114
+excluded rows, while `eco1_like_retron_rt` had 46 included and 1 excluded row.
+That broad bundle is now superseded candidate-pool context. Source FASTA
+sufficiency must be rerun after the bounded `broad_tao_homolog_rt` source
+records are materialized.
+
+### Next Slice: Conservation Bounded Homolog Selector v1
+
+`conservation-bounded-homolog-selector-v1` should consume the full Mestre
+candidate-pool provider cache and emit bounded `broad_tao_homolog_rt` source
+records. It should compute target-centered coverage, identity, length, motif
+support, and deterministic diversity/cap metadata. It must not select rows by
+raw roster order and must not treat the full Mestre roster as the conservation
+scoring denominator.
+
+After this slice, regenerate source FASTA sufficiency, run the bounded broad
+alignment through `dnadesign.aligner.msa`, and then materialize
+`conservation_profile.parquet`.
 
 ### Implementation Rules
 
@@ -278,11 +297,24 @@ blocked until aligned FASTA bundle manifests exist.
   policy are selected and materialized locally as structure artifacts.
 - Contact evidence is materialized locally from the retained DNA/RNA context.
 - Conservation source discovery and source authority are documented and
-  selected, provider-backed source FASTA bundles pass sufficiency, and a
-  conservation-profile materializer exists for explicit aligned FASTA inputs.
-  The generic MAFFT execution seam now lives in `dnadesign.aligner.msa`, but no
-  aligned FASTA bundle, materialized conservation profile, mask set, sampling
-  plan, sample table, candidate table, fold-check report, feasibility report,
-  or candidate handoff is materialized.
+  selected, provider candidate-pool acquisition exists, and a conservation-profile
+  materializer exists for explicit aligned FASTA inputs. The generic MAFFT
+  execution seam lives in `dnadesign.aligner.msa`, and the study-owned
+  conservation-alignment materializer now orchestrates source sufficiency,
+  declared MSA args, selected profile ids, and alignment bundle manifests. The
+  generic runner stages stdout to a temporary FASTA, records stderr, and
+  publishes an accepted aligned FASTA only after validation. The former
+  full-roster broad profile ran for roughly four hours under the declared
+  high-sensitivity MAFFT policy without a complete broad alignment and is no
+  longer the active denominator. The selected `eco1_like_retron_rt` profile now
+  has accepted local profile-level alignment
+  evidence, and generic `aligner.msa` MSA visualization sidecars are
+  implemented and materialized locally for that accepted profile. Those
+  sidecars can render Eco1-owned motif anchors, explicit exemplar-row windows,
+  selected-row overview panels, and plurality/gap histograms, but they remain
+  display-only and do not satisfy conservation evidence. The complete
+  two-profile aligned FASTA bundle, materialized conservation profile, mask set,
+  sampling plan, sample table, candidate table, fold-check report, feasibility
+  report, and candidate handoff are not materialized.
 - Readiness checks are still scaffold-level study preflight checks. They must
   grow content validators before Phase 1 can be marked accepted.

@@ -49,7 +49,12 @@ steps:
     path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
   - label: materialize-conservation-alignments
     kind: planned-runtime
+    status: runtime_blocked
     path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+  - label: materialize-conservation-visualizations
+    kind: generated-runtime
+    status: partial_profile_materialized
+    path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
   - label: materialize-thread-artifact-chain
     kind: planned-runtime
     path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml

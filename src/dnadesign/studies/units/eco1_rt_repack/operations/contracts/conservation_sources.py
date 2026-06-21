@@ -9,11 +9,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.common import (
     _as_string_list,
     _is_pending_value,
     _is_positive_int,
-    _is_positive_number,
     _is_sha256_text,
     _nested_get,
     _phase_rank,
     _require_known_phase,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation_source_selection import (
+    validate_conservation_selection_rule,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import (
     _CONSERVATION_GAP_DENOMINATOR_POLICY,
@@ -133,6 +135,8 @@ def validate_conservation_sources_payload(
             profile=profile,
         )
 
+    _validate_phase1_acceptance(issues, payload=payload)
+
     return ContractReport(phase=phase, issues=tuple(issues))
 
 
@@ -215,6 +219,20 @@ def _validate_conservation_alignment_policy(
                 check_id="eco1_rt.conservation.invalid_alignment_scope",
                 message="conservation alignment scope must be protein",
                 path="workbench/provenance/conservation-sources.yaml:alignment_policy.alignment_scope",
+            )
+        )
+    alternative_backend_policy = alignment_policy.get("alternative_backend_policy")
+    if isinstance(alternative_backend_policy, Mapping) and (
+        alternative_backend_policy.get("fallback_policy") != "no_silent_backend_fallback"
+    ):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.conservation.invalid_alternative_backend_fallback_policy",
+                message="alternative alignment backend policy must reject silent fallback",
+                path=(
+                    "workbench/provenance/conservation-sources.yaml:"
+                    "alignment_policy.alternative_backend_policy.fallback_policy"
+                ),
             )
         )
 
@@ -331,7 +349,7 @@ def _validate_conservation_source_groups(
                 )
             )
         _validate_conservation_roster_source(issues, source_group=source_group, index=index)
-        _validate_conservation_selection_rule(issues, source_group=source_group, index=index)
+        validate_conservation_selection_rule(issues, source_group=source_group, index=index)
         group_provider_ids = set(_as_string_list(source_group.get("provider_ids")))
         if not _REQUIRED_CONSERVATION_PROVIDER_IDS <= group_provider_ids <= provider_ids:
             issues.append(
@@ -363,6 +381,42 @@ def _validate_conservation_source_groups(
                 check_id="eco1_rt.conservation.missing_required_source_group",
                 message=f"conservation source contract must declare source group {profile_id!r}",
                 path="workbench/provenance/conservation-sources.yaml:source_groups",
+            )
+        )
+
+
+def _validate_phase1_acceptance(
+    issues: list[ContractIssue],
+    *,
+    payload: Mapping[str, Any],
+) -> None:
+    acceptance = payload.get("phase1_acceptance")
+    if not isinstance(acceptance, Mapping):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.conservation.missing_phase1_acceptance",
+                message="conservation-sources.yaml must declare phase1_acceptance",
+                path="workbench/provenance/conservation-sources.yaml:phase1_acceptance",
+            )
+        )
+        return
+    required_profile_ids = set(_as_string_list(acceptance.get("required_profile_ids")))
+    missing_profile_ids = _REQUIRED_CONSERVATION_PROFILE_IDS - required_profile_ids
+    forbidden_profile_ids = required_profile_ids - _REQUIRED_CONSERVATION_PROFILE_IDS
+    for profile_id in sorted(missing_profile_ids):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.conservation.phase1_missing_required_profile",
+                message=f"phase1_acceptance.required_profile_ids must include {profile_id!r}",
+                path="workbench/provenance/conservation-sources.yaml:phase1_acceptance.required_profile_ids",
+            )
+        )
+    for profile_id in sorted(forbidden_profile_ids):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.conservation.phase1_unapproved_profile",
+                message=f"phase1_acceptance.required_profile_ids includes unapproved profile {profile_id!r}",
+                path="workbench/provenance/conservation-sources.yaml:phase1_acceptance.required_profile_ids",
             )
         )
 
@@ -400,67 +454,3 @@ def _validate_conservation_roster_source(
                 path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].roster_source",
             )
         )
-
-
-def _validate_conservation_selection_rule(
-    issues: list[ContractIssue],
-    *,
-    source_group: Mapping[str, Any],
-    index: int,
-) -> None:
-    selection_rule = source_group.get("selection_rule")
-    profile_id = str(source_group.get("profile_id", "")).strip()
-    if not isinstance(selection_rule, Mapping):
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.conservation.missing_selection_rule",
-                message=f"source group {profile_id!r} must declare selection_rule",
-                path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule",
-            )
-        )
-        return
-    if not _is_positive_number(selection_rule.get("query_coverage_minimum")):
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.conservation.invalid_query_coverage_minimum",
-                message=f"source group {profile_id!r} must declare positive query_coverage_minimum",
-                path=(
-                    "workbench/provenance/conservation-sources.yaml:"
-                    f"source_groups[{index}].selection_rule.query_coverage_minimum"
-                ),
-            )
-        )
-    if len(selection_rule.get("identity_range") or []) != 2 or len(selection_rule.get("length_range_aa") or []) != 2:
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.conservation.invalid_filter_ranges",
-                message=f"source group {profile_id!r} must declare two-value identity and length ranges",
-                path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule",
-            )
-        )
-    if not _as_string_list(selection_rule.get("required_motifs")):
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.conservation.missing_required_motifs",
-                message=f"source group {profile_id!r} must declare motif requirements",
-                path=f"workbench/provenance/conservation-sources.yaml:source_groups[{index}].selection_rule.required_motifs",
-            )
-        )
-    if profile_id == "eco1_like_retron_rt":
-        expected_pairs = {
-            "parent_rt_clade": 9,
-            "retron_subtype": "II-A3",
-            "cluster_domain": "42_1",
-        }
-        for field, expected in expected_pairs.items():
-            if selection_rule.get(field) != expected:
-                issues.append(
-                    ContractIssue(
-                        check_id="eco1_rt.conservation.eco1_like_roster_scope_mismatch",
-                        message=f"Eco1-like source group must declare {field}={expected!r}",
-                        path=(
-                            "workbench/provenance/conservation-sources.yaml:"
-                            f"source_groups[{index}].selection_rule.{field}"
-                        ),
-                    )
-                )

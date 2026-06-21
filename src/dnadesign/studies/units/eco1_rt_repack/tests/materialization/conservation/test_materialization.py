@@ -42,10 +42,12 @@ def test_conservation_materializer_writes_long_form_profile(tmp_path: Path) -> N
     metadata = table.schema.metadata or {}
     assert metadata[b"schema_id"] == b"thread.conservation_profile"
     assert metadata[b"status"] == b"materialized"
-    assert metadata[b"profile_ids"] == b'["broad_retron_rt", "eco1_like_retron_rt"]'
+    assert metadata[b"profile_ids"] == b'["broad_tao_homolog_rt", "eco1_like_retron_rt"]'
 
     rows = table.to_pylist()
-    position_3 = next(row for row in rows if row["profile_id"] == "broad_retron_rt" and row["canonical_position"] == 3)
+    position_3 = next(
+        row for row in rows if row["profile_id"] == "broad_tao_homolog_rt" and row["canonical_position"] == 3
+    )
     assert position_3["wt_aa"] == "S"
     assert position_3["msa_column"] == 3
     assert position_3["non_gap_count"] == 21
@@ -53,11 +55,15 @@ def test_conservation_materializer_writes_long_form_profile(tmp_path: Path) -> N
     assert position_3["wt_is_plurality"] is True
     assert position_3["passes_conservation_mask"] is True
 
-    position_4 = next(row for row in rows if row["profile_id"] == "broad_retron_rt" and row["canonical_position"] == 4)
+    position_4 = next(
+        row for row in rows if row["profile_id"] == "broad_tao_homolog_rt" and row["canonical_position"] == 4
+    )
     assert position_4["wt_is_plurality"] is False
     assert position_4["passes_conservation_mask"] is False
 
-    position_1 = next(row for row in rows if row["profile_id"] == "broad_retron_rt" and row["canonical_position"] == 1)
+    position_1 = next(
+        row for row in rows if row["profile_id"] == "broad_tao_homolog_rt" and row["canonical_position"] == 1
+    )
     assert position_1["mapping_status"] == "unresolved_structure"
     assert position_1["passes_conservation_mask"] is False
 
@@ -91,7 +97,7 @@ def test_phase1_rejects_conservation_profile_source_hash_mismatch(tmp_path: Path
     table = pq.read_table(result.conservation_profile_path)
     rows = table.to_pylist()
     for row in rows:
-        if row["profile_id"] == "broad_retron_rt":
+        if row["profile_id"] == "broad_tao_homolog_rt":
             row["source_hash"] = "sha256:not-the-broad-alignment"
     pq.write_table(table.from_pylist(rows, schema=table.schema), result.conservation_profile_path)
 
@@ -126,7 +132,7 @@ def _write_alignment_inputs(
 
     root = tmp_path / "alignments"
     root.mkdir()
-    for profile_id in ("broad_retron_rt", "eco1_like_retron_rt"):
+    for profile_id in ("broad_tao_homolog_rt", "eco1_like_retron_rt"):
         records = [("eco1_rt_ec86kit_reference", target)]
         for index in range(20):
             sequence = list(target)

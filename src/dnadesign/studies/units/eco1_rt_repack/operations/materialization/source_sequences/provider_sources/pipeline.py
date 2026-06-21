@@ -22,7 +22,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_se
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache.roster import (
     load_roster_rows,
-    select_profile_rows,
+    select_candidate_rows,
 )
 
 from .bv_brc import fetch_bv_brc_feature_protein_fastas
@@ -146,7 +146,7 @@ def _collect_provider_accessions(
     provider_accessions: dict[str, list[str]] = {provider_id: [] for provider_id in accession_policy.provider_ids}
     seen: set[tuple[str, str]] = set()
     for profile_id in profile_ids:
-        selected_rows = select_profile_rows(
+        selected_rows = select_candidate_rows(
             roster_rows,
             profile_id=profile_id,
             source_group=require_mapping(source_groups.get(profile_id), f"source group {profile_id}"),

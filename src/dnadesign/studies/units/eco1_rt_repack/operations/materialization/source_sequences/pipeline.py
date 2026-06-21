@@ -76,8 +76,12 @@ def materialize_source_sequence_bundles(
 
     root = (repo_root or _find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = _resolve_path(root, output_root or _DEFAULT_OUTPUT_ROOT)
-    cache_root = _resolve_path(root, source_cache_root or _DEFAULT_SOURCE_CACHE_ROOT)
-    source_root = _resolve_path(root, bundle_root or _DEFAULT_SOURCE_BUNDLE_ROOT)
+    cache_root = (
+        _resolve_path(root, source_cache_root)
+        if source_cache_root is not None
+        else out_root / "conservation_source_cache"
+    )
+    source_root = _resolve_path(root, bundle_root) if bundle_root is not None else out_root / "conservation_sources"
     source_root.mkdir(parents=True, exist_ok=True)
 
     source_contract = load_conservation_source_contract(root / _CONSERVATION_SOURCES)
