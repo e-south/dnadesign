@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/test_pwm_retention.py
+src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/pwm/test_retention.py
 
 Tests for bidirectional tetR PWM trim-retention selection.
 
@@ -13,13 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.studies.units.retron_hairpin_design.review_outputs.pwm_retention import (
+from dnadesign.studies.units.retron_hairpin_design.review_outputs.pwm.retention import (
     PwmMotifOccurrence,
     load_meme_information_bits,
     select_best_retained_span,
 )
 
-from ..support.paths import repo_root_from
+from ...support.paths import repo_root_from
 
 
 def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows() -> None:
@@ -47,7 +47,7 @@ def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows() -> 
     )
     stronger = select_best_retained_span(
         parent_length=19,
-        retained_length=12,
+        retained_length=13,
         motif_bits=motif_bits,
         occurrences=occurrences,
     )
@@ -57,7 +57,7 @@ def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows() -> 
     assert round(mild.retained_information_fraction, 6) == 0.964248
     assert [round(value, 6) for value in mild.retained_bits_by_occurrence] == [6.785073, 6.785073]
 
-    assert (stronger.start_0, stronger.end_0) == (3, 15)
-    assert stronger.sequence_from("CTCTATATCTGATATAGAG") == "TATATCTGATAT"
-    assert round(stronger.retained_information_fraction, 6) == 0.867985
-    assert [round(value, 6) for value in stronger.retained_bits_by_occurrence] == [6.306051, 5.909354]
+    assert (stronger.start_0, stronger.end_0) == (3, 16)
+    assert stronger.sequence_from("CTCTATATCTGATATAGAG") == "TATATCTGATATA"
+    assert round(stronger.retained_information_fraction, 6) == 0.915756
+    assert [round(value, 6) for value in stronger.retained_bits_by_occurrence] == [6.443849, 6.443849]

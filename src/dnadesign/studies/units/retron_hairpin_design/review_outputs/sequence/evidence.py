@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_evidence.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/evidence.py
 
 Sequence and folding evidence checks for Retron review-output packages.
 
@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from ..compiler.exceptions import RetronMsdCompilerError
-from .sequence_index import SequenceReviewFrame
+from ...compiler.exceptions import RetronMsdCompilerError
+from .index import SequenceReviewFrame
 
 
 @dataclass(frozen=True)

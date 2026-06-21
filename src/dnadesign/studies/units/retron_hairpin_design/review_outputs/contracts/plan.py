@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/plan.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/plan.py
 
 Deliverable-plan loading for Retron hairpin review outputs.
 
@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..catalog.strict_mapping_io import DuplicateMappingKeyError, load_unique_yaml
-from ..compiler.exceptions import RetronMsdCompilerError
-from .pwm_retention import PwmMotifOccurrence, validate_declared_trim_windows
+from ...catalog.strict_mapping_io import DuplicateMappingKeyError, load_unique_yaml
+from ...compiler.exceptions import RetronMsdCompilerError
+from ..pwm.retention import PwmMotifOccurrence, validate_declared_trim_windows
 
 
 @dataclass(frozen=True)
@@ -81,12 +81,12 @@ def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
             "Retron PWM triptych payload_trim_id set does not match design-set payload_trims: "
             f"{sorted(panel_trim_ids)} != {sorted(design_trim_ids)}"
         )
-    full_payload = _require_mapping(payload_trims.get("TetR_full"), "design-set TetR_full payload trim")
+    full_payload = _find_full_payload_trim(payload_trims)
     parent_payload = _require_mapping(design_set.get("parent_payload"), "design-set parent_payload")
     parent_sequence = str(parent_payload.get("source_sequence_5to3") or "").strip().upper()
     if parent_sequence != str(full_payload.get("exact_sequence_5to3") or "").strip().upper():
         raise RetronMsdCompilerError(
-            "Retron review parent_payload.source_sequence_5to3 must match TetR_full exact_sequence_5to3"
+            "Retron review parent_payload.source_sequence_5to3 must match the untrimmed payload exact_sequence_5to3"
         )
     motif_occurrences = tuple(
         PwmMotifOccurrence.from_mapping(_require_mapping(raw, "parent_payload motif_occurrence"))
@@ -126,6 +126,23 @@ def _parse_pwm_panel(raw: object, *, payload_trims: Mapping[str, Any]) -> PwmTri
         trim_3p_nt=int(trim.get("trim_3p_nt")),
         retained_information_fraction=float(trim.get("retained_information_fraction")),
     )
+
+
+def _find_full_payload_trim(payload_trims: Mapping[str, Any]) -> Mapping[str, Any]:
+    candidates = []
+    for trim_id, raw_trim in payload_trims.items():
+        trim = _require_mapping(raw_trim, f"design-set {trim_id} payload trim")
+        span = _require_mapping(trim.get("retained_parent_span_0"), f"design-set {trim_id} retained_parent_span_0")
+        start = int(span.get("start"))
+        end = int(span.get("end"))
+        sequence = str(trim.get("exact_sequence_5to3") or "")
+        if start == 0 and end == len(sequence):
+            candidates.append(trim)
+    if len(candidates) != 1:
+        raise RetronMsdCompilerError(
+            f"Retron design set must declare exactly one untrimmed payload, found {len(candidates)}"
+        )
+    return candidates[0]
 
 
 def _load_mapping(path: Path, *, label: str) -> dict[str, Any]:

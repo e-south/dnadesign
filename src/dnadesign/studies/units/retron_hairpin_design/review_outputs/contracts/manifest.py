@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/manifest.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/manifest.py
 
 Review manifest writer for Retron hairpin review outputs.
 
@@ -16,9 +16,11 @@ import json
 from pathlib import Path
 from typing import Sequence
 
+from ..handoff.contract import SEQUENCE_HANDOFF_MANIFEST_KEY, SEQUENCE_HANDOFF_REQUIRED_FIELDS
+from ..handoff.index import HandoffIndex
+from ..sequence.evidence import SequenceEvidenceSummary
+from ..sequence.index import SequenceReviewFrame
 from .plan import TetoReviewPlan
-from .sequence_evidence import SequenceEvidenceSummary
-from .sequence_index import SequenceReviewFrame
 
 
 def write_review_manifest(
@@ -31,6 +33,7 @@ def write_review_manifest(
     pwm_png: Path,
     video_path: Path,
     video_manifest_path: Path,
+    handoff_index: HandoffIndex,
     sequence_evidence: SequenceEvidenceSummary,
 ) -> Path:
     manifest_path = review_root / "reviews" / "review_manifest.json"
@@ -41,7 +44,7 @@ def write_review_manifest(
         "design_set_ref": _repo_relative(plan.design_set_path, plan_root=plan.plan_path),
         "deliverable_plan_ref": _repo_relative(plan.plan_path, plan_root=plan.plan_path),
         "materialized_sequence_rows": len(frames),
-        "clone_handoff_verified_count": len(frames),
+        "handoff_verified_count": len(frames),
         "source_indexes": {
             "sequence_index": f"{materialized_root.name}/manifest/indexes/sequence_index.tsv",
             "sequence_index_sha256": _sha256(sequence_index_path),
@@ -59,15 +62,11 @@ def write_review_manifest(
             "still_count": len(frames),
         },
         "sequence_evidence": sequence_evidence.as_manifest(),
-        "clone_handoff": {
+        SEQUENCE_HANDOFF_MANIFEST_KEY: {
             "verified_count": len(frames),
-            "required_fields": [
-                "genbank",
-                "reverse_complement_genbank",
-                "forward_fasta",
-                "reverse_complement_fasta",
-                "features_csv",
-            ],
+            "index_tsv": _relative_to(handoff_index.tsv_path, review_root),
+            "index_markdown": _relative_to(handoff_index.markdown_path, review_root),
+            "required_fields": list(SEQUENCE_HANDOFF_REQUIRED_FIELDS),
         },
         "reader_boundary": {
             "status": "experiment_time_only",

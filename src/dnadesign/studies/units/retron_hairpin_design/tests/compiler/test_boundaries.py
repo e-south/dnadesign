@@ -140,22 +140,25 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "artifact_contracts/output_guards.py": 450,
         "artifact_contracts/materialized_outputs.py": 450,
         "artifact_contracts/manifests.py": 450,
-        "review_outputs/manifest.py": 140,
-        "review_outputs/plan.py": 160,
-        "review_outputs/pwm_baserender_record.py": 160,
-        "review_outputs/pwm_logo.py": 190,
-        "review_outputs/pwm_panel_labels.py": 60,
-        "review_outputs/pwm_panel_metadata.py": 90,
-        "review_outputs/pwm_retention.py": 240,
-        "review_outputs/pwm_sequence_rows.py": 190,
-        "review_outputs/pwm_triptych.py": 140,
-        "review_outputs/pwm_trim_annotations.py": 80,
-        "review_outputs/pwm_typography.py": 40,
-        "review_outputs/pwm_visual_layers.py": 80,
-        "review_outputs/sequence_evidence.py": 120,
-        "review_outputs/sequence_index.py": 140,
-        "review_outputs/sequence_montage.py": 190,
+        "review_outputs/contracts/manifest.py": 140,
+        "review_outputs/contracts/plan.py": 180,
+        "review_outputs/handoff/contract.py": 80,
+        "review_outputs/handoff/index.py": 160,
+        "review_outputs/pwm/baserender_record.py": 160,
+        "review_outputs/pwm/logo.py": 200,
+        "review_outputs/pwm/panel_labels.py": 60,
+        "review_outputs/pwm/panel_metadata.py": 90,
+        "review_outputs/pwm/retention.py": 240,
+        "review_outputs/pwm/sequence_rows.py": 190,
+        "review_outputs/pwm/triptych.py": 140,
+        "review_outputs/pwm/trim_annotations.py": 80,
+        "review_outputs/pwm/typography.py": 40,
+        "review_outputs/pwm/visual_layers.py": 80,
+        "review_outputs/sequence/evidence.py": 120,
+        "review_outputs/sequence/index.py": 140,
+        "review_outputs/sequence/variant_identity.py": 100,
         "review_outputs/service.py": 120,
+        "review_outputs/video/montage.py": 190,
     }
 
     for filename, max_lines in budgets.items():
@@ -166,6 +169,14 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
 
     assert not (source_root / "catalog" / "primitive_sources.py").exists()
     assert not (source_root / "catalog" / "variant_metadata.py").exists()
+    assert sorted(path.name for path in (source_root / "review_outputs").glob("*.py")) == [
+        "__init__.py",
+        "service.py",
+    ]
+    assert not any((source_root / "review_outputs").glob("pwm_*.py"))
+    assert not any((source_root / "review_outputs").glob("sequence_*.py"))
+    assert not (source_root / "review_outputs" / "clone_handoff_index.py").exists()
+    assert not (source_root / "review_outputs" / "handoff" / "clone_index.py").exists()
 
 
 def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
@@ -180,9 +191,13 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         "compiler/test_materialization.py": 900,
         "compiler/test_boundaries.py": 240,
         "compiler/specs/test_teto_trim_metadata.py": 140,
-        "review_outputs/test_pwm_retention.py": 100,
-        "review_outputs/test_sequence_montage.py": 90,
-        "review_outputs/test_teto_pwm_trim_review_outputs.py": 320,
+        "review_outputs/cli/fixtures.py": 70,
+        "review_outputs/cli/test_review_outputs.py": 90,
+        "review_outputs/cli/test_review_outputs_text.py": 70,
+        "review_outputs/package/test_generation.py": 180,
+        "review_outputs/package/test_validation_failures.py": 100,
+        "review_outputs/pwm/test_retention.py": 100,
+        "review_outputs/video/test_montage.py": 100,
         "support/cli.py": 40,
         "support/compiler_fixtures.py": 80,
         "support/registry.py": 80,
@@ -196,6 +211,7 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         assert len(path.read_text(encoding="utf-8").splitlines()) <= max_lines
 
     assert not (tests_root / "compiler" / "test_msd_compiler.py").exists()
+    assert sorted(path.name for path in (tests_root / "review_outputs").glob("test_*.py")) == []
 
 
 def _implementation_line_count(path: Path) -> int:

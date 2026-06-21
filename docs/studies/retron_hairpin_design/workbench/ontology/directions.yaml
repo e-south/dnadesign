@@ -81,5 +81,5 @@ effect_tags:
   teto_full_payload_control: Uses the full 19 nt bidirectional TetR motif payload.
   teto_flank_only_trim_control: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
   teto_mild_pwm_edge_trim: Uses the 15 nt mild dual-site TetR trim.
-  teto_stronger_pwm_edge_trim: Uses the 12 nt stronger dual-site TetR trim.
+  teto_stronger_pwm_edge_trim: Uses the 13 nt stronger dual-site TetR trim.
   wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from the rescue classification.

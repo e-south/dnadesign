@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_triptych.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/triptych.py
 
 PWM trim triptych rendering for tetO trim rescue review outputs.
 
@@ -13,10 +13,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..compiler.exceptions import RetronMsdCompilerError
-from .plan import TetoReviewPlan
-from .pwm_logo import PwmLogoColumn, PwmLogoLayer, write_pwm_logo_triptych
-from .pwm_retention import PwmMotifOccurrence, load_meme_information_bits, load_meme_probability_matrix
+from ...compiler.exceptions import RetronMsdCompilerError
+from ..contracts.plan import TetoReviewPlan
+from .logo import PwmLogoColumn, PwmLogoLayer, write_pwm_logo_triptych
+from .retention import PwmMotifOccurrence, load_meme_information_bits, load_meme_probability_matrix
 
 UNIFORM_ZERO_INFORMATION_ROW = [0.25, 0.25, 0.25, 0.25]
 

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_sequence_rows.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/sequence_rows.py
 
 BaseRender sequence-row panel rendering for bidirectional TetR PWM trim review outputs.
 
@@ -19,15 +19,15 @@ from PIL import Image
 
 import dnadesign.baserender as baserender
 
-from .plan import PwmTrimPanel
-from .pwm_baserender_record import (
+from ..contracts.plan import PwmTrimPanel
+from .baserender_record import (
     PwmLogoColumn,
     PwmLogoLayer,
     build_pwm_baserender_record,
     observed_sequence_for_panel,
 )
-from .pwm_typography import SCALE_BAR_FONT_SIZE, SEQUENCE_FONT_SIZE
-from .pwm_visual_layers import EXCLUDED_COLOR, PANEL_COLOR
+from .typography import SCALE_BAR_FONT_SIZE, SEQUENCE_FONT_SIZE
+from .visual_layers import EXCLUDED_COLOR, PANEL_COLOR
 
 PANEL_WIDTH = 690
 

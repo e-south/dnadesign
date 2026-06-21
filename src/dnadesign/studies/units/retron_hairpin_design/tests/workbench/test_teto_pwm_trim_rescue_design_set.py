@@ -36,35 +36,47 @@ def test_teto_pwm_trim_rescue_design_set_is_study_owned_and_compiler_ready() -> 
         "docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml"
     )
     assert design_set["non_goals"]["rt_fusions"] == "excluded_viability_confounded"
-    assert set(design_set["payload_trims"]) == {"TetR_full", "TetR_trim_conservative", "TetR_trim_aggressive"}
+    assert set(design_set["payload_trims"]) == {"TetR_w00_19", "TetR_w02_17", "TetR_w03_16"}
     assert {trim["payload_trim_id"] for trim in design_set["payload_trims"].values()} == set(spec["payload_sequences"])
     assert {trim["exact_sequence_5to3"] for trim in design_set["payload_trims"].values()} == {
         entry["sequence"] for entry in spec["payload_sequences"].values()
     }
     assert design_set["source_refs"]["tetr_monotypic_yiu"].endswith("configs/yiu/tetr_monotypic_hit.yiu.yaml")
+    assert design_set["parent_payload"]["parent_payload_id"] == "TetR_w00_19"
     assert design_set["parent_payload"]["source_sequence_5to3"] == "CTCTATATCTGATATAGAG"
     assert design_set["parent_payload"]["motif_occurrences"] == [
         {"motif_instance_id": "tetR:0:17:+:1", "start": 0, "end": 17, "strand": "+", "occurrence_rank": 1},
         {"motif_instance_id": "tetR:2:19:-:2", "start": 2, "end": 19, "strand": "-", "occurrence_rank": 2},
     ]
-    assert design_set["payload_trims"]["TetR_full"]["exact_sequence_5to3"] == "CTCTATATCTGATATAGAG"
-    assert design_set["payload_trims"]["TetR_trim_conservative"]["exact_sequence_5to3"] == "CTATATCTGATATAG"
-    assert design_set["payload_trims"]["TetR_trim_conservative"]["sequence_length_nt"] == 15
-    assert design_set["payload_trims"]["TetR_trim_conservative"]["retained_parent_span_0"] == {"start": 2, "end": 17}
-    assert design_set["payload_trims"]["TetR_trim_conservative"]["retained_information_fraction"] == 0.964248
-    assert design_set["payload_trims"]["TetR_trim_conservative"]["selection_rule"] == {
+    assert design_set["payload_trims"]["TetR_w00_19"]["exact_sequence_5to3"] == "CTCTATATCTGATATAGAG"
+    assert design_set["payload_trims"]["TetR_w02_17"]["exact_sequence_5to3"] == "CTATATCTGATATAG"
+    assert design_set["payload_trims"]["TetR_w02_17"]["sequence_length_nt"] == 15
+    assert design_set["payload_trims"]["TetR_w02_17"]["retained_parent_span_0"] == {"start": 2, "end": 17}
+    assert design_set["payload_trims"]["TetR_w02_17"]["retained_information_fraction"] == 0.964248
+    assert design_set["payload_trims"]["TetR_w02_17"]["selection_rule"] == {
         "algorithm": "dual_site_sliding_window_max_ic",
         "requested_length_nt": 15,
         "tie_breaker": "closest_to_parent_center",
     }
-    assert design_set["payload_trims"]["TetR_trim_aggressive"]["exact_sequence_5to3"] == "TATATCTGATAT"
-    assert design_set["payload_trims"]["TetR_trim_aggressive"]["sequence_length_nt"] == 12
-    assert design_set["payload_trims"]["TetR_trim_aggressive"]["retained_parent_span_0"] == {"start": 3, "end": 15}
-    assert design_set["payload_trims"]["TetR_trim_aggressive"]["retained_information_fraction"] == 0.867985
+    assert design_set["payload_trims"]["TetR_w03_16"]["exact_sequence_5to3"] == "TATATCTGATATA"
+    assert design_set["payload_trims"]["TetR_w03_16"]["sequence_length_nt"] == 13
+    assert design_set["payload_trims"]["TetR_w03_16"]["retained_parent_span_0"] == {"start": 3, "end": 16}
+    assert design_set["payload_trims"]["TetR_w03_16"]["retained_information_fraction"] == 0.915756
 
     direction_ids = {direction["id"] for direction in directions["directions"]}
     effect_tags = set(directions["effect_tags"])
     known_construct_ids = {design["construct_id"] for design in design_set["designs"]}
+    assert known_construct_ids == {
+        "pES-tetr-t26-w00-19",
+        "pES-tetr-t26-w02-17",
+        "pES-tetr-t26-w03-16",
+        "pES-tetr-r43-w00-19",
+        "pES-tetr-r43-w02-17",
+        "pES-tetr-r43-w03-16",
+        "pES-tetr-d033-w00-19",
+        "pES-tetr-d033-w02-17",
+        "pES-tetr-d033-w03-16",
+    }
     assert design_set["label_count"] == len(design_set["designs"]) == len(spec["designs"])
     assert design_set["label_count"] == len(resolved.catalog.records)
     assert {design["construct_id"] for design in spec["designs"]} == known_construct_ids

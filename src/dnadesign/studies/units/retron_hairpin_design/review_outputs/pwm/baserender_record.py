@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_baserender_record.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/baserender_record.py
 
 BaseRender record assembly for bidirectional TetR PWM trim panels.
 
@@ -16,8 +16,8 @@ from typing import Mapping, Sequence
 
 import dnadesign.baserender as baserender
 
-from .plan import PwmTrimPanel
-from .pwm_visual_layers import sequence_row_visual_meta
+from ..contracts.plan import PwmTrimPanel
+from .visual_layers import sequence_row_visual_meta
 
 TOP_RETAINED_FEATURE_ID = "tetO_retained_payload_span"
 BOTTOM_RETAINED_FEATURE_ID = "tetO_retained_payload_span_complement"

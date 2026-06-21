@@ -29,8 +29,8 @@ def test_retron_msd_spec_preserves_teto_trim_and_design_metadata_in_reference_in
 contract: retron_msd_compiler_spec_v1
 schema_version: 1
 designs:
-  - construct_id: pES-retron-teto-trim-002
-    payload_id: TetR_trim_conservative
+  - construct_id: pES-tetr-d033-w02-17
+    payload_id: TetR_w02_17
     cap_id: C172
     left_base: AGTG
     right_base: CAAT
@@ -39,19 +39,19 @@ designs:
     nickase: Nb.BtsI
     variant_role: rescue_candidate
     scaffold_context: de033_selected
-    payload_trim_id: TetR_trim_conservative
+    payload_trim_id: TetR_w02_17
     cap_selector_id: de033_snapback_cap_rank_1
     stem_base_selector_id: de033_scar_nick_stem_base_rank_1
     rt_mode: wt_eco1
     decision_group: target_trim_rescue
-    control_id: pES-retron-teto-trim-001
-    rationale: Conservative PWM-edge trim in the DE033-compatible scaffold target.
+    control_id: pES-tetr-d033-w00-19
+    rationale: Window [2,17) PWM-edge trim in the DE033-compatible scaffold target.
 payload_sequences:
-  TetR_trim_conservative:
+  TetR_w02_17:
     sequence: CCTATCAGTGATAGA
-    display_name: msd[teto_mild_pwm_edge_trim]
-    parent_payload_id: TetR
-    payload_trim_id: TetR_trim_conservative
+    display_name: msd[teto_w02_17]
+    parent_payload_id: TetR_w00_19
+    payload_trim_id: TetR_w02_17
     trim_class: conservative
     trim_5p_nt: 2
     trim_3p_nt: 2
@@ -68,8 +68,8 @@ cap_sequences:
     resolved = load_msd_compiler_spec(spec_path, study_dir=study_dir)
     record = resolved.catalog.records[0]
 
-    assert record.payload_or_target.payload_trim_id == "TetR_trim_conservative"
-    assert record.payload_or_target.parent_payload_id == "TetR"
+    assert record.payload_or_target.payload_trim_id == "TetR_w02_17"
+    assert record.payload_or_target.parent_payload_id == "TetR_w00_19"
     assert record.payload_or_target.trim_class == "conservative"
     assert record.payload_or_target.retained_parent_span_0 is not None
     assert record.payload_or_target.retained_parent_span_0.start == 2
@@ -82,7 +82,7 @@ cap_sequences:
     rows = list(
         csv.DictReader((out_dir / "reference_index.tsv").read_text(encoding="utf-8").splitlines(), delimiter="\t")
     )
-    assert rows[0]["payload_trim_id"] == "TetR_trim_conservative"
+    assert rows[0]["payload_trim_id"] == "TetR_w02_17"
     assert rows[0]["payload_trim_class"] == "conservative"
     assert rows[0]["variant_role"] == "rescue_candidate"
     assert rows[0]["scaffold_context"] == "de033_selected"

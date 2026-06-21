@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_montage.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/montage.py
 
 Sequence-still montage rendering for Retron review outputs.
 
@@ -15,8 +15,9 @@ import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from ..compiler.exceptions import RetronMsdCompilerError
-from .sequence_index import SequenceReviewFrame
+from ...compiler.exceptions import RetronMsdCompilerError
+from ..sequence.index import SequenceReviewFrame
+from ..sequence.variant_identity import identity_for_frame, variant_id
 
 VideoWriter = Callable[..., None]
 EDGE_COLUMN_MAX_RGB_THRESHOLD = 250
@@ -149,6 +150,7 @@ def _frame_manifest(
 ) -> dict[str, object]:
     return {
         "order": frame.order,
+        "variant_id": variant_id(frame),
         "evidence_label": frame_evidence_label(frame),
         "construct_id": frame.construct_id,
         "msd_design_id": frame.msd_design_id,
@@ -162,17 +164,12 @@ def _frame_manifest(
 
 
 def frame_filename_stem(frame: SequenceReviewFrame) -> str:
-    role = {"scaffold_target": "target", "rescue_candidate": "rescue"}.get(frame.variant_role, frame.variant_role)
-    return f"{frame.order:02d}_{_slug(role)}_{_slug(frame.scaffold_context)}_{_slug(frame.payload_trim_id)}"
+    return f"{frame.order:02d}_{variant_id(frame)}"
 
 
 def frame_evidence_label(frame: SequenceReviewFrame) -> str:
-    role = {"scaffold_target": "target", "rescue_candidate": "rescue"}.get(frame.variant_role, frame.variant_role)
-    return f"{role} | {frame.scaffold_context} | {frame.payload_trim_id}"
-
-
-def _slug(value: str) -> str:
-    return "".join(character if character.isalnum() or character == "_" else "_" for character in value).strip("_")
+    identity = identity_for_frame(frame)
+    return f"{identity.variant_id} | {identity.role} | {identity.insert_nt} nt {identity.retained_window}"
 
 
 def _relative_to(path: Path, root: Path) -> str:

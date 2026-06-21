@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_trim_annotations.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/trim_annotations.py
 
 Trim-boundary annotation metadata for bidirectional TetR PWM review panels.
 
@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .plan import PwmTrimPanel
-from .pwm_typography import BOUNDARY_TICK_FONT_SIZE
+from ..contracts.plan import PwmTrimPanel
+from .typography import BOUNDARY_TICK_FONT_SIZE
 
 
 def trim_edge_markers(panel: PwmTrimPanel, *, color: str) -> list[dict[str, object]]:

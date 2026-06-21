@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/test_sequence_montage.py
+src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_montage.py
 
 Tests for Retron review-output sequence montage still rendering.
 
@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.studies.units.retron_hairpin_design.review_outputs.sequence_index import SequenceReviewFrame
-from dnadesign.studies.units.retron_hairpin_design.review_outputs.sequence_montage import (
+from dnadesign.studies.units.retron_hairpin_design.review_outputs.sequence.index import SequenceReviewFrame
+from dnadesign.studies.units.retron_hairpin_design.review_outputs.video.montage import (
     _trim_edge_artifact_columns,
     write_sequence_montage,
 )
@@ -28,9 +28,9 @@ def test_sequence_montage_trims_compiler_png_edge_lines(tmp_path: Path) -> None:
     assert _column_is_white(cropped, cropped.width - 1)
     frame = SequenceReviewFrame(
         order=1,
-        construct_id="pES-retron-test",
-        msd_design_id="msd[tetr_dual_full]",
-        payload_trim_id="TetR_full",
+        construct_id="pES-tetr-t26-w00-19",
+        msd_design_id="msd-tetr-w00-19-C26-LCGGG-RACAG-MXMX",
+        payload_trim_id="TetR_w00_19",
         scaffold_context="retron26",
         variant_role="control",
         rt_mode="wt_eco1",
@@ -46,7 +46,7 @@ def test_sequence_montage_trims_compiler_png_edge_lines(tmp_path: Path) -> None:
         video_writer=_fake_video_writer,
     )
 
-    still_path = tmp_path / "review" / "reviews" / "video" / "stills" / "01_control_retron26_TetR_full.png"
+    still_path = tmp_path / "review" / "reviews" / "video" / "stills" / "01_t26-w00-19.png"
     assert still_path.is_file()
     assert not _has_full_height_dark_column(still_path)
 

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/__init__.py
+src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/pwm/__init__.py
 
-Review-output tests for Retron hairpin study deliverables.
+Package exports for dnadesign.studies.units.retron_hairpin_design.tests.review_outputs.pwm.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

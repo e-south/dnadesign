@@ -15,12 +15,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..compiler.exceptions import RetronMsdCompilerError
-from .manifest import write_review_manifest
-from .plan import load_teto_review_plan
-from .pwm_triptych import render_pwm_triptych
-from .sequence_evidence import verify_sequence_evidence
-from .sequence_index import load_validated_sequence_frames
-from .sequence_montage import VideoWriter, write_sequence_montage
+from .contracts.manifest import write_review_manifest
+from .contracts.plan import load_teto_review_plan
+from .handoff.index import write_handoff_index
+from .pwm.triptych import render_pwm_triptych
+from .sequence.evidence import verify_sequence_evidence
+from .sequence.index import load_validated_sequence_frames
+from .video.montage import VideoWriter, write_sequence_montage
 
 
 @dataclass(frozen=True)
@@ -30,9 +31,11 @@ class ReviewOutputResult:
     pwm_triptych_png: Path
     sequence_montage_mp4: Path
     sequence_montage_manifest: Path
+    handoff_tsv: Path
+    handoff_markdown: Path
     review_manifest_path: Path
     sequence_row_count: int
-    clone_handoff_verified_count: int
+    handoff_verified_count: int
     reverse_complement_verified_count: int
 
 
@@ -50,6 +53,12 @@ def generate_teto_pwm_trim_rescue_review_outputs(
     review_root = out_dir.expanduser().resolve()
     frames = load_validated_sequence_frames(resolved_root, plan=plan)
     sequence_evidence = verify_sequence_evidence(frames, materialized_root=resolved_root)
+    handoff_index = write_handoff_index(
+        frames,
+        review_root=review_root,
+        materialized_root=resolved_root,
+        deliverable_plan_id=plan.deliverable_plan_id,
+    )
     pwm_svg, pwm_png = render_pwm_triptych(plan, out_dir=review_root)
     video_path, video_manifest_path = write_sequence_montage(
         frames,
@@ -67,6 +76,7 @@ def generate_teto_pwm_trim_rescue_review_outputs(
         pwm_png=pwm_png,
         video_path=video_path,
         video_manifest_path=video_manifest_path,
+        handoff_index=handoff_index,
         sequence_evidence=sequence_evidence,
     )
     return ReviewOutputResult(
@@ -75,9 +85,11 @@ def generate_teto_pwm_trim_rescue_review_outputs(
         pwm_triptych_png=pwm_png,
         sequence_montage_mp4=video_path,
         sequence_montage_manifest=video_manifest_path,
+        handoff_tsv=handoff_index.tsv_path,
+        handoff_markdown=handoff_index.markdown_path,
         review_manifest_path=review_manifest_path,
         sequence_row_count=len(frames),
-        clone_handoff_verified_count=len(frames),
+        handoff_verified_count=len(frames),
         reverse_complement_verified_count=sequence_evidence.reverse_complement_verified_count,
     )
 

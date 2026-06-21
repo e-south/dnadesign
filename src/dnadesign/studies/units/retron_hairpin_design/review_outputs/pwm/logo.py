@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_logo.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/logo.py
 
 Study-owned bidirectional TetR PWM sequence-row review triptych rendering.
 
@@ -19,23 +19,23 @@ from typing import Sequence
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .plan import PwmTrimPanel
-from .pwm_panel_labels import panel_title
-from .pwm_panel_metadata import panel_metadata_attributes, panel_subtitle, trim_state_elements
-from .pwm_sequence_rows import (
+from ..contracts.plan import PwmTrimPanel
+from .panel_labels import panel_title
+from .panel_metadata import panel_metadata_attributes, panel_subtitle, trim_state_elements
+from .sequence_rows import (
     PANEL_WIDTH,
     PwmLogoColumn,
     PwmLogoLayer,
     render_pwm_sequence_row_panel,
 )
-from .pwm_typography import SUBTITLE_FONT_SIZE, TITLE_FONT_SIZE, TYPOGRAPHIC_SCALE_ID
+from .typography import SUBTITLE_FONT_SIZE, TITLE_FONT_SIZE, TYPOGRAPHIC_SCALE_ID
 
 INK = "#1F2937"
 MUTED = "#667085"
 LOGO_STYLE_ID = "baserender_sequence_rows_tetr_dual_site_trim_logo_v7"
 PANEL_GUTTER = 34
 OUTER_MARGIN_X = 36
-TOP_LABEL_HEIGHT = 76
+TOP_LABEL_HEIGHT = 128
 BOTTOM_MARGIN = 10
 
 
@@ -86,12 +86,12 @@ def _compose_triptych(
     for index, (image, panel) in enumerate(zip(panel_images, panels, strict=True)):
         x = OUTER_MARGIN_X + index * (PANEL_WIDTH + PANEL_GUTTER)
         panel_center_x = x + PANEL_WIDTH / 2
-        _draw_centered_text(draw, panel_title(panel), center_x=panel_center_x, y=6, fill=INK, font=title_font)
+        _draw_centered_text(draw, panel_title(panel), center_x=panel_center_x, y=2, fill=INK, font=title_font)
         _draw_centered_text(
             draw,
             panel_subtitle(panel),
             center_x=panel_center_x,
-            y=37,
+            y=66,
             fill=MUTED,
             font=meta_font,
         )

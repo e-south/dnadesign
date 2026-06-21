@@ -68,8 +68,12 @@ def emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"sequence_montage_manifest: {payload['sequence_montage_manifest']}")
     if payload.get("review_manifest_path") is not None:
         typer.echo(f"review_manifest_path: {payload['review_manifest_path']}")
-    if payload.get("clone_handoff_verified_count") is not None:
-        typer.echo(f"clone_handoff_verified_count: {payload['clone_handoff_verified_count']}")
+    if payload.get("handoff_tsv") is not None:
+        typer.echo(f"handoff_tsv: {payload['handoff_tsv']}")
+    if payload.get("handoff_markdown") is not None:
+        typer.echo(f"handoff_markdown: {payload['handoff_markdown']}")
+    if payload.get("handoff_verified_count") is not None:
+        typer.echo(f"handoff_verified_count: {payload['handoff_verified_count']}")
     if payload.get("finder_open") is not None:
         typer.echo(f"finder_open: {payload['finder_open']}")
     warnings = payload.get("warnings")

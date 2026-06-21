@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.18
+  version: 0.7.19
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -146,7 +146,7 @@ Out of scope:
   GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
 - Deliverable verification for tetO `review-outputs`: PWM triptych, semantic
   stills, montage MP4/manifest, review manifest, nine sequence rows, and nine
-  verified clone handoff rows.
+  verified sequence handoff rows.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.

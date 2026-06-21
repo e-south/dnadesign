@@ -54,7 +54,15 @@ def write_fake_materialized_bundle(root: Path, *, repo_root: Path, row_count: in
             else:
                 (target_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
         write_png(plots_dir / "composition_overview.png", color=(40 + idx * 12, 130, 190))
-        rows.append(_sequence_index_row(root=root, variant_dir=variant_dir, design=design, idx=idx))
+        rows.append(
+            _sequence_index_row(
+                root=root,
+                variant_dir=variant_dir,
+                design=design,
+                idx=idx,
+                parent_payload_id=str(design_set["parent_payload"]["parent_payload_id"]),
+            )
+        )
     _write_sequence_index(root / "manifest" / "indexes" / "sequence_index.tsv", rows)
     return root
 
@@ -98,7 +106,14 @@ _FAKE_ARTIFACT_FILENAMES = (
 )
 
 
-def _sequence_index_row(*, root: Path, variant_dir: Path, design: dict[str, object], idx: int) -> dict[str, str]:
+def _sequence_index_row(
+    *,
+    root: Path,
+    variant_dir: Path,
+    design: dict[str, object],
+    idx: int,
+    parent_payload_id: str,
+) -> dict[str, str]:
     rel_variant = variant_dir.relative_to(root).as_posix()
     return {
         "construct_id": str(design["construct_id"]),
@@ -106,7 +121,7 @@ def _sequence_index_row(*, root: Path, variant_dir: Path, design: dict[str, obje
         "msd_design_id": str(design["expected_msd_design_id"]),
         "payload_trim_id": str(design["payload_trim_id"]),
         "payload_trim_class": str(design["payload_trim_id"]).replace("TetR_", ""),
-        "parent_payload_id": "TetR_full",
+        "parent_payload_id": parent_payload_id,
         "pwm_source_ref": "cruncher:westmann_tetr_mitomi:tetR",
         "variant_role": str(design["variant_role"]),
         "scaffold_context": str(design["scaffold_context"]),

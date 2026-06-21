@@ -29,7 +29,7 @@ base-junction scar-nick work.
   review and handoff deliverable contracts for study hypotheses
 - `docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml`:
   tetO trim rescue deliverable plan for PWM triptych, nine sequence review
-  stills, sequence montage video, review manifest, GenBank cloning handoff, and
+  stills, sequence montage video, review manifest, GenBank sequence handoff, and
   future Reader outcome overlay routing
 - `docs/studies/retron_hairpin_design/workbench/outputs/`: ignored generated
   output roots for local materialized bundles and review packages; preferred
@@ -114,12 +114,22 @@ base-junction scar-nick work.
   `reviews/review_manifest.json`.
 - `src/dnadesign/studies/units/retron_hairpin_design/review_outputs/service.py`
   is the review-output facade used by the CLI and tests.
+- Review-output implementation is split by semantic lane:
+  `contracts/` parses deliverable plans and writes review manifests, `pwm/`
+  renders BaseRender-style trim triptychs, `sequence/` validates materialized
+  sequence evidence, `video/` writes stills and montage video, and `handoff/`
+  writes sequence-handoff indexes. Do not add root-level `pwm_*.py`,
+  `sequence_*.py`, or sequence-handoff helper files.
 - `src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/` keeps
   compiler tests split by semantic lane: `test_cap_sources.py`,
   `test_msd_ids.py`, `test_cli_lint.py`, `test_cli_compile.py`,
   `test_msd_unit.py`, `test_materialization.py`, and `test_boundaries.py`.
   Typed-spec metadata tests live under
   `tests/compiler/specs/`; shared fixtures live under `tests/support/`.
+- `src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/`
+  mirrors the review-output semantic lanes: `cli/`, `package/`, `pwm/`, and
+  `video/`. Keep shared review-output fixtures in `tests/support/`; do not add
+  broad root-level `tests/review_outputs/test_*.py` files.
 - `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.

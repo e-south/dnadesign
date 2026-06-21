@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_panel_labels.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/panel_labels.py
 
 Display labels for bidirectional TetR PWM review panels.
 
@@ -11,12 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .plan import PwmTrimPanel
+from ..contracts.plan import PwmTrimPanel
 
 PANEL_DISPLAY_TITLES = {
-    "TetR_full": "Full dual-site",
-    "TetR_trim_conservative": "Mild trim",
-    "TetR_trim_aggressive": "Stronger trim",
+    "TetR_w00_19": "Full site",
+    "TetR_w02_17": "Trim 02-17",
+    "TetR_w03_16": "Trim 03-16",
 }
 
 

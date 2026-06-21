@@ -2,7 +2,7 @@ contract: retron_hairpin_deliverable_plan_v1
 schema_version: 1
 study_id: retron_hairpin_design
 deliverable_plan_id: teto_pwm_trim_rescue_v1
-title: bidirectional TetR PWM trim rescue v1 deliverables
+title: bidirectional TetR PWM trim v1 deliverables
 authority: persistent study workbench deliverable contract
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
 compiler_spec_ref: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
@@ -42,15 +42,15 @@ artifact_families:
       - reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.svg
       - reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png
     panels:
-      - payload_trim_id: TetR_full
+      - payload_trim_id: TetR_w00_19
         label: full 19 nt dual-site parent payload
         retained_parent_span_0: {start: 0, end: 19}
-      - payload_trim_id: TetR_trim_conservative
+      - payload_trim_id: TetR_w02_17
         label: mild 15 nt dual-site trim
         retained_parent_span_0: {start: 2, end: 17}
-      - payload_trim_id: TetR_trim_aggressive
-        label: stronger 12 nt dual-site trim
-        retained_parent_span_0: {start: 3, end: 15}
+      - payload_trim_id: TetR_w03_16
+        label: stronger 13 nt dual-site trim
+        retained_parent_span_0: {start: 3, end: 16}
     motif_layers:
       - motif_instance_id: tetR:0:17:+:1
         retained_parent_span_0: {start: 0, end: 17}
@@ -64,11 +64,11 @@ artifact_families:
       - Pad each source 17-position MEME PWM with zero-information columns outside its occurrence span so each logo aligns to the full 19 nt parent without inventing motif information.
       - Validate each declared retained span with the dual_site_sliding_window_max_ic selector for that retained length before rendering.
       - Use a full-site ghost backdrop, retained-payload feature box, and retained-span cut-lines so truncation extent is visible before reading subtitles.
-      - Show only the retained-span boundary ticks for each panel: 0/19, 2/17, and 3/15; do not render generic coordinate ticks.
+      - Show only the retained-span boundary ticks for each panel: 0/19, 2/17, and 3/16; do not render generic coordinate ticks.
       - Use compact display titles and subtitles: nt count, retained span, and rounded retained information content.
       - Keep the PWM source in SVG/review-manifest metadata rather than rendering a tiny source-path footer in the bitmap.
-      - Normalize visible review typography: 24 px title, 18 px subtitle, 16 px sequence/terminal/feature labels, and quieter 11 px boundary tick labels.
-      - Use retained-payload feature boxes whose span changes by panel: 0-19 for full, 2-17 for mild, and 3-15 for stronger.
+      - Normalize visible review typography: 42 px title, 32 px subtitle, 16 px sequence/terminal/feature labels, and quieter 11 px boundary tick labels.
+      - Use retained-payload feature boxes whose span changes by panel: 0-19 for full, 2-17 for mild, and 3-16 for stronger.
       - Use match-window sequence-logo coloring: retained site positions expose the observed parent base in the feature hue, while trimmed site positions pass N and render light gray.
       - Show the 19 nt parent site as aligned top/bottom strands with retained payload positions highlighted and trimmed payload positions dimmed.
       - Show retained parent span, trim counts, retained nt, and retained PWM information fraction in panel metadata.
@@ -84,12 +84,12 @@ artifact_families:
       - variants/<construct-id>__<msd-design-id>/plots/composition_overview.svg
       - variants/<construct-id>__<msd-design-id>/plots/composition_overview.png
       - variants/<construct-id>__<msd-design-id>/plots/secondary_structure.native.png
-    expected_filename_pattern: reviews/video/stills/<order>_<role>_<scaffold_context>_<payload_trim_id>.png
+    expected_filename_pattern: reviews/video/stills/<order>_<variant-id>.png
     invariants:
       - One MSD unit per design; no complete-unit repeat expansion.
       - Plot deliverables require folding_status == ok.
       - Sequence indexes must preserve payload_trim_id, scaffold_context, variant_role, and rt_mode.
-      - Construct and MSD ids stay in manifests; still filenames lead with review evidence semantics.
+      - Construct and MSD ids stay in manifests; still filenames use compact variant ids such as t26-w02-17.
   msd_sequence_review_video:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer consuming materialized sequence_index.tsv
@@ -98,17 +98,38 @@ artifact_families:
     expected_files:
       - reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4
       - reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.manifest.json
-    source_frames: reviews/video/stills/<order>_<role>_<scaffold_context>_<payload_trim_id>.png
+    source_frames: reviews/video/stills/<order>_<variant-id>.png
     ordering: design_set_order
     invariants:
-      - Frame labels use role, scaffold_context, and payload_trim_id; construct_id and msd_design_id remain in the manifest.
+      - Frame labels use compact variant id, role, and retained window; construct_id and msd_design_id remain in the manifest.
       - Video generation is a derivative review artifact, not a replacement for GenBank or sequence indexes.
-  clone_handoff_bundle:
+  sequence_handoff:
     status: current_materialize_output
     owner_surface: Retron MSD materialize command
-    purpose: Emit sequence exports suitable for experimental cloning handoff.
+    purpose: Map each compact variant id to its GenBank, FASTA, and feature CSV exports.
     expected_count: 9
     required_index: manifest/indexes/sequence_index.tsv
+    review_indexes:
+      - reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv
+      - reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md
+    review_columns:
+      - variant_id
+      - construct_id
+      - msd_design_id
+      - scaffold
+      - retained_window
+      - insert_nt
+      - role
+      - genbank
+      - reverse_complement_genbank
+      - forward_fasta
+      - reverse_complement_fasta
+      - features_csv
+    markdown_columns:
+      - variant_id
+      - insert
+      - context
+      - files
     per_design_files:
       - variants/<construct-id>__<msd-design-id>/sequences/forward.gb
       - variants/<construct-id>__<msd-design-id>/sequences/reverse_complement.gb
@@ -117,7 +138,8 @@ artifact_families:
       - variants/<construct-id>__<msd-design-id>/sequences/features.csv
     invariants:
       - GenBank display labels stay human readable and raw ids stay in machine qualifiers.
-      - The sequence index is the handoff table for programmatic consumers.
+      - The sequence index is the complete metadata table for programmatic consumers.
+      - The review package emits a complete handoff TSV plus a compact Markdown index so reviewers can navigate from each compact variant id to its GenBank, FASTA, and feature CSV exports without scanning generated directories.
       - The review package verifies reverse_complement.fa against forward.fa before declaring handoff completeness.
       - Generated exports are caller-owned artifacts and are not durable study truth.
   future_reader_outcome_overlay:
@@ -132,13 +154,13 @@ artifact_families:
   review_package_manifest:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer
-    purpose: Tie the PWM triptych, sequence montage, materialized sequence index, and clone handoff verification into one local review package.
+    purpose: Tie the PWM triptych, sequence montage, materialized sequence index, and sequence handoff verification into one local review package.
     expected_output_group: reviews/
     expected_files:
       - reviews/review_manifest.json
     invariants:
       - The manifest records pre-assay review outputs only.
-      - It must cite sequence_index.tsv and verify all row-referenced handoff files.
+      - It must cite sequence_index.tsv, record review-local handoff indexes, and verify all row-referenced handoff files.
       - Reader SPOP and viability evidence are future experiment-time overlays, not inputs to this manifest.
 quality_gates:
   - The compiler spec lints with 9 records.
@@ -146,5 +168,5 @@ quality_gates:
   - All materialized rows report folding_status == ok before plot deliverables are complete.
   - The PWM triptych uses the same three payload_trim_id values as the design set.
   - The sequence montage consumes frames from sequence_index.tsv instead of scanning generated directories ad hoc.
-  - review-outputs writes reviews/review_manifest.json with 9 sequence rows and 9 verified clone handoff rows.
-  - review-outputs writes 9 semantically named review stills and records reverse-complement plus folding evidence.
+  - review-outputs writes reviews/review_manifest.json with 9 sequence rows and 9 verified sequence handoff rows.
+  - review-outputs writes 9 compact variant-named review stills and records reverse-complement plus folding evidence.

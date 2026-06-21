@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_retention.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/retention.py
 
 PWM information-retention helpers for Retron trim review outputs.
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from ..compiler.exceptions import RetronMsdCompilerError
+from ...compiler.exceptions import RetronMsdCompilerError
 
 
 @dataclass(frozen=True)

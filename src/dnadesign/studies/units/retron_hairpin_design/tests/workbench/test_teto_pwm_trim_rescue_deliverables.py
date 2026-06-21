@@ -13,6 +13,10 @@ from __future__ import annotations
 
 import yaml
 
+from dnadesign.studies.units.retron_hairpin_design.review_outputs.handoff.contract import (
+    SEQUENCE_HANDOFF_COLUMNS,
+)
+
 from ..support.paths import repo_root_from
 
 
@@ -43,7 +47,7 @@ def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs()
 
     families = plan["artifact_families"]
     assert set(families) == {
-        "clone_handoff_bundle",
+        "sequence_handoff",
         "future_reader_outcome_overlay",
         "msd_sequence_review_stills",
         "msd_sequence_review_video",
@@ -51,11 +55,15 @@ def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs()
         "review_package_manifest",
     }
     assert families["msd_sequence_review_stills"]["expected_count"] == design_set["expected_variant_count"] == 9
-    assert families["clone_handoff_bundle"]["expected_count"] == 9
+    assert families["sequence_handoff"]["expected_count"] == 9
     assert families["pwm_trim_review_panel"]["status"] == "current_review_renderer_output"
     assert families["msd_sequence_review_video"]["status"] == "current_review_renderer_output"
     assert families["review_package_manifest"]["status"] == "current_review_renderer_output"
-    assert families["clone_handoff_bundle"]["status"] == "current_materialize_output"
+    assert families["sequence_handoff"]["status"] == "current_materialize_output"
+    assert families["sequence_handoff"]["review_indexes"] == [
+        "reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv",
+        "reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md",
+    ]
     assert families["future_reader_outcome_overlay"]["owner_surface"] == (
         "Reader SPOP bridge and future trim-outcome join"
     )
@@ -70,12 +78,14 @@ def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs()
         "reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4"
         in families["msd_sequence_review_video"]["expected_files"]
     )
+    assert families["sequence_handoff"]["review_columns"] == list(SEQUENCE_HANDOFF_COLUMNS[1:])
+    assert families["sequence_handoff"]["markdown_columns"] == ["variant_id", "insert", "context", "files"]
     assert (
         "variants/<construct-id>__<msd-design-id>/sequences/forward.gb"
-        in families["clone_handoff_bundle"]["per_design_files"]
+        in families["sequence_handoff"]["per_design_files"]
     )
     assert (
         "variants/<construct-id>__<msd-design-id>/sequences/forward.fa"
-        in families["clone_handoff_bundle"]["per_design_files"]
+        in families["sequence_handoff"]["per_design_files"]
     )
     assert "reviews/review_manifest.json" in families["review_package_manifest"]["expected_files"]

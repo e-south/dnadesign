@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_visual_layers.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/visual_layers.py
 
 BaseRender visual-layer metadata for bidirectional TetR PWM trim sequence rows.
 
@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .plan import PwmTrimPanel
-from .pwm_trim_annotations import boundary_ticks, retained_span_bracket, trim_edge_markers
+from ..contracts.plan import PwmTrimPanel
+from .trim_annotations import boundary_ticks, retained_span_bracket, trim_edge_markers
 
 PANEL_COLOR = "#3E927F"
 EXCLUDED_COLOR = "#C8CED8"

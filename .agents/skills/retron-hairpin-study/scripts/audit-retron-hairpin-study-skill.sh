@@ -187,15 +187,18 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artif
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/materialized_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/manifests.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/layout.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/manifest.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/plan.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_logo.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_sequence_rows.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_triptych.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_evidence.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_index.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_montage.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/manifest.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/plan.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/contract.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/index.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/logo.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/sequence_rows.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/triptych.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/evidence.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/index.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/variant_identity.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/service.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/montage.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cap_sources.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cli_lint.py"
@@ -204,7 +207,13 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_materialization.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_boundaries.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/specs/test_teto_trim_metadata.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/test_teto_pwm_trim_review_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/fixtures.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs_text.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_generation.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_validation_failures.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/pwm/test_retention.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_montage.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/cli.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/compiler_fixtures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/registry.py"
@@ -362,15 +371,18 @@ budgets = {
     "artifact_contracts/output_guards.py": 450,
     "artifact_contracts/materialized_outputs.py": 450,
     "artifact_contracts/manifests.py": 450,
-    "review_outputs/manifest.py": 140,
-    "review_outputs/plan.py": 160,
-    "review_outputs/pwm_logo.py": 190,
-    "review_outputs/pwm_sequence_rows.py": 190,
-    "review_outputs/pwm_triptych.py": 140,
-    "review_outputs/sequence_evidence.py": 120,
-    "review_outputs/sequence_index.py": 140,
-    "review_outputs/sequence_montage.py": 190,
+    "review_outputs/contracts/manifest.py": 140,
+    "review_outputs/contracts/plan.py": 180,
+    "review_outputs/handoff/contract.py": 80,
+    "review_outputs/handoff/index.py": 160,
+    "review_outputs/pwm/logo.py": 200,
+    "review_outputs/pwm/sequence_rows.py": 190,
+    "review_outputs/pwm/triptych.py": 140,
+    "review_outputs/sequence/evidence.py": 120,
+    "review_outputs/sequence/index.py": 140,
+    "review_outputs/sequence/variant_identity.py": 100,
     "review_outputs/service.py": 120,
+    "review_outputs/video/montage.py": 190,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
     "catalog/compiler_spec_io.py": 140,
@@ -396,6 +408,15 @@ for filename, budget in budgets.items():
     line_count = implementation_line_count(source_root / filename)
     if line_count > budget:
         violations.append(f"{filename} has {line_count} lines > {budget}")
+root_review_modules = sorted(path.name for path in (source_root / "review_outputs").glob("*.py"))
+if root_review_modules != ["__init__.py", "service.py"]:
+    violations.append(f"review_outputs root has flat modules: {root_review_modules}")
+if list((source_root / "review_outputs").glob("pwm_*.py")):
+    violations.append("review_outputs root contains flat pwm_*.py files")
+if list((source_root / "review_outputs").glob("sequence_*.py")):
+    violations.append("review_outputs root contains flat sequence_*.py files")
+if (source_root / "review_outputs" / "clone_handoff_index.py").exists():
+    violations.append("review_outputs/clone_handoff_index.py still exists")
 if violations:
     raise SystemExit("; ".join(violations))
 PY
@@ -419,7 +440,13 @@ budgets = {
     "compiler/test_materialization.py": 900,
     "compiler/test_boundaries.py": 240,
     "compiler/specs/test_teto_trim_metadata.py": 140,
-    "review_outputs/test_teto_pwm_trim_review_outputs.py": 320,
+    "review_outputs/cli/fixtures.py": 70,
+    "review_outputs/cli/test_review_outputs.py": 90,
+    "review_outputs/cli/test_review_outputs_text.py": 70,
+    "review_outputs/package/test_generation.py": 180,
+    "review_outputs/package/test_validation_failures.py": 100,
+    "review_outputs/pwm/test_retention.py": 100,
+    "review_outputs/video/test_montage.py": 100,
     "support/cli.py": 40,
     "support/compiler_fixtures.py": 80,
     "support/registry.py": 80,
@@ -435,6 +462,9 @@ for filename, budget in budgets.items():
         violations.append(f"{filename} has {line_count} lines > {budget}")
 if (tests_root / "compiler" / "test_msd_compiler.py").exists():
     violations.append("compiler/test_msd_compiler.py still exists")
+root_review_tests = sorted(path.name for path in (tests_root / "review_outputs").glob("test_*.py"))
+if root_review_tests:
+    violations.append(f"review_outputs root has broad tests: {root_review_tests}")
 if violations:
     raise SystemExit("; ".join(violations))
 PY
@@ -465,7 +495,7 @@ require_pattern 'pwm_trim_triptych' "skill references tetO PWM trim review panel
 require_pattern 'sequence_montage' "skill references tetO sequence review video"
 require_pattern 'reviews/video/stills|semantic still' "skill references tetO semantic review stills"
 require_pattern 'reverse-complement' "skill references review-output reverse-complement evidence"
-require_pattern 'clone_handoff_bundle' "skill references tetO GenBank handoff bundle"
+require_pattern 'sequence_handoff' "skill references tetO GenBank handoff bundle"
 require_pattern 'payload-trim metadata|payload_trim_id' "skill preserves payload-trim metadata routing"
 require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim rescue lane"
 require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"

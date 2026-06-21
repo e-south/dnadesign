@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_index.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/index.py
 
 Materialized sequence-index validation for Retron review outputs.
 
@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from ..artifact_contracts.layout import MANIFEST_DIRNAME, MANIFEST_INDEXES_DIRNAME, SEQUENCE_INDEX_FILENAME
-from ..compiler.exceptions import RetronMsdCompilerError
-from .plan import TetoReviewPlan
+from ...artifact_contracts.layout import MANIFEST_DIRNAME, MANIFEST_INDEXES_DIRNAME, SEQUENCE_INDEX_FILENAME
+from ...compiler.exceptions import RetronMsdCompilerError
+from ..contracts.plan import TetoReviewPlan
 
 
 @dataclass(frozen=True)

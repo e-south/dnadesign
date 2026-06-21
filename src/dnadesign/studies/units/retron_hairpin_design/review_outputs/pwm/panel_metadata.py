@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_panel_metadata.py
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/panel_metadata.py
 
 SVG metadata helpers for bidirectional TetR PWM trim review panels.
 
@@ -14,10 +14,10 @@ from __future__ import annotations
 from html import escape
 from typing import Sequence
 
-from .plan import PwmTrimPanel
-from .pwm_panel_labels import compact_panel_subtitle, panel_title
-from .pwm_sequence_rows import PwmLogoColumn, observed_sequence_for_panel
-from .pwm_trim_annotations import BOUNDARY_TICK_FONT_SIZE
+from ..contracts.plan import PwmTrimPanel
+from .panel_labels import compact_panel_subtitle, panel_title
+from .sequence_rows import PwmLogoColumn, observed_sequence_for_panel
+from .trim_annotations import BOUNDARY_TICK_FONT_SIZE
 
 
 def panel_subtitle(panel: PwmTrimPanel) -> str:
