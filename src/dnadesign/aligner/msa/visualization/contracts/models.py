@@ -1,4 +1,13 @@
-"""Data models for generic MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/contracts/models.py
+
+Data models for generic MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

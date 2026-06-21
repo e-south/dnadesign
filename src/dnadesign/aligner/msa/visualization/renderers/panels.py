@@ -1,4 +1,13 @@
-"""SVG panel renderers for generic MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/renderers/panels.py
+
+SVG panel renderers for generic MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

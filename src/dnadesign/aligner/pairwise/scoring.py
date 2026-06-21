@@ -1,4 +1,13 @@
-"""Needleman-Wunsch style global pairwise scoring."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/pairwise/scoring.py
+
+Needleman-Wunsch style global pairwise scoring.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

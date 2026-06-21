@@ -1,4 +1,13 @@
-"""Contracts for MSA backend execution and aligned FASTA bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/contracts.py
+
+Contracts for MSA backend execution and aligned FASTA bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -11,15 +20,21 @@ class MsaBackendSpec:
     """Declared MSA backend and execution policy."""
 
     backend_id: str = "mafft"
-    executable: str = "mafft"
+    executable: str | None = None
     environment: str = "pixi"
     failure_policy: str = "fail_if_missing"
 
     def __post_init__(self) -> None:
-        if self.backend_id != "mafft":
+        if self.backend_id not in {"clustalo", "mafft"}:
             raise ValueError(f"unsupported MSA backend_id: {self.backend_id!r}")
         if self.failure_policy != "fail_if_missing":
             raise ValueError(f"unsupported MSA failure_policy: {self.failure_policy!r}")
+
+    @property
+    def executable_name(self) -> str:
+        """Return the declared executable or the backend default."""
+
+        return self.executable or self.backend_id
 
 
 @dataclass(frozen=True)

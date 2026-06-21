@@ -1,4 +1,13 @@
-"""Annotation-track contract parsing for generic MSA visualizations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/contracts/annotation_tracks.py
+
+Annotation-track contract parsing for generic MSA visualizations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

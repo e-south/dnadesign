@@ -1,4 +1,13 @@
-"""Public API for pairwise and multiple sequence alignment utilities."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/__init__.py
+
+Public API for pairwise and multiple sequence alignment utilities.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.aligner.pairwise import (
     build_score_matrix,

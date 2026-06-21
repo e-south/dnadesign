@@ -1,4 +1,13 @@
-"""SVG renderers for generic MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/renderers/__init__.py
+
+SVG renderers for generic MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.aligner.msa.visualization.renderers.exemplar_windows import (
     write_exemplar_windows_svg,

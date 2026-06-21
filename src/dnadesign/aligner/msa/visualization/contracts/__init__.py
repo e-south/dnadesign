@@ -1,4 +1,13 @@
-"""Contracts for generic MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/contracts/__init__.py
+
+Contracts for generic MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.aligner.msa.visualization.contracts.annotation_tracks import (
     load_annotation_tracks,

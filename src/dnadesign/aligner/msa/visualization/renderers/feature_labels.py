@@ -1,4 +1,13 @@
-"""Feature-label placement helpers for generic MSA SVG renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/renderers/feature_labels.py
+
+Feature-label placement helpers for generic MSA SVG renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

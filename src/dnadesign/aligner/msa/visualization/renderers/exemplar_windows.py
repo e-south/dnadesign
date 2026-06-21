@@ -1,4 +1,13 @@
-"""Selected-row motif-window SVG renderer for MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/renderers/exemplar_windows.py
+
+Selected-row motif-window SVG renderer for MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

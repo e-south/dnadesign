@@ -1,4 +1,13 @@
-"""FASTA reading and writing helpers for generic MSA workflows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/fasta.py
+
+FASTA reading and writing helpers for generic MSA workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

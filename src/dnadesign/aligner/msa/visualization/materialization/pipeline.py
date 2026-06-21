@@ -1,4 +1,13 @@
-"""Generic MSA QC and visualization sidecar materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/materialization/pipeline.py
+
+Generic MSA QC and visualization sidecar materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

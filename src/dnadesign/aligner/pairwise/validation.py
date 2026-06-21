@@ -1,4 +1,13 @@
-"""Nucleotide sequence validation for pairwise scoring."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/pairwise/validation.py
+
+Nucleotide sequence validation for pairwise scoring.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

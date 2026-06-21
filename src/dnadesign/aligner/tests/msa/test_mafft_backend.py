@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/msa/test_mafft_backend.py
+
+Module support for dnadesign.aligner.tests.msa.test_mafft_backend.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

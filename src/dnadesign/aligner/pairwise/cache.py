@@ -1,4 +1,13 @@
-"""Cache helpers for pairwise alignment score batches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/pairwise/cache.py
+
+Cache helpers for pairwise alignment score batches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

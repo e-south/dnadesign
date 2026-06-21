@@ -4,8 +4,9 @@
 **Last verified:** 2026-06-20
 
 Use `dnadesign.aligner.msa` when a workflow needs a generic aligned FASTA
-bundle. This package owns FASTA validation, MAFFT preflight/execution, and
-aligned-bundle manifests. It does not own study-specific roster curation,
+bundle. This package owns FASTA validation, declared MSA backend
+preflight/execution, and aligned-bundle manifests. It currently exposes MAFFT
+and Clustal Omega backends. It does not own study-specific roster curation,
 provider fetching, conservation scoring, or mask algebra.
 
 ## Public API
@@ -20,8 +21,8 @@ request = MsaRequest(
     output_fasta=Path("source.aligned.fasta"),
     manifest_path=Path("source.aligned.manifest.yaml"),
     target_row_id="target",
-    backend=MsaBackendSpec(backend_id="mafft"),
-    command_args=("--globalpair", "--maxiterate", "1000", "--reorder"),
+    backend=MsaBackendSpec(backend_id="clustalo"),
+    command_args=("--force", "--outfmt=fasta", "--threads=1"),
     timeout_seconds=None,
     stderr_path=Path("source.aligned.stderr.txt"),
     run_label="profile-a",
@@ -162,19 +163,32 @@ uv run python -m dnadesign.aligner.msa.visualization \
 
 ## Dependency Contract
 
-MAFFT is a native bioinformatics tool and is installed through Pixi, not `uv`.
-Run MAFFT-backed workflows through Pixi:
+MAFFT and Clustal Omega are native bioinformatics tools and are installed
+through Pixi, not `uv`. Run backend-backed workflows through Pixi:
 
 ```bash
+pixi run clustalo --version
 pixi run mafft --version
 pixi run uv run pytest src/dnadesign/aligner/tests/msa -q
 ```
 
-The MAFFT wrapper fails fast when the executable is unavailable. It writes
-backend stdout to a temporary FASTA, validates that aligned FASTA, and only
-then atomically publishes the final output path. Failed, interrupted, or timed
-out runs do not create an accepted aligned FASTA or manifest. There is no
-implicit fallback backend.
+Each backend wrapper fails fast when the executable is unavailable. It writes
+backend output to a temporary FASTA, validates that aligned FASTA, and only then
+atomically publishes the final output path. Failed, interrupted, or timed out
+runs do not create an accepted aligned FASTA or manifest. There is no implicit
+fallback backend.
+
+The package keeps backend-specific policy separate from process execution:
+
+```text
+src/dnadesign/aligner/msa/backends/
+  execution.py  # temp staging, timeout cleanup, hashes, manifests
+  mafft.py      # MAFFT executable/version/argument policy
+  clustalo.py   # Clustal Omega executable/version/argument policy
+```
+
+New backends should call the shared execution contract instead of reimplementing
+staging, validation-before-publish, Pixi-lock hashing, or stderr sidecars.
 
 ## Bundle Manifest
 

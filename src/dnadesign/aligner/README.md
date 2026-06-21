@@ -8,6 +8,6 @@ nucleotide scoring and generic protein MSA bundles.
 - [Aligner docs index](docs/README.md): route into pairwise and MSA surfaces.
 - [Pairwise Alignment](docs/pairwise.md): scoring behavior, examples, and
   output shapes.
-- [Multiple Sequence Alignment](docs/msa.md): MAFFT backend contract and
-  aligned FASTA bundle manifests.
+- [Multiple Sequence Alignment](docs/msa.md): MAFFT/Clustal Omega backend
+  contracts and aligned FASTA bundle manifests.
 - [Repository docs index](../../../docs/README.md): cross-tool workflow routing.

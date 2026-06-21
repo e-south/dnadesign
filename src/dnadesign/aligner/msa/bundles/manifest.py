@@ -1,4 +1,13 @@
-"""Manifest records for aligned FASTA bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/bundles/manifest.py
+
+Manifest records for aligned FASTA bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

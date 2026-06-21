@@ -1,4 +1,13 @@
-"""Tests for generic MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/msa/visualization/test_materialization.py
+
+Tests for generic MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Shared fixtures for MSA visualization tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/msa/visualization/_fixtures.py
+
+Shared fixtures for MSA visualization tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

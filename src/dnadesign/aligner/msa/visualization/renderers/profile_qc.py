@@ -1,4 +1,13 @@
-"""Target-position QC SVG renderer for MSA visualization sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/renderers/profile_qc.py
+
+Target-position QC SVG renderer for MSA visualization sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -10,8 +10,10 @@ environments:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-2_gnu.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/argtable2-2.13-hd590300_1004.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_8.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-hbd8a1cb_0.conda
+      - conda: https://conda.anaconda.org/bioconda/linux-64/clustalo-1.2.4-h503566f_10.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/expat-2.7.3-hecca717_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gawk-5.4.0-h0a3468a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gmp-6.3.0-hac33072_2.conda
@@ -119,8 +121,10 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zlib-1.3.1-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_6.conda
       osx-64:
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/argtable2-2.13-h10d778d_1004.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/bzip2-1.0.8-h500dc9f_8.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-hbd8a1cb_0.conda
+      - conda: https://conda.anaconda.org/bioconda/osx-64/clustalo-1.2.4-h5eaf441_10.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/expat-2.7.3-heffb93a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/gawk-5.4.0-h37db40e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/gmp-6.3.0-hf036a51_2.conda
@@ -225,6 +229,7 @@ environments:
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-hd037594_8.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-hbd8a1cb_0.conda
+      - conda: https://conda.anaconda.org/bioconda/osx-arm64/clustalo-1.2.4-haef7865_10.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/expat-2.7.3-haf25636_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/gawk-5.4.0-hcc05c04_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/gmp-6.3.0-h7bae524_2.conda
@@ -345,6 +350,22 @@ packages:
   license_family: BSD
   size: 23621
   timestamp: 1650670423406
+- conda: https://conda.anaconda.org/conda-forge/linux-64/argtable2-2.13-hd590300_1004.conda
+  sha256: 90c30b2ea71c494f3afe4dcce9e3e33a1f1fba98a2613ab374d9250c596ebe38
+  md5: d7d089e975b1213c2a0f94e592b7b422
+  depends:
+  - libgcc-ng >=12
+  license: LGPL-2.0-only
+  license_family: LGPL
+  size: 2108861
+  timestamp: 1714499922047
+- conda: https://conda.anaconda.org/conda-forge/osx-64/argtable2-2.13-h10d778d_1004.conda
+  sha256: 750e29732b539e4d8657f7087454b7d66df08591f04ecf8c6842b66c59f29017
+  md5: 7ebcbc431363dfbf9ae25e6a7205d414
+  license: LGPL-2.0-only
+  license_family: LGPL
+  size: 2103186
+  timestamp: 1714500194471
 - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_8.conda
   sha256: c30daba32ddebbb7ded490f0e371eae90f51e72db620554089103b4a6934b0d5
   md5: 51a19bba1b8ebfb60df25cde030b7ebc
@@ -381,6 +402,36 @@ packages:
   license: ISC
   size: 146519
   timestamp: 1767500828366
+- conda: https://conda.anaconda.org/bioconda/linux-64/clustalo-1.2.4-h503566f_10.conda
+  sha256: 30fd59e21c866ffe8ed22d2099a645d6df0956b3138ed4fa836a6e2b55a93644
+  md5: c418f68c70b876a5d6f0463b42226aa3
+  depends:
+  - argtable2
+  - libgcc >=13
+  - libstdcxx >=13
+  license: GPL-2.0-or-later
+  license_family: GPL
+  size: 218961
+  timestamp: 1758863698264
+- conda: https://conda.anaconda.org/bioconda/osx-64/clustalo-1.2.4-h5eaf441_10.conda
+  sha256: 91e4a8abb0f95da4b30d7c72437efa03eaaa4b590f9697c167aca056387005a7
+  md5: 78d846c2ab32e37b6ee89913b64a2147
+  depends:
+  - argtable2
+  - libcxx >=18
+  license: GPL-2.0-or-later
+  license_family: GPL
+  size: 299485
+  timestamp: 1758864463160
+- conda: https://conda.anaconda.org/bioconda/osx-arm64/clustalo-1.2.4-haef7865_10.conda
+  sha256: a7d51a72432477bcf4694bda298ffdc578d00849e21b0395703fa3bbef994cc8
+  md5: 43e0d49fbeacfe1432a0a60c7bf4fb79
+  depends:
+  - libcxx >=18
+  license: GPL-2.0-or-later
+  license_family: GPL
+  size: 2304625
+  timestamp: 1758863180634
 - conda: https://conda.anaconda.org/conda-forge/linux-64/expat-2.7.3-hecca717_0.conda
   sha256: c5d573e6831fb41177fb5ae0f1ee09caed55a868ec9887bc80ccc22c3e57b9b4
   md5: c81f6fa1865526f5ab1e6b669b3ee877

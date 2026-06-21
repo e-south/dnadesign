@@ -1,4 +1,13 @@
-"""Public pairwise alignment scoring API."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/pairwise/__init__.py
+
+Public pairwise alignment scoring API.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.aligner.pairwise.matrix import build_score_matrix, matrix_to_condensed
 from dnadesign.aligner.pairwise.scoring import compute_alignment_scores, global_alignment, mean_pairwise, score_pairwise

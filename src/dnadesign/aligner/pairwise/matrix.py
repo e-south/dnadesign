@@ -1,4 +1,13 @@
-"""Pairwise alignment score matrix helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/pairwise/matrix.py
+
+Pairwise alignment score matrix helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

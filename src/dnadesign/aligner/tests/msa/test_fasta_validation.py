@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/msa/test_fasta_validation.py
+
+Module support for dnadesign.aligner.tests.msa.test_fasta_validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

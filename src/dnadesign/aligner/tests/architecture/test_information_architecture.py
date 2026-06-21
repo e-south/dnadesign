@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/architecture/test_information_architecture.py
+
+Module support for dnadesign.aligner.tests.architecture.test_information_architecture.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,8 +34,13 @@ def test_semantic_packages_exist() -> None:
         ALIGNER_ROOT / "msa",
         ALIGNER_ROOT / "msa" / "backends",
         ALIGNER_ROOT / "msa" / "bundles",
+        ALIGNER_ROOT / "msa" / "visualization",
+        ALIGNER_ROOT / "msa" / "visualization" / "contracts",
+        ALIGNER_ROOT / "msa" / "visualization" / "materialization",
+        ALIGNER_ROOT / "msa" / "visualization" / "renderers",
         ALIGNER_ROOT / "tests" / "pairwise",
         ALIGNER_ROOT / "tests" / "msa",
+        ALIGNER_ROOT / "tests" / "msa" / "visualization",
         ALIGNER_ROOT / "tests" / "architecture",
     ]
 
@@ -44,3 +60,16 @@ def test_no_legacy_flat_pairwise_modules_remain() -> None:
 
     existing = {path.name for path in ALIGNER_ROOT.iterdir()}
     assert existing.isdisjoint(legacy_modules)
+
+
+def test_msa_backend_process_execution_has_one_contract_surface() -> None:
+    backend_root = ALIGNER_ROOT / "msa" / "backends"
+
+    assert (backend_root / "execution.py").is_file()
+    for backend_module_name in ("mafft.py", "clustalo.py"):
+        text = (backend_root / backend_module_name).read_text(encoding="utf-8")
+        assert "run_staged_backend_alignment" in text
+        assert "write_bundle_manifest" not in text
+        assert "perf_counter" not in text
+        assert "uuid4" not in text
+        assert "hashlib" not in text

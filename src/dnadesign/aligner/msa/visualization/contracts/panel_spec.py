@@ -1,4 +1,13 @@
-"""Display-only panel specification for generic MSA visualizations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/visualization/contracts/panel_spec.py
+
+Display-only panel specification for generic MSA visualizations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Validation helpers for FASTA and aligned FASTA records."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/msa/validation.py
+
+Validation helpers for FASTA and aligned FASTA records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

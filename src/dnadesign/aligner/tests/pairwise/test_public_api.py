@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/aligner/tests/pairwise/test_public_api.py
+
+Module support for dnadesign.aligner.tests.pairwise.test_public_api.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import numpy as np
