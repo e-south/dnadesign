@@ -1,7 +1,7 @@
 ## Retron Workbench Provenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-06-20
 
 This lane records what was run against a workbench design set. It stores compact
 manifests, command contracts, hashes, and output posture, not bulky generated

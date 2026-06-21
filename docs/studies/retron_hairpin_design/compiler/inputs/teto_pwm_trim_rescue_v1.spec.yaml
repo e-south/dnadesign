@@ -1,0 +1,198 @@
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+allow_non_ligatable_s0: true
+
+# Literal compiler spec for the bidirectional TetR PWM trim rescue v1 pilot.
+# Payload trim candidates are source-backed literals derived upstream from the
+# Cruncher monotypic TetR PWM elite; this compiler does not resolve payload PWM
+# sources or expand cap x stem-base grids implicitly.
+designs:
+  - construct_id: pES-retron-teto-trim-001
+    payload_id: TetR_full
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    variant_role: control
+    scaffold_context: retron26
+    payload_trim_id: TetR_full
+    cap_selector_id: retron26_full_foldback_C26
+    stem_base_selector_id: retron26_CGGG_ACAG_MXMX
+    rt_mode: wt_eco1
+    decision_group: retron26_payload_trim_control
+    rationale: Full bidirectional TetR payload in the working retron26 scaffold control.
+  - construct_id: pES-retron-teto-trim-002
+    payload_id: TetR_trim_conservative
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    variant_role: control
+    scaffold_context: retron26
+    payload_trim_id: TetR_trim_conservative
+    cap_selector_id: retron26_full_foldback_C26
+    stem_base_selector_id: retron26_CGGG_ACAG_MXMX
+    rt_mode: wt_eco1
+    decision_group: retron26_payload_trim_control
+    control_id: pES-retron-teto-trim-001
+    rationale: Mild 15 nt dual-site TetR trim in the working retron26 scaffold control.
+  - construct_id: pES-retron-teto-trim-003
+    payload_id: TetR_trim_aggressive
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    variant_role: control
+    scaffold_context: retron26
+    payload_trim_id: TetR_trim_aggressive
+    cap_selector_id: retron26_full_foldback_C26
+    stem_base_selector_id: retron26_CGGG_ACAG_MXMX
+    rt_mode: wt_eco1
+    decision_group: retron26_payload_trim_control
+    control_id: pES-retron-teto-trim-001
+    rationale: Stronger 12 nt dual-site TetR trim in the working retron26 scaffold control.
+  - construct_id: pES-retron-teto-trim-004
+    payload_id: TetR_full
+    cap_id: C43
+    left_base: CAAG
+    right_base: CTCG
+    variant_role: scaffold_target
+    scaffold_context: retron43
+    payload_trim_id: TetR_full
+    cap_selector_id: retron43_full_foldback_C43
+    stem_base_selector_id: retron43_CAAG_CTCG_MXMM
+    rt_mode: wt_eco1
+    decision_group: retron43_payload_trim_rescue
+    control_id: pES-retron-teto-trim-001
+    rationale: Full bidirectional TetR baseline in the retron43 target scaffold.
+  - construct_id: pES-retron-teto-trim-005
+    payload_id: TetR_trim_conservative
+    cap_id: C43
+    left_base: CAAG
+    right_base: CTCG
+    variant_role: rescue_candidate
+    scaffold_context: retron43
+    payload_trim_id: TetR_trim_conservative
+    cap_selector_id: retron43_full_foldback_C43
+    stem_base_selector_id: retron43_CAAG_CTCG_MXMM
+    rt_mode: wt_eco1
+    decision_group: retron43_payload_trim_rescue
+    control_id: pES-retron-teto-trim-004
+    rationale: Mild 15 nt dual-site TetR trim tests whether cargo shortening rescues retron43 SPOP.
+  - construct_id: pES-retron-teto-trim-006
+    payload_id: TetR_trim_aggressive
+    cap_id: C43
+    left_base: CAAG
+    right_base: CTCG
+    variant_role: rescue_candidate
+    scaffold_context: retron43
+    payload_trim_id: TetR_trim_aggressive
+    cap_selector_id: retron43_full_foldback_C43
+    stem_base_selector_id: retron43_CAAG_CTCG_MXMM
+    rt_mode: wt_eco1
+    decision_group: retron43_payload_trim_rescue
+    control_id: pES-retron-teto-trim-004
+    rationale: Stronger 12 nt dual-site TetR trim tests whether stronger cargo shortening rescues retron43 SPOP.
+  - construct_id: pES-retron-teto-trim-007
+    payload_id: TetR_full
+    cap_id: C172
+    left_base: AGTG
+    right_base: CAAT
+    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    variant_role: scaffold_target
+    scaffold_context: de033_selected
+    payload_trim_id: TetR_full
+    cap_selector_id: de033_snapback_C172_rank_1
+    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    rt_mode: wt_eco1
+    decision_group: de033_payload_trim_rescue
+    control_id: pES-retron-teto-trim-001
+    rationale: Full bidirectional TetR baseline in the selected DE033-compatible cap and stem-base target.
+  - construct_id: pES-retron-teto-trim-008
+    payload_id: TetR_trim_conservative
+    cap_id: C172
+    left_base: AGTG
+    right_base: CAAT
+    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    variant_role: rescue_candidate
+    scaffold_context: de033_selected
+    payload_trim_id: TetR_trim_conservative
+    cap_selector_id: de033_snapback_C172_rank_1
+    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    rt_mode: wt_eco1
+    decision_group: de033_payload_trim_rescue
+    control_id: pES-retron-teto-trim-007
+    rationale: Mild 15 nt dual-site TetR trim in the selected DE033-compatible target.
+  - construct_id: pES-retron-teto-trim-009
+    payload_id: TetR_trim_aggressive
+    cap_id: C172
+    left_base: AGTG
+    right_base: CAAT
+    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    variant_role: rescue_candidate
+    scaffold_context: de033_selected
+    payload_trim_id: TetR_trim_aggressive
+    cap_selector_id: de033_snapback_C172_rank_1
+    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    rt_mode: wt_eco1
+    decision_group: de033_payload_trim_rescue
+    control_id: pES-retron-teto-trim-007
+    rationale: Stronger 12 nt dual-site TetR trim in the selected DE033-compatible target.
+
+payload_sequences:
+  TetR_full:
+    sequence: CTCTATATCTGATATAGAG
+    display_name: msd[tetr_dual_full]
+    parent_payload_id: TetR_full
+    payload_trim_id: TetR_full
+    trim_class: full
+    trim_5p_nt: 0
+    trim_3p_nt: 0
+    retained_parent_span_0: {start: 0, end: 19}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    information_content_parent: 14.073291
+    information_content_retained: 14.073291
+    retained_information_fraction: 1.0
+    selection_basis: dual_site_tetR_pwm_information_content
+    protected_positions_or_reason: Full 19 nt monotypic TetR elite parent payload with selected plus- and minus-strand motif occurrences.
+  TetR_trim_conservative:
+    sequence: CTATATCTGATATAG
+    display_name: msd[tetr_dual_mild_trim]
+    parent_payload_id: TetR_full
+    payload_trim_id: TetR_trim_conservative
+    trim_class: conservative
+    trim_5p_nt: 2
+    trim_3p_nt: 2
+    retained_parent_span_0: {start: 2, end: 17}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    information_content_parent: 14.073291
+    information_content_retained: 13.570146
+    retained_information_fraction: 0.964248
+    selection_basis: dual_site_tetR_pwm_information_content
+    protected_positions_or_reason: Mild dual-site trim; retains the 15 nt overlap core selected by both TetR motif occurrences.
+  TetR_trim_aggressive:
+    sequence: TATATCTGATAT
+    display_name: msd[tetr_dual_stronger_trim]
+    parent_payload_id: TetR_full
+    payload_trim_id: TetR_trim_aggressive
+    trim_class: aggressive
+    trim_5p_nt: 3
+    trim_3p_nt: 4
+    retained_parent_span_0: {start: 3, end: 15}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    information_content_parent: 14.073291
+    information_content_retained: 12.215405
+    retained_information_fraction: 0.867985
+    selection_basis: dual_site_tetR_pwm_information_content
+    protected_positions_or_reason: Stronger dual-site trim; selector keeps the highest-information 12 nt subspan across both motif occurrences.
+
+cap_sequences:
+  C26:
+    sequence: AGGC
+  C43:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C172:
+    sequence: GAGAGACTC

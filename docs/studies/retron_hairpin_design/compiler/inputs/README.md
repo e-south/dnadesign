@@ -12,3 +12,8 @@ experimental meaning belongs in `../../workbench/design_sets/`.
   `scar_nick.s0_match_required=false`. C26 has no subsection topology, so
   materialization emits the whole `AGGC` segment without
   retained-stem/cap/foldback-return labels.
+- `teto_pwm_trim_rescue_v1.spec.yaml`: nine-design bidirectional TetR PWM trim rescue spec
+  for retron26 control, retron43 target scaffold, and one selected
+  DE033-compatible target context. Payload entries are literal 5'->3'
+  sequences from the Cruncher monotypic TetR elite with trim metadata; durable experimental meaning stays in
+  `../../workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`.

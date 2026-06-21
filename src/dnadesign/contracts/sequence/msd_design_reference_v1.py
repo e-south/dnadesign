@@ -73,13 +73,44 @@ def compute_scar_nick_profile_s3s2s1s0(*, left_base: str, right_base: str) -> st
 class MsdPayloadOrTargetV1(MsdDesignContractModel):
     id: str
     display_name: str | None = None
+    parent_payload_id: str | None = None
+    payload_trim_id: str | None = None
+    trim_class: Literal["full", "conservative", "aggressive"] | None = None
+    trim_5p_nt: int | None = Field(default=None, ge=0)
+    trim_3p_nt: int | None = Field(default=None, ge=0)
+    retained_parent_span_0: "MsdPayloadSpanV1 | None" = None
+    pwm_source_ref: str | None = None
+    information_content_parent: float | None = Field(default=None, ge=0)
+    information_content_retained: float | None = Field(default=None, ge=0)
+    retained_information_fraction: float | None = Field(default=None, ge=0, le=1)
+    selection_basis: str | None = None
+    protected_positions_or_reason: str | None = None
 
-    @field_validator("id", "display_name")
+    @field_validator(
+        "id",
+        "display_name",
+        "parent_payload_id",
+        "payload_trim_id",
+        "pwm_source_ref",
+        "selection_basis",
+        "protected_positions_or_reason",
+    )
     @classmethod
     def _optional_not_blank(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return _not_blank(value, label="payload_or_target field")
+
+
+class MsdPayloadSpanV1(MsdDesignContractModel):
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> "MsdPayloadSpanV1":
+        if self.end <= self.start:
+            raise ValueError("payload retained span end must be > start.")
+        return self
 
 
 class MsdCapTopologySpanV1(MsdDesignContractModel):
@@ -241,6 +272,32 @@ class MsdDesignArtifactsV1(MsdDesignContractModel):
         return _not_blank(value, label="artifact path")
 
 
+class MsdVariantMetadataV1(MsdDesignContractModel):
+    variant_role: Literal["control", "scaffold_target", "rescue_candidate"] | None = None
+    scaffold_context: Literal["retron26", "retron43", "de033_selected"] | None = None
+    payload_trim_id: str | None = None
+    cap_selector_id: str | None = None
+    stem_base_selector_id: str | None = None
+    rt_mode: Literal["wt_eco1"] | None = None
+    decision_group: str | None = None
+    control_id: str | None = None
+    rationale: str | None = None
+
+    @field_validator(
+        "payload_trim_id",
+        "cap_selector_id",
+        "stem_base_selector_id",
+        "decision_group",
+        "control_id",
+        "rationale",
+    )
+    @classmethod
+    def _optional_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _not_blank(value, label="variant metadata field")
+
+
 class MsdDesignReferenceV1(MsdDesignContractModel):
     contract: Literal["msd_design_reference_v1"] = "msd_design_reference_v1"
     schema_version: Literal[1] = 1
@@ -251,6 +308,7 @@ class MsdDesignReferenceV1(MsdDesignContractModel):
     payload_or_target: MsdPayloadOrTargetV1
     cap: MsdCapReferenceV1
     scar_nick: MsdScarNickReferenceV1
+    variant_metadata: MsdVariantMetadataV1 | None = None
     source_notes: str | None = None
     sequence: MsdSequenceSummaryV1 = Field(default_factory=MsdSequenceSummaryV1)
     source: MsdDesignSourceV1 = Field(default_factory=MsdDesignSourceV1)

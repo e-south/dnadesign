@@ -126,16 +126,22 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/catalog/msd
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/README.md"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-06-20-teto-pwm-trim-rescue-v1.compile.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/materializations/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-05-18-msd-177-194.single-unit.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/materializations/2026-06-20-teto-pwm-trim-rescue-v1.single-unit.yaml"
 require_file "$REPO_ROOT/docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md"
 require_file "$REPO_ROOT/docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md"
@@ -168,7 +174,11 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/inter
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/inputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/io.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/messages.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/review_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/specs/__init__.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/specs/primitive_sources.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/specs/variant_metadata.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/registry.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/sequence_inputs.py"
@@ -177,6 +187,29 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artif
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/materialized_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/manifests.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/layout.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/manifest.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/plan.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_logo.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_sequence_rows.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm_triptych.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_evidence.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_index.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence_montage.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/service.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cap_sources.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_ids.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cli_lint.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_unit.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cli_compile.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_materialization.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_boundaries.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/specs/test_teto_trim_metadata.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/test_teto_pwm_trim_review_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/cli.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/compiler_fixtures.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/registry.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_outputs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/viennarna.py"
 require_file "$REFERENCE_DIR/route-matrix.md"
 require_file "$REFERENCE_DIR/refresh-loop.md"
 require_file "$REFERENCE_DIR/study-surfaces.md"
@@ -207,6 +240,12 @@ for stale_surface in cli.py compiler.py errors.py; do
     pass "root Retron study Python surface removed: $stale_surface"
   fi
 done
+
+if [[ -e "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_compiler.py" ]]; then
+  fail "Retron compiler tests split into semantic lanes"
+else
+  pass "Retron compiler tests split into semantic lanes"
+fi
 
 if [[ -e "$OLD_SKILL_DIR" ]]; then
   fail "old skill directory removed"
@@ -270,6 +309,14 @@ done
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
   printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/README.md"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
+  printf '\n'
+  cat "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml"
+  printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/README.md"
   printf '\n'
   cat "$REPO_ROOT/docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md"
@@ -310,13 +357,25 @@ budgets = {
     "interfaces/cli/inputs.py": 140,
     "interfaces/cli/io.py": 140,
     "interfaces/cli/messages.py": 180,
+    "interfaces/cli/review_outputs.py": 120,
     "artifact_contracts/composition_payload.py": 450,
     "artifact_contracts/output_guards.py": 450,
     "artifact_contracts/materialized_outputs.py": 450,
     "artifact_contracts/manifests.py": 450,
+    "review_outputs/manifest.py": 140,
+    "review_outputs/plan.py": 160,
+    "review_outputs/pwm_logo.py": 190,
+    "review_outputs/pwm_sequence_rows.py": 190,
+    "review_outputs/pwm_triptych.py": 140,
+    "review_outputs/sequence_evidence.py": 120,
+    "review_outputs/sequence_index.py": 140,
+    "review_outputs/sequence_montage.py": 190,
+    "review_outputs/service.py": 120,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
     "catalog/compiler_spec_io.py": 140,
+    "catalog/specs/primitive_sources.py": 90,
+    "catalog/specs/variant_metadata.py": 140,
     "catalog/sequence_inputs.py": 120,
 }
 
@@ -346,12 +405,52 @@ else
   fail "Retron compiler source stays decomposed by responsibility"
 fi
 
+if uv run python - "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests" <<'PY'
+from pathlib import Path
+import sys
+
+tests_root = Path(sys.argv[1])
+budgets = {
+    "compiler/test_cap_sources.py": 120,
+    "compiler/test_msd_ids.py": 120,
+    "compiler/test_cli_lint.py": 1000,
+    "compiler/test_msd_unit.py": 120,
+    "compiler/test_cli_compile.py": 280,
+    "compiler/test_materialization.py": 900,
+    "compiler/test_boundaries.py": 240,
+    "compiler/specs/test_teto_trim_metadata.py": 140,
+    "review_outputs/test_teto_pwm_trim_review_outputs.py": 320,
+    "support/cli.py": 40,
+    "support/compiler_fixtures.py": 80,
+    "support/registry.py": 80,
+    "support/review_outputs.py": 180,
+    "support/viennarna.py": 100,
+}
+
+violations = []
+for filename, budget in budgets.items():
+    path = tests_root / filename
+    line_count = len(path.read_text(encoding="utf-8").splitlines())
+    if line_count > budget:
+        violations.append(f"{filename} has {line_count} lines > {budget}")
+if (tests_root / "compiler" / "test_msd_compiler.py").exists():
+    violations.append("compiler/test_msd_compiler.py still exists")
+if violations:
+    raise SystemExit("; ".join(violations))
+PY
+then
+  pass "Retron compiler tests stay decomposed by responsibility"
+else
+  fail "Retron compiler tests stay decomposed by responsibility"
+fi
+
 require_pattern 'docs/studies/README\.md' "skill routes through study records docs"
 require_pattern 'docs/studies/retron_hairpin_design/record/status\.md' "skill references pinned study status"
 require_pattern 'docs/studies/retron_hairpin_design/routes/README\.md' "skill references pinned study routes"
 require_pattern 'references/msd-design-references\.md' "skill references MSD route detail"
 require_pattern 'docs/studies/retron_hairpin_design/workbench/README\.md' "skill references workbench entrypoint"
 require_pattern 'workbench/ontology' "skill references workbench ontology lane"
+require_pattern 'workbench/deliverables' "skill references workbench deliverables lane"
 require_pattern 'workbench/provenance' "skill references workbench provenance lane"
 require_pattern 'scar_nick_profile_panel_v1\.yaml' "skill references workbench design set"
 require_pattern 'docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction\.md' "skill references scar-nick base-junction context"
@@ -360,6 +459,15 @@ require_pattern 'docs/studies/retron_hairpin_design/compiler/catalog/msd_design_
 require_pattern 'docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources\.yaml' "skill references cap source lookup"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels\.txt' "skill references MSD selected labels"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec\.yaml' "skill references full cohort materialization spec"
+require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1\.spec\.yaml' "skill references tetO trim rescue compiler spec"
+require_pattern 'teto_pwm_trim_rescue_v1\.yaml' "skill references tetO trim rescue design set"
+require_pattern 'pwm_trim_triptych' "skill references tetO PWM trim review panel"
+require_pattern 'sequence_montage' "skill references tetO sequence review video"
+require_pattern 'reviews/video/stills|semantic still' "skill references tetO semantic review stills"
+require_pattern 'reverse-complement' "skill references review-output reverse-complement evidence"
+require_pattern 'clone_handoff_bundle' "skill references tetO GenBank handoff bundle"
+require_pattern 'payload-trim metadata|payload_trim_id' "skill preserves payload-trim metadata routing"
+require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim rescue lane"
 require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"
 require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA implementation record"
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
@@ -369,6 +477,12 @@ require_pattern 'composition_payload\.py' "skill routes composition payload sour
 require_pattern 'output_guards\.py' "skill routes output guard source separately"
 require_pattern 'materialized_outputs\.py' "skill routes artifact publication source separately"
 require_pattern 'manifests\.py' "skill routes manifest writer source separately"
+require_pattern 'review_outputs/service\.py' "skill routes review output service separately"
+require_pattern 'review-outputs' "skill records review-output command"
+require_pattern 'test_cli_lint\.py' "skill records compiler lint test lane"
+require_pattern 'test_materialization\.py' "skill records compiler materialization test lane"
+require_pattern 'tests/review_outputs' "skill records review-output test lane"
+require_pattern 'tests/support' "skill records shared compiler test fixtures"
 require_pattern 'developers\.openai\.com/api/docs/guides/prompt-engineering#coding' "skill records OpenAI Developers prompt-surface source"
 require_pattern 'Start with input completeness, not study phase' "skill uses compiler-first routing"
 require_pattern 'status command output' "skill keeps status as optional progress evidence"
@@ -394,6 +508,16 @@ require_pattern 'four-base left/right basal spans' "skill preserves scar-nick pr
 require_pattern 'YIU' "skill preserves YIU boundary language"
 require_pattern 'harness-engineering' "skill routes harness work outward"
 require_pattern 'code-change-discipline' "skill routes contract work outward"
+if [[ -e "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/primitive_sources.py" ]]; then
+  fail "primitive selector specs moved into semantic package"
+else
+  pass "primitive selector specs moved into semantic package"
+fi
+if [[ -e "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/variant_metadata.py" ]]; then
+  fail "variant metadata specs moved into semantic package"
+else
+  pass "variant metadata specs moved into semantic package"
+fi
 require_pattern '\.agents/skills/retron-hairpin-study/SKILL\.md' "root AGENTS mention the skill" "$ROOT_AGENTS"
 require_pattern '\.agents/skills/retron-hairpin-study/SKILL\.md' "cruncher AGENTS mentions the skill" "$CRUNCHER_AGENTS"
 reject_pattern "$OLD_SKILL_NAME" "old skill route removed"

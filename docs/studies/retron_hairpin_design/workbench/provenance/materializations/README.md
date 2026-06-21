@@ -1,7 +1,7 @@
 ## Retron Materializations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-19
+**Last verified:** 2026-06-20
 
 Materialization records state whether a workbench design set was turned into
 sequence, GenBank, and plot deliverables.
@@ -17,6 +17,10 @@ sequence, GenBank, and plot deliverables.
   `Foldback` segment and omits topology subsection labels because no topology is
   supplied. Its whole `Foldback` segment anchors cap-right secondary-structure
   orientation.
+- `2026-06-20-teto-pwm-trim-rescue-v1.single-unit.yaml`: verified transient
+  materialization of the 9-design tetO PWM trim rescue pilot with full,
+  conservative, and aggressive tetO payloads across retron26, retron43, and
+  selected C172/de033-compatible scaffold contexts.
 
 ### Boundary
 

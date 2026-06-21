@@ -82,6 +82,16 @@ def next_step_for_error(exc: Exception) -> str:
         return "Choose a fresh --out-dir or explicitly archive/remove stale sequence artifacts before materializing."
     if "Stale MSD sequence output" in message or "Stale MSD composition config output" in message:
         return "Choose a fresh --out-dir or explicitly archive/remove stale generated sequence outputs first."
+    if "FFmpeg writer" in message or "sequence montage MP4" in message:
+        return (
+            "Install ffmpeg or run from an environment where Matplotlib can access the ffmpeg writer, then rerun "
+            "review-outputs against the same materialized sequence bundle."
+        )
+    if "Retron review" in message or "review output" in message or "sequence_index.tsv" in message:
+        return (
+            "Rerun materialize into workbench/outputs/teto_pwm_trim_rescue_v1/materialized, then run "
+            "review-outputs with that materialized root and a workbench/outputs review root."
+        )
     return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."
 
 
@@ -124,10 +134,19 @@ def materialize_next_step(out_dir: Path, *, warnings: list[str]) -> str:
     )
 
 
+def review_outputs_next_step(out_dir: Path) -> str:
+    return (
+        "Retron tetO trim review outputs emitted; inspect reviews/review_manifest.json, "
+        "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png, and "
+        f"reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4 under {out_dir.as_posix()}."
+    )
+
+
 __all__ = [
     "compile_next_step",
     "lint_next_step",
     "materialize_next_step",
     "materialize_warnings",
     "next_step_for_error",
+    "review_outputs_next_step",
 ]

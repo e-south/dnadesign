@@ -58,6 +58,18 @@ def emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"variants_dir: {payload['variants_dir']}")
     if payload.get("composition_configs_dir") is not None:
         typer.echo(f"composition_configs_dir: {payload['composition_configs_dir']}")
+    if payload.get("pwm_triptych_svg") is not None:
+        typer.echo(f"pwm_triptych_svg: {payload['pwm_triptych_svg']}")
+    if payload.get("pwm_triptych_png") is not None:
+        typer.echo(f"pwm_triptych_png: {payload['pwm_triptych_png']}")
+    if payload.get("sequence_montage_mp4") is not None:
+        typer.echo(f"sequence_montage_mp4: {payload['sequence_montage_mp4']}")
+    if payload.get("sequence_montage_manifest") is not None:
+        typer.echo(f"sequence_montage_manifest: {payload['sequence_montage_manifest']}")
+    if payload.get("review_manifest_path") is not None:
+        typer.echo(f"review_manifest_path: {payload['review_manifest_path']}")
+    if payload.get("clone_handoff_verified_count") is not None:
+        typer.echo(f"clone_handoff_verified_count: {payload['clone_handoff_verified_count']}")
     if payload.get("finder_open") is not None:
         typer.echo(f"finder_open: {payload['finder_open']}")
     warnings = payload.get("warnings")

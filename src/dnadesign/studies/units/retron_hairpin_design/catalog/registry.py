@@ -43,6 +43,7 @@ class RetronMsdRegistry:
         payload_metadata: dict[str, Any] | None = None,
         cap_metadata: dict[str, Any] | None = None,
         scar_nick_metadata: dict[str, Any] | None = None,
+        variant_metadata: dict[str, Any] | None = None,
         source_notes: str | None = None,
         allow_unregistered_construct: bool = False,
         use_construct_metadata: bool = True,
@@ -52,6 +53,7 @@ class RetronMsdRegistry:
             payload_metadata=payload_metadata,
             cap_metadata=cap_metadata,
             scar_nick_metadata=scar_nick_metadata,
+            variant_metadata=variant_metadata,
             source_notes=source_notes,
             allow_unregistered_construct=allow_unregistered_construct,
             use_construct_metadata=use_construct_metadata,
@@ -64,6 +66,7 @@ class RetronMsdRegistry:
         payload_metadata: dict[str, Any] | None = None,
         cap_metadata: dict[str, Any] | None = None,
         scar_nick_metadata: dict[str, Any] | None = None,
+        variant_metadata: dict[str, Any] | None = None,
         source_notes: str | None = None,
         allow_unregistered_construct: bool = False,
         use_construct_metadata: bool = True,
@@ -100,6 +103,8 @@ class RetronMsdRegistry:
             if not isinstance(scar_nick_metadata, dict):
                 raise RetronMsdRegistryError(f"scar_nick metadata must be a mapping: {parsed.construct_id}")
             scar_nick.update(scar_nick_metadata)
+        if variant_metadata is not None and not isinstance(variant_metadata, dict):
+            raise RetronMsdRegistryError(f"variant metadata must be a mapping: {parsed.construct_id}")
         return MsdDesignReferenceV1.model_validate(
             {
                 "construct_id": parsed.construct_id,
@@ -108,6 +113,18 @@ class RetronMsdRegistry:
                 "payload_or_target": {
                     "id": parsed.payload_id,
                     "display_name": payload.get("display_name"),
+                    "parent_payload_id": payload.get("parent_payload_id"),
+                    "payload_trim_id": payload.get("payload_trim_id"),
+                    "trim_class": payload.get("trim_class"),
+                    "trim_5p_nt": payload.get("trim_5p_nt"),
+                    "trim_3p_nt": payload.get("trim_3p_nt"),
+                    "retained_parent_span_0": payload.get("retained_parent_span_0"),
+                    "pwm_source_ref": payload.get("pwm_source_ref"),
+                    "information_content_parent": payload.get("information_content_parent"),
+                    "information_content_retained": payload.get("information_content_retained"),
+                    "retained_information_fraction": payload.get("retained_information_fraction"),
+                    "selection_basis": payload.get("selection_basis"),
+                    "protected_positions_or_reason": payload.get("protected_positions_or_reason"),
                 },
                 "cap": {
                     "id": parsed.cap_id,
@@ -125,6 +142,7 @@ class RetronMsdRegistry:
                     "nickase": scar_nick.get("nickase"),
                     "route_note": scar_nick.get("route_note"),
                 },
+                "variant_metadata": variant_metadata,
                 "source_notes": source_notes or (construct.get("source_notes") if use_construct_metadata else None),
             }
         )

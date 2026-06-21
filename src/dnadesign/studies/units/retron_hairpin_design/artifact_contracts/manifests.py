@@ -60,7 +60,7 @@ def reference_index_row(
     reference_path: Path,
     root: Path,
 ) -> dict[str, object]:
-    return {
+    row = {
         "construct_id": record.construct_id,
         "msd_design_id": record.msd_design_id,
         "payload_id": record.payload_or_target.id,
@@ -73,6 +73,8 @@ def reference_index_row(
         "nickase": record.scar_nick.nickase or "",
         "reference_path": reference_path.relative_to(root).as_posix(),
     }
+    row.update(_variant_index_fields(record))
+    return row
 
 
 def sequence_index_row(
@@ -113,7 +115,26 @@ def sequence_index_row(
         "secondary_structure_native_png": curated["secondary_structure_native_png"],
         "finder_reveal": f"open -R {shlex.quote(genbank_path.as_posix())}",
     }
+    row.update(_variant_index_fields(record))
     return row
+
+
+def _variant_index_fields(record: MsdDesignReferenceV1) -> dict[str, object]:
+    payload = record.payload_or_target
+    variant = record.variant_metadata
+    return {
+        "payload_trim_id": payload.payload_trim_id or (variant.payload_trim_id if variant else "") or "",
+        "payload_trim_class": payload.trim_class or "",
+        "parent_payload_id": payload.parent_payload_id or "",
+        "pwm_source_ref": payload.pwm_source_ref or "",
+        "variant_role": (variant.variant_role if variant else None) or "",
+        "scaffold_context": (variant.scaffold_context if variant else None) or "",
+        "cap_selector_id": (variant.cap_selector_id if variant else None) or "",
+        "stem_base_selector_id": (variant.stem_base_selector_id if variant else None) or "",
+        "rt_mode": (variant.rt_mode if variant else None) or "",
+        "decision_group": (variant.decision_group if variant else None) or "",
+        "control_id": (variant.control_id if variant else None) or "",
+    }
 
 
 def record_with_sequence_artifacts(record: MsdDesignReferenceV1, *, row: Mapping[str, object]) -> MsdDesignReferenceV1:
@@ -152,7 +173,18 @@ def write_reference_index(path: Path, rows: list[dict[str, object]]) -> None:
         "construct_id",
         "msd_design_id",
         "payload_id",
+        "payload_trim_id",
+        "payload_trim_class",
+        "parent_payload_id",
+        "pwm_source_ref",
         "cap_id",
+        "variant_role",
+        "scaffold_context",
+        "cap_selector_id",
+        "stem_base_selector_id",
+        "rt_mode",
+        "decision_group",
+        "control_id",
         "left_base",
         "right_base",
         "profile_s3s2s1s0",
@@ -172,6 +204,17 @@ def write_sequence_index(path: Path, rows: list[dict[str, object]]) -> None:
         "construct_id",
         "construct_label",
         "msd_design_id",
+        "payload_trim_id",
+        "payload_trim_class",
+        "parent_payload_id",
+        "pwm_source_ref",
+        "variant_role",
+        "scaffold_context",
+        "cap_selector_id",
+        "stem_base_selector_id",
+        "rt_mode",
+        "decision_group",
+        "control_id",
         "composition_id",
         "unit_count",
         "sequence_length",

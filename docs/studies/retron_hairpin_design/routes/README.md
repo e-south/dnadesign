@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-routes
 surface: study-route-map
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-05-18
+last_verified: 2026-06-20
 entrypoint: docs/studies/retron_hairpin_design/routes/README.md
 status_surface: studies.retron-hairpin-design.status
 preflight_surface: studies.retron-hairpin-design.preflight
@@ -12,7 +12,7 @@ preflight_surface: studies.retron-hairpin-design.preflight
 ## Retron Hairpin Design Effort Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-06-20
 
 Retron MSD product work starts from the user's provided parts and desired
 output, not from study phase. Status/preflight surfaces are only for explicit
@@ -33,6 +33,7 @@ progress or blocker questions.
 | --- | --- |
 | MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](compiler/msd-design-references.md) |
 | Persistent hypotheses, effect tags, design-set membership, or compiler/materialization provenance | [Experimental workbench](../workbench/README.md) |
+| Hypothesis-specific PWM panels, sequence-review stills/video, review package manifests, GenBank handoff map, or future outcome overlay map | [Workbench deliverables](../workbench/deliverables/README.md) |
 | Missing cap or shortening geometry | [Released-product Snapback](product/released-product-snapback.md) |
 | Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](product/scar-nick-base-junction.md) |
 | Whole-product sequence composition boundary | [Linear ssDNA composition](composition/linear-ssdna-composition.md) |
@@ -52,6 +53,10 @@ Pair with `harness-engineering` for study-surface hardening and
   compiler/product route. Do not run study status or preflight first.
 - If the request asks where the persistent experimental meaning lives, start
   from `workbench/README.md`, then the relevant design set or run record.
+- If the request asks which review or handoff artifacts should exist for a
+  hypothesis, start from `workbench/deliverables/README.md`, then the relevant
+  deliverable plan. Use the study CLI `review-outputs` command only after the
+  materialized `sequence_index.tsv` exists.
 - If the request needs compiler registry or convenience label inputs, open
   `../compiler/README.md` before the YAML/TXT records.
 - If a part is missing, route to the smallest primitive owner: Snapback for

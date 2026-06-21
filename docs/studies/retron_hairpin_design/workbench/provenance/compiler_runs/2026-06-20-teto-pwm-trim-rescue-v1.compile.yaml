@@ -1,0 +1,61 @@
+contract: retron_msd_compiler_run_record_v1
+schema_version: 1
+study_id: retron_hairpin_design
+run_id: 2026-06-20-teto-pwm-trim-rescue-v1.compile
+run_kind: compile
+status: verified_transient
+verified_at: "2026-06-20"
+git_revision: 9578da1359d1d49a91e4d399bae88ee4223a6a3d # pragma: allowlist secret
+worktree_status: verified_before_commit
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+command:
+  cwd: repo:.
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
+    - compile
+    - --spec
+    - docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+    - --out-dir
+    - /tmp/dnadesign_teto_pwm_trim_rescue_v1_compile
+    - --format
+    - json
+inputs:
+  design_set:
+    path: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+    sha256: add0de1b01bc252f00a3437e3db155a4ed6ed0135fc64d18d4a508deb903334a # pragma: allowlist secret
+    role: persistent experimental cohort and decision logic
+  compiler_spec:
+    path: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+    sha256: f70f85ba0f3919fe388139db15d0501632e0ed6193fe2f9e31276cad006a6d5c # pragma: allowlist secret
+    role: executable literal payload/cap/stem-base spec
+  registry:
+    path: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
+    sha256: 9b0716e4dc2f7df3241f9bd570612dd76d9e37908b0f8421aca0012a202dd1ba # pragma: allowlist secret
+    role: part and normalization metadata
+  cap_source_lookup:
+    path: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
+    sha256: f5cdc3f13c5d860529478e1bdf31681e7372623b49c047652cda3513099139e6 # pragma: allowlist secret
+    role: checked-in cap source labels and 5'->3' sequences
+observed_output:
+  output_policy: transient_not_checked_in
+  audit_out_dir: /private/tmp/dnadesign_teto_pwm_trim_rescue_v1_compile # pragma: allowlist secret
+  record_count: 9
+  catalog_contract: msd_design_catalog_v1
+  bundle_contract: msd_design_catalog_bundle_v1
+  catalog_sha256: 776c322044e6a7601eea878efcade84b79495e8a5b7ee8c7d500eafe5750073d # pragma: allowlist secret
+  reference_index_sha256: 561268ad637af74b4062a5f6d3bfa2bbe7244c31abf984dcdb67af974aa7880c # pragma: allowlist secret
+  manifest_sha256: 5d79fc34e4eec89dfb44b99cbaaaa402651bb47f67b12d1c62f8bdaef6360797 # pragma: allowlist secret
+  required_index_columns:
+    - payload_trim_id
+    - payload_trim_class
+    - variant_role
+    - scaffold_context
+    - rt_mode
+handoff_policy:
+  persistent_meaning: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+  generated_catalogs: explicit transient directory or owning Reader experiment inputs/designs directory
+  do_not_commit_generated_artifacts_by_default: true

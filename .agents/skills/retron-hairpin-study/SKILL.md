@@ -2,38 +2,30 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.14
+  version: 0.7.18
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
-
 # Retron Hairpin Study
-
 ## Purpose
-
 Route Retron MSD product work: compile a reference, materialize one MSD unit, or route missing constraints to a primitive solver.
-
 ## Scope
-
 In scope:
 - Retron MSD shorthand IDs and explicit part sets.
-- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal sequences, and selected public cap/stem-base primitive sources.
+- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal payloads or trim metadata, and selected public cap/stem-base primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
 - Construct/BaseRender service calls for one MSD unit per design after parts are selected.
 - Skill, route-map, and compiler-harness hardening.
-
 Out of scope:
 - Generic Cruncher walkthroughs.
 - Bench-level retron protocol advice.
 - Making Retron MSD compilation a top-level `retron-msd` tool.
 - Creating one Construct or Folding workspace per requested design.
 - Reporting phase/status posture unless the user explicitly asks for study progress or blockers.
-
 ## Success Criteria
-
 - The first decision is input completeness: compile now, or route missing constraints.
 - Complete user-provided parts are validated and compiled without solver work.
 - User-provided labels are the source of truth for a live request; do not replace them with a checked-in cohort spec or scar-compatible analog.
@@ -50,6 +42,9 @@ Out of scope:
 - Materialized plot deliverables require ViennaRNA status `ok`; publish
   `secondary_structure.native.png`, two-row `composition_overview.svg`, and
   high-resolution `composition_overview.png`, not legacy composites.
+- tetO trim review packages run after materialization with `review-outputs`;
+  consume `sequence_index.tsv` and emit `reviews/pwm/`, semantic
+  `reviews/video/stills/`, `reviews/video/`, and `reviews/review_manifest.json`.
 - Secondary-structure subtitles must include the scar-nick mismatch profile
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
@@ -57,15 +52,16 @@ Out of scope:
 - Persistent hypotheses/design-set meaning lives in `workbench/`; generated
   outputs go to explicit transient or caller-owned directories.
 - Default `S0=M` is required. Profile drift, non-ligatable S0 labels without explicit control opt-in, unknown registry parts, and missing artifacts fail fast. Deliberate controls require `--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true`, and emitted references must carry `scar_nick.s0_match_required=false`.
-- Status/preflight commands are optional progress tools, not default answer
-  posture.
+- Status/preflight commands are optional progress tools, not default answer posture.
 
 ## Workflow
-
 1. Classify the request.
 - Complete MSD label or complete parts: use [msd-design-references.md](references/msd-design-references.md).
 - Complete MSD labels plus "outputs", "deliverables", "exports", "plots",
   "GenBank", or "open in Finder": materialize, not compile-only.
+- Existing tetO trim materialized bundle plus PWM panel, sequence montage,
+  review manifest, or review package request: run `review-outputs`, preferably
+  under `workbench/outputs/teto_pwm_trim_rescue_v1/`.
 - Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
   and use `selector.mode=rank` for the preferred explicit primitive
   combination.
@@ -103,6 +99,10 @@ Out of scope:
   per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
   `composition_overview.svg`, `composition_overview.png`, and a
   secondary-structure subtitle containing the mismatch profile.
+- For tetO trim review packages, run `review-outputs` only after materialize has
+  produced the nine-row `sequence_index.tsv`; verify the logo-style PWM
+  triptych, nine semantic stills, montage MP4/manifest, review manifest, and
+  reverse-complement/folding evidence.
 - If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
   spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
@@ -110,6 +110,7 @@ Out of scope:
 - If lint fails because `S0!=M` and the user did not explicitly opt in, stop with the exact failing label; do not substitute bases, profile, cap, or construct number.
 - For missing constraints, name the missing fields and the primitive route.
 - For generated artifacts, name the output directory and contracts produced.
+  Review packages should point to `reviews/review_manifest.json`.
 
 4. Pair when the work widens.
 - Pair with `harness-engineering` for skill routing, deterministic checks, or
@@ -118,7 +119,6 @@ Out of scope:
   module-boundary changes.
 
 ## Guardrails
-
 - IDs select and validate provided parts; catalogs freeze references.
 - Snapback and scar-nick solve primitives; the compiler emits one selected MSD
   unit per design.
@@ -138,19 +138,20 @@ Out of scope:
   asked for progress/status.
 
 ## Required Deliverables
-
 - Input completeness classification.
 - Selected route: compile, Snapback, scar-nick, YIU contrast, or status.
 - Exact command or next file to open.
 - Output directory/contract posture.
 - Deliverable verification for materialize requests: record count, bundle root,
   GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
+- Deliverable verification for tetO `review-outputs`: PWM triptych, semantic
+  stills, montage MP4/manifest, review manifest, nine sequence rows, and nine
+  verified clone handoff rows.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.
 
 ## Output
-
 Return a short routing answer with:
 - what parts are present and missing
 - what will run next
@@ -160,11 +161,11 @@ Return a short routing answer with:
 - status/preflight details only when explicitly requested
 
 ## Trigger Tests
-
 Should trigger:
 - "Compile this Retron MSD shorthand ID into a design catalog."
 - "Generate one MSD sequence with GenBank and PNG outputs for these Retron IDs."
 - "Open a transient Finder window with these Retron MSD outputs."
+- "Generate the tetO trim PWM triptych and sequence montage review package."
 - "I have left/right bases but need to know if the scar-nick profile is valid."
 - "Which primitive route owns this missing Retron MSD part?"
 - "Harden the Retron MSD compiler skill or routing."
@@ -176,5 +177,4 @@ Should not trigger:
 - "Expose Retron MSD assembly as a generic top-level CLI."
 
 ## References
-
 - [msd-design-references.md](references/msd-design-references.md), [route-matrix.md](references/route-matrix.md), [study-surfaces.md](references/study-surfaces.md), [refresh-loop.md](references/refresh-loop.md), [test-matrix.md](references/test-matrix.md), [external-sources.md](references/external-sources.md)

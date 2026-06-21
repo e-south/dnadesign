@@ -39,6 +39,7 @@ from ...compiler.references import build_msd_design_reference, compile_msd_desig
 from .inputs import collect_labels, merge_sequence_maps, reject_mixed_design_sources, sequence_override_map
 from .io import emit, exit_with_error, format_option
 from .messages import compile_next_step, lint_next_step, materialize_next_step, materialize_warnings
+from .review_outputs import review_outputs_command
 
 _DEFAULT_STUDY_DIR = Path("docs/studies/retron_hairpin_design")
 
@@ -47,6 +48,9 @@ app = typer.Typer(
     no_args_is_help=True,
     help="Lint and compile Retron MSD construct labels into design-reference contracts.",
 )
+
+
+app.command("review-outputs")(review_outputs_command)
 
 
 @app.command("lint")

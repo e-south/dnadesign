@@ -20,47 +20,23 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV1
 
 from .compiler_spec_io import MsdCompilerSpecError, load_compiler_spec_mapping
-from .msd_ids import (
-    MsdDesignPartInput,
-    compute_scar_nick_profile,
-    parse_msd_construct_label,
-    parse_msd_design_parts,
-)
+from .msd_ids import MsdDesignPartInput, compute_scar_nick_profile, parse_msd_construct_label, parse_msd_design_parts
 from .registry import load_retron_msd_registry
 from .sequence_inputs import validate_dna_sequence
+from .specs import (
+    DesignVariantMetadataSpec,
+    PayloadSequenceMetadataSpec,
+    RankedPrimitiveSelectorSpec,
+    ScarNickStemBaseSourceSpec,
+    SnapbackCapSourceSpec,
+)
 
 
 class MsdCompilerSpecModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class RankedPrimitiveSelectorSpec(MsdCompilerSpecModel):
-    mode: Literal["rank"] = "rank"
-    rank: int = Field(ge=1)
-
-    @model_validator(mode="after")
-    def _validate_mode_fields(self) -> "RankedPrimitiveSelectorSpec":
-        if self.mode != "rank":
-            raise ValueError("selector supports only mode=rank.")
-        return self
-
-    def requested_ranks(self) -> list[int]:
-        return [self.rank]
-
-
-class SnapbackCapSourceSpec(MsdCompilerSpecModel):
-    kind: Literal["snapback_released_solve_cap"]
-    run_dir: Path
-    selector: RankedPrimitiveSelectorSpec
-
-
-class ScarNickStemBaseSourceSpec(MsdCompilerSpecModel):
-    kind: Literal["scar_nick_stem_bases"]
-    run_dir: Path
-    selector: RankedPrimitiveSelectorSpec
-
-
-class LiteralSequenceInputSpec(MsdCompilerSpecModel):
+class LiteralSequenceInputSpec(PayloadSequenceMetadataSpec):
     sequence: str
 
 
@@ -77,7 +53,7 @@ class CapSequenceInputSpec(MsdCompilerSpecModel):
         return self
 
 
-class MsdDesignInputSpec(MsdCompilerSpecModel):
+class MsdDesignInputSpec(DesignVariantMetadataSpec):
     construct_id: str
     payload_id: str
     cap_id: str
@@ -214,8 +190,10 @@ def resolve_msd_compiler_spec_payload(
     registry = load_retron_msd_registry(study_dir)
 
     cap_sequences, cap_metadata = _resolve_cap_sequences(spec.cap_sequences)
-    payload_sequences = _resolve_literal_sequence_map(spec.payload_sequences, label="payload_sequences")
-    payload_metadata = {payload_id: {} for payload_id in payload_sequences}
+    payload_sequences, payload_metadata = _resolve_literal_sequence_map(
+        spec.payload_sequences,
+        label="payload_sequences",
+    )
     records: list[MsdDesignReferenceV1] = []
     allow_s0_exception = allow_non_ligatable_s0 or spec.allow_non_ligatable_s0
 
@@ -241,6 +219,7 @@ def resolve_msd_compiler_spec_payload(
                 payload_metadata=payload_metadata.get(parts.payload_id),
                 cap_metadata=cap_metadata.get(parts.cap_id),
                 scar_nick_metadata=scar_nick_metadata,
+                variant_metadata=design.variant_metadata_payload(),
                 source_notes=design.source_notes,
                 allow_unregistered_construct=_has_manual_sequence_parts(
                     payload_metadata=payload_metadata.get(parts.payload_id),
@@ -260,14 +239,22 @@ def resolve_msd_compiler_spec_payload(
     )
 
 
-def _resolve_literal_sequence_map(values: dict[str, LiteralSequenceInputSpec], *, label: str) -> dict[str, str]:
+def _resolve_literal_sequence_map(
+    values: dict[str, LiteralSequenceInputSpec],
+    *,
+    label: str,
+) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
     resolved: dict[str, str] = {}
+    metadata: dict[str, dict[str, Any]] = {}
     for key, entry in values.items():
         sequence_id = _sequence_map_key(key, label=label)
         if sequence_id in resolved:
             raise MsdCompilerSpecError(f"{label} contains duplicate key after trimming: {sequence_id}.")
         resolved[sequence_id] = _dna_sequence(entry.sequence, label=f"{label}.{sequence_id}.sequence")
-    return resolved
+        entry_metadata = entry.metadata_payload()
+        entry_metadata.pop("sequence", None)
+        metadata[sequence_id] = entry_metadata
+    return resolved, metadata
 
 
 def _resolve_cap_sequences(
@@ -403,11 +390,7 @@ def _sequence_map_key(key: object, *, label: str) -> str:
     return key.strip()
 
 
-def _has_manual_sequence_parts(
-    *,
-    payload_metadata: dict[str, Any] | None,
-    cap_metadata: dict[str, Any] | None,
-) -> bool:
+def _has_manual_sequence_parts(*, payload_metadata: dict[str, Any] | None, cap_metadata: dict[str, Any] | None) -> bool:
     return payload_metadata is not None and cap_metadata is not None
 
 
@@ -451,6 +434,7 @@ def _validate_cap_topology_bounds(
 
 __all__ = [
     "MsdCompilerSpecError",
+    "RankedPrimitiveSelectorSpec",
     "ResolvedMsdCompilerSpec",
     "RetronMsdCompilerSpecV1",
     "load_msd_compiler_spec",

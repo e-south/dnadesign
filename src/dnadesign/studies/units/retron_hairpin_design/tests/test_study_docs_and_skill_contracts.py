@@ -94,7 +94,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.14"
+    assert metadata["version"] == "0.7.18"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -208,6 +208,10 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     workbench_readme = _read("docs/studies/retron_hairpin_design/workbench/README.md")
     workbench_ontology_readme = _read("docs/studies/retron_hairpin_design/workbench/ontology/README.md")
     workbench_design_sets_readme = _read("docs/studies/retron_hairpin_design/workbench/design_sets/README.md")
+    workbench_deliverables_readme = _read("docs/studies/retron_hairpin_design/workbench/deliverables/README.md")
+    workbench_deliverable_plan = _read(
+        "docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
+    )
     workbench_provenance_readme = _read("docs/studies/retron_hairpin_design/workbench/provenance/README.md")
     workbench_directions = _read("docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml")
     workbench_design_set = _read(
@@ -279,6 +283,8 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "Quick Route" in routes
     assert "Keep this page as a one-hop route map." in routes
     assert "Experimental workbench" in routes
+    assert "Workbench deliverables" in routes
+    assert "PWM panels, sequence-review stills/video, review package manifests, GenBank handoff map" in routes
     assert "Do not run study status or preflight first." in routes
     assert "MSD Design References Route" in route_msd
     assert "msd_design_hit_labels.txt" in route_msd
@@ -318,10 +324,27 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "msd_design_hit_labels.txt` remains a convenience compiler input" in workbench_readme
     assert "ontology/" in workbench_readme
     assert "design_sets/" in workbench_readme
+    assert "deliverables/" in workbench_readme
     assert "provenance/" in workbench_readme
+    assert "outputs/" in workbench_readme
     assert "controlled vocabulary" in workbench_ontology_readme
     assert "authoritative answer" in workbench_design_sets_readme
+    assert "Hypothesis-specific expectations for PWM panels" in workbench_design_sets_readme
+    assert "hypothesis-specific review and handoff deliverables" in workbench_deliverables_readme
+    assert "teto_pwm_trim_rescue_v1.pwm_trim_triptych.png" in workbench_deliverable_plan
+    assert "teto_pwm_trim_rescue_v1.sequence_montage.mp4" in workbench_deliverable_plan
+    assert "reviews/review_manifest.json" in workbench_deliverable_plan
+    assert "clone_handoff_bundle" in workbench_deliverable_plan
+    assert "Reader owns SPOP math" in workbench_deliverable_plan
     assert "Run records cite design sets" in workbench_provenance_readme
+    assert "tests/compiler/" in study_surfaces
+    assert "test_cli_lint.py" in study_surfaces
+    assert "test_materialization.py" in study_surfaces
+    assert "tests/support/" in study_surfaces
+    assert "review_outputs/" in study_surfaces
+    assert "workbench/deliverables" in study_surfaces
+    assert "sequence montage video" in study_surfaces
+    assert "review-outputs" in study_surfaces
     assert "repo:.agents/skills/retron-hairpin-study/SKILL.md" in pipeline
     assert "command_group_map:" in pipeline
     assert "lanes/materialize.yaml" in pipeline
@@ -412,7 +435,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "composition_overview.png" in pipeline
     assert "shallow output-bundle layout" in study_surfaces
     assert "single-unit sequence artifact generation" in study_surfaces
-    assert "materialize` GenBank/native-structure-PNG/review-PNG" in study_surfaces
+    assert "records plus the `materialize` and `review-outputs` routes" in study_surfaces
     assert "full component spans" in skill
     assert "same-span annotations" in skill
     assert "scar-nick route in `routes/README.md` / `routes/product/scar-nick-base-junction.md`" in route_matrix
@@ -558,16 +581,23 @@ def test_retron_hairpin_workbench_keeps_root_bounded_by_record_lanes() -> None:
     }
 
     assert visible_root_files == {"README.md"}
-    assert visible_root_dirs == {"design_sets", "ontology", "provenance"}
+    assert visible_root_dirs == {"deliverables", "design_sets", "ontology", "provenance"}
     assert (workbench / "ontology" / "README.md").exists()
     assert (workbench / "ontology" / "directions.yaml").exists()
     assert (workbench / "design_sets" / "README.md").exists()
     assert (workbench / "design_sets" / "scar_nick_profile_panel_v1.yaml").exists()
+    assert (workbench / "design_sets" / "teto_pwm_trim_rescue_v1.yaml").exists()
+    assert (workbench / "deliverables" / "README.md").exists()
+    assert (workbench / "deliverables" / "teto_pwm_trim_rescue_v1.yaml").exists()
     assert (workbench / "provenance" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "2026-05-18-msd-177-194.compile.yaml").exists()
+    assert (workbench / "provenance" / "compiler_runs" / "2026-06-20-teto-pwm-trim-rescue-v1.compile.yaml").exists()
     assert (workbench / "provenance" / "materializations" / "README.md").exists()
     assert (workbench / "provenance" / "materializations" / "2026-05-18-msd-177-194.single-unit.yaml").exists()
+    assert (
+        workbench / "provenance" / "materializations" / "2026-06-20-teto-pwm-trim-rescue-v1.single-unit.yaml"
+    ).exists()
 
 
 def test_named_study_records_keep_root_bounded_by_semantic_lanes() -> None:

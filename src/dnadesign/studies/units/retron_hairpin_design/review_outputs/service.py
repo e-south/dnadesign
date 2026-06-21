@@ -1,0 +1,93 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/retron_hairpin_design/review_outputs/service.py
+
+Service facade for Retron hairpin review-output generation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..compiler.exceptions import RetronMsdCompilerError
+from .manifest import write_review_manifest
+from .plan import load_teto_review_plan
+from .pwm_triptych import render_pwm_triptych
+from .sequence_evidence import verify_sequence_evidence
+from .sequence_index import load_validated_sequence_frames
+from .sequence_montage import VideoWriter, write_sequence_montage
+
+
+@dataclass(frozen=True)
+class ReviewOutputResult:
+    review_root: Path
+    pwm_triptych_svg: Path
+    pwm_triptych_png: Path
+    sequence_montage_mp4: Path
+    sequence_montage_manifest: Path
+    review_manifest_path: Path
+    sequence_row_count: int
+    clone_handoff_verified_count: int
+    reverse_complement_verified_count: int
+
+
+def generate_teto_pwm_trim_rescue_review_outputs(
+    *,
+    deliverable_plan_path: Path,
+    materialized_root: Path,
+    out_dir: Path,
+    repo_root: Path | None = None,
+    video_writer: VideoWriter | None = None,
+) -> ReviewOutputResult:
+    resolved_repo_root = repo_root.resolve() if repo_root is not None else _find_repo_root(deliverable_plan_path)
+    plan = load_teto_review_plan(deliverable_plan_path, repo_root=resolved_repo_root)
+    resolved_root = materialized_root.expanduser().resolve()
+    review_root = out_dir.expanduser().resolve()
+    frames = load_validated_sequence_frames(resolved_root, plan=plan)
+    sequence_evidence = verify_sequence_evidence(frames, materialized_root=resolved_root)
+    pwm_svg, pwm_png = render_pwm_triptych(plan, out_dir=review_root)
+    video_path, video_manifest_path = write_sequence_montage(
+        frames,
+        out_dir=review_root,
+        deliverable_plan_id=plan.deliverable_plan_id,
+        materialized_root=resolved_root,
+        video_writer=video_writer,
+    )
+    review_manifest_path = write_review_manifest(
+        plan=plan,
+        review_root=review_root,
+        materialized_root=resolved_root,
+        frames=frames,
+        pwm_svg=pwm_svg,
+        pwm_png=pwm_png,
+        video_path=video_path,
+        video_manifest_path=video_manifest_path,
+        sequence_evidence=sequence_evidence,
+    )
+    return ReviewOutputResult(
+        review_root=review_root,
+        pwm_triptych_svg=pwm_svg,
+        pwm_triptych_png=pwm_png,
+        sequence_montage_mp4=video_path,
+        sequence_montage_manifest=video_manifest_path,
+        review_manifest_path=review_manifest_path,
+        sequence_row_count=len(frames),
+        clone_handoff_verified_count=len(frames),
+        reverse_complement_verified_count=sequence_evidence.reverse_complement_verified_count,
+    )
+
+
+def _find_repo_root(path: Path) -> Path:
+    current = path.expanduser().resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RetronMsdCompilerError(f"Could not resolve repository root from Retron review plan path: {path}")
+
+
+__all__ = ["ReviewOutputResult", "generate_teto_pwm_trim_rescue_review_outputs"]
