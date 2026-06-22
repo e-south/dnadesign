@@ -23,14 +23,14 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/workbench/design_sets/`: authoritative
   persistent design cohorts for experimental meaning
 - `docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`:
-  authoritative cargo-shortening rescue cohort for retron26 control,
-  retron43 target, and DE033-compatible target contexts
+  authoritative cargo-shortening cohort for retron26 control, retron43 target,
+  and the pES-retron-180 C172/AGTG/CATG/XWMM context
 - `docs/studies/retron_hairpin_design/workbench/deliverables/`: persistent
   review and handoff deliverable contracts for study hypotheses
 - `docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml`:
-  tetO trim rescue deliverable plan for PWM triptych, nine sequence review
-  stills, sequence montage video, review manifest, GenBank sequence handoff, and
-  future Reader outcome overlay routing
+  tetO trim deliverable plan for PWM triptych, nine sequence review stills,
+  sequence montage video, review manifest, nine-row GenBank sequence handoff,
+  six-file Benchling import folder, and future Reader outcome overlay routing
 - `docs/studies/retron_hairpin_design/workbench/outputs/`: ignored generated
   output roots for local materialized bundles and review packages; preferred
   tetO trim root is `workbench/outputs/teto_pwm_trim_rescue_v1/`
@@ -55,7 +55,7 @@ base-junction scar-nick work.
   full checked-in materialization spec that supplies selected cap/foldback
   segments as explicit 5'->3' sequences
 - `docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml`:
-  nine-design tetO PWM trim rescue compiler spec with literal payload
+  nine-design tetO PWM trim compiler spec with literal payload
   sequences, payload-trim metadata, WT Eco1-only variant metadata, and explicit
   cap/stem-base choices
 - `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`: the exact command
@@ -116,9 +116,13 @@ base-junction scar-nick work.
   is the review-output facade used by the CLI and tests.
 - Review-output implementation is split by semantic lane:
   `contracts/` parses deliverable plans and writes review manifests, `pwm/`
-  renders BaseRender-style trim triptychs, `sequence/` validates materialized
-  sequence evidence, `video/` writes stills and montage video, and `handoff/`
-  writes sequence-handoff indexes. Do not add root-level `pwm_*.py`,
+  renders trim triptychs through public `dnadesign.baserender` APIs,
+  `sequence/` validates materialized sequence evidence, `video/` writes stills
+  and montage video, and `handoff/` writes sequence-handoff indexes plus
+  Benchling import GenBanks. The deliverable contract owns
+  `review_variant_ids`, and the Benchling import plan owns
+  `assigned_retron_ids`, `source_precedent_ids`, included trim ids, and
+  reverse-complement-only orientation. Do not add root-level `pwm_*.py`,
   `sequence_*.py`, or sequence-handoff helper files.
 - `src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/` keeps
   compiler tests split by semantic lane: `test_cap_sources.py`,
@@ -127,9 +131,10 @@ base-junction scar-nick work.
   Typed-spec metadata tests live under
   `tests/compiler/specs/`; shared fixtures live under `tests/support/`.
 - `src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/`
-  mirrors the review-output semantic lanes: `cli/`, `package/`, `pwm/`, and
-  `video/`. Keep shared review-output fixtures in `tests/support/`; do not add
-  broad root-level `tests/review_outputs/test_*.py` files.
+  mirrors the review-output semantic lanes: `cli/`, `handoff/`, `package/`,
+  `pwm/`, and `video/`. Keep shared review-output fixtures in
+  `tests/support/`; do not add broad root-level `tests/review_outputs/test_*.py`
+  files.
 - `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.

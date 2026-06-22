@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.19
+  version: 0.7.24
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -43,8 +43,7 @@ Out of scope:
   `secondary_structure.native.png`, two-row `composition_overview.svg`, and
   high-resolution `composition_overview.png`, not legacy composites.
 - tetO trim review packages run after materialization with `review-outputs`;
-  consume `sequence_index.tsv` and emit `reviews/pwm/`, semantic
-  `reviews/video/stills/`, `reviews/video/`, and `reviews/review_manifest.json`.
+  consume `sequence_index.tsv` and emit `reviews/pwm/`, 1920 x 1080 px pES-retron-titled stills, a 1920 x 1080 px montage MP4, `reviews/review_manifest.json`, and a flat six-file plan-owned `benchling_genbank/` import folder.
 - Secondary-structure subtitles must include the scar-nick mismatch profile
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
@@ -53,7 +52,6 @@ Out of scope:
   outputs go to explicit transient or caller-owned directories.
 - Default `S0=M` is required. Profile drift, non-ligatable S0 labels without explicit control opt-in, unknown registry parts, and missing artifacts fail fast. Deliberate controls require `--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true`, and emitted references must carry `scar_nick.s0_match_required=false`.
 - Status/preflight commands are optional progress tools, not default answer posture.
-
 ## Workflow
 1. Classify the request.
 - Complete MSD label or complete parts: use [msd-design-references.md](references/msd-design-references.md).
@@ -101,8 +99,9 @@ Out of scope:
   secondary-structure subtitle containing the mismatch profile.
 - For tetO trim review packages, run `review-outputs` only after materialize has
   produced the nine-row `sequence_index.tsv`; verify the logo-style PWM
-  triptych, nine semantic stills, montage MP4/manifest, review manifest, and
-  reverse-complement/folding evidence.
+  triptych, nine pES-retron-named stills, montage MP4/manifest, review manifest,
+  six reverse-complement Benchling GenBanks, and reverse-complement/folding
+  evidence.
 - If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
   spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
@@ -145,12 +144,11 @@ Out of scope:
 - Deliverable verification for materialize requests: record count, bundle root,
   GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
 - Deliverable verification for tetO `review-outputs`: PWM triptych, semantic
-  stills, montage MP4/manifest, review manifest, nine sequence rows, and nine
-  verified sequence handoff rows.
+  pES-retron-named stills, montage MP4/manifest, review manifest, nine sequence rows, nine
+  verified sequence handoff rows, and six Benchling import GenBank files.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.
-
 ## Output
 Return a short routing answer with:
 - what parts are present and missing

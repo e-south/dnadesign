@@ -188,7 +188,10 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artif
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/manifests.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/layout.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/manifest.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/benchling_import.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/plan.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/review_variant_ids.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/benchling.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/contract.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/index.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/logo.py"
@@ -198,7 +201,9 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/revie
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/index.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/sequence/variant_identity.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/service.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/frame_naming.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/montage.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/stills.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cap_sources.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cli_lint.py"
@@ -211,13 +216,17 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs_text.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_generation.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_review_variant_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_validation_failures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/pwm/test_retention.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/handoff/test_benchling_import.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_montage.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_review_still_quality.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/cli.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/compiler_fixtures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/pwm_fixtures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/registry.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_plans.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/viennarna.py"
@@ -374,7 +383,10 @@ budgets = {
     "artifact_contracts/materialized_outputs.py": 450,
     "artifact_contracts/manifests.py": 450,
     "review_outputs/contracts/manifest.py": 140,
+    "review_outputs/contracts/benchling_import.py": 140,
     "review_outputs/contracts/plan.py": 180,
+    "review_outputs/contracts/review_variant_ids.py": 130,
+    "review_outputs/handoff/benchling.py": 190,
     "review_outputs/handoff/contract.py": 80,
     "review_outputs/handoff/index.py": 160,
     "review_outputs/pwm/logo.py": 200,
@@ -384,7 +396,9 @@ budgets = {
     "review_outputs/sequence/index.py": 140,
     "review_outputs/sequence/variant_identity.py": 100,
     "review_outputs/service.py": 120,
-    "review_outputs/video/montage.py": 190,
+    "review_outputs/video/frame_naming.py": 70,
+    "review_outputs/video/montage.py": 170,
+    "review_outputs/video/stills.py": 150,
     "catalog/cap_sources.py": 220,
     "catalog/compiler_spec.py": 450,
     "catalog/compiler_spec_io.py": 140,
@@ -440,21 +454,25 @@ budgets = {
     "compiler/test_msd_unit.py": 120,
     "compiler/test_cli_compile.py": 280,
     "compiler/test_materialization.py": 900,
-    "compiler/test_boundaries.py": 240,
+    "compiler/test_boundaries.py": 245,
     "compiler/specs/test_teto_trim_metadata.py": 140,
     "review_outputs/cli/fixtures.py": 70,
     "review_outputs/cli/test_review_outputs.py": 90,
     "review_outputs/cli/test_review_outputs_text.py": 70,
-    "review_outputs/package/test_generation.py": 180,
-    "review_outputs/package/test_validation_failures.py": 100,
+    "review_outputs/handoff/test_benchling_import.py": 110,
+    "review_outputs/package/test_generation.py": 230,
+    "review_outputs/package/test_review_variant_ids.py": 70,
+    "review_outputs/package/test_validation_failures.py": 110,
     "review_outputs/pwm/test_retention.py": 100,
     "review_outputs/video/test_montage.py": 100,
+    "review_outputs/video/test_review_still_quality.py": 110,
     "support/cli.py": 40,
     "support/compiler_fixtures.py": 80,
     "support/pwm_fixtures.py": 70,
     "support/registry.py": 80,
+    "support/review_ids.py": 40,
     "support/review_plans.py": 60,
-    "support/review_outputs.py": 180,
+    "support/review_outputs.py": 220,
     "support/viennarna.py": 100,
 }
 
@@ -493,15 +511,15 @@ require_pattern 'docs/studies/retron_hairpin_design/compiler/catalog/msd_design_
 require_pattern 'docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources\.yaml' "skill references cap source lookup"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels\.txt' "skill references MSD selected labels"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec\.yaml' "skill references full cohort materialization spec"
-require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1\.spec\.yaml' "skill references tetO trim rescue compiler spec"
-require_pattern 'teto_pwm_trim_rescue_v1\.yaml' "skill references tetO trim rescue design set"
+require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1\.spec\.yaml' "skill references tetO trim compiler spec"
+require_pattern 'teto_pwm_trim_rescue_v1\.yaml' "skill references tetO trim design set"
 require_pattern 'pwm_trim_triptych' "skill references tetO PWM trim review panel"
 require_pattern 'sequence_montage' "skill references tetO sequence review video"
 require_pattern 'reviews/video/stills|semantic still' "skill references tetO semantic review stills"
 require_pattern 'reverse-complement' "skill references review-output reverse-complement evidence"
 require_pattern 'sequence_handoff' "skill references tetO GenBank handoff bundle"
 require_pattern 'payload-trim metadata|payload_trim_id' "skill preserves payload-trim metadata routing"
-require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim rescue lane"
+require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim lane"
 require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"
 require_pattern 'docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition\.md' "skill references linear ssDNA implementation record"
 require_pattern 'docs/exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups\.md' "skill references linear ssDNA follow-up plan"
