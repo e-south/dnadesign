@@ -51,6 +51,13 @@ def write_fake_materialized_bundle(root: Path, *, repo_root: Path, row_count: in
                     f">reverse_complement_{idx}\n{reverse_complement_sequence}\n",
                     encoding="utf-8",
                 )
+            elif filename.endswith(".gb"):
+                sequence = reverse_complement_sequence if filename == "reverse_complement.gb" else forward_sequence
+                _write_fake_genbank(
+                    target_dir / filename,
+                    record_id=f"fake-{idx}",
+                    sequence=sequence,
+                )
             else:
                 (target_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
         write_png(plots_dir / "composition_overview.png", color=(40 + idx * 12, 130, 190))
@@ -60,6 +67,7 @@ def write_fake_materialized_bundle(root: Path, *, repo_root: Path, row_count: in
                 variant_dir=variant_dir,
                 design=design,
                 idx=idx,
+                sequence_length=len(forward_sequence),
                 parent_payload_id=str(design_set["parent_payload"]["parent_payload_id"]),
             )
         )
@@ -112,6 +120,7 @@ def _sequence_index_row(
     variant_dir: Path,
     design: dict[str, object],
     idx: int,
+    sequence_length: int,
     parent_payload_id: str,
 ) -> dict[str, str]:
     rel_variant = variant_dir.relative_to(root).as_posix()
@@ -132,7 +141,7 @@ def _sequence_index_row(
         "control_id": "",
         "composition_id": f"composition-{idx}",
         "unit_count": "1",
-        "sequence_length": "60",
+        "sequence_length": str(sequence_length),
         "sequence_sha256": f"sha-{idx}",
         "composition_config": f"{rel_variant}/manifest/composition.yaml",
         "artifact_bundle": rel_variant,
@@ -163,6 +172,24 @@ def _write_sequence_index(path: Path, rows: list[dict[str, str]]) -> None:
 
 def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1].upper()
+
+
+def _write_fake_genbank(path: Path, *, record_id: str, sequence: str) -> None:
+    body = "\n".join(
+        [
+            f"LOCUS       {record_id:<16}{len(sequence):>11} bp ss-DNA linear SYN",
+            f"DEFINITION  {record_id} fake Retron MSD unit.",
+            f"ACCESSION   {record_id}",
+            "FEATURES             Location/Qualifiers",
+            f"     source          1..{len(sequence)}",
+            '                     /mol_type="other DNA"',
+            '                     /organism="synthetic construct"',
+            "ORIGIN",
+            f"        1 {sequence.lower()}",
+            "//",
+        ]
+    )
+    path.write_text(body + "\n", encoding="utf-8")
 
 
 __all__ = [

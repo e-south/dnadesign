@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs.py
 
-CLI tests for tetO PWM trim rescue review-output generation.
+CLI tests for tetO PWM trim review-output generation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -53,6 +53,12 @@ def test_review_outputs_cli_defaults_to_workbench_outputs(
         payload["handoff_tsv"]
         == (expected_root / "reviews" / "handoff" / "teto_pwm_trim_rescue_v1.handoff.tsv").as_posix()
     )
+    assert payload["benchling_genbank_dir"] == (expected_root / "benchling_genbank").as_posix()
+    assert (
+        payload["benchling_genbank_index"]
+        == (expected_root / "reviews" / "handoff" / "teto_pwm_trim_rescue_v1.benchling_genbank.tsv").as_posix()
+    )
+    assert payload["benchling_genbank_count"] == 6
     assert payload["handoff_verified_count"] == 9
     assert "clone_handoff_index_tsv" not in payload
     assert "clone_handoff_verified_count" not in payload

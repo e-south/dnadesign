@@ -2,7 +2,7 @@ contract: retron_msd_design_set_v1
 schema_version: 1
 study_id: retron_hairpin_design
 design_set_id: teto_pwm_trim_rescue_v1
-title: bidirectional TetR PWM trim rescue v1
+title: bidirectional TetR PWM trim v1
 authority: persistent study workbench design cohort
 allow_non_ligatable_s0: true
 label_count: 9
@@ -25,10 +25,10 @@ non_goals:
   implicit_cap_stem_grid_expansion: excluded_bounded_matrix_only
   generated_outputs_as_truth: excluded_workbench_records_are_authoritative
 selection_basis:
-  - Test cargo-length rescue before larger cap/stem-base exploration.
+  - Test whether shorter cargo changes SPOP before larger cap/stem-base exploration.
   - Keep WT Eco1 RT fixed because RT fusions are viability-confounded.
   - Use retron26 only as a scaffold and binding control, not the optimization target.
-  - Test retron43 and one selected DE033-compatible cap/stem-base context as the target rescue space.
+  - Test retron43 and the pES-retron-180 C172/AGTG/CATG/XWMM context as the target scaffold space.
   - Encode dual-site PWM trims as exact literal payloads with source-backed span and information metadata.
   - Use the sample-backed monotypic TetR elite as the parent payload so the review panel can show one selected motif occurrence on each strand.
   - Select mild and stronger retained windows by a bounded sliding-window rule that maximizes retained information across both selected motif occurrences.
@@ -51,6 +51,18 @@ parent_payload:
       strand: "-"
       occurrence_rank: 2
   overlap_span_0: {start: 2, end: 17}
+retron180_context_selection:
+  selected_precedent_construct_id: pES-retron-180
+  selected_precedent_label: pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM
+  source_design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
+  reader_spop_summary_ref: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
+  selection_basis: Highest available S0-compatible C172 bottom-nick prior in the 177-186 Reader SPOP summary; still near-zero and not a validated positive control.
+  cap_id: C172
+  left_base: AGTG
+  right_base: CATG
+  profile_s3s2s1s0: XWMM
+  nick_orientation: bottom
+  nickase: Nb.BtsI
 payload_trims:
   TetR_w00_19:
     payload_trim_id: TetR_w00_19
@@ -105,25 +117,25 @@ decision_logic:
     condition: retron26 trim controls lose SPOP despite acceptable viability.
     interpretation: Treat the payload trim as binding/readout-limited before interpreting target-scaffold failures.
   - id: cargo_shortening_not_sufficient
-    condition: retron26 trim controls retain SPOP, but retron43 and DE033-compatible trims remain near the failure floor.
+    condition: retron26 trim controls retain SPOP, but retron43 and retron180-context trims remain near the failure floor.
     interpretation: Cap/stem-base/processability dominates over cargo length in this panel.
-  - id: candidate_cargo_shortening_rescue
-    condition: Any retron43 or DE033-compatible trim rises above the 43/177-186 failure floor with acceptable viability.
+  - id: candidate_cargo_shortening_signal
+    condition: Any retron43 or retron180-context trim rises above the 43/177-186 failure floor with acceptable viability.
     interpretation: Expand the winning trim length across a bounded cap/stem-base grid.
-  - id: viability_confounded_apparent_rescue
+  - id: viability_confounded_signal
     condition: SPOP improves while viability drops below the acceptance gate.
-    interpretation: Do not classify as rescue; demote before expansion.
+    interpretation: Do not classify as a win; demote before expansion.
 outcome_bins:
   - no_call
   - inactive_or_failed_sponging
-  - viability_confounded_apparent_rescue
+  - viability_confounded_signal
   - product_abundance_limited
   - binding_or_payload_limited
-  - candidate_cargo_shortening_rescue
-  - confirmed_cargo_shortening_rescue
+  - candidate_cargo_shortening_signal
+  - confirmed_cargo_shortening_signal
 designs:
-  - construct_id: pES-tetr-t26-w00-19
-    label: pES-tetr-t26-w00-19-msd[TetR_w00_19]; C26-LCGGG-RACAG-MXMX
+  - construct_id: pES-tetr-r26-w00-19
+    label: pES-tetr-r26-w00-19-msd[TetR_w00_19]; C26-LCGGG-RACAG-MXMX
     expected_msd_design_id: msd-tetr-w00-19-C26-LCGGG-RACAG-MXMX
     payload_id: TetR_w00_19
     payload_trim_id: TetR_w00_19
@@ -138,8 +150,8 @@ designs:
     direction_ids: [teto_pwm_trim_rescue]
     effect_tags: [teto_full_payload_control, retron26_control, wt_eco1_only]
     rationale: Full bidirectional TetR payload in the working retron26 scaffold control.
-  - construct_id: pES-tetr-t26-w02-17
-    label: pES-tetr-t26-w02-17-msd[TetR_w02_17]; C26-LCGGG-RACAG-MXMX
+  - construct_id: pES-tetr-r26-w02-17
+    label: pES-tetr-r26-w02-17-msd[TetR_w02_17]; C26-LCGGG-RACAG-MXMX
     expected_msd_design_id: msd-tetr-w02-17-C26-LCGGG-RACAG-MXMX
     payload_id: TetR_w02_17
     payload_trim_id: TetR_w02_17
@@ -154,8 +166,8 @@ designs:
     direction_ids: [teto_pwm_trim_rescue]
     effect_tags: [teto_mild_pwm_edge_trim, retron26_control, wt_eco1_only]
     rationale: Mild 15 nt dual-site TetR trim in the working retron26 scaffold control.
-  - construct_id: pES-tetr-t26-w03-16
-    label: pES-tetr-t26-w03-16-msd[TetR_w03_16]; C26-LCGGG-RACAG-MXMX
+  - construct_id: pES-tetr-r26-w03-16
+    label: pES-tetr-r26-w03-16-msd[TetR_w03_16]; C26-LCGGG-RACAG-MXMX
     expected_msd_design_id: msd-tetr-w03-16-C26-LCGGG-RACAG-MXMX
     payload_id: TetR_w03_16
     payload_trim_id: TetR_w03_16
@@ -183,7 +195,7 @@ designs:
     scaffold_context: retron43
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_full_payload_control, retron43_target, cargo_length_rescue, wt_eco1_only]
+    effect_tags: [teto_full_payload_control, retron43_target, cargo_length_test, wt_eco1_only]
     rationale: Full bidirectional TetR baseline in the retron43 target scaffold.
   - construct_id: pES-tetr-r43-w02-17
     label: pES-tetr-r43-w02-17-msd[TetR_w02_17]; C43-LCAAG-RCTCG-MXMM
@@ -194,12 +206,12 @@ designs:
     left_base: CAAG
     right_base: CTCG
     profile_s3s2s1s0: MXMM
-    variant_role: rescue_candidate
+    variant_role: trim_candidate
     scaffold_context: retron43
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_mild_pwm_edge_trim, retron43_target, cargo_length_rescue, wt_eco1_only]
-    rationale: Mild 15 nt dual-site TetR trim tests whether cargo shortening rescues retron43 SPOP.
+    effect_tags: [teto_mild_pwm_edge_trim, retron43_target, cargo_length_test, wt_eco1_only]
+    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
   - construct_id: pES-tetr-r43-w03-16
     label: pES-tetr-r43-w03-16-msd[TetR_w03_16]; C43-LCAAG-RCTCG-MXMM
     expected_msd_design_id: msd-tetr-w03-16-C43-LCAAG-RCTCG-MXMM
@@ -209,60 +221,63 @@ designs:
     left_base: CAAG
     right_base: CTCG
     profile_s3s2s1s0: MXMM
-    variant_role: rescue_candidate
+    variant_role: trim_candidate
     scaffold_context: retron43
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_stronger_pwm_edge_trim, retron43_target, cargo_length_rescue, wt_eco1_only]
-    rationale: Stronger 13 nt dual-site TetR trim tests whether stronger cargo shortening rescues retron43 SPOP.
-  - construct_id: pES-tetr-d033-w00-19
-    label: pES-tetr-d033-w00-19-msd[TetR_w00_19]; C172-LAGTG-RCAAT-MXMM
-    expected_msd_design_id: msd-tetr-w00-19-C172-LAGTG-RCAAT-MXMM
+    effect_tags: [teto_stronger_pwm_edge_trim, retron43_target, cargo_length_test, wt_eco1_only]
+    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+  - construct_id: pES-tetr-r180-w00-19
+    label: pES-tetr-r180-w00-19-msd[TetR_w00_19]; C172-LAGTG-RCATG-XWMM
+    expected_msd_design_id: msd-tetr-w00-19-C172-LAGTG-RCATG-XWMM
     payload_id: TetR_w00_19
     payload_trim_id: TetR_w00_19
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    profile_s3s2s1s0: MXMM
+    right_base: CATG
+    profile_s3s2s1s0: XWMM
     variant_role: scaffold_target
-    scaffold_context: de033_selected
+    scaffold_context: retron180
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_full_payload_control, de033_selected_target, cargo_length_rescue, wt_eco1_only]
+    effect_tags: [teto_full_payload_control, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
-    rationale: Full bidirectional TetR baseline in the selected DE033-compatible cap and stem-base target.
-  - construct_id: pES-tetr-d033-w02-17
-    label: pES-tetr-d033-w02-17-msd[TetR_w02_17]; C172-LAGTG-RCAAT-MXMM
-    expected_msd_design_id: msd-tetr-w02-17-C172-LAGTG-RCAAT-MXMM
+    source_precedent_id: pES-retron-180
+    rationale: Full bidirectional TetR baseline in the selected pES-retron-180 C172/AGTG/CATG/XWMM context.
+  - construct_id: pES-tetr-r180-w02-17
+    label: pES-tetr-r180-w02-17-msd[TetR_w02_17]; C172-LAGTG-RCATG-XWMM
+    expected_msd_design_id: msd-tetr-w02-17-C172-LAGTG-RCATG-XWMM
     payload_id: TetR_w02_17
     payload_trim_id: TetR_w02_17
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    profile_s3s2s1s0: MXMM
-    variant_role: rescue_candidate
-    scaffold_context: de033_selected
+    right_base: CATG
+    profile_s3s2s1s0: XWMM
+    variant_role: trim_candidate
+    scaffold_context: retron180
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_mild_pwm_edge_trim, de033_selected_target, cargo_length_rescue, wt_eco1_only]
+    effect_tags: [teto_mild_pwm_edge_trim, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
-    rationale: Mild 15 nt dual-site TetR trim in the selected DE033-compatible target.
-  - construct_id: pES-tetr-d033-w03-16
-    label: pES-tetr-d033-w03-16-msd[TetR_w03_16]; C172-LAGTG-RCAAT-MXMM
-    expected_msd_design_id: msd-tetr-w03-16-C172-LAGTG-RCAAT-MXMM
+    source_precedent_id: pES-retron-180
+    rationale: Mild 15 nt dual-site TetR trim in the selected pES-retron-180 context.
+  - construct_id: pES-tetr-r180-w03-16
+    label: pES-tetr-r180-w03-16-msd[TetR_w03_16]; C172-LAGTG-RCATG-XWMM
+    expected_msd_design_id: msd-tetr-w03-16-C172-LAGTG-RCATG-XWMM
     payload_id: TetR_w03_16
     payload_trim_id: TetR_w03_16
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    profile_s3s2s1s0: MXMM
-    variant_role: rescue_candidate
-    scaffold_context: de033_selected
+    right_base: CATG
+    profile_s3s2s1s0: XWMM
+    variant_role: trim_candidate
+    scaffold_context: retron180
     rt_mode: wt_eco1
     direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_stronger_pwm_edge_trim, de033_selected_target, cargo_length_rescue, wt_eco1_only]
+    effect_tags: [teto_stronger_pwm_edge_trim, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
-    rationale: Stronger 13 nt dual-site TetR trim in the selected DE033-compatible target.
+    source_precedent_id: pES-retron-180
+    rationale: Stronger 13 nt dual-site TetR trim in the selected pES-retron-180 context.

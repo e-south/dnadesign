@@ -17,7 +17,6 @@ from typing import Sequence
 from ..contracts.plan import PwmTrimPanel
 from .panel_labels import compact_panel_subtitle, panel_title
 from .sequence_rows import PwmLogoColumn, observed_sequence_for_panel
-from .trim_annotations import BOUNDARY_TICK_FONT_SIZE
 
 
 def panel_subtitle(panel: PwmTrimPanel) -> str:
@@ -38,8 +37,7 @@ def panel_metadata_attributes(columns: Sequence[PwmLogoColumn], panel: PwmTrimPa
             f'data-retained-nt="{retained_nt}"',
             f'data-retained-information-fraction="{panel.retained_information_fraction:.6f}"',
             f'data-compact-subtitle="{escape(compact_panel_subtitle(panel))}"',
-            f'data-boundary-ticks-0="{panel.retained_start_0},{panel.retained_end_0}"',
-            f'data-boundary-tick-font-size-px="{BOUNDARY_TICK_FONT_SIZE}"',
+            f'data-retained-edge-cuts-0="{panel.retained_start_0},{panel.retained_end_0}"',
             f'data-visible-trim-summary="{escape(visible_trim_summary(panel))}"',
         ]
     )

@@ -15,6 +15,7 @@ output_policy:
   generated_artifacts: ignored_workbench_outputs_preferred_or_explicit_transient_output_root
   preferred_generated_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1
   preferred_materialized_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized
+  preferred_benchling_import_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/benchling_genbank
   do_not_commit_by_default:
     - GenBank exports
     - PNG/SVG review renders
@@ -36,7 +37,7 @@ artifact_families:
   pwm_trim_review_panel:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer consuming the Cruncher MEME PWM source and workbench trim spans
-    purpose: Show the full, mild, and stronger bidirectional TetR PWM-retaining payload spans as aligned BaseRender sequence-row panels over the 19 nt monotypic elite, with top/bottom strands, a full-site ghost backdrop, retained-payload feature boxes, retained-edge tick labels, trim cut-lines, and plus/minus motif logos anchored to the full parent coordinate system.
+    purpose: Show the full, mild, and stronger bidirectional TetR PWM-retaining payload spans as aligned BaseRender sequence-row panels over the 19 nt monotypic elite, with top/bottom strands, a full-site ghost backdrop, retained-payload feature boxes, trim cut-lines, and plus/minus motif logos anchored to the full parent coordinate system.
     expected_output_group: reviews/pwm/
     expected_files:
       - reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.svg
@@ -64,10 +65,11 @@ artifact_families:
       - Pad each source 17-position MEME PWM with zero-information columns outside its occurrence span so each logo aligns to the full 19 nt parent without inventing motif information.
       - Validate each declared retained span with the dual_site_sliding_window_max_ic selector for that retained length before rendering.
       - Use a full-site ghost backdrop, retained-payload feature box, and retained-span cut-lines so truncation extent is visible before reading subtitles.
-      - Show only the retained-span boundary ticks for each panel: 0/19, 2/17, and 3/16; do not render generic coordinate ticks.
+      - Show retained-span cut-lines and compact subtitle spans for each panel: 0/19, 2/17, and 3/16; do not render generic coordinate ticks.
       - Use compact display titles and subtitles: nt count, retained span, and rounded retained information content.
       - Keep the PWM source in SVG/review-manifest metadata rather than rendering a tiny source-path footer in the bitmap.
-      - Normalize visible review typography: 42 px title, 32 px subtitle, 16 px sequence/terminal/feature labels, and quieter 11 px boundary tick labels.
+      - Normalize visible review typography: 42 px title, 32 px subtitle, 16 px sequence/terminal/feature labels, and 13 px motif scale-bar labels.
+      - Render the triptych PNG at no less than 3000 x 800 px so motif letters and trim cut-lines remain inspectable outside SVG viewers.
       - Use retained-payload feature boxes whose span changes by panel: 0-19 for full, 2-17 for mild, and 3-16 for stronger.
       - Use match-window sequence-logo coloring: retained site positions expose the observed parent base in the feature hue, while trimmed site positions pass N and render light gray.
       - Show the 19 nt parent site as aligned top/bottom strands with retained payload positions highlighted and trimmed payload positions dimmed.
@@ -76,7 +78,7 @@ artifact_families:
   msd_sequence_review_stills:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer consuming materialized BaseRender composition stills
-    purpose: Provide one evidence-semantically named review still per compiled MSD sequence.
+    purpose: Provide one canonically named review still per compiled MSD sequence.
     expected_output_group: reviews/video/stills/
     expected_count: 9
     source_index: manifest/indexes/sequence_index.tsv
@@ -84,12 +86,27 @@ artifact_families:
       - variants/<construct-id>__<msd-design-id>/plots/composition_overview.svg
       - variants/<construct-id>__<msd-design-id>/plots/composition_overview.png
       - variants/<construct-id>__<msd-design-id>/plots/secondary_structure.native.png
-    expected_filename_pattern: reviews/video/stills/<order>_<variant-id>.png
+    expected_filename_pattern: reviews/video/stills/<order>_<pES-retron-id>_tetO-w<start>-<end>.png
+    review_variant_ids:
+      r26-w00-19: pES-retron-26
+      r26-w02-17: pES-retron-195
+      r26-w03-16: pES-retron-196
+      r43-w00-19: pES-retron-43
+      r43-w02-17: pES-retron-197
+      r43-w03-16: pES-retron-198
+      r180-w00-19: pES-retron-180
+      r180-w02-17: pES-retron-199
+      r180-w03-16: pES-retron-200
     invariants:
       - One MSD unit per design; no complete-unit repeat expansion.
       - Plot deliverables require folding_status == ok.
       - Sequence indexes must preserve payload_trim_id, scaffold_context, variant_role, and rt_mode.
-      - Construct and MSD ids stay in manifests; still filenames use compact variant ids such as t26-w02-17.
+      - Still filenames use the canonical pES-retron id plus the retained tetO PWM window slug; full rows use their source precedent ids and trim rows use assigned new ids.
+      - Review variant ids must match design-set row order, and imported trim ids must match benchling_genbank_import.assigned_retron_ids.
+      - Review stills are normalized to 1920 x 1080 px and are derived from materialized composition_overview.png files.
+      - Review still titles use the review-facing pES-retron-XXX construct name plus the tetO PWM retained span, for example tetO PWM [2,17).
+      - Review still subtitles report only the scaffold and retained payload length; control/target/candidate role metadata remains in indexes.
+      - Review stills crop the source composition header band and reserve a review title band so stale compiler titles or clipped source annotations cannot collide with the pES-retron title.
   msd_sequence_review_video:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer consuming materialized sequence_index.tsv
@@ -98,11 +115,12 @@ artifact_families:
     expected_files:
       - reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4
       - reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.manifest.json
-    source_frames: reviews/video/stills/<order>_<variant-id>.png
+    source_frames: reviews/video/stills/<order>_<pES-retron-id>_tetO-w<start>-<end>.png
     ordering: design_set_order
     invariants:
-      - Frame labels use compact variant id, role, and retained window; construct_id and msd_design_id remain in the manifest.
+      - Frame labels use canonical pES-retron id, tetO PWM retained span, scaffold, and retained payload length; compact variant id, construct_id, and msd_design_id remain in the manifest.
       - Video generation is a derivative review artifact, not a replacement for GenBank or sequence indexes.
+      - The montage target is 1920 x 1080 px H.264 MP4; the manifest records both still and video dimensions.
   sequence_handoff:
     status: current_materialize_output
     owner_surface: Retron MSD materialize command
@@ -142,6 +160,46 @@ artifact_families:
       - The review package emits a complete handoff TSV plus a compact Markdown index so reviewers can navigate from each compact variant id to its GenBank, FASTA, and feature CSV exports without scanning generated directories.
       - The review package verifies reverse_complement.fa against forward.fa before declaring handoff completeness.
       - Generated exports are caller-owned artifacts and are not durable study truth.
+  benchling_genbank_import:
+    status: current_review_renderer_output
+    owner_surface: study-owned review renderer consuming materialized reverse-complement GenBank exports
+    purpose: Provide a flat, drag-to-Benchling import folder for the six new trim variants only.
+    expected_output_group: benchling_genbank/
+    expected_count: 6
+    source_index: manifest/indexes/sequence_index.tsv
+    orientation: reverse_complement_only
+    included_payload_trim_ids:
+      - TetR_w02_17
+      - TetR_w03_16
+    excluded_payload_trim_ids:
+      - TetR_w00_19
+    assigned_retron_ids:
+      r26-w02-17: pES-retron-195
+      r26-w03-16: pES-retron-196
+      r43-w02-17: pES-retron-197
+      r43-w03-16: pES-retron-198
+      r180-w02-17: pES-retron-199
+      r180-w03-16: pES-retron-200
+    source_precedent_ids:
+      r26-w02-17: pES-retron-26
+      r26-w03-16: pES-retron-26
+      r43-w02-17: pES-retron-43
+      r43-w03-16: pES-retron-43
+      r180-w02-17: pES-retron-180
+      r180-w03-16: pES-retron-180
+    expected_files:
+      - benchling_genbank/pES-retron-195-msd[TetR]-r26-w02-17.gb
+      - benchling_genbank/pES-retron-196-msd[TetR]-r26-w03-16.gb
+      - benchling_genbank/pES-retron-197-msd[TetR]-r43-w02-17.gb
+      - benchling_genbank/pES-retron-198-msd[TetR]-r43-w03-16.gb
+      - benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb
+      - benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb
+    invariants:
+      - The import folder contains only the six .gb files listed above; no TSV, Markdown, FASTA, forward GenBank, or sidecar files live there.
+      - assigned_retron_ids, source_precedent_ids, and included_payload_trim_ids in this deliverable plan are the source of truth for import selection, filenames, and GenBank header provenance.
+      - Full parent payload rows are excluded because pES-retron-26, pES-retron-43, and the pES-retron-180 precedent already cover the non-trim controls.
+      - Each imported record keeps complete MSD-unit annotations from the materialized reverse-complement GenBank source.
+      - Metadata for verification stays in reviews/handoff/ and reviews/review_manifest.json.
   future_reader_outcome_overlay:
     status: experiment_time_only
     owner_surface: Reader SPOP bridge and future trim-outcome join
@@ -149,7 +207,7 @@ artifact_families:
     expected_output_group: outcomes/teto_pwm_trim_rescue_v1/
     invariants:
       - Reader owns SPOP math.
-      - Viability-confounded apparent rescue is not a rescue outcome.
+      - Viability-confounded signal is not a positive trim-effect outcome.
       - Product or abundance evidence is required before separating binding failure from production failure.
   review_package_manifest:
     status: current_review_renderer_output
@@ -169,4 +227,5 @@ quality_gates:
   - The PWM triptych uses the same three payload_trim_id values as the design set.
   - The sequence montage consumes frames from sequence_index.tsv instead of scanning generated directories ad hoc.
   - review-outputs writes reviews/review_manifest.json with 9 sequence rows and 9 verified sequence handoff rows.
-  - review-outputs writes 9 compact variant-named review stills and records reverse-complement plus folding evidence.
+  - review-outputs writes 9 canonical pES-retron-named review stills and records reverse-complement plus folding evidence.
+  - review-outputs writes exactly 6 reverse-complement Benchling import GenBanks named pES-retron-195 through pES-retron-200.

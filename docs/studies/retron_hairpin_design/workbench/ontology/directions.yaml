@@ -41,17 +41,17 @@ directions:
     question: Do top-nick Nt.BsmAI routes preserve the same MXMM design-reference posture?
     effect_tags: [mxmm_replicate, top_nick]
   - id: teto_pwm_trim_rescue
-    label: bidirectional TetR PWM trim rescue
-    question: Does PWM-informed cargo shortening of the bidirectional TetR motif payload restore SPOP in 43/de033-compatible scaffolds under WT Eco1 RT?
+    label: bidirectional TetR PWM trim test
+    question: Does PWM-informed cargo shortening of the bidirectional TetR motif payload improve SPOP in retron43 or retron180 contexts under WT Eco1 RT?
     effect_tags:
       - teto_full_payload_control
       - teto_mild_pwm_edge_trim
       - teto_stronger_pwm_edge_trim
       - teto_flank_only_trim_control
-      - cargo_length_rescue
+      - cargo_length_test
       - retron26_control
       - retron43_target
-      - de033_selected_target
+      - retron180_target
       - wt_eco1_only
 effect_tags:
   base_26_derived: 26-derived basal base context.
@@ -73,8 +73,8 @@ effect_tags:
   s3_s1_double_hard: S3/S1 double-hard profile.
   s3_s2_double_hard: S3/S2 double-hard profile.
   single_wobble_control: Single G:T wobble control.
-  cargo_length_rescue: Tests whether shortening the TetR/tetO cargo/P4 burden rescues SPOP.
-  de033_selected_target: Uses the selected DE033-compatible cap and stem-base context.
+  cargo_length_test: Tests whether shortening the TetR/tetO cargo/P4 burden improves SPOP.
+  retron180_target: Uses the pES-retron-180 C172/AGTG/CATG/XWMM cap and stem-base context.
   retron26_control: Uses retron26 as a positive scaffold or binding control, not as the optimization target.
   retron43_target: Uses the retron43 target scaffold.
   top_nick: Resolved through a top-nick scar-nick route.
@@ -82,4 +82,4 @@ effect_tags:
   teto_flank_only_trim_control: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
   teto_mild_pwm_edge_trim: Uses the 15 nt mild dual-site TetR trim.
   teto_stronger_pwm_edge_trim: Uses the 13 nt stronger dual-site TetR trim.
-  wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from the rescue classification.
+  wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from trim-effect classification.

@@ -138,7 +138,8 @@ def review_outputs_next_step(out_dir: Path) -> str:
     return (
         "Retron tetO trim review outputs emitted; inspect reviews/review_manifest.json, "
         "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png, and "
-        f"reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4 under {out_dir.as_posix()}."
+        "reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4. "
+        f"Benchling import GenBanks are in {out_dir.as_posix()}/benchling_genbank."
     )
 
 

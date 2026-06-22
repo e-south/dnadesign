@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/fixtures.py
 
-CLI fixtures for tetO PWM trim rescue review-output tests.
+CLI fixtures for tetO PWM trim review-output tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -28,6 +28,9 @@ def fake_review_output_result(**kwargs: object) -> object:
     result.sequence_montage_manifest = out_dir / "reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.manifest.json"
     result.handoff_tsv = out_dir / "reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv"
     result.handoff_markdown = out_dir / "reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md"
+    result.benchling_genbank_dir = out_dir / "benchling_genbank"
+    result.benchling_genbank_index = out_dir / "reviews/handoff/teto_pwm_trim_rescue_v1.benchling_genbank.tsv"
+    result.benchling_genbank_count = 6
     result.review_manifest_path = out_dir / "reviews/review_manifest.json"
     result.sequence_row_count = 9
     result.handoff_verified_count = 9

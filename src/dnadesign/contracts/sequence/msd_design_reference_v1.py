@@ -75,7 +75,7 @@ class MsdPayloadOrTargetV1(MsdDesignContractModel):
     display_name: str | None = None
     parent_payload_id: str | None = None
     payload_trim_id: str | None = None
-    trim_class: Literal["full", "conservative", "aggressive"] | None = None
+    trim_class: Literal["full", "mild", "stronger"] | None = None
     trim_5p_nt: int | None = Field(default=None, ge=0)
     trim_3p_nt: int | None = Field(default=None, ge=0)
     retained_parent_span_0: "MsdPayloadSpanV1 | None" = None
@@ -273,8 +273,8 @@ class MsdDesignArtifactsV1(MsdDesignContractModel):
 
 
 class MsdVariantMetadataV1(MsdDesignContractModel):
-    variant_role: Literal["control", "scaffold_target", "rescue_candidate"] | None = None
-    scaffold_context: Literal["retron26", "retron43", "de033_selected"] | None = None
+    variant_role: Literal["control", "scaffold_target", "trim_candidate"] | None = None
+    scaffold_context: Literal["retron26", "retron43", "retron180"] | None = None
     payload_trim_id: str | None = None
     cap_selector_id: str | None = None
     stem_base_selector_id: str | None = None

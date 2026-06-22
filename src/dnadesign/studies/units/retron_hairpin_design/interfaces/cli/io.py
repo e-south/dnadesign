@@ -72,6 +72,12 @@ def emit(payload: dict[str, Any], *, output_format: str) -> None:
         typer.echo(f"handoff_tsv: {payload['handoff_tsv']}")
     if payload.get("handoff_markdown") is not None:
         typer.echo(f"handoff_markdown: {payload['handoff_markdown']}")
+    if payload.get("benchling_genbank_dir") is not None:
+        typer.echo(f"benchling_genbank_dir: {payload['benchling_genbank_dir']}")
+    if payload.get("benchling_genbank_index") is not None:
+        typer.echo(f"benchling_genbank_index: {payload['benchling_genbank_index']}")
+    if payload.get("benchling_genbank_count") is not None:
+        typer.echo(f"benchling_genbank_count: {payload['benchling_genbank_count']}")
     if payload.get("handoff_verified_count") is not None:
         typer.echo(f"handoff_verified_count: {payload['handoff_verified_count']}")
     if payload.get("finder_open") is not None:

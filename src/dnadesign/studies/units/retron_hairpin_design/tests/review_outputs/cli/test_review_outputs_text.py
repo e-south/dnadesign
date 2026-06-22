@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/cli/test_review_outputs_text.py
 
-Text-output CLI tests for tetO PWM trim rescue review-output generation.
+Text-output CLI tests for tetO PWM trim review-output generation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -43,4 +43,6 @@ def test_review_outputs_cli_text_reports_sequence_handoff(
     assert "handoff_tsv:" in result.stdout
     assert "handoff_markdown:" in result.stdout
     assert "handoff_verified_count: 9" in result.stdout
+    assert "benchling_genbank_dir:" in result.stdout
+    assert "benchling_genbank_count: 6" in result.stdout
     assert "clone_handoff" not in result.stdout

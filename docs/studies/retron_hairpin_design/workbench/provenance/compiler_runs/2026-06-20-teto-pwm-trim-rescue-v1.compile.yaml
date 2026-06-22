@@ -4,8 +4,8 @@ study_id: retron_hairpin_design
 run_id: 2026-06-20-teto-pwm-trim-rescue-v1.compile
 run_kind: compile
 status: verified_transient
-verified_at: "2026-06-20"
-git_revision: 9578da1359d1d49a91e4d399bae88ee4223a6a3d # pragma: allowlist secret
+verified_at: "2026-06-22"
+git_revision: 127b716f39e9d1d3575341fd14413726832a63bf # pragma: allowlist secret
 worktree_status: verified_before_commit
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
 command:
@@ -26,11 +26,11 @@ command:
 inputs:
   design_set:
     path: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
-    sha256: 29fc494da91578ed29134edfdf59a1b00f5b20e21428ac6ba68c8bca1a234551 # pragma: allowlist secret
+    sha256: 02e9cd58a32ec950c265fa4487c9656c5434bf985cd8ddd89b3a06db04099191 # pragma: allowlist secret
     role: persistent experimental cohort and decision logic
   compiler_spec:
     path: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
-    sha256: c11157a8bf135e47c5bfb97f2f206ee41122318b65bf25e72e34b85b2dcfd905 # pragma: allowlist secret
+    sha256: d6815ed3dc7e161215ea7be985def2cec2b771c0d45641ee894a57a65f1b276c # pragma: allowlist secret
     role: executable literal payload/cap/stem-base spec
   registry:
     path: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
@@ -46,9 +46,9 @@ observed_output:
   record_count: 9
   catalog_contract: msd_design_catalog_v1
   bundle_contract: msd_design_catalog_bundle_v1
-  catalog_sha256: 1f4f61bb2e3ebfeca2f8eb8c7742da56f640ccabccd945a8a5c65820e2e8a4a3 # pragma: allowlist secret
-  reference_index_sha256: 561268ad637af74b4062a5f6d3bfa2bbe7244c31abf984dcdb67af974aa7880c # pragma: allowlist secret
-  manifest_sha256: 5d79fc34e4eec89dfb44b99cbaaaa402651bb47f67b12d1c62f8bdaef6360797 # pragma: allowlist secret
+  catalog_sha256: 61372676ed21fedd758e858eb93c076dd015f8abd4d30c79b2db74021850241d # pragma: allowlist secret
+  reference_index_sha256: f031163b1a0da5ea828d1d5109fbd6111548d8ff5929288402c303da1761c958 # pragma: allowlist secret
+  manifest_sha256: 3c4300700254dd678907dc0d0de748fe843749421ad07d5de7b3a5d6438690d8 # pragma: allowlist secret
   required_index_columns:
     - payload_trim_id
     - payload_trim_class

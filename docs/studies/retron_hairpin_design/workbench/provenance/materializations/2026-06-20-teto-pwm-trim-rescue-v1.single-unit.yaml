@@ -6,14 +6,14 @@ run_kind: materialize
 status: verified_transient
 design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
 compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-06-20-teto-pwm-trim-rescue-v1.compile.yaml
-reason: The bidirectional TetR PWM trim rescue pilot materializes from a typed spec with literal full, mild 15 nt, and stronger 13 nt monotypic-elite payloads plus explicit C26, C43, and C172 cap/foldback segments. The cohort keeps WT Eco1 fixed, excludes RT fusions, and treats retron26 as a scaffold/binding control rather than the optimization target.
-validated_at: 2026-06-20
+reason: The bidirectional TetR PWM trim pilot materializes from a typed spec with literal full, mild 15 nt, and stronger 13 nt monotypic-elite payloads plus explicit C26, C43, and C172 cap/foldback segments. The cohort keeps WT Eco1 fixed, excludes RT fusions, treats retron26 as a scaffold/binding control, and uses pES-retron-180 as the selected C172/AGTG/CATG/XWMM precedent.
+validated_at: 2026-06-22
 validated_request:
   expected_variant_count: 9
   observed_variant_count: 9
   allow_non_ligatable_s0: true
   payload_trims: [TetR_w00_19, TetR_w02_17, TetR_w03_16]
-  scaffold_contexts: [retron26, retron43, de033_selected]
+  scaffold_contexts: [retron26, retron43, retron180]
   rt_mode: wt_eco1
   invalid_requested_labels: []
   fail_fast_invariant: do not infer payloads from PWM sources or expand cap/stem-base grids implicitly
@@ -78,10 +78,10 @@ observed_output:
   output_dir: docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized
   record_count: 9
   folding_status: ok
-  catalog_sha256: 953ef4c75f63505cc28cbfc09d5625ba412846bf3ec19b08caa6a40ae084b55a # pragma: allowlist secret
-  reference_index_sha256: 3925ba3919c2fe5f8ba863b2732a49ff31717799d344f361ae06a955e657213b # pragma: allowlist secret
-  sequence_index_sha256: 7fa1009ce9d4048ec2aef67982ac0998139e578f3045baad12ddf2766e3170a1 # pragma: allowlist secret
-  sequence_manifest_sha256: 1b8581bc7e0b20ec38c3ef020571c62742ff3c1755ec74b0f4e7a5360a6ba04d # pragma: allowlist secret
+  catalog_sha256: c440d97c61cd46b09b5dfac7fe0be7cc7cac457d9c55e2842eef194b1eee3de9 # pragma: allowlist secret
+  reference_index_sha256: 3ff1bf4dd5c58703e3e0dd390c2a4106e455c4aa240524f4b1e0d49695532535 # pragma: allowlist secret
+  sequence_index_sha256: 7bc562b40c0a2c9f02fe52f09dc3f5b5c65cc3f2a5f491271d0e45cd08d03777 # pragma: allowlist secret
+  sequence_manifest_sha256: f9cc07a8b86367b0d3694242028b8ae242cdf9edc7ee064ae898ceaeb4388db2 # pragma: allowlist secret
   post_materialization_check:
     row_count: 9
     missing_row_referenced_paths: []

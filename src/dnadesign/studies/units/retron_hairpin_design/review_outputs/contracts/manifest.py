@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
+from ..handoff.benchling import BenchlingGenbankExport
 from ..handoff.contract import SEQUENCE_HANDOFF_MANIFEST_KEY, SEQUENCE_HANDOFF_REQUIRED_FIELDS
 from ..handoff.index import HandoffIndex
 from ..sequence.evidence import SequenceEvidenceSummary
@@ -34,6 +35,7 @@ def write_review_manifest(
     video_path: Path,
     video_manifest_path: Path,
     handoff_index: HandoffIndex,
+    benchling_import: BenchlingGenbankExport,
     sequence_evidence: SequenceEvidenceSummary,
 ) -> Path:
     manifest_path = review_root / "reviews" / "review_manifest.json"
@@ -60,6 +62,7 @@ def write_review_manifest(
             "manifest": _relative_to(video_manifest_path, review_root),
             "frame_count": len(frames),
             "still_count": len(frames),
+            "review_variant_ids": dict(plan.review_variant_ids),
         },
         "sequence_evidence": sequence_evidence.as_manifest(),
         SEQUENCE_HANDOFF_MANIFEST_KEY: {
@@ -67,6 +70,17 @@ def write_review_manifest(
             "index_tsv": _relative_to(handoff_index.tsv_path, review_root),
             "index_markdown": _relative_to(handoff_index.markdown_path, review_root),
             "required_fields": list(SEQUENCE_HANDOFF_REQUIRED_FIELDS),
+        },
+        "benchling_genbank_import": {
+            "orientation": plan.benchling_import.orientation,
+            "included_payload_trim_ids": list(plan.benchling_import.included_payload_trim_ids),
+            "assigned_retron_ids": dict(plan.benchling_import.assigned_retron_ids),
+            "source_precedent_ids": dict(plan.benchling_import.source_precedent_ids),
+            "verified_count": len(benchling_import.files),
+            "expected_count": plan.benchling_import.expected_count,
+            "directory": _relative_to(benchling_import.directory, review_root),
+            "index_tsv": _relative_to(benchling_import.index_tsv, review_root),
+            "files": [_relative_to(path, review_root) for path in benchling_import.files],
         },
         "reader_boundary": {
             "status": "experiment_time_only",

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_teto_pwm_trim_rescue_design_set.py
 
-Tests for the tetO PWM trim rescue study-owned design set.
+Tests for the tetO PWM trim study-owned design set.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -48,6 +48,27 @@ def test_teto_pwm_trim_rescue_design_set_is_study_owned_and_compiler_ready() -> 
         {"motif_instance_id": "tetR:0:17:+:1", "start": 0, "end": 17, "strand": "+", "occurrence_rank": 1},
         {"motif_instance_id": "tetR:2:19:-:2", "start": 2, "end": 19, "strand": "-", "occurrence_rank": 2},
     ]
+    assert design_set["retron180_context_selection"] == {
+        "selected_precedent_construct_id": "pES-retron-180",
+        "selected_precedent_label": "pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM",
+        "source_design_set_ref": (
+            "docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
+        ),
+        "reader_spop_summary_ref": (
+            "src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/"
+            "reader_spop_candidate_summary.parquet"
+        ),
+        "selection_basis": (
+            "Highest available S0-compatible C172 bottom-nick prior in the 177-186 Reader SPOP summary; "
+            "still near-zero and not a validated positive control."
+        ),
+        "cap_id": "C172",
+        "left_base": "AGTG",
+        "right_base": "CATG",
+        "profile_s3s2s1s0": "XWMM",
+        "nick_orientation": "bottom",
+        "nickase": "Nb.BtsI",
+    }
     assert design_set["payload_trims"]["TetR_w00_19"]["exact_sequence_5to3"] == "CTCTATATCTGATATAGAG"
     assert design_set["payload_trims"]["TetR_w02_17"]["exact_sequence_5to3"] == "CTATATCTGATATAG"
     assert design_set["payload_trims"]["TetR_w02_17"]["sequence_length_nt"] == 15
@@ -67,15 +88,15 @@ def test_teto_pwm_trim_rescue_design_set_is_study_owned_and_compiler_ready() -> 
     effect_tags = set(directions["effect_tags"])
     known_construct_ids = {design["construct_id"] for design in design_set["designs"]}
     assert known_construct_ids == {
-        "pES-tetr-t26-w00-19",
-        "pES-tetr-t26-w02-17",
-        "pES-tetr-t26-w03-16",
+        "pES-tetr-r26-w00-19",
+        "pES-tetr-r26-w02-17",
+        "pES-tetr-r26-w03-16",
         "pES-tetr-r43-w00-19",
         "pES-tetr-r43-w02-17",
         "pES-tetr-r43-w03-16",
-        "pES-tetr-d033-w00-19",
-        "pES-tetr-d033-w02-17",
-        "pES-tetr-d033-w03-16",
+        "pES-tetr-r180-w00-19",
+        "pES-tetr-r180-w02-17",
+        "pES-tetr-r180-w03-16",
     }
     assert design_set["label_count"] == len(design_set["designs"]) == len(spec["designs"])
     assert design_set["label_count"] == len(resolved.catalog.records)
@@ -89,8 +110,19 @@ def test_teto_pwm_trim_rescue_design_set_is_study_owned_and_compiler_ready() -> 
         assert set(design["effect_tags"]) <= effect_tags
         assert design["payload_trim_id"] in design_set["payload_trims"]
         assert design["rt_mode"] == "wt_eco1"
-        assert design["variant_role"] in {"control", "scaffold_target", "rescue_candidate"}
+        assert design["variant_role"] in {"control", "scaffold_target", "trim_candidate"}
+
+    assert {design["scaffold_context"] for design in design_set["designs"]} == {"retron26", "retron43", "retron180"}
 
     assert spec["allow_non_ligatable_s0"] is True
     assert all("source" not in payload for payload in spec["payload_sequences"].values())
     assert set(spec["cap_sequences"]) == {"C26", "C43", "C172"}
+    r180_designs = [design for design in design_set["designs"] if design["construct_id"].startswith("pES-tetr-r180")]
+    assert len(r180_designs) == 3
+    assert {design["scaffold_context"] for design in r180_designs} == {"retron180"}
+    assert {tag for design in r180_designs for tag in design["effect_tags"] if tag == "retron180_target"} == {
+        "retron180_target"
+    }
+    assert {design["right_base"] for design in r180_designs} == {"CATG"}
+    assert {design["profile_s3s2s1s0"] for design in r180_designs} == {"XWMM"}
+    assert {design["source_precedent_id"] for design in r180_designs} == {"pES-retron-180"}

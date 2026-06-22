@@ -33,10 +33,10 @@ from .typography import SUBTITLE_FONT_SIZE, TITLE_FONT_SIZE, TYPOGRAPHIC_SCALE_I
 INK = "#1F2937"
 MUTED = "#667085"
 LOGO_STYLE_ID = "baserender_sequence_rows_tetr_dual_site_trim_logo_v7"
-PANEL_GUTTER = 34
-OUTER_MARGIN_X = 36
-TOP_LABEL_HEIGHT = 128
-BOTTOM_MARGIN = 10
+PANEL_GUTTER = 48
+OUTER_MARGIN_X = 48
+TOP_LABEL_HEIGHT = 160
+BOTTOM_MARGIN = 24
 
 
 def write_pwm_logo_triptych(
@@ -146,7 +146,7 @@ def _metadata_lines(
             'data-site-coordinate-system="tetr_monotypic_elite_parent_19nt" '
             'data-feature-box="retained_payload_span" '
             'data-visual-layers="full_site_backdrop,retained_payload_overlay,dual_motif_logos,trim_cut_lines" '
-            'data-boundary-tick-policy="retained_span_edges_only" '
+            'data-trim-edge-policy="cut_lines_with_span_in_subtitle" '
             'data-retained-span-bracket="retained_payload" data-min-critical-font-size-px="16" '
             'data-full-site-backdrop-0="0..19" '
             'data-letter-coloring="match_window_seq_trim_inclusion" data-scale-bar="2_bits_left_of_logo" '

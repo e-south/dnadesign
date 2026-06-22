@@ -18,6 +18,8 @@ from typing import Any, Mapping
 from ...catalog.strict_mapping_io import DuplicateMappingKeyError, load_unique_yaml
 from ...compiler.exceptions import RetronMsdCompilerError
 from ..pwm.retention import PwmMotifOccurrence, validate_declared_trim_windows
+from .benchling_import import BenchlingGenbankImportPlan, parse_benchling_genbank_import_plan
+from .review_variant_ids import parse_review_variant_ids
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,8 @@ class TetoReviewPlan:
     deliverable_plan_id: str
     expected_variant_count: int
     pwm_panels: tuple[PwmTrimPanel, ...]
+    review_variant_ids: Mapping[str, str]
+    benchling_import: BenchlingGenbankImportPlan
 
 
 def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
@@ -52,7 +56,6 @@ def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
     plan_id = str(plan.get("deliverable_plan_id") or "").strip()
     if plan_id != "teto_pwm_trim_rescue_v1":
         raise RetronMsdCompilerError(f"Unsupported Retron review deliverable plan id: {plan_id or '<missing>'}")
-
     design_set_path = _repo_path(repo_root, plan.get("design_set_ref"), field="design_set_ref")
     design_set = _load_mapping(design_set_path, label="Retron review design set")
     if design_set.get("contract") != "retron_msd_design_set_v1":
@@ -60,10 +63,11 @@ def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
     expected_count = int(design_set.get("expected_variant_count") or 0)
     if expected_count <= 0:
         raise RetronMsdCompilerError(f"Retron design set has invalid expected_variant_count: {design_set_path}")
-
     families = plan.get("artifact_families")
     if not isinstance(families, Mapping):
         raise RetronMsdCompilerError(f"Retron deliverable plan is missing artifact_families: {plan_path}")
+    benchling_import = parse_benchling_genbank_import_plan(families)
+    review_variant_ids = parse_review_variant_ids(families, design_set=design_set, benchling_import=benchling_import)
     pwm_family = families.get("pwm_trim_review_panel")
     if not isinstance(pwm_family, Mapping):
         raise RetronMsdCompilerError(f"Retron deliverable plan is missing pwm_trim_review_panel: {plan_path}")
@@ -98,7 +102,6 @@ def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
         motif_occurrences=motif_occurrences,
         meme_pwm_path=meme_pwm_path,
     )
-
     return TetoReviewPlan(
         plan_path=plan_path,
         design_set_path=design_set_path,
@@ -109,6 +112,8 @@ def load_teto_review_plan(path: Path, *, repo_root: Path) -> TetoReviewPlan:
         deliverable_plan_id=plan_id,
         expected_variant_count=expected_count,
         pwm_panels=panels,
+        review_variant_ids=review_variant_ids,
+        benchling_import=benchling_import,
     )
 
 
@@ -179,4 +184,4 @@ def _require_sequence(raw: object, label: str) -> list[object]:
     return raw
 
 
-__all__ = ["PwmTrimPanel", "TetoReviewPlan", "load_teto_review_plan"]
+__all__ = ["BenchlingGenbankImportPlan", "PwmTrimPanel", "TetoReviewPlan", "load_teto_review_plan"]

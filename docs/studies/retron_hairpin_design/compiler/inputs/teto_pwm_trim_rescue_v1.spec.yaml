@@ -2,12 +2,12 @@ contract: retron_msd_compiler_spec_v1
 schema_version: 1
 allow_non_ligatable_s0: true
 
-# Literal compiler spec for the bidirectional TetR PWM trim rescue v1 pilot.
+# Literal compiler spec for the bidirectional TetR PWM trim v1 pilot.
 # Payload trim candidates are source-backed literals derived upstream from the
 # Cruncher monotypic TetR PWM elite; this compiler does not resolve payload PWM
 # sources or expand cap x stem-base grids implicitly.
 designs:
-  - construct_id: pES-tetr-t26-w00-19
+  - construct_id: pES-tetr-r26-w00-19
     payload_id: TetR_w00_19
     cap_id: C26
     left_base: CGGG
@@ -20,7 +20,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron26_payload_trim_control
     rationale: Full bidirectional TetR payload in the working retron26 scaffold control.
-  - construct_id: pES-tetr-t26-w02-17
+  - construct_id: pES-tetr-r26-w02-17
     payload_id: TetR_w02_17
     cap_id: C26
     left_base: CGGG
@@ -32,9 +32,9 @@ designs:
     stem_base_selector_id: retron26_CGGG_ACAG_MXMX
     rt_mode: wt_eco1
     decision_group: retron26_payload_trim_control
-    control_id: pES-tetr-t26-w00-19
+    control_id: pES-tetr-r26-w00-19
     rationale: Mild 15 nt dual-site TetR trim in the working retron26 scaffold control.
-  - construct_id: pES-tetr-t26-w03-16
+  - construct_id: pES-tetr-r26-w03-16
     payload_id: TetR_w03_16
     cap_id: C26
     left_base: CGGG
@@ -46,7 +46,7 @@ designs:
     stem_base_selector_id: retron26_CGGG_ACAG_MXMX
     rt_mode: wt_eco1
     decision_group: retron26_payload_trim_control
-    control_id: pES-tetr-t26-w00-19
+    control_id: pES-tetr-r26-w00-19
     rationale: Stronger 13 nt dual-site TetR trim in the working retron26 scaffold control.
   - construct_id: pES-tetr-r43-w00-19
     payload_id: TetR_w00_19
@@ -59,88 +59,91 @@ designs:
     cap_selector_id: retron43_full_foldback_C43
     stem_base_selector_id: retron43_CAAG_CTCG_MXMM
     rt_mode: wt_eco1
-    decision_group: retron43_payload_trim_rescue
-    control_id: pES-tetr-t26-w00-19
+    decision_group: retron43_payload_trim_test
+    control_id: pES-tetr-r26-w00-19
     rationale: Full bidirectional TetR baseline in the retron43 target scaffold.
   - construct_id: pES-tetr-r43-w02-17
     payload_id: TetR_w02_17
     cap_id: C43
     left_base: CAAG
     right_base: CTCG
-    variant_role: rescue_candidate
+    variant_role: trim_candidate
     scaffold_context: retron43
     payload_trim_id: TetR_w02_17
     cap_selector_id: retron43_full_foldback_C43
     stem_base_selector_id: retron43_CAAG_CTCG_MXMM
     rt_mode: wt_eco1
-    decision_group: retron43_payload_trim_rescue
+    decision_group: retron43_payload_trim_test
     control_id: pES-tetr-r43-w00-19
-    rationale: Mild 15 nt dual-site TetR trim tests whether cargo shortening rescues retron43 SPOP.
+    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
   - construct_id: pES-tetr-r43-w03-16
     payload_id: TetR_w03_16
     cap_id: C43
     left_base: CAAG
     right_base: CTCG
-    variant_role: rescue_candidate
+    variant_role: trim_candidate
     scaffold_context: retron43
     payload_trim_id: TetR_w03_16
     cap_selector_id: retron43_full_foldback_C43
     stem_base_selector_id: retron43_CAAG_CTCG_MXMM
     rt_mode: wt_eco1
-    decision_group: retron43_payload_trim_rescue
+    decision_group: retron43_payload_trim_test
     control_id: pES-tetr-r43-w00-19
-    rationale: Stronger 13 nt dual-site TetR trim tests whether stronger cargo shortening rescues retron43 SPOP.
-  - construct_id: pES-tetr-d033-w00-19
+    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+  - construct_id: pES-tetr-r180-w00-19
     payload_id: TetR_w00_19
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    right_base: CATG
+    literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
     nick_orientation: bottom
     nickase: Nb.BtsI
     variant_role: scaffold_target
-    scaffold_context: de033_selected
+    scaffold_context: retron180
     payload_trim_id: TetR_w00_19
     cap_selector_id: de033_snapback_C172_rank_1
-    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    stem_base_selector_id: retron180_scar_nick_AGTG_CATG_XWMM_bottom_NbBtsI
     rt_mode: wt_eco1
-    decision_group: de033_payload_trim_rescue
-    control_id: pES-tetr-t26-w00-19
-    rationale: Full bidirectional TetR baseline in the selected DE033-compatible cap and stem-base target.
-  - construct_id: pES-tetr-d033-w02-17
+    decision_group: retron180_payload_trim_test
+    control_id: pES-tetr-r26-w00-19
+    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    rationale: Full bidirectional TetR baseline in the pES-retron-180 C172/AGTG/CATG/XWMM context.
+  - construct_id: pES-tetr-r180-w02-17
     payload_id: TetR_w02_17
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    right_base: CATG
+    literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
     nick_orientation: bottom
     nickase: Nb.BtsI
-    variant_role: rescue_candidate
-    scaffold_context: de033_selected
+    variant_role: trim_candidate
+    scaffold_context: retron180
     payload_trim_id: TetR_w02_17
     cap_selector_id: de033_snapback_C172_rank_1
-    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    stem_base_selector_id: retron180_scar_nick_AGTG_CATG_XWMM_bottom_NbBtsI
     rt_mode: wt_eco1
-    decision_group: de033_payload_trim_rescue
-    control_id: pES-tetr-d033-w00-19
-    rationale: Mild 15 nt dual-site TetR trim in the selected DE033-compatible target.
-  - construct_id: pES-tetr-d033-w03-16
+    decision_group: retron180_payload_trim_test
+    control_id: pES-tetr-r180-w00-19
+    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    rationale: Mild 15 nt dual-site TetR trim in the pES-retron-180 context.
+  - construct_id: pES-tetr-r180-w03-16
     payload_id: TetR_w03_16
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    literal_stem_base_source_id: de033_literal_AGTG_CAAT_MXMM_bottom_NbBtsI
+    right_base: CATG
+    literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
     nick_orientation: bottom
     nickase: Nb.BtsI
-    variant_role: rescue_candidate
-    scaffold_context: de033_selected
+    variant_role: trim_candidate
+    scaffold_context: retron180
     payload_trim_id: TetR_w03_16
     cap_selector_id: de033_snapback_C172_rank_1
-    stem_base_selector_id: de033_scar_nick_AGTG_CAAT_MXMM_bottom_NbBtsI
+    stem_base_selector_id: retron180_scar_nick_AGTG_CATG_XWMM_bottom_NbBtsI
     rt_mode: wt_eco1
-    decision_group: de033_payload_trim_rescue
-    control_id: pES-tetr-d033-w00-19
-    rationale: Stronger 13 nt dual-site TetR trim in the selected DE033-compatible target.
+    decision_group: retron180_payload_trim_test
+    control_id: pES-tetr-r180-w00-19
+    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    rationale: Stronger 13 nt dual-site TetR trim in the pES-retron-180 context.
 
 payload_sequences:
   TetR_w00_19:
@@ -163,7 +166,7 @@ payload_sequences:
     display_name: msd[tetr_dual_w02_17]
     parent_payload_id: TetR_w00_19
     payload_trim_id: TetR_w02_17
-    trim_class: conservative
+    trim_class: mild
     trim_5p_nt: 2
     trim_3p_nt: 2
     retained_parent_span_0: {start: 2, end: 17}
@@ -178,7 +181,7 @@ payload_sequences:
     display_name: msd[tetr_dual_w03_16]
     parent_payload_id: TetR_w00_19
     payload_trim_id: TetR_w03_16
-    trim_class: aggressive
+    trim_class: stronger
     trim_5p_nt: 3
     trim_3p_nt: 3
     retained_parent_span_0: {start: 3, end: 16}

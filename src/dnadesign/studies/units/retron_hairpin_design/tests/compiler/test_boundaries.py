@@ -97,7 +97,9 @@ def test_retron_msd_study_uses_public_tool_apis_only() -> None:
                 imports.add(node.module)
 
     assert "dnadesign.construct" in imports
+    assert "dnadesign.baserender" in imports
     assert "dnadesign.construct.src.composition.runtime" not in imports
+    assert not any(name.startswith("dnadesign.baserender.src") for name in imports)
     assert not any(name == "dnadesign.cruncher" or name.startswith("dnadesign.cruncher.src") for name in imports)
     assert not any(name.startswith("dnadesign.cruncher.workspaces") for name in imports)
     assert not any(name.startswith("dnadesign.folding.src") for name in imports)
@@ -141,7 +143,10 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "artifact_contracts/materialized_outputs.py": 450,
         "artifact_contracts/manifests.py": 450,
         "review_outputs/contracts/manifest.py": 140,
+        "review_outputs/contracts/benchling_import.py": 140,
         "review_outputs/contracts/plan.py": 180,
+        "review_outputs/contracts/review_variant_ids.py": 130,
+        "review_outputs/handoff/benchling.py": 190,
         "review_outputs/handoff/contract.py": 80,
         "review_outputs/handoff/index.py": 160,
         "review_outputs/pwm/baserender_record.py": 160,
@@ -158,7 +163,9 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "review_outputs/sequence/index.py": 140,
         "review_outputs/sequence/variant_identity.py": 100,
         "review_outputs/service.py": 120,
-        "review_outputs/video/montage.py": 190,
+        "review_outputs/video/frame_naming.py": 70,
+        "review_outputs/video/montage.py": 170,
+        "review_outputs/video/stills.py": 150,
     }
 
     for filename, max_lines in budgets.items():
@@ -169,12 +176,8 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
 
     assert not (source_root / "catalog" / "primitive_sources.py").exists()
     assert not (source_root / "catalog" / "variant_metadata.py").exists()
-    assert sorted(path.name for path in (source_root / "review_outputs").glob("*.py")) == [
-        "__init__.py",
-        "service.py",
-    ]
-    assert not any((source_root / "review_outputs").glob("pwm_*.py"))
-    assert not any((source_root / "review_outputs").glob("sequence_*.py"))
+    assert sorted(path.name for path in (source_root / "review_outputs").glob("*.py")) == ["__init__.py", "service.py"]
+    assert not any((source_root / "review_outputs").glob("[ps]*_*.py"))
     assert not (source_root / "review_outputs" / "clone_handoff_index.py").exists()
     assert not (source_root / "review_outputs" / "handoff" / "clone_index.py").exists()
 
@@ -189,21 +192,25 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         "compiler/test_msd_unit.py": 120,
         "compiler/test_cli_compile.py": 280,
         "compiler/test_materialization.py": 900,
-        "compiler/test_boundaries.py": 240,
+        "compiler/test_boundaries.py": 245,
         "compiler/specs/test_teto_trim_metadata.py": 140,
         "review_outputs/cli/fixtures.py": 70,
         "review_outputs/cli/test_review_outputs.py": 90,
         "review_outputs/cli/test_review_outputs_text.py": 70,
-        "review_outputs/package/test_generation.py": 180,
-        "review_outputs/package/test_validation_failures.py": 100,
+        "review_outputs/handoff/test_benchling_import.py": 110,
+        "review_outputs/package/test_generation.py": 230,
+        "review_outputs/package/test_review_variant_ids.py": 70,
+        "review_outputs/package/test_validation_failures.py": 110,
         "review_outputs/pwm/test_retention.py": 100,
         "review_outputs/video/test_montage.py": 100,
+        "review_outputs/video/test_review_still_quality.py": 110,
         "support/cli.py": 40,
         "support/compiler_fixtures.py": 80,
         "support/pwm_fixtures.py": 70,
         "support/registry.py": 80,
+        "support/review_ids.py": 40,
         "support/review_plans.py": 60,
-        "support/review_outputs.py": 180,
+        "support/review_outputs.py": 220,
         "support/viennarna.py": 100,
     }
 

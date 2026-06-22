@@ -18,9 +18,9 @@ sequence, GenBank, and plot deliverables.
   supplied. Its whole `Foldback` segment anchors cap-right secondary-structure
   orientation.
 - `2026-06-20-teto-pwm-trim-rescue-v1.single-unit.yaml`: verified transient
-  materialization of the 9-design tetO PWM trim rescue pilot with full,
-  conservative, and aggressive tetO payloads across retron26, retron43, and
-  selected C172/de033-compatible scaffold contexts.
+  materialization of the 9-design tetO PWM trim pilot with full, mild, and
+  stronger payloads across retron26, retron43, and the pES-retron-180
+  C172/AGTG/CATG/XWMM precedent.
 
 ### Boundary
 

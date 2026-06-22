@@ -29,30 +29,30 @@ def test_retron_msd_spec_preserves_teto_trim_and_design_metadata_in_reference_in
 contract: retron_msd_compiler_spec_v1
 schema_version: 1
 designs:
-  - construct_id: pES-tetr-d033-w02-17
+  - construct_id: pES-tetr-r180-w02-17
     payload_id: TetR_w02_17
     cap_id: C172
     left_base: AGTG
-    right_base: CAAT
-    literal_stem_base_source_id: scar_nick_literal_de033_mxmm_v1
+    right_base: CATG
+    literal_stem_base_source_id: scar_nick_literal_retron180_xwmm_v1
     nick_orientation: bottom
     nickase: Nb.BtsI
-    variant_role: rescue_candidate
-    scaffold_context: de033_selected
+    variant_role: trim_candidate
+    scaffold_context: retron180
     payload_trim_id: TetR_w02_17
     cap_selector_id: de033_snapback_cap_rank_1
-    stem_base_selector_id: de033_scar_nick_stem_base_rank_1
+    stem_base_selector_id: retron180_scar_nick_stem_base_rank_1
     rt_mode: wt_eco1
-    decision_group: target_trim_rescue
-    control_id: pES-tetr-d033-w00-19
-    rationale: Window [2,17) PWM-edge trim in the DE033-compatible scaffold target.
+    decision_group: target_trim_test
+    control_id: pES-tetr-r180-w00-19
+    rationale: Window [2,17) PWM-edge trim in the pES-retron-180 scaffold target.
 payload_sequences:
   TetR_w02_17:
     sequence: CCTATCAGTGATAGA
     display_name: msd[teto_w02_17]
     parent_payload_id: TetR_w00_19
     payload_trim_id: TetR_w02_17
-    trim_class: conservative
+    trim_class: mild
     trim_5p_nt: 2
     trim_3p_nt: 2
     retained_parent_span_0: {start: 2, end: 17}
@@ -70,12 +70,12 @@ cap_sequences:
 
     assert record.payload_or_target.payload_trim_id == "TetR_w02_17"
     assert record.payload_or_target.parent_payload_id == "TetR_w00_19"
-    assert record.payload_or_target.trim_class == "conservative"
+    assert record.payload_or_target.trim_class == "mild"
     assert record.payload_or_target.retained_parent_span_0 is not None
     assert record.payload_or_target.retained_parent_span_0.start == 2
     assert record.variant_metadata is not None
-    assert record.variant_metadata.variant_role == "rescue_candidate"
-    assert record.variant_metadata.scaffold_context == "de033_selected"
+    assert record.variant_metadata.variant_role == "trim_candidate"
+    assert record.variant_metadata.scaffold_context == "retron180"
     assert record.variant_metadata.rt_mode == "wt_eco1"
 
     write_msd_design_catalog(resolved.catalog, out_dir=out_dir)
@@ -83,8 +83,8 @@ cap_sequences:
         csv.DictReader((out_dir / "reference_index.tsv").read_text(encoding="utf-8").splitlines(), delimiter="\t")
     )
     assert rows[0]["payload_trim_id"] == "TetR_w02_17"
-    assert rows[0]["payload_trim_class"] == "conservative"
-    assert rows[0]["variant_role"] == "rescue_candidate"
-    assert rows[0]["scaffold_context"] == "de033_selected"
+    assert rows[0]["payload_trim_class"] == "mild"
+    assert rows[0]["variant_role"] == "trim_candidate"
+    assert rows[0]["scaffold_context"] == "retron180"
     assert rows[0]["rt_mode"] == "wt_eco1"
-    assert rows[0]["decision_group"] == "target_trim_rescue"
+    assert rows[0]["decision_group"] == "target_trim_test"

@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from ..contracts.plan import PwmTrimPanel
-from .typography import BOUNDARY_TICK_FONT_SIZE
 
 
 def trim_edge_markers(panel: PwmTrimPanel, *, color: str) -> list[dict[str, object]]:
@@ -30,13 +29,6 @@ def trim_edge_markers(panel: PwmTrimPanel, *, color: str) -> list[dict[str, obje
     ]
 
 
-def boundary_ticks(panel: PwmTrimPanel, *, color: str) -> list[dict[str, object]]:
-    return [
-        _boundary_tick(position=panel.retained_start_0, color=color),
-        _boundary_tick(position=panel.retained_end_0, color=color),
-    ]
-
-
 def retained_span_bracket(*, color: str) -> dict[str, object]:
     return {
         "target_feature_id": "tetO_retained_payload_span",
@@ -49,15 +41,4 @@ def retained_span_bracket(*, color: str) -> dict[str, object]:
     }
 
 
-def _boundary_tick(*, position: int, color: str) -> dict[str, object]:
-    return {
-        "position": position,
-        "label": str(position),
-        "emphasis": "active",
-        "color": color,
-        "font_size": BOUNDARY_TICK_FONT_SIZE,
-        "linewidth": 0.8,
-    }
-
-
-__all__ = ["BOUNDARY_TICK_FONT_SIZE", "boundary_ticks", "retained_span_bracket", "trim_edge_markers"]
+__all__ = ["retained_span_bracket", "trim_edge_markers"]

@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ..contracts.plan import PwmTrimPanel
-from .trim_annotations import boundary_ticks, retained_span_bracket, trim_edge_markers
+from .trim_annotations import retained_span_bracket, trim_edge_markers
 
 PANEL_COLOR = "#3E927F"
 EXCLUDED_COLOR = "#C8CED8"
@@ -41,7 +41,6 @@ def sequence_row_visual_meta(
         "base_dim_color": EXCLUDED_COLOR,
         "span_backdrops": [_full_site_backdrop(site_start=site_start, site_end=site_end)],
         "span_edge_markers": trim_edge_markers(panel, color=TRIM_CUT_COLOR),
-        "boundary_ticks": boundary_ticks(panel, color=TRIM_CUT_COLOR),
         "span_brackets": [retained_span_bracket(color=PANEL_COLOR)],
     }
 

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/triptych.py
 
-PWM trim triptych rendering for tetO trim rescue review outputs.
+PWM trim triptych rendering for tetO trim review outputs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

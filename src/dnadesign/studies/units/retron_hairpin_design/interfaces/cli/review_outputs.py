@@ -25,7 +25,7 @@ def review_outputs_command(
     deliverable_plan: Path | None = typer.Option(
         None,
         "--deliverable-plan",
-        help="Retron workbench deliverable plan. Defaults to the tetO trim rescue v1 plan.",
+        help="Retron workbench deliverable plan. Defaults to the tetO trim v1 plan.",
     ),
     materialized_root: Path | None = typer.Option(
         None,
@@ -69,6 +69,9 @@ def review_outputs_command(
             "sequence_montage_manifest": str(result.sequence_montage_manifest),
             "handoff_tsv": str(result.handoff_tsv),
             "handoff_markdown": str(result.handoff_markdown),
+            "benchling_genbank_dir": str(result.benchling_genbank_dir),
+            "benchling_genbank_index": str(result.benchling_genbank_index),
+            "benchling_genbank_count": result.benchling_genbank_count,
             "review_manifest_path": str(result.review_manifest_path),
             "record_count": result.sequence_row_count,
             "handoff_verified_count": result.handoff_verified_count,

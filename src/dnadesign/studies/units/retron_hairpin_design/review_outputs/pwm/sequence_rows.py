@@ -29,7 +29,8 @@ from .baserender_record import (
 from .typography import SCALE_BAR_FONT_SIZE, SEQUENCE_FONT_SIZE
 from .visual_layers import EXCLUDED_COLOR, PANEL_COLOR
 
-PANEL_WIDTH = 690
+PANEL_WIDTH = 960
+CROP_PAD_PX = 42
 
 
 def render_pwm_sequence_row_panel(
@@ -102,13 +103,12 @@ def _crop_white(image: Image.Image) -> Image.Image:
     if not mask.any():
         return image
     ys, xs = np.where(mask)
-    pad = 12
     return image.crop(
         (
-            max(0, int(xs.min()) - pad),
-            max(0, int(ys.min()) - pad),
-            min(image.width, int(xs.max()) + pad + 1),
-            min(image.height, int(ys.max()) + pad + 1),
+            max(0, int(xs.min()) - CROP_PAD_PX),
+            max(0, int(ys.min()) - CROP_PAD_PX),
+            min(image.width, int(xs.max()) + CROP_PAD_PX + 1),
+            min(image.height, int(ys.max()) + CROP_PAD_PX + 1),
         )
     )
 

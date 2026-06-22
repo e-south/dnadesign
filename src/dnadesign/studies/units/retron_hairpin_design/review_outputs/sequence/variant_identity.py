@@ -27,17 +27,20 @@ class ReviewVariantIdentity:
     scaffold: str
     retained_window: str
     insert_nt: int
+    payload_label: str
     role: str
 
 
 def identity_for_frame(frame: SequenceReviewFrame) -> ReviewVariantIdentity:
     window = payload_window(frame.payload_trim_id)
+    retained_window = f"[{window[0]},{window[1]})"
     scaffold = scaffold_label(frame.scaffold_context)
     return ReviewVariantIdentity(
         variant_id=variant_id(frame),
         scaffold=scaffold,
-        retained_window=f"[{window[0]},{window[1]})",
+        retained_window=retained_window,
         insert_nt=window[1] - window[0],
+        payload_label=f"tetO PWM {retained_window}",
         role=role_label(frame.variant_role),
     )
 
@@ -60,16 +63,16 @@ def payload_window(payload_trim_id: str) -> tuple[int, int]:
 
 def scaffold_label(scaffold_context: str) -> str:
     return {
-        "retron26": "t26",
+        "retron26": "r26",
         "retron43": "r43",
-        "de033_selected": "d033",
+        "retron180": "r180",
     }.get(scaffold_context, _slug(scaffold_context))
 
 
 def role_label(variant_role: str) -> str:
     return {
         "scaffold_target": "target",
-        "rescue_candidate": "candidate",
+        "trim_candidate": "candidate",
     }.get(variant_role, variant_role)
 
 

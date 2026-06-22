@@ -14,15 +14,16 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Mapping
 
 from ...compiler.exceptions import RetronMsdCompilerError
 from ..sequence.index import SequenceReviewFrame
-from ..sequence.variant_identity import identity_for_frame, variant_id
+from ..sequence.variant_identity import variant_id
+from .frame_naming import frame_evidence_label, review_construct_id
+from .stills import STILL_SIZE_PX, write_review_stills
 
 VideoWriter = Callable[..., None]
-EDGE_COLUMN_MAX_RGB_THRESHOLD = 250
-EDGE_MAX_COLUMNS = 16
-EDGE_MIN_FRACTION = 0.85
+VIDEO_SIZE_PX = (1920, 1080)
 
 
 def write_sequence_montage(
@@ -31,6 +32,7 @@ def write_sequence_montage(
     out_dir: Path,
     deliverable_plan_id: str,
     materialized_root: Path,
+    review_variant_ids: Mapping[str, str],
     video_writer: VideoWriter | None = None,
     fps: int = 1,
     seconds_per_frame: int = 2,
@@ -39,7 +41,7 @@ def write_sequence_montage(
     stills_dir = video_dir / "stills"
     video_path = video_dir / f"{deliverable_plan_id}.sequence_montage.mp4"
     manifest_path = video_dir / f"{deliverable_plan_id}.sequence_montage.manifest.json"
-    still_paths = tuple(_write_review_still(frame, stills_dir=stills_dir) for frame in frames)
+    still_paths = write_review_stills(frames, stills_dir=stills_dir, review_variant_ids=review_variant_ids)
     writer = video_writer or _write_montage_video
     writer(
         frames=frames,
@@ -55,11 +57,20 @@ def write_sequence_montage(
         "video_path": _relative_to(video_path, out_dir),
         "frame_count": len(frames),
         "still_count": len(still_paths),
+        "still_resolution_px": {"width": STILL_SIZE_PX[0], "height": STILL_SIZE_PX[1]},
+        "video_resolution_px": {"width": VIDEO_SIZE_PX[0], "height": VIDEO_SIZE_PX[1]},
         "fps": fps,
         "seconds_per_frame": seconds_per_frame,
         "source_materialized_root": materialized_root.as_posix(),
+        "review_variant_ids": dict(review_variant_ids),
         "frames": [
-            _frame_manifest(frame, materialized_root=materialized_root, still_path=still_path, out_dir=out_dir)
+            _frame_manifest(
+                frame,
+                materialized_root=materialized_root,
+                still_path=still_path,
+                out_dir=out_dir,
+                review_variant_ids=review_variant_ids,
+            )
             for frame, still_path in zip(frames, still_paths, strict=True)
         ],
     }
@@ -89,7 +100,7 @@ def _write_montage_video(
         raise RetronMsdCompilerError("FFmpeg writer is required to render Retron sequence montage MP4 output.")
     arrays = [_load_still_array(path) for path in still_paths for _ in range(max(1, int(seconds_per_frame)))]
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig = plt.figure(figsize=(16, 9), dpi=120, frameon=False)
+    fig = plt.figure(figsize=(16, 9), dpi=VIDEO_SIZE_PX[0] // 16, frameon=False)
     axis = fig.add_axes([0, 0, 1, 1])
     axis.set_axis_off()
     image = axis.imshow(arrays[0], interpolation="nearest")
@@ -99,39 +110,14 @@ def _write_montage_video(
         return [image]
 
     anim = animation.FuncAnimation(fig, update, frames=len(arrays), interval=1000 / max(1, fps), blit=True)
-    writer = animation.FFMpegWriter(fps=max(1, fps), codec="libx264", bitrate=2400)
+    writer = animation.FFMpegWriter(
+        fps=max(1, fps),
+        codec="libx264",
+        bitrate=-1,
+        extra_args=["-crf", "16", "-preset", "slow", "-tune", "stillimage", "-pix_fmt", "yuv420p"],
+    )
     anim.save(output_path, writer=writer)
     plt.close(fig)
-
-
-def _write_review_still(frame: SequenceReviewFrame, *, stills_dir: Path) -> Path:
-    from PIL import Image, ImageOps
-
-    source = _trim_edge_artifact_columns(Image.open(frame.composition_overview_png).convert("RGB"))
-    canvas = Image.new("RGB", (1600, 900), color="white")
-    fitted = ImageOps.contain(source, (1600, 900))
-    canvas.paste(fitted, ((1600 - fitted.width) // 2, (900 - fitted.height) // 2))
-    stills_dir.mkdir(parents=True, exist_ok=True)
-    path = stills_dir / f"{frame_filename_stem(frame)}.png"
-    canvas.save(path)
-    return path
-
-
-def _trim_edge_artifact_columns(image):
-    left = 0
-    right = image.width
-    while left < min(EDGE_MAX_COLUMNS, right - 1) and _is_edge_artifact_column(image, left):
-        left += 1
-    while right > max(left + 1, image.width - EDGE_MAX_COLUMNS) and _is_edge_artifact_column(image, right - 1):
-        right -= 1
-    if left == 0 and right == image.width:
-        return image
-    return image.crop((left, 0, right, image.height))
-
-
-def _is_edge_artifact_column(image, x: int) -> bool:
-    artifact = sum(1 for y in range(image.height) if max(image.getpixel((x, y))[:3]) < EDGE_COLUMN_MAX_RGB_THRESHOLD)
-    return artifact / image.height >= EDGE_MIN_FRACTION
 
 
 def _load_still_array(path: Path):
@@ -147,11 +133,14 @@ def _frame_manifest(
     materialized_root: Path,
     still_path: Path,
     out_dir: Path,
+    review_variant_ids: Mapping[str, str],
 ) -> dict[str, object]:
+    compact_variant_id = variant_id(frame)
     return {
         "order": frame.order,
-        "variant_id": variant_id(frame),
-        "evidence_label": frame_evidence_label(frame),
+        "variant_id": compact_variant_id,
+        "review_construct_id": review_construct_id(frame, review_variant_ids=review_variant_ids),
+        "evidence_label": frame_evidence_label(frame, review_variant_ids=review_variant_ids),
         "construct_id": frame.construct_id,
         "msd_design_id": frame.msd_design_id,
         "payload_trim_id": frame.payload_trim_id,
@@ -163,15 +152,6 @@ def _frame_manifest(
     }
 
 
-def frame_filename_stem(frame: SequenceReviewFrame) -> str:
-    return f"{frame.order:02d}_{variant_id(frame)}"
-
-
-def frame_evidence_label(frame: SequenceReviewFrame) -> str:
-    identity = identity_for_frame(frame)
-    return f"{identity.variant_id} | {identity.role} | {identity.insert_nt} nt {identity.retained_window}"
-
-
 def _relative_to(path: Path, root: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
@@ -179,4 +159,4 @@ def _relative_to(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-__all__ = ["VideoWriter", "write_sequence_montage"]
+__all__ = ["STILL_SIZE_PX", "VIDEO_SIZE_PX", "VideoWriter", "write_sequence_montage"]
