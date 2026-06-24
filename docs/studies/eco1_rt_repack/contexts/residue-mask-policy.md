@@ -3,88 +3,121 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-19
+last_verified: 2026-06-23
 ---
 
 ## Residue Mask Policy
 
-The conservative mask tier protects function before diversity. The first
-`mask_set.yaml` should be the union of all fixed/protected sources and only
-then expose residues to MPNN sampling.
+The current mask rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
+Earlier SASA and contact-density checks remain evidence reviews only; they do
+not protect or release residues.
+
+The rule is deliberately small:
 
 ```text
-final_fixed = manual_mask
-  OR contact_mask
-  OR conservation_mask
-  OR unresolved_residue_mask
-  OR cysteine_control_mask
+protected =
+  NAxxH / YADD / VTG
+  OR Wang/Ec86 direct substrate-contact prior
+  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA
+  OR mapped residue is within 5 A of retained DNA/RNA
 
-designable = mapped_residue AND NOT final_fixed
+non_fixed = NOT protected
 ```
 
-The mask set should never infer that a residue is designable merely because one
-source is missing. Missing evidence fails the conservative tier unless the
-profile explicitly waives that source.
+Eco1's retained msDNA/msrRNA wraps broadly around the RT, so broad distance
+cutoffs such as 15-20 A overprotect the whole enzyme. This rule uses
+direct contact instead: only mapped residues within 5 A of retained DNA/RNA are
+protected by distance.
 
-### Mask Sources
+Terminal residues `1`, `2`, and `312-320` are present in the Eco1 sequence but
+missing from the selected fixed-backbone structure. They are not protected by
+the mask policy. They should be reported as `non_fixed_missing_backbone`, which
+means they are unprotected but cannot be mutated by fixed-backbone ProteinMPNN
+until coordinates are supplied or handled separately.
 
-| Source | Owner | Initial policy |
-| --- | --- | --- |
-| Catalytic residues | study | fixed until manually reopened; proposed anchors include YADD, RT1-RT7, retron X, and retron Y motifs after numbering audit |
-| Substrate/contact residues | `thread` structure evidence plus study thresholds | fixed when within declared contact threshold; conservative first pass uses heavy-atom distance to retained nucleic acid context |
-| MSA conservation | planned evidence contract | fixed above declared conservation threshold when the Eco1 residue is the plurality amino acid |
-| Unresolved structure residues | `thread` residue map | fixed or excluded |
-| Interface/ligand context | study and `thread` contact profile | fixed unless explicitly waived |
-| Cysteine control | study profile | no new cysteine in conservative tier; existing cysteine policy must be explicit |
+### Protected Sources
 
-### Conservative Defaults
+| Source | Policy |
+| --- | --- |
+| NAxxH `105-109` | protected |
+| YADD `195-198` | protected |
+| VTG `243-245` | protected |
+| Wang/Ec86 direct substrate-contact priors | protected |
+| >=25% WT plurality in the Ec86 clade 9 MSA | protected |
+| mapped residue within 5 A of retained DNA/RNA | protected |
+| terminal missing-backbone residues `1`, `2`, `312-320` | `non_fixed_missing_backbone`; not protected, not directly fixed-backbone ProteinMPNN mutable until coordinates exist |
 
-These are starting policy values, not residue-map evidence:
+RT1-RT7 intervals remain annotation and review labels. They do not blanket
+hard-fix residues under this rule.
 
-| Setting | First-pass value | Notes |
-| --- | --- | --- |
-| Contact threshold | `20 A` | Use all retained nucleic-acid atoms. Add `18 A` and `15 A` only as later relaxed tiers. |
-| Conservation threshold | `0.25` | Apply to broad retron-RT and Eco1-like MSAs separately; fixed if either profile passes. |
-| MSA gap policy | non-gap denominator | Positions with insufficient non-gap support fail until the profile declares a minimum. |
-| Manual motif policy | fixed | Exact residue ids remain provisional until structure and sequence authority are selected. |
-| Effector-interface policy | not automatically fixed | Preserve only if also contact/conserved/manual, or if the study declares an effector-retention objective. |
+### Current Counts
 
-### Residue Mask Table
+Applying the current rule gives this row-level classification:
 
-The runtime authority should be a typed table. A review export may use CSV with
-the same columns:
+| Class | Count |
+| --- | ---: |
+| `non_fixed` mapped residues | 123 |
+| `non_fixed_missing_backbone` terminal residues | 11 |
+| evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA | 106 |
+| within 5 A retained DNA/RNA | 120 |
+| NAxxH / YADD / VTG | 12 |
+| Wang/Ec86 direct substrate-contact priors | 8 |
+
+Total unprotected positions: `134`. Directly fixed-backbone ProteinMPNN mutable
+positions from the current 7V9U backbone: `123`.
+
+### Evidence Roles
+
+The method rationale is intentionally plain:
+
+- Tao supplies the fixed-backbone RT redesign method prior and homolog-MSA
+  WT-plurality conservation rule.
+- Mestre supplies the Ec86 clade/type source ontology for homolog panels.
+- Wang supplies the Eco1/Ec86 cryo-EM structure and specific RT-msDNA/msrRNA
+  substrate-contact priors.
+- Simon supplies RT-region and motif annotation grammar.
+
+Evidence-review artifacts explain the structure context but are not mask inputs.
+The rule does not search across SASA, contact-density, contact-class, or
+conservation-threshold variants.
+The next sampling plan should use the materialized `mask_set.yaml` under
+`eco1_rt_clade9_plurality25_direct_contact5a_v1`.
+
+### Implementation Contract
+
+Study-local mask row algebra lives in
+`src/dnadesign/studies/units/eco1_rt_repack/operations/masking/`. The
+`mask_set` materializer should write one row-level artifact for this rule.
+Wang/Ec86 direct-contact priors must come from the study authority surface, not
+a hard-coded list inside the materializer.
+
+Expected `mask_set.yaml` row shape:
 
 ```text
 canonical_position
 wt_aa
-structure_chain_id
-structure_residue_id
 design_position
-domain_or_region
-distance_to_retained_nucleic_acid_angstrom
-contact_mask
-broad_msa_non_gap_count
-broad_msa_wt_frequency
-broad_msa_plurality_aa
-eco1_like_msa_non_gap_count
-eco1_like_msa_wt_frequency
-eco1_like_msa_plurality_aa
-conservation_mask
-manual_mask
-manual_mask_reason
-unresolved_residue_mask
-cysteine_control_mask
-final_fixed
-proteinmpnn_designable
+has_backbone_coordinates
+motif_protected
+wang_ec86_direct_contact_prior
+wt_plurality_frequency
+wt_plurality_aa
+min_distance_to_retained_dna_rna_angstrom
+protected
+non_fixed
+non_fixed_missing_backbone
+protection_reasons
 ```
 
 ### Fail-Fast Rules
 
-- A mutable residue must have one canonical residue-map row.
-- A fixed residue must record at least one source reason.
-- Contact and conservation masks must carry thresholds and source hashes.
-- Conflicting mask inputs fail until manually resolved in the profile fixture.
-- Empty mutable masks fail; all-mutable masks fail for the conservative tier.
-- A manual Eco1 residue id is advisory until it resolves through the residue map.
-- No mask file may mix canonical Eco1 numbering and PDB residue ids without
-  explicit columns for each.
+- Missing `mask_set.yaml` blocks thread execution.
+- Every protected residue must name at least one protection source.
+- `non_fixed` must equal `NOT protected`.
+- Residues `1`, `2`, and `312-320` must be
+  `non_fixed_missing_backbone`, not protected.
+- Missing-backbone residues must not be emitted as directly fixed-backbone
+  ProteinMPNN mutable positions until coordinates exist.
+- No RT1-RT7 interval may blanket hard-fix residues.
+- Wang/Ec86 direct-contact priors must be explicit study-owned records before
+  they protect residues.

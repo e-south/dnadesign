@@ -34,6 +34,8 @@ residue_numbering_audit:
   ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-audit.md
 residue_numbering_policy:
   ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+structure_preprocessing_policy:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml
 rt_lnrna_route_map:
   ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
 planned_runtime_root:
@@ -46,15 +48,27 @@ planned_backbone_bundle:
 planned_residue_map:
   status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+planned_structure_preprocessing_manifest:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
 planned_conservation_profile:
-  status: planned
+  status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
 planned_contact_profile:
   status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+planned_contact_geometry_profile:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+planned_manual_mask_authority:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
 planned_mask_set:
-  status: planned
+  status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+planned_contact_risk_profile:
+  status: materialized_audit_only
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
 planned_thread_plan:
   status: planned
   ref: repo:outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml

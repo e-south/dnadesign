@@ -1,7 +1,7 @@
 schema_id: dnadesign.aligner.msa.visualization.annotation_tracks
 schema_version: 1
 study_id: eco1_rt_repack
-status: motif_anchor_first_pass
+status: rt1_rt7_interval_authority_v1
 coordinate_space: target_ungapped_position
 target_row_id: eco1_rt_ec86kit_reference
 target_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
@@ -13,7 +13,7 @@ source_basis:
   - id: eco1_rt_v1_profile_manual_mask_anchors
     note: Checked-in Eco1 profile declares YADD, RT1-RT7, retron X, and retron Y as hard manual mask classes.
 notes:
-  - Exact RT0-RT7 interval boxes are not yet materialized here because they require a dedicated Eco1 numbering/motif audit.
+  - RT1-RT7 boxes mirror the audited canonical intervals in manual-mask-authority.yaml for display.
   - This file provides visualization annotations only; it does not decide mask membership or designability.
 tracks:
   - id: retron_rt_context_spans
@@ -53,6 +53,87 @@ tracks:
         text_color: "#d73027"
         label_position: above
         mask_relevance: manual_mask_anchor_context_display_only
+  - id: retron_rt_core_intervals
+    label: RT1-RT7 core intervals
+    color: "#111111"
+    features:
+      - id: rt1_interval
+        label: RT1
+        start: 33
+        end: 64
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt2_interval
+        label: RT2
+        start: 65
+        end: 99
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt3_interval
+        label: RT3
+        start: 111
+        end: 151
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt4_interval
+        label: RT4
+        start: 159
+        end: 190
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt5_interval
+        label: RT5
+        start: 192
+        end: 211
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt6_interval
+        label: RT6
+        start: 212
+        end: 230
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
+      - id: rt7_interval
+        label: RT7
+        start: 231
+        end: 245
+        color: "#111111"
+        fill_opacity: 0.02
+        stroke_color: "#111111"
+        stroke_width: 2
+        text_color: "#111111"
+        label_position: above
+        mask_relevance: mirrors_manual_mask_authority_display_only
   - id: retron_rt_motif_anchors
     label: RT motif anchors
     color: "#5b5f97"

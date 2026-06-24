@@ -161,15 +161,33 @@ def _validate_profile_conservative_policy(*, issues: list[ContractIssue], profil
     if not isinstance(policy, Mapping):
         return
 
-    threshold = policy.get("substrate_contact_threshold_angstrom")
-    if not _is_positive_number(threshold):
+    if policy.get("mask_policy_id") != "eco1_rt_clade9_plurality25_direct_contact5a_v1":
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_mask_policy_id",
+                message="mask_policy_id must be eco1_rt_clade9_plurality25_direct_contact5a_v1",
+                path="conservative_policy.mask_policy_id",
+            )
+        )
+
+    direct_threshold = policy.get("direct_contact_threshold_angstrom")
+    if not _is_positive_number(direct_threshold) or float(direct_threshold) != 5.0:
         issues.append(
             ContractIssue(
                 check_id="eco1_rt.profile.invalid_contact_threshold",
-                message="substrate_contact_threshold_angstrom must be a positive number",
-                path="conservative_policy.substrate_contact_threshold_angstrom",
+                message="direct_contact_threshold_angstrom must equal 5",
+                path="conservative_policy.direct_contact_threshold_angstrom",
             )
         )
+    for legacy_field in ("substrate_contact_threshold_angstrom", "relaxed_contact_thresholds_angstrom"):
+        if legacy_field in policy:
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.profile.legacy_mask_policy_field",
+                    message=f"conservative_policy must not retain legacy field {legacy_field!r}",
+                    path=f"conservative_policy.{legacy_field}",
+                )
+            )
 
     conservation_threshold = policy.get("conservation_threshold")
     if not isinstance(conservation_threshold, int | float) or not 0 < float(conservation_threshold) <= 1:

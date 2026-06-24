@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-conservation-source-discovery
 surface: study-provenance-note
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-20
+last_verified: 2026-06-22
 ---
 
 ## Conservation Source Discovery
@@ -214,13 +214,12 @@ The human reproduction method is recorded at:
 docs/studies/eco1_rt_repack/contexts/msa-method.md
 ```
 
-The conservation-profile materializer now exists as study-owned code, but it
-requires explicit aligned FASTA inputs for `ec86_clade9_conservation_v1` and
-`ec86_iia3_cluster42_1_conservation_v1`. Phase 1 must continue to fail on
-`conservation_profile_not_materialized` until a real
-`conservation_profile.parquet` is generated from those declared sources. It
-must not let review-figure alignments, prose, missing provider rows, or the
-mismatched NCBI Eco1 target row imply designability.
+The conservation-profile materializer exists as study-owned code and requires
+explicit aligned FASTA inputs for `ec86_clade9_conservation_v1` and
+`ec86_iia3_cluster42_1_conservation_v1`. A real
+`conservation_profile.parquet` has since been generated from those declared
+sources. Review-figure alignments, prose, missing provider rows, or the
+mismatched NCBI Eco1 target row still must not imply designability.
 
 The broad source policy was revised after an interactive full-roster MAFFT run
 proved operationally impractical and methodologically broader than the Tao-style
@@ -228,9 +227,12 @@ homolog MSA requires. The selected broad source set is now the Mestre
 Ec86-containing RT clade 9 panel after declared QC. The local
 `conservation-clade9-source-cache-v1` run now emits
 `ec86_clade9_conservation_v1` source records with coverage, identity, length,
-motif-QC, and explicit exclusion metadata. The next runtime gate is accepted
-Clustal Omega alignment for both selected profiles before any conservation
-profile is materialized.
+motif-QC, and explicit exclusion metadata. Both selected profile alignments
+have since been accepted under the declared Clustal Omega policy, and the
+study-owned conservation materializer has produced
+`conservation_profile.parquet`. The current runtime gate is therefore no longer
+MSA acceptance; it is mask/sampling policy after the diagnostic all-fixed 20 A
+mask.
 
 ### External Source Links
 

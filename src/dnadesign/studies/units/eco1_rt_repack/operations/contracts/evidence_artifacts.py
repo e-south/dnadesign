@@ -17,14 +17,22 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation_artifacts import (
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation import (
     validate_conservation_profile_content,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import (
     _DOCS_ROOT,
     _REQUIRED_CONTACT_PROFILE_COLUMNS,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.masks import validate_mask_set_content
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure.contact_geometry import (
+    validate_contact_geometry_profile_content,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure.preprocessing import (
+    contact_geometry_upstream_artifact_paths,
+    validate_structure_preprocessing_manifest_content,
+)
 
 
 def _validate_materialized_evidence_and_mask_artifacts(
@@ -38,6 +46,9 @@ def _validate_materialized_evidence_and_mask_artifacts(
     issues: list[ContractIssue] = []
     conservation_profile = structure_root / "conservation_profile.parquet"
     contact_profile = structure_root / "contact_profile.parquet"
+    structure_preprocessing_manifest = structure_root / "structure_preprocessing_manifest.yaml"
+    contact_geometry_profile = structure_root / "contact_geometry_profile.parquet"
+    manual_mask_authority = structure_root / "manual_mask_authority.yaml"
     mask_set = structure_root / "mask_set.yaml"
 
     if not conservation_profile.exists():
@@ -74,12 +85,63 @@ def _validate_materialized_evidence_and_mask_artifacts(
                 profile=profile,
             )
         )
+    if not structure_preprocessing_manifest.exists():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.structure.structure_preprocessing_manifest_not_materialized",
+                message="Phase 1 mask evidence requires a materialized structure_preprocessing_manifest.yaml",
+                path=str(structure_preprocessing_manifest),
+            )
+        )
+    else:
+        issues.extend(
+            validate_structure_preprocessing_manifest_content(
+                structure_preprocessing_manifest,
+                repo_root=repo_root,
+                structure_root=structure_root,
+            )
+        )
+    if not contact_geometry_profile.exists():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.structure.contact_geometry_profile_not_materialized",
+                message="Phase 1 mask evidence requires a materialized contact_geometry_profile.parquet",
+                path=str(contact_geometry_profile),
+            )
+        )
+    else:
+        issues.extend(
+            validate_contact_geometry_profile_content(
+                contact_geometry_profile,
+                residue_map_path=structure_root / "residue_map.parquet",
+                upstream_artifact_paths=contact_geometry_upstream_artifact_paths(repo_root, structure_root),
+            )
+        )
+    if not manual_mask_authority.exists():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.mask.manual_mask_authority_not_materialized",
+                message="Phase 1 sampling requires a materialized manual_mask_authority.yaml",
+                path=str(manual_mask_authority),
+            )
+        )
     if not mask_set.exists():
         issues.append(
             ContractIssue(
                 check_id="eco1_rt.mask.mask_set_not_materialized",
                 message="Phase 1 sampling requires a materialized mask_set.yaml",
                 path=str(mask_set),
+            )
+        )
+    elif conservation_profile.exists() and contact_geometry_profile.exists() and manual_mask_authority.exists():
+        issues.extend(
+            validate_mask_set_content(
+                mask_set,
+                repo_root=repo_root,
+                residue_map_path=structure_root / "residue_map.parquet",
+                contact_geometry_profile_path=contact_geometry_profile,
+                conservation_profile_path=conservation_profile,
+                manual_mask_authority_path=manual_mask_authority,
             )
         )
     return issues
@@ -240,7 +302,7 @@ def _contact_threshold_angstrom(profile: Mapping[str, Any]) -> float:
     policy = profile.get("conservative_policy")
     if not isinstance(policy, Mapping):
         return 0.0
-    value = policy.get("substrate_contact_threshold_angstrom")
+    value = policy.get("direct_contact_threshold_angstrom")
     if isinstance(value, int | float) and not isinstance(value, bool):
         return float(value)
     return 0.0

@@ -1,0 +1,1 @@
+"""Structure-preprocessing materialization tests."""

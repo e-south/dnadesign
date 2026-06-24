@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-06-20
+last_verified: 2026-06-22
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -44,6 +44,12 @@ datasets:
     path: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
     status: selected_authority
     description: Selected Eco1/Ec86 structure-authority record using the sibling ec86kit protomer-1 workspace as provenance.
+  - id: eco1_rt_structure_preprocessing_policy
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml
+    status: selected_policy
+    description: Study-owned provenance policy for raw RCSB 7V9U dimer context, selected ec86kit protomer-1 model, retained protein/DNA/RNA chains, excluded paired protomer context, and the explicit non-objective of preserving paired-protomer dimerization in this first profile.
   - id: eco1_rt_residue_numbering_policy
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -68,12 +74,24 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/
     status: phase1_structure_artifact_materializer
     description: Study-owned materializer for thread-shaped backbone_bundle.yaml and residue_map.parquet from the selected ec86kit authority.
+  - id: eco1_rt_structure_preprocessing_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure_preprocessing/
+    status: phase1_structure_preprocessing_manifest_materializer
+    description: Study-owned materializer for structure_preprocessing_manifest.yaml; hash-checks selected ec86kit model provenance and machine-checks RT/DNA/RNA retained chain ontology before contact geometry.
   - id: eco1_rt_contact_materializer
     owner: eco1_rt_repack
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/
     status: phase1_contact_profile_materializer
     description: Study-owned materializer for thread-shaped contact_profile.parquet from the retained ec86kit DNA/RNA context distance profile.
+  - id: eco1_rt_contact_geometry_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_geometry/
+    status: phase1_contact_geometry_materializer
+    description: Study-owned Biopython/mmCIF materializer for contact_geometry_profile.parquet with atom-class DNA/RNA distance evidence. The current rule uses the mapped retained-DNA/RNA <=5 A predicate; contact-density and retained-chain-count classes do not decide protected residues.
   - id: eco1_rt_conservation_materializer
     owner: eco1_rt_repack
     kind: checked_in_code
@@ -84,8 +102,8 @@ datasets:
     owner: eco1_rt_repack
     kind: checked_in_code
     path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/
-    status: phase1_alignment_bundle_materializer_hardened_runtime_blocked
-    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MSA backend command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; both selected profiles must be regenerated under the current Clustal Omega policy before conservation scoring.
+    status: phase1_alignment_bundle_materializer_accepted_local
+    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MSA backend command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; both selected profiles are accepted locally under the current Clustal Omega policy.
   - id: aligner_msa_visualization_api
     owner: aligner
     kind: checked_in_code
@@ -96,8 +114,14 @@ datasets:
     owner: eco1_rt_repack
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml
-    status: motif_anchor_first_pass
-    description: Study-owned target-position annotation tracks for audited Eco1 RT motif anchors rendered by the generic aligner.msa visualization API; not a mask source or designability rule.
+    status: rt1_rt7_interval_authority_v1
+    description: Study-owned target-position annotation tracks for audited Eco1 RT1-RT7 intervals and motif anchors rendered by the generic aligner.msa visualization API; not a mask source or designability rule.
+  - id: eco1_rt_manual_mask_authority_source
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml
+    status: rt1_rt7_interval_authority_v1
+    description: Study-owned manual mask ontology for audited Eco1 NAxxH, YADD, VTG, RT1-RT7 annotation spans, and Wang/Ec86 direct substrate-contact priors. Under the selected simple policy, RT1-RT7 spans are review labels rather than blanket hard masks.
   - id: eco1_rt_msa_exemplar_rows
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -145,7 +169,7 @@ datasets:
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
     status: source_discovery
-    description: Study-owned source-discovery note for Ec86 clade 9 and II-A3 cluster 42_1 conservation profile authority before MSA materialization.
+    description: Study-owned source-discovery note for Ec86 clade 9 and II-A3 cluster 42_1 conservation profile authority, updated as MSA alignment and conservation-profile materialization advance.
   - id: eco1_rt_conservation_sources
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -169,19 +193,31 @@ datasets:
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
     status: materialized
-    description: Local generated all-position residue-numbering map; 309 mapped positions and 11 terminal unresolved fixed positions.
+    description: Local generated all-position residue-numbering map; 309 mapped positions and 11 terminal missing-backbone positions. Terminal residues 1, 2, and 312-320 are non_fixed_missing_backbone under eco1_rt_clade9_plurality25_direct_contact5a_v1.
+  - id: eco1_rt_structure_preprocessing_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+    status: materialized_local
+    description: Local generated raw-to-protomer provenance manifest for RCSB 7V9U/ec86kit protomer 1; verifies RT chain A, retained DNA chain D, retained RNA chains E/F, excluded paired-protomer context, and the explicit non-objective of preserving dimerization.
   - id: eco1_rt_conservation_profile
     owner: planned_thread
-    kind: planned_artifact
+    kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
-    status: not_generated
-    description: Planned MSA-derived conservation profile with source hashes and residue-map coverage; blocked until source-contract-backed source FASTA and aligned FASTA inputs exist.
+    status: materialized_local
+    description: Local generated MSA-derived conservation profile from accepted Clustal Omega alignments for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1; 640 rows, 616 usable evidence rows, 22 unresolved-structure rows, and 2 low-non-gap-support rows.
   - id: eco1_rt_contact_profile
     owner: planned_thread
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
     status: materialized
-    description: Local generated retained-context contact profile with 20 A distance-threshold provenance; 309 resolved rows pass the contact-mask predicate and runtime output is not checked in by default.
+    description: Local generated retained-context contact profile with 5 A direct-contact threshold provenance; 120 mapped rows pass the contact predicate and runtime output is not checked in by default.
+  - id: eco1_rt_contact_geometry_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+    status: materialized_local
+    description: Local generated atom-class geometry profile from the selected ec86kit mmCIF model; 320 canonical rows with all-atom, side-chain, backbone, DNA/RNA split, contact-density, and retained-chain-count evidence. The current rule uses mapped <=5 A retained DNA/RNA distance, not contact-density classes.
   - id: eco1_rt_conservation_provider_sources
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -199,25 +235,43 @@ datasets:
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
     status: materialized_local_sufficiency_passed
-    description: Local generated unaligned source FASTA bundles for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1. Source-sequence sufficiency passes for the regenerated selected profiles; the next gate is accepted Clustal Omega alignment.
+    description: Local generated unaligned source FASTA bundles for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1. Source-sequence sufficiency passes for the regenerated selected profiles.
   - id: eco1_rt_conservation_alignment_bundle
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
-    status: partial_profile_materialized_local
-    description: Local generated aligned FASTA area; the older ec86_iia3_cluster42_1_conservation_v1 alignment remains historical local evidence, while both ec86_clade9_conservation_v1.aligned.fasta and ec86_iia3_cluster42_1_conservation_v1.aligned.fasta must be regenerated under the current Clustal Omega policy before the complete two-profile bundle is accepted.
+    status: materialized_local_accepted
+    description: Local generated aligned FASTA bundle for both selected conservation profiles under the selected Clustal Omega policy. ec86_clade9_conservation_v1 has 303 aligned records and ec86_iia3_cluster42_1_conservation_v1 has 45 aligned records, both with the pinned target row and accepted manifests.
   - id: eco1_rt_conservation_visualizations
     owner: eco1_rt_repack
     kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
-    status: partial_profile_materialized_local
-    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API with Eco1-owned motif-anchor annotations, exemplar-row windows, selected-row overview panels, and plurality/gap histograms; current report covers historical ec86_iia3_cluster42_1_conservation_v1 alignment and explicitly records ec86_clade9_conservation_v1 as missing until clade 9 source records and alignment exist.
+    status: materialized_local
+    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API for both selected conservation profiles, with Eco1-owned RT1-RT7 interval and motif-anchor annotations, exemplar-row windows, selected-row overview panels, plurality/gap histograms, HTML report, and index manifest.
+  - id: eco1_rt_manual_mask_authority
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+    status: materialized_local
+    description: Local generated manual mask-authority artifact. It records NAxxH 105-109, YADD 195-198, VTG 243-245, RT1-RT7 annotation spans, and Wang/Ec86 direct substrate-contact priors. The current mask rule protects NAxxH/YADD/VTG and Wang direct-contact priors, but does not blanket hard-fix RT1-RT7.
   - id: eco1_rt_mask_set
-    owner: planned_thread
-    kind: planned_artifact
+    owner: eco1_rt_repack
+    kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
-    status: not_generated
-    description: Planned conservative fixed/mutable mask set.
+    status: materialized_local_accepted
+    description: Local generated simple mask set under eco1_rt_clade9_plurality25_direct_contact5a_v1. It records 123 mapped non-fixed residues, 11 non-fixed terminal missing-backbone residues, and protected residues from NAxxH/YADD/VTG, Wang/Ec86 direct-contact priors, Ec86 clade 9 >=25% WT plurality conservation, or mapped <=5 A retained DNA/RNA.
+  - id: eco1_rt_contact_risk_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
+    status: materialized_local_audit_only
+    description: Local generated contact-risk evidence review. It joins retained-context nearest-distance evidence, atom-class contact geometry, MSA conservation masks, manual mask authority, and Wang/Ec86 candidate priors. It is not a mask call.
+  - id: eco1_rt_surface_accessibility_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/surface_accessibility_profile.parquet
+    status: materialized_local
+    description: Local generated complex-context SASA evidence from the selected Ec86 7V9U protomer plus retained DNA/RNA chains. It is an earlier evidence review; SASA is not part of eco1_rt_clade9_plurality25_direct_contact5a_v1.
   - id: eco1_rt_thread_plan
     owner: planned_thread
     kind: planned_artifact

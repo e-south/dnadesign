@@ -20,39 +20,34 @@ thread_contract:
   mask_set: planned
   thread_plan: planned
 conservative_policy:
-  status: proposed_until_structure_authority_selected
+  status: clade9_plurality25_direct_contact5a_selected
+  mask_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1
   manual_mask_groups:
-    - id: catalytic_core
-      status: pending_residue_numbering_audit
-      policy: fixed
+    - id: motif_anchors
+      status: audited_in_manual_mask_authority
+      policy: protected
       proposed_anchors:
         - YADD catalytic motif
-        - RT1-RT7 core motif residues
-    - id: retron_x_region
-      status: pending_residue_numbering_audit
-      policy: fixed
-      proposed_anchors:
         - NAxxH retron X motif
-    - id: retron_y_region
-      status: pending_residue_numbering_audit
-      policy: fixed
-      proposed_anchors:
         - VTG retron Y motif
-    - id: effector_interface
-      status: optional
-      policy: do_not_fix_unless_retained_context_or_manual_decision
-  substrate_contact_threshold_angstrom: 20
-  relaxed_contact_thresholds_angstrom:
-    - 18
-    - 15
+    - id: wang_ec86_direct_contact_priors
+      status: audited_in_manual_mask_authority
+      policy: protected
+      proposed_anchors:
+        - Ec86 substrate-contact residues called from Wang/Ec86 structural priors
+    - id: rt1_rt7_intervals
+      status: audited_review_labels
+      policy: not_blanket_fixed
+      proposed_anchors:
+        - RT1-RT7 interval labels for review and figures
+  direct_contact_threshold_angstrom: 5
   conservation_threshold: 0.25
   conservation_profiles:
     - ec86_clade9_conservation_v1
-    - ec86_iia3_cluster42_1_conservation_v1
-  conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
+  conservation_rule: protected_when_clade9_wt_is_plurality_and_frequency_meets_threshold
   cysteine_policy: no_new_cysteine
-  unresolved_residue_policy: fixed
-  designable_rule: mapped_and_not_final_fixed
+  unresolved_residue_policy: terminal_missing_backbone_is_non_fixed_missing_backbone
+  designable_rule: mapped_and_not_protected
 sampling_policy:
   status: planned
   backends_allowed:

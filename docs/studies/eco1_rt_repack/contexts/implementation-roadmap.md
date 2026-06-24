@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-20
+last_verified: 2026-06-22
 ---
 
 ## Implementation Roadmap
@@ -85,8 +85,9 @@ backbone, DNA chain `D` as retained context, and RNA chains `E` and `F` as
 retained context. The residue map records all 320 canonical Eco1 RT positions:
 309 mapped positions and 11 unresolved terminal positions fixed by policy.
 
-Phase 1 now fails on the next conservation/contact/mask blockers until contact
-profile materialization is run:
+At that point in the slice sequence, Phase 1 failed on the next
+conservation/contact/mask blockers until contact profile materialization was
+run:
 
 ```text
 eco1_rt.evidence.conservation_profile_not_materialized
@@ -110,7 +111,8 @@ terminal residues non-designable. The Phase 1 validator now checks the contact
 profile source hash, threshold, canonical row coverage, unresolved policy, and
 mask-threshold consistency.
 
-Phase 1 now fails on the next conservation/mask blockers:
+After contact materialization, Phase 1 failed on the next conservation/mask
+blockers until the MSA-derived conservation profile was materialized:
 
 ```text
 eco1_rt.evidence.conservation_profile_not_materialized
@@ -252,8 +254,9 @@ The previous local full-Mestre broad source bundle had 1814 included and 114
 excluded rows, while `ec86_iia3_cluster42_1_conservation_v1` had 46 included
 and 1 excluded row. That broad bundle is now superseded candidate-pool
 context. The current selected source bundles pass sufficiency locally after
-clade 9 / II-A3 QC, so the next runtime gate is alignment, not source
-reselection.
+clade 9 / II-A3 QC. Alignment and conservation-profile materialization have
+since completed for the selected profiles; the current runtime gate is the
+post-mask sampling-plan policy, not source reselection.
 
 ### Implemented Slice: Conservation Clade 9 Source Cache v1
 
@@ -269,10 +272,118 @@ may be introduced only by
 an explicit benchmark/contract update; it must not be the default explanation
 for the broad panel.
 
-After this slice, the regenerated source FASTA sufficiency gate passes. The next
-runtime slice is to run both selected source FASTAs through
-`dnadesign.aligner.msa` using the selected Clustal Omega backend, and then
-materialize `conservation_profile.parquet`.
+After this slice, the regenerated source FASTA sufficiency gate passes.
+
+### Implemented Slice: Conservation Alignment and Profile Acceptance v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`
+now accepts both selected source FASTA bundles through the public
+`dnadesign.aligner.msa` Clustal Omega seam. The accepted local alignment bundle
+contains `ec86_clade9_conservation_v1.aligned.fasta` with 303 records and
+`ec86_iia3_cluster42_1_conservation_v1.aligned.fasta` with 45 records; both
+include the pinned `eco1_rt_ec86kit_reference` target row and hash-linked
+manifests.
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`
+then materializes `conservation_profile.parquet` from those accepted alignments.
+The local profile has 640 rows, one per selected profile id and canonical Eco1
+position. Generic `aligner.msa` visualization sidecars have also been
+regenerated for both selected profiles.
+
+### Implemented Slice: Manual Motif And RT Interval Authority v1
+
+`docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml`
+is the study-owned source ontology for mask-authoritative motif anchors. It is
+distinct from `rt-annotation-tracks.yaml`, which remains visualization-only.
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/`
+materializes local `manual_mask_authority.yaml` from the ontology and
+`residue_map.parquet`, fixing audited NAxxH, YADD, VTG, and RT1-RT7 canonical
+interval spans. The same ontology records Wang/Ec86 RT-msDNA/msrRNA interface
+candidates as candidate-prior rows. Those candidates guide contact review; they
+do not create additional `manual_mask=true` rows by themselves.
+
+### Implemented Slice: Mask Set Materializer v1a
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/`
+composes `residue_map.parquet`, `contact_profile.parquet`,
+`conservation_profile.parquet`, and `manual_mask_authority.yaml` into
+`mask_set.yaml`. The old 20 A version is all-fixed: 320 fixed positions and
+zero directly mutable positions. That result showed that broad retained
+nucleic-acid proximity is too blunt for Eco1. The next mask should use the
+plurality25 direct-contact rule instead.
+
+### Implemented Slice: Structure Preprocessing and Contact Geometry v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure_preprocessing/`
+materializes `structure_preprocessing_manifest.yaml` from the checked-in
+`structure-preprocessing.yaml` provenance policy. It records raw RCSB 7V9U
+dimer context, selected sibling `ec86kit` protomer-1 model provenance, retained
+RT/DNA/RNA chains, excluded paired-protomer context, the explicit non-objective
+of preserving paired-protomer dimerization, and upstream hashes.
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_geometry/`
+materializes `contact_geometry_profile.parquet` by parsing the selected
+ec86kit mmCIF model with the study-owned Biopython backend. The profile keeps
+one row per canonical Eco1 position and measures all-atom, side-chain,
+backbone, DNA/RNA split, contact-density, and retained-chain-count evidence.
+Raw structure residue ids remain joined through `residue_map.parquet`; they do
+not become design positions.
+
+### Implemented Slice: Contact Risk Profile v1
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`
+materializes `contact_risk_profile.yaml` as a contact evidence review after the
+conservative mask set. It joins the retained-context nearest-distance profile,
+atom-class contact geometry, conservation masks, manual mask authority,
+and Wang/Ec86 candidate priors.
+
+`src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`
+validates the artifact shape and prevents missing evidence-status records from
+being treated as permission to mutate a residue. This slice improves evidence
+legibility; it does not choose the mask.
+
+After this slice, Phase 1 passes locally. The old diagnostic 20 A mask has
+been replaced by the simpler plurality25 direct-contact rule.
+
+### Completed Slice: Plurality25 Direct-Contact Mask v1
+
+The current rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`:
+
+```text
+protected =
+  NAxxH / YADD / VTG
+  OR Wang/Ec86 direct substrate-contact prior
+  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA
+  OR mapped residue is within 5 A of retained DNA/RNA
+
+non_fixed = NOT protected
+```
+
+Terminal residues `1`, `2`, and `312-320` are
+`non_fixed_missing_backbone`: unprotected, but not directly mutable by
+fixed-backbone ProteinMPNN until coordinates exist.
+
+This slice:
+
+1. Regenerates `mask_set.yaml` under
+   `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
+2. Emits row-level classes `protected`, `non_fixed`, and
+   `non_fixed_missing_backbone`.
+3. Preserves the current evidence roles: Tao for fixed-backbone redesign and
+   homolog-MSA plurality, Mestre for source ontology, Wang for direct Ec86
+   substrate-contact priors, and Simon for motif grammar.
+4. Excludes SASA, contact-density classes, retained-chain-count classes,
+   contact-class tiers, and RT1-RT7 blanket hard fixing from the mask call.
+5. Keeps evidence-review artifacts out of the sampling plan unless a future
+   task explicitly changes the mask policy.
+
+### Next Slice: Thread Plan v1
+
+Generate a small explicit `thread_plan.yaml` from the materialized simple mask.
+The plan should name backend kind, request hash, seed list, temperature list,
+fixed/non-fixed position source, no-fallback policy, and the missing-backbone
+handling note for terminal residues `1`, `2`, and `312-320`. Do not execute
+ProteinMPNN in the same slice.
 
 ### Implementation Rules
 
@@ -304,24 +415,13 @@ materialize `conservation_profile.parquet`.
   policy are selected and materialized locally as structure artifacts.
 - Contact evidence is materialized locally from the retained DNA/RNA context.
 - Conservation source discovery and source authority are documented and
-  selected, provider candidate-pool acquisition exists, and a conservation-profile
-  materializer exists for explicit aligned FASTA inputs. The generic MSA
-  execution seam lives in `dnadesign.aligner.msa`, and the study-owned
-  conservation-alignment materializer now orchestrates source sufficiency,
-  declared MSA args, selected profile ids, and alignment bundle manifests. The
-  generic runner stages stdout to a temporary FASTA, records stderr, and
-  publishes an accepted aligned FASTA only after validation. The former
-  full-roster broad profile ran for roughly four hours under the declared
-  high-sensitivity MAFFT policy without a complete broad alignment and is no
-  longer the active denominator. The selected `ec86_iia3_cluster42_1_conservation_v1` profile now
-  has accepted local profile-level alignment
-  evidence, and generic `aligner.msa` MSA visualization sidecars are
-  implemented and materialized locally for that accepted profile. Those
-  sidecars can render Eco1-owned motif anchors, explicit exemplar-row windows,
-  selected-row overview panels, and plurality/gap histograms, but they remain
-  display-only and do not satisfy conservation evidence. The complete
-  two-profile aligned FASTA bundle, materialized conservation profile, mask set,
-  sampling plan, sample table, candidate table, fold-check report, feasibility
-  report, and candidate handoff are not materialized.
-- Readiness checks are still scaffold-level study preflight checks. They must
-  grow content validators before Phase 1 can be marked accepted.
+  selected, provider candidate-pool acquisition exists, selected source FASTAs
+  pass sufficiency, and both selected conservation alignments are accepted under
+  the current Clustal Omega policy. `conservation_profile.parquet`, generic
+  `aligner.msa` MSA visualization sidecars, and the conservative diagnostic
+  `mask_set.yaml` are materialized locally. The sampling plan, sample table,
+  candidate table, fold-check report, feasibility report, and candidate handoff
+  are not materialized.
+- Phase 1 now has content validators for the local structure, contact,
+  conservation, and mask artifacts. Phase 2 still needs sampling-plan and
+  backend-ingest validators.

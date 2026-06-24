@@ -69,9 +69,18 @@ artifacts:
     required_columns:
       - canonical_position
       - wt_aa
-      - final_fixed
-      - proteinmpnn_designable
-      - mask_sources
+      - mapping_status
+      - has_backbone_coordinates
+      - min_distance_to_retained_dna_rna_angstrom
+      - direct_contact_threshold_angstrom
+      - direct_retained_dna_rna_contact_5a
+      - motif_protected
+      - wang_ec86_direct_contact_prior
+      - evolutionarily_conserved_clade9_25pct_plurality
+      - protected
+      - non_fixed
+      - non_fixed_missing_backbone
+      - protection_reasons
       - conflict_status
       - conflict_reason
   thread_plan:

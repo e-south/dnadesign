@@ -23,9 +23,6 @@ consensus_histogram:
   metric: plurality_frequency_and_gap_fraction_by_target_position
   note: Histogram is a visual audit of accepted aligned FASTA records, not a replacement for conservation_profile.parquet.
 sidecar_note: Visualization sidecar only; not a conservation denominator, mask source, or designability rule.
-pending_annotations:
-  - id: rt0_rt7_interval_boxes
-    reason: Exact Eco1 target-position intervals require a dedicated residue-numbering/motif audit before display boxes are materialized.
 notes:
-  - The current RT annotation track intentionally contains only audited motif anchors: NAxxH, YADD, and VTG.
-  - Any future publication panel may add RT1-RT7 and Region X/Y interval boxes only through this ontology surface, not renderer code.
+  - The current RT annotation track contains audited RT1-RT7 intervals and motif anchors: NAxxH, YADD, and VTG.
+  - Any future publication panel may add or revise interval boxes only through the ontology surfaces, not renderer code.

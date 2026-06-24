@@ -1,11 +1,13 @@
 ## Eco1 RT Conservative Thread v1
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-19
+**Last verified:** 2026-06-23
 **Status:** scaffold
 
-This design set will contain the first conservative fixed-backbone Eco1 RT
-candidate batch after the `thread` tracer bullet exists.
+This design set will contain the first fixed-backbone Eco1 RT candidate batch
+after `mask_set.yaml` is regenerated under
+`eco1_rt_clade9_plurality25_direct_contact5a_v1` and the `thread` tracer bullet
+exists.
 
 ### Inclusion Intent
 
@@ -21,8 +23,8 @@ candidate batch after the `thread` tracer bullet exists.
 | --- | --- | --- |
 | Structure authority | `backbone_bundle.yaml`, `residue_map.parquet` | Non-pending source, chain, retained context, numbering origin, and sequence hash. |
 | Evidence profiles | `conservation_profile.parquet`, `contact_profile.parquet` | Per-position mapping, thresholds, source hashes, and no missing evidence inferred as designable. |
-| Mask set | `mask_set.yaml` | Conservative union of manual, contact, conservation, unresolved, and cysteine-control masks. |
-| Sampling request | `thread_plan.yaml` | Backend request manifest, seeds, temperatures, fixed-position source, and explicit no-fallback policy. |
+| Mask set | `mask_set.yaml` | Selected simple policy: protect NAxxH/YADD/VTG, Wang/Ec86 direct contacts, Ec86 clade 9 >=25% WT-plurality conservation calls, and mapped residues within 5 A retained DNA/RNA; classify terminal missing-backbone residues separately. |
+| Sampling request | `thread_plan.yaml` | Backend request manifest, seeds, temperatures, fixed-position source, selected non-empty mask policy, mask hash, and explicit no-fallback policy. |
 | Raw samples | `sample_table.parquet` | Deterministic backend provenance, seeds, temperatures, and no fixed-position edits. |
 | Deduplicated candidates | `candidate_table.parquet` | Stable ids, mutation list, mutation windows, and mask audit fields. |
 | Fold QA | `foldcheck_report.parquet` | Full-sequence fold-check rows for every selected candidate. |

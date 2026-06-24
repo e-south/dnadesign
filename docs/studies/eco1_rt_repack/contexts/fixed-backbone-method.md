@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fixed-backbone-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-19
+last_verified: 2026-06-22
 ---
 
 ## Fixed-Backbone Method
@@ -24,6 +24,23 @@ sponging workflows. The method is computational and contract-first:
 The motivating source method is Tao et al., Nature Biotechnology 2026,
 DOI `10.1038/s41587-026-03149-6`. This study uses the computational pattern,
 not the prime-editing objective.
+
+### Literature Roles
+
+The method intentionally separates source roles instead of treating any paper as
+a monolithic recipe:
+
+- Tao et al. provides the fixed-backbone RT redesign pattern: preserve
+  functional and conserved residues, sample fold-compatible RT sequences, and
+  filter candidates structurally. It does not make the entire Mestre roster the
+  MSA denominator.
+- Mestre et al. provides the retron RT source ontology: use Ec86 RT clade 9 as
+  the broad homolog panel and II-A3/`42_1` as the Eco1-family panel.
+- Simon et al. provides RT-region and motif annotation grammar for figures and
+  audits. Annotation tracks are not automatically mask-authoritative.
+- Wang et al. provides the Eco1/Ec86 structural context and interface priors.
+  Candidate interface residues remain priors until promoted by an explicit
+  mask-authority audit.
 
 ### Method Posture
 

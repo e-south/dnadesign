@@ -1,56 +1,312 @@
 version: 1
 study_id: eco1_rt_repack
-status: contact_profile_materialized
+status: clade9_plurality25_direct_contact5a_mask_materialized
+notes:
+  - Commands are independently runnable lane contracts, not a hidden run-all pipeline.
+  - Generated outputs live under outputs/thread/eco1_rt_conservative_v1/ and are ignored runtime artifacts.
+  - Provider-source lanes require explicit local source files and hash-pinned roster inputs; do not infer rows from prose or figures.
 lanes:
   - id: refine_dev_spec
     owner: docs
     status: active
     entry: docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md
+    command: null
   - id: structure_authority
     owner: eco1_rt_repack
     status: materialized
     entry: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure
+        - --repo-root
+        - .
   - id: residue_map
-    owner: planned_thread
+    owner: eco1_rt_repack
     status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
-  - id: evidence_profiles
-    owner: planned_thread
-    status: partially_materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    command_ref: structure_authority
+  - id: structure_preprocessing
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure_preprocessing
+        - --repo-root
+        - .
   - id: contact_profile
-    owner: planned_thread
+    owner: eco1_rt_repack
     status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact
+        - --repo-root
+        - .
+  - id: contact_geometry_profile
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry
+        - --repo-root
+        - .
+  - id: conservation_provider_sources
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/
+    requires_external_inputs:
+      - mestre_s1_roster_table
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.provider_sources
+        - --repo-root
+        - .
+        - --roster-table
+        - <mestre-s1-roster.xlsx>
+        - --write-unresolved-ledger
+  - id: conservation_roster_cache
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+    requires_external_inputs:
+      - mestre_s1_roster_table
+      - provider_fasta_source_root
+      - provider_source_failures_yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.roster_cache
+        - --repo-root
+        - .
+        - --roster-table
+        - <mestre-s1-roster.xlsx>
+        - --provider-source-root
+        - outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources
+        - --provider-failure-ledger
+        - outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_failures.yaml
+  - id: conservation_source_bundles
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences
+        - --repo-root
+        - .
+  - id: conservation_source_sufficiency
+    owner: eco1_rt_repack
+    status: passing
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.source_sequences.sufficiency
+        - --repo-root
+        - .
+  - id: conservation_alignments
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+    command:
+      environment: pixi
+      argv:
+        - pixi
+        - run
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation_alignments
+        - --repo-root
+        - .
+  - id: conservation_visualizations
+    owner: aligner.msa
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.aligner.msa.visualization
+        - --alignment-root
+        - outputs/thread/eco1_rt_conservative_v1/conservation_alignments
+        - --output-root
+        - outputs/thread/eco1_rt_conservative_v1/conservation_visualizations
+        - --profile-id
+        - ec86_clade9_conservation_v1
+        - --profile-id
+        - ec86_iia3_cluster42_1_conservation_v1
+        - --target-row-id
+        - eco1_rt_ec86kit_reference
+        - --target-sequence-hash
+        - sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+        - --annotation-tracks-yaml
+        - docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml
+        - --exemplar-rows-yaml
+        - docs/studies/eco1_rt_repack/workbench/ontology/msa-exemplar-rows.yaml
+        - --panel-spec-yaml
+        - docs/studies/eco1_rt_repack/workbench/ontology/msa-panel-spec.yaml
+  - id: evidence_profiles
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation
+        - --repo-root
+        - .
+  - id: manual_mask_authority
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.manual_mask_authority
+        - --repo-root
+        - .
   - id: mask_contract
-    owner: planned_thread
-    status: planned
+    owner: eco1_rt_repack
+    status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.mask_set
+        - --repo-root
+        - .
+  - id: contact_risk_profile
+    owner: eco1_rt_repack
+    status: materialized_audit_only
+    entry: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_risk
+        - --repo-root
+        - .
+  - id: surface_accessibility_profile
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/surface_accessibility_profile.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.surface_accessibility
+        - --repo-root
+        - .
+  - id: phase0_contract_validation
+    owner: eco1_rt_repack
+    status: passing
+    entry: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.contract_validation
+        - --repo-root
+        - .
+        - --phase
+        - phase0_scaffold
+  - id: phase1_contract_validation
+    owner: eco1_rt_repack
+    status: passing
+    entry: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.contract_validation
+        - --repo-root
+        - .
+        - --phase
+        - phase1_thread_contract
   - id: sampling_plan
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+    command: null
   - id: sample_ingest
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+    command: null
   - id: candidate_table
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+    command: null
   - id: candidate_qa
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+    command: null
   - id: assembly_feasibility
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+    command: null
   - id: candidate_handoff
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+    command: null
   - id: rt_lnrna_handoff
     owner: eco1_rt_repack
     status: planned
     downstream: docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
+    command: null

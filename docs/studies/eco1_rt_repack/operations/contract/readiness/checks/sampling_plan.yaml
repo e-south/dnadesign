@@ -14,13 +14,34 @@ checks:
       artifact: thread_artifact_chain_schema
   phase2_real_backend_ingest:
     - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_simple_mask_set
+      check_group: sampling_plan
+      summary: Real backend ingest requires mask_set.yaml under eco1_rt_clade9_plurality25_direct_contact5a_v1 before thread_plan.yaml.
+      required: true
+      artifact: planned_mask_set
+      validator_intent:
+        required_state: materialized
+        required_inputs:
+          - planned_contact_geometry_profile
+          - planned_conservation_profile
+          - planned_manual_mask_authority
+        required_fields:
+          - policy_id
+          - protected
+          - non_fixed
+          - non_fixed_missing_backbone
+          - protection_reasons
+        required_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1
+    - kind: path_exists
       check_id: eco1_rt.sampling.materialized_thread_plan
       check_group: sampling_plan
-      summary: Real backend ingest requires thread_plan.yaml with request hash and explicit no-fallback policy.
+      summary: Real backend ingest requires thread_plan.yaml with request hash, explicit no-fallback policy, and non-fixed positions from the validated simple mask.
       required: true
       artifact: planned_thread_plan
       validator_intent:
         required_state: materialized
+        upstream_artifacts:
+          - planned_mask_set
         required_fields:
           - backend_kind
           - backend_request_manifest

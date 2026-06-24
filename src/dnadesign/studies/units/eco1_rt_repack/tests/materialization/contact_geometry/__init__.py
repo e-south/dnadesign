@@ -1,0 +1,1 @@
+"""Contact-geometry materialization tests."""

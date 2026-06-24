@@ -378,9 +378,9 @@ def _contact_threshold_angstrom(profile: Mapping[str, Any]) -> float:
     conservative_policy = profile.get("conservative_policy")
     if not isinstance(conservative_policy, Mapping):
         raise ValueError("profile must declare conservative_policy before contact materialization")
-    value = conservative_policy.get("substrate_contact_threshold_angstrom")
+    value = conservative_policy.get("direct_contact_threshold_angstrom")
     if not isinstance(value, int | float) or isinstance(value, bool) or float(value) <= 0:
-        raise ValueError("substrate_contact_threshold_angstrom must be a positive number")
+        raise ValueError("direct_contact_threshold_angstrom must be a positive number")
     return float(value)
 
 

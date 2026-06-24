@@ -2,12 +2,12 @@ version: 1
 study_id: eco1_rt_repack
 contract_id: eco1_rt_conservation_sources_v1
 status: selected
-last_verified: 2026-06-20
+last_verified: 2026-06-22
 
 source_method:
   method_id: tao_plurality_frequency_mask_v1
   method_ref: doi:10.1038/s41587-026-03149-6
-  conservation_rule: fixed_when_wt_is_plurality_and_frequency_meets_threshold
+  conservation_rule: protected_when_clade9_wt_is_plurality_and_frequency_meets_threshold
   threshold: 0.25
   tested_reference_thresholds:
     - 0.25

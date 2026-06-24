@@ -38,7 +38,7 @@ def test_contact_materializer_writes_thresholded_retained_context_profile(tmp_pa
     metadata = table.schema.metadata or {}
     assert metadata[b"schema_id"] == b"thread.contact_profile"
     assert metadata[b"status"] == b"materialized"
-    assert metadata[b"contact_threshold_angstrom"] == b"20.0"
+    assert metadata[b"contact_threshold_angstrom"] == b"5.0"
     rows = table.to_pylist()
     assert rows[0]["canonical_position"] == 1
     assert rows[0]["mapping_status"] == "unresolved_structure"
@@ -52,8 +52,8 @@ def test_contact_materializer_writes_thresholded_retained_context_profile(tmp_pa
     assert position_3["nearest_rna_chain"] == "E"
     assert position_3["nearest_context_chain_id"] == "D"
     assert position_3["nearest_context_atom_distance_angstrom"] == 16.731
-    assert position_3["contact_threshold_angstrom"] == 20.0
-    assert position_3["passes_contact_mask"] is True
+    assert position_3["contact_threshold_angstrom"] == 5.0
+    assert position_3["passes_contact_mask"] is False
     assert position_3["source_hash"] == ("sha256:29fb97933658cc6f62f0cdbb10f86bbad60f5115d56ad017e6cc7222ec640a49")
 
 

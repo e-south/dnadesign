@@ -25,13 +25,22 @@ steps:
     kind: generated-runtime
     status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+  - label: materialize-structure-preprocessing
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
   - label: materialize-evidence-profiles
-    kind: planned-runtime
+    kind: generated-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
   - label: materialize-contact-profile
     kind: generated-runtime
     status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+  - label: materialize-contact-geometry
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
   - label: discover-conservation-sources
     kind: study-record
     status: source_discovery
@@ -45,19 +54,29 @@ steps:
     status: documented
     path: docs/studies/eco1_rt_repack/contexts/msa-method.md
   - label: materialize-conservation-source-sequences
-    kind: planned-runtime
+    kind: generated-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
   - label: materialize-conservation-alignments
-    kind: planned-runtime
-    status: runtime_blocked
+    kind: generated-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
   - label: materialize-conservation-visualizations
     kind: generated-runtime
-    status: partial_profile_materialized
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+  - label: materialize-manual-mask-authority
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
   - label: materialize-thread-artifact-chain
     kind: planned-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+  - label: materialize-contact-risk-profile
+    kind: generated-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
   - label: build-sampling-plan
     kind: planned-runtime
     path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml

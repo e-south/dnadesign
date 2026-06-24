@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-msa-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-20
+last_verified: 2026-06-22
 ---
 
 ## MSA Method
@@ -52,9 +52,9 @@ mestre_all_retron_rt_context  classification/candidate-pool context, not the Pha
 ### Reviewer-Facing Method Logic
 
 Evolutionary conservation is estimated from Mestre-derived homolog panels, not
-from the entire retron RT census. Mestre S1 is the accession and
-classification authority. For Eco1/Ec86, the broad homolog panel is RT clade 9,
-the Mestre-defined RT clade containing Eco1/Ec86; the Eco1-family panel is the
+from the entire retron RT census. Mestre S1 is the accession and classification authority.
+For Eco1/Ec86, the broad homolog panel is RT clade 9, the
+Mestre-defined RT clade containing Eco1/Ec86; the Eco1-family panel is the
 narrower subtype II-A3, cluster/domain `42_1`. Both panels are filtered for
 coverage, length, source availability, hard-reject structural obviousness, and
 motif QC before alignment. Conservation masking then follows Tao et al.'s
@@ -62,6 +62,12 @@ plurality/frequency rule: an Eco1 residue is fixed when the Eco1 amino acid is
 the plurality amino acid at the aligned column and its non-gap frequency meets
 the declared threshold. The full Mestre roster is retained for context and
 visualization, but is not the Phase 1 conservation denominator.
+
+This is the key anti-footgun for reviewers and future agents: the study is
+running homolog MSA conservation scoring, not a whole-database census alignment.
+The full Mestre table can contextualize clades and figures, while the two
+selected panels define the denominators used by
+`conservation_profile.parquet`.
 
 ### Procedure
 
@@ -351,17 +357,20 @@ runtime evidence, not the selected Phase 1 alignment policy. Do not switch MSA
 backends or presets silently. Clustal Omega is now selected by contract for the
 Mestre clade 9 and II-A3/`42_1` homolog panels.
 
-A selected-profile local run of `ec86_iia3_cluster42_1_conservation_v1` completed through the
-declared command and published:
+A complete local run of both selected profiles completed through the declared
+Clustal Omega command and published:
 
 ```text
+outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_clade9_conservation_v1.aligned.fasta
+outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_clade9_conservation_v1.aligned.manifest.yaml
 outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
 outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.manifest.yaml
 ```
 
-The accepted profile was generated before the current Clustal Omega policy and
-is retained as local historical evidence only. Regenerate it under the selected
-backend before materializing `conservation_profile.parquet`.
+The accepted clade-9 alignment has 303 records and aligned length 853. The
+accepted II-A3/`42_1` alignment has 45 records and aligned length 527. Both
+include the pinned `eco1_rt_ec86kit_reference` target row and hash-linked
+manifests.
 
 ### MSA Visualization Sidecars
 
@@ -408,15 +417,16 @@ docs/studies/eco1_rt_repack/workbench/ontology/msa-panel-spec.yaml
 It follows the visualization precedent from validated retron RT MSAs: Simon et
 al. boxed conserved RT regions and highlighted retron-specific X/Y and
 catalytic motif anchors, while Mestre et al. used RT0-RT7 alignments to define
-retron RT clades. The current Eco1 track renders only audited motif anchors
-(`NAxxH`, `YADD`, and `VTG`). Full RT0-RT7 interval boxes should be added only
-after a dedicated Eco1 residue-numbering/motif audit.
+retron RT clades. The current Eco1 track renders the audited RT1-RT7 interval
+spans plus motif anchors (`NAxxH`, `YADD`, and `VTG`). Those coordinates are
+declared in the ontology; they are not renderer constants.
 
-The Eco1 annotation track uses two display layers:
+The Eco1 annotation track uses three display layers:
 
 1. light bordered context spans around Region X, the catalytic YADD context,
-   and Region Y; and
-2. stronger filled motif anchors for `NAxxH`, `YADD`, and `VTG`.
+   and Region Y;
+2. RT1-RT7 interval boxes that mirror `manual-mask-authority.yaml`; and
+3. stronger filled motif anchors for `NAxxH`, `YADD`, and `VTG`.
 
 Context-span labels are declared above the spans, while compact motif-anchor
 labels are declared below the anchors. That placement is an Eco1 display
@@ -527,17 +537,26 @@ outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
 
 It validates the target row against `residue_map.parquet`, records aligned
 FASTA source hashes, and emits long-form rows keyed by
-`profile_id + canonical_position`.
+`profile_id + canonical_position`. The current local materialized profile has
+640 rows: 320 per selected profile.
 
-This materializer does not fetch provider sequences or run the MSA backend. It requires
-an accepted aligned FASTA bundle from the alignment materializer before it can
-create real conservation evidence.
+This materializer does not fetch provider sequences or run the MSA backend. It
+requires an accepted aligned FASTA bundle from the alignment materializer before
+it can create real conservation evidence.
 
-### Next Slice
+### Current Mask Use
 
-The clade-9 source cache and source FASTA sufficiency gates now pass locally for
-the selected profile IDs. The next data slice is
-`conservation-alignment-bundle-v1`: align both profiles through
-`dnadesign.aligner.msa` using the selected Clustal Omega command, run the
-conservation materializer, and confirm Phase 1 advances to the `mask_set.yaml`
-blocker only.
+The clade-9 source cache, source FASTA sufficiency gate, accepted Clustal Omega
+alignment bundle, generic MSA visualization sidecars, and
+`conservation_profile.parquet` are now available for the selected profile IDs.
+The current mask rule uses the Ec86 clade 9 profile through a hard
+WT-plurality rule: an Eco1 amino acid is protected when it is evolutionarily
+conserved at `>=25%` WT plurality in the clade 9 homolog MSA.
+
+The current mask is `eco1_rt_clade9_plurality25_direct_contact5a_v1`: protect
+NAxxH/YADD/VTG, Wang/Ec86 direct substrate-contact priors, Ec86 clade 9 >=25%
+WT-plurality conservation calls, and mapped residues within 5 A of retained
+DNA/RNA.
+Terminal residues `1`, `2`, and `312-320` are `non_fixed_missing_backbone`.
+Paired-protomer dimerization is not a retention objective for this profile, so
+pre-RT1 residues are not fixed solely to preserve the dimer.

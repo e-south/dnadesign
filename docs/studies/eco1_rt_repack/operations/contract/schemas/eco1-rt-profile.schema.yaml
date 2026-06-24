@@ -26,8 +26,9 @@ field_contract:
   conservative_policy:
     required:
       - status
+      - mask_policy_id
       - manual_mask_groups
-      - substrate_contact_threshold_angstrom
+      - direct_contact_threshold_angstrom
       - conservation_threshold
       - conservation_profiles
       - conservation_rule
@@ -35,7 +36,8 @@ field_contract:
       - unresolved_residue_policy
       - designable_rule
     invariants:
-      - contact_threshold_must_be_positive_number
+      - mask_policy_id_must_match_current_simple_policy
+      - direct_contact_threshold_must_be_five_angstrom
       - conservation_threshold_must_be_between_zero_and_one
       - manual_mask_groups_must_have_id_status_policy
       - designable_rule_must_not_treat_missing_evidence_as_designable

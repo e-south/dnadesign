@@ -41,7 +41,7 @@ checks:
     - kind: path_exists
       check_id: eco1_rt.mask.materialized_evidence_profiles
       check_group: mask_contract
-      summary: Mask construction requires conservation and contact profiles with source hashes; contact is locally materialized and conservation is still planned.
+      summary: Mask construction requires conservation and contact profiles with source hashes; both are locally materialized for the selected profiles.
       required: true
       artifact: planned_conservation_profile
       validator_intent:
@@ -49,9 +49,30 @@ checks:
         required_state: materialized
         rejects_missing_source_hashes: true
     - kind: path_exists
+      check_id: eco1_rt.mask.materialized_manual_mask_authority
+      check_group: mask_contract
+      summary: Mask construction requires motif anchors, Wang/Ec86 direct-contact priors, and RT1-RT7 review labels resolved through the residue map before mask rows are accepted.
+      required: true
+      artifact: planned_manual_mask_authority
+      validator_intent:
+        required_state: materialized
+        rejects_visualization_only_annotation_tracks: true
+        required_authoritative_anchors:
+          - retron_x_naxxh
+          - catalytic_yadd
+          - retron_y_vtg
+        required_review_intervals:
+          - rt1_interval
+          - rt2_interval
+          - rt3_interval
+          - rt4_interval
+          - rt5_interval
+          - rt6_interval
+          - rt7_interval
+    - kind: path_exists
       check_id: eco1_rt.mask.materialized_mask_set
       check_group: mask_contract
-      summary: Conservative mask set must be materialized before any backend request is valid.
+      summary: Mask set is required under eco1_rt_clade9_plurality25_direct_contact5a_v1 before any backend request is valid.
       required: true
       artifact: planned_mask_set
       validator_intent:

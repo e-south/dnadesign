@@ -22,23 +22,21 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.common import (
     _merge_reports,
     _require_known_phase,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation_sources import (
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.conservation import (
     validate_conservation_sources_payload,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import (
     _CONTRACT_ROOT,
     _DOCS_ROOT,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.mask_cases import (
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.masks import (
     validate_conservative_mask_cases_payload,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractReport
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.profile import validate_profile_payload
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure_artifacts import (
-    validate_materialized_structure_artifacts,
-)
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure_authority import (
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure import (
     validate_authority_consistency_payload,
+    validate_materialized_structure_artifacts,
     validate_residue_numbering_policy_payload,
     validate_structure_authority_payload,
 )

@@ -6,6 +6,7 @@ record_sources:
   datasets_ref: manifest:record/datasets.yaml
   campaign_ref: manifest:record/campaign.yaml
   routes_ref: manifest:routes/README.md
+  structure_preprocessing_ref: manifest:workbench/provenance/structure-preprocessing.yaml
   residue_numbering_policy_ref: manifest:workbench/provenance/residue-numbering-policy.yaml
   conservation_source_discovery_ref: manifest:workbench/provenance/conservation-source-discovery.md
   conservation_sources_ref: manifest:workbench/provenance/conservation-sources.yaml

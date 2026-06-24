@@ -14,9 +14,6 @@ from __future__ import annotations
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.artifact_chain import (
     validate_artifact_chain_schema_payload,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.mask_cases import (
-    validate_conservative_mask_cases_payload,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.profile import validate_profile_payload
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import load_yaml
 
@@ -53,14 +50,3 @@ def test_artifact_chain_schema_requires_no_fallback_and_fixture_boundaries() -> 
     check_ids = {issue.check_id for issue in report.issues}
     assert "thread.artifact_chain.missing_no_fallback_invariant" in check_ids
     assert "thread.artifact_chain.missing_fixture_boundary_invariant" in check_ids
-
-
-def test_conservative_mask_cases_keep_required_fail_fast_gates() -> None:
-    cases = load_yaml("docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/conservative_mask_cases.yaml")
-    cases["cases"] = [case for case in cases["cases"] if case["id"] != "reject_missing_contact_threshold"]
-
-    report = validate_conservative_mask_cases_payload(cases)
-
-    assert report.passed is False
-    check_ids = {issue.check_id for issue in report.issues}
-    assert "eco1_rt.mask_cases.missing_required_case" in check_ids
