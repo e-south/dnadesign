@@ -29,10 +29,15 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   fixture stubs.
 - `operations/contract/schemas/`: profile, artifact-chain, candidate-handoff,
   and RT-only downstream acceptance schemas.
-- `operations/runtime/command-groups/pipeline.yaml`: planned command-group
-  posture; it is not an executable pipeline.
+- `operations/runtime/command-groups/pipeline.yaml`: sequential command-group
+  contract for independently runnable study-owned materialization lanes; it is
+  not a hidden run-all pipeline.
 - `workbench/provenance/structure-sources.yaml`: selected `ec86kit`-backed
   Eco1/Ec86 protomer authority.
+- `workbench/provenance/structure-preprocessing.yaml`: raw 7V9U
+  dimer-to-selected-protomer provenance policy, including selected protein,
+  DNA, RNA, excluded paired-protomer context, and the explicit non-objective of
+  preserving paired-protomer dimerization.
 - `workbench/provenance/residue-numbering-policy.yaml`: selected numbering
   policy that remains separate from the local materialized
   `residue_map.parquet`.
@@ -40,7 +45,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   contract for `ec86_clade9_conservation_v1` and `ec86_iia3_cluster42_1_conservation_v1`; full Mestre
   rows are candidate/context only, not the broad conservation denominator.
 - `workbench/provenance/conservation-source-discovery.md`: source-discovery
-  note for method and roster priors before MSA materialization.
+  note for method and roster priors, updated as the MSA and conservation
+  profile materialization state advances.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`:
   study-owned provider-source acquisition package for declared NCBI Protein and
   BV-BRC FASTA source files plus explicit unresolved-provider ledgers.
@@ -68,6 +74,10 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 - `workbench/ontology/rt-annotation-tracks.yaml`: Eco1-owned target-position
   motif annotation tracks that the generic MSA visualization API can render;
   they are not mask sources or designability rules.
+- `workbench/ontology/manual-mask-authority.yaml`: Eco1-owned
+  manual mask ontology. Under `eco1_rt_clade9_plurality25_direct_contact5a_v1`
+  it protects NAxxH, YADD, VTG, and Wang/Ec86 direct substrate-contact priors; RT1-RT7
+  intervals remain annotation/review labels, not blanket hard masks.
 - `workbench/ontology/msa-exemplar-rows.yaml`: Eco1-owned explicit row
   selections that ground motif-window visualization; they are not conservation
   denominators or representative-set claims.
@@ -101,14 +111,41 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py`:
   Phase 0/1 CLI entrypoint for checked-in contract validation.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/`:
-  semantic validator package for profile, artifact-chain, mask-case, structure
-  authority, conservation-source, and materialized-artifact checks.
+  shared validator package for profile, artifact-chain, evidence aggregation,
+  models, constants, and the Phase 0/1 validation suite.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/`:
+  conservation-specific contract package for MSA source authority, source-set
+  selection rules, materialized conservation-profile metadata, source hashes,
+  residue-map joins, and Tao-style conservation rule consistency.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/`:
+  mask-specific contract package for conservative mask cases, checked-in manual
+  mask source ontology helpers, RT1-RT7 interval source contracts, generated
+  `manual_mask_authority.yaml` validation, and generated `mask_set.yaml`
+  validation.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/`:
+  structure-specific contract package for selected authority, residue-numbering
+  policy, profile/source consistency, materialized `backbone_bundle.yaml`,
+  materialized `residue_map.parquet`, materialized
+  `structure_preprocessing_manifest.yaml`, shared structure-provenance hash
+  closure, and materialized `contact_geometry_profile.parquet`.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/`:
   study-owned materializer for local `backbone_bundle.yaml` and
   `residue_map.parquet`.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure_preprocessing/`:
+  study-owned materializer for `structure_preprocessing_manifest.yaml`; it
+  hash-checks selected ec86kit model provenance and machine-checks retained
+  RT/DNA/RNA chain ontology before contact geometry.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/`:
   study-owned materializer for local `contact_profile.parquet` from retained
   DNA/RNA context distances.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_geometry/`:
+  study-owned Biopython/mmCIF materializer for local
+  `contact_geometry_profile.parquet` from the selected 7V9U/ec86kit protomer
+  context, including side-chain, backbone, contact-density, and
+  retained-chain-count evidence. The package is intentionally split so
+  `structure_io.py` owns mmCIF/chain parsing, `rows.py` owns atom-distance row
+  math, `writer.py` owns Parquet schema/metadata emission, and `pipeline.py`
+  stays orchestration-only.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`:
   study-owned materializer for local `conservation_profile.parquet` from
   explicit aligned FASTA inputs.
@@ -117,7 +154,34 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   sufficiency-passing source FASTA inputs. The selected
   `ec86_clade9_conservation_v1` and
   `ec86_iia3_cluster42_1_conservation_v1` source FASTAs now pass sufficiency,
-  but a complete accepted two-profile aligned FASTA bundle is not materialized.
+  and a complete accepted two-profile Clustal Omega aligned FASTA bundle is
+  materialized locally.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/masking/`:
+  study-owned mask-row algebra package for protected/non-fixed row
+  composition, source-count summaries, and missing-backbone handling. Runtime
+  writers and Phase 1 validators route through this package instead of
+  duplicating row math.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/`:
+  study-owned materializer for `mask_set.yaml`. The artifact is materialized
+  under `eco1_rt_clade9_plurality25_direct_contact5a_v1`, with row classes
+  `protected`, `non_fixed`, and `non_fixed_missing_backbone`.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`:
+  study-owned materializer for `contact_risk_profile.yaml`. It is a
+  review artifact that joins nearest-distance contact evidence, atom-class
+  contact geometry, conservation masks, manual-mask authority, Wang/Ec86
+  candidate priors, and selected simple-mask row status.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/`:
+  study-owned materializer for `surface_accessibility_profile.parquet`. It
+  computes complex-context Biopython Shrake-Rupley SASA from the selected Ec86
+  RT-msDNA-msrRNA structure and records one canonical row per Eco1 RT position.
+  It is an earlier check, not an input to the current mask rule.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`:
+  contact-risk artifact contract package. It validates review metadata, required
+  evidence-availability statuses, and per-row risk-class fields without making
+  review artifacts control protected residues.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/`:
+  study-owned materializer for local `manual_mask_authority.yaml` from the
+  checked-in manual mask-authority ontology and `residue_map.parquet`.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`:
   study-owned materializer for unaligned source FASTA bundles from explicit
   provider caches and exclusion ledgers.
@@ -133,9 +197,6 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py`:
-  semantic validator for materialized conservation-profile metadata, source
-  hashes, residue-map joins, and Tao-style conservation rule consistency.
 - Reusable fixed-backbone mechanics belong in a future `src/dnadesign/thread/`
   package after a tracer bullet makes the executable contract real.
 

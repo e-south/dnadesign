@@ -1,36 +1,30 @@
 # External Sources
 
-External paper and structure references are contextual, not the checked-in
-record of truth.
+External papers and structures explain method choice. The checked-in Eco1
+record remains the source of truth for current artifacts, hashes, and gates.
 
-Current method source:
+## Source Role Table
 
-- Tao et al., "AI-guided redesign of laboratory-evolved reverse transcriptases
-  enhances prime editing", Nature Biotechnology, published 2026-05-21, DOI
-  `10.1038/s41587-026-03149-6`.
-- The associated public repository is `Allentaoyz/Redesigned_prime_editor_RTs`.
+| Source | Retrieved | Study role | Must not be used as |
+| --- | --- | --- | --- |
+| Tao et al. 2026, Nature Biotechnology, DOI `10.1038/s41587-026-03149-6` | 2026-06-23 | Method prior for fixed-backbone RT redesign, protected functional residues, MSA-derived WT plurality/frequency masking, and fold-check filtering. | A prime-editing objective for this study or a mandate to use a whole-database retron MSA. |
+| `Allentaoyz/Redesigned_prime_editor_RTs` public repository | 2026-06-23 | Implementation-context prior for Tao-style redesign workflow shape. | A direct Eco1 source authority or a runtime dependency. |
+| Mestre et al. 2020, Nucleic Acids Research, DOI `10.1093/nar/gkaa1149` | 2026-06-23 | Retron RT roster and classification authority. Mestre S1 defines the candidate pool, Ec86 RT clade 9 panel, and II-A3/`42_1` family panel. | A finished MSA, conservation profile, or full-roster Phase 1 denominator. |
+| Simon et al. 2019, Nucleic Acids Research, DOI `10.1093/nar/gkz865` | 2026-06-23 | RT motif and figure-grammar prior for RT1-RT7, Region X/Y, NAxxH, catalytic DD/YADD, and VTG annotations. | A mask-authority table by itself; Eco1 canonical coordinates must come from the checked-in ontology. |
+| Wang et al. 2022, Nature Microbiology, DOI `10.1038/s41564-022-01197-7` | 2026-06-23 | Eco1/Ec86 cryo-EM structure prior for RT-msDNA/msrRNA context, active-site/motif context, RT1-RT7 interval spans, and interface-candidate residues. | Automatic permission to promote every interface candidate or to redesign substrate-contact residues. |
+| RCSB PDB `7V9U` | 2026-06-23 | Structure cross-check for the selected Ec86 RT-msDNA-RNA complex authority. | Replacement for the study-owned ec86kit protomer authority or residue-numbering policy. |
 
-Use these references to understand the computational pattern: fixed-backbone
-sequence design, residue protection, candidate sampling, and fold-check
-filtering. Do not import the paper's prime-editing objective into the Eco1 RT
-sponging study.
+## Placement Rules
 
-Current conservation-source priors:
-
-- Mestre et al., "Systematic prediction of genes functionally associated with
-  bacterial retrons", Nucleic Acids Research, 2020, DOI
-  `10.1093/nar/gkaa1149`.
-- Mestre Supplementary Table S1 is the current accession-roster prior and
-  candidate pool for `ec86_clade9_conservation_v1` plus the clade-near source for
-  `ec86_iia3_cluster42_1_conservation_v1`; it is not itself a materialized MSA, conservation
-  profile, or broad conservation denominator.
-- The selected MSA source policy is recorded in
+- MSA source authority lives in
   `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`.
-- The future-agent reproduction method is recorded in
+- MSA reproduction and reviewer-facing rationale live in
   `docs/studies/eco1_rt_repack/contexts/msa-method.md`.
-- Simon et al. 2019, Wang et al. 2022, and Khan et al. 2025 are secondary
-  sanity/context sources for motifs, structure, and functional retron rosters.
+- Mask-authoritative motif anchors and RT intervals live in
+  `docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml`.
+- Visualization-only RT annotation tracks live in
+  `docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml`.
 
 For live factual claims, re-check external sources and cite them in the user
-response. The checked-in study record should keep only concise source
-identifiers and stable provenance fields.
+response. The checked-in study record should keep concise source identifiers,
+stable provenance fields, and explicit no-inference boundaries.

@@ -2,7 +2,7 @@
 
 **Status:** proposed development specification
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-19
+**Last verified:** 2026-06-22
 **Study id:** `eco1_rt_repack`
 **Primary study surface:** `docs/studies/eco1_rt_repack/`
 **Planned reusable tool surface:** `thread`
@@ -150,8 +150,7 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
 - The third implementation slice is a study-owned contact materializer at
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/`.
   It emits thread-shaped local runtime contact evidence for
-  `contact_profile.parquet` from the retained DNA/RNA context; Phase 1 now
-  fails on missing conservation evidence and `mask_set.yaml`.
+  `contact_profile.parquet` from the retained DNA/RNA context.
 - The fourth implementation slice is a study-owned conservation source
   contract at
   `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`.
@@ -177,9 +176,33 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   full-Mestre broad-profile run with the declared high-sensitivity MAFFT policy
   was stopped after roughly four hours and is no longer the active broad
   denominator. The active broad profile is now the natural Mestre Ec86 RT clade
-  9 panel after declared QC; selected source records and source FASTA
-  sufficiency now pass locally, so the next runtime blocker is accepted
-  Clustal Omega alignment through `dnadesign.aligner.msa`.
+  9 panel after declared QC. Selected source records and source FASTA
+  sufficiency pass locally, and both selected profiles are now accepted as a
+  Clustal Omega aligned FASTA bundle through `dnadesign.aligner.msa`.
+- The conservation alignment/profile acceptance slice materializes
+  `conservation_profile.parquet` from the accepted
+  `ec86_clade9_conservation_v1` and
+  `ec86_iia3_cluster42_1_conservation_v1` alignments.
+- The manual motif mask-authority slice adds
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/`.
+  It turns the study-owned `manual-mask-authority.yaml` ontology into a runtime
+  `manual_mask_authority.yaml` artifact for audited NAxxH, YADD, VTG, RT1-RT7
+  review labels, and Wang/Ec86 direct substrate-contact priors. Under the
+  current mask rule, RT1-RT7 labels do not blanket hard-fix residues.
+- The mask-set materializer slice adds
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/`.
+  It emits a thread-shaped `mask_set.yaml` from residue-map, contact,
+  conservation, and manual motif/direct-contact evidence. The prior
+  conservative 20 A tier is diagnostic history. The next mask artifact should
+  use `eco1_rt_plurality25_direct_contact6a_v1`.
+- The contact-risk profile slice adds
+  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`
+  and `operations/contracts/contact_risk/`. It emits
+  `contact_risk_profile.yaml` as a contact evidence review after
+  `mask_set.yaml`, joining nearest-distance contact evidence, conservation
+  masks, manual-mask authority, Wang/Ec86 priors, and older mask-comparison
+  membership. The current mask rule uses direct retained DNA/RNA contact
+  within 6 A.
 - The conservation source-sequence bundle slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`.
   It consumes explicit local provider FASTA caches plus `source_records.yaml`,
@@ -333,12 +356,57 @@ materialized structure-artifact content for the Eco1 tracer bullet. Runtime
 artifact mechanics may still graduate to `thread` only through a later explicit
 promotion.
 
+### 6.1 Plurality25 Direct-Contact Mask Policy
+
+The earlier mask-comparison files tested broader proximity and surface rules,
+but they no longer define the design mask. The current mask rule is
+`eco1_rt_plurality25_direct_contact6a_v1`:
+
+```text
+protected =
+  NAxxH / YADD / VTG
+  OR Wang/Ec86 direct substrate-contact prior
+  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality
+  OR mapped residue is within 6 A of retained DNA/RNA
+
+non_fixed = NOT protected
+```
+
+Terminal residues `1`, `2`, and `312-320` are
+`non_fixed_missing_backbone`: unprotected, but not directly mutable by
+fixed-backbone ProteinMPNN until coordinates exist.
+
+The next implementation slice should regenerate `mask_set.yaml` under this rule
+and update validation around three classes: `protected`, `non_fixed`,
+and `non_fixed_missing_backbone`.
+
+This rule excludes:
+
+- SASA and surface-based release rules;
+- contact-density, retained-chain-count, and contact-class release rules;
+- RT1-RT7 blanket hard fixing;
+- 15 A / 18 A / 20 A broad proximity rules as sampling policy;
+- conservation weakening to reach a target mutable count.
+
+The residue-count outcome from current evidence is:
+
+- `76` mapped non-fixed residues directly usable by fixed-backbone ProteinMPNN;
+- `11` terminal `non_fixed_missing_backbone` residues;
+- `87` total unprotected residues.
+
+Do not create a generic `thread` implementation for this mask until the
+study-local artifact proves which row fields are reusable. The study code home
+remains `operations/materialization/mask_set/`, with validation under
+`operations/contracts/masks/`.
+
 ### 7. Fail-Fast Policy
 
 - No design run without a valid `BackboneBundle`.
 - No mutable residue without a `ResidueMap` row.
 - No MSA conservation mask without a target-row mapping and gap policy.
 - No contact mask without structure provenance and distance threshold policy.
+- No manual motif mask without an explicit study-owned mask-authority artifact
+  resolved through the residue map.
 - No sample table without backend version, seed, and mask provenance.
 - No fold-check acceptance without explicit thresholds and runtime provenance.
 - No pooled-window handoff unless every recombined candidate has preserved

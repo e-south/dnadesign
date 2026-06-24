@@ -92,6 +92,21 @@ Out of scope:
   `aligner.msa.visualization.contracts`, orchestration and manifests under
   `aligner.msa.visualization.materialization`, and SVG drawing under
   `aligner.msa.visualization.renderers`.
+- Route Eco1 motif anchors through
+  `workbench/ontology/manual-mask-authority.yaml` and
+  `operations/materialization/manual_mask_authority/`; route shared mask-row
+  composition through `operations/masking/`; `rt-annotation-tracks.yaml` remains
+  visualization/context unless a separate mask-authority record names the same
+  positions. Use `eco1_rt_clade9_plurality25_direct_contact5a_v1` for the
+  current mask rule: protect NAxxH, YADD, VTG, Wang/Ec86 direct
+  substrate-contact priors, Ec86 clade 9 >=25% WT-plurality conservation calls,
+  or mapped residues within 5 A of retained DNA/RNA. RT1-RT7 spans are
+  annotation/review labels and do not blanket hard-fix residues. Terminal
+  residues 1, 2, and 312-320 are `non_fixed_missing_backbone`: unprotected, but
+  not directly fixed-backbone ProteinMPNN mutable until coordinates exist.
+  `surface_accessibility_profile.parquet` and `contact_risk_profile.yaml` are
+  evidence reviews; they do not decide which residues are protected unless a
+  future task explicitly reopens them.
 - Do not infer MSA source authority from review figures, prose, or public
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume

@@ -125,10 +125,16 @@ if flat_materializers:
 
 expected_materialization_primitives = {
     "structure",
+    "structure_preprocessing",
     "contact",
+    "contact_geometry",
+    "contact_risk",
     "conservation",
     "conservation_alignments",
+    "manual_mask_authority",
+    "mask_set",
     "source_sequences",
+    "surface_accessibility",
 }
 observed_materialization_primitives = {
     path.name for path in materialization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
@@ -148,7 +154,31 @@ for primitive in sorted(expected_materialization_primitives):
         if not (package / required_name).is_file():
             problems.append(f"missing materialization/{primitive}/{required_name}")
 
-source_sequences_root = materialization_root / "source_sequences"
+contact_geometry_root = materialization_root / "contact_geometry"
+expected_contact_geometry_files = {
+    "__init__.py",
+    "__main__.py",
+    "cli.py",
+    "constants.py",
+    "models.py",
+    "paths.py",
+    "pipeline.py",
+    "rows.py",
+    "structure_io.py",
+    "writer.py",
+}
+observed_contact_geometry_files = {path.name for path in contact_geometry_root.glob("*.py")}
+if observed_contact_geometry_files != expected_contact_geometry_files:
+    problems.append(
+        "contact_geometry materialization must stay decomposed by constants, models, paths, rows, "
+        f"structure_io, writer, and pipeline, observed {sorted(observed_contact_geometry_files)}"
+    )
+contact_geometry_pipeline_text = (contact_geometry_root / "pipeline.py").read_text(encoding="utf-8")
+for forbidden_snippet in ("Bio.PDB", "pyarrow as pa", "np.stack", "MMCIFParser"):
+    if forbidden_snippet in contact_geometry_pipeline_text:
+        problems.append(f"contact_geometry pipeline reabsorbed implementation detail: {forbidden_snippet}")
+
+    source_sequences_root = materialization_root / "source_sequences"
 expected_source_sequence_files = {
     "__init__.py",
     "__main__.py",
@@ -191,7 +221,59 @@ for dirname in ("contracts", "materialization"):
     if not (tests_root / dirname).is_dir():
         problems.append(f"missing tests/{dirname}/ mirrored package")
 
-flat_test_files = sorted(path.name for path in tests_root.glob("test_*.py"))
+contracts_root = operations_root / "contracts"
+expected_contract_root_files = {
+    "__init__.py",
+    "artifact_chain.py",
+    "common.py",
+    "constants.py",
+    "evidence_artifacts.py",
+    "models.py",
+    "profile.py",
+    "suite.py",
+}
+observed_contract_root_files = {path.name for path in contracts_root.glob("*.py")}
+if observed_contract_root_files != expected_contract_root_files:
+    problems.append(
+        "operations/contracts root must stay shared-orchestration only, observed "
+        f"{sorted(observed_contract_root_files)}"
+    )
+
+expected_contract_packages = {"conservation", "contact_risk", "masks", "structure"}
+observed_contract_packages = {
+    path.name for path in contracts_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if observed_contract_packages != expected_contract_packages:
+    problems.append(
+        "operations/contracts domain validators must live in semantic packages, observed "
+        f"{sorted(observed_contract_packages)}"
+    )
+
+expected_contract_package_files = {
+    "conservation": {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"},
+    "contact_risk": {"__init__.py", "artifacts.py"},
+    "masks": {
+        "__init__.py",
+        "cases.py",
+        "manual_artifacts.py",
+        "rt_intervals.py",
+        "set_artifacts.py",
+        "source.py",
+    },
+    "structure": {"__init__.py", "artifacts.py", "authority.py", "contact_geometry.py", "preprocessing.py", "provenance.py"},
+}
+for package_name, expected_files in sorted(expected_contract_package_files.items()):
+    package = contracts_root / package_name
+    if not package.is_dir():
+        problems.append(f"missing operations/contracts/{package_name}/ semantic package")
+        continue
+    observed_files = {path.name for path in package.glob("*.py")}
+    if observed_files != expected_files:
+        problems.append(
+            f"operations/contracts/{package_name} file set drifted, observed {sorted(observed_files)}"
+        )
+
+    flat_test_files = sorted(path.name for path in tests_root.glob("test_*.py"))
 if flat_test_files:
     problems.append(f"flat study tests are not allowed at tests root: {flat_test_files}")
 
@@ -199,7 +281,46 @@ legacy_test = tests_root / "test_contract_validation.py"
 if legacy_test.exists():
     problems.append(f"legacy flat test still exists: {legacy_test.relative_to(repo_root)}")
 
-test_materialization_root = tests_root / "materialization"
+contract_test_root = tests_root / "contracts"
+expected_contract_test_root_files = {"__init__.py", "test_phase_contracts.py", "test_source_contracts.py"}
+observed_contract_test_root_files = {path.name for path in contract_test_root.glob("*.py")}
+if observed_contract_test_root_files != expected_contract_test_root_files:
+    problems.append(
+        "tests/contracts root must stay shared-orchestration only, observed "
+        f"{sorted(observed_contract_test_root_files)}"
+    )
+
+expected_contract_test_packages = {"conservation", "contact_risk", "masks", "structure"}
+observed_contract_test_packages = {
+    path.name for path in contract_test_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if observed_contract_test_packages != expected_contract_test_packages:
+    problems.append(
+        "tests/contracts domain tests must mirror semantic contract packages, observed "
+        f"{sorted(observed_contract_test_packages)}"
+    )
+
+expected_contract_test_package_files = {
+    "conservation": {"__init__.py", "test_sources.py"},
+    "contact_risk": {"__init__.py", "test_artifacts.py"},
+    "masks": {
+        "__init__.py",
+        "test_cases.py",
+        "test_rt_intervals.py",
+        "test_source.py",
+    },
+    "structure": {"__init__.py", "test_authority.py", "test_contact_geometry.py", "test_preprocessing.py"},
+}
+for package_name, expected_files in sorted(expected_contract_test_package_files.items()):
+    package = contract_test_root / package_name
+    if not package.is_dir():
+        problems.append(f"missing tests/contracts/{package_name}/ mirrored package")
+        continue
+    observed_files = {path.name for path in package.glob("*.py")}
+    if observed_files != expected_files:
+        problems.append(f"tests/contracts/{package_name} file set drifted, observed {sorted(observed_files)}")
+
+    test_materialization_root = tests_root / "materialization"
 flat_materialization_tests = sorted(
     path.name for path in test_materialization_root.glob("test_*.py")
 )
@@ -374,18 +495,28 @@ require_file "$STUDY_ROOT/contexts/msa-method.md"
 require_file "$STUDY_ROOT/contexts/residue-mask-policy.md"
 require_file "$STUDY_ROOT/contexts/fold-validation-policy.md"
 require_file "$STUDY_ROOT/workbench/ontology/rt-annotation-tracks.yaml"
+require_file "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
 require_file "$STUDY_ROOT/workbench/ontology/msa-exemplar-rows.yaml"
 require_file "$STUDY_ROOT/workbench/ontology/msa-panel-spec.yaml"
 require_file "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_file "$REPO_ROOT/docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/masking"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/contracts"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/contracts/contact_risk"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/contracts/masks"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/tests/materialization"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set"
+require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization"
@@ -396,12 +527,31 @@ require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/ma
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/provider_accessions.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/cli.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/cli.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/cli.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/cli.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/pipeline.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/masking/rows.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/artifacts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/sources.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/artifacts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/source.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/manual_artifacts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/rt_intervals.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/set_artifacts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/artifacts.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/authority.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/preprocessing.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/provenance.py"
 require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts/annotation_tracks.py"
 require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts/exemplar_rows.py"
 require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers/profile_qc.py"
 require_file "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/renderers/exemplar_windows.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation_artifacts.py"
 
 require_frontmatter_yaml
 require_source_information_architecture
@@ -423,6 +573,12 @@ require_pattern 'ec86kit target sequence hash' "skill guardrail rejects silent M
 require_pattern 'Do not imply that `src/dnadesign/thread/` exists' "skill keeps planned thread separate from implementation"
 require_pattern 'rt_lnrna_sponging_construct_triage' "skill names downstream RT-lnRNA route boundary"
 require_pattern 'No OPS provider is registered' "route matrix documents record-only status" "$REFERENCE_DIR/route-matrix.md"
+require_pattern 'Tao et al\. 2026' "external source table records Tao method prior" "$REFERENCE_DIR/external-sources.md"
+require_pattern 'Mestre et al\. 2020' "external source table records Mestre source ontology prior" "$REFERENCE_DIR/external-sources.md"
+require_pattern 'Simon et al\. 2019' "external source table records Simon annotation prior" "$REFERENCE_DIR/external-sources.md"
+require_pattern 'Wang et al\. 2022' "external source table records Wang Ec86 structure prior" "$REFERENCE_DIR/external-sources.md"
+require_pattern '2026-06-23' "external source table records retrieval date" "$REFERENCE_DIR/external-sources.md"
+require_pattern 'Must not be used as' "external source table records misuse boundaries" "$REFERENCE_DIR/external-sources.md"
 require_pattern 'record-only' "status is explicitly record-only" "$STUDY_ROOT/record/status.md"
 require_pattern 'planned' "artifact surface is planned" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
 require_pattern 'thread_artifact_chain_schema' "artifact surface includes artifact-chain schema" "$STUDY_ROOT/operations/contract/surfaces/artifacts.yaml"
@@ -436,6 +592,18 @@ require_pattern 'ec86_iia3_cluster42_1_conservation_v1' "conservation source con
 require_pattern 'accession_patterns' "conservation source contract declares provider accession patterns" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 require_pattern 'materialization/conservation/' "study surfaces route conservation materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'materialization/conservation_alignments/' "study surfaces route conservation alignment package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'manual-mask-authority.yaml' "study surfaces route manual mask-authority ontology" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'materialization/manual_mask_authority/' "study surfaces route manual mask-authority materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'wang_et_al_2022_ec86_cryoem_structure_priors' "manual mask authority source records Wang/Ec86 structural priors" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
+require_pattern 'candidate_prior_not_mask_authoritative' "manual mask authority keeps Wang interface residues as candidate priors" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
+require_pattern 'rt7_interval' "manual mask authority source materializes RT1-RT7 interval spans" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
+require_pattern 'materialization/mask_set/' "study surfaces route mask-set materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'materialization/contact_risk/' "study surfaces route contact-risk materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'materialization/surface_accessibility/' "study surfaces route surface-accessibility materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/contracts/contact_risk/' "study surfaces route contact-risk contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'eco1_rt_clade9_plurality25_direct_contact5a_v1' "study surfaces describe current simple mask rule" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'shared structure-provenance hash' "study surfaces route structure hash-closure contract" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/masking/' "study surfaces route shared mask-row algebra package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'aligner/msa/visualization' "study surfaces route generic MSA visualization API" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'rt-annotation-tracks.yaml' "study surfaces route Eco1 annotation tracks" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'msa-exemplar-rows.yaml' "study surfaces route Eco1 exemplar rows" "$REFERENCE_DIR/study-surfaces.md"
@@ -443,7 +611,23 @@ require_pattern 'msa-panel-spec.yaml' "study surfaces route Eco1 panel spec" "$R
 require_pattern 'source_sequences/contracts/' "study surfaces route source-sequence contract package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'source_sequences/sufficiency/' "study surfaces route source-sequence sufficiency package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'provider accession policy' "study surfaces route provider accession contract policy" "$REFERENCE_DIR/study-surfaces.md"
-require_pattern 'conservation_artifacts.py' "study surfaces route conservation artifact validator" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/contracts/conservation/' "study surfaces route conservation contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/contracts/structure/' "study surfaces route structure contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'not a hidden run-all pipeline' "command-group README rejects hidden run-all execution" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
+require_pattern 'conservation_provider_sources' "pipeline records provider-source command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'conservation_roster_cache' "pipeline records roster-cache command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'conservation_source_sufficiency' "pipeline records source-sufficiency command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'conservation_alignments' "pipeline records alignment command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'contact_risk_profile' "pipeline records contact-risk command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'surface_accessibility_profile' "pipeline records surface-accessibility command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'materialized_simple_mask_set' "sampling readiness gates thread_plan behind validated simple mask" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
+require_pattern 'required_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1' "sampling readiness records simple mask policy id" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
+require_pattern 'non_fixed_missing_backbone' "sampling readiness records terminal missing-backbone class" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
+require_pattern 'phase1_thread_contract' "pipeline records Phase 1 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'presence-only check' "command-group README documents Phase 1 hash closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
+require_absent 'argparse' "contact-risk pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/pipeline.py"
+require_absent 'argparse' "manual mask pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/pipeline.py"
+require_absent 'argparse' "mask-set pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/pipeline.py"
 require_pattern 'reject_as_target_without_declared_substitution' "conservation source contract rejects target drift" "$STUDY_ROOT/workbench/provenance/conservation-sources.yaml"
 placeholder_pattern='TO''DO|\[''TO''DO'
 require_absent "$placeholder_pattern" "skill contains no initializer placeholders"
