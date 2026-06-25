@@ -349,11 +349,12 @@ def apply_handoff_record_lifecycle(
 ) -> list[SelectedCandidate]:
     """Stamp record-owned lifecycle fields onto selected rows before manifest build."""
 
+    expected_run_ids = record.expected_run_ids_by_campaign
     return [
         SelectedCandidate(
             campaign_slug=row.campaign_slug,
             as_of_round=row.as_of_round,
-            run_id=row.run_id,
+            run_id=expected_run_ids.get(row.campaign_slug, row.run_id),
             selection_rank=row.selection_rank,
             id=row.id,
             sequence=row.sequence,

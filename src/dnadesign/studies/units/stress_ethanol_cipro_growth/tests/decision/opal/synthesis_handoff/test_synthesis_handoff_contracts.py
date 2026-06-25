@@ -45,6 +45,11 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.cli import (
     main as synthesis_handoff_main,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.records import (
+    ExpectedHandoffArtifact,
+    SynthesisHandoffRecord,
+    apply_handoff_record_lifecycle,
+)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.strategy import (
     load_cloning_strategy,
 )
@@ -1180,6 +1185,43 @@ def test_cli_handoff_record_resolves_opal_round_per_campaign_run_ids(
         "stress_eth_cip_ethanol_rf_sfxi_topn": "eth-run-b",
         "stress_eth_cip_cipro_rf_sfxi_topn": "cip-run-a",
     }
+
+
+def test_handoff_record_lifecycle_stamps_campaign_run_ids_onto_selected_rows() -> None:
+    source_row = SelectedCandidate(
+        campaign_slug="stress_eth_cip_ethanol_rf_sfxi_topn",
+        as_of_round=1,
+        run_id="source-run-a",
+        selection_rank=1,
+        id="opal-candidate-a",
+        sequence=CORE_A,
+        synthesis_name="ES-promoter-32",
+    )
+    record = SynthesisHandoffRecord(
+        handoff_id="stress-opal-r1-sfxi-v1",
+        lifecycle_status="generated_pending_acceptance",
+        source_authority="opal_selection_set",
+        selection_epoch="opal_model_round",
+        assay_batch_index=1,
+        model_as_of_round=1,
+        run_id=None,
+        strategy_id="sfxi_promoter_insert:v1",
+        expected_campaigns=(
+            ExpectedHandoffArtifact(
+                campaign_slug="stress_eth_cip_ethanol_rf_sfxi_topn",
+                expected_rows=1,
+                run_id="record-run-b",
+                manifest_path="out/ethanol/synthesis_manifest.csv",
+                vendor_workbook_path="out/ethanol/azenta_gene_synthesis.xlsx",
+                genbank_dir_path="out/ethanol/genbank_inserts",
+                genbank_feature_table_path="out/ethanol/genbank_features.csv",
+            ),
+        ),
+    )
+
+    stamped = apply_handoff_record_lifecycle([source_row], record)
+
+    assert [row.run_id for row in stamped] == ["record-run-b"]
 
 
 def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
