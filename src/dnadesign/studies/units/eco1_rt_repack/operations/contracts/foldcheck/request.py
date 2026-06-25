@@ -65,7 +65,7 @@ def validate_foldcheck_request_content(path: Path, *, output_root: Path) -> list
             )
         )
 
-    fasta_path = Path(str(manifest.get("input_fasta_path", "")))
+    fasta_path = _resolve_manifest_path(path, manifest.get("input_fasta_path", ""))
     if not fasta_path.exists():
         issues.append(
             ContractIssue(
@@ -150,6 +150,13 @@ def _manifest_sequences(manifest: Mapping[str, Any]) -> dict[str, str]:
         if isinstance(row, Mapping) and isinstance(row.get("sequence_id"), str):
             result[str(row["sequence_id"])] = str(row.get("sequence_hash", ""))
     return result
+
+
+def _resolve_manifest_path(manifest_path: Path, value: Any) -> Path:
+    path = Path(str(value))
+    if path.is_absolute():
+        return path
+    return manifest_path.parent / path
 
 
 def _read_fasta_ids(path: Path) -> dict[str, str]:

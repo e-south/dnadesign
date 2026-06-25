@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import yaml
@@ -31,6 +32,19 @@ def test_foldcheck_request_contract_accepts_materialized_request(tmp_path: Path)
     result = materialize_foldcheck_request(repo_root=Path.cwd(), output_root=tmp_path)
 
     issues = validate_foldcheck_request_content(result.request_manifest_path, output_root=tmp_path)
+
+    assert issues == []
+
+
+def test_foldcheck_request_contract_resolves_manifest_relative_fasta_path(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    write_minimal_foldcheck_inputs(source_root)
+    result = materialize_foldcheck_request(repo_root=Path.cwd(), output_root=source_root)
+    deployed_root = tmp_path / "deployed"
+    shutil.copytree(source_root, deployed_root)
+    deployed_manifest = deployed_root / result.request_manifest_path.relative_to(source_root)
+
+    issues = validate_foldcheck_request_content(deployed_manifest, output_root=deployed_root)
 
     assert issues == []
 

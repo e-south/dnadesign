@@ -32,6 +32,8 @@ def test_foldcheck_request_materializes_wt_and_candidate_fasta(tmp_path: Path) -
     fasta_text = result.input_fasta_path.read_text(encoding="utf-8")
     assert manifest["backend_kind"] == "colabfold"
     assert manifest["execution_status"] == "planned_not_run"
+    assert manifest["input_fasta_path"] == "input_sequences.fasta"
+    assert manifest["output_root"] == "colabfold_outputs"
     assert manifest["sequence_count"] == 2
     assert manifest["wt_sequence_id"] == "wild_type"
     assert ">wild_type\n" in fasta_text
