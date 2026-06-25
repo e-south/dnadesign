@@ -11,8 +11,9 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 
 ### Quick start
 
-Use project (`-P`) and runtime/config overrides at submit time.
-Templates intentionally omit hard-coded `#$ -P` so the same script can be reused across projects.
+Use project (`-P`) and runtime/config overrides at submit time for reusable
+templates. The Eco1 ColabFold fold-check template is study-specific and pins
+`#$ -P dunlop` so the SCC smoke/full runs fail fast under the intended project.
 
 ```bash
 qsub -P <project> \
@@ -25,8 +26,8 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
-qsub -P <project> \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate \
+qsub \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 qsub -P <project> \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
@@ -148,9 +149,9 @@ Smoke run, WT plus the first five accepted ProteinMPNN candidates:
 
 ```bash
 mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
-qsub -P <project> \
+qsub \
   -l h_rt=04:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
@@ -158,7 +159,7 @@ Full current request, WT plus 96 accepted candidates:
 
 ```bash
 mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
-qsub -P <project> \
+qsub \
   -l h_rt=24:00:00 \
   -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
@@ -173,6 +174,8 @@ qsub -P <project> \
   not fall back to the older system `libstdc++`.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
   full materialized request
+- runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
+  preflight smoke runs; declare the model count explicitly for full screens
 - durable output root: `FOLDCHECK_RUN_ROOT` defaults to
   `/project/dunlop/esouth/foldcheck/eco1_rt/$JOB_NAME.$JOB_ID`
 - compact run manifest: `colabfold_run_manifest.yaml` records the source

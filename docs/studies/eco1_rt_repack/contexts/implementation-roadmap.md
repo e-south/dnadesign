@@ -432,18 +432,33 @@ It locates the current study request manifest, calls the generic adapter, and
 writes `foldcheck_report.parquet` under the study workspace. Phase 3 validation
 now fails fast when that report is absent or lacks WT/candidate coverage.
 
-### Next Slice: SCC Fold Smoke and Report v1
+### Completed Slice: SCC Fold Smoke and Report v1
 
 LocalColabFold is installed on BU SCC under
 `/projectnb/dunlop/esouth/tools/localcolabfold`, and the
 `colabfold_batch --help` preflight succeeds when the pixi environment `lib/`
-directory is first on `LD_LIBRARY_PATH`. The next step is to deploy the current
-`dnadesign` branch state plus the materialized fold-check request to the SCC
-clone, verify Phase 2 there, then run a small ColabFold smoke job from the
-materialized request with `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`.
-After the smoke completes, run the fold-check report materializer against the
-SCC output directory before scaling to the full 96-candidate request. The owner
-split is explicit: `docs/bu-scc` owns scheduler/runtime templates,
+directory is first on `LD_LIBRARY_PATH`. The SCC clone was fast-forwarded to
+the current branch, the materialized fold-check request was regenerated there,
+and BU SCC job `6224446` ran the WT baseline plus five accepted candidates.
+
+The normalized `foldcheck_report.parquet` now validates with six `accepted`
+rows and 91 explicit `errored` rows for candidates outside the smoke subset.
+The report keeps raw ColabFold PDB/JSON paths on SCC project storage and syncs
+only the compact normalized Parquet artifact back to the laptop workspace.
+
+The smoke also exposed one generic portability bug: fold-check request hashes
+must not include host-local FASTA/output paths. `dnadesign.thread.foldcheck`
+now hashes request intent, sequence hashes, threshold policy, and upstream
+artifact hashes while leaving local paths as operator metadata.
+
+### Next Slice: Full Foldcheck Batch v1
+
+Run the full WT plus 96-candidate ColabFold request after choosing the runtime
+shape. For quick runtime preflights, pass
+`COLABFOLD_EXTRA_ARGS='--num-models 1'`. For the first full fold screen, decide
+explicitly whether to keep ColabFold defaults or reduce model count to trade
+coverage speed against model-rank evidence. The owner split remains explicit:
+`docs/bu-scc` owns scheduler/runtime templates,
 `dnadesign.thread.adapters.colabfold` owns output normalization,
 `dnadesign.thread.foldcheck` owns the normalized report contract, and
 `eco1_rt_repack` owns candidate selection, WT sequence reconstruction, and

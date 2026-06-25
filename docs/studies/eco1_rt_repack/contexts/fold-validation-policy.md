@@ -34,6 +34,11 @@ which calls the generic `dnadesign.thread.adapters.colabfold` parser and writes
 the compact `foldcheck_report.parquet` artifact. This parser does not run a
 fold model and does not copy raw SCC output trees into the repository.
 
+The first SCC smoke run, job `6224446`, folded the WT baseline plus five
+accepted ProteinMPNN candidates. The normalized report contains six `accepted`
+rows and explicit `errored` rows for candidates outside the smoke subset. That
+is runtime-path evidence, not a full candidate screen.
+
 The FASTA contains one WT baseline plus accepted ProteinMPNN candidates as
 full 320-aa canonical Eco1 sequences. Terminal positions without 7V9U backbone
 coordinates are retained as WT residues in the fold-check sequence; they were
@@ -103,6 +108,9 @@ decision.
   materialized candidate handoff.
 - Runtime failures are rows with `status: rejected` or `status: errored`, not
   silent omissions.
+- Smoke subsets must leave candidates outside the subset as explicit
+  `errored` rows, so a partial fold run cannot masquerade as complete
+  fold-check coverage.
 
 ### BU SCC Storage Posture
 
@@ -118,3 +126,7 @@ outputs when live capacity allows. Use `/projectnb/dunlop/esouth` only after a
 fresh capacity check. USR sync should move compact manifests and normalized
 reports by default; raw ColabFold output directories should stay on SCC unless
 a later handoff explicitly selects small structure files for transfer.
+
+Future smoke runs should use `COLABFOLD_EXTRA_ARGS='--num-models 1'` when the
+goal is runtime-path validation. Full candidate screens should declare model
+count explicitly before submission.

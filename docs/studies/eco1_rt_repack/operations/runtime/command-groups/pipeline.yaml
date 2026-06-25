@@ -347,19 +347,17 @@ lanes:
         - .
   - id: colabfold_scc_smoke
     owner: bu_scc_runtime
-    status: planned_external
+    status: smoke_materialized
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
     command:
       argv:
         - qsub
-        - -P
-        - <project>
         - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
         - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
   - id: foldcheck_report
     owner: thread
-    status: implemented_waiting_for_runtime_output
+    status: smoke_materialized
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
     command:
       argv:

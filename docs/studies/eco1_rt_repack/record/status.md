@@ -6,12 +6,14 @@
 
 ### Current Phase
 
-Phase 2 backend ingest now passes locally. The study has the required
+Phase 3 downstream-promotion validation now passes locally and on BU SCC for a
+six-sequence ColabFold smoke report. The study has the required
 structure, source, alignment, conservation evidence, manual mask authority,
 mask set, explicit thread plan, ProteinMPNN request, backend run manifest, and
 sample/candidate tables under `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
-Fold-check request generation is materialized as a planned ColabFold input, and
-the ColabFold output normalizer is implemented. No fold model has been run yet.
+Fold-check request generation is materialized as a ColabFold input, the
+ColabFold output normalizer is implemented, and the first SCC smoke run has
+been normalized into `foldcheck_report.parquet`.
 The selected mask rule is:
 
 ```text
@@ -91,6 +93,10 @@ handled separately.
   contains one WT baseline plus the 96 accepted candidates as full 320-aa
   canonical sequences. The request is `planned_not_run`, backend kind
   `colabfold`, and runtime kind `alphafold_family_colabfold`.
+- `foldcheck_report.parquet` is materialized from BU SCC ColabFold smoke job
+  `6224446`. The smoke covered WT plus the first five accepted candidates and
+  left explicit `errored` rows for candidates outside the smoke subset. Row
+  counts are `accepted: 6` and `errored: 91`.
 
 ### Mask Counts
 
@@ -139,16 +145,13 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Deploy the current `dnadesign` branch state and materialized fold-check
-   request to the BU SCC clone, then re-run the Phase 2 validator there.
-2. Run `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub` as a BU SCC ColabFold
-   smoke job for the WT baseline plus a small candidate subset, then normalize
-   the output with
-   `dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report`
-   into `foldcheck_report.parquet`.
-3. Scale the fold-check run to the full 96-candidate batch once the smoke
-   report validates.
-4. Define the downstream RT-lnRNA candidate handoff accepted by
+1. Decide the full-batch ColabFold runtime shape. The smoke used default
+   ColabFold settings, which wrote five models per sequence; future runtime
+   preflights should pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` when speed is
+   the objective.
+2. Scale the fold-check run to the full WT plus 96-candidate batch, then
+   normalize the completed SCC output directory into `foldcheck_report.parquet`.
+3. Define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers
@@ -159,8 +162,9 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   `/projectnb/dunlop/esouth/tools/localcolabfold`, and
   `colabfold_batch --help` succeeds when the pixi environment `lib/` directory
   is on `LD_LIBRARY_PATH`.
-- No fold-check runtime report with WT baseline, thresholds, and runtime
-  parameter hash exists.
+- The current fold-check runtime report is smoke-scale only. It proves the SCC
+  ColabFold path and report contract, but it is not a full 96-candidate fold
+  screen.
 - No assembly feasibility report exists.
 - No RT-only candidate handoff or RT-lnRNA acceptance record exists.
 
