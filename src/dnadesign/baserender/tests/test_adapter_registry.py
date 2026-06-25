@@ -1059,6 +1059,36 @@ def test_sequence_evidence_map_adapter_preserves_explicit_complement_and_base_hi
     assert boundary_effects[0].target == {"boundary": 9, "lane": "primary"}
 
 
+def test_sequence_evidence_map_adapter_bounds_segment_labels_by_row() -> None:
+    adapter = SequenceEvidenceMapV1Adapter(columns={}, policies={}, alphabet="DNA")
+
+    record = adapter.apply(
+        {
+            "contract_kind": "sequence_evidence_map_v1",
+            "state_id": "longer-complement-label",
+            "topology_kind": "linear_dsdna",
+            "alphabet": "iupac_dna",
+            "primary_sequence": "ACGT",
+            "complement_sequence": "TGCATGCA",
+            "owners": [],
+            "effect_tags": [],
+            "boundaries": [],
+            "pairings": [],
+            "display": {"title": "Complement label"},
+            "meta": {
+                "segment_labels": [
+                    {"text": "Complement-only segment", "row_id": "complement", "start": 4, "end": 8},
+                ],
+            },
+        },
+        row_index=0,
+    )
+
+    assert record.meta["segment_labels"] == (
+        {"text": "Complement-only segment", "start": 4, "end": 8, "row_id": "complement"},
+    )
+
+
 def test_snapback_visual_adapter_embeds_contract_for_snapback_renderer() -> None:
     adapter = SnapbackVisualV1Adapter(columns={}, policies={}, alphabet="DNA")
 

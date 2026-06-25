@@ -322,7 +322,12 @@ def _normalize_optional_positive_float(meta: Mapping[str, Any], *, key: str) -> 
     return value
 
 
-def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -> tuple[dict[str, object], ...]:
+def _normalize_segment_labels(
+    meta: Mapping[str, Any],
+    *,
+    primary_length: int,
+    complement_length: int,
+) -> tuple[dict[str, object], ...]:
     raw = meta.get("segment_labels", ())
     if raw is None:
         return ()
@@ -340,13 +345,14 @@ def _normalize_segment_labels(meta: Mapping[str, Any], *, primary_length: int) -
             end = int(entry.get("end"))
         except Exception as exc:
             raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries require integer start/end") from exc
-        if start < 0 or end > primary_length or end <= start:
-            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries must be within primary bounds")
         row_id = str(entry.get("row_id", "primary")).strip().lower() or "primary"
         if row_id not in {"primary", "complement"}:
             raise SchemaError(
                 "sequence_evidence_map_v1 meta.segment_labels entries row_id must be primary or complement"
             )
+        limit = primary_length if row_id == "primary" else complement_length
+        if start < 0 or end > limit or end <= start:
+            raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries must be within row bounds")
         label_side = str(entry.get("label_side", "")).strip().lower()
         if label_side and label_side not in {"above", "below"}:
             raise SchemaError("sequence_evidence_map_v1 meta.segment_labels entries label_side must be above or below")
@@ -552,7 +558,11 @@ class SequenceEvidenceMapV1Adapter:
             raise SchemaError(
                 "sequence_evidence_map_v1 connector hidden/cross indices require connector_overhang_spans"
             )
-        segment_labels = _normalize_segment_labels(meta, primary_length=len(contract.primary_sequence))
+        segment_labels = _normalize_segment_labels(
+            meta,
+            primary_length=len(contract.primary_sequence),
+            complement_length=complement_length,
+        )
         segment_label_gap_px = _normalize_optional_positive_float(meta, key="segment_label_gap_px")
         segment_label_tier_gap_px = _normalize_optional_positive_float(meta, key="segment_label_tier_gap_px")
 

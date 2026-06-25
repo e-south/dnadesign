@@ -89,6 +89,7 @@ def write_html_report(
     profile_qcs: list[ProfileQc],
     missing_profile_ids: list[str],
     *,
+    written_exemplar_svg_paths: dict[str, Path],
     has_exemplar_rows: bool,
     has_alignment_overview: bool,
     has_consensus_histogram: bool,
@@ -133,7 +134,7 @@ def write_html_report(
                 "</figure>"
             )
             for qc in profile_qcs
-            if qc.profile_exemplar_svg_path.exists()
+            if qc.profile_id in written_exemplar_svg_paths
         )
     panel_figures = ""
     if has_alignment_overview or has_consensus_histogram:
@@ -211,6 +212,7 @@ def write_index_manifest(
     missing_profile_ids: tuple[str, ...],
     position_qc_csv_path: Path,
     html_report_path: Path,
+    written_exemplar_svg_paths: dict[str, Path],
     has_alignment_overview: bool,
     has_consensus_histogram: bool,
 ) -> None:
@@ -236,9 +238,7 @@ def write_index_manifest(
         "profile_qc_paths": {qc.profile_id: str(qc.profile_qc_path) for qc in profile_qcs},
         "profile_svg_paths": {qc.profile_id: str(qc.profile_svg_path) for qc in profile_qcs},
         "profile_exemplar_svg_paths": {
-            qc.profile_id: str(qc.profile_exemplar_svg_path)
-            for qc in profile_qcs
-            if qc.profile_exemplar_svg_path.exists()
+            profile_id: str(path) for profile_id, path in written_exemplar_svg_paths.items()
         },
         "profile_alignment_overview_svg_paths": {
             qc.profile_id: str(qc.profile_alignment_overview_svg_path) for qc in profile_qcs if has_alignment_overview

@@ -56,6 +56,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
     profile_qcs: list[ProfileQc] = []
     position_rows: list[PositionQc] = []
     missing_profile_ids: list[str] = []
+    written_exemplar_svg_paths = {}
     annotation_tracks = load_annotation_tracks(request.annotation_tracks_yaml)
     exemplar_spec = load_exemplar_rows(request.exemplar_rows_yaml)
     panel_spec = load_panel_spec(request.panel_spec_yaml)
@@ -107,6 +108,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
                 tracks=annotation_tracks,
                 exemplar_rows=exemplar_rows,
             )
+            written_exemplar_svg_paths[profile_id] = qc.profile_exemplar_svg_path
         if panel_spec.overview_enabled:
             write_alignment_overview_svg(
                 qc.profile_alignment_overview_svg_path,
@@ -139,6 +141,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         html_report_path,
         profile_qcs,
         missing_profile_ids,
+        written_exemplar_svg_paths=written_exemplar_svg_paths,
         has_exemplar_rows=exemplar_spec.has_rows,
         has_alignment_overview=panel_spec.overview_enabled,
         has_consensus_histogram=panel_spec.consensus_histogram_enabled,
@@ -152,6 +155,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         missing_profile_ids=tuple(missing_profile_ids),
         position_qc_csv_path=position_qc_csv_path,
         html_report_path=html_report_path,
+        written_exemplar_svg_paths=written_exemplar_svg_paths,
         has_alignment_overview=panel_spec.overview_enabled,
         has_consensus_histogram=panel_spec.consensus_histogram_enabled,
     )
@@ -164,9 +168,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         html_report_path=html_report_path,
         profile_qc_paths={qc.profile_id: qc.profile_qc_path for qc in profile_qcs},
         profile_svg_paths={qc.profile_id: qc.profile_svg_path for qc in profile_qcs},
-        profile_exemplar_svg_paths={
-            qc.profile_id: qc.profile_exemplar_svg_path for qc in profile_qcs if qc.profile_exemplar_svg_path.exists()
-        },
+        profile_exemplar_svg_paths=written_exemplar_svg_paths,
         profile_alignment_overview_svg_paths={
             qc.profile_id: qc.profile_alignment_overview_svg_path for qc in profile_qcs if panel_spec.overview_enabled
         },

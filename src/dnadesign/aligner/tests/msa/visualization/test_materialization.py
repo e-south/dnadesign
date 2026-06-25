@@ -168,6 +168,45 @@ def test_visualization_html_links_only_generated_exemplar_svgs(tmp_path: Path) -
     assert set(index["profile_exemplar_svg_paths"]) == {"profile_a"}
 
 
+def test_visualization_ignores_stale_exemplar_svgs_from_prior_run(tmp_path: Path) -> None:
+    alignment_root = write_alignment_inputs(tmp_path, profile_ids=("profile_a", "profile_b"))
+    output_root = tmp_path / "visualizations"
+    annotation_tracks = write_annotation_tracks(tmp_path)
+    first_exemplar_rows = write_exemplar_rows(tmp_path, profile_ids=("profile_a", "profile_b"))
+
+    materialize_msa_visualizations(
+        MsaVisualizationRequest(
+            alignment_root=alignment_root,
+            output_root=output_root,
+            profile_ids=("profile_a", "profile_b"),
+            target_row_id="target",
+            target_sequence_hash=target_hash(TARGET),
+            annotation_tracks_yaml=annotation_tracks,
+            exemplar_rows_yaml=first_exemplar_rows,
+        )
+    )
+
+    second_exemplar_rows = write_exemplar_rows(tmp_path, profile_ids=("profile_a",))
+    result = materialize_msa_visualizations(
+        MsaVisualizationRequest(
+            alignment_root=alignment_root,
+            output_root=output_root,
+            profile_ids=("profile_a", "profile_b"),
+            target_row_id="target",
+            target_sequence_hash=target_hash(TARGET),
+            annotation_tracks_yaml=annotation_tracks,
+            exemplar_rows_yaml=second_exemplar_rows,
+        )
+    )
+
+    html_report = result.html_report_path.read_text(encoding="utf-8")
+    assert "profile_a.exemplar_windows.svg" in html_report
+    assert "profile_b.exemplar_windows.svg" not in html_report
+    index = yaml.safe_load(result.index_manifest_path.read_text(encoding="utf-8"))
+    assert set(index["profile_exemplar_svg_paths"]) == {"profile_a"}
+    assert set(result.profile_exemplar_svg_paths) == {"profile_a"}
+
+
 def test_visualization_rejects_target_hash_drift(tmp_path: Path) -> None:
     alignment_root = write_alignment_inputs(tmp_path, profile_ids=("profile_a",))
 
