@@ -17,7 +17,11 @@ import pytest
 
 from dnadesign.thread.adapters.proteinmpnn.execution import ProteinMpnnExecutionConfig
 from dnadesign.thread.adapters.proteinmpnn.execution_preflight import validate_proteinmpnn_root
-from dnadesign.thread.adapters.proteinmpnn.samples import parse_proteinmpnn_fasta_samples
+from dnadesign.thread.adapters.proteinmpnn.samples import (
+    parse_proteinmpnn_fasta_samples,
+    validate_sample_table,
+    write_sample_table,
+)
 
 
 def test_proteinmpnn_preflight_rejects_missing_official_scripts(tmp_path: Path) -> None:
@@ -78,6 +82,40 @@ def test_parse_proteinmpnn_fasta_samples_extracts_seed_temperature_and_scores(tm
     assert rows[0]["score"] == 0.5
     assert rows[0]["global_score"] == 1.5
     assert rows[0]["status"] == "accepted"
+
+
+def test_validate_sample_table_rejects_stale_sequence_hash(tmp_path: Path) -> None:
+    sample_table_path = tmp_path / "sample_table.parquet"
+    write_sample_table(
+        sample_table_path,
+        [
+            {
+                "sample_id": "sample-1",
+                "backend_run_id": "run-1",
+                "request_hash": "sha256:request",
+                "seed": 101,
+                "temperature": 0.1,
+                "sample_index": 1,
+                "sequence": "AAAA",
+                "sequence_hash": "sha256:stale",
+                "score": 0.5,
+                "global_score": 1.5,
+                "seq_recovery": 0.9,
+                "backend_result_hash": "sha256:result",
+                "status": "accepted",
+            }
+        ],
+        request_hash="sha256:request",
+    )
+
+    issues = validate_sample_table(
+        sample_table_path,
+        request_hash="sha256:request",
+        expected_sample_count=1,
+        sequence_length=4,
+    )
+
+    assert {issue.check_id for issue in issues} == {"thread.proteinmpnn.sample_table_sequence_hash_mismatch"}
 
 
 def test_proteinmpnn_execution_config_derives_expected_samples() -> None:

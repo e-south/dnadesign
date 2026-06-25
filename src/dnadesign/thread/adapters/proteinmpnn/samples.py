@@ -192,6 +192,17 @@ def validate_sample_table(
                 path=str(path),
             )
         )
+    bad_sequence_hashes = [
+        row["sample_id"] for row in rows if str(row["sequence_hash"]) != _sequence_hash(str(row["sequence"]))
+    ]
+    if bad_sequence_hashes:
+        issues.append(
+            ProteinMpnnRequestIssue(
+                check_id="thread.proteinmpnn.sample_table_sequence_hash_mismatch",
+                message="ProteinMPNN sample sequence_hash values must match sample sequences",
+                path=str(path),
+            )
+        )
     return issues
 
 
