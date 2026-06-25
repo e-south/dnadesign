@@ -1,9 +1,10 @@
 version: 1
 study_id: eco1_rt_repack
 snapshot:
-  status: foldcheck_request_materialized
-  phase: phase2_real_backend_ingest
+  status: foldcheck_smoke_report_materialized
+  phase: phase3_downstream_promotion
   current_record: docs/studies/eco1_rt_repack/record/status.md
   blockers:
-    - fold-check runtime report not materialized
+    - full 96-candidate fold-check screen not materialized
+    - assembly feasibility report not materialized
     - downstream RT-only acceptance not materialized

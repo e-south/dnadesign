@@ -11,17 +11,20 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
-from dnadesign.thread.adapters.proteinmpnn.execution import ProteinMpnnExecutionConfig
+from dnadesign.thread.adapters.proteinmpnn.execution import ProteinMpnnExecutionConfig, run_official_proteinmpnn_request
 from dnadesign.thread.adapters.proteinmpnn.execution_preflight import validate_proteinmpnn_root
 from dnadesign.thread.adapters.proteinmpnn.samples import (
     parse_proteinmpnn_fasta_samples,
     validate_sample_table,
     write_sample_table,
 )
+from dnadesign.thread.adapters.proteinmpnn.sidecars import write_jsonl
 
 
 def test_proteinmpnn_preflight_rejects_missing_official_scripts(tmp_path: Path) -> None:
@@ -128,3 +131,85 @@ def test_proteinmpnn_execution_config_derives_expected_samples() -> None:
 def test_proteinmpnn_execution_config_rejects_nondivisible_batch_size() -> None:
     with pytest.raises(ValueError, match="num_seq_per_target must be divisible"):
         ProteinMpnnExecutionConfig(batch_id="bad", num_seq_per_target=10, batch_size=3)
+
+
+def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proteinmpnn_root = _write_fake_proteinmpnn_root(tmp_path / "ProteinMPNN")
+    request_dir = tmp_path / "proteinmpnn_request"
+    request_dir.mkdir()
+    backbone_path = request_dir / "chain_a_backbone.pdb"
+    parsed_path = request_dir / "parsed_pdbs.jsonl"
+    assigned_path = request_dir / "assigned_chains.jsonl"
+    fixed_path = request_dir / "fixed_positions.jsonl"
+    backbone_path.write_text("END\n", encoding="utf-8")
+    parsed_payload = {"name": "target", "num_of_chains": 1, "seq_chain_A": "ABC"}
+    assigned_payload = {"target": [["A"], []]}
+    fixed_payload = {"target": {"A": [1, 3]}}
+    write_jsonl(parsed_path, parsed_payload)
+    write_jsonl(assigned_path, assigned_payload)
+    write_jsonl(fixed_path, fixed_payload)
+    stale_dir = tmp_path / "other_host" / "proteinmpnn_request"
+    stale_dir.mkdir(parents=True)
+    write_jsonl(stale_dir / "parsed_pdbs.jsonl", {"name": "target", "seq_chain_A": "ZZZ"})
+    write_jsonl(stale_dir / "assigned_chains.jsonl", {"target": [["B"], []]})
+    write_jsonl(stale_dir / "fixed_positions.jsonl", {"target": {"A": [2]}})
+    manifest = {
+        "request_hash": "sha256:" + "1" * 64,
+        "proteinmpnn_name": "target",
+        "proteinmpnn_design_chain": "A",
+        "sidecar_paths": {
+            "chain_a_backbone_pdb": str(stale_dir / "chain_a_backbone.pdb"),
+            "parsed_pdbs_jsonl": str(stale_dir / "parsed_pdbs.jsonl"),
+            "assigned_chains_jsonl": str(stale_dir / "assigned_chains.jsonl"),
+            "fixed_positions_jsonl": str(stale_dir / "fixed_positions.jsonl"),
+        },
+        "fixed_positions_jsonl": fixed_payload,
+        "seed_set": [101],
+        "temperature_schedule": [0.1],
+    }
+    manifest_path = request_dir / "request_manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    observed_run_commands: list[list[str]] = []
+
+    def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if "parse_multiple_chains.py" in argv[1]:
+            write_jsonl(Path(argv[argv.index("--output_path") + 1]), parsed_payload)
+        elif "assign_fixed_chains.py" in argv[1]:
+            write_jsonl(Path(argv[argv.index("--output_path") + 1]), assigned_payload)
+        elif "make_fixed_positions_dict.py" in argv[1]:
+            write_jsonl(Path(argv[argv.index("--output_path") + 1]), fixed_payload)
+        elif "protein_mpnn_run.py" in argv[1]:
+            observed_run_commands.append(list(argv))
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    run_official_proteinmpnn_request(
+        request_manifest_path=manifest_path,
+        proteinmpnn_root=proteinmpnn_root,
+        output_dir=tmp_path / "proteinmpnn_outputs",
+        execution_config=ProteinMpnnExecutionConfig(batch_id="portable", num_seq_per_target=1, batch_size=1),
+    )
+
+    assert len(observed_run_commands) == 1
+    command = observed_run_commands[0]
+    assert command[command.index("--jsonl_path") + 1] == str(parsed_path)
+    assert command[command.index("--chain_id_jsonl") + 1] == str(assigned_path)
+    assert command[command.index("--fixed_positions_jsonl") + 1] == str(fixed_path)
+
+
+def _write_fake_proteinmpnn_root(root: Path) -> Path:
+    for rel_path in (
+        "protein_mpnn_run.py",
+        "helper_scripts/parse_multiple_chains.py",
+        "helper_scripts/assign_fixed_chains.py",
+        "helper_scripts/make_fixed_positions_dict.py",
+        "vanilla_model_weights/v_48_020.pt",
+    ):
+        path = root / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# fixture\n", encoding="utf-8")
+    return root

@@ -41,6 +41,8 @@ from dnadesign.thread.adapters.proteinmpnn.samples import (
 from dnadesign.thread.adapters.proteinmpnn.sidecars import (
     assigned_chains_payload,
     fixed_positions_payload,
+    resolve_manifest_sidecar_path,
+    resolve_manifest_sidecar_paths,
     write_jsonl,
 )
 from dnadesign.thread.adapters.proteinmpnn.structure import export_chain_backbone
@@ -63,6 +65,8 @@ __all__ = [
     "request_hash",
     "require_int_list",
     "require_missing_backbone_excluded",
+    "resolve_manifest_sidecar_path",
+    "resolve_manifest_sidecar_paths",
     "resolve_proteinmpnn_root",
     "run_official_proteinmpnn_request",
     "to_proteinmpnn_positions",

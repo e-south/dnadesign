@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.thread.adapters.colabfold.outputs import _select_model_pdb, build_colabfold_foldcheck_rows
+from dnadesign.thread.adapters.colabfold.index import ColabFoldOutputIndex
+from dnadesign.thread.adapters.colabfold.outputs import build_colabfold_foldcheck_rows
 from dnadesign.thread.foldcheck.hashes import sequence_hash
 
 
@@ -149,8 +150,9 @@ def test_colabfold_output_parser_requires_colabfold_suffix_boundary_for_prefixed
     assert rows[1]["missing_metric_reason"] == "colabfold_output_missing"
     assert rows[2]["candidate_id"] == longer_id
     assert rows[2]["status"] == "accepted"
-    assert _select_model_pdb(output_root, shorter_id) is None
-    assert _select_model_pdb(output_root, longer_id) is not None
+    output_index = ColabFoldOutputIndex.from_output_root(output_root, sequence_ids=[shorter_id, longer_id])
+    assert output_index.select_model_pdb(shorter_id) is None
+    assert output_index.select_model_pdb(longer_id) is not None
 
 
 def _request_manifest(sequence_ids: list[str]) -> dict[str, object]:

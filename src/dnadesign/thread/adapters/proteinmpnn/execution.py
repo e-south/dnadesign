@@ -30,6 +30,7 @@ from dnadesign.thread.adapters.proteinmpnn.execution_preflight import (
     validate_proteinmpnn_root,
 )
 from dnadesign.thread.adapters.proteinmpnn.samples import write_backend_run_manifest
+from dnadesign.thread.adapters.proteinmpnn.sidecars import resolve_manifest_sidecar_paths
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ def run_official_proteinmpnn_request(
     request_hash = str(manifest["request_hash"])
     target_name = str(manifest["proteinmpnn_name"])
     chain_id = str(manifest["proteinmpnn_design_chain"])
+    sidecar_paths = resolve_manifest_sidecar_paths(request_manifest_path, manifest["sidecar_paths"])
     output_dir.mkdir(parents=True, exist_ok=True)
     batch_output_dir = output_dir / "batches" / config.run_dir_name
     if batch_output_dir.exists():
@@ -97,6 +99,7 @@ def run_official_proteinmpnn_request(
         helper_dir=helper_dir,
         python_executable=executable,
         chain_id=chain_id,
+        sidecar_paths=sidecar_paths,
     )
 
     runs: list[dict[str, Any]] = []
@@ -107,11 +110,11 @@ def run_official_proteinmpnn_request(
             executable,
             str(root / "protein_mpnn_run.py"),
             "--jsonl_path",
-            str(Path(str(manifest["sidecar_paths"]["parsed_pdbs_jsonl"]))),
+            str(sidecar_paths["parsed_pdbs_jsonl"]),
             "--chain_id_jsonl",
-            str(Path(str(manifest["sidecar_paths"]["assigned_chains_jsonl"]))),
+            str(sidecar_paths["assigned_chains_jsonl"]),
             "--fixed_positions_jsonl",
-            str(Path(str(manifest["sidecar_paths"]["fixed_positions_jsonl"]))),
+            str(sidecar_paths["fixed_positions_jsonl"]),
             "--out_folder",
             str(seed_output_dir),
             "--num_seq_per_target",
@@ -178,12 +181,12 @@ def _run_helper_parity_check(
     helper_dir: Path,
     python_executable: str,
     chain_id: str,
+    sidecar_paths: Mapping[str, Path],
 ) -> None:
     if helper_dir.exists():
         shutil.rmtree(helper_dir)
     helper_dir.mkdir(parents=True)
-    sidecar_paths = manifest["sidecar_paths"]
-    request_dir = Path(str(sidecar_paths["chain_a_backbone_pdb"])).parent
+    request_dir = sidecar_paths["chain_a_backbone_pdb"].parent
     parsed_path = helper_dir / "parsed_pdbs.jsonl"
     assigned_path = helper_dir / "assigned_chains.jsonl"
     fixed_path = helper_dir / "fixed_positions.jsonl"
@@ -231,17 +234,17 @@ def _run_helper_parity_check(
 
     _assert_jsonl_payload_close(
         observed=_load_jsonl_record(parsed_path),
-        expected=_load_jsonl_record(Path(str(sidecar_paths["parsed_pdbs_jsonl"]))),
+        expected=_load_jsonl_record(sidecar_paths["parsed_pdbs_jsonl"]),
         context=f"{request_manifest_path}:parsed_pdbs_jsonl",
     )
     _assert_jsonl_payload_close(
         observed=_load_jsonl_record(assigned_path),
-        expected=_load_jsonl_record(Path(str(sidecar_paths["assigned_chains_jsonl"]))),
+        expected=_load_jsonl_record(sidecar_paths["assigned_chains_jsonl"]),
         context=f"{request_manifest_path}:assigned_chains_jsonl",
     )
     _assert_jsonl_payload_close(
         observed=_load_jsonl_record(fixed_path),
-        expected=_load_jsonl_record(Path(str(sidecar_paths["fixed_positions_jsonl"]))),
+        expected=_load_jsonl_record(sidecar_paths["fixed_positions_jsonl"]),
         context=f"{request_manifest_path}:fixed_positions_jsonl",
     )
 

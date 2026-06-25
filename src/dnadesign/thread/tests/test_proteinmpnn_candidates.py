@@ -64,6 +64,22 @@ def test_candidate_table_validator_rejects_protected_mutations(tmp_path: Path) -
     assert [issue.check_id for issue in issues] == ["thread.candidate_table.protected_mutation"]
 
 
+def test_candidate_rows_resolve_colocated_sidecars_from_copied_manifest(tmp_path: Path) -> None:
+    manifest_path = _write_request_manifest(tmp_path)
+    stale_path = tmp_path / "other_host" / "parsed_pdbs.jsonl"
+    stale_path.parent.mkdir()
+    stale_path.write_text(json.dumps({"name": "target", "seq_chain_A": "ZZZ"}) + "\n", encoding="utf-8")
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest["sidecar_paths"]["parsed_pdbs_jsonl"] = str(stale_path)
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    sample_table = _write_sample_table(tmp_path, [_sample_row("sample-1", "BBC")])
+
+    rows = build_proteinmpnn_candidate_rows(sample_table_path=sample_table, request_manifest_path=manifest_path)
+
+    assert rows[0]["canonical_mutations"] == ["A10B"]
+    assert rows[0]["status"] == "accepted"
+
+
 def _write_request_manifest(tmp_path: Path) -> Path:
     parsed_path = tmp_path / "parsed_pdbs.jsonl"
     parsed_path.write_text(json.dumps({"name": "target", "seq_chain_A": "ABC"}) + "\n", encoding="utf-8")

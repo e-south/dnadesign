@@ -1,3 +1,10 @@
+---
+doc_id: bu-scc-job-templates
+surface: ops-runbook
+owner: dnadesign-maintainers
+last_verified: 2026-06-25
+---
+
 ## BU SCC job templates
 
 These scripts are submit-ready templates for BU SCC SGE jobs:
@@ -173,7 +180,9 @@ qsub \
   wrapper prepends the sibling `lib/` directory to `LD_LIBRARY_PATH` so SCC does
   not fall back to the older system `libstdc++`.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
-  full materialized request
+  full materialized request. The template delegates FASTA subsetting and run
+  manifest writing to `python -m dnadesign.thread.foldcheck.subset`, which
+  validates FASTA ids and sequence hashes against the request manifest.
 - runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
   preflight smoke runs; declare the model count explicitly for full screens
 - durable output root: `FOLDCHECK_RUN_ROOT` defaults to

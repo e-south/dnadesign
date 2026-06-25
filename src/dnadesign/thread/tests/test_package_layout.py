@@ -29,7 +29,7 @@ _PROTEINMPNN_FILES = {
     "validation.py",
 }
 _COLABFOLD_FILES = {"__init__.py", "index.py", "manifest.py", "metrics.py", "outputs.py"}
-_FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py"}
+_FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py", "subset.py"}
 
 
 def test_thread_root_is_small_public_tool_surface() -> None:
@@ -52,6 +52,7 @@ def test_proteinmpnn_adapter_owns_generic_request_mechanics() -> None:
         assert "mestre" not in text
         assert "wang" not in text
     assert "ProteinMPNN" in (root / "validation.py").read_text(encoding="utf-8")
+    assert "resolve_manifest_sidecar_path" in (root / "sidecars.py").read_text(encoding="utf-8")
 
 
 def test_colabfold_adapter_owns_generic_result_normalization() -> None:
@@ -78,6 +79,7 @@ def test_foldcheck_package_owns_generic_fold_report_contracts() -> None:
         assert "mestre" not in text
         assert "wang" not in text
     assert "thread.foldcheck_report" in (root / "report.py").read_text(encoding="utf-8")
+    assert "thread.foldcheck_external_run_manifest" in (root / "subset.py").read_text(encoding="utf-8")
 
 
 def _repo_root() -> Path:

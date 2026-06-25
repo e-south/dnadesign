@@ -1,7 +1,14 @@
+---
+doc_id: dnadesign-thread-docs
+surface: tool-docs
+owner: dnadesign-maintainers
+last_verified: 2026-06-25
+---
+
 # Thread Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-06-25
 
 `dnadesign.thread` is intentionally small right now. Its public surfaces are the
 generic ProteinMPNN adapter, generic ColabFold output normalizer,
@@ -28,6 +35,8 @@ The fold-check contract owns model-agnostic artifact shape:
 - runtime kind/version and parameter hash fields
 - threshold id and threshold values
 - normalized fold-check report rows with accepted/rejected/errored states
+- subset FASTA and external-run manifest preparation through
+  `python -m dnadesign.thread.foldcheck.subset`
 
 `dnadesign.thread.adapters.colabfold` owns reusable ColabFold output parsing:
 

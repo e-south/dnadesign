@@ -48,76 +48,14 @@ if [[ -n "$(find "$output_dir" -mindepth 1 -maxdepth 1 -print -quit)" && "${FOLD
   exit 2
 fi
 
-uv run python - "$request_manifest" "$sequence_limit" "$input_fasta" "$run_manifest" "$output_dir" <<'PY'
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-import yaml
-
-manifest_path = Path(sys.argv[1])
-limit_text = sys.argv[2]
-input_fasta = Path(sys.argv[3])
-run_manifest = Path(sys.argv[4])
-output_dir = Path(sys.argv[5])
-
-manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-source_fasta = Path(manifest["input_fasta_path"])
-if not source_fasta.is_absolute():
-    source_fasta = (manifest_path.parent / source_fasta).resolve()
-if not source_fasta.exists():
-    source_fasta = Path(manifest["input_fasta_path"])
-if not source_fasta.exists():
-    raise SystemExit(f"foldcheck input FASTA not found: {manifest['input_fasta_path']}")
-
-records: list[tuple[str, str]] = []
-header: str | None = None
-sequence_parts: list[str] = []
-for line in source_fasta.read_text(encoding="utf-8").splitlines():
-    if line.startswith(">"):
-        if header is not None:
-            records.append((header, "".join(sequence_parts)))
-        header = line[1:].strip()
-        sequence_parts = []
-    else:
-        sequence_parts.append(line.strip())
-if header is not None:
-    records.append((header, "".join(sequence_parts)))
-
-if not records:
-    raise SystemExit(f"foldcheck input FASTA has no records: {source_fasta}")
-
-if limit_text.lower() == "all":
-    selected_records = records
-else:
-    limit = int(limit_text)
-    if limit < 1:
-        raise SystemExit("FOLDCHECK_SEQUENCE_LIMIT must be a positive integer or 'all'")
-    selected_records = records[:limit]
-
-input_fasta.parent.mkdir(parents=True, exist_ok=True)
-input_fasta.write_text(
-    "".join(f">{name}\n{sequence}\n" for name, sequence in selected_records),
-    encoding="utf-8",
-)
-
-run_payload = {
-    "schema_id": "eco1_rt.colabfold_scc_run_manifest",
-    "schema_version": 1,
-    "source_request_manifest": str(manifest_path),
-    "source_request_hash": manifest["request_hash"],
-    "source_sequence_count": manifest["sequence_count"],
-    "selected_sequence_count": len(selected_records),
-    "selected_sequence_ids": [name for name, _ in selected_records],
-    "input_fasta": str(input_fasta),
-    "output_dir": str(output_dir),
-    "execution_status": "submitted_to_external_colabfold_cli",
-}
-run_manifest.write_text(yaml.safe_dump(run_payload, sort_keys=False), encoding="utf-8")
-print(f"wrote {len(selected_records)} fold-check sequences to {input_fasta}")
-print(f"wrote run manifest to {run_manifest}")
-PY
+uv run python -m dnadesign.thread.foldcheck.subset \
+  --request-manifest "$request_manifest" \
+  --sequence-limit "$sequence_limit" \
+  --input-fasta "$input_fasta" \
+  --run-manifest "$run_manifest" \
+  --output-dir "$output_dir" \
+  --schema-id eco1_rt.colabfold_scc_run_manifest \
+  --execution-status submitted_to_external_colabfold_cli
 
 if [[ -n "${COLABFOLD_ENV_ACTIVATE:-}" ]]; then
   # shellcheck disable=SC1090

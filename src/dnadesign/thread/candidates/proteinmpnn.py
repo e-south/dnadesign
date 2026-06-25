@@ -21,6 +21,7 @@ import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.thread.adapters.proteinmpnn.models import ProteinMpnnRequestIssue
+from dnadesign.thread.adapters.proteinmpnn.sidecars import resolve_manifest_sidecar_path
 
 CANDIDATE_TABLE_SCHEMA_ID = "thread.proteinmpnn_candidate_table"
 _REQUIRED_CANDIDATE_COLUMNS = {
@@ -55,7 +56,7 @@ def build_proteinmpnn_candidate_rows(
 
     sample_rows = pq.read_table(sample_table_path).to_pylist()
     manifest = _load_yaml(request_manifest_path)
-    context = _CandidateContext.from_manifest(manifest)
+    context = _CandidateContext.from_manifest(manifest, request_manifest_path=request_manifest_path)
     rows_by_hash: dict[str, list[Mapping[str, Any]]] = {}
     for row in sample_rows:
         rows_by_hash.setdefault(str(row["sequence_hash"]), []).append(row)
@@ -227,7 +228,7 @@ class _CandidateContext:
         self.mutable_positions = mutable_positions
 
     @classmethod
-    def from_manifest(cls, manifest: Mapping[str, Any]) -> "_CandidateContext":
+    def from_manifest(cls, manifest: Mapping[str, Any], *, request_manifest_path: Path) -> "_CandidateContext":
         chain_id = str(manifest["proteinmpnn_design_chain"])
         target_name = str(manifest["proteinmpnn_name"])
         canonical_to_mpnn = {
@@ -236,7 +237,10 @@ class _CandidateContext:
         }
         fixed_payload = manifest["fixed_positions_jsonl"][target_name][chain_id]
         mutable_payload = manifest["mutable_positions_by_chain"][chain_id]
-        parsed_path = Path(str(manifest["sidecar_paths"]["parsed_pdbs_jsonl"]))
+        parsed_path = resolve_manifest_sidecar_path(
+            request_manifest_path,
+            manifest["sidecar_paths"]["parsed_pdbs_jsonl"],
+        )
         parsed_record = _load_jsonl_record(parsed_path)
         wt_sequence = str(parsed_record[f"seq_chain_{chain_id}"])
         return cls(

@@ -131,18 +131,6 @@ def _reference_coordinates(
     return ca_coordinates(wt_model_path)
 
 
-def _select_model_pdb(output_root: Path, sequence_id: str) -> Path | None:
-    """Select a model PDB from ``output_root`` for compatibility with older call sites."""
-
-    return ColabFoldOutputIndex.from_output_root(output_root).select_model_pdb(sequence_id)
-
-
-def _select_score_json(output_root: Path, sequence_id: str) -> Path | None:
-    """Select a score JSON from ``output_root`` for compatibility with older call sites."""
-
-    return ColabFoldOutputIndex.from_output_root(output_root).select_score_json(sequence_id)
-
-
 def _failure_row(
     *,
     candidate_id: str,
