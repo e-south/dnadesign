@@ -119,7 +119,7 @@ def _validate_sidecars(issues: list[ProteinMpnnRequestIssue], *, manifest: Mappi
         )
         return
     for name, sidecar in sidecar_paths.items():
-        sidecar_path = Path(str(sidecar))
+        sidecar_path = _resolve_manifest_sidecar_path(path, sidecar)
         if not sidecar_path.exists():
             issues.append(
                 ProteinMpnnRequestIssue(
@@ -148,7 +148,7 @@ def _validate_sidecar_payloads(
     if not isinstance(sidecar_paths, Mapping):
         return
     fixed_payload = manifest.get("fixed_positions_jsonl")
-    fixed_path = Path(str(sidecar_paths.get("fixed_positions_jsonl", "")))
+    fixed_path = _resolve_manifest_sidecar_path(path, sidecar_paths.get("fixed_positions_jsonl", ""))
     fixed_record = _jsonl_record_or_issue(issues, sidecar_path=fixed_path, sidecar_name="fixed_positions", path=path)
     if fixed_record is not None and fixed_record != fixed_payload:
         issues.append(
@@ -158,7 +158,7 @@ def _validate_sidecar_payloads(
                 path=str(path),
             )
         )
-    assigned_path = Path(str(sidecar_paths.get("assigned_chains_jsonl", "")))
+    assigned_path = _resolve_manifest_sidecar_path(path, sidecar_paths.get("assigned_chains_jsonl", ""))
     assigned_record = _jsonl_record_or_issue(
         issues, sidecar_path=assigned_path, sidecar_name="assigned_chains", path=path
     )
@@ -170,7 +170,7 @@ def _validate_sidecar_payloads(
                 path=str(path),
             )
         )
-    parsed_path = Path(str(sidecar_paths.get("parsed_pdbs_jsonl", "")))
+    parsed_path = _resolve_manifest_sidecar_path(path, sidecar_paths.get("parsed_pdbs_jsonl", ""))
     parsed_payload = _jsonl_record_or_issue(issues, sidecar_path=parsed_path, sidecar_name="parsed_pdbs", path=path)
     if parsed_payload is not None:
         if parsed_payload.get("name") != target_name or parsed_payload.get("num_of_chains") != 1:
@@ -209,6 +209,18 @@ def _load_jsonl_record(path: Path) -> dict[str, Any]:
     if len(records) != 1 or not isinstance(records[0], dict):
         raise ValueError(f"Expected one JSON object in {path}")
     return records[0]
+
+
+def _resolve_manifest_sidecar_path(manifest_path: Path, value: Any) -> Path:
+    """Resolve sidecars recorded on another host when the colocated file exists."""
+
+    recorded = Path(str(value))
+    if recorded.exists():
+        return recorded
+    colocated = manifest_path.parent / recorded.name
+    if recorded.name and colocated.exists():
+        return colocated
+    return recorded
 
 
 def _jsonl_record_or_issue(

@@ -97,7 +97,6 @@ def _validate_thread_plan(
         )
         return
     expected = {
-        "path": str(thread_plan_path),
         "hash": "sha256:" + _sha256(thread_plan_path),
         "request_hash": thread_plan.get("request_hash"),
     }
@@ -110,6 +109,14 @@ def _validate_thread_plan(
                     path=str(path),
                 )
             )
+    if not str(source.get("path", "")).strip():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.sampling.proteinmpnn_thread_plan_source_mismatch",
+                message="ProteinMPNN request source_thread_plan field 'path' must be non-empty",
+                path=str(path),
+            )
+        )
     if manifest.get("seed_set") != thread_plan.get("seed_set") or manifest.get(
         "temperature_schedule"
     ) != thread_plan.get("temperature_schedule"):

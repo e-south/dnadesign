@@ -76,7 +76,6 @@ def _validate_backend_run_manifest(
         "schema_id": BACKEND_RUN_SCHEMA_ID,
         "status": "materialized",
         "backend_kind": "proteinmpnn",
-        "request_manifest_path": str(request_manifest_path),
         "request_hash": request_hash,
     }
     for field, value in expected.items():
@@ -88,6 +87,22 @@ def _validate_backend_run_manifest(
                     path=f"{path}:{field}",
                 )
             )
+    if not str(manifest.get("request_manifest_path", "")).strip():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.sampling.backend_run_manifest_field_mismatch",
+                message="ProteinMPNN backend run manifest field 'request_manifest_path' must be non-empty",
+                path=f"{path}:request_manifest_path",
+            )
+        )
+    if manifest.get("request_manifest_hash") != "sha256:" + _sha256(request_manifest_path):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.sampling.backend_run_manifest_field_mismatch",
+                message="ProteinMPNN backend run manifest field 'request_manifest_hash' must match the request",
+                path=f"{path}:request_manifest_hash",
+            )
+        )
     for field in ("batch_id", "num_seq_per_target", "batch_size", "expected_sample_count"):
         if field not in manifest:
             issues.append(
@@ -130,3 +145,13 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {path}")
     return loaded
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

@@ -63,6 +63,28 @@ def test_sample_table_contract_rejects_request_hash_drift(tmp_path: Path) -> Non
     assert {issue.check_id for issue in issues} == {"eco1_rt.sampling.sample_table_request_hash_mismatch"}
 
 
+def test_sample_table_contract_accepts_host_specific_backend_request_path(tmp_path: Path) -> None:
+    materialize_upstream_artifacts(tmp_path)
+    materialize_mask_set(repo_root=repo_root(), output_root=tmp_path)
+    materialize_thread_plan(repo_root=repo_root(), output_root=tmp_path)
+    materialize_proteinmpnn_request(repo_root=repo_root(), output_root=tmp_path)
+    result = materialize_proteinmpnn_samples(
+        repo_root=repo_root(),
+        output_root=tmp_path,
+        proteinmpnn_root=tmp_path / "fake_proteinmpnn",
+        runner=_fake_runner,
+    )
+    backend_manifest_path = tmp_path / "proteinmpnn_outputs/backend_run_manifest.yaml"
+    manifest = yaml.safe_load(backend_manifest_path.read_text(encoding="utf-8"))
+    assert isinstance(manifest, dict)
+    manifest["request_manifest_path"] = "/other/host/proteinmpnn_request/request_manifest.yaml"
+    backend_manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    issues = validate_sample_table_content(result.sample_table_path, output_root=tmp_path)
+
+    assert issues == []
+
+
 def _fake_runner(
     *,
     request_manifest_path: Path,

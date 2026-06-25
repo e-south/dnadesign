@@ -94,6 +94,28 @@ def test_proteinmpnn_request_validator_rejects_rehashed_wrong_fixed_sidecar(tmp_
     assert "eco1_rt.sampling.proteinmpnn_sidecar_payload_mismatch" in {issue.check_id for issue in issues}
 
 
+def test_proteinmpnn_request_validator_accepts_host_specific_recorded_paths(tmp_path: Path) -> None:
+    materialize_upstream_artifacts(tmp_path)
+    materialize_mask_set(repo_root=repo_root(), output_root=tmp_path)
+    materialize_thread_plan(repo_root=repo_root(), output_root=tmp_path)
+    result = materialize_proteinmpnn_request(repo_root=repo_root(), output_root=tmp_path)
+    manifest = _load_yaml(result.request_manifest_path)
+    manifest["source_thread_plan"]["path"] = "/other/host/thread_plan.yaml"
+    manifest["sidecar_paths"] = {
+        name: f"/other/host/proteinmpnn_request/{Path(path).name}" for name, path in manifest["sidecar_paths"].items()
+    }
+    manifest["request_hash"] = _request_hash({key: value for key, value in manifest.items() if key != "request_hash"})
+    result.request_manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    issues = validate_proteinmpnn_request_content(
+        result.request_manifest_path,
+        repo_root=repo_root(),
+        output_root=tmp_path,
+    )
+
+    assert issues == []
+
+
 def _load_yaml(path: Path) -> dict[str, object]:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(loaded, dict)

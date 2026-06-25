@@ -103,7 +103,6 @@ def validate_request_fields(
         "expected_sample_count",
         "fixed_positions",
         "excluded_non_fixed_missing_backbone_positions",
-        "fixed_position_source",
     )
     for field in scalar_fields:
         if plan.get(field) != expected[field]:
@@ -114,6 +113,7 @@ def validate_request_fields(
                     path=str(path),
                 )
             )
+    _validate_fixed_position_source(issues, plan=plan, expected=expected, path=path)
     if plan.get("mutable_positions") != expected["mutable_positions"]:
         issues.append(
             ContractIssue(
@@ -123,6 +123,43 @@ def validate_request_fields(
             )
         )
     _validate_backend_manifest(issues, plan=plan, expected=expected, path=path)
+
+
+def _validate_fixed_position_source(
+    issues: list[ContractIssue],
+    *,
+    plan: Mapping[str, Any],
+    expected: Mapping[str, Any],
+    path: Path,
+) -> None:
+    source = plan.get("fixed_position_source")
+    expected_source = expected["fixed_position_source"]
+    if not isinstance(source, Mapping):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.sampling.thread_plan_fixed_position_source_mismatch",
+                message="thread_plan.yaml fixed_position_source must be a mapping",
+                path=str(path),
+            )
+        )
+        return
+    for field in ("artifact_id", "hash", "mask_policy_id"):
+        if source.get(field) != expected_source[field]:
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.sampling.thread_plan_fixed_position_source_mismatch",
+                    message=f"thread_plan.yaml fixed_position_source field {field!r} must match the mask set",
+                    path=str(path),
+                )
+            )
+    if not str(source.get("path", "")).strip():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.sampling.thread_plan_fixed_position_source_mismatch",
+                message="thread_plan.yaml fixed_position_source must keep a non-empty source path",
+                path=str(path),
+            )
+        )
 
 
 def validate_request_hash(issues: list[ContractIssue], *, plan: Mapping[str, Any], path: Path) -> None:

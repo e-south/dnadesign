@@ -76,6 +76,61 @@ def test_proteinmpnn_manifest_validator_accepts_helper_sidecars(tmp_path: Path) 
     assert validate_request_manifest(manifest_path) == []
 
 
+def test_proteinmpnn_manifest_validator_accepts_colocated_sidecars_from_another_host(tmp_path: Path) -> None:
+    parsed_path = tmp_path / "parsed_pdbs.jsonl"
+    assigned_path = tmp_path / "assigned_chains.jsonl"
+    fixed_path = tmp_path / "fixed_positions.jsonl"
+    pdb_path = tmp_path / "target.pdb"
+    pdb_path.write_text("END\n", encoding="utf-8")
+    write_jsonl(
+        parsed_path,
+        {
+            "name": "target",
+            "num_of_chains": 1,
+            "seq": "ACD",
+            "seq_chain_A": "ACD",
+            "coords_chain_A": {"N_chain_A": [], "CA_chain_A": [], "C_chain_A": [], "O_chain_A": []},
+        },
+    )
+    write_jsonl(assigned_path, assigned_chains_payload(target_name="target", chain_id="A"))
+    write_jsonl(fixed_path, fixed_positions_payload(target_name="target", chain_id="A", fixed_positions=[1, 3]))
+    manifest_without_hash = build_request_manifest(
+        artifact_id="test.proteinmpnn_request",
+        created_by="test",
+        profile_id="profile",
+        mask_policy_id="mask",
+        target_name="target",
+        chain_id="A",
+        sidecar_paths={
+            "chain_a_backbone_pdb": pdb_path,
+            "parsed_pdbs_jsonl": parsed_path,
+            "assigned_chains_jsonl": assigned_path,
+            "fixed_positions_jsonl": fixed_path,
+        },
+        upstream_artifact_hashes={},
+        source_thread_plan={"path": "/other/host/thread_plan.yaml"},
+        canonical_to_mpnn={3: 1, 4: 2, 5: 3},
+        fixed_positions=[1, 3],
+        mutable_positions=[2],
+        excluded_positions=[],
+        seed_set=[101],
+        temperatures=[0.1],
+        batch_id="test_batch",
+        num_seq_per_target=1,
+        batch_size=1,
+        expected_sample_count=1,
+    )
+    manifest_without_hash["sidecar_paths"] = {
+        name: f"/other/host/proteinmpnn_request/{Path(path).name}"
+        for name, path in manifest_without_hash["sidecar_paths"].items()
+    }
+    manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
+    manifest_path = tmp_path / "request_manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    assert validate_request_manifest(manifest_path) == []
+
+
 def test_proteinmpnn_manifest_validator_rejects_rehashed_wrong_fixed_sidecar(tmp_path: Path) -> None:
     parsed_path = tmp_path / "parsed_pdbs.jsonl"
     assigned_path = tmp_path / "assigned_chains.jsonl"
