@@ -55,5 +55,5 @@ def test_materializer_writes_thread_ready_structure_artifacts(tmp_path: Path) ->
     unresolved = [row for row in rows if row["mapping_status"] == "unresolved_structure"]
     assert len(mapped) == 309
     assert [row["canonical_position"] for row in unresolved] == [1, 2, 312, 313, 314, 315, 316, 317, 318, 319, 320]
-    assert all(row["unresolved_policy"] == "fixed" for row in unresolved)
+    assert all(row["unresolved_policy"] == "terminal_missing_backbone_not_directly_mutable" for row in unresolved)
     assert all(row["is_designable_initially"] is False for row in rows)

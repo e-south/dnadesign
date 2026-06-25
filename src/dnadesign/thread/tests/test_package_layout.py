@@ -28,7 +28,7 @@ _PROTEINMPNN_FILES = {
     "structure.py",
     "validation.py",
 }
-_COLABFOLD_FILES = {"__init__.py", "manifest.py", "metrics.py", "outputs.py"}
+_COLABFOLD_FILES = {"__init__.py", "index.py", "manifest.py", "metrics.py", "outputs.py"}
 _FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py"}
 
 

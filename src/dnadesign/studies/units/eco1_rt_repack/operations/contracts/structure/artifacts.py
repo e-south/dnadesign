@@ -308,13 +308,17 @@ def _validate_residue_map_content(
     bad_unresolved = [
         row.get("canonical_position")
         for row in unresolved_rows
-        if row.get("unresolved_policy") != "fixed" or row.get("is_designable_initially") is not False
+        if row.get("unresolved_policy") != "terminal_missing_backbone_not_directly_mutable"
+        or row.get("is_designable_initially") is not False
     ]
     if bad_unresolved:
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.structure.residue_map_unresolved_not_fixed",
-                message=f"unresolved residue-map rows must be fixed and non-designable: {bad_unresolved}",
+                check_id="eco1_rt.structure.residue_map_unresolved_policy_mismatch",
+                message=(
+                    "unresolved terminal residue-map rows must be marked as missing-backbone rows "
+                    f"that are not directly fixed-backbone mutable: {bad_unresolved}"
+                ),
                 path=str(path),
             )
         )

@@ -61,6 +61,7 @@ def validate_foldcheck_report(
     *,
     request_hash: str,
     expected_candidate_ids: set[str] | None = None,
+    required_accepted_candidate_ids: set[str] | None = None,
     wt_candidate_id: str = "wild_type",
 ) -> list[FoldCheckIssue]:
     """Validate a normalized fold-check report without study-specific biology."""
@@ -115,6 +116,18 @@ def validate_foldcheck_report(
                 path=str(path),
             )
         )
+    else:
+        wt_accepted = any(
+            str(row["candidate_id"]) == wt_candidate_id and str(row["status"]) == "accepted" for row in rows
+        )
+        if not wt_accepted:
+            issues.append(
+                FoldCheckIssue(
+                    check_id="thread.foldcheck_report.wt_baseline_not_accepted",
+                    message=f"Fold-check report must include an accepted WT baseline row {wt_candidate_id!r}",
+                    path=str(path),
+                )
+            )
     if expected_candidate_ids is not None:
         missing = sorted(expected_candidate_ids - candidate_ids)
         if missing:
@@ -122,6 +135,26 @@ def validate_foldcheck_report(
                 FoldCheckIssue(
                     check_id="thread.foldcheck_report.missing_candidates",
                     message=f"Fold-check report is missing expected candidate ids: {missing}",
+                    path=str(path),
+                )
+            )
+        unexpected = sorted(candidate_ids - expected_candidate_ids)
+        if unexpected:
+            issues.append(
+                FoldCheckIssue(
+                    check_id="thread.foldcheck_report.unexpected_candidates",
+                    message=f"Fold-check report contains unexpected candidate ids: {unexpected}",
+                    path=str(path),
+                )
+            )
+    if required_accepted_candidate_ids is not None:
+        accepted_candidate_ids = {str(row["candidate_id"]) for row in rows if str(row["status"]) == "accepted"}
+        missing_accepted = sorted(required_accepted_candidate_ids - accepted_candidate_ids)
+        if missing_accepted:
+            issues.append(
+                FoldCheckIssue(
+                    check_id="thread.foldcheck_report.selected_candidates_not_accepted",
+                    message=f"Fold-check report lacks accepted rows for selected candidate ids: {missing_accepted}",
                     path=str(path),
                 )
             )

@@ -58,11 +58,12 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase2_real_backend_ingest
 ```
 
-The validator owns only study-local scaffold and structure-artifact checks. It
-does not hide MPNN/fold execution behind a run-all command. The current
+The validator owns only study-local scaffold and runtime-artifact checks. It
+does not hide MPNN or fold execution behind a run-all command. The current
 `dnadesign.thread` surface covers generic ProteinMPNN request, sample-ingest,
-and candidate-table mechanics; fold-check, feasibility, and handoff mechanics
-may graduate to `thread` only through separate contract promotions.
+candidate-table, fold-check report, and ColabFold output-normalization
+mechanics. Fold-model execution, feasibility, and handoff mechanics remain
+separate contract promotions.
 
 ### Implemented Slice: Structure Authority v1a
 
@@ -86,7 +87,9 @@ src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/ou
 The backbone bundle records typed chain inventory: RT chain `A` as the design
 backbone, DNA chain `D` as retained context, and RNA chains `E` and `F` as
 retained context. The residue map records all 320 canonical Eco1 RT positions:
-309 mapped positions and 11 unresolved terminal positions fixed by policy.
+309 mapped positions and 11 terminal positions without coordinates. The current
+mask treats those terminals as unprotected but not directly fixed-backbone
+mutable until coordinates exist.
 
 At that point in the slice sequence, Phase 1 failed on the next
 conservation/contact/mask blockers until contact profile materialization was
@@ -107,12 +110,11 @@ artifact:
 src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
 ```
 
-The profile is joined through `residue_map.parquet`, uses the pinned
-`ec86kit` per-residue DNA/RNA minimum-distance table, encodes the conservative
-20 A contact threshold from `eco1_rt_v1.profile.yaml`, and keeps unresolved
-terminal residues non-designable. The Phase 1 validator now checks the contact
-profile source hash, threshold, canonical row coverage, unresolved policy, and
-mask-threshold consistency.
+The profile is joined through `residue_map.parquet` and uses the pinned
+`ec86kit` per-residue DNA/RNA minimum-distance table. It is retained as
+distance evidence, not as the active mask policy. The active mask uses the
+5 A direct-contact rule described below; broad 15-20 A shells remain diagnostic
+history.
 
 After contact materialization, Phase 1 failed on the next conservation/mask
 blockers until the MSA-derived conservation profile was materialized:
@@ -300,10 +302,10 @@ is the study-owned source ontology for mask-authoritative motif anchors. It is
 distinct from `rt-annotation-tracks.yaml`, which remains visualization-only.
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/`
 materializes local `manual_mask_authority.yaml` from the ontology and
-`residue_map.parquet`, fixing audited NAxxH, YADD, VTG, and RT1-RT7 canonical
-interval spans. The same ontology records Wang/Ec86 RT-msDNA/msrRNA interface
-candidates as candidate-prior rows. Those candidates guide contact review; they
-do not create additional `manual_mask=true` rows by themselves.
+`residue_map.parquet`. NAxxH, YADD, and VTG are protected motif anchors.
+RT1-RT7 spans remain annotation/review labels under the current mask and do not
+blanket-protect their intervals. The same ontology records Wang/Ec86
+RT-msDNA/msrRNA interface candidates as direct substrate-contact priors.
 
 ### Implemented Slice: Mask Set Materializer v1a
 
@@ -425,6 +427,8 @@ directories into generic fold-check rows. It discovers model files by request
 sequence id, extracts pLDDT from PDB B-factors, summarizes PAE JSON when
 available, computes C-alpha RMSD against the WT runtime baseline or an explicit
 reference PDB, and emits failure rows for missing outputs or missing metrics.
+Output discovery uses a one-pass ColabFold output index and rank-token parsing
+so numeric candidate ids cannot be mistaken for model ranks.
 
 Eco1's thin wrapper lives at
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_report/`.
@@ -441,15 +445,21 @@ directory is first on `LD_LIBRARY_PATH`. The SCC clone was fast-forwarded to
 the current branch, the materialized fold-check request was regenerated there,
 and BU SCC job `6224446` ran the WT baseline plus five accepted candidates.
 
-The normalized `foldcheck_report.parquet` now validates with six `accepted`
-rows and 91 explicit `errored` rows for candidates outside the smoke subset.
-The report keeps raw ColabFold PDB/JSON paths on SCC project storage and syncs
-only the compact normalized Parquet artifact back to the laptop workspace.
+The smoke raw output lives on SCC project storage under
+`/project/dunlop/esouth/foldcheck/eco1_rt/eco1_colabfold_foldcheck.6224446/`.
+After the residue-map missing-backbone policy was renamed, the fold-check
+request hash changed and the compact local `foldcheck_report.parquet` was
+re-normalized from that SCC raw output. The report now validates against the
+current request hash, with six `accepted` rows and 91 explicit `errored` rows
+for candidates outside the smoke subset.
 
 The smoke also exposed one generic portability bug: fold-check request hashes
 must not include host-local FASTA/output paths. `dnadesign.thread.foldcheck`
 now hashes request intent, sequence hashes, threshold policy, and upstream
 artifact hashes while leaving local paths as operator metadata.
+Smoke reports may include errored rows for candidates outside the subset.
+Downstream selection must require accepted fold-check rows for selected
+candidates.
 
 ### Next Slice: Full Foldcheck Batch v1
 
@@ -502,9 +512,11 @@ threshold policy.
   `proteinmpnn_request/request_manifest.yaml`, `sample_table.parquet`,
   `candidate_table.parquet`, and the ColabFold-planned
   `foldcheck_request/foldcheck_request_manifest.yaml` are materialized locally.
-  The fold-check runtime report, feasibility report, and candidate handoff are
-  not materialized.
+  A current six-sequence ColabFold smoke `foldcheck_report.parquet` is
+  materialized and validates. The full WT plus 96-candidate fold screen,
+  feasibility report, and candidate handoff are not materialized.
 - Phase 1 now has content validators for the local structure, contact,
-  conservation, mask, thread-plan, and ProteinMPNN request artifacts. Phase 2
-  backend ingest passes locally through the candidate table. Fold-check runtime
-  validation is the next gate.
+  conservation, mask, thread-plan, ProteinMPNN request, and fold-check request
+  artifacts. Phase 2 backend ingest passes locally through the candidate table,
+  and Phase 3 fold-check report validation passes for the smoke report. Full
+  fold coverage and downstream selection are the next gates.

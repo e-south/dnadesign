@@ -280,9 +280,10 @@ def _validate_contact_profile_content(
     if unresolved_bad:
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.evidence.contact_profile_unresolved_not_fixed",
+                check_id="eco1_rt.evidence.contact_profile_missing_backbone_has_contact_evidence",
                 message=(
-                    f"unresolved contact-profile rows must have no distance and fail contact mask: {unresolved_bad}"
+                    "missing-backbone contact-profile rows must have no retained-context distance "
+                    f"and must fail the contact mask: {unresolved_bad}"
                 ),
                 path=str(path),
             )

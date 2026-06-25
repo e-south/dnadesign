@@ -31,12 +31,15 @@ checks:
     - kind: path_exists
       check_id: eco1_rt.foldcheck.materialized_report
       check_group: foldcheck_runtime
-      summary: Downstream promotion requires nonfixture foldcheck_report rows for selected full sequences.
+      summary: Fold-check report validation requires nonfixture rows, including an accepted WT baseline; downstream promotion still requires accepted selected-candidate rows in the handoff contract.
       required: true
       artifact: planned_foldcheck_report
       validator_intent:
         required_state: materialized
         fixture_rows_allowed_for_acceptance: false
+        wt_baseline_must_be_accepted: true
+        report_sequence_hashes_must_match_request_manifest: true
+        selected_candidate_acceptance_checked_by_handoff: true
         required_columns:
           - candidate_id
           - wt_baseline_artifact_id

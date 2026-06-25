@@ -1,19 +1,24 @@
-## Eco1 RT Repack Status
+---
+doc_id: study-eco1-rt-repack-status
+surface: study-record
+study_id: eco1_rt_repack
+owner: dnadesign-maintainers
+last_verified: 2026-06-25
+status_surface: record-only
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-25
-**Status surface:** record-only
+## Eco1 RT Repack Status
 
 ### Current Phase
 
-Phase 3 downstream-promotion validation now passes locally and on BU SCC for a
-six-sequence ColabFold smoke report. The study has the required
-structure, source, alignment, conservation evidence, manual mask authority,
-mask set, explicit thread plan, ProteinMPNN request, backend run manifest, and
-sample/candidate tables under `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
-Fold-check request generation is materialized as a ColabFold input, the
-ColabFold output normalizer is implemented, and the first SCC smoke run has
-been normalized into `foldcheck_report.parquet`.
+Phase 3 fold-check report validation passes locally for a six-sequence
+ColabFold smoke report. The study has the required structure, source,
+alignment, conservation evidence, manual mask authority, mask set, explicit
+thread plan, ProteinMPNN request, backend run manifest, sample/candidate tables,
+fold-check request, and compact fold-check smoke report under
+`src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
+This is smoke-scale runtime evidence, not downstream candidate-handoff
+readiness.
 The selected mask rule is:
 
 ```text
@@ -94,9 +99,10 @@ handled separately.
   canonical sequences. The request is `planned_not_run`, backend kind
   `colabfold`, and runtime kind `alphafold_family_colabfold`.
 - `foldcheck_report.parquet` is materialized from BU SCC ColabFold smoke job
-  `6224446`. The smoke covered WT plus the first five accepted candidates and
-  left explicit `errored` rows for candidates outside the smoke subset. Row
-  counts are `accepted: 6` and `errored: 91`.
+  `6224446`, re-normalized after the current request-hash cleanup. The smoke
+  covered WT plus the first five accepted candidates and left explicit
+  `errored` rows for candidates outside the smoke subset. Row counts are
+  `accepted: 6` and `errored: 91`.
 
 ### Mask Counts
 
@@ -143,6 +149,12 @@ Phase 2 backend-ingest validation:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase2_real_backend_ingest
 ```
 
+Phase 3 fold-check report validation:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase3_downstream_promotion
+```
+
 ### Current Next Actions
 
 1. Decide the full-batch ColabFold runtime shape. The smoke used default
@@ -151,7 +163,8 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    the objective.
 2. Scale the fold-check run to the full WT plus 96-candidate batch, then
    normalize the completed SCC output directory into `foldcheck_report.parquet`.
-3. Define the downstream RT-lnRNA candidate handoff accepted by
+3. Select candidates only from rows with accepted fold-check coverage, then
+   define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers

@@ -310,10 +310,10 @@ datasets:
     description: Local generated fold-check FASTA containing the WT baseline and 96 accepted ProteinMPNN candidates as full 320-aa canonical Eco1 sequences for external ColabFold/AlphaFold-family CLI execution.
   - id: eco1_rt_foldcheck_report
     owner: thread
-    kind: planned_artifact
+    kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
-    status: not_generated
-    description: Planned fold-validation report for selected full-sequence candidates. The materializer and generic ColabFold output normalizer are implemented; the artifact awaits a completed ColabFold output directory.
+    status: materialized_local_smoke
+    description: Local generated fold-validation smoke report normalized from BU SCC ColabFold job 6224446 after the current request-hash cleanup. It contains six accepted rows for WT plus five candidates and 91 explicit errored rows for candidates outside the smoke subset; it proves the runtime/parser path, not full candidate handoff readiness.
   - id: eco1_rt_feasibility_report
     owner: thread
     kind: planned_artifact

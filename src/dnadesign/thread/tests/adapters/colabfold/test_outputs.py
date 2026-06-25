@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.thread.adapters.colabfold.outputs import build_colabfold_foldcheck_rows
+from dnadesign.thread.adapters.colabfold.outputs import _select_model_pdb, build_colabfold_foldcheck_rows
 from dnadesign.thread.foldcheck.hashes import sequence_hash
 
 
@@ -64,6 +64,93 @@ def test_colabfold_output_parser_turns_missing_candidate_output_into_failure_row
     assert missing["status"] == "errored"
     assert missing["missing_metric_reason"] == "colabfold_output_missing"
     assert missing["rejection_reason"] == "colabfold_output_missing"
+
+
+def test_colabfold_output_parser_ignores_numeric_candidate_id_when_selecting_rank(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    candidate_id = "thread_candidate_318124686032"
+    _write_ca_pdb(output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb", bfactor=91.0)
+    _write_ca_pdb(
+        output_root / f"{candidate_id}_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb",
+        bfactor=84.0,
+        y_offset=0.2,
+    )
+    (output_root / f"{candidate_id}_predicted_aligned_error_v1.json").write_text(
+        '{"predicted_aligned_error": [[9.0]]}',
+        encoding="utf-8",
+    )
+    rank_score = output_root / f"{candidate_id}_scores_rank_001_alphafold2_model_1_seed_000.json"
+    rank_score.write_text('{"pae": [[1.0]]}', encoding="utf-8")
+    manifest = _request_manifest(["wild_type", candidate_id])
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=manifest,
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+    )
+
+    assert rows[1]["candidate_id"] == candidate_id
+    assert rows[1]["status"] == "accepted"
+    assert rows[1]["score_artifact_path"].endswith(rank_score.name)
+    assert rows[1]["pae_summary"]["mean"] == 1.0
+
+
+def test_colabfold_output_parser_does_not_steal_prefix_candidate_outputs(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    shorter_id = "thread_candidate_a"
+    longer_id = "thread_candidate_a_extra"
+    _write_ca_pdb(output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb", bfactor=91.0)
+    _write_ca_pdb(
+        output_root / f"{longer_id}_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb",
+        bfactor=84.0,
+        y_offset=0.2,
+    )
+    manifest = _request_manifest(["wild_type", shorter_id, longer_id])
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=manifest,
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+    )
+
+    assert rows[1]["candidate_id"] == shorter_id
+    assert rows[1]["status"] == "errored"
+    assert rows[1]["missing_metric_reason"] == "colabfold_output_missing"
+    assert rows[2]["candidate_id"] == longer_id
+    assert rows[2]["status"] == "accepted"
+
+
+def test_colabfold_output_parser_requires_colabfold_suffix_boundary_for_prefixed_ids(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    shorter_id = "seq1"
+    longer_id = "seq1_variant"
+    _write_ca_pdb(output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb", bfactor=91.0)
+    _write_ca_pdb(
+        output_root / f"{longer_id}_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb",
+        bfactor=84.0,
+        y_offset=0.2,
+    )
+    manifest = _request_manifest(["wild_type", shorter_id, longer_id])
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=manifest,
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+    )
+
+    assert rows[1]["candidate_id"] == shorter_id
+    assert rows[1]["status"] == "errored"
+    assert rows[1]["missing_metric_reason"] == "colabfold_output_missing"
+    assert rows[2]["candidate_id"] == longer_id
+    assert rows[2]["status"] == "accepted"
+    assert _select_model_pdb(output_root, shorter_id) is None
+    assert _select_model_pdb(output_root, longer_id) is not None
 
 
 def _request_manifest(sequence_ids: list[str]) -> dict[str, object]:

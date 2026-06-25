@@ -44,7 +44,7 @@ residue_map_artifact:
   status: materialized
   path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
 acceptance_rules:
-  unresolved_residue_policy: fixed
+  unresolved_residue_policy: terminal_missing_backbone_not_directly_mutable
   no_mutable_residue_without_materialized_map: true
   pdb_residue_ids_and_canonical_positions_are_distinct: true
   materialized_residue_map_required_for_sampling: true

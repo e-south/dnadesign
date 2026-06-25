@@ -35,9 +35,12 @@ the compact `foldcheck_report.parquet` artifact. This parser does not run a
 fold model and does not copy raw SCC output trees into the repository.
 
 The first SCC smoke run, job `6224446`, folded the WT baseline plus five
-accepted ProteinMPNN candidates. The normalized report contains six `accepted`
-rows and explicit `errored` rows for candidates outside the smoke subset. That
-is runtime-path evidence, not a full candidate screen.
+accepted ProteinMPNN candidates. Its raw output remains on SCC project storage
+under `/project/dunlop/esouth/foldcheck/eco1_rt/eco1_colabfold_foldcheck.6224446/`.
+The compact local report has been regenerated from that raw output for the
+current request hash. It contains six `accepted` rows and 91 explicit `errored`
+rows for candidates outside the smoke subset. That smoke output is runtime-path
+evidence, not a full candidate screen.
 
 The FASTA contains one WT baseline plus accepted ProteinMPNN candidates as
 full 320-aa canonical Eco1 sequences. Terminal positions without 7V9U backbone
@@ -97,7 +100,12 @@ decision.
 ### Fail-Fast Rules
 
 - No fold-check run without a WT baseline sequence in the same request.
+- No materialized fold-check report can pass validation unless the WT baseline
+  row is `accepted`; candidate RMSD and degradation checks depend on that
+  baseline.
 - No accepted fold-check row without a candidate-table row.
+- No fold-check row can carry an `input_sequence_hash` that disagrees with the
+  current fold-check request manifest for the same candidate id.
 - No accepted fold-check row without reference structure provenance.
 - No accepted fold-check row without runtime kind, runtime version, runtime
   parameter hash, threshold id, and threshold values.
@@ -111,6 +119,8 @@ decision.
 - Smoke subsets must leave candidates outside the subset as explicit
   `errored` rows, so a partial fold run cannot masquerade as complete
   fold-check coverage.
+- Candidate handoff selection must require `accepted` fold-check rows for the
+  selected candidate ids. Presence as an `errored` smoke-row is not acceptance.
 
 ### BU SCC Storage Posture
 

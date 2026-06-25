@@ -111,7 +111,7 @@ def validate_sampling_artifacts(
             issues.append(
                 ContractIssue(
                     check_id="eco1_rt.foldcheck_report.not_materialized",
-                    message="Phase 3 downstream promotion requires materialized foldcheck_report.parquet",
+                    message="Phase 3 fold-check report validation requires materialized foldcheck_report.parquet",
                     path=str(foldcheck_report),
                 )
             )

@@ -259,8 +259,11 @@ def _append_row_issues(
     if unresolved_bad:
         issues.append(
             ContractIssue(
-                check_id="eco1_rt.evidence.conservation_profile_unresolved_not_fixed",
-                message=f"unresolved conservation-profile rows must fail conservation mask: {unresolved_bad[:20]}",
+                check_id="eco1_rt.evidence.conservation_profile_missing_backbone_has_conservation_mask",
+                message=(
+                    "missing-backbone conservation-profile rows must not create a conservation protection call: "
+                    f"{unresolved_bad[:20]}"
+                ),
                 path=str(path),
             )
         )

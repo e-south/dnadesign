@@ -80,6 +80,8 @@ def protein_residue_index(model: Any, *, chain_id: str) -> dict[tuple[str, int, 
     chain = model[chain_id]
     indexed: dict[tuple[str, int, str], Any] = {}
     for residue in chain.get_residues():
+        if not _is_standard_residue(residue):
+            continue
         insertion_code = "" if str(residue.id[2]).strip() == "" else str(residue.id[2]).strip()
         indexed[(chain_id, int(residue.id[1]), insertion_code)] = residue
     return indexed
@@ -106,3 +108,7 @@ def _require_int(row: Mapping[str, Any], field: str) -> int:
     if not isinstance(value, int):
         raise ValueError(f"{field} must be an integer")
     return value
+
+
+def _is_standard_residue(residue: Any) -> bool:
+    return isinstance(getattr(residue, "id", None), tuple) and str(residue.id[0]).strip() == ""

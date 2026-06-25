@@ -185,7 +185,7 @@ def _build_residue_map_rows(
                     "mapping_status": "unresolved_structure",
                     "mapping_issue": "not_resolved_in_structure_authority",
                     "is_designable_initially": False,
-                    "unresolved_policy": "fixed",
+                    "unresolved_policy": "terminal_missing_backbone_not_directly_mutable",
                 }
             )
             continue

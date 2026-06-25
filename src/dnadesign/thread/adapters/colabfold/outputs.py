@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dnadesign.thread.adapters.colabfold.index import ColabFoldOutputIndex
 from dnadesign.thread.adapters.colabfold.manifest import runtime_parameters_hash
 from dnadesign.thread.adapters.colabfold.metrics import ca_coordinates, ca_rmsd, mean_ca_plddt, pae_summary
 
@@ -30,10 +31,12 @@ def build_colabfold_foldcheck_rows(
     """Build generic fold-check rows from one ColabFold output directory."""
 
     sequence_rows = _sequence_rows(request_manifest)
+    sequence_ids = tuple(str(sequence["sequence_id"]) for sequence in sequence_rows)
     wt_sequence_id = str(request_manifest.get("wt_sequence_id", "wild_type"))
     runtime_hash = runtime_parameters_hash(runtime_parameters)
+    output_index = ColabFoldOutputIndex.from_output_root(output_root, sequence_ids=sequence_ids)
     reference_coords = _reference_coordinates(
-        output_root=output_root,
+        output_index=output_index,
         wt_sequence_id=wt_sequence_id,
         reference_pdb_path=reference_pdb_path,
     )
@@ -41,8 +44,8 @@ def build_colabfold_foldcheck_rows(
     rows: list[dict[str, Any]] = []
     for sequence in sequence_rows:
         candidate_id = str(sequence["sequence_id"])
-        model_path = _select_model_pdb(output_root, candidate_id)
-        score_path = _select_score_json(output_root, candidate_id)
+        model_path = output_index.select_model_pdb(candidate_id)
+        score_path = output_index.select_score_json(candidate_id)
         if model_path is None:
             rows.append(
                 _failure_row(
@@ -114,7 +117,7 @@ def _sequence_rows(request_manifest: Mapping[str, Any]) -> list[Mapping[str, Any
 
 def _reference_coordinates(
     *,
-    output_root: Path,
+    output_index: ColabFoldOutputIndex,
     wt_sequence_id: str,
     reference_pdb_path: Path | None,
 ) -> Any | None:
@@ -122,42 +125,22 @@ def _reference_coordinates(
         if not reference_pdb_path.exists():
             raise FileNotFoundError(reference_pdb_path)
         return ca_coordinates(reference_pdb_path)
-    wt_model_path = _select_model_pdb(output_root, wt_sequence_id)
+    wt_model_path = output_index.select_model_pdb(wt_sequence_id)
     if wt_model_path is None:
         return None
     return ca_coordinates(wt_model_path)
 
 
 def _select_model_pdb(output_root: Path, sequence_id: str) -> Path | None:
-    candidates = [
-        path
-        for path in output_root.rglob("*.pdb")
-        if path.name == f"{sequence_id}.pdb" or path.name.startswith(f"{sequence_id}_")
-    ]
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda path: (_rank_key(path.name), "relaxed" not in path.name, path.name))[0]
+    """Select a model PDB from ``output_root`` for compatibility with older call sites."""
+
+    return ColabFoldOutputIndex.from_output_root(output_root).select_model_pdb(sequence_id)
 
 
 def _select_score_json(output_root: Path, sequence_id: str) -> Path | None:
-    candidates = [
-        path
-        for path in output_root.rglob("*.json")
-        if (path.name == f"{sequence_id}.json" or path.name.startswith(f"{sequence_id}_"))
-        and ("score" in path.name or "pae" in path.name or "aligned_error" in path.name)
-    ]
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda path: (_rank_key(path.name), path.name))[0]
+    """Select a score JSON from ``output_root`` for compatibility with older call sites."""
 
-
-def _rank_key(name: str) -> int:
-    for token in name.replace(".", "_").split("_"):
-        if token.isdigit():
-            return int(token)
-        if token.startswith("rank") and token.removeprefix("rank").isdigit():
-            return int(token.removeprefix("rank"))
-    return 9999
+    return ColabFoldOutputIndex.from_output_root(output_root).select_score_json(sequence_id)
 
 
 def _failure_row(

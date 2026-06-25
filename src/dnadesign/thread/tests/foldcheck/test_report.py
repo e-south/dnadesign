@@ -57,6 +57,62 @@ def test_foldcheck_report_validator_rejects_accepted_rows_without_runtime_hash(t
     assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.accepted_missing_runtime_hash"]
 
 
+def test_foldcheck_report_validator_requires_accepted_wt_baseline(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    row = {
+        **_accepted_row("wild_type"),
+        "status": "errored",
+        "plddt": None,
+        "backbone_rmsd_to_reference": None,
+        "rejection_reason": "colabfold_output_missing",
+        "missing_metric_reason": "colabfold_output_missing",
+    }
+    write_foldcheck_report(report, [row], request_hash=_REQUEST_HASH)
+
+    issues = validate_foldcheck_report(report, request_hash=_REQUEST_HASH)
+
+    assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.wt_baseline_not_accepted"]
+
+
+def test_foldcheck_report_validator_rejects_unexpected_candidates(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    rows = [_accepted_row("wild_type"), _accepted_row("candidate_a"), _accepted_row("foreign_candidate")]
+    write_foldcheck_report(report, rows, request_hash=_REQUEST_HASH)
+
+    issues = validate_foldcheck_report(
+        report,
+        request_hash=_REQUEST_HASH,
+        expected_candidate_ids={"wild_type", "candidate_a"},
+    )
+
+    assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.unexpected_candidates"]
+
+
+def test_foldcheck_report_validator_requires_selected_candidate_acceptance(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    rows = [
+        _accepted_row("wild_type"),
+        {
+            **_accepted_row("candidate_a"),
+            "status": "errored",
+            "plddt": None,
+            "backbone_rmsd_to_reference": None,
+            "rejection_reason": "colabfold_output_missing",
+            "missing_metric_reason": "colabfold_output_missing",
+        },
+    ]
+    write_foldcheck_report(report, rows, request_hash=_REQUEST_HASH)
+
+    issues = validate_foldcheck_report(
+        report,
+        request_hash=_REQUEST_HASH,
+        expected_candidate_ids={"wild_type", "candidate_a"},
+        required_accepted_candidate_ids={"candidate_a"},
+    )
+
+    assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.selected_candidates_not_accepted"]
+
+
 def _accepted_row(candidate_id: str) -> dict[str, object]:
     return {
         "candidate_id": candidate_id,

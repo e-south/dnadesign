@@ -24,13 +24,18 @@ The fold-check contract owns model-agnostic artifact shape:
 
 - fold-check FASTA request records
 - WT baseline presence
+- request-sequence hash binding
 - runtime kind/version and parameter hash fields
 - threshold id and threshold values
 - normalized fold-check report rows with accepted/rejected/errored states
 
 `dnadesign.thread.adapters.colabfold` owns reusable ColabFold output parsing:
 
-- ColabFold output-file discovery by request sequence id
+- ColabFold output-file discovery by request sequence id, with longer
+  manifest sequence ids matched before shorter prefixes and file matching
+  limited to exact ids or known ColabFold-generated suffixes
+- one-pass output indexing with rank-token parsing for ColabFold model/score
+  files
 - pLDDT extraction from model PDB B-factors
 - PAE JSON summarization when available
 - C-alpha RMSD against the WT runtime baseline or an explicit reference PDB
