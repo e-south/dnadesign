@@ -39,6 +39,7 @@ def validate_source_sequence_bundle_sufficiency(
     output_root: Path | None = None,
     source_cache_root: Path | None = None,
     bundle_root: Path | None = None,
+    selected_profile_ids: tuple[str, ...] | None = None,
 ) -> SourceSequenceBundleSufficiencyReport:
     """Validate source FASTA bundles before any MSA backend run."""
 
@@ -53,6 +54,7 @@ def validate_source_sequence_bundle_sufficiency(
         bundle_root=resolve_path(root, bundle_root) if bundle_root is not None else out_root / "conservation_sources",
         conservation_sources_path=root / CONSERVATION_SOURCES,
         conservation_sources=load_yaml_mapping(root / CONSERVATION_SOURCES),
+        selected_profile_ids=selected_profile_ids,
     )
     return SourceSequenceBundleSufficiencyReport(
         issues=dedupe_issues(collect_source_sequence_sufficiency_issues(context)),

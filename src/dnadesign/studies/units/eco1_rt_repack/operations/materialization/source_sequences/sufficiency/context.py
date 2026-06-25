@@ -27,3 +27,4 @@ class SourceSequenceSufficiencyContext:
     bundle_root: Path
     conservation_sources_path: Path
     conservation_sources: Mapping[str, Any]
+    selected_profile_ids: tuple[str, ...] | None = None

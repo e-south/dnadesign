@@ -74,7 +74,8 @@ def collect_source_sequence_sufficiency_issues(
         provider_cache_root=provider_cache_root,
     )
     profile_manifests = _profile_manifest_paths(index_manifest, root=context.repo_root)
-    for profile_id in contract.profile_ids:
+    selected_profile_ids = context.selected_profile_ids or tuple(contract.profile_ids)
+    for profile_id in selected_profile_ids:
         manifest_path = profile_manifests.get(profile_id)
         if manifest_path is None or not manifest_path.exists():
             issues.append(

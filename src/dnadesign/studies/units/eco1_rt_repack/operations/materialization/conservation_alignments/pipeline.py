@@ -86,13 +86,6 @@ def materialize_conservation_alignment_bundles(
     )
     align_root.mkdir(parents=True, exist_ok=True)
 
-    _require_source_sufficiency(
-        repo_root=root,
-        output_root=out_root,
-        source_cache_root=cache_root,
-        source_bundle_root=source_root,
-    )
-
     source_contract = load_conservation_source_contract(root / CONSERVATION_SOURCES)
     command = _declared_alignment_command(source_contract.sources)
     backend_id, command_args = parse_declared_alignment_command(command)
@@ -101,6 +94,13 @@ def materialize_conservation_alignment_bundles(
     selected_profile_ids = _select_profile_ids(
         declared_profile_ids=tuple(source_contract.profile_ids),
         requested_profile_ids=profile_ids,
+    )
+    _require_source_sufficiency(
+        repo_root=root,
+        output_root=out_root,
+        source_cache_root=cache_root,
+        source_bundle_root=source_root,
+        selected_profile_ids=tuple(selected_profile_ids),
     )
 
     base_upstream_hashes = {
@@ -253,12 +253,14 @@ def _require_source_sufficiency(
     output_root: Path,
     source_cache_root: Path,
     source_bundle_root: Path,
+    selected_profile_ids: tuple[str, ...],
 ) -> None:
     report = validate_source_sequence_bundle_sufficiency(
         repo_root=repo_root,
         output_root=output_root,
         source_cache_root=source_cache_root,
         bundle_root=source_bundle_root,
+        selected_profile_ids=selected_profile_ids,
     )
     if report.passed:
         return
