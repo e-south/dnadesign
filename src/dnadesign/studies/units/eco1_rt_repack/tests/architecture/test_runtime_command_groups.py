@@ -33,14 +33,15 @@ _EXECUTABLE_LANES = {
     "manual_mask_authority",
     "mask_contract",
     "contact_risk_profile",
-    "phase0_contract_validation",
-    "phase1_contract_validation",
-}
-_PLANNED_LANES = {
-    "refine_dev_spec",
     "sampling_plan",
     "sample_ingest",
     "candidate_table",
+    "phase0_contract_validation",
+    "phase1_contract_validation",
+    "phase2_contract_validation",
+}
+_PLANNED_LANES = {
+    "refine_dev_spec",
     "candidate_qa",
     "assembly_feasibility",
     "candidate_handoff",
@@ -89,7 +90,8 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
 
     assert by_id["conservation_alignments"]["owner"] == "eco1_rt_repack"
     assert by_id["conservation_visualizations"]["owner"] == "aligner.msa"
-    assert by_id["sampling_plan"]["owner"] == "planned_thread"
+    assert by_id["sampling_plan"]["owner"] == "eco1_rt_repack"
+    assert by_id["sample_ingest"]["owner"] == "thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]

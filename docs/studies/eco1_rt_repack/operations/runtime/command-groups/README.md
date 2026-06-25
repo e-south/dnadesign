@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Command Groups
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-22
+**Last verified:** 2026-06-24
 
 This directory is the reproducibility route for the study-owned Eco1 RT repack
 materialization path. It is not a hidden run-all pipeline. Each lane in
@@ -57,10 +57,7 @@ input placeholders.
    `mask_set.yaml`.
 13. `contact_risk_profile` emits a contact evidence review from the contact,
    conservation, manual-mask, and mask-set evidence chain.
-14. `surface_accessibility_profile` emits complex-context SASA evidence from
-   the selected Ec86 RT-msDNA-msrRNA structure. This is an earlier check, not
-   an input to the current mask rule.
-15. `phase1_contract_validation` must pass before sampling-plan work starts.
+14. `phase1_contract_validation` must pass before sampling-plan work starts.
 
 Phase 1 validation is not a presence-only check. It validates
 `structure_preprocessing_manifest.yaml` as the raw 7V9U-to-protomer authority and
@@ -83,23 +80,37 @@ Wang/Ec86 direct substrate-contact priors, Ec86 clade 9 >=25% WT-plurality
 conservation calls, and mapped residues within 5 A of retained DNA/RNA.
 Terminal residues `1`, `2`, and `312-320` are `non_fixed_missing_backbone`.
 
-### Next Policy Gate
+### Next Backend Gate
 
-The next execution step is a sampling request plan:
+The request plan is materialized:
 
 ```text
 thread_plan.yaml
+proteinmpnn_request/request_manifest.yaml
 ```
 
-The next slice should materialize a small explicit `thread_plan.yaml` from the
-validated simple mask, with backend, seed, temperature, request hash, fixed/
-non-fixed position source, and no-fallback policy. Any future mask expansion
-must be opened as an explicit policy change before it can feed sampling.
+`thread_plan.yaml` declares backend, seed, temperature, request hash,
+fixed/non-fixed position source, terminal missing-backbone exclusions, and
+no-fallback policy. The Eco1 `proteinmpnn_request` command resolves study
+paths and selected 7V9U/ec86kit structure provenance, then calls
+`dnadesign.thread.adapters.proteinmpnn` to export the protein-only
+backbone, convert canonical residues to chain-local ProteinMPNN positions,
+write helper JSONL payloads, and build the request manifest. The Eco1
+`proteinmpnn_sample_ingest` command then calls the same generic adapter with an
+explicit ProteinMPNN checkout, verifies official helper parity, runs the named
+batch for declared seeds, temperatures, and `num_seq_per_target`, and writes
+`sample_table.parquet`. `candidate_table` then converts accepted backend rows
+into canonical-position mutation summaries and rejects protected-position edits.
+A changed mask rule must be opened as an explicit policy change before it can
+feed sampling.
 
 ### Source-Role Guardrails
 
 - Tao is the masking-method prior: homolog MSA conservation, fixed functional
   residues, fixed-backbone RT redesign, and fold-check triage.
+- ProteinMPNN is the backend request-format prior: helper-compatible parsed PDB
+  JSONL, assigned-chain JSONL, fixed-position JSONL, explicit seed,
+  temperature, omitted-amino-acid, and no-fallback execution fields.
 - Mestre is the source ontology: the full S1 roster is a candidate/context
   surface, while Ec86 RT clade 9 and II-A3/`42_1` are the active conservation
   denominators.

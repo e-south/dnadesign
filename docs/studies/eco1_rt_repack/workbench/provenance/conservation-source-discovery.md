@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-conservation-source-discovery
 surface: study-provenance-note
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-22
+last_verified: 2026-06-24
 ---
 
 ## Conservation Source Discovery
@@ -230,9 +230,9 @@ Ec86-containing RT clade 9 panel after declared QC. The local
 motif-QC, and explicit exclusion metadata. Both selected profile alignments
 have since been accepted under the declared Clustal Omega policy, and the
 study-owned conservation materializer has produced
-`conservation_profile.parquet`. The current runtime gate is therefore no longer
-MSA acceptance; it is mask/sampling policy after the diagnostic all-fixed 20 A
-mask.
+`conservation_profile.parquet`. The current mask is the clade-9 plurality-25 /
+direct-contact-5 A rule, and the current runtime gate is backend sample ingest
+into `sample_table.parquet`.
 
 ### External Source Links
 

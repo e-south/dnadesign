@@ -1,11 +1,11 @@
 ## Eco1 RT Repack Vocabulary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-23
+**Last verified:** 2026-06-24
 
 | Term | Meaning |
 | --- | --- |
-| `thread` | Planned reusable tool for fixed-backbone protein sequence design intent. |
+| `thread` | Reusable fixed-backbone design tool. Its current executable surface is the generic ProteinMPNN request adapter. |
 | `eco1_rt_v1` | First Eco1 RT fixed-backbone profile for this study. |
 | `BackboneBundle` | Generic structure/reference bundle for fixed-backbone design. |
 | `ResidueMap` | Generic residue-numbering map across structure, protein, CDS, and design positions. |
@@ -21,7 +21,7 @@
 | `MsaPanelSpec` | Study-owned display contract for selected-row overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
 | `ManualMaskAuthority` | Study-owned mask ontology and generated runtime artifact. It records audited motif anchors, RT1-RT7 annotation/review spans, and Wang/Ec86 substrate-contact priors. RT1-RT7 spans do not blanket hard-fix residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
 | `MaskRowAlgebra` | Study-local executable contract for composing protected, non-fixed mapped, and non-fixed missing-backbone rows under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. Implemented under `operations/masking/`, not inside a runtime writer. |
-| `EvidenceReviewArtifacts` | Contact-risk and surface-accessibility artifacts that can help explain structure context. They do not protect or release residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
+| `EvidenceReviewArtifacts` | Contact-risk and contact-geometry review artifacts that explain structure context. They do not protect or release residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
 | `ResidueMaskSet` | Generic mutable/fixed/protected/unresolved mask contract. |
 | `ThreadPlan` | Generic fixed-backbone sampling plan with backend, seeds, temperature, and fixed-position policy. |
 | `BackendRequestManifest` | Declared backend request hash and execution intent produced by `thread` before any model process runs. |

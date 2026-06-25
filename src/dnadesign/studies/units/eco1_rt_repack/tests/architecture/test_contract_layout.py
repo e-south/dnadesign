@@ -26,7 +26,7 @@ _CONTRACT_ROOT_FILES = {
     "profile.py",
     "suite.py",
 }
-_CONTRACT_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "structure"}
+_CONTRACT_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_FILES = {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"}
 _CONTRACT_CONTACT_RISK_FILES = {"__init__.py", "artifacts.py"}
 _CONTRACT_MASK_FILES = {
@@ -38,6 +38,22 @@ _CONTRACT_MASK_FILES = {
     "source.py",
 }
 _CONTRACT_MASK_PACKAGES: set[str] = set()
+_CONTRACT_SAMPLING_FILES = {
+    "__init__.py",
+    "artifacts.py",
+    "candidate_table.py",
+    "proteinmpnn_request.py",
+    "sample_table.py",
+}
+_CONTRACT_SAMPLING_PACKAGES = {"thread_plan"}
+_CONTRACT_THREAD_PLAN_FILES = {
+    "__init__.py",
+    "constants.py",
+    "expected.py",
+    "io.py",
+    "report.py",
+    "validation.py",
+}
 _CONTRACT_STRUCTURE_FILES = {
     "__init__.py",
     "artifacts.py",
@@ -51,7 +67,7 @@ _CONTRACT_TEST_ROOT_FILES = {
     "test_phase_contracts.py",
     "test_source_contracts.py",
 }
-_CONTRACT_TEST_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "structure"}
+_CONTRACT_TEST_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_TEST_FILES = {"__init__.py", "test_sources.py"}
 _CONTRACT_CONTACT_RISK_TEST_FILES = {"__init__.py", "test_artifacts.py"}
 _CONTRACT_MASK_TEST_FILES = {
@@ -61,6 +77,14 @@ _CONTRACT_MASK_TEST_FILES = {
     "test_source.py",
 }
 _CONTRACT_MASK_TEST_PACKAGES: set[str] = set()
+_CONTRACT_SAMPLING_TEST_FILES = {
+    "__init__.py",
+    "test_candidate_table.py",
+    "test_proteinmpnn_request.py",
+    "test_sample_table.py",
+}
+_CONTRACT_SAMPLING_TEST_PACKAGES = {"thread_plan"}
+_CONTRACT_THREAD_PLAN_TEST_FILES = {"__init__.py", "test_contract.py"}
 _CONTRACT_STRUCTURE_TEST_FILES = {
     "__init__.py",
     "test_authority.py",
@@ -87,6 +111,13 @@ def test_contract_package_routes_domain_contracts_through_semantic_subpackages()
     assert sorted(
         path.name for path in (source_root / "masks").iterdir() if path.is_dir() and path.name != "__pycache__"
     ) == sorted(_CONTRACT_MASK_PACKAGES)
+    assert sorted(path.name for path in (source_root / "sampling").glob("*.py")) == sorted(_CONTRACT_SAMPLING_FILES)
+    assert sorted(
+        path.name for path in (source_root / "sampling").iterdir() if path.is_dir() and path.name != "__pycache__"
+    ) == sorted(_CONTRACT_SAMPLING_PACKAGES)
+    assert sorted(path.name for path in (source_root / "sampling/thread_plan").glob("*.py")) == sorted(
+        _CONTRACT_THREAD_PLAN_FILES
+    )
     assert sorted(path.name for path in (source_root / "structure").glob("*.py")) == sorted(_CONTRACT_STRUCTURE_FILES)
     assert sorted(path.name for path in test_root.glob("*.py")) == sorted(_CONTRACT_TEST_ROOT_FILES)
     assert sorted(path.name for path in test_root.iterdir() if path.is_dir() and path.name != "__pycache__") == sorted(
@@ -102,6 +133,13 @@ def test_contract_package_routes_domain_contracts_through_semantic_subpackages()
     assert sorted(
         path.name for path in (test_root / "masks").iterdir() if path.is_dir() and path.name != "__pycache__"
     ) == sorted(_CONTRACT_MASK_TEST_PACKAGES)
+    assert sorted(path.name for path in (test_root / "sampling").glob("*.py")) == sorted(_CONTRACT_SAMPLING_TEST_FILES)
+    assert sorted(
+        path.name for path in (test_root / "sampling").iterdir() if path.is_dir() and path.name != "__pycache__"
+    ) == sorted(_CONTRACT_SAMPLING_TEST_PACKAGES)
+    assert sorted(path.name for path in (test_root / "sampling/thread_plan").glob("*.py")) == sorted(
+        _CONTRACT_THREAD_PLAN_TEST_FILES
+    )
     assert sorted(path.name for path in (test_root / "structure").glob("*.py")) == sorted(
         _CONTRACT_STRUCTURE_TEST_FILES
     )

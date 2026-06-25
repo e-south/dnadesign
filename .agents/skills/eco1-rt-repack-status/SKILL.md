@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.9
+  version: 0.1.11
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -28,7 +28,8 @@ In scope:
   assembly feasibility, candidate handoff, and downstream handoff gates
 
 Out of scope:
-- generic `thread` package implementation
+- generic `thread` package expansion beyond the implemented ProteinMPNN request
+  adapter
 - status for `rt_lnrna_sponging_construct_triage` or any other study
 - ProteinMPNN, LigandMPNN, AlphaFold, or ColabFold execution
 - wet-lab protocol advice or assay execution planning
@@ -39,9 +40,13 @@ Out of scope:
 
 - Status answers come from `record/status.md`, `record/datasets.yaml`,
   `record/campaign.yaml`, and `operations/ops.study.yaml`.
-- The answer distinguishes planned `thread` contracts from executable code.
-- Eco1-specific policy remains in the study; reusable mechanics stay reserved
-  for a future `dnadesign.thread` package.
+- The answer distinguishes the implemented ProteinMPNN request, sample-ingest,
+  and candidate-table surfaces from planned fold-check, feasibility, and
+  handoff tooling.
+- Eco1-specific policy remains in the study; reusable ProteinMPNN request and
+  sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
+  and reusable candidate-table mechanics route through `dnadesign.thread.candidates`.
+  Fold-check, feasibility, and handoff tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
 - Missing or mismatched `study_id` fails visibly.
@@ -74,8 +79,9 @@ Out of scope:
 ## Guardrails
 
 - This skill is study-specific. Do not generalize it to another study.
-- Do not imply that `src/dnadesign/thread/` exists or that MPNN/fold-check
-  execution is wired.
+- Report that `src/dnadesign/thread/` currently exposes generic ProteinMPNN
+  request, sample-ingest, and candidate-table mechanics; do not imply that
+  fold-checks, feasibility, or handoffs are wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
 - Route generic aligned FASTA generation and generic MSA QC visualization
@@ -104,9 +110,8 @@ Out of scope:
   annotation/review labels and do not blanket hard-fix residues. Terminal
   residues 1, 2, and 312-320 are `non_fixed_missing_backbone`: unprotected, but
   not directly fixed-backbone ProteinMPNN mutable until coordinates exist.
-  `surface_accessibility_profile.parquet` and `contact_risk_profile.yaml` are
-  evidence reviews; they do not decide which residues are protected unless a
-  future task explicitly reopens them.
+  `contact_risk_profile.yaml` is an evidence review; it does not decide which
+  residues are protected unless a future task explicitly reopens the mask rule.
 - Do not infer MSA source authority from review figures, prose, or public
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume
@@ -117,7 +122,8 @@ Out of scope:
 ## Required Deliverables
 
 - current phase and record posture
-- canonical study record paths and planned `thread` dev spec path
+- canonical study record paths, the current `dnadesign.thread` adapter path, and
+  the dev spec path for broader thread work
 - declared dataset/artifact roots and whether they are planned or materialized
 - next readiness blockers from the checked-in readiness checks
 - selected route for residue masks, fold validation, synthesis feasibility, or

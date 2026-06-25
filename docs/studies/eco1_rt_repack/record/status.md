@@ -1,14 +1,16 @@
 ## Eco1 RT Repack Status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-23
+**Last verified:** 2026-06-24
 **Status surface:** record-only
 
 ### Current Phase
 
-Phase 1 has the required structure, source, alignment, conservation evidence,
-manual mask authority, and mask set under
-`outputs/thread/eco1_rt_conservative_v1/`. The selected mask rule is:
+Phase 2 backend ingest now passes locally. The study has the required
+structure, source, alignment, conservation evidence, manual mask authority,
+mask set, explicit thread plan, ProteinMPNN request, backend run manifest, and
+sample table under `outputs/thread/eco1_rt_conservative_v1/`. The selected mask
+rule is:
 
 ```text
 eco1_rt_clade9_plurality25_direct_contact5a_v1
@@ -60,6 +62,28 @@ handled separately.
   `manual-mask-authority.yaml`.
 - `mask_set.yaml` is materialized under
   `eco1_rt_clade9_plurality25_direct_contact5a_v1`; Phase 1 validates locally.
+- `thread_plan.yaml` is materialized locally with explicit `proteinmpnn`
+  backend selection, seeds `101`, `202`, `303`, temperatures `0.1` and `0.3`,
+  a request hash, and `explicit_no_fallback` policy. The plan emits 123 mapped
+  mutable positions and excludes terminal `non_fixed_missing_backbone`
+  positions from fixed-backbone mutation.
+- `proteinmpnn_request/request_manifest.yaml` is materialized locally. The Eco1
+  wrapper resolves study paths and selected structure provenance, then calls
+  `dnadesign.thread.adapters.proteinmpnn` for the protein-only chain export,
+  chain-local position mapping, helper-compatible JSONL sidecars, request
+  hashes, and generic request validation. The request declares `--omit_AAs C`
+- Official ProteinMPNN commit `8907e6671bfbfc92303b5f79c4b5e6ce47cdef57` was
+  installed locally under `.var/tools/proteinmpnn` and used through an explicit
+  `--proteinmpnn-root` path. The active backend batch is
+  `eco1_rt_p25_5a_n96_20260624`: seeds `101`, `202`, `303`, temperatures
+  `0.1` and `0.3`, and `num_seq_per_target: 16`.
+- `sample_table.parquet` is materialized locally with 96 accepted ProteinMPNN
+  rows. The named batch table is also retained at
+  `sample_tables/eco1_rt_p25_5a_n96_20260624.parquet`.
+- `candidate_table.parquet` is materialized locally with 96 accepted candidate
+  rows and no protected-position or outside-mutable-position mutations. The
+  named batch table is also retained at
+  `candidate_tables/eco1_rt_p25_5a_n96_20260624.parquet`.
 
 ### Mask Counts
 
@@ -79,9 +103,8 @@ positions from the current 7V9U backbone: `123`.
 
 ### Prior Mask Checks
 
-`surface_accessibility_profile.parquet` and `contact_risk_profile.yaml` remain
-evidence reviews. They do not protect or release residues under the current
-mask.
+`contact_risk_profile.yaml` remains an evidence review. It does not protect or
+release residues under the current mask.
 
 The previous 20 A all-fixed mask is diagnostic history: it showed that broad
 retained-nucleic-acid proximity fixes the whole RT and is therefore too blunt
@@ -101,19 +124,23 @@ Phase 1 contract validation:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase1_thread_contract
 ```
 
+Phase 2 backend-ingest validation:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase2_real_backend_ingest
+```
+
 ### Current Next Actions
 
-1. Generate a small explicit sampling plan with backend, seed, temperature,
-   fixed-position, request-hash, and no-fallback policy only after the simple
-   mask validates.
+1. Define fold-check and feasibility gates for accepted candidate rows.
 2. Define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers
 
-- No executable `thread` package exists.
-- No sampling plan or backend-ingest contract is materialized.
-- No sample table, candidate table, or backend result manifest exists.
+- `dnadesign.thread` now exposes generic ProteinMPNN request, sample-ingest,
+  and candidate-table mechanics. Fold-check normalization, feasibility, and
+  handoff tooling remain planned.
 - No fold-check runtime report with WT baseline, thresholds, and runtime
   parameter hash exists.
 - No assembly feasibility report exists.

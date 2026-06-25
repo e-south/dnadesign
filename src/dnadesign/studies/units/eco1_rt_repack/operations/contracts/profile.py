@@ -244,6 +244,22 @@ def _validate_profile_sampling_policy(*, issues: list[ContractIssue], profile: M
             )
         )
 
+    selected_backend = policy.get("selected_backend")
+    allowed_backends = policy.get("backends_allowed")
+    if (
+        not isinstance(selected_backend, str)
+        or not selected_backend.strip()
+        or not isinstance(allowed_backends, list)
+        or selected_backend not in allowed_backends
+    ):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_selected_backend",
+                message="selected_backend must be declared and listed in backends_allowed",
+                path="sampling_policy.selected_backend",
+            )
+        )
+
     temperatures = policy.get("temperatures")
     if (
         not isinstance(temperatures, list)
@@ -255,5 +271,64 @@ def _validate_profile_sampling_policy(*, issues: list[ContractIssue], profile: M
                 check_id="eco1_rt.profile.invalid_temperatures",
                 message="temperatures must be a non-empty list of positive numbers",
                 path="sampling_policy.temperatures",
+            )
+        )
+
+    seed_set = policy.get("seed_set")
+    if (
+        policy.get("seed_policy") != "explicit_seed_list_required"
+        or not isinstance(seed_set, list)
+        or not seed_set
+        or not all(isinstance(item, int) and not isinstance(item, bool) and item > 0 for item in seed_set)
+        or len(set(seed_set)) != len(seed_set)
+    ):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_seed_set",
+                message="seed_policy requires a non-empty explicit unique positive integer seed_set",
+                path="sampling_policy.seed_set",
+            )
+        )
+
+    batch_id = policy.get("batch_id")
+    if not isinstance(batch_id, str) or not batch_id.strip():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_batch_id",
+                message="sampling_policy.batch_id must be explicit for scaled backend ingest",
+                path="sampling_policy.batch_id",
+            )
+        )
+    num_seq_per_target = policy.get("num_seq_per_target")
+    batch_size = policy.get("batch_size")
+    if not isinstance(num_seq_per_target, int) or isinstance(num_seq_per_target, bool) or num_seq_per_target <= 0:
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_num_seq_per_target",
+                message="sampling_policy.num_seq_per_target must be a positive integer",
+                path="sampling_policy.num_seq_per_target",
+            )
+        )
+    if not isinstance(batch_size, int) or isinstance(batch_size, bool) or batch_size <= 0:
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_batch_size",
+                message="sampling_policy.batch_size must be a positive integer",
+                path="sampling_policy.batch_size",
+            )
+        )
+    if (
+        isinstance(num_seq_per_target, int)
+        and not isinstance(num_seq_per_target, bool)
+        and isinstance(batch_size, int)
+        and not isinstance(batch_size, bool)
+        and batch_size > 0
+        and num_seq_per_target % batch_size != 0
+    ):
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.profile.invalid_sampling_batch_divisibility",
+                message="sampling_policy.num_seq_per_target must be divisible by batch_size",
+                path="sampling_policy",
             )
         )

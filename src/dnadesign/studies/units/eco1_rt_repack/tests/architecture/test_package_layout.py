@@ -21,12 +21,15 @@ _TEST_SEMANTIC_PACKAGES = {"architecture", "contracts", "masking", "materializat
 _MASKING_ROOT_FILES = {"__init__.py", "rows.py"}
 _MASKING_TEST_ROOT_FILES = {"__init__.py", "test_rows.py"}
 _CLI_MATERIALIZATION_PACKAGES = {
+    "candidate_table",
     "contact_geometry",
     "contact_risk",
     "manual_mask_authority",
     "mask_set",
+    "proteinmpnn_request",
+    "proteinmpnn_sample_ingest",
     "structure_preprocessing",
-    "surface_accessibility",
+    "thread_plan",
 }
 _CONTACT_GEOMETRY_ROOT_FILES = {
     "__init__.py",
@@ -41,8 +44,7 @@ _CONTACT_GEOMETRY_ROOT_FILES = {
     "writer.py",
 }
 _MATERIALIZATION_PRIMITIVES = {
-    "structure",
-    "structure_preprocessing",
+    "candidate_table",
     "contact",
     "contact_geometry",
     "contact_risk",
@@ -50,18 +52,20 @@ _MATERIALIZATION_PRIMITIVES = {
     "conservation_alignments",
     "manual_mask_authority",
     "mask_set",
+    "proteinmpnn_request",
+    "proteinmpnn_sample_ingest",
     "source_sequences",
-    "surface_accessibility",
+    "structure",
+    "structure_preprocessing",
+    "thread_plan",
 }
-_SURFACE_ACCESSIBILITY_ROOT_FILES = {
+_PROTEINMPNN_REQUEST_ROOT_FILES = {
     "__init__.py",
     "__main__.py",
     "cli.py",
     "constants.py",
     "models.py",
     "pipeline.py",
-    "rows.py",
-    "writer.py",
 }
 _SOURCE_SEQUENCE_ROOT_FILES = {
     "__init__.py",
@@ -158,14 +162,17 @@ def test_contact_geometry_materializer_uses_semantic_modules() -> None:
     assert "MMCIFParser" in (source_root / "structure_io.py").read_text(encoding="utf-8")
 
 
-def test_surface_accessibility_materializer_uses_semantic_modules() -> None:
-    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/surface_accessibility"
+def test_proteinmpnn_request_materializer_uses_semantic_modules() -> None:
+    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/proteinmpnn_request"
 
-    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_SURFACE_ACCESSIBILITY_ROOT_FILES)
-    assert "argparse" not in (source_root / "pipeline.py").read_text(encoding="utf-8")
-    assert "pyarrow as pa" not in (source_root / "pipeline.py").read_text(encoding="utf-8")
-    assert "ShrakeRupley" in (source_root / "pipeline.py").read_text(encoding="utf-8")
-    assert "write_surface_accessibility_profile" in (source_root / "writer.py").read_text(encoding="utf-8")
+    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_PROTEINMPNN_REQUEST_ROOT_FILES)
+    pipeline_text = (source_root / "pipeline.py").read_text(encoding="utf-8")
+    assert "pyarrow" not in pipeline_text
+    assert "hashlib" not in pipeline_text
+    assert "protein_mpnn_run.py" not in pipeline_text
+    assert "dnadesign.thread.adapters.proteinmpnn" in pipeline_text
+    assert "build_request_manifest" in pipeline_text
+    assert "export_chain_backbone" in pipeline_text
 
 
 def test_source_sequence_stack_uses_semantic_subpackages() -> None:

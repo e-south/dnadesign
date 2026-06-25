@@ -34,6 +34,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import (
     ContractIssue,
     ContractReport,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling import validate_sampling_artifacts
 
 
 def validate_materialized_structure_artifacts(
@@ -103,6 +104,8 @@ def validate_materialized_structure_artifacts(
             profile=profile,
         )
     )
+    if not issues and _phase_rank(phase) >= _phase_rank("phase2_real_backend_ingest"):
+        issues.extend(validate_sampling_artifacts(repo_root=repo_root, structure_root=structure_root))
     return ContractReport(phase=phase, issues=tuple(issues))
 
 

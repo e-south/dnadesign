@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fixed-backbone-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-22
+last_verified: 2026-06-24
 ---
 
 ## Fixed-Backbone Method
@@ -14,7 +14,7 @@ sponging workflows. The method is computational and contract-first:
 1. Choose one structure authority and chain policy.
 2. Map every designable residue into a canonical Eco1 RT numbering system.
 3. Compose conservative fixed/mutable masks from structure contacts,
-   conservation, catalytic policy, and unresolved-residue policy.
+   conservation, catalytic policy, and explicit missing-backbone handling.
 4. Generate fixed-backbone sequence samples with a declared MPNN backend.
 5. Deduplicate and rank candidates.
 6. Validate structural fidelity with declared fold-check metrics.
@@ -34,6 +34,10 @@ a monolithic recipe:
   functional and conserved residues, sample fold-compatible RT sequences, and
   filter candidates structurally. It does not make the entire Mestre roster the
   MSA denominator.
+- ProteinMPNN provides the backend request format for this first sampling path:
+  helper-compatible parsed PDB JSONL, assigned-chain JSONL, fixed-position
+  JSONL, explicit seed/temperature fields, and omitted-amino-acid policy. It
+  does not define Eco1 mask policy.
 - Mestre et al. provides the retron RT source ontology: use Ec86 RT clade 9 as
   the broad homolog panel and II-A3/`42_1` as the Eco1-family panel.
 - Simon et al. provides RT-region and motif annotation grammar for figures and
@@ -79,14 +83,17 @@ ad-hoc reconstruction from filenames or transient notebook state.
 ### Study Boundary
 
 Eco1 profile choices, catalytic protection, structural-source selection, and
-candidate-batch policy stay study-owned. Generic mechanics should graduate to
-`thread` only after the tracer bullet proves the contract.
+candidate-batch policy stay study-owned. Generic fixed-backbone request,
+sample-ingest, and candidate-table mechanics may live in `thread` only when
+they are free of Eco1 biology and have their own contract tests.
 
 ### Execution Boundary
 
-Do not implement a generic `thread` package until the tracer bullet has a real
-need for executable validation. The first code slice should be a small contract
-validator or artifact builder, not a model-running framework.
+Do not hide model execution behind an implicit run-all framework. Eco1 can call
+the generic ProteinMPNN adapter with an explicit tool root and request manifest,
+then call generic candidate-table construction after sample ingest. Fold
+checking, feasibility analysis, and candidate handoff remain explicit later
+gates.
 
 Use `implementation-roadmap.md` for the exact implementation slice order. That
 page is the current owner of code-home, input/output, and negative-path

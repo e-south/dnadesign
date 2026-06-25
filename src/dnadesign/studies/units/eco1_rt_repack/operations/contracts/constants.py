@@ -33,6 +33,7 @@ _EXPECTED_ARTIFACT_ORDER = (
     "contact_profile",
     "mask_set",
     "thread_plan",
+    "proteinmpnn_request",
     "sample_table",
     "candidate_table",
     "foldcheck_report",

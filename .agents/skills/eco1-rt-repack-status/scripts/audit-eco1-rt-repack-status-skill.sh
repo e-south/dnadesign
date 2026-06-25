@@ -124,6 +124,7 @@ if flat_materializers:
     problems.append(f"flat materialization primitive modules are not allowed: {flat_materializers}")
 
 expected_materialization_primitives = {
+    "candidate_table",
     "structure",
     "structure_preprocessing",
     "contact",
@@ -133,8 +134,10 @@ expected_materialization_primitives = {
     "conservation_alignments",
     "manual_mask_authority",
     "mask_set",
+    "proteinmpnn_request",
+    "proteinmpnn_sample_ingest",
     "source_sequences",
-    "surface_accessibility",
+    "thread_plan",
 }
 observed_materialization_primitives = {
     path.name for path in materialization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
@@ -178,7 +181,54 @@ for forbidden_snippet in ("Bio.PDB", "pyarrow as pa", "np.stack", "MMCIFParser")
     if forbidden_snippet in contact_geometry_pipeline_text:
         problems.append(f"contact_geometry pipeline reabsorbed implementation detail: {forbidden_snippet}")
 
-    source_sequences_root = materialization_root / "source_sequences"
+proteinmpnn_request_root = materialization_root / "proteinmpnn_request"
+expected_proteinmpnn_request_files = {
+    "__init__.py",
+    "__main__.py",
+    "cli.py",
+    "constants.py",
+    "models.py",
+    "pipeline.py",
+}
+observed_proteinmpnn_request_files = {path.name for path in proteinmpnn_request_root.glob("*.py")}
+if observed_proteinmpnn_request_files != expected_proteinmpnn_request_files:
+    problems.append(
+        "proteinmpnn_request materialization must stay a thin Eco1 wrapper around constants, models, "
+        f"and pipeline, observed {sorted(observed_proteinmpnn_request_files)}"
+    )
+proteinmpnn_pipeline_text = (proteinmpnn_request_root / "pipeline.py").read_text(encoding="utf-8")
+for forbidden_snippet in ("pyarrow", "hashlib", "protein_mpnn_run.py", "parse_multiple_chains.py"):
+    if forbidden_snippet in proteinmpnn_pipeline_text:
+        problems.append(f"proteinmpnn_request pipeline reabsorbed implementation detail: {forbidden_snippet}")
+if "dnadesign.thread.adapters.proteinmpnn" not in proteinmpnn_pipeline_text:
+    problems.append("proteinmpnn_request pipeline must delegate generic request mechanics to dnadesign.thread")
+
+thread_proteinmpnn_root = repo_root / "src/dnadesign/thread/adapters/proteinmpnn"
+expected_thread_proteinmpnn_files = {
+    "__init__.py",
+    "execution.py",
+    "execution_preflight.py",
+    "hashing.py",
+    "manifest.py",
+    "models.py",
+    "positions.py",
+    "samples.py",
+    "sidecars.py",
+    "structure.py",
+    "validation.py",
+}
+observed_thread_proteinmpnn_files = {path.name for path in thread_proteinmpnn_root.glob("*.py")}
+if observed_thread_proteinmpnn_files != expected_thread_proteinmpnn_files:
+    problems.append(
+        "thread ProteinMPNN adapter must stay decomposed by generic request responsibility, observed "
+        f"{sorted(observed_thread_proteinmpnn_files)}"
+    )
+for path in thread_proteinmpnn_root.glob("*.py"):
+    text = path.read_text(encoding="utf-8").lower()
+    if "eco1" in text or "ec86" in text or "mestre" in text or "wang" in text:
+        problems.append(f"generic thread adapter leaked Eco1 study semantics: {path.relative_to(repo_root)}")
+
+source_sequences_root = materialization_root / "source_sequences"
 expected_source_sequence_files = {
     "__init__.py",
     "__main__.py",
@@ -239,7 +289,7 @@ if observed_contract_root_files != expected_contract_root_files:
         f"{sorted(observed_contract_root_files)}"
     )
 
-expected_contract_packages = {"conservation", "contact_risk", "masks", "structure"}
+expected_contract_packages = {"conservation", "contact_risk", "masks", "sampling", "structure"}
 observed_contract_packages = {
     path.name for path in contracts_root.iterdir() if path.is_dir() and path.name != "__pycache__"
 }
@@ -260,6 +310,7 @@ expected_contract_package_files = {
         "set_artifacts.py",
         "source.py",
     },
+    "sampling": {"__init__.py", "artifacts.py", "candidate_table.py", "proteinmpnn_request.py", "sample_table.py"},
     "structure": {"__init__.py", "artifacts.py", "authority.py", "contact_geometry.py", "preprocessing.py", "provenance.py"},
 }
 for package_name, expected_files in sorted(expected_contract_package_files.items()):
@@ -273,7 +324,23 @@ for package_name, expected_files in sorted(expected_contract_package_files.items
             f"operations/contracts/{package_name} file set drifted, observed {sorted(observed_files)}"
         )
 
-    flat_test_files = sorted(path.name for path in tests_root.glob("test_*.py"))
+sampling_package_dirs = {
+    path.name for path in (contracts_root / "sampling").iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if sampling_package_dirs != {"thread_plan"}:
+    problems.append(
+        "operations/contracts/sampling must keep thread-plan validation in a semantic package, observed "
+        f"{sorted(sampling_package_dirs)}"
+    )
+expected_thread_plan_files = {"__init__.py", "constants.py", "expected.py", "io.py", "report.py", "validation.py"}
+observed_thread_plan_files = {path.name for path in (contracts_root / "sampling/thread_plan").glob("*.py")}
+if observed_thread_plan_files != expected_thread_plan_files:
+    problems.append(
+        "operations/contracts/sampling/thread_plan file set drifted, observed "
+        f"{sorted(observed_thread_plan_files)}"
+    )
+
+flat_test_files = sorted(path.name for path in tests_root.glob("test_*.py"))
 if flat_test_files:
     problems.append(f"flat study tests are not allowed at tests root: {flat_test_files}")
 
@@ -290,7 +357,7 @@ if observed_contract_test_root_files != expected_contract_test_root_files:
         f"{sorted(observed_contract_test_root_files)}"
     )
 
-expected_contract_test_packages = {"conservation", "contact_risk", "masks", "structure"}
+expected_contract_test_packages = {"conservation", "contact_risk", "masks", "sampling", "structure"}
 observed_contract_test_packages = {
     path.name for path in contract_test_root.iterdir() if path.is_dir() and path.name != "__pycache__"
 }
@@ -309,6 +376,7 @@ expected_contract_test_package_files = {
         "test_rt_intervals.py",
         "test_source.py",
     },
+    "sampling": {"__init__.py", "test_candidate_table.py", "test_proteinmpnn_request.py", "test_sample_table.py"},
     "structure": {"__init__.py", "test_authority.py", "test_contact_geometry.py", "test_preprocessing.py"},
 }
 for package_name, expected_files in sorted(expected_contract_test_package_files.items()):
@@ -320,7 +388,23 @@ for package_name, expected_files in sorted(expected_contract_test_package_files.
     if observed_files != expected_files:
         problems.append(f"tests/contracts/{package_name} file set drifted, observed {sorted(observed_files)}")
 
-    test_materialization_root = tests_root / "materialization"
+sampling_test_package_dirs = {
+    path.name for path in (contract_test_root / "sampling").iterdir() if path.is_dir() and path.name != "__pycache__"
+}
+if sampling_test_package_dirs != {"thread_plan"}:
+    problems.append(
+        "tests/contracts/sampling must mirror the thread-plan semantic package, observed "
+        f"{sorted(sampling_test_package_dirs)}"
+    )
+expected_thread_plan_test_files = {"__init__.py", "test_contract.py"}
+observed_thread_plan_test_files = {path.name for path in (contract_test_root / "sampling/thread_plan").glob("*.py")}
+if observed_thread_plan_test_files != expected_thread_plan_test_files:
+    problems.append(
+        "tests/contracts/sampling/thread_plan file set drifted, observed "
+        f"{sorted(observed_thread_plan_test_files)}"
+    )
+
+test_materialization_root = tests_root / "materialization"
 flat_materialization_tests = sorted(
     path.name for path in test_materialization_root.glob("test_*.py")
 )
@@ -516,7 +600,6 @@ require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/ma
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority"
 require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set"
-require_dir "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/contracts"
 require_dir "$REPO_ROOT/src/dnadesign/aligner/msa/visualization/materialization"
@@ -533,8 +616,6 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/m
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/cli.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/pipeline.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/cli.py"
-require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/pipeline.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/masking/rows.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/artifacts.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/sources.py"
@@ -570,7 +651,7 @@ require_pattern 'msa-method' "skill names MSA method surface"
 require_pattern 'Do not use for another study or for family-level routing' "skill rejects family-level routing"
 require_pattern 'Do not generalize it to another study' "skill guardrail rejects cross-study reuse"
 require_pattern 'ec86kit target sequence hash' "skill guardrail rejects silent MSA target drift"
-require_pattern 'Do not imply that `src/dnadesign/thread/` exists' "skill keeps planned thread separate from implementation"
+require_pattern 'currently exposes generic ProteinMPNN' "skill keeps thread scope limited to implemented thread mechanics"
 require_pattern 'rt_lnrna_sponging_construct_triage' "skill names downstream RT-lnRNA route boundary"
 require_pattern 'No OPS provider is registered' "route matrix documents record-only status" "$REFERENCE_DIR/route-matrix.md"
 require_pattern 'Tao et al\. 2026' "external source table records Tao method prior" "$REFERENCE_DIR/external-sources.md"
@@ -599,7 +680,6 @@ require_pattern 'candidate_prior_not_mask_authoritative' "manual mask authority 
 require_pattern 'rt7_interval' "manual mask authority source materializes RT1-RT7 interval spans" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
 require_pattern 'materialization/mask_set/' "study surfaces route mask-set materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'materialization/contact_risk/' "study surfaces route contact-risk materializer package" "$REFERENCE_DIR/study-surfaces.md"
-require_pattern 'materialization/surface_accessibility/' "study surfaces route surface-accessibility materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/contracts/contact_risk/' "study surfaces route contact-risk contract package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'eco1_rt_clade9_plurality25_direct_contact5a_v1' "study surfaces describe current simple mask rule" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'shared structure-provenance hash' "study surfaces route structure hash-closure contract" "$REFERENCE_DIR/study-surfaces.md"
@@ -613,17 +693,28 @@ require_pattern 'source_sequences/sufficiency/' "study surfaces route source-seq
 require_pattern 'provider accession policy' "study surfaces route provider accession contract policy" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/contracts/conservation/' "study surfaces route conservation contract package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/contracts/structure/' "study surfaces route structure contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/contracts/sampling/' "study surfaces route sampling contract package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/thread_plan/' "study surfaces route thread-plan materializer package" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/proteinmpnn_request/' "study surfaces route Eco1 ProteinMPNN request wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/proteinmpnn_sample_ingest/' "study surfaces route Eco1 ProteinMPNN sample-ingest wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/candidate_table/' "study surfaces route Eco1 candidate-table wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'src/dnadesign/thread/adapters/proteinmpnn/' "study surfaces route generic ProteinMPNN request adapter" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'src/dnadesign/thread/candidates/' "study surfaces route generic candidate-table builder" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'not a hidden run-all pipeline' "command-group README rejects hidden run-all execution" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
 require_pattern 'conservation_provider_sources' "pipeline records provider-source command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'conservation_roster_cache' "pipeline records roster-cache command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'conservation_source_sufficiency' "pipeline records source-sufficiency command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'conservation_alignments' "pipeline records alignment command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'contact_risk_profile' "pipeline records contact-risk command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'surface_accessibility_profile' "pipeline records surface-accessibility command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'materialized_simple_mask_set' "sampling readiness gates thread_plan behind validated simple mask" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
 require_pattern 'required_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1' "sampling readiness records simple mask policy id" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
 require_pattern 'non_fixed_missing_backbone' "sampling readiness records terminal missing-backbone class" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.thread_plan' "pipeline records thread-plan materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request' "pipeline records ProteinMPNN request materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest' "pipeline records ProteinMPNN sample-ingest materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table' "pipeline records candidate-table materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase1_thread_contract' "pipeline records Phase 1 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'phase2_real_backend_ingest' "pipeline records Phase 2 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'presence-only check' "command-group README documents Phase 1 hash closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
 require_absent 'argparse' "contact-risk pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/pipeline.py"
 require_absent 'argparse' "manual mask pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/pipeline.py"

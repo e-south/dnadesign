@@ -3,14 +3,13 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-23
+last_verified: 2026-06-24
 ---
 
 ## Residue Mask Policy
 
 The current mask rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
-Earlier SASA and contact-density checks remain evidence reviews only; they do
-not protect or release residues.
+Contact-risk review artifacts do not protect or release residues.
 
 The rule is deliberately small:
 
@@ -78,7 +77,7 @@ The method rationale is intentionally plain:
 - Simon supplies RT-region and motif annotation grammar.
 
 Evidence-review artifacts explain the structure context but are not mask inputs.
-The rule does not search across SASA, contact-density, contact-class, or
+The rule does not search across contact-density, contact-class, or
 conservation-threshold variants.
 The next sampling plan should use the materialized `mask_set.yaml` under
 `eco1_rt_clade9_plurality25_direct_contact5a_v1`.

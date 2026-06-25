@@ -165,16 +165,49 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   study-owned materializer for `mask_set.yaml`. The artifact is materialized
   under `eco1_rt_clade9_plurality25_direct_contact5a_v1`, with row classes
   `protected`, `non_fixed`, and `non_fixed_missing_backbone`.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/thread_plan/`:
+  study-owned materializer for local `thread_plan.yaml` from the validated
+  simple mask. It emits an explicit planned `proteinmpnn` request with seeds,
+  temperatures, request hash, fixed and mutable positions, terminal
+  missing-backbone exclusions, and no backend fallback.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/proteinmpnn_request/`:
+  thin study-owned wrapper that resolves Eco1 paths, validates selected
+  structure provenance, and delegates generic ProteinMPNN request mechanics to
+  `src/dnadesign/thread/adapters/proteinmpnn/`. It does not execute
+  ProteinMPNN.
+- `src/dnadesign/thread/adapters/proteinmpnn/`:
+  generic fixed-backbone ProteinMPNN adapter. It owns
+  canonical-to-chain-local conversion, helper JSONL payloads, protein-only
+  backbone export, request manifests, official-checkout preflight, helper
+  parity checks, backend run manifests, sample-table writing, request/sample
+  validation, and generic hashing. It must not contain Eco1, Ec86, Mestre,
+  Wang, or motif policy.
+- `src/dnadesign/thread/candidates/`:
+  generic candidate-table builders. ProteinMPNN candidate rows are built from
+  normalized sample tables and request manifests; canonical mutation accounting
+  must use the request's canonical-to-chain-local position map.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/proteinmpnn_sample_ingest/`:
+  thin study-owned wrapper that resolves Eco1 paths and delegates generic
+  ProteinMPNN execution/result mechanics to
+  `src/dnadesign/thread/adapters/proteinmpnn/`. It writes
+  `sample_table.parquet` from accepted backend rows.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/candidate_table/`:
+  thin study-owned wrapper that resolves Eco1 paths and delegates generic
+  candidate-table construction to `src/dnadesign/thread/candidates/`. It writes
+  `candidate_table.parquet` from accepted backend rows.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/sampling/`:
+  sampling artifact contract package. Phase 2 validates `thread_plan.yaml` and
+  `proteinmpnn_request/request_manifest.yaml` separately from
+  `sample_table.parquet` and `candidate_table.parquet`, so request planning,
+  backend adaptation, backend ingest, and candidate construction remain distinct
+  gates. `sampling/thread_plan/` owns thread-plan metadata, upstream-hash,
+  expected-field, and request-hash checks, while `sampling/sample_table.py` and
+  `sampling/candidate_table.py` validate normalized backend rows and candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`:
   study-owned materializer for `contact_risk_profile.yaml`. It is a
   review artifact that joins nearest-distance contact evidence, atom-class
   contact geometry, conservation masks, manual-mask authority, Wang/Ec86
   candidate priors, and selected simple-mask row status.
-- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/`:
-  study-owned materializer for `surface_accessibility_profile.parquet`. It
-  computes complex-context Biopython Shrake-Rupley SASA from the selected Ec86
-  RT-msDNA-msrRNA structure and records one canonical row per Eco1 RT position.
-  It is an earlier check, not an input to the current mask rule.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`:
   contact-risk artifact contract package. It validates review metadata, required
   evidence-availability statuses, and per-row risk-class fields without making
@@ -197,8 +230,9 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- Reusable fixed-backbone mechanics belong in a future `src/dnadesign/thread/`
-  package after a tracer bullet makes the executable contract real.
+- Broader reusable candidate, fold-check, feasibility, and handoff mechanics
+  are still planned; the current executable `thread` surface is the generic
+  ProteinMPNN adapter for request and sample ingest.
 
 ## Router Rule
 

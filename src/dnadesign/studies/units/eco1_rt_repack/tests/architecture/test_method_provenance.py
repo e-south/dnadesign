@@ -45,9 +45,9 @@ def test_contact_risk_profile_is_documented_as_prior_evidence_only() -> None:
     status = _text("docs/studies/eco1_rt_repack/record/status.md")
     command_readme = _text("docs/studies/eco1_rt_repack/operations/runtime/command-groups/README.md")
 
-    assert "evidence reviews only" in mask_policy
+    assert "Contact-risk review artifacts do not protect or release residues" in mask_policy
     assert "Evidence-review artifacts explain the structure context but are not mask inputs" in mask_policy
     assert "direct contact instead: only mapped residues within 5 A" in mask_policy
     assert "contact_geometry_profile.parquet" in status
-    assert "do not protect or release residues" in status
+    assert "does not protect or" in status
     assert "current mask rule" in command_readme

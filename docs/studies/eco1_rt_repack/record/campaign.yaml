@@ -79,9 +79,15 @@ steps:
     path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
   - label: build-sampling-plan
     kind: planned-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+  - label: build-proteinmpnn-request
+    kind: planned-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
   - label: ingest-thread-samples
     kind: planned-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
   - label: build-candidate-table
     kind: planned-runtime

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/surface_accessibility/models.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/proteinmpnn_sample_ingest/models.py
 
-Typed fragments for Eco1 RT surface-accessibility materialization.
+Typed result models for Eco1 ProteinMPNN sample ingest.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,8 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
-class MaterializedSurfaceAccessibilityArtifacts:
-    """Paths emitted by the surface-accessibility materializer."""
+class ProteinMpnnSampleIngestResult:
+    """Paths emitted by Eco1 ProteinMPNN sample ingest."""
 
-    surface_accessibility_profile_path: Path
+    sample_table_path: Path
+    backend_run_manifest_path: Path

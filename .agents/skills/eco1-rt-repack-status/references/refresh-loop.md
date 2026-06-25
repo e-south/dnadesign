@@ -22,7 +22,7 @@ Use this loop when updating or reporting the Eco1 RT repack scaffold.
 Fail fast when:
 
 - the study id in a file does not equal `eco1_rt_repack`
-- `thread` is described as executable before source exists
+- `thread` is described as broadly executable before code exists
 - a sampling plan exists without explicit no-fallback backend policy
 - a candidate handoff lacks upstream artifact provenance
 - a materialized handoff uses fixture fold-check rows

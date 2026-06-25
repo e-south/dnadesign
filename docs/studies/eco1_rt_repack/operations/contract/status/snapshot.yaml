@@ -1,11 +1,9 @@
 version: 1
 study_id: eco1_rt_repack
 snapshot:
-  status: simple_mask_policy_materialized
-  phase: phase1_thread_contract
+  status: proteinmpnn_candidate_table_materialized
+  phase: phase2_real_backend_ingest
   current_record: docs/studies/eco1_rt_repack/record/status.md
   blockers:
-    - thread package not implemented
-    - sampling plan not materialized after simple mask validation
     - fold-check runtime report not materialized
     - downstream RT-only acceptance not materialized

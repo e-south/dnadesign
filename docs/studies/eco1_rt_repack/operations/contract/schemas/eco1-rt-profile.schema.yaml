@@ -45,12 +45,22 @@ field_contract:
     required:
       - status
       - backends_allowed
+      - selected_backend
       - backend_selection_policy
       - temperatures
       - seed_policy
+      - seed_set
+      - batch_id
+      - num_seq_per_target
+      - batch_size
     invariants:
+      - selected_backend_must_be_listed_in_backends_allowed
       - backend_selection_policy_must_be_explicit_no_fallback
       - temperatures_must_be_positive_numbers
+      - seed_policy_requires_explicit_seed_set
+      - batch_id_must_be_explicit
+      - num_seq_per_target_must_be_positive
+      - batch_size_must_divide_num_seq_per_target
   fold_validation_policy:
     required:
       - status

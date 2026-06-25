@@ -1,13 +1,11 @@
 ## Eco1 RT Conservative Thread v1
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-23
-**Status:** scaffold
+**Last verified:** 2026-06-24
+**Status:** backend candidates materialized; fold QA pending
 
-This design set will contain the first fixed-backbone Eco1 RT candidate batch
-after `mask_set.yaml` is regenerated under
-`eco1_rt_clade9_plurality25_direct_contact5a_v1` and the `thread` tracer bullet
-exists.
+This design set contains the first fixed-backbone Eco1 RT ProteinMPNN candidate
+batch generated under `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
 
 ### Inclusion Intent
 
@@ -17,7 +15,7 @@ exists.
 - Fold-check coverage for selected full sequences.
 - Explicit downstream handoff posture for RT-lnRNA collaboration.
 
-### Planned Candidate Funnel
+### Candidate Funnel
 
 | Step | Planned output | Acceptance posture |
 | --- | --- | --- |
@@ -44,4 +42,7 @@ deduplication. Backend, score, and fold outcome remain fields, not id tokens.
 
 ### Current State
 
-No candidates are selected. This page is the durable design-set placeholder.
+The active backend batch is `eco1_rt_p25_5a_n96_20260624`. It produced 96
+accepted ProteinMPNN sample rows and 96 accepted candidate rows with no
+protected-position edits. No candidate has been selected for downstream handoff;
+fold QA and synthesis feasibility remain pending.

@@ -3,13 +3,13 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-22
+last_verified: 2026-06-24
 ---
 
 ## Implementation Roadmap
 
 This roadmap is the implementation-facing checklist for the Eco1 RT repack
-study and the planned reusable `thread` tool. It is intentionally staged so
+study and the reusable `thread` tool. It is intentionally staged so
 each slice can be changed, tested, or replaced without rewriting the full
 campaign.
 
@@ -43,7 +43,8 @@ campaign.
 ### Implemented Slice: Phase 0 Contract Validator
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py`
-is the first executable study-owned CLI seam. Domain validation now lives under
+is the first executable study-owned CLI entrypoint. Domain validation now lives
+under
 `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/`, with
 separate modules for profile contracts, artifact-chain contracts, structure
 authority, conservation-source authority, and materialized runtime artifacts.
@@ -54,12 +55,14 @@ Supported commands:
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase0_scaffold
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase1_thread_contract
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase2_real_backend_ingest
 ```
 
 The validator owns only study-local scaffold and structure-artifact checks. It
-does not run MPNN/fold backends or create `dnadesign.thread`. Reusable
-artifact-chain mechanics may graduate to `thread` only through a separate
-breaking-contract promotion.
+does not hide MPNN/fold execution behind a run-all command. The current
+`dnadesign.thread` surface covers generic ProteinMPNN request, sample-ingest,
+and candidate-table mechanics; fold-check, feasibility, and handoff mechanics
+may graduate to `thread` only through separate contract promotions.
 
 ### Implemented Slice: Structure Authority v1a
 
@@ -174,7 +177,7 @@ steps; aligned FASTA materialization remains the next blocker.
 
 ### Implemented Cross-Tool Slice: Aligner MSA Backend v1
 
-`src/dnadesign/aligner/msa/` provides the generic alignment seam for the next
+`src/dnadesign/aligner/msa/` provides the generic alignment API for the next
 source-data slice: FASTA validation, MAFFT/Clustal Omega preflight/execution,
 and aligned FASTA bundle manifests. It is intentionally not Eco1-aware. It does not fetch
 Mestre/NCBI/BV-BRC source sequences, adjudicate the T301/A301 target mismatch,
@@ -278,7 +281,7 @@ After this slice, the regenerated source FASTA sufficiency gate passes.
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`
 now accepts both selected source FASTA bundles through the public
-`dnadesign.aligner.msa` Clustal Omega seam. The accepted local alignment bundle
+`dnadesign.aligner.msa` Clustal Omega backend. The accepted local alignment bundle
 contains `ec86_clade9_conservation_v1.aligned.fasta` with 303 records and
 `ec86_iia3_cluster42_1_conservation_v1.aligned.fasta` with 45 records; both
 include the pinned `eco1_rt_ec86kit_reference` target row and hash-linked
@@ -372,18 +375,42 @@ This slice:
 3. Preserves the current evidence roles: Tao for fixed-backbone redesign and
    homolog-MSA plurality, Mestre for source ontology, Wang for direct Ec86
    substrate-contact priors, and Simon for motif grammar.
-4. Excludes SASA, contact-density classes, retained-chain-count classes,
+4. Excludes contact-density classes, retained-chain-count classes,
    contact-class tiers, and RT1-RT7 blanket hard fixing from the mask call.
 5. Keeps evidence-review artifacts out of the sampling plan unless a future
    task explicitly changes the mask policy.
 
-### Next Slice: Thread Plan v1
+### Completed Slice: ProteinMPNN Request Adapter v1
 
-Generate a small explicit `thread_plan.yaml` from the materialized simple mask.
-The plan should name backend kind, request hash, seed list, temperature list,
-fixed/non-fixed position source, no-fallback policy, and the missing-backbone
-handling note for terminal residues `1`, `2`, and `312-320`. Do not execute
-ProteinMPNN in the same slice.
+`thread_plan.yaml` is materialized from the simple mask. The study
+`proteinmpnn_request/` materializer now delegates generic fixed-backbone
+request mechanics to `dnadesign.thread.adapters.proteinmpnn`: protein-only
+backbone export, chain-local position conversion, helper JSONL payloads,
+request manifest construction, and generic request validation. Eco1 keeps the
+study path, structure-source, mask, and provenance decisions.
+
+### Completed Slice: Backend Sample Ingest v1
+
+`sample_table.parquet` is materialized from the validated ProteinMPNN request.
+The active batch `eco1_rt_p25_5a_n96_20260624` uses an explicit local
+ProteinMPNN checkout, runs official helper parity checks before sampling,
+preserves request hash, seed, temperature, fixed-position source, and
+no-fallback policy, and records a separate backend-run manifest.
+
+### Completed Slice: Candidate Table v1
+
+Build `candidate_table.parquet` from accepted `sample_table.parquet` rows. It
+assigns stable candidate ids, keeps request/sample provenance, summarizes
+mutations against the selected backbone sequence, rejects edits at protected
+positions, and keeps terminal missing-backbone residues out of fixed-backbone
+mutation accounting. The active table contains 96 accepted candidate rows.
+
+### Next Slice: Fold Check v1
+
+Define and materialize the first fold-check runtime report for accepted
+candidate rows. The report must include WT baseline, runtime parameter hash,
+candidate ids, and explicit pass/fail thresholds before any downstream
+promotion.
 
 ### Implementation Rules
 
@@ -419,9 +446,10 @@ ProteinMPNN in the same slice.
   pass sufficiency, and both selected conservation alignments are accepted under
   the current Clustal Omega policy. `conservation_profile.parquet`, generic
   `aligner.msa` MSA visualization sidecars, and the conservative diagnostic
-  `mask_set.yaml` are materialized locally. The sampling plan, sample table,
-  candidate table, fold-check report, feasibility report, and candidate handoff
-  are not materialized.
+  `mask_set.yaml`, `thread_plan.yaml`, and
+  `proteinmpnn_request/request_manifest.yaml` are materialized locally. The
+  sample table, candidate table, fold-check report, feasibility report, and
+  candidate handoff are not materialized.
 - Phase 1 now has content validators for the local structure, contact,
-  conservation, and mask artifacts. Phase 2 still needs sampling-plan and
-  backend-ingest validators.
+  conservation, mask, thread-plan, and ProteinMPNN request artifacts. Phase 2
+  now fails only on the missing backend sample table.

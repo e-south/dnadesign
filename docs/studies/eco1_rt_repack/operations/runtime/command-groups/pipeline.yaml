@@ -232,19 +232,6 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_risk
         - --repo-root
         - .
-  - id: surface_accessibility_profile
-    owner: eco1_rt_repack
-    status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/surface_accessibility_profile.parquet
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.surface_accessibility
-        - --repo-root
-        - .
   - id: phase0_contract_validation
     owner: eco1_rt_repack
     status: passing
@@ -276,20 +263,75 @@ lanes:
         - --phase
         - phase1_thread_contract
   - id: sampling_plan
-    owner: planned_thread
-    status: planned
+    owner: eco1_rt_repack
+    status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
-    command: null
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.thread_plan
+        - --repo-root
+        - .
+  - id: proteinmpnn_request
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request
+        - --repo-root
+        - .
   - id: sample_ingest
-    owner: planned_thread
-    status: planned
+    owner: thread
+    status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
-    command: null
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest
+        - --repo-root
+        - .
+        - --proteinmpnn-root
+        - .var/tools/proteinmpnn
+        - --overwrite
+  - id: phase2_contract_validation
+    owner: eco1_rt_repack
+    status: passing
+    entry: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.contract_validation
+        - --repo-root
+        - .
+        - --phase
+        - phase2_real_backend_ingest
   - id: candidate_table
-    owner: planned_thread
-    status: planned
+    owner: thread
+    status: materialized
     entry: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
-    command: null
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table
+        - --repo-root
+        - .
   - id: candidate_qa
     owner: planned_thread
     status: planned

@@ -70,13 +70,16 @@ planned_contact_risk_profile:
   status: materialized_audit_only
   ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
 planned_thread_plan:
-  status: planned
+  status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+planned_proteinmpnn_request:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
 planned_sample_table:
-  status: planned
+  status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
 planned_candidate_table:
-  status: planned
+  status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
 planned_foldcheck_report:
   status: planned

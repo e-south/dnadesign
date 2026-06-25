@@ -86,7 +86,9 @@ Study folders have these meanings:
 | `workbench/design_sets/` | Named candidate-batch intent and inclusion policy. | No large candidate tables; link to runtime artifacts. |
 | `workbench/provenance/` | Source authority, numbering, and evidence audits. | Every mutable residue must be traceable here before sampling. |
 
-The planned reusable tool, once promoted, should use this shape:
+The reusable tool has started with a narrow public ProteinMPNN request adapter
+under `src/dnadesign/thread/adapters/proteinmpnn/`. Broader thread contracts
+are still planned and should use this shape when promoted:
 
 ```text
 src/dnadesign/thread/
@@ -116,14 +118,16 @@ src/dnadesign/thread/
 | `candidates/` | Deduplication, ids, mutation tables, and ranking. | Emit deterministic `ThreadCandidate` rows. |
 | `handoffs/` | Downstream handoff bundles and hash closure. | Emit `CandidateHandoff`. |
 
-Do not create `thread` source modules until a tracer bullet needs executable
-contracts. Until then, the study docs and fixtures are the stable planning
-surface.
+Do not broaden `thread` beyond the implemented ProteinMPNN request adapter
+until a tracer bullet needs another executable contract. The Eco1 study docs
+and fixtures remain the stable planning surface for study-specific biology.
 
-Promotion checklist before `src/dnadesign/thread/` becomes executable:
+Promotion checklist before broader `src/dnadesign/thread/` surfaces become
+executable:
 
 - Public imports are exposed from `dnadesign.thread` only after contracts pass
-  fixture and negative-path tests.
+  fixture and negative-path tests. The current public seams are
+  `dnadesign.thread.adapters.proteinmpnn` and `dnadesign.thread.candidates`.
 - CLI stance is explicit: Phase 1 may provide `thread validate` and
   `thread materialize-fixture`; it should not provide `thread run-all`.
 - Tests mirror module ownership: `contracts/`, `structure/`, `evidence/`,
@@ -193,16 +197,15 @@ Promotion checklist before `src/dnadesign/thread/` becomes executable:
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/`.
   It emits a thread-shaped `mask_set.yaml` from residue-map, contact,
   conservation, and manual motif/direct-contact evidence. The prior
-  conservative 20 A tier is diagnostic history. The next mask artifact should
-  use `eco1_rt_plurality25_direct_contact6a_v1`.
+  conservative 20 A mask is diagnostic history. The materialized mask uses
+  `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
 - The contact-risk profile slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`
   and `operations/contracts/contact_risk/`. It emits
   `contact_risk_profile.yaml` as a contact evidence review after
   `mask_set.yaml`, joining nearest-distance contact evidence, conservation
-  masks, manual-mask authority, Wang/Ec86 priors, and older mask-comparison
-  membership. The current mask rule uses direct retained DNA/RNA contact
-  within 6 A.
+  masks, manual-mask authority, Wang/Ec86 priors, and selected mask-row status.
+  The current mask rule uses direct retained DNA/RNA contact within 5 A.
 - The conservation source-sequence bundle slice adds
   `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`.
   It consumes explicit local provider FASTA caches plus `source_records.yaml`,
@@ -356,18 +359,16 @@ materialized structure-artifact content for the Eco1 tracer bullet. Runtime
 artifact mechanics may still graduate to `thread` only through a later explicit
 promotion.
 
-### 6.1 Plurality25 Direct-Contact Mask Policy
+### 6.1 Clade9 Plurality25 Direct-Contact Mask Policy
 
-The earlier mask-comparison files tested broader proximity and surface rules,
-but they no longer define the design mask. The current mask rule is
-`eco1_rt_plurality25_direct_contact6a_v1`:
+The current mask rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`:
 
 ```text
 protected =
   NAxxH / YADD / VTG
   OR Wang/Ec86 direct substrate-contact prior
-  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality
-  OR mapped residue is within 6 A of retained DNA/RNA
+  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA
+  OR mapped residue is within 5 A of retained DNA/RNA
 
 non_fixed = NOT protected
 ```
@@ -376,13 +377,11 @@ Terminal residues `1`, `2`, and `312-320` are
 `non_fixed_missing_backbone`: unprotected, but not directly mutable by
 fixed-backbone ProteinMPNN until coordinates exist.
 
-The next implementation slice should regenerate `mask_set.yaml` under this rule
-and update validation around three classes: `protected`, `non_fixed`,
-and `non_fixed_missing_backbone`.
+The materialized `mask_set.yaml` already uses this rule and validates three row
+classes: `protected`, `non_fixed`, and `non_fixed_missing_backbone`.
 
 This rule excludes:
 
-- SASA and surface-based release rules;
 - contact-density, retained-chain-count, and contact-class release rules;
 - RT1-RT7 blanket hard fixing;
 - 15 A / 18 A / 20 A broad proximity rules as sampling policy;
@@ -390,13 +389,13 @@ This rule excludes:
 
 The residue-count outcome from current evidence is:
 
-- `76` mapped non-fixed residues directly usable by fixed-backbone ProteinMPNN;
+- `123` mapped non-fixed residues directly usable by fixed-backbone ProteinMPNN;
 - `11` terminal `non_fixed_missing_backbone` residues;
-- `87` total unprotected residues.
+- `134` total unprotected residues.
 
-Do not create a generic `thread` implementation for this mask until the
-study-local artifact proves which row fields are reusable. The study code home
-remains `operations/materialization/mask_set/`, with validation under
+Do not create a generic `thread` implementation for this mask until backend
+sample ingest proves which request/result fields are reusable. The study code
+home remains `operations/materialization/mask_set/`, with validation under
 `operations/contracts/masks/`.
 
 ### 7. Fail-Fast Policy

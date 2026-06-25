@@ -266,30 +266,36 @@ datasets:
     path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
     status: materialized_local_audit_only
     description: Local generated contact-risk evidence review. It joins retained-context nearest-distance evidence, atom-class contact geometry, MSA conservation masks, manual mask authority, and Wang/Ec86 candidate priors. It is not a mask call.
-  - id: eco1_rt_surface_accessibility_profile
+  - id: eco1_rt_thread_plan
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/surface_accessibility_profile.parquet
-    status: materialized_local
-    description: Local generated complex-context SASA evidence from the selected Ec86 7V9U protomer plus retained DNA/RNA chains. It is an earlier evidence review; SASA is not part of eco1_rt_clade9_plurality25_direct_contact5a_v1.
-  - id: eco1_rt_thread_plan
-    owner: planned_thread
-    kind: planned_artifact
     path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
-    status: not_generated
-    description: Planned sampling request contract with backend, request hash, seeds, temperatures, and no-fallback policy.
+    status: materialized_local
+    description: Local generated sampling request contract from the validated simple mask. It declares the proteinmpnn backend, explicit seeds 101/202/303, temperatures 0.1/0.3, request hash, 123 mapped mutable positions, terminal missing-backbone exclusions, and explicit no-fallback policy.
+  - id: eco1_rt_proteinmpnn_request
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+    status: materialized_local
+    description: Local generated ProteinMPNN helper-compatible request sidecars. The Eco1 wrapper resolves study paths and selected structure provenance, while dnadesign.thread.adapters.proteinmpnn owns protein-only chain export, canonical-to-chain-local position mapping, fixed-position JSONL, request hashing, --omit_AAs C, and explicit no-fallback request validation.
   - id: eco1_rt_sample_table
-    owner: planned_thread
-    kind: planned_artifact
+    owner: thread
+    kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
-    status: not_generated
-    description: Planned raw backend sample table with run id, request hash, sequence hash, score, and status.
+    status: materialized_local
+    description: "Local generated ProteinMPNN active sample table with 96 accepted rows from batch eco1_rt_p25_5a_n96_20260624: seeds 101/202/303, temperatures 0.1/0.3, and num_seq_per_target 16. Each row carries backend run id, request hash, sequence hash, score, global score, backend result hash, and status."
+  - id: eco1_rt_proteinmpnn_backend_run_manifest
+    owner: thread
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_outputs/backend_run_manifest.yaml
+    status: materialized_local
+    description: Local generated backend-run manifest for official ProteinMPNN commit 8907e6671bfbfc92303b5f79c4b5e6ce47cdef57; records per-seed commands, return codes, elapsed seconds, request hash, request manifest hash, and explicit tool root.
   - id: eco1_rt_candidate_table
-    owner: planned_thread
-    kind: planned_artifact
+    owner: thread
+    kind: generated_artifact
     path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
-    status: not_generated
-    description: Planned deduplicated fixed-backbone candidate table.
+    status: materialized_local
+    description: Local generated active candidate table with 96 accepted rows from the active ProteinMPNN batch; candidate rows use canonical residue mapping from the request manifest and reject protected-position or outside-mutable-position edits.
   - id: eco1_rt_foldcheck_report
     owner: planned_thread
     kind: planned_artifact

@@ -11,7 +11,7 @@ cases:
     reason: every mutable residue must map to canonical Eco1 RT numbering
   - id: reject_protected_catalytic_residue
     expected: fail
-    reason: catalytic residues are fixed in the conservative tier
+    reason: catalytic motif anchors are protected by the active mask rule
   - id: reject_missing_contact_threshold
     expected: fail
     reason: contact-derived masks must declare distance thresholds
@@ -20,7 +20,7 @@ cases:
     reason: conservation-derived masks must point to source profile hashes
   - id: reject_designable_from_missing_source
     expected: fail
-    reason: missing evidence does not imply designability in the conservative tier
+    reason: missing evidence does not imply designability
   - id: reject_fixture_foldcheck_for_materialized_handoff
     expected: fail
     reason: fixture fold-check rows cannot satisfy real candidate handoffs

@@ -53,6 +53,7 @@ sampling_policy:
   backends_allowed:
     - proteinmpnn
     - ligandmpnn
+  selected_backend: proteinmpnn
   backend_selection_policy: explicit_no_fallback
   design_contract_owner: thread
   process_execution_owner: explicit_backend_or_infer_manifest
@@ -61,6 +62,13 @@ sampling_policy:
     - 0.1
     - 0.3
   seed_policy: explicit_seed_list_required
+  seed_set:
+    - 101
+    - 202
+    - 303
+  batch_id: eco1_rt_p25_5a_n96_20260624
+  num_seq_per_target: 16
+  batch_size: 1
 fold_validation_policy:
   status: planned
   wild_type_baseline_required: true

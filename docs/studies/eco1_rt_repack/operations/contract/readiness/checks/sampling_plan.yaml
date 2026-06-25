@@ -51,6 +51,26 @@ checks:
           - fallback_policy
         fallback_policy: explicit_no_fallback
     - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_proteinmpnn_request
+      check_group: sampling_plan
+      summary: Real backend ingest requires ProteinMPNN helper-compatible request sidecars with chain-local fixed positions.
+      required: true
+      artifact: planned_proteinmpnn_request
+      validator_intent:
+        required_state: materialized
+        upstream_artifacts:
+          - planned_thread_plan
+        required_fields:
+          - request_hash
+          - fixed_positions_jsonl
+          - canonical_to_proteinmpnn_position
+          - omit_aas
+          - fallback_policy
+        position_basis: chain_local_1_indexed_after_export
+        omit_aas:
+          - C
+        fallback_policy: explicit_no_fallback
+    - kind: path_exists
       check_id: eco1_rt.sampling.materialized_sample_table
       check_group: sampling_plan
       summary: Real backend ingest requires materialized sample_table.parquet with backend provenance.

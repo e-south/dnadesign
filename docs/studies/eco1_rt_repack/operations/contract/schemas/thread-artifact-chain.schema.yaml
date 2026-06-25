@@ -9,6 +9,7 @@ artifact_order:
   - contact_profile
   - mask_set
   - thread_plan
+  - proteinmpnn_request
   - sample_table
   - candidate_table
   - foldcheck_report
@@ -94,6 +95,15 @@ artifacts:
       - fixed_position_source
       - expected_sample_count
       - fallback_policy
+  proteinmpnn_request:
+    required_fields:
+      - request_hash
+      - source_thread_plan
+      - fixed_positions_jsonl
+      - canonical_to_proteinmpnn_position
+      - omit_aas
+      - fallback_policy
+      - sidecar_paths
   sample_table:
     required_columns:
       - sample_id
