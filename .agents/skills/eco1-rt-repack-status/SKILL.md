@@ -47,8 +47,9 @@ Out of scope:
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
   and reusable fold-check request/report contracts route through
-  `dnadesign.thread.foldcheck`. Fold-model execution, feasibility, and handoff
-  tooling remain planned.
+  `dnadesign.thread.foldcheck`. Reusable ColabFold output normalization routes
+  through `dnadesign.thread.adapters.colabfold`. Fold-model execution,
+  feasibility, and handoff tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
 - Missing or mismatched `study_id` fails visibly.
@@ -82,9 +83,9 @@ Out of scope:
 
 - This skill is study-specific. Do not generalize it to another study.
 - Report that `src/dnadesign/thread/` currently exposes generic ProteinMPNN
-  request, sample-ingest, candidate-table, and fold-check request/report
-  contracts; do not imply that fold-model execution, feasibility, or handoffs
-  are wired.
+  request, sample-ingest, candidate-table, ColabFold output normalization, and
+  fold-check request/report contracts; do not imply that fold-model execution,
+  feasibility, or handoffs are wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
 - Route generic aligned FASTA generation and generic MSA QC visualization

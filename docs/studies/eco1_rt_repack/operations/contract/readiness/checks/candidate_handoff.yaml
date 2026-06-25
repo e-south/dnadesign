@@ -50,7 +50,7 @@ checks:
           - planned_conservation_profile
           - planned_contact_profile
           - planned_mask_set
-          - planned_thread_plan
+          - thread_plan_artifact
           - planned_sample_table
           - planned_candidate_table
           - planned_foldcheck_report

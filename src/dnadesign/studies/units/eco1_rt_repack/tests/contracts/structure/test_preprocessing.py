@@ -19,6 +19,7 @@ import yaml
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.structure import (
     validate_structure_preprocessing_manifest_content,
 )
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
 
 def test_structure_preprocessing_validator_accepts_hash_linked_manifest(tmp_path: Path) -> None:
@@ -27,7 +28,7 @@ def test_structure_preprocessing_validator_accepts_hash_linked_manifest(tmp_path
     issues = validate_structure_preprocessing_manifest_content(
         manifest_path,
         repo_root=tmp_path,
-        structure_root=tmp_path / "outputs/thread/eco1_rt_conservative_v1",
+        structure_root=tmp_path / DEFAULT_THREAD_OUTPUT_ROOT,
     )
 
     assert issues == []
@@ -43,7 +44,7 @@ def test_structure_preprocessing_validator_rejects_stale_upstream_hash(tmp_path:
     issues = validate_structure_preprocessing_manifest_content(
         manifest_path,
         repo_root=tmp_path,
-        structure_root=tmp_path / "outputs/thread/eco1_rt_conservative_v1",
+        structure_root=tmp_path / DEFAULT_THREAD_OUTPUT_ROOT,
     )
 
     assert "eco1_rt.structure.structure_preprocessing_upstream_hash_mismatch" in {issue.check_id for issue in issues}
@@ -58,7 +59,7 @@ def test_structure_preprocessing_validator_rejects_implicit_dimerization_objecti
     issues = validate_structure_preprocessing_manifest_content(
         manifest_path,
         repo_root=tmp_path,
-        structure_root=tmp_path / "outputs/thread/eco1_rt_conservative_v1",
+        structure_root=tmp_path / DEFAULT_THREAD_OUTPUT_ROOT,
     )
 
     assert "eco1_rt.structure.structure_preprocessing_design_objective_mismatch" in {issue.check_id for issue in issues}
@@ -66,7 +67,7 @@ def test_structure_preprocessing_validator_rejects_implicit_dimerization_objecti
 
 def _write_preprocessing_contract_fixture(root: Path) -> Path:
     docs_root = root / "docs/studies/eco1_rt_repack/workbench/provenance"
-    output_root = root / "outputs/thread/eco1_rt_conservative_v1"
+    output_root = root / DEFAULT_THREAD_OUTPUT_ROOT
     docs_root.mkdir(parents=True)
     output_root.mkdir(parents=True)
     ec86kit_manifest = root / "ec86kit_manifest.yaml"

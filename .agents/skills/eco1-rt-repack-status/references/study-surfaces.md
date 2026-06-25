@@ -200,10 +200,20 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   sequences from the residue map and candidate table, then writes a
   ColabFold-planned fold-check FASTA and request manifest without running a fold
   model.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_report/`:
+  thin study-owned wrapper that resolves Eco1 paths and delegates completed
+  ColabFold output parsing to `src/dnadesign/thread/adapters/colabfold/`. It
+  writes `foldcheck_report.parquet` from completed runtime outputs and does not
+  submit jobs or copy raw model directories.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
-  fold-check request contract package. It validates the request manifest, FASTA
-  sequence ids, full 320-aa Eco1 sequence length, accepted candidate coverage,
-  request hash, and upstream artifact hashes.
+  fold-check request/report contract package. It validates the request
+  manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted
+  candidate coverage, request hash, upstream artifact hashes, and report
+  coverage once runtime output exists.
+- `src/dnadesign/thread/adapters/colabfold/`:
+  generic ColabFold output normalizer. It discovers model files by request
+  sequence id, extracts pLDDT/PAE/RMSD-style fields, and emits failure rows
+  without importing Eco1 policy.
 - `src/dnadesign/thread/foldcheck/`:
   generic fold-check request/report contract package. It owns WT-baseline
   request manifests, fold-check FASTA writing, report schemas, and report

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _STRUCTURE_SOURCES = _DOCS_ROOT / "workbench/provenance/structure-sources.yaml"
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry"
 _DEFAULT_CREATED_AT = "2026-06-22T00:00:00Z"
 _GEOMETRY_BACKEND_ID = "biopython_mmcif_atom_geometry_v1"

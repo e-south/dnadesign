@@ -23,15 +23,31 @@ Boltz, or other fold runtimes can write the same normalized report fields.
 
 The materialized fold-check request is:
 
-- `outputs/thread/eco1_rt_conservative_v1/foldcheck_request/input_sequences.fasta`
-- `outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml`
+- `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta`
+- `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml`
 - `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub` for SCC smoke/full
   ColabFold execution from that manifest.
+
+Completed ColabFold output directories are normalized by
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_report/`,
+which calls the generic `dnadesign.thread.adapters.colabfold` parser and writes
+the compact `foldcheck_report.parquet` artifact. This parser does not run a
+fold model and does not copy raw SCC output trees into the repository.
 
 The FASTA contains one WT baseline plus accepted ProteinMPNN candidates as
 full 320-aa canonical Eco1 sequences. Terminal positions without 7V9U backbone
 coordinates are retained as WT residues in the fold-check sequence; they were
 not directly mutated by fixed-backbone ProteinMPNN.
+
+### Runtime Ownership
+
+Fold validation is split across three owners. Eco1 selects the sequences,
+reference structure, and thresholds. BU SCC job templates own scheduler and
+device execution details such as storage roots, queue resources, and the
+`colabfold_batch` command. `dnadesign.thread.adapters.colabfold` owns generic
+ColabFold output parsing, and `dnadesign.thread.foldcheck` owns the normalized
+request/report fields so ColabFold, AlphaFold-family, or later fold runtimes can
+write the same compact artifact without importing Eco1 biology.
 
 ### Required Fields
 

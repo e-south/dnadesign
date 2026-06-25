@@ -4,8 +4,9 @@
 **Last verified:** 2026-06-24
 
 `dnadesign.thread` is intentionally small right now. Its public surfaces are the
-generic ProteinMPNN adapter, ProteinMPNN candidate normalization, and generic
-fold-check request/report contracts.
+generic ProteinMPNN adapter, generic ColabFold output normalizer,
+ProteinMPNN candidate normalization, and generic fold-check request/report
+contracts.
 
 The adapter owns reusable fixed-backbone mechanics:
 
@@ -27,6 +28,20 @@ The fold-check contract owns model-agnostic artifact shape:
 - threshold id and threshold values
 - normalized fold-check report rows with accepted/rejected/errored states
 
+`dnadesign.thread.adapters.colabfold` owns reusable ColabFold output parsing:
+
+- ColabFold output-file discovery by request sequence id
+- pLDDT extraction from model PDB B-factors
+- PAE JSON summarization when available
+- C-alpha RMSD against the WT runtime baseline or an explicit reference PDB
+- failure rows for missing output or missing required metrics
+
 Study packages own biological masks, evidence interpretation, source selection,
 candidate batch policy, fold-check threshold policy, and candidate-ranking
 policy.
+
+Fold model execution is a runtime boundary, not a hidden `thread` fallback.
+Scheduler templates, device storage, and environment activation belong to the
+operator surface that runs the model. `thread` should parse or write compact
+fold-check artifacts through public contracts; it should not choose a study's
+fold backend, thresholds, or downstream promotion rule.

@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Command Groups
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-06-25
 
 This directory is the reproducibility route for the study-owned Eco1 RT repack
 materialization path. It is not a hidden run-all pipeline. Each lane in
@@ -9,7 +9,7 @@ materialization path. It is not a hidden run-all pipeline. Each lane in
 command or planned future command.
 
 Use `pipeline.yaml` as the machine-readable checklist for rerunning the current
-Phase 1 artifact chain:
+study artifact chain:
 
 ```text
 structure authority
@@ -80,7 +80,7 @@ Wang/Ec86 direct substrate-contact priors, Ec86 clade 9 >=25% WT-plurality
 conservation calls, and mapped residues within 5 A of retained DNA/RNA.
 Terminal residues `1`, `2`, and `312-320` are `non_fixed_missing_backbone`.
 
-### Next Backend Gate
+### Backend and Device Boundary
 
 The request plan is materialized:
 
@@ -102,9 +102,12 @@ batch for declared seeds, temperatures, and `num_seq_per_target`, and writes
 `sample_table.parquet`. `candidate_table` then converts accepted backend rows
 into canonical-position mutation summaries and rejects protected-position edits.
 `foldcheck_request` reconstructs full 320-aa WT/candidate sequences and writes a
-ColabFold-planned request manifest without running a fold model. The SCC
-execution lane is `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`: submit a
-small `FOLDCHECK_SEQUENCE_LIMIT=6` smoke first, then `all` only after the smoke
+ColabFold-planned request manifest without running a fold model. The device
+boundary is explicit: this study owns the request and threshold policy,
+`docs/bu-scc` owns scheduler/runtime templates, and `thread` owns the normalized
+fold-check report contract. The SCC execution lane is
+`docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`: submit a small
+`FOLDCHECK_SEQUENCE_LIMIT=6` smoke first, then `all` only after the smoke
 outputs can be normalized into `foldcheck_report.parquet`. A changed mask rule
 must be opened as an explicit policy change before it can feed sampling.
 

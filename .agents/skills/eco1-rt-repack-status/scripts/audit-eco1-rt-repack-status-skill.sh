@@ -132,6 +132,7 @@ expected_materialization_primitives = {
     "contact_risk",
     "conservation",
     "conservation_alignments",
+    "foldcheck_report",
     "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
@@ -303,7 +304,7 @@ if observed_contract_packages != expected_contract_packages:
 expected_contract_package_files = {
     "conservation": {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"},
     "contact_risk": {"__init__.py", "artifacts.py"},
-    "foldcheck": {"__init__.py", "request.py"},
+    "foldcheck": {"__init__.py", "report.py", "request.py"},
     "masks": {
         "__init__.py",
         "cases.py",
@@ -372,7 +373,7 @@ if observed_contract_test_packages != expected_contract_test_packages:
 expected_contract_test_package_files = {
     "conservation": {"__init__.py", "test_sources.py"},
     "contact_risk": {"__init__.py", "test_artifacts.py"},
-    "foldcheck": {"__init__.py", "test_request.py"},
+    "foldcheck": {"__init__.py", "test_report.py", "test_request.py"},
     "masks": {
         "__init__.py",
         "test_cases.py",
@@ -701,7 +702,9 @@ require_pattern 'operations/materialization/thread_plan/' "study surfaces route 
 require_pattern 'operations/materialization/proteinmpnn_request/' "study surfaces route Eco1 ProteinMPNN request wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/proteinmpnn_sample_ingest/' "study surfaces route Eco1 ProteinMPNN sample-ingest wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/candidate_table/' "study surfaces route Eco1 candidate-table wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/foldcheck_report/' "study surfaces route Eco1 fold-check report wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/adapters/proteinmpnn/' "study surfaces route generic ProteinMPNN request adapter" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'src/dnadesign/thread/adapters/colabfold/' "study surfaces route generic ColabFold output normalizer" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/candidates/' "study surfaces route generic candidate-table builder" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'not a hidden run-all pipeline' "command-group README rejects hidden run-all execution" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
 require_pattern 'conservation_provider_sources' "pipeline records provider-source command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
@@ -716,6 +719,7 @@ require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materializati
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request' "pipeline records ProteinMPNN request materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest' "pipeline records ProteinMPNN sample-ingest materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table' "pipeline records candidate-table materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report' "pipeline records fold-check report materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase1_thread_contract' "pipeline records Phase 1 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase2_real_backend_ingest' "pipeline records Phase 2 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'presence-only check' "command-group README documents Phase 1 hash closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"

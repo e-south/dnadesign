@@ -28,6 +28,7 @@ _PROTEINMPNN_FILES = {
     "structure.py",
     "validation.py",
 }
+_COLABFOLD_FILES = {"__init__.py", "manifest.py", "metrics.py", "outputs.py"}
 _FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py"}
 
 
@@ -51,6 +52,19 @@ def test_proteinmpnn_adapter_owns_generic_request_mechanics() -> None:
         assert "mestre" not in text
         assert "wang" not in text
     assert "ProteinMPNN" in (root / "validation.py").read_text(encoding="utf-8")
+
+
+def test_colabfold_adapter_owns_generic_result_normalization() -> None:
+    root = _repo_root() / "src/dnadesign/thread/adapters/colabfold"
+
+    assert sorted(path.name for path in root.glob("*.py")) == sorted(_COLABFOLD_FILES)
+    for path in root.glob("*.py"):
+        text = path.read_text(encoding="utf-8").lower()
+        assert "eco1" not in text
+        assert "ec86" not in text
+        assert "mestre" not in text
+        assert "wang" not in text
+    assert "colabfold" in (root / "outputs.py").read_text(encoding="utf-8").lower()
 
 
 def test_foldcheck_package_owns_generic_fold_report_contracts() -> None:

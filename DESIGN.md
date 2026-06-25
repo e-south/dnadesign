@@ -52,7 +52,7 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
 - Cross-dataset overlay carry must stay explicit and narrow: no implicit merge-side overlay copying, no non-`id` carry keys, and no reserved-namespace transfer hidden behind convenience defaults.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.
-- Transient operational working directories are never root-level repo paths; disposable working state uses `/scratch`, while durable orchestration state remains workspace-scoped.
+- Transient operational working directories and generated artifact roots are never root-level repo paths; disposable working state uses `/scratch`, while durable orchestration state remains workspace-scoped.
 
 ## Tool/package boundaries
 - Tool-local behavior belongs under `src/dnadesign/<tool>/`.

@@ -9,9 +9,10 @@
 Phase 2 backend ingest now passes locally. The study has the required
 structure, source, alignment, conservation evidence, manual mask authority,
 mask set, explicit thread plan, ProteinMPNN request, backend run manifest, and
-sample/candidate tables under `outputs/thread/eco1_rt_conservative_v1/`.
-Fold-check request generation is materialized as a planned ColabFold input, but
-no fold model has been run yet. The selected mask rule is:
+sample/candidate tables under `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
+Fold-check request generation is materialized as a planned ColabFold input, and
+the ColabFold output normalizer is implemented. No fold model has been run yet.
+The selected mask rule is:
 
 ```text
 eco1_rt_clade9_plurality25_direct_contact5a_v1
@@ -138,11 +139,13 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Fast-forward the BU SCC clone to the pushed branch and run the Phase 2
-   validator there.
+1. Deploy the current `dnadesign` branch state and materialized fold-check
+   request to the BU SCC clone, then re-run the Phase 2 validator there.
 2. Run `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub` as a BU SCC ColabFold
-   smoke job for the WT baseline plus a small candidate subset, then ingest the
-   output into `foldcheck_report.parquet`.
+   smoke job for the WT baseline plus a small candidate subset, then normalize
+   the output with
+   `dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report`
+   into `foldcheck_report.parquet`.
 3. Scale the fold-check run to the full 96-candidate batch once the smoke
    report validates.
 4. Define the downstream RT-lnRNA candidate handoff accepted by
@@ -151,8 +154,11 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 ### Blockers
 
 - `dnadesign.thread` now exposes generic ProteinMPNN request, sample-ingest,
-  candidate-table, and fold-check request/report contracts. ColabFold execution
-  and fold-output ingest remain planned.
+  candidate-table, fold-check request/report contracts, and ColabFold output
+  normalization. SCC LocalColabFold is installed under
+  `/projectnb/dunlop/esouth/tools/localcolabfold`, and
+  `colabfold_batch --help` succeeds when the pixi environment `lib/` directory
+  is on `LD_LIBRARY_PATH`.
 - No fold-check runtime report with WT baseline, thresholds, and runtime
   parameter hash exists.
 - No assembly feasibility report exists.

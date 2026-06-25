@@ -3,7 +3,7 @@ study_id: eco1_rt_repack
 status: clade9_plurality25_direct_contact5a_mask_materialized
 notes:
   - Commands are independently runnable lane contracts, not a hidden run-all pipeline.
-  - Generated outputs live under outputs/thread/eco1_rt_conservative_v1/ and are ignored runtime artifacts.
+  - Generated outputs live under src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/ and are ignored runtime artifacts.
   - Provider-source lanes require explicit local source files and hash-pinned roster inputs; do not infer rows from prose or figures.
 lanes:
   - id: refine_dev_spec
@@ -27,12 +27,12 @@ lanes:
   - id: residue_map
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
     command_ref: structure_authority
   - id: structure_preprocessing
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
     command:
       argv:
         - uv
@@ -45,7 +45,7 @@ lanes:
   - id: contact_profile
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
     command:
       argv:
         - uv
@@ -58,7 +58,7 @@ lanes:
   - id: contact_geometry_profile
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
     command:
       argv:
         - uv
@@ -71,7 +71,7 @@ lanes:
   - id: conservation_provider_sources
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/
     requires_external_inputs:
       - mestre_s1_roster_table
     command:
@@ -89,7 +89,7 @@ lanes:
   - id: conservation_roster_cache
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/
     requires_external_inputs:
       - mestre_s1_roster_table
       - provider_fasta_source_root
@@ -106,13 +106,13 @@ lanes:
         - --roster-table
         - <mestre-s1-roster.xlsx>
         - --provider-source-root
-        - outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources
         - --provider-failure-ledger
-        - outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_failures.yaml
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/provider_source_failures.yaml
   - id: conservation_source_bundles
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
     command:
       argv:
         - uv
@@ -125,7 +125,7 @@ lanes:
   - id: conservation_source_sufficiency
     owner: eco1_rt_repack
     status: passing
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
     command:
       argv:
         - uv
@@ -138,7 +138,7 @@ lanes:
   - id: conservation_alignments
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/
     command:
       environment: pixi
       argv:
@@ -154,7 +154,7 @@ lanes:
   - id: conservation_visualizations
     owner: aligner.msa
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
     command:
       argv:
         - uv
@@ -163,9 +163,9 @@ lanes:
         - -m
         - dnadesign.aligner.msa.visualization
         - --alignment-root
-        - outputs/thread/eco1_rt_conservative_v1/conservation_alignments
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments
         - --output-root
-        - outputs/thread/eco1_rt_conservative_v1/conservation_visualizations
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations
         - --profile-id
         - ec86_clade9_conservation_v1
         - --profile-id
@@ -183,7 +183,7 @@ lanes:
   - id: evidence_profiles
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
     command:
       argv:
         - uv
@@ -196,7 +196,7 @@ lanes:
   - id: manual_mask_authority
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
     command:
       argv:
         - uv
@@ -209,7 +209,7 @@ lanes:
   - id: mask_contract
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
     command:
       argv:
         - uv
@@ -222,7 +222,7 @@ lanes:
   - id: contact_risk_profile
     owner: eco1_rt_repack
     status: materialized_audit_only
-    entry: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
     command:
       argv:
         - uv
@@ -265,7 +265,7 @@ lanes:
   - id: sampling_plan
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
     command:
       argv:
         - uv
@@ -278,7 +278,7 @@ lanes:
   - id: proteinmpnn_request
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
     command:
       argv:
         - uv
@@ -291,7 +291,7 @@ lanes:
   - id: sample_ingest
     owner: thread
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
     command:
       argv:
         - uv
@@ -322,7 +322,7 @@ lanes:
   - id: candidate_table
     owner: thread
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
     command:
       argv:
         - uv
@@ -335,7 +335,7 @@ lanes:
   - id: foldcheck_request
     owner: eco1_rt_repack
     status: materialized
-    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
     command:
       argv:
         - uv
@@ -348,29 +348,41 @@ lanes:
   - id: colabfold_scc_smoke
     owner: bu_scc_runtime
     status: planned_external
-    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
     command:
       argv:
         - qsub
         - -P
         - <project>
         - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
         - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
   - id: foldcheck_report
-    owner: planned_thread
-    status: planned
-    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
-    command: null
+    owner: thread
+    status: implemented_waiting_for_runtime_output
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report
+        - --repo-root
+        - .
+        - --colabfold-output-root
+        - <scc_colabfold_outputs>
+        - --runtime-version
+        - <colabfold_version>
   - id: assembly_feasibility
-    owner: planned_thread
+    owner: thread
     status: planned
-    entry: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
     command: null
   - id: candidate_handoff
-    owner: planned_thread
+    owner: thread
     status: planned
-    entry: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
     command: null
   - id: rt_lnrna_handoff
     owner: eco1_rt_repack

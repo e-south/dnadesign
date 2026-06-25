@@ -29,7 +29,7 @@ _CONTRACT_ROOT_FILES = {
 _CONTRACT_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_FILES = {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"}
 _CONTRACT_CONTACT_RISK_FILES = {"__init__.py", "artifacts.py"}
-_CONTRACT_FOLDCHECK_FILES = {"__init__.py", "request.py"}
+_CONTRACT_FOLDCHECK_FILES = {"__init__.py", "report.py", "request.py"}
 _CONTRACT_MASK_FILES = {
     "__init__.py",
     "cases.py",
@@ -71,7 +71,7 @@ _CONTRACT_TEST_ROOT_FILES = {
 _CONTRACT_TEST_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_TEST_FILES = {"__init__.py", "test_sources.py"}
 _CONTRACT_CONTACT_RISK_TEST_FILES = {"__init__.py", "test_artifacts.py"}
-_CONTRACT_FOLDCHECK_TEST_FILES = {"__init__.py", "test_request.py"}
+_CONTRACT_FOLDCHECK_TEST_FILES = {"__init__.py", "test_report.py", "test_request.py"}
 _CONTRACT_MASK_TEST_FILES = {
     "__init__.py",
     "test_cases.py",

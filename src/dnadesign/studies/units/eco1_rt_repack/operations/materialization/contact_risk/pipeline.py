@@ -20,7 +20,9 @@ from typing import Any
 import pyarrow.parquet as pq
 import yaml
 
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_risk"
 _DEFAULT_CREATED_AT = "2026-06-22T00:00:00Z"
 _POLICY_ID = "eco1_rt_contact_risk_audit_v1"

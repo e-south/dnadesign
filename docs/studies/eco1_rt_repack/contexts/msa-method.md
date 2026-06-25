@@ -166,16 +166,16 @@ rules, resolves provider identity through `sequence_providers[*].accession_patte
 in `conservation-sources.yaml`, and writes explicit provider FASTA source files:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/ncbi_protein_efetch.fasta
-outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/bv_brc_feature_protein_fasta.fasta
-outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_manifest.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/ncbi_protein_efetch.fasta
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/bv_brc_feature_protein_fasta.fasta
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/provider_source_manifest.yaml
 ```
 
 If a declared provider does not return requested records, those records may
 only be carried forward through an explicit failure ledger:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/provider_source_failures.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/provider_source_failures.yaml
 ```
 
 Current local real-data counts:
@@ -241,9 +241,9 @@ By default it requires the roster-table hash to match
 the local source cache:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/source_records.yaml
-outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/provider_caches/
-outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/source_cache_manifest.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/source_records.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/provider_caches/
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/source_cache_manifest.yaml
 ```
 
 Command shape:
@@ -283,7 +283,7 @@ metadata is preserved into the profile manifests so the sufficiency gate can
 reject hand-authored or stale bundles before alignment:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
 ```
 
 It does not fetch live provider records and it does not run the MSA backend.
@@ -361,10 +361,10 @@ A complete local run of both selected profiles completed through the declared
 Clustal Omega command and published:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_clade9_conservation_v1.aligned.fasta
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_clade9_conservation_v1.aligned.manifest.yaml
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
-outputs/thread/eco1_rt_conservative_v1/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.manifest.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/ec86_clade9_conservation_v1.aligned.fasta
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/ec86_clade9_conservation_v1.aligned.manifest.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.manifest.yaml
 ```
 
 The accepted clade-9 alignment has 303 records and aligned length 853. The
@@ -393,7 +393,7 @@ Eco1 supplies profile IDs, the target row ID/hash, optional study-owned
 target-position annotations, and the output location:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
 ```
 
 The optional Eco1 annotation track is:
@@ -464,8 +464,8 @@ Run a strict complete report after both required profiles exist:
 
 ```bash
 uv run python -m dnadesign.aligner.msa.visualization \
-  --alignment-root outputs/thread/eco1_rt_conservative_v1/conservation_alignments \
-  --output-root outputs/thread/eco1_rt_conservative_v1/conservation_visualizations \
+  --alignment-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments \
+  --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations \
   --profile-id ec86_clade9_conservation_v1 \
   --profile-id ec86_iia3_cluster42_1_conservation_v1 \
   --target-row-id eco1_rt_ec86kit_reference \
@@ -479,8 +479,8 @@ While only one profile is accepted, an explicit partial report can be generated:
 
 ```bash
 uv run python -m dnadesign.aligner.msa.visualization \
-  --alignment-root outputs/thread/eco1_rt_conservative_v1/conservation_alignments \
-  --output-root outputs/thread/eco1_rt_conservative_v1/conservation_visualizations \
+  --alignment-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments \
+  --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations \
   --profile-id ec86_clade9_conservation_v1 \
   --profile-id ec86_iia3_cluster42_1_conservation_v1 \
   --target-row-id eco1_rt_ec86kit_reference \
@@ -532,7 +532,7 @@ eco1_rt_ec86kit_reference
 The materializer writes:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
 ```
 
 It validates the target row against `residue_map.parquet`, records aligned

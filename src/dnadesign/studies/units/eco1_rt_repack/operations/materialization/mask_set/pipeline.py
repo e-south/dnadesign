@@ -27,12 +27,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.masking import (
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.manual_mask_authority import (
     materialize_manual_mask_authority,
 )
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _CONTRACT_ROOT = _DOCS_ROOT / "operations/contract"
 _PROFILE = _CONTRACT_ROOT / "fixtures/thread/eco1_rt_v1.profile.yaml"
 _CONSERVATION_SOURCES = _DOCS_ROOT / "workbench/provenance/conservation-sources.yaml"
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.mask_set"
 _DEFAULT_CREATED_AT = "2026-06-21T00:00:00Z"
 

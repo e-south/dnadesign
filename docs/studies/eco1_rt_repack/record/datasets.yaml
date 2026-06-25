@@ -183,147 +183,147 @@ datasets:
     status: method_documented
     description: Human-readable reproduction method for future MSA curation, Tao-style conservation scoring, and T301/A301 source mismatch handling.
   - id: eco1_rt_backbone_bundle
-    owner: planned_thread
+    owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
     status: materialized
     description: Local generated selected structure/reference bundle with typed chain inventory; runtime output is not checked in by default.
   - id: eco1_rt_residue_map
-    owner: planned_thread
+    owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
     status: materialized
     description: Local generated all-position residue-numbering map; 309 mapped positions and 11 terminal missing-backbone positions. Terminal residues 1, 2, and 312-320 are non_fixed_missing_backbone under eco1_rt_clade9_plurality25_direct_contact5a_v1.
   - id: eco1_rt_structure_preprocessing_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
     status: materialized_local
     description: Local generated raw-to-protomer provenance manifest for RCSB 7V9U/ec86kit protomer 1; verifies RT chain A, retained DNA chain D, retained RNA chains E/F, excluded paired-protomer context, and the explicit non-objective of preserving dimerization.
   - id: eco1_rt_conservation_profile
-    owner: planned_thread
+    owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
     status: materialized_local
     description: Local generated MSA-derived conservation profile from accepted Clustal Omega alignments for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1; 640 rows, 616 usable evidence rows, 22 unresolved-structure rows, and 2 low-non-gap-support rows.
   - id: eco1_rt_contact_profile
-    owner: planned_thread
+    owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
     status: materialized
     description: Local generated retained-context contact profile with 5 A direct-contact threshold provenance; 120 mapped rows pass the contact predicate and runtime output is not checked in by default.
   - id: eco1_rt_contact_geometry_profile
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
     status: materialized_local
     description: Local generated atom-class geometry profile from the selected ec86kit mmCIF model; 320 canonical rows with all-atom, side-chain, backbone, DNA/RNA split, contact-density, and retained-chain-count evidence. The current rule uses mapped <=5 A retained DNA/RNA distance, not contact-density classes.
   - id: eco1_rt_conservation_provider_sources
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_provider_sources/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/
     status: materialized_local
     description: Local generated provider-source FASTA root; NCBI returned 350/350 records and BV-BRC returned 1464/1577 records with 113 explicit unresolved-provider ledger entries.
   - id: eco1_rt_conservation_source_cache
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_source_cache/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/
     status: materialized_local_qc_passed
     description: Local generated source_records.yaml plus filtered provider FASTA caches for the selected Ec86 clade 9 and II-A3/42_1 profiles. Current regenerated cache includes 302/22 included/excluded ec86_clade9_conservation_v1 rows and 44/3 included/excluded ec86_iia3_cluster42_1_conservation_v1 rows, with pairwise target coverage, pairwise identity, length, motif-marker, and hard-reject QC metadata.
   - id: eco1_rt_conservation_source_fastas
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
     status: materialized_local_sufficiency_passed
     description: Local generated unaligned source FASTA bundles for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1. Source-sequence sufficiency passes for the regenerated selected profiles.
   - id: eco1_rt_conservation_alignment_bundle
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/
     status: materialized_local_accepted
     description: Local generated aligned FASTA bundle for both selected conservation profiles under the selected Clustal Omega policy. ec86_clade9_conservation_v1 has 303 aligned records and ec86_iia3_cluster42_1_conservation_v1 has 45 aligned records, both with the pinned target row and accepted manifests.
   - id: eco1_rt_conservation_visualizations
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
     status: materialized_local
     description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API for both selected conservation profiles, with Eco1-owned RT1-RT7 interval and motif-anchor annotations, exemplar-row windows, selected-row overview panels, plurality/gap histograms, HTML report, and index manifest.
   - id: eco1_rt_manual_mask_authority
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
     status: materialized_local
     description: Local generated manual mask-authority artifact. It records NAxxH 105-109, YADD 195-198, VTG 243-245, RT1-RT7 annotation spans, and Wang/Ec86 direct substrate-contact priors. The current mask rule protects NAxxH/YADD/VTG and Wang direct-contact priors, but does not blanket hard-fix RT1-RT7.
   - id: eco1_rt_mask_set
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
     status: materialized_local_accepted
     description: Local generated simple mask set under eco1_rt_clade9_plurality25_direct_contact5a_v1. It records 123 mapped non-fixed residues, 11 non-fixed terminal missing-backbone residues, and protected residues from NAxxH/YADD/VTG, Wang/Ec86 direct-contact priors, Ec86 clade 9 >=25% WT plurality conservation, or mapped <=5 A retained DNA/RNA.
   - id: eco1_rt_contact_risk_profile
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
     status: materialized_local_audit_only
     description: Local generated contact-risk evidence review. It joins retained-context nearest-distance evidence, atom-class contact geometry, MSA conservation masks, manual mask authority, and Wang/Ec86 candidate priors. It is not a mask call.
   - id: eco1_rt_thread_plan
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
     status: materialized_local
     description: Local generated sampling request contract from the validated simple mask. It declares the proteinmpnn backend, explicit seeds 101/202/303, temperatures 0.1/0.3, request hash, 123 mapped mutable positions, terminal missing-backbone exclusions, and explicit no-fallback policy.
   - id: eco1_rt_proteinmpnn_request
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
     status: materialized_local
     description: Local generated ProteinMPNN helper-compatible request sidecars. The Eco1 wrapper resolves study paths and selected structure provenance, while dnadesign.thread.adapters.proteinmpnn owns protein-only chain export, canonical-to-chain-local position mapping, fixed-position JSONL, request hashing, --omit_AAs C, and explicit no-fallback request validation.
   - id: eco1_rt_sample_table
     owner: thread
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
     status: materialized_local
     description: "Local generated ProteinMPNN active sample table with 96 accepted rows from batch eco1_rt_p25_5a_n96_20260624: seeds 101/202/303, temperatures 0.1/0.3, and num_seq_per_target 16. Each row carries backend run id, request hash, sequence hash, score, global score, backend result hash, and status."
   - id: eco1_rt_proteinmpnn_backend_run_manifest
     owner: thread
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_outputs/backend_run_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_outputs/backend_run_manifest.yaml
     status: materialized_local
     description: Local generated backend-run manifest for official ProteinMPNN commit 8907e6671bfbfc92303b5f79c4b5e6ce47cdef57; records per-seed commands, return codes, elapsed seconds, request hash, request manifest hash, and explicit tool root.
   - id: eco1_rt_candidate_table
     owner: thread
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
     status: materialized_local
     description: Local generated active candidate table with 96 accepted rows from the active ProteinMPNN batch; candidate rows use canonical residue mapping from the request manifest and reject protected-position or outside-mutable-position edits.
   - id: eco1_rt_foldcheck_request_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
     status: materialized_local_planned_not_run
     description: Local generated ColabFold-planned fold-check request manifest. It records one WT baseline plus 96 accepted candidates, full 320-aa canonical sequence hashes, candidate-table/residue-map/ProteinMPNN-request hashes, threshold policy, BU SCC storage posture, and no model execution.
   - id: eco1_rt_foldcheck_input_fasta
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/input_sequences.fasta
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
     status: materialized_local
     description: Local generated fold-check FASTA containing the WT baseline and 96 accepted ProteinMPNN candidates as full 320-aa canonical Eco1 sequences for external ColabFold/AlphaFold-family CLI execution.
   - id: eco1_rt_foldcheck_report
-    owner: planned_thread
+    owner: thread
     kind: planned_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
     status: not_generated
-    description: Planned fold-validation report for selected full-sequence candidates.
+    description: Planned fold-validation report for selected full-sequence candidates. The materializer and generic ColabFold output normalizer are implemented; the artifact awaits a completed ColabFold output directory.
   - id: eco1_rt_feasibility_report
-    owner: planned_thread
+    owner: thread
     kind: planned_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
     status: not_generated
     description: Planned mutation-window and parent-haplotype feasibility report; Eco1 synthesis decisions remain study policy.
   - id: eco1_rt_candidate_handoff
-    owner: planned_thread
+    owner: thread
     kind: planned_artifact
-    path: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
     status: not_generated
     description: Planned RT-only handoff bundle emitted by `thread`; Eco1 selection policy and downstream acceptance remain study-owned.
 downstream_collaboration:

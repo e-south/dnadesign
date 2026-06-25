@@ -19,11 +19,13 @@ from typing import Any
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _STRUCTURE_PREPROCESSING = _DOCS_ROOT / "workbench/provenance/structure-preprocessing.yaml"
 _STRUCTURE_SOURCES = _DOCS_ROOT / "workbench/provenance/structure-sources.yaml"
 _NUMBERING_POLICY = _DOCS_ROOT / "workbench/provenance/residue-numbering-policy.yaml"
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure_preprocessing"
 _DEFAULT_CREATED_AT = "2026-06-22T00:00:00Z"
 

@@ -141,24 +141,26 @@ Before first submit on a host, run deterministic environment bootstrap:
 The Eco1 ColabFold template consumes the materialized fold-check request:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
 ```
 
 Smoke run, WT plus the first five accepted ProteinMPNN candidates:
 
 ```bash
+mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
 qsub -P <project> \
   -l h_rt=04:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
 Full current request, WT plus 96 accepted candidates:
 
 ```bash
+mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
 qsub -P <project> \
   -l h_rt=24:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
@@ -166,7 +168,9 @@ qsub -P <project> \
 - fail-fast gates: request manifest exists, request FASTA exists, output
   directory is empty unless `FOLDCHECK_ALLOW_EXISTING_OUTPUT=1`, and
   `colabfold_batch` is discoverable through `COLABFOLD_BATCH` or the activated
-  environment
+  environment. When `COLABFOLD_BATCH` points into a pixi environment, the
+  wrapper prepends the sibling `lib/` directory to `LD_LIBRARY_PATH` so SCC does
+  not fall back to the older system `libstdc++`.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
   full materialized request
 - durable output root: `FOLDCHECK_RUN_ROOT` defaults to
@@ -175,9 +179,18 @@ qsub -P <project> \
   request hash, selected sequence ids, input FASTA, and output directory
 
 This template deliberately does not parse ColabFold outputs into
-`foldcheck_report.parquet`. That normalization is a separate dnadesign/thread
-contract so raw model directories can stay on SCC while compact reports are
-synced back.
+`foldcheck_report.parquet`. Normalize completed output directories through the
+study wrapper around `dnadesign.thread.adapters.colabfold`:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report \
+  --repo-root . \
+  --colabfold-output-root /project/dunlop/esouth/foldcheck/eco1_rt/<run_id>/colabfold_outputs \
+  --runtime-version <colabfold_version>
+```
+
+Raw model directories stay on SCC by default. The compact report can be synced
+back after validation.
 
 ### Permuter evaluate submissions
 

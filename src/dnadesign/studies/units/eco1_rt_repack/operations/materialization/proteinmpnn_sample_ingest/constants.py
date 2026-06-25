@@ -11,9 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from pathlib import Path
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
-DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 REQUEST_MANIFEST = "proteinmpnn_request/request_manifest.yaml"
 BACKEND_OUTPUT_DIR = "proteinmpnn_outputs"
 SAMPLE_TABLE = "sample_table.parquet"

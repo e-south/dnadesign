@@ -37,7 +37,7 @@ checks:
       check_group: sampling_plan
       summary: Real backend ingest requires thread_plan.yaml with request hash, explicit no-fallback policy, and non-fixed positions from the validated simple mask.
       required: true
-      artifact: planned_thread_plan
+      artifact: thread_plan_artifact
       validator_intent:
         required_state: materialized
         upstream_artifacts:
@@ -59,7 +59,7 @@ checks:
       validator_intent:
         required_state: materialized
         upstream_artifacts:
-          - planned_thread_plan
+          - thread_plan_artifact
         required_fields:
           - request_hash
           - fixed_positions_jsonl

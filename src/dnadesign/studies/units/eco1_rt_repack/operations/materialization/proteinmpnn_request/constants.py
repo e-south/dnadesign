@@ -13,9 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
 DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 STRUCTURE_SOURCES = DOCS_ROOT / "workbench/provenance/structure-sources.yaml"
-DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 REQUEST_DIR_NAME = "proteinmpnn_request"
 PROTEINMPNN_NAME = "chain_a_backbone"
 CHAIN_ID = "A"

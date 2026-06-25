@@ -23,7 +23,7 @@ alignment_policy:
   target_sequence_policy: ec86kit_reference_sequence_must_be_target_row
   target_row_id: eco1_rt_ec86kit_reference
   residue_map_join_key: canonical_position
-  output_profile_artifact: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+  output_profile_artifact: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
   row_count_guardrail:
     declared_command_intended_max_records: 500
     policy: allow_declared_mestre_clade_panel_reject_full_roster_census

@@ -409,6 +409,7 @@ OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
 )
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
+DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES = ("outputs",)
 OVERLAY_GUARD_DOC_PATHS = (
     "docs/operations/orchestration/runbooks.md",
     "docs/bu-scc/jobs/README.md",
@@ -2512,6 +2513,18 @@ def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
 
 def _find_transient_operational_artifact_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
+    for dir_name in DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES:
+        candidate = repo_root / dir_name
+        if not candidate.exists():
+            continue
+        if not candidate.is_dir():
+            continue
+        if not any(candidate.iterdir()):
+            continue
+        issues.append(
+            f"{candidate}: generated artifact directory is not allowed at repository root; "
+            "use a tool or study workspace outputs/ root instead."
+        )
     for dir_name in TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES:
         candidate = repo_root / dir_name
         if not candidate.exists():

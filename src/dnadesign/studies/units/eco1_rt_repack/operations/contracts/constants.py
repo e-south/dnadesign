@@ -13,10 +13,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
 _STUDY_ID = "eco1_rt_repack"
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _CONTRACT_ROOT = _DOCS_ROOT / "operations/contract"
-_PLANNED_THREAD_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_PLANNED_THREAD_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _ALLOWED_PHASES = (
     "phase0_scaffold",
     "phase1_thread_contract",

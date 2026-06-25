@@ -105,7 +105,7 @@ def validate_materialized_structure_artifacts(
         )
     )
     if not issues and _phase_rank(phase) >= _phase_rank("phase2_real_backend_ingest"):
-        issues.extend(validate_sampling_artifacts(repo_root=repo_root, structure_root=structure_root))
+        issues.extend(validate_sampling_artifacts(repo_root=repo_root, structure_root=structure_root, phase=phase))
     return ContractReport(phase=phase, issues=tuple(issues))
 
 

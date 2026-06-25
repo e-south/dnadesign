@@ -24,9 +24,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _CONSERVATION_SOURCES = _DOCS_ROOT / "workbench/provenance/conservation-sources.yaml"
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _DEFAULT_ALIGNMENT_ROOT = _DEFAULT_OUTPUT_ROOT / "conservation_alignments"
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.conservation"
 _DEFAULT_CREATED_AT = "2026-06-20T00:00:00Z"

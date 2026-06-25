@@ -1731,6 +1731,14 @@ def test_find_transient_operational_artifact_path_issues_flags_repo_root_codex_t
     assert any("transient operational artifact directory is not allowed at repo root" in issue for issue in issues)
 
 
+def test_find_transient_operational_artifact_path_issues_flags_repo_root_outputs(tmp_path: Path) -> None:
+    _write(tmp_path / "outputs" / "thread" / "artifact.yaml", "placeholder\n")
+
+    issues = _find_transient_operational_artifact_path_issues(tmp_path)
+
+    assert any("generated artifact directory is not allowed at repository root" in issue for issue in issues)
+
+
 def test_find_transient_operational_artifact_path_issues_allows_workspace_nested_temp_dirs(tmp_path: Path) -> None:
     _write(
         tmp_path

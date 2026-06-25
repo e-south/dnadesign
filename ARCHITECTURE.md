@@ -126,7 +126,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - use `src/dnadesign/usr/docs/operations/` when the owner is a durable USR dataset, overlay set, or `.events.log`
   - use the downstream tool docs after the handoff when that tool owns the next state machine
 - Cross-tool path ownership is explicit: repeated runs accumulate in workspace-scoped directories, not repository-root runbook/log fan-out.
-- Repository-root transient operational working directories (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under `<workspace-root>/outputs/logs/ops/`.
+- Repository-root generated artifact and transient operational directories (for example `outputs/`, `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under a tool or study workspace root.
 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`

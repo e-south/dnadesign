@@ -23,7 +23,7 @@ keeps heavy fold-model execution outside this package.
 ## Current Artifact Ladder
 
 Run materializers as independent steps. Do not hand-edit generated files under
-`outputs/thread/eco1_rt_conservative_v1/`.
+`src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
 
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure --repo-root .

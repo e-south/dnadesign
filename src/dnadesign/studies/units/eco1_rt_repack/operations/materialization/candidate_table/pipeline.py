@@ -17,9 +17,10 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 from dnadesign.thread.candidates import build_proteinmpnn_candidate_rows, write_candidate_table
 
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _REQUEST_MANIFEST = "proteinmpnn_request/request_manifest.yaml"
 _SAMPLE_TABLE = "sample_table.parquet"
 _CANDIDATE_TABLE = "candidate_table.parquet"

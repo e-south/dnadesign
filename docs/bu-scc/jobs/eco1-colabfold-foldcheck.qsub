@@ -5,7 +5,7 @@
 #$ -l mem_per_core=8G
 #$ -l gpus=1
 #$ -j y
-#$ -o outputs/logs/$JOB_NAME.$JOB_ID.out
+#$ -o /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/$JOB_NAME.$JOB_ID.out
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ fi
 repo_root="${DNADESIGN_REPO:-$PWD}"
 cd "$repo_root"
 
-request_manifest="${FOLDCHECK_REQUEST_MANIFEST:-outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml}"
+request_manifest="${FOLDCHECK_REQUEST_MANIFEST:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml}"
 sequence_limit="${FOLDCHECK_SEQUENCE_LIMIT:-6}"
 run_root="${FOLDCHECK_RUN_ROOT:-/project/dunlop/esouth/foldcheck/eco1_rt/${JOB_NAME}.${JOB_ID:-manual}}"
 input_fasta="$run_root/input_sequences.fasta"
@@ -122,8 +122,17 @@ if [[ -n "${COLABFOLD_ENV_ACTIVATE:-}" ]]; then
 fi
 
 colabfold_batch_bin="${COLABFOLD_BATCH:-colabfold_batch}"
+if [[ -n "${COLABFOLD_LD_LIBRARY_PATH:-}" ]]; then
+  export LD_LIBRARY_PATH="${COLABFOLD_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH:-}"
+fi
+if [[ "$colabfold_batch_bin" = /* && -x "$colabfold_batch_bin" ]]; then
+  colabfold_env_root="$(dirname "$(dirname "$colabfold_batch_bin")")"
+  if [[ -d "$colabfold_env_root/lib" ]]; then
+    export LD_LIBRARY_PATH="$colabfold_env_root/lib:${LD_LIBRARY_PATH:-}"
+  fi
+fi
 if ! command -v "$colabfold_batch_bin" >/dev/null 2>&1; then
-  echo "colabfold_batch command not found. Set COLABFOLD_BATCH or COLABFOLD_ENV_ACTIVATE." >&2
+  echo "colabfold_batch command not found. Set COLABFOLD_BATCH, COLABFOLD_ENV_ACTIVATE, or COLABFOLD_LD_LIBRARY_PATH." >&2
   exit 2
 fi
 

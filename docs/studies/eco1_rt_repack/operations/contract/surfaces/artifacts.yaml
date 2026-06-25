@@ -40,59 +40,59 @@ rt_lnrna_route_map:
   ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
 planned_runtime_root:
   status: partially_materialized
-  root_ref: repo:outputs/thread/eco1_rt_conservative_v1
+  root_ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread
   commit_policy: ask_before_commit
 planned_backbone_bundle:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
 planned_residue_map:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
 planned_structure_preprocessing_manifest:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
 planned_conservation_profile:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
 planned_contact_profile:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
 planned_contact_geometry_profile:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
 planned_manual_mask_authority:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
 planned_mask_set:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
 planned_contact_risk_profile:
   status: materialized_audit_only
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
-planned_thread_plan:
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
+thread_plan_artifact:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
 planned_proteinmpnn_request:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
 planned_sample_table:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
 planned_candidate_table:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
 planned_foldcheck_request:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
 planned_foldcheck_input_fasta:
   status: materialized
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_request/input_sequences.fasta
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
 planned_foldcheck_report:
   status: planned
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
 planned_feasibility_report:
   status: planned
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
 planned_candidate_handoff:
   status: planned
-  ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml

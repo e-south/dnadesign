@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.common import _phase_rank
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.foldcheck import (
+    validate_foldcheck_report_content,
     validate_foldcheck_request_content,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
@@ -31,7 +33,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.thread
 )
 
 
-def validate_sampling_artifacts(*, repo_root: Path, structure_root: Path) -> list[ContractIssue]:
+def validate_sampling_artifacts(
+    *,
+    repo_root: Path,
+    structure_root: Path,
+    phase: str = "phase2_real_backend_ingest",
+) -> list[ContractIssue]:
     """Validate Phase 2 sampling handoff artifacts without requiring backend execution in Phase 1."""
 
     issues: list[ContractIssue] = []
@@ -40,6 +47,7 @@ def validate_sampling_artifacts(*, repo_root: Path, structure_root: Path) -> lis
     sample_table = structure_root / "sample_table.parquet"
     candidate_table = structure_root / "candidate_table.parquet"
     foldcheck_request = structure_root / "foldcheck_request/foldcheck_request_manifest.yaml"
+    foldcheck_report = structure_root / "foldcheck_report.parquet"
     if not thread_plan.exists():
         issues.append(
             ContractIssue(
@@ -98,4 +106,15 @@ def validate_sampling_artifacts(*, repo_root: Path, structure_root: Path) -> lis
         )
     else:
         issues.extend(validate_foldcheck_request_content(foldcheck_request, output_root=structure_root))
+    if _phase_rank(phase) >= _phase_rank("phase3_downstream_promotion"):
+        if not foldcheck_report.exists():
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.foldcheck_report.not_materialized",
+                    message="Phase 3 downstream promotion requires materialized foldcheck_report.parquet",
+                    path=str(foldcheck_report),
+                )
+            )
+        else:
+            issues.extend(validate_foldcheck_report_content(foldcheck_report, output_root=structure_root))
     return issues

@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-24
+last_verified: 2026-06-25
 ---
 
 ## Implementation Roadmap
@@ -79,8 +79,8 @@ reference positions.
 materializes the selected authority into local runtime artifacts:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
-outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
 ```
 
 The backbone bundle records typed chain inventory: RT chain `A` as the design
@@ -104,7 +104,7 @@ materializes the retained-context contact evidence into a local runtime
 artifact:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
 ```
 
 The profile is joined through `residue_map.parquet`, uses the pinned
@@ -161,7 +161,7 @@ materializes a long-form local runtime artifact when supplied explicit aligned
 FASTA inputs for each selected profile id:
 
 ```text
-outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
 ```
 
 The materializer reads `conservation-sources.yaml`, joins through
@@ -418,15 +418,36 @@ Generic fold-check request/report contracts now live in
 `dnadesign.thread.foldcheck`. Eco1 owns candidate selection, WT sequence
 reconstruction, threshold policy, and SCC storage posture.
 
-### Next Slice: ColabFold Smoke and Report Ingest v1
+### Implemented Slice: ColabFold Output Normalizer v1
 
-Fast-forward the BU SCC clone to the pushed branch, verify Phase 2 there, then
-run a small ColabFold smoke job from the materialized request with
-`docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`. Normalize the smoke output
-into `foldcheck_report.parquet` before scaling to the full 96-candidate request.
-The report must include WT baseline, runtime parameter hash, candidate ids,
-explicit pass/fail thresholds, and rows for runtime failures before any
-downstream promotion.
+`dnadesign.thread.adapters.colabfold` now normalizes completed ColabFold output
+directories into generic fold-check rows. It discovers model files by request
+sequence id, extracts pLDDT from PDB B-factors, summarizes PAE JSON when
+available, computes C-alpha RMSD against the WT runtime baseline or an explicit
+reference PDB, and emits failure rows for missing outputs or missing metrics.
+
+Eco1's thin wrapper lives at
+`src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_report/`.
+It locates the current study request manifest, calls the generic adapter, and
+writes `foldcheck_report.parquet` under the study workspace. Phase 3 validation
+now fails fast when that report is absent or lacks WT/candidate coverage.
+
+### Next Slice: SCC Fold Smoke and Report v1
+
+LocalColabFold is installed on BU SCC under
+`/projectnb/dunlop/esouth/tools/localcolabfold`, and the
+`colabfold_batch --help` preflight succeeds when the pixi environment `lib/`
+directory is first on `LD_LIBRARY_PATH`. The next step is to deploy the current
+`dnadesign` branch state plus the materialized fold-check request to the SCC
+clone, verify Phase 2 there, then run a small ColabFold smoke job from the
+materialized request with `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`.
+After the smoke completes, run the fold-check report materializer against the
+SCC output directory before scaling to the full 96-candidate request. The owner
+split is explicit: `docs/bu-scc` owns scheduler/runtime templates,
+`dnadesign.thread.adapters.colabfold` owns output normalization,
+`dnadesign.thread.foldcheck` owns the normalized report contract, and
+`eco1_rt_repack` owns candidate selection, WT sequence reconstruction, and
+threshold policy.
 
 ### Implementation Rules
 

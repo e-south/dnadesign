@@ -24,6 +24,7 @@ _CLI_MATERIALIZATION_PACKAGES = {
     "candidate_table",
     "contact_geometry",
     "contact_risk",
+    "foldcheck_report",
     "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
@@ -51,6 +52,7 @@ _MATERIALIZATION_PRIMITIVES = {
     "contact_risk",
     "conservation",
     "conservation_alignments",
+    "foldcheck_report",
     "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
@@ -77,6 +79,13 @@ _FOLDCHECK_REQUEST_ROOT_FILES = {
     "models.py",
     "pipeline.py",
     "sequences.py",
+}
+_FOLDCHECK_REPORT_ROOT_FILES = {
+    "__init__.py",
+    "__main__.py",
+    "cli.py",
+    "constants.py",
+    "pipeline.py",
 }
 
 
@@ -177,3 +186,14 @@ def test_foldcheck_request_materializer_uses_semantic_modules() -> None:
     assert "re.compile" not in pipeline_text
     assert "dnadesign.thread.foldcheck" in pipeline_text
     assert "build_foldcheck_sequence_records" in pipeline_text
+
+
+def test_foldcheck_report_materializer_uses_thread_colabfold_adapter() -> None:
+    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/foldcheck_report"
+
+    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_FOLDCHECK_REPORT_ROOT_FILES)
+    pipeline_text = (source_root / "pipeline.py").read_text(encoding="utf-8")
+    assert "pyarrow" not in pipeline_text
+    assert "np." not in pipeline_text
+    assert "dnadesign.thread.adapters.colabfold" in pipeline_text
+    assert "dnadesign.thread.foldcheck" in pipeline_text

@@ -17,6 +17,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 
 _PIPELINE = "docs/studies/eco1_rt_repack/operations/runtime/command-groups/pipeline.yaml"
 _README = "docs/studies/eco1_rt_repack/operations/runtime/command-groups/README.md"
+_DATASETS = "docs/studies/eco1_rt_repack/record/datasets.yaml"
 
 _EXECUTABLE_LANES = {
     "structure_authority",
@@ -37,6 +38,7 @@ _EXECUTABLE_LANES = {
     "sample_ingest",
     "candidate_table",
     "foldcheck_request",
+    "foldcheck_report",
     "phase0_contract_validation",
     "phase1_contract_validation",
     "phase2_contract_validation",
@@ -44,7 +46,6 @@ _EXECUTABLE_LANES = {
 _EXTERNAL_LANES = {"colabfold_scc_smoke"}
 _PLANNED_LANES = {
     "refine_dev_spec",
-    "foldcheck_report",
     "assembly_feasibility",
     "candidate_handoff",
     "rt_lnrna_handoff",
@@ -101,8 +102,18 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["sample_ingest"]["owner"] == "thread"
     assert by_id["foldcheck_request"]["owner"] == "eco1_rt_repack"
     assert by_id["colabfold_scc_smoke"]["owner"] == "bu_scc_runtime"
-    assert by_id["foldcheck_report"]["owner"] == "planned_thread"
+    assert by_id["foldcheck_report"]["owner"] == "thread"
+    assert by_id["assembly_feasibility"]["owner"] == "thread"
+    assert by_id["candidate_handoff"]["owner"] == "thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]
     assert "dnadesign.aligner.msa.visualization" in by_id["conservation_visualizations"]["command"]["argv"]
+
+
+def test_owner_vocabulary_does_not_encode_lifecycle_status() -> None:
+    pipeline_text = (repo_root() / _PIPELINE).read_text(encoding="utf-8")
+    datasets_text = (repo_root() / _DATASETS).read_text(encoding="utf-8")
+
+    assert "owner: planned_thread" not in pipeline_text
+    assert "owner: planned_thread" not in datasets_text

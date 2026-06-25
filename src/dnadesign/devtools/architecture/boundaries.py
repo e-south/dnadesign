@@ -125,6 +125,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("studies", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
     ("studies", "thread"): (
+        "dnadesign.thread.adapters.colabfold",
         "dnadesign.thread.adapters.proteinmpnn",
         "dnadesign.thread.candidates",
         "dnadesign.thread.foldcheck",

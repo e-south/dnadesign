@@ -26,12 +26,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.manual_ma
     structure_residue_ids_for_positions,
     validate_deferred_authority,
 )
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
 _CONTRACT_ROOT = _DOCS_ROOT / "operations/contract"
 _PROFILE = _CONTRACT_ROOT / "fixtures/thread/eco1_rt_v1.profile.yaml"
 _AUTHORITY_SOURCE = _DOCS_ROOT / "workbench/ontology/manual-mask-authority.yaml"
-_DEFAULT_OUTPUT_ROOT = Path("outputs/thread/eco1_rt_conservative_v1")
+_DEFAULT_OUTPUT_ROOT = DEFAULT_THREAD_OUTPUT_ROOT
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.manual_mask_authority"
 _DEFAULT_CREATED_AT = "2026-06-21T00:00:00Z"
 

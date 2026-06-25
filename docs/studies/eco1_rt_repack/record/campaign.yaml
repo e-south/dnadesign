@@ -20,27 +20,27 @@ steps:
   - label: materialize-backbone-bundle
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/backbone_bundle.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
   - label: materialize-residue-map
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/residue_map.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
   - label: materialize-structure-preprocessing
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/structure_preprocessing_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
   - label: materialize-evidence-profiles
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
   - label: materialize-contact-profile
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/contact_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
   - label: materialize-contact-geometry
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/contact_geometry_profile.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
   - label: discover-conservation-sources
     kind: study-record
     status: source_discovery
@@ -56,54 +56,54 @@ steps:
   - label: materialize-conservation-source-sequences
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_sources/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
   - label: materialize-conservation-alignments
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_alignments/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/
   - label: materialize-conservation-visualizations
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/conservation_visualizations/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
   - label: materialize-manual-mask-authority
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/manual_mask_authority.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
   - label: materialize-thread-artifact-chain
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/mask_set.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
   - label: materialize-contact-risk-profile
     kind: generated-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
   - label: build-sampling-plan
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/thread_plan.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
   - label: build-proteinmpnn-request
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/proteinmpnn_request/request_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
   - label: ingest-thread-samples
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
   - label: build-candidate-table
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
   - label: build-foldcheck-request
     kind: planned-runtime
     status: materialized
-    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
   - label: foldcheck-selected-candidates
     kind: planned-runtime
-    status: planned
-    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
+    status: implemented_waiting_for_runtime_output
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
   - label: assess-assembly-feasibility
     kind: planned-runtime
-    path: outputs/thread/eco1_rt_conservative_v1/feasibility_report.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
   - label: tracer-bullet-thread
     kind: planned-runtime
-    path: outputs/thread/eco1_rt_conservative_v1/candidate_handoff.yaml
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
