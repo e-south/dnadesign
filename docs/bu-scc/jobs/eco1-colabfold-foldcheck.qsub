@@ -1,5 +1,6 @@
 #!/bin/bash -l
 #$ -N eco1_colabfold_foldcheck
+#$ -P dunlop
 #$ -l h_rt=04:00:00
 #$ -pe omp 4
 #$ -l mem_per_core=8G
@@ -14,6 +15,8 @@ set -euo pipefail
 # external ColabFold CLI. It does not normalize results into dnadesign contracts.
 
 module purge
+
+export OMP_NUM_THREADS="${NSLOTS:-4}"
 
 if [[ -n "${CUDA_MODULE:-}" ]]; then
   module load "$CUDA_MODULE"
