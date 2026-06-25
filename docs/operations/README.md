@@ -7,7 +7,7 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-06-24
 
 Batch orchestration and read-only Ops status checks start here. Dataset
 assembly, construct realization, and infer write-back stay in the shared USR
