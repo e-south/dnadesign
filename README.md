@@ -45,6 +45,7 @@ Choose the package that owns the artifact, workspace, or workflow you need.
 | [**permuter**](src/dnadesign/permuter/README.md) | Generate sequence permutations and evaluate downstream outputs. | [![permuter coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=permuter)](https://codecov.io/gh/e-south/dnadesign?component=permuter) |
 | [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md) | Analyze TFKD libraries in PPTP-seq context. | [![tfkdanalysis coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=tfkdanalysis)](https://codecov.io/gh/e-south/dnadesign?component=tfkdanalysis) |
 | [**aligner**](src/dnadesign/aligner/README.md) | Score pairwise sequence alignments with Biopython. | [![aligner coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=aligner)](https://codecov.io/gh/e-south/dnadesign?component=aligner) |
+| [**thread**](src/dnadesign/thread/README.md) | Build fixed-backbone design request artifacts for declared backend adapters. | [![thread coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=thread)](https://codecov.io/gh/e-south/dnadesign?component=thread) |
 
 ### Artifact services
 

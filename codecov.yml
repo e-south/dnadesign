@@ -107,6 +107,10 @@ component_management:
       name: aligner
       paths:
         - src/dnadesign/aligner/**
+    - component_id: thread
+      name: thread
+      paths:
+        - src/dnadesign/thread/**
     - component_id: baserender
       name: baserender
       paths:

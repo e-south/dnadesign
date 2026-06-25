@@ -35,6 +35,7 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "ops",
     "permuter",
     "studies",
+    "thread",
     "tfkdanalysis",
     "usr",
 }
@@ -89,6 +90,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("studies", "densegen"),
     ("studies", "opal"),
     ("studies", "permuter"),
+    ("studies", "thread"),
     ("studies", "usr"),
     ("usr", "ops"),
 }
@@ -122,6 +124,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
 }
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("studies", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
+    ("studies", "thread"): ("dnadesign.thread.adapters.proteinmpnn", "dnadesign.thread.candidates"),
     ("usr", "cruncher"): ("dnadesign.cruncher.ingest.promoters",),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (
