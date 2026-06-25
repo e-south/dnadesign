@@ -21,6 +21,7 @@ from dnadesign.thread.foldcheck.models import FoldCheckSequenceRecord
 
 FOLDCHECK_REQUEST_SCHEMA_ID = "thread.foldcheck_request"
 _ALLOWED_AA = set("ACDEFGHIKLMNPQRSTVWY")
+_REQUEST_LOCAL_PATH_FIELDS = {"input_fasta_path", "output_root"}
 
 
 def write_foldcheck_fasta(path: Path, records: Sequence[FoldCheckSequenceRecord]) -> None:
@@ -114,8 +115,14 @@ def build_foldcheck_request_manifest(
 def request_hash(payload: Mapping[str, Any]) -> str:
     """Return the canonical hash URI for a fold-check request payload."""
 
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(_request_hash_payload(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _request_hash_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    if payload.get("schema_id") != FOLDCHECK_REQUEST_SCHEMA_ID:
+        return dict(payload)
+    return {key: value for key, value in payload.items() if key not in _REQUEST_LOCAL_PATH_FIELDS}
 
 
 def _require_identifier(value: str) -> str:
