@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-06-24
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.

@@ -1,7 +1,7 @@
 ## How to use Ops
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-06-24
 
 When Ops is already the right surface, start with the next command below. Use
 `uv run ops catalog list --simple` if the route is still unknown.

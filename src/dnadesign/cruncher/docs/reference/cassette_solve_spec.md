@@ -5,7 +5,7 @@
 **Audience:** cassette workflow users and maintainers
 **Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `configs/cassettes/*.cassette.solve.yaml`
-**Last verified:** 2026-03-25
+**Last verified:** 2026-06-24
 **Primary artifacts:** `solve_report.json`, `table__hits.csv`, `views/top_hits.linear_duplex.v1.jsonl`, `views/top_hits.ssdna_hairpin.v1.jsonl`, and materialized explicit hit bundles
 
 ### Contents
