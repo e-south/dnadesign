@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 _THREAD_ROOT_FILES = {"__init__.py"}
-_THREAD_DIRECTORIES = {"adapters", "assets", "candidates", "docs", "tests"}
+_THREAD_DIRECTORIES = {"adapters", "assets", "candidates", "docs", "foldcheck", "tests"}
 _PROTEINMPNN_FILES = {
     "__init__.py",
     "execution.py",
@@ -28,6 +28,7 @@ _PROTEINMPNN_FILES = {
     "structure.py",
     "validation.py",
 }
+_FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py"}
 
 
 def test_thread_root_is_small_public_tool_surface() -> None:
@@ -50,6 +51,19 @@ def test_proteinmpnn_adapter_owns_generic_request_mechanics() -> None:
         assert "mestre" not in text
         assert "wang" not in text
     assert "ProteinMPNN" in (root / "validation.py").read_text(encoding="utf-8")
+
+
+def test_foldcheck_package_owns_generic_fold_report_contracts() -> None:
+    root = _repo_root() / "src/dnadesign/thread/foldcheck"
+
+    assert sorted(path.name for path in root.glob("*.py")) == sorted(_FOLDCHECK_FILES)
+    for path in root.glob("*.py"):
+        text = path.read_text(encoding="utf-8").lower()
+        assert "eco1" not in text
+        assert "ec86" not in text
+        assert "mestre" not in text
+        assert "wang" not in text
+    assert "thread.foldcheck_report" in (root / "report.py").read_text(encoding="utf-8")
 
 
 def _repo_root() -> Path:

@@ -81,6 +81,12 @@ planned_sample_table:
 planned_candidate_table:
   status: materialized
   ref: repo:outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+planned_foldcheck_request:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+planned_foldcheck_input_fasta:
+  status: materialized
+  ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_request/input_sequences.fasta
 planned_foldcheck_report:
   status: planned
   ref: repo:outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet

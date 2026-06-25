@@ -15,6 +15,11 @@ biological policy, then calls that public adapter for chain-local positions,
 helper JSONL sidecars, protein-only backbone export, request hashes, and
 generic request validation.
 
+Reusable fold-check request/report contracts live in
+`dnadesign.thread.foldcheck`. Eco1 reconstructs the full canonical WT and
+candidate sequences, declares the first ColabFold/AlphaFold-family request, and
+keeps heavy fold-model execution outside this package.
+
 ## Current Artifact Ladder
 
 Run materializers as independent steps. Do not hand-edit generated files under
@@ -34,6 +39,7 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request --repo-root .
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest --repo-root . --proteinmpnn-root .var/tools/proteinmpnn --overwrite
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table --repo-root .
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request --repo-root .
 ```
 
 Validate the current gates:
@@ -45,14 +51,15 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 ```
 
 Phase 2 passes after `sample_table.parquet`,
-`proteinmpnn_outputs/backend_run_manifest.yaml`, and
-`candidate_table.parquet` are materialized.
+`proteinmpnn_outputs/backend_run_manifest.yaml`, and `candidate_table.parquet`
+are materialized. The next fold-check step starts from
+`foldcheck_request/foldcheck_request_manifest.yaml`.
 
 ## Source Layout
 
 - `operations/contracts/`: study contract validation, split into semantic
-  packages for `conservation`, `contact_risk`, `masks`, `sampling`, and
-  `structure`.
+  packages for `conservation`, `contact_risk`, `foldcheck`, `masks`,
+  `sampling`, and `structure`.
 - `operations/materialization/<primitive>/`: one runtime artifact family per
   package. CLI parsing stays in `cli.py`; artifact behavior stays in
   `pipeline.py` and narrower helper modules.

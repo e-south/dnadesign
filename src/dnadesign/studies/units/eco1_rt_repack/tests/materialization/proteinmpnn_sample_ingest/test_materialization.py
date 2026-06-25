@@ -23,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.suite import va
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table import (
     materialize_candidate_table,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request import (
+    materialize_foldcheck_request,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.mask_set import materialize_mask_set
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request import (
     materialize_proteinmpnn_request,
@@ -65,6 +68,7 @@ def test_proteinmpnn_sample_ingest_writes_phase2_sample_table(tmp_path: Path) ->
     assert all(len(row["sequence"]) == 309 for row in rows)
     assert all(row["status"] == "accepted" for row in rows)
     materialize_candidate_table(repo_root=repo_root(), output_root=tmp_path)
+    materialize_foldcheck_request(repo_root=repo_root(), output_root=tmp_path)
 
     phase2 = validate_checked_in_contracts(
         repo_root=repo_root(),

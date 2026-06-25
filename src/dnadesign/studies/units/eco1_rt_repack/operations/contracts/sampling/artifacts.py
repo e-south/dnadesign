@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.foldcheck import (
+    validate_foldcheck_request_content,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_table import (
     validate_candidate_table_content,
@@ -36,6 +39,7 @@ def validate_sampling_artifacts(*, repo_root: Path, structure_root: Path) -> lis
     proteinmpnn_request = structure_root / "proteinmpnn_request/request_manifest.yaml"
     sample_table = structure_root / "sample_table.parquet"
     candidate_table = structure_root / "candidate_table.parquet"
+    foldcheck_request = structure_root / "foldcheck_request/foldcheck_request_manifest.yaml"
     if not thread_plan.exists():
         issues.append(
             ContractIssue(
@@ -82,4 +86,16 @@ def validate_sampling_artifacts(*, repo_root: Path, structure_root: Path) -> lis
         )
     else:
         issues.extend(validate_candidate_table_content(candidate_table, output_root=structure_root))
+    if not foldcheck_request.exists():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.foldcheck_request.not_materialized",
+                message=(
+                    "Phase 2 backend ingest requires materialized foldcheck_request/foldcheck_request_manifest.yaml"
+                ),
+                path=str(foldcheck_request),
+            )
+        )
+    else:
+        issues.extend(validate_foldcheck_request_content(foldcheck_request, output_root=structure_root))
     return issues

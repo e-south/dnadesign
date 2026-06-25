@@ -101,8 +101,12 @@ explicit ProteinMPNN checkout, verifies official helper parity, runs the named
 batch for declared seeds, temperatures, and `num_seq_per_target`, and writes
 `sample_table.parquet`. `candidate_table` then converts accepted backend rows
 into canonical-position mutation summaries and rejects protected-position edits.
-A changed mask rule must be opened as an explicit policy change before it can
-feed sampling.
+`foldcheck_request` reconstructs full 320-aa WT/candidate sequences and writes a
+ColabFold-planned request manifest without running a fold model. The SCC
+execution lane is `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`: submit a
+small `FOLDCHECK_SEQUENCE_LIMIT=6` smoke first, then `all` only after the smoke
+outputs can be normalized into `foldcheck_report.parquet`. A changed mask rule
+must be opened as an explicit policy change before it can feed sampling.
 
 ### Source-Role Guardrails
 

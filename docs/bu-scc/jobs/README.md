@@ -5,6 +5,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
+- `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
@@ -24,6 +25,9 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate \
+  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 qsub -P <project> \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
   docs/bu-scc/jobs/permuter-evaluate.qsub
@@ -131,6 +135,49 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
 - [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
+
+### Eco1 ColabFold fold-check submissions
+
+The Eco1 ColabFold template consumes the materialized fold-check request:
+
+```text
+outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+```
+
+Smoke run, WT plus the first five accepted ProteinMPNN candidates:
+
+```bash
+qsub -P <project> \
+  -l h_rt=04:00:00 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate \
+  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
+```
+
+Full current request, WT plus 96 accepted candidates:
+
+```bash
+qsub -P <project> \
+  -l h_rt=24:00:00 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
+  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
+```
+
+`eco1-colabfold-foldcheck.qsub` defaults:
+- fail-fast gates: request manifest exists, request FASTA exists, output
+  directory is empty unless `FOLDCHECK_ALLOW_EXISTING_OUTPUT=1`, and
+  `colabfold_batch` is discoverable through `COLABFOLD_BATCH` or the activated
+  environment
+- subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
+  full materialized request
+- durable output root: `FOLDCHECK_RUN_ROOT` defaults to
+  `/project/dunlop/esouth/foldcheck/eco1_rt/$JOB_NAME.$JOB_ID`
+- compact run manifest: `colabfold_run_manifest.yaml` records the source
+  request hash, selected sequence ids, input FASTA, and output directory
+
+This template deliberately does not parse ColabFold outputs into
+`foldcheck_report.parquet`. That normalization is a separate dnadesign/thread
+contract so raw model directories can stay on SCC while compact reports are
+synced back.
 
 ### Permuter evaluate submissions
 

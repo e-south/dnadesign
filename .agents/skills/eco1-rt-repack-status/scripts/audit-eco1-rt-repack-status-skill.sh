@@ -132,6 +132,7 @@ expected_materialization_primitives = {
     "contact_risk",
     "conservation",
     "conservation_alignments",
+    "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
     "proteinmpnn_request",
@@ -289,7 +290,7 @@ if observed_contract_root_files != expected_contract_root_files:
         f"{sorted(observed_contract_root_files)}"
     )
 
-expected_contract_packages = {"conservation", "contact_risk", "masks", "sampling", "structure"}
+expected_contract_packages = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 observed_contract_packages = {
     path.name for path in contracts_root.iterdir() if path.is_dir() and path.name != "__pycache__"
 }
@@ -302,6 +303,7 @@ if observed_contract_packages != expected_contract_packages:
 expected_contract_package_files = {
     "conservation": {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"},
     "contact_risk": {"__init__.py", "artifacts.py"},
+    "foldcheck": {"__init__.py", "request.py"},
     "masks": {
         "__init__.py",
         "cases.py",
@@ -357,7 +359,7 @@ if observed_contract_test_root_files != expected_contract_test_root_files:
         f"{sorted(observed_contract_test_root_files)}"
     )
 
-expected_contract_test_packages = {"conservation", "contact_risk", "masks", "sampling", "structure"}
+expected_contract_test_packages = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 observed_contract_test_packages = {
     path.name for path in contract_test_root.iterdir() if path.is_dir() and path.name != "__pycache__"
 }
@@ -370,6 +372,7 @@ if observed_contract_test_packages != expected_contract_test_packages:
 expected_contract_test_package_files = {
     "conservation": {"__init__.py", "test_sources.py"},
     "contact_risk": {"__init__.py", "test_artifacts.py"},
+    "foldcheck": {"__init__.py", "test_request.py"},
     "masks": {
         "__init__.py",
         "test_cases.py",

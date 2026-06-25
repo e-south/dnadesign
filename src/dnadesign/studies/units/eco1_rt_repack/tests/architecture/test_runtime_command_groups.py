@@ -36,13 +36,15 @@ _EXECUTABLE_LANES = {
     "sampling_plan",
     "sample_ingest",
     "candidate_table",
+    "foldcheck_request",
     "phase0_contract_validation",
     "phase1_contract_validation",
     "phase2_contract_validation",
 }
+_EXTERNAL_LANES = {"colabfold_scc_smoke"}
 _PLANNED_LANES = {
     "refine_dev_spec",
-    "candidate_qa",
+    "foldcheck_report",
     "assembly_feasibility",
     "candidate_handoff",
     "rt_lnrna_handoff",
@@ -81,6 +83,11 @@ def test_pipeline_names_sequential_executable_lanes() -> None:
         assert isinstance(argv, list), lane_id
         assert "python" in argv or lane_id == "conservation_alignments"
 
+    for lane_id in sorted(_EXTERNAL_LANES):
+        command = by_id[lane_id].get("command")
+        assert isinstance(command, dict), lane_id
+        assert command.get("argv", [])[0] == "qsub"
+
     for lane_id in sorted(_PLANNED_LANES):
         assert by_id[lane_id].get("command") is None, lane_id
 
@@ -92,6 +99,9 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["conservation_visualizations"]["owner"] == "aligner.msa"
     assert by_id["sampling_plan"]["owner"] == "eco1_rt_repack"
     assert by_id["sample_ingest"]["owner"] == "thread"
+    assert by_id["foldcheck_request"]["owner"] == "eco1_rt_repack"
+    assert by_id["colabfold_scc_smoke"]["owner"] == "bu_scc_runtime"
+    assert by_id["foldcheck_report"]["owner"] == "planned_thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]

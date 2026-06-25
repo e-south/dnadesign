@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Status
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-06-25
 **Status surface:** record-only
 
 ### Current Phase
@@ -9,8 +9,9 @@
 Phase 2 backend ingest now passes locally. The study has the required
 structure, source, alignment, conservation evidence, manual mask authority,
 mask set, explicit thread plan, ProteinMPNN request, backend run manifest, and
-sample table under `outputs/thread/eco1_rt_conservative_v1/`. The selected mask
-rule is:
+sample/candidate tables under `outputs/thread/eco1_rt_conservative_v1/`.
+Fold-check request generation is materialized as a planned ColabFold input, but
+no fold model has been run yet. The selected mask rule is:
 
 ```text
 eco1_rt_clade9_plurality25_direct_contact5a_v1
@@ -84,6 +85,11 @@ handled separately.
   rows and no protected-position or outside-mutable-position mutations. The
   named batch table is also retained at
   `candidate_tables/eco1_rt_p25_5a_n96_20260624.parquet`.
+- `foldcheck_request/foldcheck_request_manifest.yaml` and
+  `foldcheck_request/input_sequences.fasta` are materialized locally. The FASTA
+  contains one WT baseline plus the 96 accepted candidates as full 320-aa
+  canonical sequences. The request is `planned_not_run`, backend kind
+  `colabfold`, and runtime kind `alphafold_family_colabfold`.
 
 ### Mask Counts
 
@@ -132,15 +138,21 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Define fold-check and feasibility gates for accepted candidate rows.
-2. Define the downstream RT-lnRNA candidate handoff accepted by
+1. Fast-forward the BU SCC clone to the pushed branch and run the Phase 2
+   validator there.
+2. Run `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub` as a BU SCC ColabFold
+   smoke job for the WT baseline plus a small candidate subset, then ingest the
+   output into `foldcheck_report.parquet`.
+3. Scale the fold-check run to the full 96-candidate batch once the smoke
+   report validates.
+4. Define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
 ### Blockers
 
 - `dnadesign.thread` now exposes generic ProteinMPNN request, sample-ingest,
-  and candidate-table mechanics. Fold-check normalization, feasibility, and
-  handoff tooling remain planned.
+  candidate-table, and fold-check request/report contracts. ColabFold execution
+  and fold-output ingest remain planned.
 - No fold-check runtime report with WT baseline, thresholds, and runtime
   parameter hash exists.
 - No assembly feasibility report exists.

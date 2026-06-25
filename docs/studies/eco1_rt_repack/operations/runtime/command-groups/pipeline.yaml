@@ -332,7 +332,32 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table
         - --repo-root
         - .
-  - id: candidate_qa
+  - id: foldcheck_request
+    owner: eco1_rt_repack
+    status: materialized
+    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request
+        - --repo-root
+        - .
+  - id: colabfold_scc_smoke
+    owner: bu_scc_runtime
+    status: planned_external
+    entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    command:
+      argv:
+        - qsub
+        - -P
+        - <project>
+        - -v
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_ENV_ACTIVATE=<colabfold_env>/bin/activate
+        - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
+  - id: foldcheck_report
     owner: planned_thread
     status: planned
     entry: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet

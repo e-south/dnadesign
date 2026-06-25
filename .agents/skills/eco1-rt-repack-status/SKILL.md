@@ -41,12 +41,14 @@ Out of scope:
 - Status answers come from `record/status.md`, `record/datasets.yaml`,
   `record/campaign.yaml`, and `operations/ops.study.yaml`.
 - The answer distinguishes the implemented ProteinMPNN request, sample-ingest,
-  and candidate-table surfaces from planned fold-check, feasibility, and
-  handoff tooling.
+  candidate-table, and fold-check request surfaces from planned fold runtime,
+  feasibility, and handoff tooling.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
-  and reusable candidate-table mechanics route through `dnadesign.thread.candidates`.
-  Fold-check, feasibility, and handoff tooling remain planned.
+  reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
+  and reusable fold-check request/report contracts route through
+  `dnadesign.thread.foldcheck`. Fold-model execution, feasibility, and handoff
+  tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
 - Missing or mismatched `study_id` fails visibly.
@@ -80,8 +82,9 @@ Out of scope:
 
 - This skill is study-specific. Do not generalize it to another study.
 - Report that `src/dnadesign/thread/` currently exposes generic ProteinMPNN
-  request, sample-ingest, and candidate-table mechanics; do not imply that
-  fold-checks, feasibility, or handoffs are wired.
+  request, sample-ingest, candidate-table, and fold-check request/report
+  contracts; do not imply that fold-model execution, feasibility, or handoffs
+  are wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
 - Route generic aligned FASTA generation and generic MSA QC visualization

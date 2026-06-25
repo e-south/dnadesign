@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-routes
 surface: study-route-map
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-21
+last_verified: 2026-06-25
 entrypoint: self
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -38,6 +38,7 @@ study.
 | Conservation contract validators | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/conservation/` |
 | Mask contract validators | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/masks/` |
 | Structure contract validators | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/structure/` |
+| Fold-check request validator | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/` |
 | Sequential materialization command group | `../operations/runtime/command-groups/pipeline.yaml` |
 | Structure materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/` |
 | Contact profile materializer | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/` |
@@ -87,7 +88,8 @@ study.
 | Contact-risk review | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`, `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`, and `../../../outputs/thread/eco1_rt_conservative_v1/contact_risk_profile.yaml` | retained as evidence review; contact-density and contact-class ideas do not decide protected residues |
 | ProteinMPNN sample ingest | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/proteinmpnn_sample_ingest/`, `../../../src/dnadesign/thread/adapters/proteinmpnn/`, `../../../outputs/thread/eco1_rt_conservative_v1/proteinmpnn_outputs/backend_run_manifest.yaml`, and `../../../outputs/thread/eco1_rt_conservative_v1/sample_table.parquet` | materialized locally from official ProteinMPNN commit `8907e6671bfbfc92303b5f79c4b5e6ce47cdef57`; active batch `eco1_rt_p25_5a_n96_20260624` has 96 accepted rows and Phase 2 validates |
 | Candidate table | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/candidate_table/`, `../../../src/dnadesign/thread/candidates/`, and `../../../outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet` | materialized locally; 96 accepted candidate rows, zero protected-position edits, and canonical-position mutation summaries derived from the ProteinMPNN request manifest |
-| Fold validation | `../contexts/fold-validation-policy.md` | planned |
+| Fold-check request | `../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_request/`, `../../../src/dnadesign/thread/foldcheck/`, and `../../../outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml` | materialized locally; one WT baseline plus 96 accepted candidates as full 320-aa canonical sequences, planned for ColabFold/AlphaFold-family CLI execution on BU SCC |
+| Fold validation | `../contexts/fold-validation-policy.md` | request materialized; runtime report planned |
 | Full-gene vs pooled-window economics | `../contexts/synthesis-feasibility-policy.md` | planned |
 | Downstream RT-lnRNA collaboration | `../../rt_lnrna_sponging_construct_triage/routes/README.md` | explicit handoff needed |
 | RT-only downstream acceptance | `../operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml` | scaffolded |

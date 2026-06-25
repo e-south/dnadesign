@@ -99,8 +99,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   scoring rule, and T301/A301 source-mismatch handling.
 - `contexts/residue-mask-policy.md`: catalytic/contact/conservation mask
   policy.
-- `contexts/fold-validation-policy.md`: fold-check acceptance and no-go
-  signals.
+- `contexts/fold-validation-policy.md`: fold-check request, runtime acceptance,
+  and no-go signals.
 - `contexts/synthesis-feasibility-policy.md`: full-gene versus bounded-window
   computational handoff policy.
 
@@ -195,6 +195,19 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   thin study-owned wrapper that resolves Eco1 paths and delegates generic
   candidate-table construction to `src/dnadesign/thread/candidates/`. It writes
   `candidate_table.parquet` from accepted backend rows.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_request/`:
+  thin study-owned wrapper that reconstructs full canonical WT/candidate
+  sequences from the residue map and candidate table, then writes a
+  ColabFold-planned fold-check FASTA and request manifest without running a fold
+  model.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
+  fold-check request contract package. It validates the request manifest, FASTA
+  sequence ids, full 320-aa Eco1 sequence length, accepted candidate coverage,
+  request hash, and upstream artifact hashes.
+- `src/dnadesign/thread/foldcheck/`:
+  generic fold-check request/report contract package. It owns WT-baseline
+  request manifests, fold-check FASTA writing, report schemas, and report
+  validation; it does not run ColabFold or choose Eco1 thresholds.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/sampling/`:
   sampling artifact contract package. Phase 2 validates `thread_plan.yaml` and
   `proteinmpnn_request/request_manifest.yaml` separately from
@@ -230,9 +243,9 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- Broader reusable candidate, fold-check, feasibility, and handoff mechanics
-  are still planned; the current executable `thread` surface is the generic
-  ProteinMPNN adapter for request and sample ingest.
+- Broader reusable fold-model execution, feasibility, and handoff mechanics are
+  still planned; the current executable `thread` surfaces are the generic
+  ProteinMPNN adapter, candidate-table package, and fold-check contract package.
 
 ## Router Rule
 

@@ -86,23 +86,17 @@ Study folders have these meanings:
 | `workbench/design_sets/` | Named candidate-batch intent and inclusion policy. | No large candidate tables; link to runtime artifacts. |
 | `workbench/provenance/` | Source authority, numbering, and evidence audits. | Every mutable residue must be traceable here before sampling. |
 
-The reusable tool has started with a narrow public ProteinMPNN request adapter
-under `src/dnadesign/thread/adapters/proteinmpnn/`. Broader thread contracts
-are still planned and should use this shape when promoted:
+The reusable tool has started with narrow public ProteinMPNN, candidate-table,
+and fold-check contract surfaces under `src/dnadesign/thread/`. Broader thread
+contracts should keep this direct package shape when promoted:
 
 ```text
 src/dnadesign/thread/
   README.md
   docs/
-  workspaces/
-  src/
-    contracts/
-    structure/
-    evidence/
-    masks/
-    adapters/
-    candidates/
-    handoffs/
+  adapters/
+  candidates/
+  foldcheck/
   tests/
 ```
 
@@ -116,18 +110,22 @@ src/dnadesign/thread/
 | `masks/` | Deterministic mask algebra and conflict checks. | Emit `ResidueMaskSet` or fail with named conflicts. |
 | `adapters/` | Thin request/result adapters for declared model backends. | Emit backend request manifests and normalize already-declared results; no process runner and no implicit fallback backend. |
 | `candidates/` | Deduplication, ids, mutation tables, and ranking. | Emit deterministic `ThreadCandidate` rows. |
+| `foldcheck/` | Model-agnostic fold-check request/report contracts. | Emit WT-baselined request manifests and normalized report validators; no fold-model execution. |
 | `handoffs/` | Downstream handoff bundles and hash closure. | Emit `CandidateHandoff`. |
 
-Do not broaden `thread` beyond the implemented ProteinMPNN request adapter
-until a tracer bullet needs another executable contract. The Eco1 study docs
-and fixtures remain the stable planning surface for study-specific biology.
+Do not broaden `thread` beyond generic artifact contracts until a tracer bullet
+needs another executable seam. The current public seams are ProteinMPNN request
+adaptation, candidate normalization, and fold-check request/report contracts.
+The Eco1 study docs and fixtures remain the stable planning surface for
+study-specific biology.
 
 Promotion checklist before broader `src/dnadesign/thread/` surfaces become
 executable:
 
 - Public imports are exposed from `dnadesign.thread` only after contracts pass
   fixture and negative-path tests. The current public seams are
-  `dnadesign.thread.adapters.proteinmpnn` and `dnadesign.thread.candidates`.
+  `dnadesign.thread.adapters.proteinmpnn`, `dnadesign.thread.candidates`, and
+  `dnadesign.thread.foldcheck`.
 - CLI stance is explicit: Phase 1 may provide `thread validate` and
   `thread materialize-fixture`; it should not provide `thread run-all`.
 - Tests mirror module ownership: `contracts/`, `structure/`, `evidence/`,
@@ -311,7 +309,8 @@ single owner, explicit input and output artifacts, and a negative-path test.
 | `sampling-request-v1` | `thread.adapters` | mask set and backend policy | `thread_plan.yaml`, backend request manifest | backend selection, seeds, temperature, fixed positions, or fallback policy is implicit |
 | `sample-ingest-v1` | `thread.adapters` or `infer` provider | backend result manifest | `sample_table.parquet` | backend result lacks run id, request hash, sequence hash, seed, temperature, score, or status |
 | `candidate-qa-v1` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, mask violations, unstable row ordering, or missing mutation windows appear |
-| `foldcheck-normalize-v1` | `thread.adapters` or `infer` provider | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, provenance, or failure rows are missing |
+| `foldcheck-request-v1` | study plus `thread.foldcheck` | candidate table and residue map | `foldcheck_request/input_sequences.fasta`, `foldcheck_request/foldcheck_request_manifest.yaml` | WT baseline, full canonical sequence reconstruction, threshold policy, SCC storage posture, or upstream hashes are missing |
+| `foldcheck-normalize-v1` | `thread.foldcheck` or `infer` provider | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, provenance, or failure rows are missing |
 | `window-feasibility-v1` | `thread.candidates` plus study policy | accepted full-sequence candidates | `feasibility_report.parquet` | structural coupling or nearest-parent distance is unreported for windowed candidates |
 | `candidate-handoff-v1` | `thread.handoffs` plus study selection policy | candidate, fold, and feasibility reports | `candidate_handoff.yaml` | upstream hash closure, nonfixture fold acceptance, full-sequence validation, or downstream target is missing |
 | `rt-lnrna-acceptance-v1` | downstream study | RT-only candidate handoff | accepted/rejected promotion record | construct subject ids are preclaimed or required RT-only fields are absent |
@@ -328,7 +327,8 @@ The first executable slice should be deliberately small:
 3. Emit one conservative `mask_set.yaml`.
 4. Ingest or run eight deterministic ProteinMPNN or LigandMPNN samples.
 5. Deduplicate to a small `candidate_table.parquet`.
-6. Attach fixture or real fold-check metrics.
+6. Materialize a fold-check request for WT plus accepted candidates.
+7. Attach fixture or real fold-check metrics.
 7. Emit `candidate_handoff.yaml`.
 8. Verify that mutable positions are mapped, mask violations are zero,
    candidate ids are deterministic, and every emitted artifact records upstream

@@ -91,9 +91,15 @@ steps:
     path: outputs/thread/eco1_rt_conservative_v1/sample_table.parquet
   - label: build-candidate-table
     kind: planned-runtime
+    status: materialized
     path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
+  - label: build-foldcheck-request
+    kind: planned-runtime
+    status: materialized
+    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
   - label: foldcheck-selected-candidates
     kind: planned-runtime
+    status: planned
     path: outputs/thread/eco1_rt_conservative_v1/foldcheck_report.parquet
   - label: assess-assembly-feasibility
     kind: planned-runtime

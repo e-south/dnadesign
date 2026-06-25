@@ -23,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.suite import va
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table import (
     materialize_candidate_table,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request import (
+    materialize_foldcheck_request,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.mask_set import materialize_mask_set
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request import (
     materialize_proteinmpnn_request,
@@ -56,6 +59,7 @@ def test_candidate_table_materializes_from_current_sample_table(tmp_path: Path) 
     )
 
     result = materialize_candidate_table(repo_root=repo_root(), output_root=tmp_path)
+    materialize_foldcheck_request(repo_root=repo_root(), output_root=tmp_path)
 
     rows = pq.read_table(result.candidate_table_path).to_pylist()
     assert result.candidate_table_path.exists()

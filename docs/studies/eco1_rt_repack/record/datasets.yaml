@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-06-22
+last_verified: 2026-06-25
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -296,6 +296,18 @@ datasets:
     path: outputs/thread/eco1_rt_conservative_v1/candidate_table.parquet
     status: materialized_local
     description: Local generated active candidate table with 96 accepted rows from the active ProteinMPNN batch; candidate rows use canonical residue mapping from the request manifest and reject protected-position or outside-mutable-position edits.
+  - id: eco1_rt_foldcheck_request_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/foldcheck_request_manifest.yaml
+    status: materialized_local_planned_not_run
+    description: Local generated ColabFold-planned fold-check request manifest. It records one WT baseline plus 96 accepted candidates, full 320-aa canonical sequence hashes, candidate-table/residue-map/ProteinMPNN-request hashes, threshold policy, BU SCC storage posture, and no model execution.
+  - id: eco1_rt_foldcheck_input_fasta
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: outputs/thread/eco1_rt_conservative_v1/foldcheck_request/input_sequences.fasta
+    status: materialized_local
+    description: Local generated fold-check FASTA containing the WT baseline and 96 accepted ProteinMPNN candidates as full 320-aa canonical Eco1 sequences for external ColabFold/AlphaFold-family CLI execution.
   - id: eco1_rt_foldcheck_report
     owner: planned_thread
     kind: planned_artifact

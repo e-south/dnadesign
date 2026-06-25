@@ -26,9 +26,10 @@ _CONTRACT_ROOT_FILES = {
     "profile.py",
     "suite.py",
 }
-_CONTRACT_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "sampling", "structure"}
+_CONTRACT_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_FILES = {"__init__.py", "artifacts.py", "source_selection.py", "sources.py"}
 _CONTRACT_CONTACT_RISK_FILES = {"__init__.py", "artifacts.py"}
+_CONTRACT_FOLDCHECK_FILES = {"__init__.py", "request.py"}
 _CONTRACT_MASK_FILES = {
     "__init__.py",
     "cases.py",
@@ -67,9 +68,10 @@ _CONTRACT_TEST_ROOT_FILES = {
     "test_phase_contracts.py",
     "test_source_contracts.py",
 }
-_CONTRACT_TEST_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "masks", "sampling", "structure"}
+_CONTRACT_TEST_SEMANTIC_PACKAGES = {"conservation", "contact_risk", "foldcheck", "masks", "sampling", "structure"}
 _CONTRACT_CONSERVATION_TEST_FILES = {"__init__.py", "test_sources.py"}
 _CONTRACT_CONTACT_RISK_TEST_FILES = {"__init__.py", "test_artifacts.py"}
+_CONTRACT_FOLDCHECK_TEST_FILES = {"__init__.py", "test_request.py"}
 _CONTRACT_MASK_TEST_FILES = {
     "__init__.py",
     "test_cases.py",
@@ -107,6 +109,7 @@ def test_contract_package_routes_domain_contracts_through_semantic_subpackages()
     assert sorted(path.name for path in (source_root / "contact_risk").glob("*.py")) == sorted(
         _CONTRACT_CONTACT_RISK_FILES
     )
+    assert sorted(path.name for path in (source_root / "foldcheck").glob("*.py")) == sorted(_CONTRACT_FOLDCHECK_FILES)
     assert sorted(path.name for path in (source_root / "masks").glob("*.py")) == sorted(_CONTRACT_MASK_FILES)
     assert sorted(
         path.name for path in (source_root / "masks").iterdir() if path.is_dir() and path.name != "__pycache__"
@@ -128,6 +131,9 @@ def test_contract_package_routes_domain_contracts_through_semantic_subpackages()
     )
     assert sorted(path.name for path in (test_root / "contact_risk").glob("*.py")) == sorted(
         _CONTRACT_CONTACT_RISK_TEST_FILES
+    )
+    assert sorted(path.name for path in (test_root / "foldcheck").glob("*.py")) == sorted(
+        _CONTRACT_FOLDCHECK_TEST_FILES
     )
     assert sorted(path.name for path in (test_root / "masks").glob("*.py")) == sorted(_CONTRACT_MASK_TEST_FILES)
     assert sorted(

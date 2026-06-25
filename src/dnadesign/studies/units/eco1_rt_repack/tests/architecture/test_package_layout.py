@@ -24,6 +24,7 @@ _CLI_MATERIALIZATION_PACKAGES = {
     "candidate_table",
     "contact_geometry",
     "contact_risk",
+    "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
     "proteinmpnn_request",
@@ -50,6 +51,7 @@ _MATERIALIZATION_PRIMITIVES = {
     "contact_risk",
     "conservation",
     "conservation_alignments",
+    "foldcheck_request",
     "manual_mask_authority",
     "mask_set",
     "proteinmpnn_request",
@@ -67,23 +69,14 @@ _PROTEINMPNN_REQUEST_ROOT_FILES = {
     "models.py",
     "pipeline.py",
 }
-_SOURCE_SEQUENCE_ROOT_FILES = {
+_FOLDCHECK_REQUEST_ROOT_FILES = {
     "__init__.py",
     "__main__.py",
     "cli.py",
-    "io.py",
-    "issues.py",
-    "manifest.py",
-    "paths.py",
+    "constants.py",
+    "models.py",
     "pipeline.py",
-}
-_SOURCE_SEQUENCE_PACKAGES = {"contracts", "provider_sources", "providers", "roster_cache", "sufficiency"}
-_SOURCE_SEQUENCE_TEST_ROOT_FILES = {"__init__.py", "_fixtures.py", "_qc_fixtures.py", "test_materialization.py"}
-_SOURCE_SEQUENCE_TEST_PACKAGES = {
-    "contracts": "test_provider_accessions.py",
-    "provider_sources": "test_materialization.py",
-    "roster_cache": "test_materialization.py",
-    "sufficiency": "test_sufficiency.py",
+    "sequences.py",
 }
 
 
@@ -175,24 +168,12 @@ def test_proteinmpnn_request_materializer_uses_semantic_modules() -> None:
     assert "export_chain_backbone" in pipeline_text
 
 
-def test_source_sequence_stack_uses_semantic_subpackages() -> None:
-    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/source_sequences"
+def test_foldcheck_request_materializer_uses_semantic_modules() -> None:
+    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/foldcheck_request"
 
-    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_SOURCE_SEQUENCE_ROOT_FILES)
-    for package in sorted(_SOURCE_SEQUENCE_PACKAGES):
-        assert (source_root / package).is_dir()
-        assert (source_root / package / "__init__.py").is_file()
-    for command_package in ("provider_sources", "roster_cache", "sufficiency"):
-        assert (source_root / command_package / "cli.py").is_file()
-        assert "argparse" not in (source_root / command_package / "pipeline.py").read_text(encoding="utf-8")
-    assert "argparse" not in (source_root / "pipeline.py").read_text(encoding="utf-8")
-
-
-def test_source_sequence_tests_mirror_semantic_subpackages() -> None:
-    test_root = repo_root() / _PACKAGE_ROOT / "tests/materialization/source_sequences"
-
-    assert sorted(path.name for path in test_root.glob("*.py")) == sorted(_SOURCE_SEQUENCE_TEST_ROOT_FILES)
-    for package, test_file in sorted(_SOURCE_SEQUENCE_TEST_PACKAGES.items()):
-        assert (test_root / package).is_dir()
-        assert (test_root / package / "__init__.py").is_file()
-        assert (test_root / package / test_file).is_file()
+    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_FOLDCHECK_REQUEST_ROOT_FILES)
+    pipeline_text = (source_root / "pipeline.py").read_text(encoding="utf-8")
+    assert "pyarrow" not in pipeline_text
+    assert "re.compile" not in pipeline_text
+    assert "dnadesign.thread.foldcheck" in pipeline_text
+    assert "build_foldcheck_sequence_records" in pipeline_text

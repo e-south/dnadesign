@@ -14,9 +14,24 @@ checks:
       artifact: thread_candidate_handoff_schema
   phase2_real_backend_ingest:
     - kind: path_exists
+      check_id: eco1_rt.foldcheck.materialized_request
+      check_group: foldcheck_runtime
+      summary: Fold-check readiness requires WT plus candidate FASTA and a backend-neutral request manifest.
+      required: true
+      artifact: planned_foldcheck_request
+      validator_intent:
+        required_state: materialized
+        backend_kind: colabfold
+        fold_model_family: alphafold_family
+        execution_status: planned_not_run
+        required_inputs:
+          - planned_candidate_table
+          - planned_foldcheck_input_fasta
+  phase3_downstream_promotion:
+    - kind: path_exists
       check_id: eco1_rt.foldcheck.materialized_report
       check_group: foldcheck_runtime
-      summary: Real backend ingest requires nonfixture foldcheck_report rows for selected full sequences.
+      summary: Downstream promotion requires nonfixture foldcheck_report rows for selected full sequences.
       required: true
       artifact: planned_foldcheck_report
       validator_intent:

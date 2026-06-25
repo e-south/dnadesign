@@ -1,7 +1,7 @@
 version: 1
 study_id: eco1_rt_repack
 snapshot:
-  status: proteinmpnn_candidate_table_materialized
+  status: foldcheck_request_materialized
   phase: phase2_real_backend_ingest
   current_record: docs/studies/eco1_rt_repack/record/status.md
   blockers:

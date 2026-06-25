@@ -405,12 +405,28 @@ mutations against the selected backbone sequence, rejects edits at protected
 positions, and keeps terminal missing-backbone residues out of fixed-backbone
 mutation accounting. The active table contains 96 accepted candidate rows.
 
-### Next Slice: Fold Check v1
+### Completed Slice: Fold Check Request v1
 
-Define and materialize the first fold-check runtime report for accepted
-candidate rows. The report must include WT baseline, runtime parameter hash,
-candidate ids, and explicit pass/fail thresholds before any downstream
-promotion.
+`foldcheck_request/input_sequences.fasta` and
+`foldcheck_request/foldcheck_request_manifest.yaml` are materialized from the
+accepted candidate table. The request contains one WT baseline plus 96 accepted
+ProteinMPNN candidates as full 320-aa canonical Eco1 sequences. It is a planned
+ColabFold/AlphaFold-family CLI request for BU SCC execution; no fold model is
+run by this materializer.
+
+Generic fold-check request/report contracts now live in
+`dnadesign.thread.foldcheck`. Eco1 owns candidate selection, WT sequence
+reconstruction, threshold policy, and SCC storage posture.
+
+### Next Slice: ColabFold Smoke and Report Ingest v1
+
+Fast-forward the BU SCC clone to the pushed branch, verify Phase 2 there, then
+run a small ColabFold smoke job from the materialized request with
+`docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`. Normalize the smoke output
+into `foldcheck_report.parquet` before scaling to the full 96-candidate request.
+The report must include WT baseline, runtime parameter hash, candidate ids,
+explicit pass/fail thresholds, and rows for runtime failures before any
+downstream promotion.
 
 ### Implementation Rules
 
@@ -447,9 +463,12 @@ promotion.
   the current Clustal Omega policy. `conservation_profile.parquet`, generic
   `aligner.msa` MSA visualization sidecars, and the conservative diagnostic
   `mask_set.yaml`, `thread_plan.yaml`, and
-  `proteinmpnn_request/request_manifest.yaml` are materialized locally. The
-  sample table, candidate table, fold-check report, feasibility report, and
-  candidate handoff are not materialized.
+  `proteinmpnn_request/request_manifest.yaml`, `sample_table.parquet`,
+  `candidate_table.parquet`, and the ColabFold-planned
+  `foldcheck_request/foldcheck_request_manifest.yaml` are materialized locally.
+  The fold-check runtime report, feasibility report, and candidate handoff are
+  not materialized.
 - Phase 1 now has content validators for the local structure, contact,
   conservation, mask, thread-plan, and ProteinMPNN request artifacts. Phase 2
-  now fails only on the missing backend sample table.
+  backend ingest passes locally through the candidate table. Fold-check runtime
+  validation is the next gate.
