@@ -88,8 +88,9 @@ planned_foldcheck_input_fasta:
   status: materialized
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
 planned_foldcheck_report:
-  status: planned
+  status: materialized
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
+  coverage: smoke subset; WT plus five candidates accepted, with explicit errored rows for candidates outside the smoke run.
 planned_feasibility_report:
   status: planned
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet

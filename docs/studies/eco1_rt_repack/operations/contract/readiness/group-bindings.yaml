@@ -6,4 +6,4 @@ group_phase_bindings:
   candidate_handoff: phase1_thread_contract
   foldcheck_runtime: phase1_thread_contract
   assembly_feasibility: phase1_thread_contract
-  downstream_rt_lnrna_handoff: phase3_downstream_promotion
+  downstream_rt_lnrna_handoff: phase4_downstream_promotion

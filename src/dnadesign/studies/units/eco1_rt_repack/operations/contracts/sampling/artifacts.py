@@ -106,7 +106,7 @@ def validate_sampling_artifacts(
         )
     else:
         issues.extend(validate_foldcheck_request_content(foldcheck_request, output_root=structure_root))
-    if _phase_rank(phase) >= _phase_rank("phase3_downstream_promotion"):
+    if _phase_rank(phase) >= _phase_rank("phase3_foldcheck_report"):
         if not foldcheck_report.exists():
             issues.append(
                 ContractIssue(

@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -19,6 +18,8 @@ import pyarrow.parquet as pq
 
 from dnadesign.ops.status.artifacts import load_yaml_mapping
 from dnadesign.ops.status.paths import required_path
+
+from ..storage.state import CampaignState, RoundEntry
 
 
 def provide_opal_campaign_state_status(
@@ -90,19 +91,32 @@ def _opal_campaign_state_status(
             },
         )
 
-    payload = json.loads(state_path.read_text(encoding="utf-8"))
-    rounds = sorted(
-        list(payload.get("rounds") or []),
-        key=lambda round_payload: int(round_payload.get("round_index", -1)),
-    )
+    try:
+        campaign_state = CampaignState.load(state_path)
+    except Exception as exc:
+        return (
+            "attention",
+            "OPAL state.json is not loadable",
+            {
+                "opal_workdir": str(workdir),
+                "opal_config": str(config_path) if config_path is not None else None,
+                "state_path": str(state_path),
+                "ledger_runs_path": str(ledger_runs_path),
+                "ledger_runs_present": ledger_runs_path.exists(),
+                **candidate_evidence,
+                "state_load_error": str(exc),
+            },
+        )
+
+    rounds = sorted(campaign_state.rounds, key=lambda round_entry: int(round_entry.round_index))
     latest_round = rounds[-1] if rounds else None
     num_rounds = len(rounds)
-    campaign_slug = str(payload.get("campaign_slug") or payload.get("slug") or "")
+    campaign_slug = str(campaign_state.campaign_slug or "")
     if num_rounds == 0:
         summary = "OPAL campaign initialized with no completed rounds yet"
         state = "attention"
     else:
-        summary = f"OPAL campaign has {num_rounds} recorded rounds; latest round {latest_round.get('round_index')}"
+        summary = f"OPAL campaign has {num_rounds} recorded rounds; latest round {latest_round.round_index}"
         state = "ok"
     return (
         state,
@@ -115,21 +129,25 @@ def _opal_campaign_state_status(
             "ledger_runs_present": ledger_runs_path.exists(),
             **candidate_evidence,
             "campaign_slug": campaign_slug,
-            "campaign_name": payload.get("campaign_name") or payload.get("name"),
-            "x_column_name": payload.get("x_column_name"),
-            "y_column_name": payload.get("y_column_name"),
+            "campaign_name": campaign_state.campaign_name,
+            "x_column_name": campaign_state.x_column_name,
+            "y_column_name": campaign_state.y_column_name,
             "num_rounds": num_rounds,
-            "latest_round": {
-                "round_index": latest_round.get("round_index"),
-                "run_id": latest_round.get("run_id"),
-                "round_dir": latest_round.get("round_dir"),
-                "selection_top_k_requested": latest_round.get("selection_top_k_requested"),
-                "selection_top_k_effective_after_ties": latest_round.get("selection_top_k_effective_after_ties"),
-            }
-            if latest_round is not None
-            else None,
+            "latest_round": _round_status_evidence(latest_round),
         },
     )
+
+
+def _round_status_evidence(round_entry: RoundEntry | None) -> dict[str, object] | None:
+    if round_entry is None:
+        return None
+    return {
+        "round_index": round_entry.round_index,
+        "run_id": round_entry.run_id,
+        "round_dir": round_entry.round_dir,
+        "selection_top_k_requested": round_entry.selection_top_k_requested,
+        "selection_top_k_effective_after_ties": round_entry.selection_top_k_effective_after_ties,
+    }
 
 
 def _opal_candidate_records_evidence(candidate_records: dict[str, object] | None) -> dict[str, object]:

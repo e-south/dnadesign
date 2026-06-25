@@ -23,7 +23,8 @@ _ALLOWED_PHASES = (
     "phase0_scaffold",
     "phase1_thread_contract",
     "phase2_real_backend_ingest",
-    "phase3_downstream_promotion",
+    "phase3_foldcheck_report",
+    "phase4_downstream_promotion",
 )
 _PHASE_RANK = {phase: index for index, phase in enumerate(_ALLOWED_PHASES)}
 _CONTRACT_STATES = {"scaffold", "fixture", "materialized", "accepted", "rejected"}

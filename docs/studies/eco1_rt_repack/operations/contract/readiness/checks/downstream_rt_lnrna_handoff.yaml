@@ -1,5 +1,5 @@
 checks:
-  phase3_downstream_promotion:
+  phase4_downstream_promotion:
     - kind: path_exists
       check_id: eco1_rt.downstream.rt_lnrna_route
       check_group: downstream_rt_lnrna_handoff

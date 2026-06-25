@@ -152,7 +152,7 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 Phase 3 fold-check report validation:
 
 ```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase3_downstream_promotion
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase3_foldcheck_report
 ```
 
 ### Current Next Actions

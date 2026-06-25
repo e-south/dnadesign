@@ -7,6 +7,9 @@
 - id: phase2_real_backend_ingest
   label: Real MPNN and fold-check artifact ingest
   status: planned
-- id: phase3_downstream_promotion
+- id: phase3_foldcheck_report
+  label: Fold-check report materialization
+  status: planned
+- id: phase4_downstream_promotion
   label: RT-lnRNA promotion handoff
   status: planned

@@ -1037,13 +1037,7 @@ def _write_opal_campaign(config_path: Path, *, rounds: list[dict[str, object]]) 
         yaml.safe_dump({"campaign": {"workdir": str(workdir)}}, sort_keys=False),
         encoding="utf-8",
     )
-    payload = {
-        "campaign_slug": "demo_campaign",
-        "campaign_name": "Demo campaign",
-        "x_column_name": "infer__demo",
-        "y_column_name": "measured_activity",
-        "rounds": rounds,
-    }
+    payload = _opal_state_payload(workdir=workdir, rounds=rounds)
     (workdir / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
@@ -1055,14 +1049,53 @@ def _write_relative_opal_campaign(config_path: Path, *, rounds: list[dict[str, o
         yaml.safe_dump({"campaign": {"workdir": "."}}, sort_keys=False),
         encoding="utf-8",
     )
-    payload = {
+    payload = _opal_state_payload(workdir=campaign_root, rounds=rounds)
+    (campaign_root / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _opal_state_payload(*, workdir: Path, rounds: list[dict[str, object]]) -> dict[str, object]:
+    return {
+        "version": 2,
         "campaign_slug": "demo_campaign",
         "campaign_name": "Demo campaign",
+        "workdir": str(workdir),
+        "data_location": {"kind": "local", "path": "records.parquet"},
         "x_column_name": "infer__demo",
         "y_column_name": "measured_activity",
-        "rounds": rounds,
+        "created_at": "2026-06-25T00:00:00Z",
+        "updated_at": "2026-06-25T00:00:00Z",
+        "representation_vector_dimension": 2,
+        "representation_transform": {"kind": "none"},
+        "training_policy": {"kind": "test"},
+        "performance": {},
+        "rounds": [_opal_round_payload(round_payload) for round_payload in rounds],
+        "backlog": {"number_of_selected_but_not_yet_labeled_candidates_total": 0},
     }
-    (campaign_root / "state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _opal_round_payload(round_payload: dict[str, object]) -> dict[str, object]:
+    round_index = int(round_payload.get("round_index", 0))
+    payload: dict[str, object] = {
+        "round_index": round_index,
+        "run_id": f"run_{round_index:03d}",
+        "round_name": f"round_{round_index}",
+        "round_dir": f"/tmp/opal_campaign/outputs/rounds/round_{round_index}",
+        "labels_used_rounds": [],
+        "number_of_training_examples_used_in_round": 0,
+        "number_of_candidates_scored_in_round": 0,
+        "selection_top_k_requested": 0,
+        "selection_top_k_effective_after_ties": 0,
+        "model": {},
+        "metrics": {},
+        "durations_sec": {},
+        "seeds": {},
+        "artifacts": {},
+        "writebacks": {},
+        "warnings": [],
+        "status": "completed",
+    }
+    payload.update(round_payload)
+    return payload
 
 
 def _write_opal_usr_campaign_without_records(config_path: Path) -> None:
@@ -2713,6 +2746,61 @@ def test_cli_progress_show_reports_opal_campaign_surface() -> None:
         assert payload["state"] == "ok"
         assert payload["evidence"]["num_rounds"] == 1
         assert payload["evidence"]["latest_round"]["run_id"] == "run_001"
+
+
+def test_cli_progress_show_rejects_incompatible_opal_state_schema() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        config_path = Path("configs") / "campaign.yaml"
+        _write_opal_campaign(
+            config_path,
+            rounds=[
+                {
+                    "round_index": 1,
+                    "run_id": "run_001",
+                    "round_dir": "/tmp/opal_campaign/outputs/rounds/round_1",
+                    "selection_top_k_requested": 12,
+                    "selection_top_k_effective_after_ties": 12,
+                }
+            ],
+        )
+        state_path = config_path.parent / "opal_campaign" / "state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "campaign_slug": "demo_campaign",
+                    "campaign_name": "Demo campaign",
+                    "x_column_name": "infer__demo",
+                    "y_column_name": "measured_activity",
+                    "rounds": [{"round_index": 1, "run_id": "run_001"}],
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "opal.downstream.usr-infer-x-active-learning",
+                "--repo-root",
+                str(_repo_root()),
+                "--opal-config",
+                str(config_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status_kind"] == "opal-campaign-state"
+        assert payload["state"] == "attention"
+        assert payload["summary"] == "OPAL state.json is not loadable"
+        assert "state.json version must be 2" in payload["evidence"]["state_load_error"]
 
 
 def test_cli_progress_show_resolves_opal_workdir_relative_to_campaign_root() -> None:

@@ -27,7 +27,7 @@ This study intentionally separates three layers:
 | Layer | Owner | Examples |
 | --- | --- | --- |
 | Study biology | `eco1_rt_repack` | Eco1 structure authority, catalytic masks, retron motif protection, first candidate-batch policy. |
-| Reusable fixed-backbone mechanics | `thread` | Generic ProteinMPNN request, sample-ingest, candidate-table, and fold-check request/report contracts now; fold-model execution, feasibility, and handoff contracts are planned. |
+| Reusable fixed-backbone mechanics | `thread` | Generic ProteinMPNN request, sample-ingest, candidate-table, ColabFold output normalization, and fold-check request/report contracts now; fold-model execution, feasibility, and handoff contracts are planned. |
 | Downstream construct realization | `rt_lnrna_sponging_construct_triage` and `construct` | Pairing an accepted RT with lnRNA/TF-sponging construct subjects. |
 
 The record must fail visibly when a layer is missing. It should not hide missing
@@ -92,13 +92,16 @@ sidecars do not belong in this checked-in record root.
 ### Implementation Boundary
 
 The current executable chain materializes structure, conservation, mask, thread
-plan, ProteinMPNN request, sample table, candidate table, and fold-check request
-artifacts. The active backend batch is `eco1_rt_p25_5a_n96_20260624`, with 96
-accepted ProteinMPNN samples and 96 accepted candidate rows.
+plan, ProteinMPNN request, sample table, candidate table, fold-check request, and
+a six-sequence fold-check smoke report. The active backend batch is
+`eco1_rt_p25_5a_n96_20260624`, with 96 accepted ProteinMPNN samples and 96
+accepted candidate rows. Full WT plus 96-candidate fold-check coverage is still
+required before candidate selection.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic
 ProteinMPNN request and sample-ingest mechanics, `dnadesign.thread.candidates`
 owns generic candidate-table construction, and `dnadesign.thread.foldcheck`
-owns generic fold-check request/report contracts. `infer` may later own backend
+owns generic fold-check request/report contracts. `dnadesign.thread.adapters.colabfold`
+owns generic ColabFold output normalization. `infer` may later own backend
 process execution if an explicit adapter contract is added.

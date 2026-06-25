@@ -27,7 +27,7 @@ def test_phase3_requires_materialized_foldcheck_report_when_phase2_artifacts_exi
 
     report = validate_checked_in_contracts(
         repo_root=root,
-        phase="phase3_downstream_promotion",
+        phase="phase3_foldcheck_report",
         output_root=output_root,
     )
 

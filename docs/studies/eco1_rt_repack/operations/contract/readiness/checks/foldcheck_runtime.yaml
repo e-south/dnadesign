@@ -27,7 +27,7 @@ checks:
         required_inputs:
           - planned_candidate_table
           - planned_foldcheck_input_fasta
-  phase3_downstream_promotion:
+  phase3_foldcheck_report:
     - kind: path_exists
       check_id: eco1_rt.foldcheck.materialized_report
       check_group: foldcheck_runtime
