@@ -163,7 +163,11 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    the objective.
 2. Scale the fold-check run to the full WT plus 96-candidate batch, then
    normalize the completed SCC output directory into `foldcheck_report.parquet`.
-3. Select candidates only from rows with accepted fold-check coverage, then
+3. Optionally generate an Atlas semantic profile for WT plus fold-accepted
+   candidates. Treat ESMC/SAE feature and similarity results as
+   model-derived context for review, not as fold validation or measured
+   processivity.
+4. Select candidates only from rows with accepted fold-check coverage, then
    define the downstream RT-lnRNA candidate handoff accepted by
    `rt_lnrna_sponging_construct_triage`.
 
@@ -178,6 +182,8 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 - The current fold-check runtime report is smoke-scale only. It proves the SCC
   ColabFold path and report contract, but it is not a full 96-candidate fold
   screen.
+- No Atlas semantic profile exists. Atlas is planned as optional model-derived
+  context after fold checking, not as a candidate acceptance gate.
 - No assembly feasibility report exists.
 - No RT-only candidate handoff or RT-lnRNA acceptance record exists.
 

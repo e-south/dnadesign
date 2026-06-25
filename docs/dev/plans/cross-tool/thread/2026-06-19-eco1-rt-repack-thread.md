@@ -115,7 +115,11 @@ src/dnadesign/thread/
 
 Do not broaden `thread` beyond generic artifact contracts until a tracer bullet
 needs another executable seam. The current public seams are ProteinMPNN request
-adaptation, candidate normalization, and fold-check request/report contracts.
+adaptation, candidate normalization, ColabFold output normalization, and
+fold-check request/report contracts. A future `adapters.esm_atlas` seam may
+normalize ESM Atlas query responses into compact model-derived semantic context,
+but it should not become a new core package until another backend needs the
+same contract.
 The Eco1 study docs and fixtures remain the stable planning surface for
 study-specific biology.
 
@@ -124,7 +128,8 @@ executable:
 
 - Public imports are exposed from `dnadesign.thread` only after contracts pass
   fixture and negative-path tests. The current public seams are
-  `dnadesign.thread.adapters.proteinmpnn`, `dnadesign.thread.candidates`, and
+  `dnadesign.thread.adapters.proteinmpnn`,
+  `dnadesign.thread.adapters.colabfold`, `dnadesign.thread.candidates`, and
   `dnadesign.thread.foldcheck`.
 - CLI stance is explicit: Phase 1 may provide `thread validate` and
   `thread materialize-fixture`; it should not provide `thread run-all`.
@@ -311,6 +316,7 @@ single owner, explicit input and output artifacts, and a negative-path test.
 | `candidate-qa-v1` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, mask violations, unstable row ordering, or missing mutation windows appear |
 | `foldcheck-request-v1` | study plus `thread.foldcheck` | candidate table and residue map | `foldcheck_request/input_sequences.fasta`, `foldcheck_request/foldcheck_request_manifest.yaml` | WT baseline, full canonical sequence reconstruction, threshold policy, SCC storage posture, or upstream hashes are missing |
 | `foldcheck-normalize-v1` | `thread.foldcheck` or `infer` provider | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, provenance, or failure rows are missing |
+| `atlas-semantic-profile-v1` | `thread.adapters` plus study wrapper | fold-accepted candidates and full sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, API/schema drift is hidden, or query hashes/raw response hashes are missing |
 | `window-feasibility-v1` | `thread.candidates` plus study policy | accepted full-sequence candidates | `feasibility_report.parquet` | structural coupling or nearest-parent distance is unreported for windowed candidates |
 | `candidate-handoff-v1` | `thread.handoffs` plus study selection policy | candidate, fold, and feasibility reports | `candidate_handoff.yaml` | upstream hash closure, nonfixture fold acceptance, full-sequence validation, or downstream target is missing |
 | `rt-lnrna-acceptance-v1` | downstream study | RT-only candidate handoff | accepted/rejected promotion record | construct subject ids are preclaimed or required RT-only fields are absent |

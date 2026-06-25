@@ -36,6 +36,7 @@ campaign.
 | `sample-ingest` | `thread.adapters` or `infer` handoff | backend result manifest | `sample_table.parquet` | samples lack run id, request hash, score, sequence hash, seed, or status |
 | `candidate-builder` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, non-deterministic ordering, or mask violations are accepted |
 | `foldcheck-normalizer` | `thread.adapters` or `infer` handoff | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, or errored rows are missing |
+| `atlas-semantic-profiler` | `thread.adapters` plus study wrapper | accepted fold-check rows and candidate sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, query hashes are missing, or API schema drift is hidden |
 | `feasibility-assessor` | `thread.candidates` plus study policy | accepted full-sequence candidates | `feasibility_report.parquet` | windowed candidates lack nearest-parent or structural-coupling evidence |
 | `candidate-handoff-builder` | `thread.handoffs` plus study selection policy | candidate, fold, and feasibility reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, or downstream target are missing |
 | `rt-lnrna-promotion-check` | downstream study | RT-only candidate handoff | downstream accept/reject record | construct-subject ids are preclaimed before downstream binding |
@@ -474,6 +475,35 @@ coverage speed against model-rank evidence. The owner split remains explicit:
 `eco1_rt_repack` owns candidate selection, WT sequence reconstruction, and
 threshold policy.
 
+### Planned Slice: ESM Atlas Semantic Profile v1
+
+After full fold-check coverage exists, add a small Atlas annotation lane for
+WT plus fold-accepted Eco1 candidates. The output should be a compact
+`atlas_semantic_profile.parquet` in the study workspace. It should record
+query sequence hashes, Atlas API base/version, raw response hashes, retrieved
+cluster/protein context, top SAE feature labels, similar-protein summaries, and
+explicit failure rows.
+
+This is not a fold-validation replacement and not a functional assay. The
+plain claim is: Atlas provides model-derived semantic affiliations from
+ESMC/SAE representations and ESMFold2-backed Atlas structures. For Ec86, the
+first processivity-oriented feature panel should be treated as a hypothesis
+panel around polymerase mechanics, not a measured processivity score:
+
+- thumb/palm nucleic-acid binding and C-terminal thumb context;
+- motif B / primer-grip context;
+- N-terminal fingers/palm context for structured-template handling;
+- DxD/YADD metal-coordination context;
+- pre-catalytic helix and open/closed gating context;
+- broad RT/RdRp palm-core features as fold/class sanity checks only.
+
+Keep the first implementation pragmatic: a generic
+`dnadesign.thread.adapters.esm_atlas` client/normalizer plus a thin Eco1
+materializer. Do not add a wider `semantic_profile` framework until a second
+semantic backend needs the same report contract. The Eco1 wrapper owns which
+candidates are queried and how the feature panel is interpreted in the study
+record.
+
 ### Implementation Rules
 
 - Start with validators and fixture materializers before backend execution.
@@ -488,6 +518,10 @@ threshold policy.
 - Do not let backend selection fall through from ProteinMPNN to LigandMPNN, or
   from real fold metrics to fixtures. A changed backend or fixture mode is a
   new run id and an operator-visible decision.
+- Do not let Atlas, ESMC, or SAE output become an acceptance gate without a
+  separate policy slice. Model-derived affiliations can prioritize review or
+  assay candidates; they do not prove strand displacement, processivity, or
+  hairpin unwinding.
 
 ### Phase Gates
 
@@ -514,9 +548,11 @@ threshold policy.
   `foldcheck_request/foldcheck_request_manifest.yaml` are materialized locally.
   A current six-sequence ColabFold smoke `foldcheck_report.parquet` is
   materialized and validates. The full WT plus 96-candidate fold screen,
-  feasibility report, and candidate handoff are not materialized.
+  Atlas semantic profile, feasibility report, and candidate handoff are not
+  materialized.
 - Phase 1 now has content validators for the local structure, contact,
   conservation, mask, thread-plan, ProteinMPNN request, and fold-check request
   artifacts. Phase 2 backend ingest passes locally through the candidate table,
   and Phase 3 fold-check report validation passes for the smoke report. Full
-  fold coverage and downstream selection are the next gates.
+  fold coverage, optional Atlas semantic annotation, and downstream selection
+  are the next gates.

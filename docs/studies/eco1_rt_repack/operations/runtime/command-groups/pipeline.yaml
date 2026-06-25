@@ -372,6 +372,11 @@ lanes:
         - <scc_colabfold_outputs>
         - --runtime-version
         - <colabfold_version>
+  - id: atlas_semantic_profile
+    owner: thread
+    status: planned
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_semantic_profile.parquet
+    command: null
   - id: assembly_feasibility
     owner: thread
     status: planned

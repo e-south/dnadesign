@@ -314,6 +314,12 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
     status: materialized_local_smoke
     description: Local generated fold-validation smoke report normalized from BU SCC ColabFold job 6224446 after the current request-hash cleanup. It contains six accepted rows for WT plus five candidates and 91 explicit errored rows for candidates outside the smoke subset; it proves the runtime/parser path, not full candidate handoff readiness.
+  - id: eco1_rt_atlas_semantic_profile
+    owner: thread
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_semantic_profile.parquet
+    status: not_generated
+    description: Planned compact ESM Atlas semantic profile for WT plus fold-accepted candidates. It should record model-derived ESMC/SAE feature and similarity context, raw response hashes, query sequence hashes, and explicit failure rows. It is not fold validation and not a functional acceptance gate.
   - id: eco1_rt_feasibility_report
     owner: thread
     kind: planned_artifact

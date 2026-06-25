@@ -140,3 +140,52 @@ a later handoff explicitly selects small structure files for transfer.
 Future smoke runs should use `COLABFOLD_EXTRA_ARGS='--num-models 1'` when the
 goal is runtime-path validation. Full candidate screens should declare model
 count explicitly before submission.
+
+### Optional Atlas Semantic Context
+
+ESM Atlas can be used after fold checking as an annotation layer for WT and
+fold-accepted candidates. It is not a replacement for ColabFold/AlphaFold-family
+fold QA, and it is not evidence that a candidate has improved function. The
+right study wording is:
+
+> Atlas results are model-derived semantic affiliations. They summarize where a
+> query sequence lands in ESMC/SAE representation space and which Atlas
+> proteins, clusters, or features are nearby. They do not measure processivity,
+> strand displacement, or hairpin unwinding.
+
+The first Eco1 use case is to ask whether ProteinMPNN candidates remain in an
+RT-like Ec86 neighborhood and whether the same polymerase feature regions remain
+visible. For structured RNA templates, the relevant feature panel should be
+described as processivity-related hypotheses:
+
+| Feature context | How to use it |
+| --- | --- |
+| Thumb/palm nucleic-acid binding | Candidate context for duplex grip and C-terminal thumb integrity. |
+| Motif B / primer grip | Candidate context for template-primer register during structured-template pausing. |
+| N-terminal fingers/palm | Candidate context for template entry and possible hairpin destabilization. |
+| DxD/YADD metal coordination | Catalytic competence context; protect from over-interpretation as processivity. |
+| Pre-catalytic helix | Candidate context for open/closed active-site gating. |
+| Broad RT/RdRp palm-core markers | Sanity checks that the sequence remains polymerase-like, not positive processivity scores. |
+
+`RdRp` means RNA-dependent RNA polymerase. The label appears in some ESMC/SAE
+feature names because RTs and RdRps share polymerase fold and motif geometry;
+it does not mean Ec86 is an RdRp.
+
+Atlas and Biohub Platform surfaces should stay separate in documentation and
+code. The ESM Atlas API is an alpha, currently no-auth lookup/search surface
+for Atlas proteins, features, and similarity context. The authenticated Biohub
+Platform `/api/v1/fold` endpoint is the ESMFold2 fold service. The
+authenticated `/api/v1/logits` endpoint exposes ESMC logits/embeddings/SAE
+outputs and is not a fold endpoint. The first dnadesign implementation should
+therefore use a small `dnadesign.thread.adapters.esm_atlas` adapter only for
+Atlas semantic context. Do not route it through fold validation or candidate
+acceptance until a later policy explicitly says how that evidence is used.
+
+Source roles:
+
+- Tao et al. supplies the ProteinMPNN-to-fold-check design pattern, not an
+  Atlas scoring rule.
+- Candido et al. supplies the ESMC, ESMFold2, Atlas, and SAE representation
+  frame.
+- Atlas API documentation supplies current endpoint behavior and alpha-status
+  caveats.

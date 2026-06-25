@@ -50,6 +50,13 @@ The fold-check contract owns model-agnostic artifact shape:
 - C-alpha RMSD against the WT runtime baseline or an explicit reference PDB
 - failure rows for missing output or missing required metrics
 
+Planned semantic-context adapters should follow the same boundary. For the
+first ESM Atlas path, `thread` may own a small `adapters.esm_atlas`
+client/normalizer for query hashes, raw response hashes, feature/similarity
+summaries, and explicit failure rows. Study packages own which sequences are
+queried and how model-derived affiliations are interpreted. Do not add a wider
+semantic-profile framework until a second backend needs the same contract.
+
 Study packages own biological masks, evidence interpretation, source selection,
 candidate batch policy, fold-check threshold policy, and candidate-ranking
 policy.
