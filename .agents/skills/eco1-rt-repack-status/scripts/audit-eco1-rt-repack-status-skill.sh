@@ -479,7 +479,7 @@ for package_name in sorted(expected_visualization_packages):
     if not (package / "__init__.py").is_file():
         problems.append(f"missing aligner/msa/visualization/{package_name}/__init__.py")
 
-expected_visualization_test_files = {"__init__.py", "_fixtures.py", "test_materialization.py"}
+expected_visualization_test_files = {"__init__.py", "_fixtures.py", "test_exemplar_manifest.py", "test_materialization.py"}
 observed_visualization_test_files = {path.name for path in visualization_tests_root.glob("*.py")}
 if observed_visualization_test_files != expected_visualization_test_files:
     problems.append(
