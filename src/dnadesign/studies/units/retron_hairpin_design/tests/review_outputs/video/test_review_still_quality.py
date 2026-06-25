@@ -1,7 +1,19 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_review_still_quality.py
+
+Review-still quality tests for Retron review output video frames.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.video.frame_naming import frame_evidence_label
@@ -27,7 +39,8 @@ def test_review_still_masks_compiler_title_and_uses_video_resolution(tmp_path: P
 
     still_path = tmp_path / "out" / "reviews" / "video" / "stills" / "01_pES-retron-199_tetO-w02-17.png"
     assert still_path.name == "01_pES-retron-199_tetO-w02-17.png"
-    assert _image_size(still_path) == VIDEO_SIZE_PX
+    with Image.open(still_path) as image:
+        assert image.size == VIDEO_SIZE_PX
     assert not _has_stale_title_marker(still_path)
     assert _has_top_content_marker(still_path)
     label = frame_evidence_label(frame, review_variant_ids={"r180-w02-17": "pES-retron-199"})
@@ -78,31 +91,16 @@ def _write_source_png_with_stale_title_marker(path: Path) -> None:
     image.save(path)
 
 
-def _image_size(path: Path) -> tuple[int, int]:
-    with Image.open(path) as image:
-        return image.size
-
-
 def _has_stale_title_marker(path: Path) -> bool:
     with Image.open(path) as image:
-        rgb = image.convert("RGB")
-        pixels = rgb.load()
-        return any(
-            pixels[x, y][0] > 220 and pixels[x, y][1] < 70 and pixels[x, y][2] > 130
-            for y in range(rgb.height)
-            for x in range(rgb.width)
-        )
+        pixels = np.asarray(image.convert("RGB"))
+        return bool(((pixels[..., 0] > 220) & (pixels[..., 1] < 70) & (pixels[..., 2] > 130)).any())
 
 
 def _has_top_content_marker(path: Path) -> bool:
     with Image.open(path) as image:
-        rgb = image.convert("RGB")
-        pixels = rgb.load()
-        return sum(1 for x in range(rgb.width) for y in range(rgb.height) if _is_green_marker(pixels[x, y])) > 15000
-
-
-def _is_green_marker(pixel: tuple[int, int, int]) -> bool:
-    return pixel[1] > 145 and pixel[0] < 40 and pixel[2] < 140
+        pixels = np.asarray(image.convert("RGB"))
+        return int(((pixels[..., 1] > 145) & (pixels[..., 0] < 40) & (pixels[..., 2] < 140)).sum()) > 15000
 
 
 def _write_mock_video(**kwargs) -> None:
