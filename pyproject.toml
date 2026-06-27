@@ -50,6 +50,7 @@ dependencies = [
   "marimo>=0.23.0",
   "openai>=2.14.0",
   "viennarna>=2.7.2",
+  "zstd>=1.5",
 ]
 
 [project.scripts]

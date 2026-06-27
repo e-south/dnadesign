@@ -11,14 +11,15 @@ last_verified: 2026-06-25
 **Last verified:** 2026-06-25
 
 `dnadesign.thread` is intentionally small right now. Its public surfaces are the
-generic ProteinMPNN adapter, generic ColabFold output normalizer,
-ProteinMPNN candidate normalization, and generic fold-check request/report
-contracts.
+generic ProteinMPNN adapter, generic ColabFold output normalizer, generic ESM
+Atlas annotation adapter, ProteinMPNN candidate normalization, generic
+fold-check request/report contracts, and a generic structure-prediction
+registry.
 
 The adapter owns reusable fixed-backbone mechanics:
 
 - chain-local ProteinMPNN position conversion
-- helper-compatible JSONL payloads
+- helper-compatible parsed-PDB, assigned-chain, and fixed-position JSONL payloads
 - protein-only backbone export
 - request manifests and request hashes
 - explicit official-checkout preflight
@@ -26,6 +27,12 @@ The adapter owns reusable fixed-backbone mechanics:
 - backend-run manifests
 - normalized sample tables
 - generic no-fallback request validation
+
+The adapter follows the public ProteinMPNN CLI path. It prepares sidecars,
+checks them against official helpers, runs `protein_mpnn_run.py` only when an
+explicit checkout root is provided, and normalizes the resulting sequences. It
+does not decide study masks, infer raw PDB residue ids as fixed positions, or
+silently fall back to another inverse-folding backend.
 
 The fold-check contract owns model-agnostic artifact shape:
 
@@ -50,12 +57,50 @@ The fold-check contract owns model-agnostic artifact shape:
 - C-alpha RMSD against the WT runtime baseline or an explicit reference PDB
 - failure rows for missing output or missing required metrics
 
-Planned semantic-context adapters should follow the same boundary. For the
-first ESM Atlas path, `thread` may own a small `adapters.esm_atlas`
-client/normalizer for query hashes, raw response hashes, feature/similarity
-summaries, and explicit failure rows. Study packages own which sequences are
-queried and how model-derived affiliations are interpreted. Do not add a wider
-semantic-profile framework until a second backend needs the same contract.
+The adapter normalizes completed `colabfold_batch` output directories. It does
+not install ColabFold, call a hosted API, submit scheduler jobs, or choose the
+study's fold-check thresholds.
+
+`dnadesign.thread.adapters.esm_atlas` owns reusable Atlas API annotation
+mechanics:
+
+- no-auth Atlas protein lookup by sequence MD5 hash
+- bounded query parameters and explicit `fold_on_miss` handling
+- query MD5 hashes, request hashes, and raw response hashes
+- top SAE feature summaries
+- sparse protein-level activations
+- sparse per-residue activations
+- compact feature catalog rows
+- explicit error rows when the alpha API drifts or a query is absent
+- optional Atlas on-demand structure payload extraction when a caller has
+  explicitly enabled `fold_on_miss`
+
+The adapter does not claim function, rank processivity, or choose which study
+candidates to query. Study packages own sequence selection, feature panel
+interpretation, WT-relative comparisons, and assay-panel decisions. Do not add a
+wider semantic-profile framework until a second backend needs the same contract.
+
+`dnadesign.thread.adapters.biohub_esmc` owns authenticated Biohub ESMC
+query-time SAE mechanics:
+
+- runtime-only credential loading with redacted manifests
+- public `POST /api/v1/encode` -> `POST /api/v1/logits` request flow
+- encoded SAE tensor decoding
+- sparse per-sequence and per-residue SAE feature rows
+- explicit error rows for API, decode, or schema failures
+
+This is not an Atlas lookup adapter and not a fold adapter. Study wrappers may
+use it to annotate synthetic sequences that do not exist in Atlas, but those
+rows remain semantic context unless a study-specific policy uses them later.
+
+`dnadesign.thread.structure_predictions` owns the backend-neutral registry for
+model-predicted structures. It records candidate id, sequence hash, backend,
+model family/name/version, runtime or endpoint, parameter hash, request hash,
+raw response hash, structure hash, structure source URI, local structure path,
+confidence fields, status, and failure reason. This registry is deliberately
+separate from fold-check reports and Atlas semantic profiles. A ColabFold
+structure used for fold validation and an Atlas/ESMFold-derived structure for
+the same sequence must be two provenance-separated rows, not one merged result.
 
 Study packages own biological masks, evidence interpretation, source selection,
 candidate batch policy, fold-check threshold policy, and candidate-ranking
