@@ -1,0 +1,287 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_review/plots.py
+
+SVG plot rendering for Eco1 fold-check review.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from html import escape
+from pathlib import Path
+from typing import Any
+
+import matplotlib
+import pyarrow.parquet as pq
+from matplotlib import rc_context
+
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    BIOHUB_ESMC_PROFILE_FILE_NAME,
+)
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+_CLASS_COLORS = {
+    "strong_fold_preserved": "#2f7d5b",
+    "good_fold_preserved": "#6aa84f",
+    "review_band": "#6c8ebf",
+    "low_confidence": "#c9a227",
+    "structural_outlier": "#b45f5f",
+    "metric_missing": "#8a8a8a",
+}
+_CLASS_ORDER = (
+    "strong_fold_preserved",
+    "good_fold_preserved",
+    "review_band",
+    "low_confidence",
+    "structural_outlier",
+    "metric_missing",
+)
+
+
+def write_review_plot_rows(
+    *,
+    plot_root: Path,
+    output_root: Path,
+    ranking_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Write review SVGs and return manifest-ready plot rows."""
+
+    plot_root.mkdir(parents=True, exist_ok=True)
+    plots = [
+        _write_review_class_counts(plot_root, ranking_rows),
+        _write_fold_metric_scatter(plot_root, ranking_rows),
+        _write_cryoem_metric_scatter(plot_root, ranking_rows),
+    ]
+    biohub_profile_path = output_root / BIOHUB_ESMC_PROFILE_FILE_NAME
+    if biohub_profile_path.exists():
+        plots.append(_write_biohub_profile_summary(plot_root, biohub_profile_path))
+    return plots
+
+
+def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    counts = Counter(str(row.get("review_class") or "metric_missing") for row in rows)
+    labels = [label for label in _CLASS_ORDER if counts.get(label)]
+    values = [counts[label] for label in labels]
+    fig, ax = plt.subplots(figsize=(7.2, 4.0))
+    ax.bar(range(len(labels)), values, color=[_CLASS_COLORS[label] for label in labels])
+    ax.set_xticks(range(len(labels)), [_human_label(label) for label in labels], rotation=22, ha="right", fontsize=10)
+    ax.set_ylabel("Candidate count", fontsize=11)
+    ax.set_title("Fold-review labels summarize continuous structure metrics.", fontsize=13, pad=10)
+    ax.grid(axis="y", alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(axis="y", labelsize=10)
+    fig.tight_layout()
+    path = plot_root / "review_class_counts.svg"
+    alt = (
+        f"Bar chart of Eco1 fold-review classes for {len(rows)} candidates. "
+        + ", ".join(f"{_human_label(label)}: {counts[label]}" for label in labels)
+        + "."
+    )
+    _save_accessible_svg(fig, path, title="Fold-review class counts", description=alt)
+    return _plot_row(
+        plot_id="review_class_counts",
+        path=path,
+        title="Fold-review labels summarize continuous structure metrics",
+        alt_text=alt,
+        description=(
+            "Counts candidates in the review labels used for structural inspection. "
+            "Use the continuous RMSD and pLDDT plots for metric-level interpretation."
+        ),
+        interpretation_limit="Review labels are triage summaries, not candidate acceptance decisions.",
+        data_sources=["foldcheck_review/foldcheck_candidate_ranking.parquet"],
+    )
+
+
+def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    fig, ax = plt.subplots(figsize=(5.8, 5.8))
+    for label in _CLASS_ORDER:
+        selected = [row for row in rows if str(row.get("review_class")) == label]
+        if selected:
+            _scatter_review_rows(ax, selected, x_key="wt_runtime_ca_rmsd", y_key="plddt", label=label)
+    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=11)
+    ax.set_ylabel("Mean pLDDT", fontsize=11)
+    ax.set_title("Most accepted designs stay close to the WT ColabFold model.", fontsize=13, pad=10)
+    ax.grid(alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(labelsize=10)
+    _add_legend_if_present(ax)
+    fig.tight_layout()
+    path = plot_root / "fold_metric_scatter.svg"
+    alt = (
+        "Scatter plot of WT-runtime C-alpha RMSD versus mean pLDDT for Eco1 "
+        f"ProteinMPNN candidates. The plot contains {len(rows)} candidate points "
+        "colored by fold-review class."
+    )
+    _save_accessible_svg(fig, path, title="ColabFold fold-check metric scatter", description=alt)
+    return _plot_row(
+        plot_id="fold_metric_scatter",
+        path=path,
+        title="Accepted designs remain near the WT ColabFold model",
+        alt_text=alt,
+        description="Shows confidence and within-run structural drift relative to the WT ColabFold model.",
+        interpretation_limit="This is a structural-fidelity summary, not activity or processivity evidence.",
+        data_sources=["foldcheck_review/foldcheck_candidate_ranking.parquet"],
+    )
+
+
+def _write_cryoem_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    available = [row for row in rows if str(row.get("cryoem_mapped_ca_rmsd_status")) == "available"]
+    fig, ax = plt.subplots(figsize=(5.8, 5.8))
+    for label in _CLASS_ORDER:
+        selected = [row for row in available if str(row.get("review_class")) == label]
+        if selected:
+            _scatter_review_rows(
+                ax,
+                selected,
+                x_key="wt_runtime_ca_rmsd",
+                y_key="cryoem_mapped_ca_rmsd",
+                label=label,
+            )
+    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=11)
+    ax.set_ylabel("cryoEM-reference mapped C-alpha RMSD (A)", fontsize=11)
+    ax.set_title("WT-model similarity and cryoEM similarity are checked separately.", fontsize=13, pad=10)
+    ax.grid(alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(labelsize=10)
+    if not available:
+        ax.text(0.5, 0.5, "CryoEM-reference RMSD unavailable", transform=ax.transAxes, ha="center", va="center")
+    _add_legend_if_present(ax)
+    fig.tight_layout()
+    path = plot_root / "cryoem_vs_runtime_rmsd.svg"
+    alt = (
+        "Scatter plot comparing each candidate's RMSD to the WT ColabFold runtime model "
+        "against its mapped-residue RMSD to the ec86kit/7V9U cryoEM-backed reference. "
+        f"{len(available)} candidates have available cryoEM-reference RMSD."
+    )
+    _save_accessible_svg(fig, path, title="Runtime RMSD versus cryoEM-reference RMSD", description=alt)
+    return _plot_row(
+        plot_id="cryoem_vs_runtime_rmsd",
+        path=path,
+        title="Runtime RMSD and cryoEM-reference RMSD are separate checks",
+        alt_text=alt,
+        description=(
+            "Makes the two RMSD reference frames visible so within-run ColabFold similarity "
+            "is not confused with direct comparison to the cryoEM-backed scaffold."
+        ),
+        interpretation_limit="High or low RMSD here is a review signal; final selection still requires feasibility.",
+        data_sources=["foldcheck_review/foldcheck_candidate_ranking.parquet"],
+    )
+
+
+def _write_biohub_profile_summary(plot_root: Path, profile_path: Path) -> dict[str, Any]:
+    rows = pq.read_table(
+        profile_path,
+        columns=["candidate_id", "status", "protein_feature_count", "residue_feature_count", "encoded_sae_bytes"],
+    ).to_pylist()
+    accepted = [row for row in rows if str(row.get("status")) == "accepted"]
+    fig, ax = plt.subplots(figsize=(5.8, 5.8))
+    ax.scatter(
+        [_float(row.get("protein_feature_count")) for row in accepted],
+        [_float(row.get("encoded_sae_bytes")) / 1024.0 for row in accepted],
+        s=28,
+        alpha=0.7,
+        color="#5b7fa6",
+        edgecolors="none",
+    )
+    ax.set_xlabel("Protein-level nonzero SAE features", fontsize=11)
+    ax.set_ylabel("Encoded SAE payload size (KiB)", fontsize=11)
+    ax.set_title("Biohub ESMC returned sparse SAE features for all queries.", fontsize=13, pad=10)
+    ax.grid(alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(labelsize=10)
+    fig.tight_layout()
+    path = plot_root / "biohub_esmc_sae_coverage.svg"
+    residue_counts = sorted({int(row.get("residue_feature_count") or 0) for row in accepted})
+    alt = (
+        f"Scatter plot summarizing Biohub ESMC SAE output coverage for {len(accepted)} accepted "
+        f"sequences. Per-residue activation counts observed: {residue_counts}."
+    )
+    _save_accessible_svg(fig, path, title="Biohub ESMC SAE coverage", description=alt)
+    return _plot_row(
+        plot_id="biohub_esmc_sae_coverage",
+        path=path,
+        title="Biohub ESMC returned sparse SAE features for all queries",
+        alt_text=alt,
+        description="Confirms query-time SAE coverage without loading the full sparse residue table into the notebook.",
+        interpretation_limit="SAE features are semantic annotations and are not activity measurements.",
+        data_sources=["biohub_esmc_sae_profile.parquet"],
+    )
+
+
+def _scatter_review_rows(ax: Any, rows: list[dict[str, Any]], *, x_key: str, y_key: str, label: str) -> None:
+    ax.scatter(
+        [_float(row.get(x_key)) for row in rows],
+        [_float(row.get(y_key)) for row in rows],
+        s=36,
+        alpha=0.82,
+        label=_human_label(label),
+        color=_CLASS_COLORS[label],
+        edgecolors="none",
+    )
+
+
+def _plot_row(
+    *,
+    plot_id: str,
+    path: Path,
+    title: str,
+    alt_text: str,
+    description: str,
+    interpretation_limit: str,
+    data_sources: list[str],
+) -> dict[str, Any]:
+    return {
+        "plot_id": plot_id,
+        "path": str(path),
+        "title": title,
+        "alt_text": alt_text,
+        "description": description,
+        "interpretation_limit": interpretation_limit,
+        "data_sources": data_sources,
+    }
+
+
+def _save_accessible_svg(fig: Any, path: Path, *, title: str, description: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with rc_context({"svg.fonttype": "none"}):
+        fig.savefig(path, format="svg", bbox_inches="tight")
+    plt.close(fig)
+    _inject_svg_accessibility(path, title=title, description=description)
+
+
+def _inject_svg_accessibility(path: Path, *, title: str, description: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    title_id = f"{path.stem}-title"
+    desc_id = f"{path.stem}-desc"
+    if "<title" not in text and "<svg " in text:
+        text = text.replace("<svg ", f'<svg role="img" aria-labelledby="{title_id} {desc_id}" ', 1)
+        svg_start = text.find("<svg ")
+        svg_end = text.find(">", svg_start)
+        if svg_start != -1 and svg_end != -1:
+            accessible = (
+                f'\n<title id="{escape(title_id)}">{escape(title)}</title>'
+                f'\n<desc id="{escape(desc_id)}">{escape(description)}</desc>'
+            )
+            text = text[: svg_end + 1] + accessible + text[svg_end + 1 :]
+    path.write_text(text, encoding="utf-8")
+
+
+def _human_label(value: str) -> str:
+    return value.replace("_", " ").capitalize()
+
+
+def _float(value: Any) -> float:
+    return float(value) if value is not None else float("nan")
+
+
+def _add_legend_if_present(ax: Any) -> None:
+    handles, labels = ax.get_legend_handles_labels()
+    if handles and labels:
+        ax.legend(frameon=False, fontsize=9)

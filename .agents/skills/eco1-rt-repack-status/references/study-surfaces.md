@@ -205,6 +205,21 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   ColabFold output parsing to `src/dnadesign/thread/adapters/colabfold/`. It
   writes `foldcheck_report.parquet` from completed runtime outputs and does not
   submit jobs or copy raw model directories.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/foldcheck_review/`:
+  study-owned fold-review wrapper. It ranks full fold-check rows, separates
+  WT-runtime RMSD from direct ec86kit/7V9U mapped-residue RMSD, stages a small
+  structure-panel manifest and ChimeraX script, stages the full local PDB set for
+  ChimeraX review, writes an Atlas subset manifest, and emits SVG review plots
+  plus a scoped marimo notebook through `review_visual_manifest.yaml`. It does
+  not run ChimeraX, copy full raw ColabFold output trees, or accept candidates.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/`:
+  study-owned visual-deliverable wrapper. It writes
+  `review_deliverable_manifest.yaml`, canonical-coordinate MSA plurality/mask
+  context, linear mask tracks, a ChimeraX mask-context script, ProteinMPNN
+  diversity panels, linked foldcheck_review plots, and a manifest-backed marimo
+  notebook. Manifest paths are relative to the manifest location, and notebook
+  dogfood includes static checks plus HTML export. It does not rerun
+  ProteinMPNN, ColabFold, Biohub, Atlas, ChimeraX, or candidate selection.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
   fold-check request/report contract package. It validates the request
   manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted
@@ -214,10 +229,40 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   generic ColabFold output normalizer. It discovers model files by request
   sequence id, extracts pLDDT/PAE/RMSD-style fields, and emits failure rows
   without importing Eco1 policy.
+- `src/dnadesign/thread/adapters/esm_atlas/`:
+  generic ESM Atlas API adapter and sparse-activation normalizer. It owns
+  bounded no-auth Atlas lookup calls, query/raw-response hashes, top feature
+  summaries, sparse protein-level activations, sparse per-residue activations,
+  compact feature catalog rows, and explicit error rows. It must not interpret
+  Eco1 function or act as a candidate acceptance gate.
+- `src/dnadesign/thread/adapters/biohub_esmc/`:
+  generic authenticated Biohub ESMC adapter for query-time SAE activations. It
+  owns runtime-only credential loading, the documented `/api/v1/encode` ->
+  `/api/v1/logits` flow, encoded SAE tensor decoding, sparse protein/residue
+  feature rows, redacted manifests, and explicit error rows. It must not
+  interpret Eco1 function, claim processivity, or act as a candidate acceptance
+  gate.
+- `src/dnadesign/thread/structure_predictions/`:
+  generic registry for model-predicted structures. It keeps Atlas/ESMFold,
+  ColabFold, Biohub Fold, Boltz, or other future structure predictions
+  provenance-separated by backend, model, request hash, raw-response hash, and
+  structure hash.
 - `src/dnadesign/thread/foldcheck/`:
   generic fold-check request/report contract package. It owns WT-baseline
   request manifests, fold-check FASTA writing, report schemas, and report
   validation; it does not run ColabFold or choose Eco1 thresholds.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/atlas_semantic_profile/`:
+  thin study-owned wrapper that selects WT plus fold-accepted Eco1 sequences and
+  delegates Atlas lookup/normalization to `src/dnadesign/thread/adapters/esm_atlas/`.
+  It writes compact semantic-profile and sparse SAE activation artifacts, plus a
+  structure-prediction registry for any explicitly authorized Atlas on-demand
+  structures. These are not fold-check or processivity evidence.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sae_profile/`:
+  thin study-owned wrapper that selects fold-accepted Eco1 sequences and
+  delegates authenticated ESMC/logits request normalization to
+  `src/dnadesign/thread/adapters/biohub_esmc/`. It writes compact query-time SAE
+  artifacts for synthetic sequences and keeps the Biohub token out of manifests,
+  logs, docs, and generated artifacts.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/sampling/`:
   sampling artifact contract package. Phase 2 validates `thread_plan.yaml` and
   `proteinmpnn_request/request_manifest.yaml` separately from

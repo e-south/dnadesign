@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-25
+last_verified: 2026-06-26
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -92,16 +92,34 @@ sidecars do not belong in this checked-in record root.
 ### Implementation Boundary
 
 The current executable chain materializes structure, conservation, mask, thread
-plan, ProteinMPNN request, sample table, candidate table, fold-check request, and
-a six-sequence fold-check smoke report. The active backend batch is
+plan, ProteinMPNN request, sample table, candidate table, fold-check request, a
+full WT plus 96-candidate ColabFold report, fold-check review bundle, local
+full-fold PDB set, and selected-panel ESM Atlas lookup. The fold-check review
+bundle ranks candidates and writes selected-panel and full-set ChimeraX scripts,
+alt-text-backed review plots, a visual manifest, and a scoped marimo notebook
+without selecting candidates. The active backend batch is
 `eco1_rt_p25_5a_n96_20260624`, with 96 accepted ProteinMPNN samples and 96
-accepted candidate rows. Full WT plus 96-candidate fold-check coverage is still
-required before candidate selection.
+accepted candidate rows. Biohub ESMC query-time SAE coverage is complete for WT
+plus all 96 fold-accepted candidates. Candidate selection still depends on
+structure review, feasibility review, and handoff gates.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic
 ProteinMPNN request and sample-ingest mechanics, `dnadesign.thread.candidates`
 owns generic candidate-table construction, and `dnadesign.thread.foldcheck`
 owns generic fold-check request/report contracts. `dnadesign.thread.adapters.colabfold`
-owns generic ColabFold output normalization. `infer` may later own backend
-process execution if an explicit adapter contract is added.
+owns generic ColabFold output normalization, and
+`dnadesign.thread.adapters.esm_atlas` owns generic Atlas lookup and sparse SAE
+activation normalization. `dnadesign.thread.adapters.biohub_esmc` owns
+authenticated Biohub ESMC `/api/v1/encode` -> `/api/v1/logits` query-time SAE
+normalization for synthetic sequences that are not present in Atlas. These
+Biohub ESMC rows are semantic annotation only; they are not fold validation,
+processivity evidence, or candidate acceptance. `dnadesign.thread.structure_predictions` owns the
+generic registry for model-predicted structures, so an Atlas/ESMFold structure
+and a ColabFold fold-check structure for the same sequence remain separate
+provenance records. `infer` may later own backend process execution if an
+explicit adapter contract is added.
+
+Fold-check execution currently means the ColabFold `colabfold_batch` CLI on BU
+SCC, installed through LocalColabFold. LocalColabFold is an environment/install
+path for the CLI, not a separate fold model or hosted API.

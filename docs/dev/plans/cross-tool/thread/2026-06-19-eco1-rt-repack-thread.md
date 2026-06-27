@@ -1,451 +1,947 @@
-## Eco1 RT Repack Thread
+---
+doc_id: dev-thread-eco1-rt-repack-candidate-review
+surface: cross-tool-dev-spec
+study_id: eco1_rt_repack
+owner: dnadesign-maintainers
+last_verified: 2026-06-26
+status: active_next_slice
+primary_slice: assembly-feasibility-report-v1
+---
 
-**Status:** proposed development specification
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-22
-**Study id:** `eco1_rt_repack`
-**Primary study surface:** `docs/studies/eco1_rt_repack/`
-**Planned reusable tool surface:** `thread`
+## Eco1 RT Repack Candidate Review, Feasibility, And RT-Only Handoff
 
-### 0. Document Framing And Authority
+This spec is the current cross-tool development surface for the next Eco1 RT
+repack slice. The study has already moved past the original tracer bullet:
+ProteinMPNN sampling, candidate normalization, ColabFold fold checking,
+fold-check review, local PDB staging, and all-97 Biohub ESMC query-time SAE
+collection are materialized. The next engineering task is to make candidate
+review deterministic enough for feasibility assessment and an RT-only handoff.
 
-This proposal defines the first contract for an Eco1 reverse-transcriptase
-fixed-backbone redesign campaign. The campaign is large enough to be a
-standalone checked-in study, but it must keep downstream collaboration with
-`rt_lnrna_sponging_construct_triage` explicit rather than duplicating that
-study's paired RT-lnRNA construct semantics.
+### Decision Summary
 
-The planned reusable tool is `thread`: a short, punchy package name for
-fixed-backbone protein sequence design intent. `thread` should own backbone
-intake, residue maps, mask sets, inverse-folding sampling plans, candidate
-tables, fold-check normalization, and candidate handoff contracts once those
-mechanics are no longer Eco1-specific.
+Primary implementation slice:
 
-Eco1 is the first profile and anchor, not the reusable ontology.
+```text
+assembly-feasibility-report-v1
+```
 
-### 1. Problem Statement
+The hard handoff eligibility rule is:
 
-The study needs a conservative, inspectable computational path for redesigning
-Eco1 RT sequence variants against a fixed structural context while protecting
-catalytic, substrate-contact, and conserved residues. The immediate goal is a
-design and QA surface, not a wet-lab protocol and not a prime-editing campaign.
+```text
+accepted candidate row
++ accepted fold-check row
++ reviewed structure metrics
++ feasible synthesis row
++ upstream hash closure
+-> RT-only candidate_handoff eligibility
+```
 
-The downstream biological setting is transcription-factor sponging through
-RT-lnRNA constructs. This study therefore emits RT candidate handoffs that the
-RT-lnRNA study can choose to promote into paired construct subjects. It does
-not own lnRNA slots, Construct context views, Reader SPOP labels, LatentDNA
-interpretation, or OPAL campaign state.
+Biohub ESMC/SAE data are semantic annotation and stratification evidence. They
+must not become a hidden processivity score, a fold-validation substitute, or an
+acceptance gate. A biochemical assay remains the only evidence for processivity,
+strand displacement, or hairpin readthrough.
 
-### 2. Owner Boundaries
+### Current Record Posture
+
+Use the checked-in record as the source of truth:
+
+- Status: `docs/studies/eco1_rt_repack/record/status.md`
+- Dataset registry: `docs/studies/eco1_rt_repack/record/datasets.yaml`
+- Route map: `docs/studies/eco1_rt_repack/routes/README.md`
+- Fold policy: `docs/studies/eco1_rt_repack/contexts/fold-validation-policy.md`
+- Feasibility policy:
+  `docs/studies/eco1_rt_repack/contexts/synthesis-feasibility-policy.md`
+
+The current runtime artifact root is:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/
+```
+
+Materialized inputs for this slice:
+
+- `conservation_alignments/`: accepted Clustal Omega alignments for the
+  selected Ec86 clade 9 and II-A3/cluster42_1 profiles. The broad clade 9
+  alignment has 303 records after QC; the focused II-A3/cluster42_1 alignment
+  has 45 records. Use those counts exactly. Do not describe the clade 9
+  denominator as "about 40" rows.
+- `conservation_visualizations/`: existing MSA QC sidecars, position plots,
+  selected-row overviews, and plurality/gap summaries from the generic
+  `aligner.msa.visualization` API.
+- `candidate_table.parquet`: 96 accepted ProteinMPNN candidates.
+- `foldcheck_report.parquet`: WT plus all 96 candidates, all accepted.
+- `foldcheck_review/foldcheck_candidate_ranking.parquet`: 96 candidate rows with
+  ProteinMPNN metrics, ColabFold confidence, WT-runtime RMSD, direct
+  ec86kit/7V9U mapped-residue RMSD, and review classes.
+- `foldcheck_review/foldcheck_full_structure_set.yaml`: local normalized PDBs
+  for WT plus all 96 candidates, with raw ColabFold trees still on BU SCC.
+- `biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits materialization
+  accepted all 97 query rows.
+- `biohub_esmc_protein_features.parquet`: 338,560 sparse per-sequence SAE
+  feature summary rows.
+- `biohub_esmc_residue_features.parquet`: 1,986,560 sparse per-residue SAE
+  rows, equal to 97 sequences x 320 residues x 64 active features.
+- `biohub_esmc_feature_catalog.parquet`: 4,618 observed feature indices from
+  the current run. Labels are intentionally blank until a feature-description
+  source is joined.
+
+Missing by design:
+
+- `feasibility_report.parquet`
+- `candidate_selection_panel.parquet`
+- `candidate_handoff.yaml`
+- downstream RT-lnRNA accept/reject record
+
+### Evidence Ladder
+
+Use one question per model layer:
+
+```text
+cryoEM structure gives the scaffold
+-> ProteinMPNN proposes fold-compatible sequence candidates on that scaffold
+-> ColabFold asks whether those sequences still fold like the scaffold
+-> Biohub ESMC/SAE asks how query-time model features change across candidates
+-> ESM Atlas may add public-protein neighborhood context where available
+-> biochemical assays decide processivity, strand displacement, and hairpin readthrough
+```
+
+Do not write that ProteinMPNN proves stability. Do not write that ColabFold
+proves activity. Do not write that SAE features measure processivity.
+
+The closest methods analogue is Tao-style fixed-backbone RT redesign: protect
+functionally important or conserved residues, use ProteinMPNN to propose
+sequences on the remaining design canvas, and use AlphaFold-family structure
+prediction as a structural filter. Eco1 differs in the biological details:
+Wang/Ec86/7V9U supplies the specific cryoEM scaffold and substrate-contact
+context, Mestre clade 9 supplies the selected conservation denominator, and the
+current mask uses a direct 5 A retained DNA/RNA contact rule rather than a broad
+distance sweep.
+
+### Owner Boundaries
 
 | Surface | Owns | Does not own |
 | --- | --- | --- |
-| `thread` | Generic fixed-backbone protein design contracts, masks, request/result normalization, candidate ids, ranking, fold-check interpretation, and candidate handoff bundles. | Eco1 biological policy, Construct realization, model-process execution ledgers, Infer sidecars, RT-lnRNA labels. |
-| `infer` | Optional model-process execution and writeback for ProteinMPNN, LigandMPNN, AlphaFold, or ColabFold once explicit adapter contracts exist. | Redesign ontology, mask algebra, candidate identity, or study-specific acceptance policy. |
-| `aligner` | Pairwise nucleotide alignment and generic MSA bundle mechanics through the public `dnadesign.aligner` API. | Eco1 roster curation, provider fetching, target-row adjudication, conservation scoring, or hidden mask machinery. |
-| `construct` | Sequence realization, named slots, placement/window feasibility, and construct-context views. | Deciding which redesigned RT variants are worth ordering or assaying. |
-| `permuter` | DMS and explicit variant intent through public `dnadesign.permuter` APIs. | ProteinMPNN-generated design proposals unless they are intentionally imported as variant records through a later contract. |
-| `eco1_rt_repack` | Eco1 profile, protected-residue policy, source structure choice, candidate batch policy, and downstream handoff decisions. | Reusable MPNN mechanics, generic fold-check adapters, or RT-lnRNA paired-construct semantics. |
+| `eco1_rt_repack` | Eco1 structure authority, mask policy, feature-window interpretation, feasibility policy, selection policy, RT-only handoff intent. | Generic backend mechanics, RT-lnRNA construct subjects, wet-lab assay truth. |
+| `dnadesign.thread` | Generic fixed-backbone mechanics: ProteinMPNN request/sample ingest, candidate table construction, fold-check contracts, ColabFold parsing, Atlas/Biohub adapters, structure-prediction registry. | Eco1 catalytic masks, Wang/Ec86 contact priors, assay claims, study-specific selection thresholds. |
+| BU SCC | Heavy ColabFold runtime and raw prediction trees. | Candidate selection or local study policy. |
+| Biohub/Atlas | External model APIs and public-protein neighborhood context. | Fold-check acceptance, processivity claims, or downstream handoff decisions. |
+| downstream RT-lnRNA study | Accept/reject RT-only handoff into a paired construct context. | Eco1 repack mask policy or current candidate generation. |
 
-Backend rule: Phase 1 treats `thread` as the design-domain owner and `infer` as
-an optional execution provider. `thread` may build backend requests and ingest
-declared backend results, but it must not hide process execution, retry policy,
-or model fallback inside design-domain code. If `infer` executes a backend run,
-`thread` records only the public run id, request hash, result hash, and adapter
-kind.
+### Method Wording
 
-Boundary rule: a generic contract may mention `BackboneBundle`,
-`ResidueMaskSet`, or `ThreadCandidate`; it may not mention Eco1 residues,
-retron motifs, prime editing, TF sponging, or study-specific synthesis choices.
-Those terms belong in `eco1_rt_repack` policy or downstream studies.
+ProteinMPNN:
 
-### 3. Information Architecture
+> ProteinMPNN was used as a fixed-backbone inverse-folding sampler. The selected
+> Ec86 RT backbone was converted to helper-compatible ProteinMPNN inputs, fixed
+> positions were supplied in chain-local one-indexed sequence coordinates,
+> cysteine was omitted, and sampling used explicit seeds, temperatures, and
+> `num_seq_per_target`. The output rows are sequence proposals, not stability
+> measurements or functional evidence.
 
-The study record owns the current campaign state:
+ColabFold:
+
+> Fold checks were run on BU SCC with the ColabFold `colabfold_batch` command
+> installed through LocalColabFold. The input FASTA contained WT Ec86 RT and the
+> accepted ProteinMPNN candidates as full 320-aa canonical sequences. The first
+> full screen used `--num-models 1`. `dnadesign` normalized ColabFold outputs
+> into a compact fold-check report with runtime provenance, confidence metrics,
+> and C-alpha RMSD fields. This asks whether designed sequences preserve the
+> Ec86 RT fold; it does not measure RT activity.
+
+Biohub ESMC/SAE:
+
+> Biohub ESMC/logits was used to collect query-time SAE activations for WT plus
+> all 96 fold-accepted candidate sequences. These rows are model-derived
+> semantic annotation. They can support review and assay-panel stratification,
+> but they cannot by themselves establish processivity, strand displacement, or
+> structured-template readthrough.
+
+ESM Atlas:
+
+> ESM Atlas lookup/on-demand probing remains separate from Biohub ESMC/logits.
+> In the current all-97 probe, WT returned rich Atlas rows while synthetic
+> ProteinMPNN candidates returned explicit hash-lookup failures or were left
+> unattempted by the request cap. Do not treat the Atlas hash-lookup path as
+> synthetic-candidate SAE coverage.
+
+### Metric Ontology
+
+Keep native fold metrics separate from Eco1-derived review metrics.
+
+Native ColabFold metrics are model-confidence fields:
+
+- global pLDDT summary;
+- PAE summary when present in runtime output;
+- runtime parameters and model count;
+- model artifact and score artifact hashes.
+
+Eco1-derived structure metrics are scaffold-preservation fields:
+
+- `wt_runtime_ca_rmsd`: candidate C-alpha RMSD to the WT ColabFold model from
+  the same runtime screen.
+- `cryoem_mapped_ca_rmsd`: direct mapped-residue RMSD to the ec86kit/7V9U
+  protein backbone.
+- region-level RMSD fields for protected motifs or structural regions, only
+  after those regions are declared in code and validated.
+
+Interpretation rule:
 
 ```text
-docs/studies/eco1_rt_repack/
-  README.md
-  record/
-  routes/
-  contexts/
-  operations/
-  workbench/
+ColabFold confidence asks whether the model trusts its predicted fold.
+Eco1-derived RMSD asks whether the candidate preserves the intended Ec86/7V9U-like scaffold.
 ```
 
-Study folders have these meanings:
+A candidate should not pass because pLDDT is high. It can be eligible only when
+the fold-check row is accepted, structure-review metrics are available, and no
+protected-region or feasibility rule fails.
 
-| Directory | Meaning | Mutation policy |
+### SAE Feature Compatibility
+
+Do not mix SAE dictionaries by feature id.
+
+The earlier Ec86 hairpin/processivity feature notes refer to an Atlas-style
+feature interpretation panel. Those feature ids must be treated as tied to a
+specific model, layer, sparsity, and codebook. The current all-97 Biohub run
+uses:
+
+```text
+model: esmc-300m-2024-12
+sae_model: esmc-300m-2024-12-sae-layer23-k64-codebook65536
+feature_dictionary_size: 65536
+```
+
+Therefore, feature ids such as `14365`, `10777`, or `9008` must not be assumed
+to carry the same interpretation in the current Biohub 65,536-feature
+dictionary unless a source explicitly maps that feature index for this exact
+SAE model.
+
+The next implementation should use two layers:
+
+1. **Model-specific window summary.** Summarize current Biohub ESMC feature
+   activations over declared Eco1 residue windows without assigning unsupported
+   biological labels to feature ids.
+2. **Interpreted feature panel.** Add labels or named biological roles only for
+   feature ids whose interpretation is source-backed for the exact model and
+   codebook.
+
+### SAE Window Summary
+
+Materialize:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
+```
+
+Use a subdirectory for new Biohub-derived summaries to avoid adding more flat
+root-level files. Do not move the existing all-97 source tables in this slice.
+
+One row per:
+
+```text
+candidate_id x feature_index x window_id
+```
+
+Required fields:
+
+```yaml
+candidate_id: string
+sequence_hash: string
+feature_panel_id: string
+sae_model: string
+feature_dictionary_size: int
+feature_index: int
+feature_label: string | null
+window_id: string
+window_start_0based: int
+window_end_0based_exclusive: int
+activation_sum: float
+activation_mean: float
+activation_max: float
+activation_argmax_residue_0based: int | null
+activation_argmax_residue_1based: int | null
+coverage_fraction_above_threshold: float
+fragment_count_above_threshold: int
+peak_shift_vs_wt: int | null
+wt_activation_sum: float | null
+delta_vs_wt_sum: float | null
+ratio_vs_wt_sum: float | null
+zscore_across_candidates: float | null
+window_status: string
+interpretation_role: string
+```
+
+Declared Eco1 windows for the first pass:
+
+| Window id | Residues, zero-based half-open | Purpose |
 | --- | --- | --- |
-| `record/` | Current state, dataset registry, and campaign step list. | Small, factual, human-readable records only. |
-| `routes/` | One-hop navigation and owner handoffs. | Update whenever a new authoritative surface is added. |
-| `contexts/` | Durable study policy and rationale. | Study-specific biology belongs here, not in `thread`. |
-| `operations/contract/` | Machine-readable providerless contracts, readiness groups, fixtures, and schemas. | Keep split by object or phase; avoid catch-all YAML files. |
-| `operations/runtime/` | Planned command grouping and future runtime lanes. | No generated runtime payloads in the repo record root. |
-| `workbench/ontology/` | Vocabulary and naming semantics. | Prefer short object names with precise definitions. |
-| `workbench/design_sets/` | Named candidate-batch intent and inclusion policy. | No large candidate tables; link to runtime artifacts. |
-| `workbench/provenance/` | Source authority, numbering, and evidence audits. | Every mutable residue must be traceable here before sampling. |
+| `nterm_fingers_0_53` | `0-53` | N-terminal/fingers-side model-feature shifts. |
+| `fingers_palm_0_113` | `0-113` | Forward template-contact region review. |
+| `primer_grip_71_121` | `71-121` | Template-primer positioning region review. |
+| `motif_a_101_131` | `101-131` | Motif A catalytic-environment review. |
+| `intermotif_136_148` | `136-148` | Inter-motif structural hub review. |
+| `precatalytic_helix_171_195` | `171-195` | Active-site gating-region review. |
+| `dxd_yadd_187_203` | `187-203` | YADD/DxD catalytic motif review. |
+| `thumb_206_319` | `206-319` | C-terminal thumb/palm scaffold review. |
+| `thumb_core_279_295` | `279-295` | Thumb-core peak-window review. |
 
-The reusable tool has started with narrow public ProteinMPNN, candidate-table,
-and fold-check contract surfaces under `src/dnadesign/thread/`. Broader thread
-contracts should keep this direct package shape when promoted:
-
-```text
-src/dnadesign/thread/
-  README.md
-  docs/
-  adapters/
-  candidates/
-  foldcheck/
-  tests/
-```
-
-`thread` source modules should remain small and contract-oriented:
-
-| Module | Owns | First public seam |
-| --- | --- | --- |
-| `contracts/` | Pydantic/dataclass contracts and serialization boundaries. | Validate `BackboneBundle`, `ResidueMaskSet`, `ThreadPlan`, and `CandidateHandoff`. |
-| `structure/` | Structure intake, chain selection, residue-id normalization. | Emit `BackboneBundle` and `ResidueMap`. |
-| `evidence/` | Conservation/contact profile ingestion and normalization. | Emit `ConservationProfile` and `ContactProfile`; do not perform hidden searches. |
-| `masks/` | Deterministic mask algebra and conflict checks. | Emit `ResidueMaskSet` or fail with named conflicts. |
-| `adapters/` | Thin request/result adapters for declared model backends. | Emit backend request manifests and normalize already-declared results; no process runner and no implicit fallback backend. |
-| `candidates/` | Deduplication, ids, mutation tables, and ranking. | Emit deterministic `ThreadCandidate` rows. |
-| `foldcheck/` | Model-agnostic fold-check request/report contracts. | Emit WT-baselined request manifests and normalized report validators; no fold-model execution. |
-| `handoffs/` | Downstream handoff bundles and hash closure. | Emit `CandidateHandoff`. |
-
-Do not broaden `thread` beyond generic artifact contracts until a tracer bullet
-needs another executable seam. The current public seams are ProteinMPNN request
-adaptation, candidate normalization, ColabFold output normalization, and
-fold-check request/report contracts. A future `adapters.esm_atlas` seam may
-normalize ESM Atlas query responses into compact model-derived semantic context,
-but it should not become a new core package until another backend needs the
-same contract.
-The Eco1 study docs and fixtures remain the stable planning surface for
-study-specific biology.
-
-Promotion checklist before broader `src/dnadesign/thread/` surfaces become
-executable:
-
-- Public imports are exposed from `dnadesign.thread` only after contracts pass
-  fixture and negative-path tests. The current public seams are
-  `dnadesign.thread.adapters.proteinmpnn`,
-  `dnadesign.thread.adapters.colabfold`, `dnadesign.thread.candidates`, and
-  `dnadesign.thread.foldcheck`.
-- CLI stance is explicit: Phase 1 may provide `thread validate` and
-  `thread materialize-fixture`; it should not provide `thread run-all`.
-- Tests mirror module ownership: `contracts/`, `structure/`, `evidence/`,
-  `masks/`, `adapters/`, `candidates/`, and `handoffs/` each get focused
-  contract tests before shared integration tests.
-- Package data is limited to schemas, small fixtures, and docs; model weights,
-  PDB/mmCIF files, fold predictions, and candidate tables stay in workspaces or
-  runtime outputs.
-- Architecture-boundary checks must reject cross-tool imports from sibling
-  internals such as `dnadesign.infer.src.*`, `dnadesign.construct.src.*`, or
-  `dnadesign.permuter.src.*`.
-- The first implementation slice is now a study-owned Phase 0/1 contract
-  validator at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py`.
-  This is the CLI entrypoint; domain validators live under
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/` so profile,
-  structure authority, conservation-source, materialized-artifact, and mask-case
-  checks do not accrete into a single module.
-- The second implementation slice is a study-owned structure materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/`.
-  It emits thread-shaped local runtime artifacts for `backbone_bundle.yaml` and
-  `residue_map.parquet`. It is not a model-execution framework and does not
-  create `dnadesign.thread`.
-- The third implementation slice is a study-owned contact materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/`.
-  It emits thread-shaped local runtime contact evidence for
-  `contact_profile.parquet` from the retained DNA/RNA context.
-- The fourth implementation slice is a study-owned conservation source
-  contract at
-  `docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml`.
-  It validates the declared MSA roster authority, provider policy, target-row
-  sequence hash, gap denominator, threshold, and plurality rule without
-  materializing `conservation_profile.parquet`.
-- The fifth implementation slice is a study-owned conservation materializer at
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/`.
-  It consumes explicit aligned FASTA inputs and emits thread-shaped long-form
-  `conservation_profile.parquet` evidence. It does not fetch provider
-  sequences, run MSA backends, or create `dnadesign.thread`; the real aligned FASTA
-  bundle remains the next source-data blocker.
-- The Aligner modernization slice adds public `dnadesign.aligner.msa` contracts
-  for FASTA validation, MAFFT and Clustal Omega preflight/execution, atomic
-  aligned FASTA publication, stderr sidecars, and aligned FASTA bundle manifests. Eco1 still
-  owns the source roster, provider policy, target-row hash, and conservation
-  scoring.
-- The conservation alignment slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`.
-  It validates Eco1 source FASTA sufficiency, parses declared MSA backend args, calls
-  the public `dnadesign.aligner.msa` runner, supports selected profile ids for
-  operational runs, and writes an Eco1 alignment bundle index. The former
-  full-Mestre broad-profile run with the declared high-sensitivity MAFFT policy
-  was stopped after roughly four hours and is no longer the active broad
-  denominator. The active broad profile is now the natural Mestre Ec86 RT clade
-  9 panel after declared QC. Selected source records and source FASTA
-  sufficiency pass locally, and both selected profiles are now accepted as a
-  Clustal Omega aligned FASTA bundle through `dnadesign.aligner.msa`.
-- The conservation alignment/profile acceptance slice materializes
-  `conservation_profile.parquet` from the accepted
-  `ec86_clade9_conservation_v1` and
-  `ec86_iia3_cluster42_1_conservation_v1` alignments.
-- The manual motif mask-authority slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/`.
-  It turns the study-owned `manual-mask-authority.yaml` ontology into a runtime
-  `manual_mask_authority.yaml` artifact for audited NAxxH, YADD, VTG, RT1-RT7
-  review labels, and Wang/Ec86 direct substrate-contact priors. Under the
-  current mask rule, RT1-RT7 labels do not blanket hard-fix residues.
-- The mask-set materializer slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/`.
-  It emits a thread-shaped `mask_set.yaml` from residue-map, contact,
-  conservation, and manual motif/direct-contact evidence. The prior
-  conservative 20 A mask is diagnostic history. The materialized mask uses
-  `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
-- The contact-risk profile slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/`
-  and `operations/contracts/contact_risk/`. It emits
-  `contact_risk_profile.yaml` as a contact evidence review after
-  `mask_set.yaml`, joining nearest-distance contact evidence, conservation
-  masks, manual-mask authority, Wang/Ec86 priors, and selected mask-row status.
-  The current mask rule uses direct retained DNA/RNA contact within 5 A.
-- The conservation source-sequence bundle slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/`.
-  It consumes explicit local provider FASTA caches plus `source_records.yaml`,
-  inserts the ec86kit target row, rejects undeclared providers and unexplained
-  exclusions, and emits unaligned source FASTA bundles plus manifests. It does
-  not fetch live provider rows, run an MSA backend, score conservation, or create
-  `dnadesign.thread`.
-- The conservation provider-source slice adds
-  `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/`.
-  It remains study-owned because it derives accessions from the Eco1/Mestre
-  source contract and writes explicit unresolved-provider ledgers. It does not
-  belong in `aligner` or future `thread`; those tools consume declared FASTA
-  bundles and evidence artifacts after source authority is already resolved.
-- The broad conservation source policy was revised from a whole-roster Mestre
-  denominator to `ec86_clade9_conservation_v1`: the Mestre Ec86-containing RT
-  clade 9 panel after declared QC. Tao remains the masking method prior, not the
-  source-set name. The full Mestre roster remains candidate-pool/classification
-  context, not Phase 1 conservation evidence.
-
-### 4. Contract Objects
-
-Generic contract names should not include Eco1:
-
-| Object | Purpose |
-| --- | --- |
-| `BackboneBundle` | Structure source, chain selection, sequence hash, ligand/cofactor policy, and fixed-backbone declaration. |
-| `ResidueMap` | Mapping among structure residue ids, canonical protein positions, CDS positions, and design positions. |
-| `ConservationProfile` | MSA-derived per-position conservation values and mapping quality. |
-| `ContactProfile` | Structure-derived protected contacts to substrate, metal, RNA/DNA, ligand, or protein interfaces. |
-| `ResidueMaskSet` | Final mutable/fixed/protected/unresolved residue masks with source contributions. |
-| `ThreadPlan` | Sampling backend, seed set, temperature schedule, fixed positions, tied positions, and expected sample count. |
-| `ThreadSample` | Raw sampled sequence with backend provenance and score fields. |
-| `ThreadCandidate` | Deduplicated candidate with stable id, mutation list, mask checks, rank, and provenance. |
-| `FoldCheckReport` | Fold-validation metrics, thresholds, and explicit per-candidate pass/fail state. |
-| `AssemblyFeasibilityReport` | Computational mutation-window and haplotype feasibility for full-sequence candidates. Study economics and Construct placement remain outside the generic object. |
-| `CandidateHandoff` | Selected candidates plus upstream artifact hashes and downstream target contract. |
-
-Contract state must be explicit:
-
-| State | Meaning |
-| --- | --- |
-| `scaffold` | Shape exists for planning but is not runtime-valid. |
-| `fixture` | Deterministic example exists and is allowed only in fixture lanes. |
-| `materialized` | Runtime artifact exists and records provenance. |
-| `accepted` | Artifact passed the declared checks for its phase. |
-| `rejected` | Artifact failed with named reasons. |
-
-No code path may silently promote `scaffold` or `fixture` artifacts to
-`materialized` evidence.
-
-### 5. Artifact Chain
-
-Use generic artifact names inside `thread`-style fixtures:
+Allowed status values:
 
 ```text
-backbone_bundle.yaml
-residue_map.parquet
-conservation_profile.parquet
-contact_profile.parquet
-mask_set.yaml
-thread_plan.yaml
-sample_table.parquet
-candidate_table.parquet
-foldcheck_report.parquet
-feasibility_report.parquet
-candidate_handoff.yaml
+wt_like
+enriched
+depleted
+shifted
+fragmented
+missing
+not_interpreted
 ```
 
-Study-specific fixtures may include `eco1_rt_v1` in profile ids and filenames,
-but reusable object names remain generic.
-
-Authority rules:
-
-- Runtime table authority should be Parquet for typed, bounded columns.
-- Review exports may be CSV, but they are not the source of truth unless the
-  contract explicitly says so.
-- Every artifact must record `schema_id`, `schema_version`, `artifact_id`,
-  `created_by`, `created_at`, and upstream artifact hashes.
-- A table with zero rows is valid only when the schema declares an empty-output
-  state and a reason.
-- A missing optional metric is encoded as null plus a reason column; it is never
-  inferred from another metric.
-- Fold-check reports must record the wild-type baseline artifact, runtime
-  parameter hash, threshold id, threshold values, and per-candidate pass/fail
-  reason. A raw pLDDT or RMSD value without those fields is not acceptance
-  evidence.
-- Candidate handoffs are emitted by the design-domain contract, but selected
-  candidate policy is study-owned. Downstream studies accept or reject the
-  handoff through their own promotion contract.
-
-### 5.1 Implementation Roadmap
-
-Implementation should proceed in narrow, replaceable slices. Each slice has a
-single owner, explicit input and output artifacts, and a negative-path test.
-
-| Slice | Owner | Input | Output | Must fail when |
-| --- | --- | --- | --- | --- |
-| `thread-contracts-v1` | `thread` | checked-in schemas and fixtures | importable contract models and validators | required fields conflict, unknown state is accepted, or fixture artifacts satisfy materialized contracts |
-| `structure-authority-v1` | study then `thread.structure` | selected structure source and reference FASTA | `backbone_bundle.yaml`, `residue_map.parquet` | source, chain, retained context, numbering origin, or sequence hash is pending |
-| `conservation-source-contract-v1` | study then `thread.evidence` | declared MSA roster and sequence-provider authority | selected source contract | target row, provider, gap denominator, threshold, or plurality rule is missing |
-| `evidence-profiles-v1` | `thread.evidence` | residue map plus declared MSA/contact source artifacts | `conservation_profile.parquet`, `contact_profile.parquet` | source hashes, gap policy, retained context, or per-position mapping is missing |
-| `mask-algebra-v1` | `thread.masks` plus study policy | evidence profiles and manual mask groups | `mask_set.yaml` | missing evidence implies designability, conflicts are unresolved, or mutable set is empty/all-mutable |
-| `sampling-request-v1` | `thread.adapters` | mask set and backend policy | `thread_plan.yaml`, backend request manifest | backend selection, seeds, temperature, fixed positions, or fallback policy is implicit |
-| `sample-ingest-v1` | `thread.adapters` or `infer` provider | backend result manifest | `sample_table.parquet` | backend result lacks run id, request hash, sequence hash, seed, temperature, score, or status |
-| `candidate-qa-v1` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, mask violations, unstable row ordering, or missing mutation windows appear |
-| `foldcheck-request-v1` | study plus `thread.foldcheck` | candidate table and residue map | `foldcheck_request/input_sequences.fasta`, `foldcheck_request/foldcheck_request_manifest.yaml` | WT baseline, full canonical sequence reconstruction, threshold policy, SCC storage posture, or upstream hashes are missing |
-| `foldcheck-normalize-v1` | `thread.foldcheck` or `infer` provider | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, provenance, or failure rows are missing |
-| `atlas-semantic-profile-v1` | `thread.adapters` plus study wrapper | fold-accepted candidates and full sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, API/schema drift is hidden, or query hashes/raw response hashes are missing |
-| `window-feasibility-v1` | `thread.candidates` plus study policy | accepted full-sequence candidates | `feasibility_report.parquet` | structural coupling or nearest-parent distance is unreported for windowed candidates |
-| `candidate-handoff-v1` | `thread.handoffs` plus study selection policy | candidate, fold, and feasibility reports | `candidate_handoff.yaml` | upstream hash closure, nonfixture fold acceptance, full-sequence validation, or downstream target is missing |
-| `rt-lnrna-acceptance-v1` | downstream study | RT-only candidate handoff | accepted/rejected promotion record | construct subject ids are preclaimed or required RT-only fields are absent |
-
-Do not collapse these slices into one module or command. A future orchestration
-command may run them in order only after each slice has its own validator.
-
-### 6. Conservative Tracer Bullet
-
-The first executable slice should be deliberately small:
-
-1. Ingest one Eco1/Ec86 RT structure source and one Eco1 RT reference sequence.
-2. Emit `residue_map.parquet`.
-3. Emit one conservative `mask_set.yaml`.
-4. Ingest or run eight deterministic ProteinMPNN or LigandMPNN samples.
-5. Deduplicate to a small `candidate_table.parquet`.
-6. Materialize a fold-check request for WT plus accepted candidates.
-7. Attach fixture or real fold-check metrics.
-7. Emit `candidate_handoff.yaml`.
-8. Verify that mutable positions are mapped, mask violations are zero,
-   candidate ids are deterministic, and every emitted artifact records upstream
-   hashes.
-
-The tracer bullet should be split into five fail-fast gates:
-
-| Gate | Required output | Fails when |
-| --- | --- | --- |
-| Structure authority | `backbone_bundle.yaml`, `residue_map.parquet` | Chain, sequence hash, numbering, or ligand policy is unresolved. |
-| Mask contract | `conservation_profile.parquet`, `contact_profile.parquet`, `mask_set.yaml` | Any mutable residue lacks mapping or any fixed reason conflicts. |
-| Sampling plan | `thread_plan.yaml`, `sample_table.parquet` | Backend, seed set, temperature, fixed positions, or sample count is implicit. |
-| Candidate QA | `candidate_table.parquet`, `foldcheck_report.parquet` | Mask violations, duplicate ids, missing fold provenance, or threshold-free acceptance appears. |
-| Handoff | `feasibility_report.parquet`, `candidate_handoff.yaml` | Selected ids are not full-sequence validated or downstream target is undeclared. |
-
-Current checked-in readiness records use the supported study preflight kinds
-available today, mostly `path_exists`. Those checks are scaffolding only. Phase
-1 acceptance requires content validators for schema fields, Parquet columns,
-artifact state, upstream hashes, fixture/materialized separation, and the
-negative cases listed in the Eco1 study fixtures.
-
-The current Phase 0 validator covers checked-in YAML/Markdown scaffold content:
-profile fields, forbidden cross-tool identity fields, artifact-chain schema
-shape, no-fallback and fixture/materialized invariants, conservative mask-case
-coverage, structure-source selection status, retained-context policy,
-profile/source consistency, residue-numbering policy status, and the
-materialized structure-artifact content for the Eco1 tracer bullet. Runtime
-artifact mechanics may still graduate to `thread` only through a later explicit
-promotion.
-
-### 6.1 Clade9 Plurality25 Direct-Contact Mask Policy
-
-The current mask rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`:
+Forbidden column names:
 
 ```text
-protected =
-  NAxxH / YADD / VTG
-  OR Wang/Ec86 direct substrate-contact prior
-  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA
-  OR mapped residue is within 5 A of retained DNA/RNA
-
-non_fixed = NOT protected
+processivity_score
+strand_displacement_score
+hairpin_unwinding_score
+activity_score
+enzyme_efficiency_score
 ```
 
-Terminal residues `1`, `2`, and `312-320` are
-`non_fixed_missing_backbone`: unprotected, but not directly mutable by
-fixed-backbone ProteinMPNN until coordinates exist.
+### Feasibility Report
 
-The materialized `mask_set.yaml` already uses this rule and validates three row
-classes: `protected`, `non_fixed`, and `non_fixed_missing_backbone`.
+Materialize the already-registered planned artifact:
 
-This rule excludes:
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
+```
 
-- contact-density, retained-chain-count, and contact-class release rules;
-- RT1-RT7 blanket hard fixing;
-- 15 A / 18 A / 20 A broad proximity rules as sampling policy;
-- conservation weakening to reach a target mutable count.
+One row per ProteinMPNN candidate. WT may appear only as an optional baseline
+row if the policy explicitly says so; handoff eligibility is candidate-only.
 
-The residue-count outcome from current evidence is:
+Required fields:
 
-- `123` mapped non-fixed residues directly usable by fixed-backbone ProteinMPNN;
-- `11` terminal `non_fixed_missing_backbone` residues;
-- `134` total unprotected residues.
+```yaml
+candidate_id: string
+sequence_hash: string
+parent_sequence_id: string
+parent_sequence_hash: string
+mutation_count_total: int
+mutation_count_mutable_region: int
+mutation_count_protected_region: int
+protected_mutation_violation_count: int
+protected_mutation_violations_json: string
+mutation_windows_json: string
+max_mutation_window_length: int
+max_mutation_window_mutation_count: int
+mutation_window_density_max: float
+nearest_parent_id: string | null
+nearest_parent_distance_aa: int | null
+nearest_parent_distance_fraction: float | null
+parent_haplotype_id: string | null
+parent_haplotype_distance_aa: int | null
+synthesis_tier: string
+synthesis_blockers_json: string
+codon_policy_id: string | null
+sequence_complexity_flags_json: string
+feasibility_status: string
+feasibility_reason: string
+feasibility_policy_id: string
+input_candidate_table_hash: string
+input_mask_policy_hash: string
+input_foldcheck_report_hash: string
+created_at_utc: string
+created_by: string
+```
 
-Do not create a generic `thread` implementation for this mask until backend
-sample ingest proves which request/result fields are reusable. The study code
-home remains `operations/materialization/mask_set/`, with validation under
-`operations/contracts/masks/`.
+Allowed `synthesis_tier` values:
 
-### 7. Fail-Fast Policy
+```text
+easy
+standard
+difficult
+blocked
+unknown
+```
 
-- No design run without a valid `BackboneBundle`.
-- No mutable residue without a `ResidueMap` row.
-- No MSA conservation mask without a target-row mapping and gap policy.
-- No contact mask without structure provenance and distance threshold policy.
-- No manual motif mask without an explicit study-owned mask-authority artifact
-  resolved through the residue map.
-- No sample table without backend version, seed, and mask provenance.
-- No fold-check acceptance without explicit thresholds and runtime provenance.
-- No pooled-window handoff unless every recombined candidate has preserved
-  haplotype/window linkage, nearest-parent distance, structural-coupling flags,
-  and computational QA.
-- No RT-lnRNA promotion without the downstream study's construct-subject
-  contract.
-- No hidden backcompat shim from a study-local schema to a future `thread`
-  schema. Migration must be an explicit breaking contract update.
-- No fallback from ProteinMPNN to LigandMPNN, or from real fold metrics to
-  fixture metrics, without a new run id and an explicit operator decision.
-- No monolithic `run_all` command before the five gates above can be run and
-  verified independently.
+Allowed `feasibility_status` values:
 
-### 8. Source Evidence
+```text
+feasible
+review
+blocked
+missing_inputs
+```
 
-The motivating external method is Tao et al., "AI-guided redesign of
-laboratory-evolved reverse transcriptases enhances prime editing", Nature
-Biotechnology, published 2026-05-21, DOI `10.1038/s41587-026-03149-6`.
-The paper cites ProteinMPNN as the core fixed-backbone sequence-design method
-and provides GitHub/SRA resources for the prime-editor RT redesign campaign.
-This study adapts the computational pattern to Eco1 RT for sponging use; it
-does not adopt the prime-editing objective.
+Fail-fast rules:
 
-### 9. Open Questions For Refinement
+- exactly 96 candidate rows unless an explicit baseline policy adds WT;
+- unique `candidate_id`;
+- no missing sequence hashes;
+- no `feasible` row with protected mutation violations;
+- every candidate exists in `candidate_table.parquet`;
+- every handoff-eligible candidate has an accepted fold-check row;
+- synthesis economics remain study policy, not a generic `thread` decision.
 
-- Which first backend result format should `thread` ingest: direct
-  ProteinMPNN/LigandMPNN files, `infer` result manifests, or both through
-  separate explicit adapters?
-- Which parts of protein MSA evidence should promote from the Eco1 materializer
-  into `thread.evidence` after `dnadesign.aligner.msa` emits aligned FASTA
-  bundles?
-- Which Eco1/Ec86 structural source is the first profile authority?
-- Which fold-check metrics are required for the first real candidate batch?
-- What exact downstream acceptance record will
-  `rt_lnrna_sponging_construct_triage` emit after it accepts or rejects RT-only
-  candidates?
+### Candidate Selection Panel
+
+Materialize:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+```
+
+This table is the review surface between feasibility and handoff. It should not
+replace `candidate_table.parquet`.
+
+Required fields:
+
+```yaml
+candidate_id: string
+eligible_for_handoff: bool
+rank_within_eligible: int | null
+fold_preservation_rank: int
+cryoem_preservation_rank: int
+feasibility_rank: int | null
+semantic_stratum: string
+selection_bucket: string
+selection_reason: string
+input_foldcheck_review_hash: string
+input_feasibility_report_hash: string
+input_sae_window_summary_hash: string | null
+```
+
+Allowed `selection_bucket` values:
+
+```text
+primary_candidate
+structural_control
+semantic_diversity_candidate
+outlier_for_review
+feasibility_blocked
+excluded
+```
+
+Eligibility rule:
+
+```text
+candidate_table.status == accepted
+AND foldcheck_report.status == accepted
+AND foldcheck_review row is present
+AND feasibility_report.feasibility_status == feasible
+AND protected_mutation_violation_count == 0
+AND required upstream hashes are present
+```
+
+SAE rows may diversify candidates inside the fold-accepted and feasible set.
+They must not select a candidate on their own.
+
+### RT-Only Candidate Handoff
+
+Materialize the already-registered planned artifact:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
+```
+
+The handoff is RT-only. It must not create an RT-lnRNA construct subject.
+
+Required top-level fields:
+
+```yaml
+handoff_id: eco1_rt_repack_candidate_handoff_v1
+handoff_kind: rt_only_candidate_handoff
+study_id: eco1_rt_repack
+subject_kind: reverse_transcriptase_protein_only
+construct_subject_created: false
+downstream_acceptance_required: true
+source_artifacts: {}
+selection_policy: {}
+candidates: []
+```
+
+Validator rules:
+
+- fail if `feasibility_report.parquet` is missing;
+- fail if `candidate_selection_panel.parquet` is missing;
+- fail if a selected candidate lacks an accepted fold-check row;
+- fail if a selected candidate is feasibility-blocked;
+- fail if any required upstream hash is missing;
+- fail if any construct-subject id is emitted;
+- fail if SAE is configured as an acceptance gate.
+
+### Scientific Deliverable And Visualization Contract
+
+The visual plan should tell the study in order, using one figure family per
+question. Do not build a single overloaded plot. Write all new deliverables
+under:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/
+```
+
+The deliverable root must contain `review_deliverable_manifest.yaml`. Every
+persisted figure, frame, or notebook input must record:
+
+- artifact path;
+- input artifact hashes;
+- source table or structure ids;
+- alt text;
+- plain description;
+- interpretation limit;
+- whether the panel is manuscript-facing, review-only, or optional/heavy.
+
+Current foundation status: `review-deliverable-foundation-v1` is materialized.
+It writes the visual manifest, canonical-coordinate MSA plurality/mask SVG,
+linear mask-track SVG, ChimeraX mask-context script, ProteinMPNN diversity SVGs,
+and a manifest-backed marimo notebook. It also links existing foldcheck_review
+plots instead of duplicating them. The visual manifests use manifest-relative
+paths so the review bundle can move with the study workspace. Static marimo
+checks and HTML export are the dogfood path for notebook resolution. Biohub ESMC
+feature-window heatmaps, WT SAE feature structure frames, feasibility matrices,
+and handoff panels remain follow-on deliverables.
+
+#### Deliverable 1: MSA Plurality And Mask Context
+
+Artifact group:
+
+```text
+msa_plurality_mask_panel/
+```
+
+Main outputs:
+
+- `msa_plurality_mask_panel.svg`
+- `msa_plurality_mask_panel.alt.md`
+- optional `msa_plurality_mask_panel.html` for full-row inspection
+
+Purpose:
+
+```text
+Show how the current conservation mask was derived and where it lands on the
+Eco1/Ec86 sequence.
+```
+
+Inputs:
+
+- `ec86_clade9_conservation_v1.aligned.fasta` with 303 aligned records after QC;
+- `ec86_iia3_cluster42_1_conservation_v1.aligned.fasta` with 45 aligned records;
+- `conservation_profile.parquet`;
+- `rt-annotation-tracks.yaml`;
+- `manual_mask_authority.yaml`;
+- `mask_set.yaml`.
+
+Rendering contract:
+
+- The Eco1/Ec86 target row must be first.
+- The main static figure should use a declared display subset, not silently plot
+  all 303 clade 9 rows with unreadable labels.
+- A full-row view belongs in HTML or marimo, not a dense static SVG.
+- Column backgrounds should mark `>=25%` WT-plurality protected positions.
+- Separate tracks should mark NAxxH, YADD, VTG, Wang/Ec86 direct-contact priors,
+  retained DNA/RNA 5 A contacts, and the mutable design canvas.
+- Y-axis labels must be source labels from the declared row metadata, not FASTA
+  order guesses.
+
+Interpretation limit:
+
+```text
+The MSA panel explains the conservation component of the mask. It does not
+prove that conserved residues are functionally required in Eco1, and it does not
+make the full Mestre roster the scoring denominator.
+```
+
+#### Deliverable 2: Linear Mask And 3D Scaffold Context
+
+Artifact group:
+
+```text
+mask_structure_context/
+```
+
+Main outputs:
+
+- `linear_mask_tracks.svg`
+- `mask_structure_context.cxc`
+- `mask_structure_context.png`
+- optional `mask_structure_context.svg` if exported through a reproducible
+  vector route
+
+Purpose:
+
+```text
+Show which residues were fixed or protected, which residues remained designable,
+and where those classes sit on the cryoEM-backed RT fold.
+```
+
+Rendering contract:
+
+- Use an off-white RT cartoon as the neutral base.
+- Color protected categories with a small categorical palette:
+  - catalytic/motif anchors;
+  - Wang/Ec86 direct-contact priors;
+  - retained DNA/RNA 5 A contact residues;
+  - clade 9 plurality-protected residues;
+  - mutable design-canvas residues.
+- Use a declared precedence or multi-track legend for residues with multiple
+  protection reasons. Do not let overlapping colors hide mask reasons.
+- The linear track and structure panel must use the same category names.
+- RT1-RT7 labels do not blanket hard-fix residues. They may be shown as context
+  spans, but not as blanket protected spans.
+
+Interpretation limit:
+
+```text
+This panel shows design policy and structure context. It does not evaluate
+candidate folding and does not claim activity.
+```
+
+#### Deliverable 3: ProteinMPNN Candidate Diversity
+
+Artifact group:
+
+```text
+proteinmpnn_candidate_diversity/
+```
+
+Main outputs:
+
+- `proteinmpnn_score_mutation_burden.svg`
+- `sequence_identity_vs_score.svg`
+- `mutation_density_by_position.svg`
+
+Purpose:
+
+```text
+Show what ProteinMPNN changed relative to the Ec86/7V9U reference before fold
+review.
+```
+
+Metrics:
+
+- ProteinMPNN score and global score;
+- sampling seed, temperature, and sample index;
+- sequence identity to WT/Ec86 reference;
+- mutation count;
+- mutation density by canonical residue position;
+- protected-position violation count, expected to remain zero.
+
+Interpretation limit:
+
+```text
+Sequence identity is descriptive. Lower sequence recovery is not bad by itself
+if fold-review metrics remain acceptable and protected residues are preserved.
+```
+
+#### Deliverable 4: ColabFold Structure Review Panels
+
+Artifact group:
+
+```text
+colabfold_structure_review/
+```
+
+Main outputs:
+
+- `structure_panel_best_worst.png`
+- `structure_panel_best_worst_manifest.yaml`
+- optional `structure_contact_sheet_all97.png`
+- optional `structure_contact_sheet_all97_manifest.yaml`
+
+Purpose:
+
+```text
+Show whether candidate structures preserve the Ec86 scaffold, and make outliers
+visually inspectable without loading every model manually.
+```
+
+Rendering contract:
+
+- Always render a small panel first: WT, top preserved candidates, high-RMSD
+  outliers, low-pLDDT rows, and one or more deterministic controls.
+- Render the all-97 contact sheet only as an optional/heavy artifact.
+- Cache per-structure thumbnails by structure hash and view preset so reruns do
+  not rerender unchanged PDBs.
+- Keep full 3D PDB inspection available through the existing full-set ChimeraX
+  script.
+- Labels beneath each thumbnail should include only compact metrics:
+  - `pLDDT`;
+  - sequence identity to WT;
+  - `cryoem_mapped_ca_rmsd`;
+  - `wt_runtime_ca_rmsd` if space allows.
+- Do not call this an ESMFold2 panel; the current full structure set is
+  ColabFold output.
+
+Performance note:
+
+```text
+Rendering 97 structures is feasible but should be treated as a cached contact
+sheet job, not as an always-on notebook render. The marimo notebook should load
+pre-rendered images and manifests, not rerender ChimeraX views interactively.
+```
+
+#### Deliverable 5: WT Biohub ESMC SAE Feature Structure Frames
+
+Artifact group:
+
+```text
+biohub_esmc_wt_feature_frames/
+```
+
+Main outputs:
+
+- `frames/<sae_model>__feature_<feature_index>.png`
+- `biohub_esmc_wt_feature_frames_manifest.yaml`
+- optional `biohub_esmc_wt_feature_frames.mp4`
+
+Purpose:
+
+```text
+Use WT Ec86 as the control sequence and show where selected Biohub ESMC SAE
+features activate on the protein structure.
+```
+
+Rendering contract:
+
+- Use the WT ColabFold model or the ec86kit/7V9U reference consistently; record
+  which one is used.
+- Use an off-white protein base.
+- Color residues by per-residue activation for one feature at a time.
+- Frame labels must include feature index, SAE model id, and any source-backed
+  feature label. If no label exists for the current model/codebook, write
+  `unlabeled feature`.
+- Select features by a declared rule: WT top features, highest fold-accepted
+  variance, or source-backed polymerase labels for the exact SAE model. Do not
+  mix Atlas-style labels into the Biohub 65,536-feature dictionary.
+
+Interpretation limit:
+
+```text
+These frames show model-derived activation localization. They are not evidence
+for processivity, strand displacement, or hairpin readthrough.
+```
+
+#### Deliverable 6: Biohub ESMC Variant Feature Heatmap
+
+Artifact group:
+
+```text
+biohub_esmc_feature_heatmap/
+```
+
+Main outputs:
+
+- `biohub_esmc_feature_window_heatmap.svg`
+- `biohub_esmc_feature_window_heatmap.alt.md`
+
+Purpose:
+
+```text
+Compare selected Biohub ESMC feature-window activations across WT and the 96
+candidate variants.
+```
+
+Rendering contract:
+
+- Rows are WT plus candidate variants.
+- Default row order should be structural: sort candidates by
+  `cryoem_mapped_ca_rmsd`, with WT first and outliers labelled.
+- Columns should be a declared subset of features or feature windows:
+  - WT top features;
+  - high-variance features across fold-accepted candidates;
+  - model-matched source-backed polymerase features if available.
+- Do not show all feature indices.
+- Values should be WT-normalized activation ratios or z-scores, with missing
+  values explicit.
+- Use this heatmap as semantic stratification after fold review, not as a hidden
+  candidate selector.
+
+Interpretation limit:
+
+```text
+The heatmap shows which model-derived feature activations are retained, shifted,
+or depleted across candidates. It does not rank processivity.
+```
+
+#### Deliverable 7: Feasibility And Handoff Matrix
+
+Artifact group:
+
+```text
+selection_and_feasibility/
+```
+
+Main outputs:
+
+- `synthesis_feasibility_matrix.svg`
+- `candidate_selection_panel.svg`
+
+Purpose:
+
+```text
+Show which structurally reviewed candidates are feasible, selected, blocked, or
+reserved as controls.
+```
+
+Inputs:
+
+- `feasibility_report.parquet`;
+- `candidate_selection_panel.parquet`;
+- `candidate_handoff.yaml` when present.
+
+This deliverable must not render until feasibility exists.
+
+#### Notebook Surface
+
+The marimo notebook should stay manifest-backed. It should expose dropdowns for:
+
+- MSA and mask context;
+- linear/3D mask context;
+- ProteinMPNN diversity;
+- fold-review structure panels;
+- WT SAE feature frames;
+- variant SAE heatmap;
+- feasibility and handoff once present.
+
+The notebook must read manifests and pre-rendered artifacts. It must not
+hard-code plot paths, rerun Biohub requests, rerender all ChimeraX structures,
+or implement selection logic inline.
+
+### Implementation Tickets
+
+1. **SAE feature-window summary**
+   - Add study-owned materializer:
+     `operations/materialization/biohub_esmc_feature_windows/`.
+   - Keep generic sparse-row utilities in `dnadesign.thread.adapters.biohub_esmc`
+     only if they are not Eco1-specific.
+   - Validate model id, SAE model id, dictionary size, row counts, and WT joins.
+
+2. **Feasibility report**
+   - Add materializer:
+     `operations/materialization/feasibility_report/`.
+   - Add contract package:
+     `operations/contracts/feasibility/`.
+   - Start with full-sequence candidate feasibility. Do not introduce pooled
+     recombination until parent haplotypes and structural coupling checks are
+     explicit.
+
+3. **Selection panel**
+   - Add materializer:
+     `operations/materialization/candidate_selection_panel/`.
+   - Reject SAE-only selection and missing feasibility/fold rows.
+
+4. **RT-only handoff**
+   - Add materializer:
+     `operations/materialization/candidate_handoff/`.
+   - Reuse generic handoff/hashing helpers only after the Eco1 shape is stable.
+   - Keep downstream RT-lnRNA acceptance as a separate contract.
+
+5. **Visual bundle extension**
+   - Foundation materialized in `operations/materialization/review_deliverables/`
+     with MSA plurality/mask context, linear mask tracks, a ChimeraX mask-context
+     script, ProteinMPNN candidate diversity, linked fold-review plots, and a
+     manifest-backed marimo notebook.
+   - Visual manifests must use manifest-relative paths, and notebook dogfood
+     must include `marimo check` plus HTML export so missing linked media is
+     caught before review.
+   - ChimeraX command scripts should use paths relative to the script
+     directory for staged local structures. Keep raw SCC paths as provenance in
+     manifests, not as required paths inside the local review script.
+   - SVG outputs should retain editable text nodes and include title/desc
+     metadata plus manifest alt text.
+   - Next visual extension starts after `sae_feature_window_summary.parquet`:
+     WT SAE feature frames and the Biohub ESMC feature-window heatmap.
+   - Treat the all-97 structure contact sheet and feature-frame video as
+     optional/heavy deliverables with cached per-structure or per-feature
+     intermediates.
+   - Keep SVGs and PNGs alt-text-backed, manifest-recorded, and sequentially
+     useful for a concise scientific methods/results narrative.
+
+6. **Phase wording cleanup**
+   - Use `phase3_foldcheck_report` for current fold-check validation.
+   - Reserve `phase4_downstream_promotion` for RT-only handoff and downstream
+     accept/reject readiness.
+
+### Validation Plan
+
+Run after implementation:
+
+```bash
+uv run pytest src/dnadesign/thread/tests src/dnadesign/studies/units/eco1_rt_repack/tests -q
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase0_scaffold
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase1_thread_contract
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase2_real_backend_ingest
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase3_foldcheck_report
+uv run ruff check .
+uv run ruff format --check .
+uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root . --max-sor-age-days 92
+bash .agents/skills/eco1-rt-repack-status/scripts/audit-eco1-rt-repack-status-skill.sh
+uv run marimo check src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
+uv run marimo check src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
+uv run marimo export html src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py --no-include-code -o /tmp/eco1_review_deliverables.html -f
+uv run marimo export html src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py --no-include-code -o /tmp/eco1_foldcheck_review.html -f
+git diff --check
+test ! -e outputs
+```
+
+Add focused tests for:
+
+- SAE model/dictionary mismatch rejection;
+- window summary peak/fragment calculations;
+- feasibility rejection on protected mutations;
+- handoff rejection when feasibility is missing;
+- handoff rejection when construct subjects are emitted;
+- selection rejection when SAE is the only positive evidence;
+- deterministic reruns where output hashes should be stable.
+
+### Definition Of Done
+
+This slice is done when:
+
+```text
+sae_feature_window_summary.parquet exists and validates
+feasibility_report.parquet exists and validates
+candidate_selection_panel.parquet exists and validates
+candidate_handoff.yaml exists and validates
+review_deliverable_manifest.yaml exists and validates
+MSA plurality/mask context visual renders from declared alignment inputs
+linear-plus-3D mask context visual renders from declared mask/structure inputs
+ProteinMPNN sequence-diversity visuals render from candidate_table.parquet
+cached ColabFold structure-review panel renders from local staged PDBs
+WT Biohub ESMC SAE feature frames render for a declared feature subset
+Biohub ESMC feature-window heatmap renders from sae_feature_window_summary.parquet
+selection visuals render from materialized feasibility/selection inputs
+all visual manifests include alt text and interpretation limits
+status.md, datasets.yaml, routes, and command groups name the new state
+phase wording separates fold-check validation from downstream promotion
+handoff validator proves no construct subject was created
+```
+
+The only final claim enabled by this slice is:
+
+```text
+These RT-only candidates are fold-checked, structure-reviewed, computationally feasible, and ready for downstream accept/reject review.
+```
+
+This slice still must not claim:
+
+```text
+These candidates are more processive.
+These candidates have strand-displacement activity.
+These candidates read through hairpins better.
+```
+
+Those claims require downstream experimental evidence.
+
+### Source Roles
+
+- Tao et al. supplies the fixed-backbone RT redesign method pattern:
+  protect functional/conserved residues, generate RT sequence proposals, and
+  structurally filter candidates. It does not define Eco1's biological objective.
+- ProteinMPNN supplies the public fixed-backbone inverse-folding CLI and helper
+  JSONL workflow.
+- Wang et al. and 7V9U supply the Ec86 RT-msDNA/msrRNA cryoEM scaffold and
+  substrate-contact context.
+- ColabFold supplies the `colabfold_batch` structural-fidelity path used on
+  BU SCC. LocalColabFold supplies the install/environment path for that CLI.
+- Candido et al., Biohub ESMC, and ESM Atlas supply model-derived semantic
+  representation context. They do not supply biochemical processivity evidence.

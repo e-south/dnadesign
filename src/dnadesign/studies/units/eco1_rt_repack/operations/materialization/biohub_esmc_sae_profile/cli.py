@@ -1,0 +1,93 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sae_profile/cli.py
+
+CLI for Eco1 Biohub ESMC SAE-profile materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import argparse
+from collections.abc import Sequence
+from pathlib import Path
+
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.constants import (
+    DEFAULT_BIOHUB_API_BASE_URL,
+    DEFAULT_KEY_FILE,
+    DEFAULT_MODEL,
+    DEFAULT_NORMALIZE_FEATURES,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    DEFAULT_SAE_MODEL,
+    DEFAULT_SEQUENCE_LIMIT,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.pipeline import (
+    materialize_biohub_esmc_sae_profile,
+)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Materialize Eco1 Biohub ESMC SAE-profile artifacts.")
+    parser.add_argument("--repo-root", type=Path, default=None)
+    parser.add_argument("--output-root", type=Path, default=None)
+    parser.add_argument("--sequence-limit", default=DEFAULT_SEQUENCE_LIMIT)
+    parser.add_argument("--biohub-api-base-url", default=DEFAULT_BIOHUB_API_BASE_URL)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--sae-model", default=DEFAULT_SAE_MODEL)
+    parser.add_argument(
+        "--normalize-features",
+        action="store_true",
+        default=DEFAULT_NORMALIZE_FEATURES,
+        help="Request normalized SAE features. Not supported by Biohub for the 300M SAE model.",
+    )
+    parser.add_argument("--key-file", type=Path, default=DEFAULT_KEY_FILE)
+    parser.add_argument(
+        "--resume-existing",
+        action="store_true",
+        help="Reuse accepted rows whose per-sequence Biohub query hash matches the current request.",
+    )
+    parser.add_argument(
+        "--max-new-requests",
+        type=int,
+        default=None,
+        help="Optional cap on new Biohub API calls; unattempted rows are explicit and resumable.",
+    )
+    parser.add_argument(
+        "--request-sleep-seconds",
+        type=float,
+        default=0.0,
+        help="Delay between new Biohub API calls for conservative batch progression.",
+    )
+    parser.add_argument(
+        "--request-timeout-seconds",
+        type=float,
+        default=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        help="Wall-clock timeout for each Biohub POST request.",
+    )
+    args = parser.parse_args(argv)
+
+    result = materialize_biohub_esmc_sae_profile(
+        repo_root=args.repo_root,
+        output_root=args.output_root,
+        sequence_limit=args.sequence_limit,
+        biohub_api_base_url=args.biohub_api_base_url,
+        model=args.model,
+        sae_model=args.sae_model,
+        normalize_features=args.normalize_features,
+        key_file=args.key_file,
+        resume_existing=args.resume_existing,
+        max_new_requests=args.max_new_requests,
+        request_sleep_seconds=args.request_sleep_seconds,
+        request_timeout_seconds=args.request_timeout_seconds,
+    )
+    print(f"selected_sequences: {result.selected_sequence_count}")
+    print(f"biohub_request_hash: {result.biohub_request_hash}")
+    print(f"profile: {result.profile_path}")
+    print(f"protein_features: {result.protein_features_path}")
+    print(f"residue_features: {result.residue_features_path}")
+    print(f"feature_catalog: {result.feature_catalog_path}")
+    print(f"request_manifest: {result.request_manifest_path}")
+    return 0

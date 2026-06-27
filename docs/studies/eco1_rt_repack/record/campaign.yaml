@@ -99,11 +99,31 @@ steps:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
   - label: foldcheck-selected-candidates
     kind: planned-runtime
-    status: implemented_waiting_for_runtime_output
+    status: materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
+  - label: review-foldcheck-candidates
+    kind: planned-runtime
+    status: materialized
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
+  - label: materialize-biohub-esmc-sae-profile
+    kind: planned-runtime
+    status: materialized
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_sae_profile.parquet
+  - label: summarize-biohub-esmc-sae-feature-windows
+    kind: planned-runtime
+    status: planned
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
   - label: assess-assembly-feasibility
     kind: planned-runtime
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
+  - label: build-candidate-selection-panel
+    kind: planned-runtime
+    status: planned
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+  - label: render-review-deliverables
+    kind: materialized-runtime
+    status: materialized_foundation
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
   - label: tracer-bullet-thread
     kind: planned-runtime
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml

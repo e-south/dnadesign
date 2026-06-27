@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-06-25
+last_verified: 2026-06-26
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -277,7 +277,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
     status: materialized_local
-    description: Local generated ProteinMPNN helper-compatible request sidecars. The Eco1 wrapper resolves study paths and selected structure provenance, while dnadesign.thread.adapters.proteinmpnn owns protein-only chain export, canonical-to-chain-local position mapping, fixed-position JSONL, request hashing, --omit_AAs C, and explicit no-fallback request validation.
+    description: Local generated ProteinMPNN helper-compatible request sidecars. The Eco1 wrapper resolves study paths and selected structure provenance, while dnadesign.thread.adapters.proteinmpnn owns protein-only chain export, canonical-to-chain-local position mapping, parsed-PDB/assigned-chain/fixed-position JSONL, request hashing, --omit_AAs C, and explicit no-fallback request validation.
   - id: eco1_rt_sample_table
     owner: thread
     kind: generated_artifact
@@ -289,7 +289,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_outputs/backend_run_manifest.yaml
     status: materialized_local
-    description: Local generated backend-run manifest for official ProteinMPNN commit 8907e6671bfbfc92303b5f79c4b5e6ce47cdef57; records per-seed commands, return codes, elapsed seconds, request hash, request manifest hash, and explicit tool root.
+    description: Local generated backend-run manifest for official ProteinMPNN commit 8907e6671bfbfc92303b5f79c4b5e6ce47cdef57; records per-seed protein_mpnn_run.py commands, return codes, elapsed seconds, request hash, request manifest hash, and explicit tool root.
   - id: eco1_rt_candidate_table
     owner: thread
     kind: generated_artifact
@@ -301,31 +301,242 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
     status: materialized_local_planned_not_run
-    description: Local generated ColabFold-planned fold-check request manifest. It records one WT baseline plus 96 accepted candidates, full 320-aa canonical sequence hashes, candidate-table/residue-map/ProteinMPNN-request hashes, threshold policy, BU SCC storage posture, and no model execution.
+    description: Local generated ColabFold CLI fold-check request manifest. It records one WT baseline plus 96 accepted candidates, full 320-aa canonical sequence hashes, candidate-table/residue-map/ProteinMPNN-request hashes, threshold policy, BU SCC storage posture, and no model execution.
   - id: eco1_rt_foldcheck_input_fasta
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
     status: materialized_local
-    description: Local generated fold-check FASTA containing the WT baseline and 96 accepted ProteinMPNN candidates as full 320-aa canonical Eco1 sequences for external ColabFold/AlphaFold-family CLI execution.
+    description: Local generated fold-check FASTA containing the WT baseline and 96 accepted ProteinMPNN candidates as full 320-aa canonical Eco1 sequences for external ColabFold colabfold_batch CLI execution.
   - id: eco1_rt_foldcheck_report
     owner: thread
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
-    status: materialized_local_smoke
-    description: Local generated fold-validation smoke report normalized from BU SCC ColabFold job 6224446 after the current request-hash cleanup. It contains six accepted rows for WT plus five candidates and 91 explicit errored rows for candidates outside the smoke subset; it proves the runtime/parser path, not full candidate handoff readiness.
+    status: materialized_local_full
+    description: Local generated fold-validation report normalized from BU SCC ColabFold job 6228979 under /project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42. It contains accepted rows for WT plus all 96 ProteinMPNN candidates; raw ColabFold outputs remain on SCC project storage.
+  - id: eco1_rt_foldcheck_candidate_ranking
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
+    status: materialized_local_review
+    description: Local generated fold-check review ranking for the 96 ProteinMPNN candidates. It carries ProteinMPNN metrics, pLDDT, PAE summaries, WT-runtime C-alpha RMSD, direct cryoEM-reference RMSD from the staged local full structure set, and plain review classes.
+  - id: eco1_rt_foldcheck_structure_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_structure_panel.yaml
+    status: materialized_local_review
+    description: Local generated structure-review panel manifest. It records the ec86kit/7V9U reference, WT runtime model, best-folded candidates, high-RMSD outliers, low-pLDDT rows, intermediate rows, deterministic controls, exact SCC source paths, and local staged PDB paths.
+  - id: eco1_rt_foldcheck_full_structure_set
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_full_structure_set.yaml
+    status: materialized_local_review
+    description: Local generated full fold-structure manifest for ChimeraX/review use. It tracks one normalized PDB for the WT runtime model plus each of the 96 accepted candidate models; raw ColabFold output trees remain on SCC.
+  - id: eco1_rt_foldcheck_chimerax_script
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/chimerax/ec86_fold_panel.cxc
+    status: materialized_local_review
+    description: Local generated ChimeraX command script for the selected fold-check structure panel. It opens the local ec86kit/7V9U protein backbone reference and aligns selected model PDBs.
+  - id: eco1_rt_foldcheck_full_chimerax_script
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/chimerax/ec86_full_fold_set.cxc
+    status: materialized_local_review
+    description: Local generated ChimeraX command script for opening the cryoEM-backed reference, WT runtime model, and all 96 candidate PDBs from the normalized local full structure set.
+  - id: eco1_rt_foldcheck_review_visual_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/review_visual_manifest.yaml
+    status: materialized_local_review
+    description: Local generated visual manifest for fold-check review. It records plot paths, alt text, descriptions, data sources, and interpretation limits for review figures; figures are review aids, not acceptance gates.
+  - id: eco1_rt_foldcheck_review_plots
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
+    status: materialized_local_review
+    description: Local generated SVG plots for review-class counts, ColabFold fold metrics, cryoEM-reference RMSD comparison, and Biohub ESMC SAE coverage. Each SVG is referenced by the visual manifest and has embedded title/description text.
+  - id: eco1_rt_foldcheck_review_notebook
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
+    status: materialized_local_review
+    description: Local generated marimo review notebook scoped to Eco1 fold-check review. It reads review_visual_manifest.yaml and presents generated plots through a dropdown review surface with alt text, evidence rows, and interpretation limits.
+  - id: eco1_rt_foldcheck_atlas_subset_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/atlas_subset_manifest.yaml
+    status: materialized_local_review
+    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later semantic annotation. Atlas remains a post-fold semantic audit and assay-stratification layer, not a candidate acceptance gate.
   - id: eco1_rt_atlas_semantic_profile
     owner: thread
-    kind: planned_artifact
+    kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_semantic_profile.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: >-
+      Compact ESM Atlas semantic-profile summary for the all-97 fold-check
+      request. A bounded hash-lookup/on-demand probe accepted WT, returned
+      explicit 404 rows for the first four synthetic ProteinMPNN candidates even
+      with fold_on_miss=true, and left the remaining 92 candidates explicitly
+      unattempted for resume safety. It is not fold validation, not a
+      processivity model, and not a functional acceptance gate.
+  - id: eco1_rt_atlas_protein_activations
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_protein_activations.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Sparse protein-level ESM Atlas SAE activations for accepted Atlas lookup rows. The current accepted row is WT, stored as 2,095 nonzero activation rows rather than a dense 16,384-feature vector.
+  - id: eco1_rt_atlas_residue_activations
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_residue_activations.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Sparse per-residue ESM Atlas SAE activations for accepted Atlas lookup rows. The current accepted row is WT, with 20,480 nonzero rows, zero-based Atlas residue indices, and one-based sequence positions. Long feature descriptions are not repeated per residue.
+  - id: eco1_rt_atlas_feature_catalog
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_feature_catalog.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Compact feature metadata table for the top 100 Atlas SAE features observed in the accepted WT Atlas response.
+  - id: eco1_rt_structure_prediction_registry
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_predictions/structure_prediction_registry.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Generic structure-prediction registry for optional model-predicted structures. The current Atlas on-demand probe records one WT Atlas/ESMFold-derived structure and keeps it separate from ColabFold fold-check structures.
+  - id: eco1_rt_biohub_esmc_sae_profile
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_sae_profile.parquet
+    status: materialized_all97
+    description: >-
+      Authenticated Biohub ESMC/logits query-time SAE profile for WT plus all
+      96 fold-accepted ProteinMPNN candidates. The materialization accepted all
+      97 query rows. This is a semantic annotation artifact, not fold
+      validation or candidate acceptance.
+  - id: eco1_rt_biohub_esmc_protein_features
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_protein_features.parquet
+    status: materialized_all97
+    description: >-
+      Sparse per-sequence SAE feature summaries derived from Biohub ESMC/logits
+      residue activations. The current materialized table has 338,560 rows.
+  - id: eco1_rt_biohub_esmc_residue_features
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_residue_features.parquet
+    status: materialized_all97
+    description: >-
+      Sparse per-residue Biohub ESMC SAE activations. The current all-97 run
+      has 1,986,560 rows: 97 sequences x 320 residues x 64 active features
+      per residue.
+  - id: eco1_rt_biohub_esmc_feature_catalog
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_feature_catalog.parquet
+    status: materialized_all97
+    description: >-
+      Observed Biohub ESMC SAE feature indices for the current run. Labels
+      are intentionally blank until a separate feature-description source is
+      joined.
+  - id: eco1_rt_biohub_esmc_sae_feature_window_summary
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
     status: not_generated
-    description: Planned compact ESM Atlas semantic profile for WT plus fold-accepted candidates. It should record model-derived ESMC/SAE feature and similarity context, raw response hashes, query sequence hashes, and explicit failure rows. It is not fold validation and not a functional acceptance gate.
+    description: >-
+      Planned model-compatible summary of sparse Biohub ESMC SAE activations
+      over declared Eco1 residue windows. This is a semantic stratification
+      artifact, not a processivity score and not a candidate acceptance gate.
+  - id: eco1_rt_review_deliverable_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
+    status: materialized_foundation
+    description: >-
+      Materialized manifest for manuscript-facing and review-only visual
+      deliverables. It records figure paths, input hashes, alt text, plain
+      descriptions, interpretation limits, and whether each deliverable is
+      rendered, linked, skipped, or optional-heavy.
+  - id: eco1_rt_msa_plurality_mask_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
+    status: materialized_foundation
+    description: >-
+      MSA plurality and mask-context deliverable. It uses the accepted Ec86
+      clade 9 alignment, places the Eco1/Ec86 target row first, highlights
+      >=25% WT-plurality columns and protected mask positions on canonical
+      residue coordinates, and keeps full-row inspection in marimo rather than
+      a dense static all-row SVG.
+  - id: eco1_rt_mask_structure_context_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
+    status: materialized_script_png_skipped
+    description: >-
+      Linear-plus-3D mask context deliverable. The linear SVG is rendered and
+      the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
+      with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
+      priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
+      positions, and the mutable design canvas. The PNG render is marked
+      skipped until a ChimeraX executable is available.
+  - id: eco1_rt_proteinmpnn_candidate_diversity_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/proteinmpnn_candidate_diversity/
+    status: materialized_foundation
+    description: >-
+      ProteinMPNN candidate-diversity visuals for score/global score, sequence
+      recovery to WT, mutation count, sampling temperature, and mutation density.
+      Sequence recovery is descriptive and not an acceptance criterion.
+  - id: eco1_rt_colabfold_structure_review_panels
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/
+    status: materialized_linked_existing
+    description: >-
+      Existing foldcheck_review visual bundle is linked into
+      review_deliverable_manifest.yaml instead of duplicated. It includes
+      fold-review class counts, ColabFold metric scatter, cryoEM/reference RMSD
+      comparison, and Biohub ESMC coverage. A new all-97 contact sheet remains
+      optional-heavy and should reuse cached thumbnails if added later.
+  - id: eco1_rt_biohub_esmc_wt_feature_frames
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
+    status: not_generated
+    description: >-
+      Planned WT-control Biohub ESMC SAE structure frames. Each frame shows one
+      declared feature's per-residue activation on an off-white WT structure and
+      records the SAE model id, feature index, any source-backed label, and an
+      explicit interpretation limit.
+  - id: eco1_rt_biohub_esmc_feature_heatmap
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
+    status: not_generated
+    description: >-
+      Planned Biohub ESMC feature-window heatmap. Rows are WT plus candidates
+      sorted by structural review metrics; columns are a declared subset of
+      model-compatible features or windows. It is semantic stratification, not a
+      processivity ranking.
   - id: eco1_rt_feasibility_report
     owner: thread
     kind: planned_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
     status: not_generated
     description: Planned mutation-window and parent-haplotype feasibility report; Eco1 synthesis decisions remain study policy.
+  - id: eco1_rt_candidate_selection_panel
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+    status: not_generated
+    description: >-
+      Planned study-owned review table that combines accepted candidate rows,
+      fold-check review, feasibility review, and optional SAE strata before
+      RT-only handoff selection.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

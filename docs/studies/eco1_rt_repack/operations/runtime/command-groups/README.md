@@ -91,33 +91,88 @@ proteinmpnn_request/request_manifest.yaml
 
 `thread_plan.yaml` declares backend, seed, temperature, request hash,
 fixed/non-fixed position source, terminal missing-backbone exclusions, and
-no-fallback policy. The Eco1 `proteinmpnn_request` command resolves study
-paths and selected 7V9U/ec86kit structure provenance, then calls
-`dnadesign.thread.adapters.proteinmpnn` to export the protein-only
-backbone, convert canonical residues to chain-local ProteinMPNN positions,
-write helper JSONL payloads, and build the request manifest. The Eco1
-`proteinmpnn_sample_ingest` command then calls the same generic adapter with an
-explicit ProteinMPNN checkout, verifies official helper parity, runs the named
-batch for declared seeds, temperatures, and `num_seq_per_target`, and writes
+no-fallback policy. The Eco1 `proteinmpnn_request` command resolves study paths
+and selected 7V9U/ec86kit structure provenance, then calls
+`dnadesign.thread.adapters.proteinmpnn` to export the protein-only backbone,
+convert canonical residues to chain-local ProteinMPNN positions, write
+helper-compatible parsed-PDB, assigned-chain, and fixed-position JSONL payloads,
+and build the request manifest. The Eco1 `proteinmpnn_sample_ingest` command
+then calls the same generic adapter with an explicit ProteinMPNN checkout,
+verifies official helper parity, runs `protein_mpnn_run.py` for declared seeds,
+temperatures, `num_seq_per_target`, and omitted amino acids, and writes
 `sample_table.parquet`. `candidate_table` then converts accepted backend rows
 into canonical-position mutation summaries and rejects protected-position edits.
 `foldcheck_request` reconstructs full 320-aa WT/candidate sequences and writes a
-ColabFold-planned request manifest without running a fold model. The device
-boundary is explicit: this study owns the request and threshold policy,
-`docs/bu-scc` owns scheduler/runtime templates, and `thread` owns the normalized
-fold-check report contract. The SCC execution lane is
+ColabFold CLI request manifest without running a fold model. The device boundary
+is explicit: this study owns the request and threshold policy, `docs/bu-scc`
+owns scheduler/runtime templates, and `thread` owns the normalized fold-check
+report contract. The SCC execution lane is
 `docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub`: submit a small
 `FOLDCHECK_SEQUENCE_LIMIT=6` smoke first, then `all` only after the smoke
 outputs can be normalized into `foldcheck_report.parquet`. A changed mask rule
 must be opened as an explicit policy change before it can feed sampling.
 
+The SCC runtime uses the ColabFold `colabfold_batch` command. LocalColabFold is
+only the pixi-based install path that provides this command on BU SCC.
+
+`foldcheck_review` ranks the full 96-candidate fold report and writes a selected
+structure-panel manifest, full local structure-set manifest, ChimeraX scripts,
+Atlas subset manifest, visual manifest, SVG review plots, and a scoped marimo
+notebook. It does not run ChimeraX or copy the full SCC ColabFold output tree.
+The local structure set is one normalized PDB per accepted fold row, suitable
+for full ChimeraX viewing while preserving SCC source paths in the manifest. The
+review plots include alt text and interpretation limits; they summarize model
+metrics and SAE coverage for inspection, not candidate acceptance.
+
+`review_deliverables` builds the first broader manuscript/review bundle from
+existing artifacts. It writes `review_deliverable_manifest.yaml`, MSA
+plurality/mask and ProteinMPNN diversity SVGs, a ChimeraX mask-context script,
+and a scoped marimo notebook. It links existing foldcheck_review plots instead
+of duplicating them. It does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or
+candidate selection.
+
+`atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
+operator explicitly opts into on-demand folding. Use `--selection-manifest` for
+declared panels, `--resume-existing` to reuse rows with matching per-sequence
+Atlas query hashes, and `--max-new-requests` plus `--request-sleep-seconds` for
+bounded batch progression. The current all-97 on-demand probe accepted WT,
+returned explicit 404 rows for the first four synthetic ProteinMPNN candidates,
+and left the remaining 92 rows unattempted. Any returned PDB is recorded as an
+Atlas/ESMFold-derived structure prediction, separate from ColabFold fold-check
+evidence. Synthetic-candidate Atlas context through the no-auth API should use a
+separate sequence-similarity artifact rather than retrying the hash-lookup path.
+
+`biohub_esmc_sae_profile` uses the authenticated Biohub `POST /api/v1/encode`
+then `POST /api/v1/logits` path for query-time ESMC SAE activations. Keep the
+key in the sibling `../key.md` file or another operator-supplied path; the
+materializer records the key label and redacted authorization only. The current
+all-97 profile is materialized; this command is the safe resumable form:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile \
+  --repo-root . \
+  --sequence-limit all \
+  --key-file ../key.md \
+  --model esmc-300m-2024-12 \
+  --sae-model esmc-300m-2024-12-sae-layer23-k64-codebook65536 \
+  --resume-existing \
+  --max-new-requests 5 \
+  --request-sleep-seconds 1.5 \
+  --request-timeout-seconds 180
+```
+
+Use `--sequence-limit all --resume-existing` only after deciding to spend the
+remaining hosted requests. These rows are semantic annotation, not fold
+validation or processivity evidence.
+
 ### Source-Role Guardrails
 
 - Tao is the masking-method prior: homolog MSA conservation, fixed functional
   residues, fixed-backbone RT redesign, and fold-check triage.
-- ProteinMPNN is the backend request-format prior: helper-compatible parsed PDB
-  JSONL, assigned-chain JSONL, fixed-position JSONL, explicit seed,
-  temperature, omitted-amino-acid, and no-fallback execution fields.
+- ProteinMPNN is the backend request-format and execution prior:
+  helper-compatible parsed-PDB JSONL, assigned-chain JSONL, fixed-position JSONL,
+  chain-local 1-indexed positions, explicit seed, temperature,
+  `num_seq_per_target`, omitted-amino-acid, and no-fallback execution fields.
 - Mestre is the source ontology: the full S1 roster is a candidate/context
   surface, while Ec86 RT clade 9 and II-A3/`42_1` are the active conservation
   denominators.

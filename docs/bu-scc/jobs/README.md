@@ -152,6 +152,17 @@ The Eco1 ColabFold template consumes the materialized fold-check request:
 src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
 ```
 
+The runtime is the ColabFold `colabfold_batch` CLI. On BU SCC that command is
+currently exposed by a LocalColabFold pixi environment at:
+
+```text
+/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
+```
+
+LocalColabFold is the install path and environment wrapper. It should not be
+described as a separate fold model, a hosted API, or a native DeepMind AlphaFold2
+run.
+
 Smoke run, WT plus the first five accepted ProteinMPNN candidates:
 
 ```bash
@@ -168,7 +179,7 @@ Full current request, WT plus 96 accepted candidates:
 mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
 qsub \
   -l h_rt=24:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1',FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
@@ -184,7 +195,8 @@ qsub \
   manifest writing to `python -m dnadesign.thread.foldcheck.subset`, which
   validates FASTA ids and sequence hashes against the request manifest.
 - runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
-  preflight smoke runs; declare the model count explicitly for full screens
+  preflight smoke runs and the first full coverage screen; reserve heavier
+  multi-model checks for selected candidates after this first pass
 - durable output root: `FOLDCHECK_RUN_ROOT` defaults to
   `/project/dunlop/esouth/foldcheck/eco1_rt/$JOB_NAME.$JOB_ID`
 - compact run manifest: `colabfold_run_manifest.yaml` records the source

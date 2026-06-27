@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-status: clade9_plurality25_direct_contact5a_mask_materialized
+status: review_deliverables_foundation_materialized
 notes:
   - Commands are independently runnable lane contracts, not a hidden run-all pipeline.
   - Generated outputs live under src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/ and are ignored runtime artifacts.
@@ -355,9 +355,22 @@ lanes:
         - -v
         - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
         - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
+  - id: colabfold_scc_full
+    owner: bu_scc_runtime
+    status: materialized_scc_full
+    entry: /project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42/
+    job_id: "6228979"
+    command:
+      argv:
+        - qsub
+        - -P
+        - dunlop
+        - -v
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
+        - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
   - id: foldcheck_report
     owner: thread
-    status: smoke_materialized
+    status: materialized_local_full
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
     command:
       argv:
@@ -372,16 +385,157 @@ lanes:
         - <scc_colabfold_outputs>
         - --runtime-version
         - <colabfold_version>
+  - id: foldcheck_review
+    owner: eco1_rt_repack
+    status: materialized_local_review
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_structure_panel.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_full_structure_set.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/review_visual_manifest.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review
+        - --repo-root
+        - .
+    validation:
+      - argv:
+          - uv
+          - run
+          - marimo
+          - check
+          - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
+      - argv:
+          - uv
+          - run
+          - marimo
+          - export
+          - html
+          - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
+          - --no-include-code
+          - -o
+          - /tmp/eco1_foldcheck_review.html
+          - -f
   - id: atlas_semantic_profile
     owner: thread
-    status: planned
+    status: materialized_all97_on_demand_probe_partial
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_semantic_profile.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_predictions/structure_prediction_registry.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.atlas_semantic_profile
+        - --repo-root
+        - .
+        - --sequence-limit
+        - all
+        - --allow-fold-on-miss
+        - --prediction-set-id
+        - atlas_esmfold_on_miss_all97_20260626
+        - --resume-existing
+        - --max-new-requests
+        - "5"
+        - --request-sleep-seconds
+        - "1.5"
+  - id: biohub_esmc_sae_profile
+    owner: thread
+    status: materialized_all97
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_sae_profile.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_protein_features.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_residue_features.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_feature_catalog.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_request_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile
+        - --repo-root
+        - .
+        - --sequence-limit
+        - all
+        - --key-file
+        - ../key.md
+        - --model
+        - esmc-300m-2024-12
+        - --sae-model
+        - esmc-300m-2024-12-sae-layer23-k64-codebook65536
+        - --resume-existing
+        - --max-new-requests
+        - "5"
+        - --request-sleep-seconds
+        - "1.5"
+        - --request-timeout-seconds
+        - "180"
+  - id: biohub_esmc_sae_feature_windows
+    owner: eco1_rt_repack
+    status: planned
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
     command: null
   - id: assembly_feasibility
     owner: thread
     status: planned
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
     command: null
+  - id: candidate_selection_panel
+    owner: eco1_rt_repack
+    status: planned
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+    command: null
+  - id: review_deliverables
+    owner: eco1_rt_repack
+    status: materialized_foundation
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/proteinmpnn_candidate_diversity/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/selection_and_feasibility/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables
+        - --repo-root
+        - .
+        - --no-chimerax-render
+    validation:
+      - argv:
+          - uv
+          - run
+          - marimo
+          - check
+          - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
+      - argv:
+          - uv
+          - run
+          - marimo
+          - export
+          - html
+          - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
+          - --no-include-code
+          - -o
+          - /tmp/eco1_review_deliverables.html
+          - -f
   - id: candidate_handoff
     owner: thread
     status: planned

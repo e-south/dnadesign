@@ -28,8 +28,8 @@ In scope:
   assembly feasibility, candidate handoff, and downstream handoff gates
 
 Out of scope:
-- generic `thread` package expansion beyond the implemented ProteinMPNN request
-  adapter
+- generic `thread` package expansion beyond the implemented Eco1 tracer-bullet
+  surfaces
 - status for `rt_lnrna_sponging_construct_triage` or any other study
 - ProteinMPNN, LigandMPNN, AlphaFold, or ColabFold execution
 - wet-lab protocol advice or assay execution planning
@@ -41,15 +41,24 @@ Out of scope:
 - Status answers come from `record/status.md`, `record/datasets.yaml`,
   `record/campaign.yaml`, and `operations/ops.study.yaml`.
 - The answer distinguishes the implemented ProteinMPNN request, sample-ingest,
-  candidate-table, and fold-check request surfaces from planned fold runtime,
-  feasibility, and handoff tooling.
+  candidate-table, fold-check request/report, ColabFold normalization, full
+  fold-check coverage, study-owned fold-review bundle, local full-fold PDB set,
+  alt-text-backed fold-review plots, scoped fold-review marimo notebook,
+  study-owned review-deliverables bundle, selected-panel Atlas lookup surfaces,
+  all-97 Biohub ESMC query-time SAE profile, and structure-prediction registry
+  from feasibility and handoff tooling.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
   and reusable fold-check request/report contracts route through
   `dnadesign.thread.foldcheck`. Reusable ColabFold output normalization routes
-  through `dnadesign.thread.adapters.colabfold`. Fold-model execution,
-  feasibility, and handoff tooling remain planned.
+  through `dnadesign.thread.adapters.colabfold`. Reusable Atlas annotation
+  mechanics route through `dnadesign.thread.adapters.esm_atlas`. Reusable
+  authenticated Biohub ESMC query-time SAE mechanics route through
+  `dnadesign.thread.adapters.biohub_esmc`. Reusable
+  model-predicted-structure provenance routes through
+  `dnadesign.thread.structure_predictions`. Fold-model execution, feasibility,
+  and handoff tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
 - Missing or mismatched `study_id` fails visibly.
@@ -83,9 +92,10 @@ Out of scope:
 
 - This skill is study-specific. Do not generalize it to another study.
 - Report that `src/dnadesign/thread/` currently exposes generic ProteinMPNN
-  request, sample-ingest, candidate-table, ColabFold output normalization, and
-  fold-check request/report contracts; do not imply that fold-model execution,
-  feasibility, or handoffs are wired.
+  request, sample-ingest, candidate-table, ColabFold output normalization,
+  fold-check request/report contracts, and ESM Atlas sparse-activation
+  normalization; do not imply that fold-model execution, feasibility, or
+  handoffs are wired.
 - Do not put Eco1 biology, catalytic masks, or downstream construct semantics
   into generic `thread` contracts.
 - Route generic aligned FASTA generation and generic MSA QC visualization

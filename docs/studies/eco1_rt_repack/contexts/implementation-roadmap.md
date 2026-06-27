@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-25
+last_verified: 2026-06-26
 ---
 
 ## Implementation Roadmap
@@ -392,6 +392,13 @@ backbone export, chain-local position conversion, helper JSONL payloads,
 request manifest construction, and generic request validation. Eco1 keeps the
 study path, structure-source, mask, and provenance decisions.
 
+The request uses the public ProteinMPNN command-line contract, not a private
+parser: parsed-PDB JSONL, assigned-chain JSONL, fixed-position JSONL, explicit
+designed chain, sampling temperature, seed, `num_seq_per_target`, and
+omitted-amino-acid fields. ProteinMPNN fixed positions are chain-local
+1-indexed sequence positions, so canonical Eco1 residue numbers are converted
+before backend execution.
+
 ### Completed Slice: Backend Sample Ingest v1
 
 `sample_table.parquet` is materialized from the validated ProteinMPNN request.
@@ -399,6 +406,10 @@ The active batch `eco1_rt_p25_5a_n96_20260624` uses an explicit local
 ProteinMPNN checkout, runs official helper parity checks before sampling,
 preserves request hash, seed, temperature, fixed-position source, and
 no-fallback policy, and records a separate backend-run manifest.
+The actual model call is `protein_mpnn_run.py` from official ProteinMPNN commit
+`8907e6671bfbfc92303b5f79c4b5e6ce47cdef57`; `dnadesign` only prepares inputs,
+checks parity, runs the declared command, and normalizes the resulting sequences
+into sample rows.
 
 ### Completed Slice: Candidate Table v1
 
@@ -414,7 +425,7 @@ mutation accounting. The active table contains 96 accepted candidate rows.
 `foldcheck_request/foldcheck_request_manifest.yaml` are materialized from the
 accepted candidate table. The request contains one WT baseline plus 96 accepted
 ProteinMPNN candidates as full 320-aa canonical Eco1 sequences. It is a planned
-ColabFold/AlphaFold-family CLI request for BU SCC execution; no fold model is
+ColabFold `colabfold_batch` CLI request for BU SCC execution; no fold model is
 run by this materializer.
 
 Generic fold-check request/report contracts now live in
@@ -442,9 +453,11 @@ now fails fast when that report is absent or lacks WT/candidate coverage.
 LocalColabFold is installed on BU SCC under
 `/projectnb/dunlop/esouth/tools/localcolabfold`, and the
 `colabfold_batch --help` preflight succeeds when the pixi environment `lib/`
-directory is first on `LD_LIBRARY_PATH`. The SCC clone was fast-forwarded to
-the current branch, the materialized fold-check request was regenerated there,
-and BU SCC job `6224446` ran the WT baseline plus five accepted candidates.
+directory is first on `LD_LIBRARY_PATH`. LocalColabFold is the install/runtime
+environment for the ColabFold CLI, not a separate fold model or API. The SCC
+clone was fast-forwarded to the current branch, the materialized fold-check
+request was regenerated there, and BU SCC job `6224446` ran the WT baseline
+plus five accepted candidates.
 
 The smoke raw output lives on SCC project storage under
 `/project/dunlop/esouth/foldcheck/eco1_rt/eco1_colabfold_foldcheck.6224446/`.
@@ -462,33 +475,156 @@ Smoke reports may include errored rows for candidates outside the subset.
 Downstream selection must require accepted fold-check rows for selected
 candidates.
 
-### Next Slice: Full Foldcheck Batch v1
+### Completed Slice: Full Foldcheck Batch v1
 
-Run the full WT plus 96-candidate ColabFold request after choosing the runtime
-shape. For quick runtime preflights, pass
-`COLABFOLD_EXTRA_ARGS='--num-models 1'`. For the first full fold screen, decide
-explicitly whether to keep ColabFold defaults or reduce model count to trade
-coverage speed against model-rank evidence. The owner split remains explicit:
-`docs/bu-scc` owns scheduler/runtime templates,
+The full WT plus 96-candidate ColabFold request was run through
+`colabfold_batch` on BU SCC as job `6228979`, using `--num-models 1`. Raw output
+remains under `/project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42/`.
+The compact `foldcheck_report.parquet` was normalized on SCC, synced back to
+the study workspace, and validates locally with 97 accepted rows. Reserve
+heavier multi-model checks for selected candidates after this first coverage
+pass. The owner split remains explicit: `docs/bu-scc` owns scheduler/runtime templates,
 `dnadesign.thread.adapters.colabfold` owns output normalization,
 `dnadesign.thread.foldcheck` owns the normalized report contract, and
 `eco1_rt_repack` owns candidate selection, WT sequence reconstruction, and
 threshold policy.
 
-### Planned Slice: ESM Atlas Semantic Profile v1
+### Implemented Slice: Foldcheck Review v1
 
-After full fold-check coverage exists, add a small Atlas annotation lane for
-WT plus fold-accepted Eco1 candidates. The output should be a compact
-`atlas_semantic_profile.parquet` in the study workspace. It should record
-query sequence hashes, Atlas API base/version, raw response hashes, retrieved
-cluster/protein context, top SAE feature labels, similar-protein summaries, and
-explicit failure rows.
+The study now materializes `foldcheck_review/` under the study workspace. This
+review bundle writes:
+
+- `foldcheck_candidate_ranking.parquet`
+- `foldcheck_structure_panel.yaml`
+- `chimerax/ec86_fold_panel.cxc`
+- `atlas_subset_manifest.yaml`
+
+The ranking table joins ProteinMPNN candidate metrics with ColabFold metrics and
+uses explicit RMSD fields. `wt_runtime_ca_rmsd` is the candidate-to-WT
+ColabFold runtime-model comparison from the normalized fold report.
+`cryoem_mapped_ca_rmsd` is direct mapped-position RMSD to the ec86kit/7V9U
+backbone from the local normalized full structure set. Raw ColabFold outputs
+remain on SCC project storage; the study-local review bundle keeps one PDB per
+accepted fold row for ChimeraX and direct structure review.
+
+The current review classes are `strong_fold_preserved: 17`,
+`good_fold_preserved: 53`, `low_confidence: 9`, `review_band: 14`, and
+`structural_outlier: 3`. The structure-panel manifest selects WT, best-folded
+candidates, high-RMSD outliers, low-pLDDT rows, intermediate rows, and
+deterministic controls. The Atlas subset manifest records a contrastive panel
+for later semantic annotation; it is not a candidate acceptance gate.
+
+### Next Slice: SAE Window Summary, Feasibility, Selection, And RT-Only Handoff v1
+
+Inspect the selected and full ChimeraX review scripts before candidate
+selection. The Atlas hash-lookup/on-demand probe selected WT plus all 96
+candidates and allowed five new requests. WT was accepted with rich sparse Atlas
+data and one Atlas/ESMFold-derived structure registry row; the first four
+synthetic candidates still returned explicit 404 rows, and the remaining 92
+synthetic candidates were left unattempted. Do not continue retrying that hash
+lookup path for synthetic candidates unless the API behavior changes. If Atlas
+context is needed through the no-auth API, add a separate sequence-similarity
+artifact for semantic-neighborhood review. Then materialize the
+assembly/synthesis feasibility report and only then prepare downstream RT-only
+handoff records.
+
+The authenticated Biohub ESMC/logits path is now implemented as a separate
+query-time SAE lane. The current conservative run selected WT plus all 96
+fold-accepted ProteinMPNN candidates, and the materialization accepted all
+97 query rows. It writes
+`biohub_esmc_sae_profile.parquet`, `biohub_esmc_protein_features.parquet`,
+`biohub_esmc_residue_features.parquet`,
+`biohub_esmc_feature_catalog.parquet`, and a redacted
+`biohub_esmc_request_manifest.yaml`. This lane is for synthetic sequence SAE
+annotation, not Atlas lookup and not fold validation.
+
+The next implementation should not treat current Biohub SAE feature indices as
+the interpreted Atlas feature panel. The all-97 Biohub run used
+`esmc-300m-2024-12-sae-layer23-k64-codebook65536`, so feature ids are tied to
+that exact model, layer, sparsity, and dictionary. The next table should first
+summarize sparse activations over declared Eco1 residue windows, then attach
+biological labels only when a source-backed interpretation exists for the exact
+SAE model.
+
+The materialized review-deliverable foundation makes the first visuals explicit
+rather than free-floating illustrations. It writes a single
+`review_deliverables/review_deliverable_manifest.yaml` with manifest-relative
+figure paths, input hashes, alt text, plain descriptions, interpretation
+limits, and a lightweight or optional/heavy flag. The marimo notebook reads the
+manifest and pre-rendered assets; dogfood validation includes static notebook
+checks and HTML export. The deliverable sequence is:
+
+1. MSA plurality/mask context: Eco1/Ec86 target row first, declared display
+   subset for the 303-row clade 9 alignment, full-row inspection in HTML or
+   marimo, and background markings for `>=25%` WT-plurality protected columns.
+2. Linear-plus-3D mask context: an off-white Ec86 RT scaffold with categorical
+   overlays for catalytic anchors, Wang/Ec86 direct-contact priors, retained
+   DNA/RNA 5 A contacts, clade 9 plurality protection, and mutable design canvas.
+3. ProteinMPNN candidate diversity: score/global score, mutation count,
+   sequence identity to WT, sampling temperature/seed, and mutation density.
+4. ColabFold structure review: a cached top/bottom/control structure panel first
+   and an all-97 contact sheet only as an optional/heavy cached artifact.
+5. WT Biohub ESMC SAE feature frames: one feature per frame on the WT structure,
+   labelled by exact SAE model and feature index, with source-backed names only.
+6. Biohub ESMC feature-window heatmap: WT plus candidates sorted by structural
+   review metrics, with a declared feature/window subset instead of all features.
+7. Feasibility and handoff matrix after feasibility and selection tables exist.
+
+After the SAE summary and review-deliverable foundation, materialize
+`feasibility_report.parquet`, `selection/candidate_selection_panel.parquet`, and
+the RT-only `candidate_handoff.yaml`.
+
+### Implemented Slice: ESM Atlas Semantic Audit v1
+
+The repo now has a small Atlas semantic-audit lane for WT plus fold-accepted
+Eco1 candidates. The generic API boundary is
+`dnadesign.thread.adapters.esm_atlas`; the Eco1 wrapper is
+`operations/materialization/atlas_semantic_profile/`. The current command uses
+the all-97 request, explicit on-demand provenance, and a bounded request cap:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.atlas_semantic_profile \
+  --repo-root . \
+  --sequence-limit all \
+  --allow-fold-on-miss \
+  --prediction-set-id atlas_esmfold_on_miss_all97_20260626 \
+  --resume-existing \
+  --max-new-requests 5 \
+  --request-sleep-seconds 1.5
+```
+
+The materializer writes compact study-local Parquet artifacts:
+
+- `atlas_semantic_profile.parquet`
+- `atlas_protein_activations.parquet`
+- `atlas_residue_activations.parquet`
+- `atlas_feature_catalog.parquet`
+- `structure_predictions/structure_prediction_registry.parquet`
+
+The all-97 hash-lookup/on-demand probe is materialized locally. It produced 97
+profile rows: WT accepted, four synthetic ProteinMPNN candidates as explicit
+404 rows, and 92 synthetic candidates marked
+`atlas_request_not_attempted_due_to_max_new_requests`. The accepted WT row
+carries 2,095 sparse protein-level activations, 20,480 sparse per-residue
+activations, and 100 feature-catalog rows. Sparse activation tables avoid dense
+16,384-feature matrices and avoid repeating long feature descriptions per
+residue. The WT Atlas-generated PDB is written through the generic
+`thread.structure_predictions` registry instead of being folded into the Atlas
+semantic-profile table.
 
 This is not a fold-validation replacement and not a functional assay. The
-plain claim is: Atlas provides model-derived semantic affiliations from
-ESMC/SAE representations and ESMFold2-backed Atlas structures. For Ec86, the
-first processivity-oriented feature panel should be treated as a hypothesis
-panel around polymerase mechanics, not a measured processivity score:
+plain claim is:
+
+```text
+ProteinMPNN = fold-compatible sequence proposal
+ColabFold = structural fidelity gate
+Biohub ESMC/SAE = query-time semantic annotation
+ESM Atlas = public-protein neighborhood context where available
+Assay = functional truth
+```
+
+For Ec86, the first processivity-oriented feature panel should be treated as a
+hypothesis panel around polymerase mechanics, not a measured processivity score:
 
 - thumb/palm nucleic-acid binding and C-terminal thumb context;
 - motif B / primer-grip context;
@@ -497,12 +633,25 @@ panel around polymerase mechanics, not a measured processivity score:
 - pre-catalytic helix and open/closed gating context;
 - broad RT/RdRp palm-core features as fold/class sanity checks only.
 
-Keep the first implementation pragmatic: a generic
-`dnadesign.thread.adapters.esm_atlas` client/normalizer plus a thin Eco1
-materializer. Do not add a wider `semantic_profile` framework until a second
-semantic backend needs the same report contract. The Eco1 wrapper owns which
-candidates are queried and how the feature panel is interpreted in the study
-record.
+Do not rank candidates by a hidden composite "processivity" score. Use Atlas
+features to stratify a small experimental panel after fold acceptance:
+
+- semantic-retained candidates;
+- semantic-shifted candidates;
+- thumb-retained / fingers-shifted candidates;
+- primer-grip-shifted candidates;
+- random fold-accepted controls.
+
+Before biochemical data are inspected, freeze the feature panel, residue
+windows, normalization rule, fold thresholds, semantic flag definitions,
+selection strata, assay endpoints, and primary analysis plan. Atlas/SAE may
+prioritize review or assay design; it may not claim processivity, strand
+displacement, or hairpin readthrough.
+
+Keep the implementation pragmatic. Do not add a wider `semantic_profile`
+framework until a second semantic backend needs the same report contract. The
+Eco1 wrapper owns which candidates are queried and how the feature panel is
+interpreted in the study record.
 
 ### Implementation Rules
 
@@ -530,7 +679,8 @@ record.
 | Phase 0 scaffold | Study records, schema stubs, policy pages, and negative fixture cases exist. |
 | Phase 1 contract | Profile, artifact-chain, mask, fold, feasibility, and handoff validators reject the known negative cases. |
 | Phase 2 backend ingest | Materialized runtime artifacts exist with nonfixture states, schema-valid fields, and upstream hashes. |
-| Phase 3 downstream promotion | RT-only candidate handoff is accepted or rejected by the downstream RT-lnRNA contract without creating construct subjects implicitly. |
+| Phase 3 fold-check report | Full fold-check report and fold-review artifacts validate for WT plus the accepted candidate set. This is not handoff readiness. |
+| Phase 4 downstream promotion | RT-only candidate handoff is accepted or rejected by the downstream RT-lnRNA contract without creating construct subjects implicitly. |
 
 ### Current Known Gaps
 
@@ -544,15 +694,16 @@ record.
   `aligner.msa` MSA visualization sidecars, and the conservative diagnostic
   `mask_set.yaml`, `thread_plan.yaml`, and
   `proteinmpnn_request/request_manifest.yaml`, `sample_table.parquet`,
-  `candidate_table.parquet`, and the ColabFold-planned
+  `candidate_table.parquet`, and the ColabFold CLI
   `foldcheck_request/foldcheck_request_manifest.yaml` are materialized locally.
-  A current six-sequence ColabFold smoke `foldcheck_report.parquet` is
-  materialized and validates. The full WT plus 96-candidate fold screen,
-  Atlas semantic profile, feasibility report, and candidate handoff are not
+  A full WT plus 96-candidate ColabFold `foldcheck_report.parquet` is
+  materialized and validates. Fold-check review, the local full-fold PDB set,
+  selected-panel Atlas lookup, and all-97 Biohub ESMC query-time SAE profile
+  are materialized. Feasibility report and candidate handoff are not
   materialized.
 - Phase 1 now has content validators for the local structure, contact,
   conservation, mask, thread-plan, ProteinMPNN request, and fold-check request
   artifacts. Phase 2 backend ingest passes locally through the candidate table,
-  and Phase 3 fold-check report validation passes for the smoke report. Full
-  fold coverage, optional Atlas semantic annotation, and downstream selection
-  are the next gates.
+  and Phase 3 fold-check report validation passes for the full report. Optional
+  Atlas semantic annotation, feasibility review, and downstream selection are
+  the next gates.
