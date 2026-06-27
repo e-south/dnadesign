@@ -1,0 +1,7 @@
+interface:
+  display_name: "ChimeraX Structure Review"
+  short_description: "Review, style, capture, and render ChimeraX structure views with provenance."
+  default_prompt: "Help me review this structure in ChimeraX, capture the current pose, and save a reproducible render."
+
+policy:
+  allow_implicit_invocation: true

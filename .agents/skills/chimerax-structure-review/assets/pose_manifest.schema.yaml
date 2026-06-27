@@ -1,0 +1,34 @@
+schema_id: chimerax_pose_manifest_v1
+required_fields:
+  - schema_version
+  - status
+  - failure_reason
+  - pose_id
+  - captured_at_utc
+  - chimerax_executable
+  - inputs
+  - control
+  - scene
+  - outputs
+  - commands
+input_required_fields:
+  - structure_path
+  - structure_sha256
+  - source_url
+  - opened_model_id
+  - preopened_session
+control_required_fields:
+  - host
+  - port
+  - rest_stopped
+outputs_required_fields:
+  - session_path
+  - session_sha256
+  - image_path
+  - image_sha256
+  - command_log_path
+  - command_log_sha256
+notes:
+  - The session file is provenance, not the sole reproducibility contract.
+  - The manifest must record camera mode explicitly.
+  - Command entries must map to command-allowlist keys.

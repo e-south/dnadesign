@@ -1,0 +1,33 @@
+schema_version: chimerax_style_presets_v1
+presets:
+  white_cartoon_reference:
+    description: Clean single-model cartoon view on a white background.
+    command_keys:
+      - set_background
+      - camera_mode
+      - lighting
+      - silhouettes
+      - color_selection
+      - cartoon_style
+  faint_surface_shield:
+    description: Subtle transparent molecular surface around a declared selection.
+    command_keys:
+      - surface_selection
+      - surface_transparency
+      - color_selection
+    defaults:
+      transparency_percent: 70
+      target: s
+  chain_role_colors:
+    description: Distinct colors for explicitly declared chains or roles.
+    command_keys:
+      - color_selection
+      - show_selection
+  transparent_comparison_model:
+    description: Transparent overlay for a query model compared with a reference model.
+    command_keys:
+      - cartoon_transparency
+      - color_selection
+    defaults:
+      transparency_percent: 45
+      target: r
