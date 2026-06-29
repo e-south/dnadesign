@@ -129,14 +129,24 @@ metrics and SAE coverage for inspection, not candidate acceptance.
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
 Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
 SVGs, a Tao-style ColabFold RMSD/pLDDT joint plot for the current single mask
-policy, a ChimeraX mask-context script, WT ESMC model-constraint audit SVGs,
-and a scoped marimo notebook organized by progressive analysis sections. The
-notebook presents reference scaffold and mask evidence, ProteinMPNN sequence
-proposals, ColabFold structure triage, and WT ESMC substitution constraint. It
-fits visual previews to the notebook column, keeps full artifact paths in the
-evidence details, and links existing foldcheck_review and Permuter-style WT
-ESMC masked-marginal plots instead of duplicating them. It does not rerun
-ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
+policy, a ChimeraX mask-context script/render, WT ESMC model-constraint audit
+SVGs, exact-dictionary Biohub ESMC SAE review plots, interactive
+py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
+organized by progressive analysis sections. The notebook presents reference
+scaffold and mask evidence, ProteinMPNN sequence proposals, ColabFold structure
+triage, WT ESMC substitution constraint, and Biohub ESMC SAE interpretation.
+Static plots and interactive structure views are selected through the same
+section/visual controls. The scaffold/mask browser highlights one mask or motif
+category at a time on the off-white ec86kit/7V9U reference using a single
+high-contrast highlight color. The ColabFold browser reuses local ColabFold
+PDBs, fits the selected query to the reference in memory over mapped C-alpha
+atoms, and displays a compact metric strip for pLDDT, RMSD, sequence identity,
+and mutation burden. It does not rewrite or duplicate the raw ColabFold PDB
+files; ChimeraX remains the still-render and pose-capture path. The command
+does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
+WT SAE structure frames, feature-window heatmaps, SAE-to-structure overlays,
+and feasibility/selection matrices are planned follow-ons, not part of the
+materialized foundation bundle.
 
 `atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
 operator explicitly opts into on-demand folding. Use `--selection-manifest` for

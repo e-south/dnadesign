@@ -141,20 +141,30 @@ handled separately.
   Mestre-derived clade 9 alignment panel, linear mask tracks, a ChimeraX
   mask-context script/render, ProteinMPNN diversity SVGs, a Tao-style
   ColabFold RMSD/pLDDT joint plot for the current single mask policy, WT ESMC
-  model-constraint audit plots, a Biohub ESMC SAE interpretation section, an
-  interactive structure-browser manifest for the local ColabFold PDB set, and a
-  manifest-backed marimo notebook. The notebook is organized as a progressive
-  analysis surface: reference scaffold and mask evidence, ProteinMPNN sequence
-  proposals, ColabFold structure triage, WT ESMC substitution constraint, and
-  Biohub ESMC SAE interpretation. In the ColabFold section, it can load one
-  selected PDB plus the ec86kit/7V9U reference into a browser-native 3D view for
-  mouse-driven inspection. This browser view uses
-  `dnadesign.thread.structure_views` and is review-only; ChimeraX remains the
-  publication-still and pose-capture path. It fits
-  visual previews to the notebook column and keeps full artifact paths in the
-  evidence details. The manifest also links the existing foldcheck_review
+  model-constraint audit plots, a Biohub ESMC SAE interpretation section, two
+  interactive structure-browser manifests, and a manifest-backed marimo
+  notebook. The notebook is organized as a progressive analysis surface:
+  reference sequence/alignment/mask evidence, ProteinMPNN sequence proposals,
+  ColabFold structure triage, WT ESMC substitution constraint, and Biohub ESMC
+  SAE interpretation. Structure views are selected through the same
+  section/visual controls as static plots. In the reference section, the browser
+  shows the off-white ec86kit/7V9U backbone and lets the reviewer switch among
+  mask and motif highlight categories. Each mask category uses the same
+  high-contrast highlight color because only one category is displayed at a
+  time. In the ColabFold section, the browser loads one selected PDB plus the
+  ec86kit/7V9U reference into a browser-native 3D view for mouse-driven
+  inspection. The notebook aligns each selected query model to the reference in
+  memory over mapped C-alpha atoms before rendering, so local raw ColabFold PDB
+  files remain unchanged. The selected structure view now shows a compact
+  metric strip for mean pLDDT, WT-runtime C-alpha RMSD, direct cryoEM mapped
+  C-alpha RMSD, sequence identity, and mutation count. These browser views use
+  `dnadesign.thread.structure_views` and are
+  review-only; ChimeraX remains the still-render and pose-capture path. The
+  notebook fits visual previews to the column and keeps full artifact paths in
+  the evidence details. The manifest also links the existing foldcheck_review
   SVG/PNG visuals and Permuter-style WT ESMC masked-marginal SVGs instead of
-  duplicating them. The model-constraint audit compares clade 9 WT plurality
+  duplicating them. The
+  model-constraint audit compares clade 9 WT plurality
   with ESMC masked-marginal entropy, best alternate LLR, and residue-wise
   constraint tracks. In the current WT table, plurality and entropy are
   inversely correlated (`Pearson r = -0.7838`, `R2 = 0.6144`). This is a review
@@ -166,7 +176,10 @@ handled separately.
   first, ranks ProteinMPNN variants by SAE-feature similarity to WT, and shows
   ColabFold pLDDT plus summed WT masked-marginal single-substitution LLR as
   side markers. The LLR sum is a review covariate, not a joint protein
-  likelihood, and the panel is not an activity or acceptance score. Manifest
+  likelihood, and the panel is not an activity or acceptance score. Mapping
+  selected SAE feature activations onto the same interactive structure-view
+  contract is a planned follow-on that requires an explicit feature/residue
+  selection policy; it is not part of the current mask browser. Manifest
   paths are relative to the manifest location, so the visual bundle can move
   with the study workspace. The generated ChimeraX scripts use relative paths
   for staged local structures and keep raw remote paths out of the local review
@@ -308,10 +321,10 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    descriptions into curated functional annotations.
 3. Inspect the `review_deliverables/` marimo surface. It currently covers
    reference scaffold and mask evidence, ProteinMPNN sequence proposals,
-   ColabFold structure triage, WT ESMC substitution constraint, and a first
-   exact-dictionary Biohub ESMC SAE interpretation view. WT SAE structure frames
-   and the Biohub ESMC feature-window heatmap remain downstream of
-   `sae_feature_window_summary`.
+   ColabFold structure triage with static and interactive structure views, WT
+   ESMC substitution constraint, and a first exact-dictionary Biohub ESMC SAE
+   interpretation view. WT SAE structure frames and the Biohub ESMC
+   feature-window heatmap remain downstream of `sae_feature_window_summary`.
 4. Add a separate Atlas sequence-similarity materializer if synthetic-candidate
    Atlas neighborhood context is needed through the no-auth Atlas API. Do not
    keep retrying the hash-lookup/on-demand endpoint for the 96 synthetics unless

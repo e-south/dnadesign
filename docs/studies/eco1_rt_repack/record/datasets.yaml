@@ -541,6 +541,20 @@ datasets:
       positions, and the mutable design canvas. The PNG render is materialized
       when a local ChimeraX executable is available and otherwise records an
       explicit skipped status in the manifest.
+  - id: eco1_rt_mask_structure_browser_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/mask_structure_browser_manifest.yaml
+    status: materialized_foundation
+    description: >-
+      Study-owned manifest for browser-native interactive mask inspection in
+      the review-deliverables marimo notebook. It points to the off-white
+      ec86kit/7V9U reference backbone and exposes dropdown views for catalytic
+      motif anchors, Wang/Ec86 substrate-contact priors, retained DNA/RNA 5 A
+      contacts, clade 9 plurality-protected residues, the protected union, and
+      the ProteinMPNN design canvas. It uses the generic
+      `dnadesign.thread.structure_views` residue-selection contract and is
+      review context only.
   - id: eco1_rt_proteinmpnn_candidate_diversity_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -570,10 +584,16 @@ datasets:
       Study-owned manifest for browser-native interactive structure inspection
       in the review-deliverables marimo notebook. It points to the existing
       local foldcheck_review PDB files and the ec86kit/7V9U reference without
-      copying structures into review_deliverables. The generic viewer contract
-      is `dnadesign.thread.structure_views`, with py3Dmol as the current HTML
-      backend. This is review context only; ChimeraX remains the publication
-      still-render and pose-capture path.
+      copying structures into review_deliverables. The notebook aligns query
+      coordinates to the reference in memory over mapped C-alpha atoms before
+      rendering; the local raw ColabFold PDB files remain unchanged. The
+      generic viewer contract is `dnadesign.thread.structure_views`, with
+      py3Dmol as the current HTML backend. Mask-category views use one
+      high-contrast highlight color because the notebook displays one category
+      at a time. ColabFold structure views include a compact metric strip for
+      pLDDT, RMSD, sequence identity, and mutation burden. This is review
+      context only; ChimeraX remains the publication still-render and
+      pose-capture path.
   - id: eco1_rt_wt_model_constraint_audit_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
