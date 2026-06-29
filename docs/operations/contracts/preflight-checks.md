@@ -1,7 +1,7 @@
 ## OPS preflight checks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 Study contracts declare generic readiness checks in `operations/ops.study.yaml`.
 

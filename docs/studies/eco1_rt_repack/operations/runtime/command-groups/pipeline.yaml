@@ -394,6 +394,7 @@ lanes:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_full_structure_set.yaml
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/review_visual_manifest.yaml
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/structure_overlay_panel.png
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
     command:
       argv:
@@ -470,12 +471,65 @@ lanes:
         - --key-file
         - ../key.md
         - --model
-        - esmc-300m-2024-12
+        - esmc-6b-2024-12
         - --sae-model
-        - esmc-300m-2024-12-sae-layer23-k64-codebook65536
+        - esmc-6b-2024-12-sae-layer60-k64-codebook16384
+        - --normalize-features
+        - --fetch-feature-descriptions
         - --resume-existing
         - --max-new-requests
         - "5"
+        - --request-sleep-seconds
+        - "1.5"
+        - --request-timeout-seconds
+        - "180"
+  - id: biohub_esmc_wt_mutation_scoring
+    owner: permuter
+    status: materialized_full_wt_320_positions
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_position_entropy.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_substitution_llr.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_mutation_scoring_mask_join.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_mutation_scoring_manifest.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/plots/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring
+        - --repo-root
+        - .
+        - --positions
+        - all
+        - --key-file
+        - ../key.md
+        - --model
+        - esmc-300m-2024-12
+        - --resume-existing
+        - --max-new-requests
+        - "10"
+        - --request-sleep-seconds
+        - "1.5"
+        - --request-timeout-seconds
+        - "180"
+    smoke_command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring
+        - --repo-root
+        - .
+        - --positions
+        - 1-3
+        - --key-file
+        - ../key.md
+        - --model
+        - esmc-300m-2024-12
+        - --resume-existing
         - --request-sleep-seconds
         - "1.5"
         - --request-timeout-seconds
@@ -504,6 +558,7 @@ lanes:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/proteinmpnn_candidate_diversity/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_constraint_audit/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
@@ -517,7 +572,6 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables
         - --repo-root
         - .
-        - --no-chimerax-render
     validation:
       - argv:
           - uv

@@ -126,6 +126,7 @@ if flat_materializers:
 expected_materialization_primitives = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
+    "biohub_esmc_wt_mutation_scoring",
     "candidate_table",
     "structure",
     "structure_preprocessing",
@@ -710,6 +711,7 @@ require_pattern 'operations/materialization/foldcheck_report/' "study surfaces r
 require_pattern 'operations/materialization/foldcheck_review/' "study surfaces route Eco1 fold-check review wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/review_deliverables/' "study surfaces route Eco1 review deliverables wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/biohub_esmc_sae_profile/' "study surfaces route Eco1 Biohub ESMC wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'operations/materialization/biohub_esmc_wt_mutation_scoring/' "study surfaces route Eco1 WT ESMC mutation-scoring wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/adapters/proteinmpnn/' "study surfaces route generic ProteinMPNN request adapter" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/adapters/colabfold/' "study surfaces route generic ColabFold output normalizer" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/adapters/biohub_esmc/' "study surfaces route generic Biohub ESMC adapter" "$REFERENCE_DIR/study-surfaces.md"
@@ -731,6 +733,7 @@ require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materializati
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review' "pipeline records fold-check review materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables' "pipeline records review deliverables materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile' "pipeline records Biohub ESMC materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring' "pipeline records WT ESMC mutation-scoring materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase1_thread_contract' "pipeline records Phase 1 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase2_real_backend_ingest' "pipeline records Phase 2 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'presence-only check' "command-group README documents Phase 1 hash closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"

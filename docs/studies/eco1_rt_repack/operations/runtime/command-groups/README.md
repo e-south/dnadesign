@@ -117,19 +117,26 @@ only the pixi-based install path that provides this command on BU SCC.
 
 `foldcheck_review` ranks the full 96-candidate fold report and writes a selected
 structure-panel manifest, full local structure-set manifest, ChimeraX scripts,
-Atlas subset manifest, visual manifest, SVG review plots, and a scoped marimo
-notebook. It does not run ChimeraX or copy the full SCC ColabFold output tree.
+Atlas subset manifest, visual manifest, SVG review plots, a selected-structure
+ChimeraX overlay PNG when the local executable is available, and a scoped marimo
+notebook. It does not copy the full SCC ColabFold output tree.
 The local structure set is one normalized PDB per accepted fold row, suitable
 for full ChimeraX viewing while preserving SCC source paths in the manifest. The
 review plots include alt text and interpretation limits; they summarize model
 metrics and SAE coverage for inspection, not candidate acceptance.
 
 `review_deliverables` builds the first broader manuscript/review bundle from
-existing artifacts. It writes `review_deliverable_manifest.yaml`, MSA
-plurality/mask and ProteinMPNN diversity SVGs, a ChimeraX mask-context script,
-and a scoped marimo notebook. It links existing foldcheck_review plots instead
-of duplicating them. It does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or
-candidate selection.
+existing artifacts. It writes `review_deliverable_manifest.yaml`, a
+Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
+SVGs, a Tao-style ColabFold RMSD/pLDDT joint plot for the current single mask
+policy, a ChimeraX mask-context script, WT ESMC model-constraint audit SVGs,
+and a scoped marimo notebook organized by progressive analysis sections. The
+notebook presents reference scaffold and mask evidence, ProteinMPNN sequence
+proposals, ColabFold structure triage, and WT ESMC substitution constraint. It
+fits visual previews to the notebook column, keeps full artifact paths in the
+evidence details, and links existing foldcheck_review and Permuter-style WT
+ESMC masked-marginal plots instead of duplicating them. It does not rerun
+ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
 
 `atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
 operator explicitly opts into on-demand folding. Use `--selection-manifest` for
@@ -153,8 +160,10 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --repo-root . \
   --sequence-limit all \
   --key-file ../key.md \
-  --model esmc-300m-2024-12 \
-  --sae-model esmc-300m-2024-12-sae-layer23-k64-codebook65536 \
+  --model esmc-6b-2024-12 \
+  --sae-model esmc-6b-2024-12-sae-layer60-k64-codebook16384 \
+  --normalize-features \
+  --fetch-feature-descriptions \
   --resume-existing \
   --max-new-requests 5 \
   --request-sleep-seconds 1.5 \
@@ -164,6 +173,18 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 Use `--sequence-limit all --resume-existing` only after deciding to spend the
 remaining hosted requests. These rows are semantic annotation, not fold
 validation or processivity evidence.
+
+The review-deliverables command now also renders a lightweight SAE
+interpretation section from the existing sparse Biohub ESMC tables. That pass
+does not call Biohub again. It follows the
+[Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
+at a small scale: rank WT-active features, inspect residue-localized
+activations, compare candidate retention of the same exact-dictionary
+features, and render a joint review panel that orders variants by SAE
+similarity to WT while showing ColabFold pLDDT and summed WT masked-marginal
+single-substitution LLR side markers. Feature labels and descriptions are
+joined only from the exact 6B layer-60 16k dictionary; the LLR side marker is
+not a joint protein likelihood.
 
 ### Source-Role Guardrails
 

@@ -1,7 +1,7 @@
 ## OPS status kinds
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 Registered public OPS routes and their status-kind providers:
 

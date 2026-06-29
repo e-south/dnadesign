@@ -1,7 +1,7 @@
 ## baserender docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 Use this index for package-local `baserender` documentation. The public surface stays small: validate or run a `BaseRenderJobV3` / `RenderJobV3`, render records through the stable package API, and use integrations only when a source tool needs a contract-specific adapter or render-contract descriptor.
 

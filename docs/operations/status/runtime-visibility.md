@@ -1,7 +1,7 @@
 ## OPS runtime visibility
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 Scheduler probes, active-job resolution, and degraded submit behavior in
 `ops runbook` follow this contract.

@@ -209,17 +209,20 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   study-owned fold-review wrapper. It ranks full fold-check rows, separates
   WT-runtime RMSD from direct ec86kit/7V9U mapped-residue RMSD, stages a small
   structure-panel manifest and ChimeraX script, stages the full local PDB set for
-  ChimeraX review, writes an Atlas subset manifest, and emits SVG review plots
+  ChimeraX review, writes an Atlas subset manifest, and emits SVG review plots,
+  a selected-structure ChimeraX overlay PNG when the executable is available,
   plus a scoped marimo notebook through `review_visual_manifest.yaml`. It does
-  not run ChimeraX, copy full raw ColabFold output trees, or accept candidates.
+  not copy full raw ColabFold output trees or accept candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/`:
   study-owned visual-deliverable wrapper. It writes
   `review_deliverable_manifest.yaml`, canonical-coordinate MSA plurality/mask
-  context, linear mask tracks, a ChimeraX mask-context script, ProteinMPNN
-  diversity panels, linked foldcheck_review plots, and a manifest-backed marimo
-  notebook. Manifest paths are relative to the manifest location, and notebook
-  dogfood includes static checks plus HTML export. It does not rerun
-  ProteinMPNN, ColabFold, Biohub, Atlas, ChimeraX, or candidate selection.
+  context, linear mask tracks, a ChimeraX mask-context script/render,
+  ProteinMPNN diversity panels, linked foldcheck_review SVG/PNG visuals, linked
+  WT ESMC masked-marginal plots, MSA-vs-ESMC model-constraint audit plots, and
+  a manifest-backed marimo notebook. Manifest paths are relative to the manifest
+  location, and notebook dogfood includes static checks plus HTML export. It does
+  not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate
+  selection.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
   fold-check request/report contract package. It validates the request
   manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted
@@ -263,6 +266,13 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   `src/dnadesign/thread/adapters/biohub_esmc/`. It writes compact query-time SAE
   artifacts for synthetic sequences and keeps the Biohub token out of manifests,
   logs, docs, and generated artifacts.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_wt_mutation_scoring/`:
+  thin study-owned wrapper that selects the accepted WT fold-check sequence,
+  delegates single-mutant grid semantics to `dnadesign.permuter`, and delegates
+  authenticated Biohub ESMC sequence-logit calls to the Biohub adapter. It
+  writes WT-only masked-marginal position entropy and substitution LLR tables,
+  plus a mask-context join. This is model-derived mutation-scoring evidence for
+  review, not experimental DMS and not a current-mask update.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/sampling/`:
   sampling artifact contract package. Phase 2 validates `thread_plan.yaml` and
   `proteinmpnn_request/request_manifest.yaml` separately from

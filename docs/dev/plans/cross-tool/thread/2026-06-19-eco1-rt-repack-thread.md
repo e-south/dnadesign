@@ -3,7 +3,7 @@ doc_id: dev-thread-eco1-rt-repack-candidate-review
 surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-26
+last_verified: 2026-06-29
 status: active_next_slice
 primary_slice: assembly-feasibility-report-v1
 ---
@@ -77,13 +77,18 @@ Materialized inputs for this slice:
   for WT plus all 96 candidates, with raw ColabFold trees still on BU SCC.
 - `biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits materialization
   accepted all 97 query rows.
-- `biohub_esmc_protein_features.parquet`: 338,560 sparse per-sequence SAE
+- `biohub_esmc_protein_features.parquet`: 204,935 sparse per-sequence SAE
   feature summary rows.
 - `biohub_esmc_residue_features.parquet`: 1,986,560 sparse per-residue SAE
   rows, equal to 97 sequences x 320 residues x 64 active features.
-- `biohub_esmc_feature_catalog.parquet`: 4,618 observed feature indices from
-  the current run. Labels are intentionally blank until a feature-description
-  source is joined.
+- `biohub_esmc_feature_catalog.parquet`: 2,328 observed feature indices from
+  the exact current Biohub SAE dictionary. Labels and descriptions are fetched
+  for this same dictionary.
+- `biohub_esmc/mutation_scoring/`: implemented WT-only ESMC masked-marginal
+  mutation-scoring lane. The full 320-position WT run is materialized with
+  position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
+  redacted manifest, and compact plot artifacts. This is a model-constraint
+  audit, not an update to the current mask.
 
 Missing by design:
 
@@ -156,6 +161,28 @@ Biohub ESMC/SAE:
 > but they cannot by themselves establish processivity, strand displacement, or
 > structured-template readthrough.
 
+Biohub ESMC masked-marginal mutation scoring:
+
+> Biohub ESMC/logits can also be used on masked WT contexts to produce
+> DMS-shaped in silico single-substitution scores. For Eco1 this lane is
+> WT-only: 320 masked positions and 6,080 non-WT amino-acid substitutions. It
+> is a model-constraint audit that can be compared with the current mask, not
+> experimental deep mutational scanning and not a change to the current mask.
+
+Method note:
+
+> For each WT Ec86 position, the materializer replaces that residue with `_`,
+> calls Biohub ESMC `/api/v1/encode` and `/api/v1/logits` with sequence logits
+> enabled, and reads the logit vector at the masked residue. It records
+> Shannon entropy in bits for the full returned vocabulary and
+> `canonical_entropy_bits` for the canonical amino-acid subset. It computes
+> each single-substitution LLR as `log P(alternate residue) - log P(WT
+> residue)`. The stored `logit_residue_offset` records whether the logits
+> include a beginning-of-sequence token. Negative LLR means the model assigns
+> lower probability to the alternate residue than to the WT residue in that
+> masked context. The stored `fraction_negative_alternate_llr` is computed over
+> the 19 non-WT canonical alternates, not over the WT residue itself.
+
 ESM Atlas:
 
 > ESM Atlas lookup/on-demand probing remains separate from Biohub ESMC/logits.
@@ -205,21 +232,21 @@ specific model, layer, sparsity, and codebook. The current all-97 Biohub run
 uses:
 
 ```text
-model: esmc-300m-2024-12
-sae_model: esmc-300m-2024-12-sae-layer23-k64-codebook65536
-feature_dictionary_size: 65536
+model: esmc-6b-2024-12
+sae_model: esmc-6b-2024-12-sae-layer60-k64-codebook16384
+feature_dictionary_size: 16384
+normalize_features: true
 ```
 
-Therefore, feature ids such as `14365`, `10777`, or `9008` must not be assumed
-to carry the same interpretation in the current Biohub 65,536-feature
-dictionary unless a source explicitly maps that feature index for this exact
-SAE model.
+Therefore, feature ids and source-backed descriptions in the current Biohub
+SAE review lane refer to the same 6B layer-60 16k dictionary. They remain
+model-derived interpretation aids, not curated Eco1 functional annotations.
 
 The next implementation should use two layers:
 
 1. **Model-specific window summary.** Summarize current Biohub ESMC feature
-   activations over declared Eco1 residue windows without assigning unsupported
-   biological labels to feature ids.
+   activations over declared Eco1 residue windows without turning feature
+   descriptions into assay evidence.
 2. **Interpreted feature panel.** Add labels or named biological roles only for
    feature ids whose interpretation is source-backed for the exact model and
    codebook.
@@ -491,13 +518,14 @@ persisted figure, frame, or notebook input must record:
 
 Current foundation status: `review-deliverable-foundation-v1` is materialized.
 It writes the visual manifest, canonical-coordinate MSA plurality/mask SVG,
-linear mask-track SVG, ChimeraX mask-context script, ProteinMPNN diversity SVGs,
-and a manifest-backed marimo notebook. It also links existing foldcheck_review
-plots instead of duplicating them. The visual manifests use manifest-relative
-paths so the review bundle can move with the study workspace. Static marimo
-checks and HTML export are the dogfood path for notebook resolution. Biohub ESMC
-feature-window heatmaps, WT SAE feature structure frames, feasibility matrices,
-and handoff panels remain follow-on deliverables.
+linear mask-track SVG, ChimeraX mask-context script/render, ProteinMPNN
+diversity SVGs, and a manifest-backed marimo notebook. It also links existing
+foldcheck_review SVG/PNG visuals instead of duplicating them. The visual
+manifests use manifest-relative paths so the review bundle can move with the
+study workspace. Static marimo checks and HTML export are the dogfood path for
+notebook resolution. Biohub ESMC feature-window heatmaps, WT SAE feature
+structure frames, feasibility matrices, and handoff panels remain follow-on
+deliverables.
 
 #### Deliverable 1: MSA Plurality And Mask Context
 
@@ -710,7 +738,7 @@ Rendering contract:
   `unlabeled feature`.
 - Select features by a declared rule: WT top features, highest fold-accepted
   variance, or source-backed polymerase labels for the exact SAE model. Do not
-  mix Atlas-style labels into the Biohub 65,536-feature dictionary.
+  mix labels across SAE dictionaries.
 
 Interpretation limit:
 
@@ -807,14 +835,30 @@ or implement selection logic inline.
 
 ### Implementation Tickets
 
-1. **SAE feature-window summary**
+1. **WT ESMC masked-marginal mutation scoring**
+   - Generic DMS-grid utilities live under
+     `dnadesign.permuter.src.scoring.esmc_masked_marginal/`.
+   - The Eco1 materializer lives under
+     `operations/materialization/biohub_esmc_wt_mutation_scoring/`.
+   - Use WT only, not all 97 sequence backgrounds.
+   - The full WT 320-position run writes `wt_position_entropy.parquet`,
+     `wt_substitution_llr.parquet`, `wt_mutation_scoring_mask_join.parquet`, a
+     redacted manifest with non-secret method references, and compact SVG plots
+     with embedded title/description metadata.
+   - Keep `--resume-existing`, `--max-new-requests`, and request spacing in
+     future refreshes so the lane remains resumable and conservative with
+     Biohub API usage.
+   - Do not use this lane to update
+     `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
+
+2. **SAE feature-window summary**
    - Add study-owned materializer:
      `operations/materialization/biohub_esmc_feature_windows/`.
    - Keep generic sparse-row utilities in `dnadesign.thread.adapters.biohub_esmc`
      only if they are not Eco1-specific.
    - Validate model id, SAE model id, dictionary size, row counts, and WT joins.
 
-2. **Feasibility report**
+3. **Feasibility report**
    - Add materializer:
      `operations/materialization/feasibility_report/`.
    - Add contract package:
@@ -823,22 +867,24 @@ or implement selection logic inline.
      recombination until parent haplotypes and structural coupling checks are
      explicit.
 
-3. **Selection panel**
+4. **Selection panel**
    - Add materializer:
      `operations/materialization/candidate_selection_panel/`.
    - Reject SAE-only selection and missing feasibility/fold rows.
 
-4. **RT-only handoff**
+5. **RT-only handoff**
    - Add materializer:
      `operations/materialization/candidate_handoff/`.
    - Reuse generic handoff/hashing helpers only after the Eco1 shape is stable.
    - Keep downstream RT-lnRNA acceptance as a separate contract.
 
-5. **Visual bundle extension**
+6. **Visual bundle extension**
    - Foundation materialized in `operations/materialization/review_deliverables/`
      with MSA plurality/mask context, linear mask tracks, a ChimeraX mask-context
-     script, ProteinMPNN candidate diversity, linked fold-review plots, and a
-     manifest-backed marimo notebook.
+     script/render, ProteinMPNN candidate diversity, linked fold-review SVG/PNG
+     visuals, WT ESMC masked-marginal constraint visuals, exact-dictionary
+     Biohub ESMC SAE interpretation plots, a joint SAE-similarity/fold/LLR
+     review panel, and a manifest-backed marimo notebook.
    - Visual manifests must use manifest-relative paths, and notebook dogfood
      must include `marimo check` plus HTML export so missing linked media is
      caught before review.
@@ -846,16 +892,18 @@ or implement selection logic inline.
      directory for staged local structures. Keep raw SCC paths as provenance in
      manifests, not as required paths inside the local review script.
    - SVG outputs should retain editable text nodes and include title/desc
-     metadata plus manifest alt text.
+     metadata plus manifest alt text. Display titles belong in the manifest so
+     marimo remains a manifest-backed review surface rather than a second label
+     registry.
    - Next visual extension starts after `sae_feature_window_summary.parquet`:
-     WT SAE feature frames and the Biohub ESMC feature-window heatmap.
+     WT SAE structure frames and the Biohub ESMC feature-window heatmap.
    - Treat the all-97 structure contact sheet and feature-frame video as
      optional/heavy deliverables with cached per-structure or per-feature
      intermediates.
    - Keep SVGs and PNGs alt-text-backed, manifest-recorded, and sequentially
      useful for a concise scientific methods/results narrative.
 
-6. **Phase wording cleanup**
+7. **Phase wording cleanup**
    - Use `phase3_foldcheck_report` for current fold-check validation.
    - Reserve `phase4_downstream_promotion` for RT-only handoff and downstream
      accept/reject readiness.
@@ -945,3 +993,7 @@ Those claims require downstream experimental evidence.
   BU SCC. LocalColabFold supplies the install/environment path for that CLI.
 - Candido et al., Biohub ESMC, and ESM Atlas supply model-derived semantic
   representation context. They do not supply biochemical processivity evidence.
+- The Biohub ESMC mutation-scoring notebook supplies the masked-marginal
+  sequence-logit pattern: mask one residue, compute per-position entropy, and
+  compute zero-shot single-substitution LLRs. It does not supply experimental
+  DMS data or an Eco1 mask rule.

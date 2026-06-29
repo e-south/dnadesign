@@ -1,7 +1,7 @@
 ## OPS mental model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 OPS owns neutral command routing, read-only observation, and deterministic
 runbook control. Tool and study status runtime policy stays outside OPS core.

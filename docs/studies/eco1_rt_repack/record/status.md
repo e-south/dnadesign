@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-26
+last_verified: 2026-06-29
 status_surface: record-only
 ---
 
@@ -115,11 +115,16 @@ handled separately.
   96-row candidate ranking, a selected structure-panel manifest, a full
   local fold-structure manifest, a selected-panel ChimeraX command script, a
   full-fold-set ChimeraX command script, an Atlas subset manifest, and a visual
-  review manifest. The visual manifest points to four SVG plots with embedded
-  title/description text and a scoped marimo notebook. The notebook reads the
-  manifest and presents the figures through a dropdown review surface with
-  evidence rows and interpretation limits. These visuals summarize fold-review
-  classes, ColabFold pLDDT/RMSD, cryoEM-reference RMSD, and Biohub ESMC SAE
+  review manifest. The visual manifest points to four SVG plots and one
+  rendered ChimeraX PNG structure-overlay panel with alt text, plain
+  descriptions, and a scoped marimo notebook. The structure overlay aligns WT
+  and selected candidate model residues `3-311` to ec86kit/7V9U reference
+  residues `1-309` over C-alpha atoms before rendering; this matches the
+  mapped-residue review frame and avoids relying on an interactive ChimeraX
+  alignment command. The notebook reads the manifest and presents the figures
+  through a dropdown review surface with evidence rows and interpretation
+  limits. These visuals summarize fold-review classes, ColabFold pLDDT/RMSD,
+  cryoEM-reference RMSD, representative structure overlays, and Biohub ESMC SAE
   coverage; they are review aids, not candidate acceptance gates. The
   local full structure set contains one normalized PDB for the WT runtime model
   plus each of the 96 candidate models, copied from the SCC ColabFold run
@@ -132,18 +137,46 @@ handled separately.
   `good_fold_preserved: 53`, `low_confidence: 9`, `review_band: 14`, and
   `structural_outlier: 3`.
 - `review_deliverables/` is materialized as a study-owned visual bundle. It
-  writes `review_deliverable_manifest.yaml`, a canonical-coordinate MSA
-  plurality/mask panel, linear mask tracks, a ChimeraX mask-context script, two
-  ProteinMPNN diversity SVGs, and a manifest-backed marimo notebook. The
-  manifest also links the existing foldcheck_review SVGs instead of duplicating
-  them. Manifest paths are relative to the manifest location, so the visual
-  bundle can move with the study workspace. The generated ChimeraX scripts use
-  relative paths for staged local structures and keep raw remote paths out of
-  the local review command path. The optional ChimeraX PNG render is marked
-  skipped when no ChimeraX executable is available. Every deliverable row
-  carries input hashes, alt text, a plain description, and an interpretation
-  limit. SVG outputs keep editable text nodes plus embedded title/description
-  metadata.
+  writes `review_deliverable_manifest.yaml`, a canonical-coordinate
+  Mestre-derived clade 9 alignment panel, linear mask tracks, a ChimeraX
+  mask-context script/render, ProteinMPNN diversity SVGs, a Tao-style
+  ColabFold RMSD/pLDDT joint plot for the current single mask policy, WT ESMC
+  model-constraint audit plots, a Biohub ESMC SAE interpretation section, an
+  interactive structure-browser manifest for the local ColabFold PDB set, and a
+  manifest-backed marimo notebook. The notebook is organized as a progressive
+  analysis surface: reference scaffold and mask evidence, ProteinMPNN sequence
+  proposals, ColabFold structure triage, WT ESMC substitution constraint, and
+  Biohub ESMC SAE interpretation. In the ColabFold section, it can load one
+  selected PDB plus the ec86kit/7V9U reference into a browser-native 3D view for
+  mouse-driven inspection. This browser view uses
+  `dnadesign.thread.structure_views` and is review-only; ChimeraX remains the
+  publication-still and pose-capture path. It fits
+  visual previews to the notebook column and keeps full artifact paths in the
+  evidence details. The manifest also links the existing foldcheck_review
+  SVG/PNG visuals and Permuter-style WT ESMC masked-marginal SVGs instead of
+  duplicating them. The model-constraint audit compares clade 9 WT plurality
+  with ESMC masked-marginal entropy, best alternate LLR, and residue-wise
+  constraint tracks. In the current WT table, plurality and entropy are
+  inversely correlated (`Pearson r = -0.7838`, `R2 = 0.6144`). This is a review
+  aid for future mask-policy discussion, not a current-mask update. The SAE
+  interpretation section uses the existing all-97 Biohub ESMC sparse tables to
+  show WT-active feature localization and candidate retention of those same
+  exact-dictionary features. It does not attach Atlas labels or claim
+  processivity. The same section includes a joint review panel that places WT
+  first, ranks ProteinMPNN variants by SAE-feature similarity to WT, and shows
+  ColabFold pLDDT plus summed WT masked-marginal single-substitution LLR as
+  side markers. The LLR sum is a review covariate, not a joint protein
+  likelihood, and the panel is not an activity or acceptance score. Manifest
+  paths are relative to the manifest location, so the visual bundle can move
+  with the study workspace. The generated ChimeraX scripts use relative paths
+  for staged local structures and keep raw remote paths out of the local review
+  command path. The ChimeraX mask-context PNG is rendered when a local ChimeraX
+  executable is available and otherwise records an explicit skipped status.
+  Every deliverable row carries a display title, input hashes, alt text, a
+  plain description, and an interpretation
+  limit. WT model-constraint rows also carry the masked-marginal method summary
+  and row-count evidence used by the marimo notebook. SVG outputs keep editable
+  text nodes plus embedded title/description metadata.
 - An all-97 ESM Atlas semantic-profile probe has been materialized through
   `dnadesign.thread.adapters.esm_atlas` and the thin Eco1 wrapper at
   `operations/materialization/atlas_semantic_profile/`. It uses
@@ -170,17 +203,44 @@ handled separately.
   authenticated public API path `POST /api/v1/encode` followed by
   `POST /api/v1/logits`; it does not use Atlas hash lookup and does not run a
   fold model. The current conservative run selected WT plus all 96 fold-accepted
-  ProteinMPNN candidates with model `esmc-300m-2024-12` and SAE
-  model `esmc-300m-2024-12-sae-layer23-k64-codebook65536`,
-  `normalize_features=false`. The materialization accepted all 97 query rows.
+  ProteinMPNN candidates with model `esmc-6b-2024-12` and SAE
+  model `esmc-6b-2024-12-sae-layer60-k64-codebook16384`,
+  `normalize_features=true`. The materialization accepted all 97 query rows.
   Each 320-residue
   sequence has 20,480 sparse per-residue activations, matching 64 active SAE
-  features per residue. The generated tables contain 97 profile rows, 338,560
-  protein-feature summary rows, 1,986,560 residue-feature rows, and 4,618
+  features per residue. The generated tables contain 97 profile rows, 204,935
+  protein-feature summary rows, 1,986,560 residue-feature rows, and 2,328
   observed feature-catalog rows. The request manifest stores the key label and
-  redacted authorization only; it does not store the Biohub token. This is rich
+  redacted authorization only; it does not store the Biohub token. It now also
+  records non-secret method references for the Biohub ESMC SAE feature
+  interpretation notebook and the Biohub logits API. This is rich
   query-time SAE context for synthetic sequences, not fold validation,
   processivity evidence, or an acceptance gate.
+  The sparse residue-feature tables are residue-only after BOS/EOS trimming:
+  `token_count` is 322 for the 320-aa sequences, stored residue positions run
+  from 1-320, and every residue has exactly 64 nonzero SAE features for the
+  `k64` dictionary. Feature descriptions are fetched only for the exact
+  Biohub 6B layer-60 16k dictionary used in this run. They are model-derived
+  descriptions from the Biohub interpretation workflow, not curated functional
+  annotations and not assay evidence.
+- A WT-only Biohub ESMC masked-marginal mutation-scoring materializer is
+  implemented at
+  `operations/materialization/biohub_esmc_wt_mutation_scoring/`. It uses the
+  same authenticated `POST /api/v1/encode` -> `POST /api/v1/logits` public API
+  path but requests sequence logits rather than SAE activations. The full WT
+  run is materialized for the 320-aa Ec86 sequence: 320 accepted position
+  entropy rows, 6,080 accepted non-WT single-substitution LLR rows, a
+  mask-context join, compact plots, and a redacted request manifest. The
+  manifest records non-secret method references for the Biohub ESMC
+  mutation-scoring notebook, the Biohub logits API, and the ESMC primary
+  literature context. The method follows the Biohub notebook pattern: mask one
+  residue, read sequence logits at the masked position, compute Shannon entropy
+  in bits for the full returned vocabulary plus `canonical_entropy_bits` for
+  canonical amino acids, and compute each alternate-residue LLR as
+  `log P(alternate) - log P(WT)`. The `fraction_negative_alternate_llr` field is
+  over the 19 non-WT canonical alternates, not over the WT residue. This is a
+  model-constraint audit for future mask-policy review, not experimental deep
+  mutational scanning and not a current-mask update.
 
 ### Mask Counts
 
@@ -238,15 +298,20 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 1. Inspect the fold-check structure panel and review plots, especially the two
    high-RMSD outliers, low-pLDDT rows, and candidates where WT-runtime RMSD and
    cryoEM-reference RMSD tell different stories, before candidate selection.
-2. Materialize a model-compatible Biohub ESMC SAE feature-window summary before
-   using SAE rows for stratification. The current Biohub run uses the
-   `esmc-300m-2024-12-sae-layer23-k64-codebook65536` dictionary, so Atlas-style
-   feature ids must not be reused as biological labels unless a matching
-   source-backed interpretation exists for that exact SAE model.
-3. Inspect the `review_deliverables/` marimo surface. It currently covers MSA
-   plurality/mask context, linear/3D mask context, ProteinMPNN diversity, and
-   linked fold-review plots. WT SAE feature frames and the Biohub ESMC
-   feature-window heatmap remain downstream of `sae_feature_window_summary`.
+2. Materialize a Biohub ESMC SAE feature-window summary before using SAE rows
+   for stratification. The current Biohub SAE run uses the source-described
+   `esmc-6b-2024-12-sae-layer60-k64-codebook16384` dictionary, so feature ids
+   and descriptions now refer to the same model, layer, sparsity, and codebook.
+   The Biohub SAE feature interpretation notebook should be treated as the
+   method pattern for ranking features, locating residue-level activation peaks,
+   and reviewing feature prevalence; it does not make model-derived feature
+   descriptions into curated functional annotations.
+3. Inspect the `review_deliverables/` marimo surface. It currently covers
+   reference scaffold and mask evidence, ProteinMPNN sequence proposals,
+   ColabFold structure triage, WT ESMC substitution constraint, and a first
+   exact-dictionary Biohub ESMC SAE interpretation view. WT SAE structure frames
+   and the Biohub ESMC feature-window heatmap remain downstream of
+   `sae_feature_window_summary`.
 4. Add a separate Atlas sequence-similarity materializer if synthetic-candidate
    Atlas neighborhood context is needed through the no-auth Atlas API. Do not
    keep retrying the hash-lookup/on-demand endpoint for the 96 synthetics unless

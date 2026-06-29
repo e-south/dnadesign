@@ -277,6 +277,27 @@ fold-accepted variants to fill strata such as:
 - Primer-grip-shifted candidates with intact catalytic and fold gates.
 - Random fold-accepted controls.
 
+The [Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
+is the appropriate method reference for the SAE review step. In this study,
+that means removing BOS/EOS positions before residue indexing, checking the
+expected top-k sparsity, ranking features from the exact query-time SAE
+dictionary by peak activation and prevalence, inspecting where they activate
+over residues, and joining source-backed descriptions only for the same model,
+layer, sparsity, and codebook. The current Eco1 all-97 SAE review path uses
+the described `esmc-6b-2024-12-sae-layer60-k64-codebook16384` dictionary.
+Candidate filtering should therefore stay staged:
+
+```text
+fold accepted
++ feasibility reviewed
++ optional exact-dictionary SAE stratum
+-> review panel
+```
+
+The SAE stratum can help balance WT-like, shifted, depleted, and outlier
+semantic profiles inside the review panel. It must not rescue a structurally
+failed candidate or serve as a standalone acceptance rule.
+
 Atlas and Biohub Platform surfaces should stay separate in documentation and
 code. The ESM Atlas API is an alpha, currently no-auth lookup/search surface
 for Atlas proteins, features, and similarity context. The authenticated Biohub
@@ -326,12 +347,11 @@ same sequence
 -> compact dnadesign Parquet tables keyed by candidate_id and sequence_hash
 ```
 
-The current smoke uses `esmc-300m-2024-12` with
-`esmc-300m-2024-12-sae-layer23-k64-codebook65536` and
-`normalize_features=false`, because Biohub's ESM SDK rejects normalized SAE
-features for the 300M SAE model. The current conservative run materialized WT
-plus all 96 fold-accepted ProteinMPNN candidates. All 97 selected sequences
-returned sparse query-time SAE outputs with 64 active features per residue.
+The current run uses `esmc-6b-2024-12` with
+`esmc-6b-2024-12-sae-layer60-k64-codebook16384` and
+`normalize_features=true`. It materialized WT plus all 96 fold-accepted
+ProteinMPNN candidates. All 97 selected sequences returned sparse query-time
+SAE outputs with 64 active features per residue.
 Store these rows as semantic annotation only.
 Do not use them as a hidden processivity score or as a replacement for
 ColabFold/AlphaFold-family structural checks.
@@ -352,3 +372,6 @@ Source roles:
   caveats.
 - Biohub `/api/v1/encode` and `/api/v1/logits` documentation supplies the
   authenticated query-time ESMC/SAE API shape used for synthetic candidates.
+- The Biohub ESMC SAE feature interpretation notebook supplies the feature
+  ranking, residue-localization, and feature-prevalence review pattern for
+  exact-dictionary SAE interpretation.

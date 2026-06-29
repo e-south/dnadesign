@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-06-26
+last_verified: 2026-06-29
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -355,7 +355,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
     status: materialized_local_review
-    description: Local generated SVG plots for review-class counts, ColabFold fold metrics, cryoEM-reference RMSD comparison, and Biohub ESMC SAE coverage. Each SVG is referenced by the visual manifest and has embedded title/description text.
+    description: Local generated fold-review visuals. The set includes SVG plots for review-class counts, ColabFold fold metrics, cryoEM-reference RMSD comparison, and Biohub ESMC SAE coverage, plus a ChimeraX-rendered PNG overlay of selected structures against the ec86kit/7V9U reference. Each visual is referenced by the visual manifest and carries alt text plus interpretation limits.
   - id: eco1_rt_foldcheck_review_notebook
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -421,7 +421,8 @@ datasets:
     status: materialized_all97
     description: >-
       Sparse per-sequence SAE feature summaries derived from Biohub ESMC/logits
-      residue activations. The current materialized table has 338,560 rows.
+      residue activations. The current 6B normalized materialized table has
+      204,935 rows.
   - id: eco1_rt_biohub_esmc_residue_features
     owner: thread
     kind: generated_artifact
@@ -437,9 +438,66 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_feature_catalog.parquet
     status: materialized_all97
     description: >-
-      Observed Biohub ESMC SAE feature indices for the current run. Labels
-      are intentionally blank until a separate feature-description source is
-      joined.
+      Observed Biohub ESMC SAE feature indices for the current 6B layer-60 16k
+      run. Labels and descriptions are fetched from the exact Biohub
+      feature-description dictionary when available, stored once here, and not
+      repeated in the sparse residue/protein tables.
+  - id: eco1_rt_biohub_esmc_sae_interpretation_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_sae_interpretation/
+    status: materialized_foundation
+    description: >-
+      Study-owned Biohub ESMC SAE interpretation visuals generated from the
+      existing all-97 sparse SAE tables without new API calls. The current
+      panels select peak-ranked top WT-active features from the exact
+      esmc-6b-2024-12-sae-layer60-k64-codebook16384 dictionary, show their
+      WT residue-localization patterns, and compare WT-normalized feature
+      retention across WT plus ProteinMPNN candidates. The same section also
+      renders `sae_fold_llr_comparison.svg`, which orders WT first and then
+      ranks ProteinMPNN variants by SAE-feature similarity to WT while showing
+      ColabFold pLDDT and summed WT masked-marginal single-substitution LLR as
+      side markers. The LLR sum is a review covariate, not a joint protein
+      likelihood. The same directory also
+      stores `protein_top_sae_features.parquet`, a compact per-protein table
+      ranked by peak activation and prevalence for marimo dropdown inspection.
+      Feature names and descriptions come from the exact 6B layer-60 16k
+      feature-description source when available. These visuals are semantic
+      review aids, not fold validation, processivity evidence, or candidate
+      acceptance gates.
+  - id: eco1_rt_biohub_esmc_wt_position_entropy
+    owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_position_entropy.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      WT-only ESMC masked-marginal position table with one accepted row per
+      Ec86 WT residue. It records sequence-logit entropy, WT log probability,
+      fraction of the 19 non-WT alternate residues with negative LLR, and
+      best/worst alternate residue summaries. This is model-derived in silico
+      mutation-scoring evidence, not experimental deep mutational scanning and
+      not a current-mask update.
+  - id: eco1_rt_biohub_esmc_wt_substitution_llr
+    owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_substitution_llr.parquet
+    status: materialized_full_wt_6080_rows
+    description: >-
+      WT-only ESMC masked-marginal substitution table with 6,080 accepted rows
+      for 320 positions x 19 non-WT canonical amino-acid substitutions. LLR is
+      computed from Biohub sequence logits as log P(alternate) minus log P(WT)
+      at the masked position.
+  - id: eco1_rt_biohub_esmc_wt_mutation_scoring_mask_join
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_mutation_scoring_mask_join.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      Study-owned join from WT ESMC mutation-scoring rows to the current Eco1
+      mask context, including protected status, protection reasons, clade-9 WT
+      plurality frequency, and retained DNA/RNA contact distance. This is an
+      audit table for future mask-policy review; it does not change the
+      current mask.
   - id: eco1_rt_biohub_esmc_sae_feature_window_summary
     owner: eco1_rt_repack
     kind: planned_artifact
@@ -456,32 +514,33 @@ datasets:
     status: materialized_foundation
     description: >-
       Materialized manifest for manuscript-facing and review-only visual
-      deliverables. It records figure paths, input hashes, alt text, plain
-      descriptions, interpretation limits, and whether each deliverable is
-      rendered, linked, skipped, or optional-heavy.
+      deliverables. It records figure paths, display titles, input hashes, alt
+      text, plain descriptions, interpretation limits, and whether each
+      deliverable is rendered, linked, skipped, or optional-heavy.
   - id: eco1_rt_msa_plurality_mask_panel
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
     status: materialized_foundation
     description: >-
-      MSA plurality and mask-context deliverable. It uses the accepted Ec86
-      clade 9 alignment, places the Eco1/Ec86 target row first, highlights
-      >=25% WT-plurality columns and protected mask positions on canonical
-      residue coordinates, and keeps full-row inspection in marimo rather than
-      a dense static all-row SVG.
+      Reference scaffold and mask-evidence deliverable. It uses the accepted
+      Mestre-derived Ec86 clade 9 alignment, places the Eco1/Ec86 target row
+      first, marks >=25% WT-plurality columns and protected mask positions on
+      canonical residue coordinates, and keeps full-row inspection in marimo
+      rather than a dense static all-row SVG.
   - id: eco1_rt_mask_structure_context_panel
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
-    status: materialized_script_png_skipped
+    status: materialized_script_png
     description: >-
       Linear-plus-3D mask context deliverable. The linear SVG is rendered and
       the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
       with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
       priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
-      positions, and the mutable design canvas. The PNG render is marked
-      skipped until a ChimeraX executable is available.
+      positions, and the mutable design canvas. The PNG render is materialized
+      when a local ChimeraX executable is available and otherwise records an
+      explicit skipped status in the manifest.
   - id: eco1_rt_proteinmpnn_candidate_diversity_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -502,6 +561,33 @@ datasets:
       fold-review class counts, ColabFold metric scatter, cryoEM/reference RMSD
       comparison, and Biohub ESMC coverage. A new all-97 contact sheet remains
       optional-heavy and should reuse cached thumbnails if added later.
+  - id: eco1_rt_interactive_structure_browser_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/interactive_structure_browser_manifest.yaml
+    status: materialized_foundation
+    description: >-
+      Study-owned manifest for browser-native interactive structure inspection
+      in the review-deliverables marimo notebook. It points to the existing
+      local foldcheck_review PDB files and the ec86kit/7V9U reference without
+      copying structures into review_deliverables. The generic viewer contract
+      is `dnadesign.thread.structure_views`, with py3Dmol as the current HTML
+      backend. This is review context only; ChimeraX remains the publication
+      still-render and pose-capture path.
+  - id: eco1_rt_wt_model_constraint_audit_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_constraint_audit/
+    status: materialized_foundation
+    description: >-
+      WT-only model-constraint review visuals that compare clade-9 WT plurality
+      against ESMC masked-marginal entropy, best alternate-residue LLR, and
+      residue-wise constraint tracks. The review manifest also links the
+      Permuter-style WT ESMC entropy, fraction-negative-alternate-LLR, and
+      substitution-LLR heatmap SVGs. The manifest carries the masked-marginal
+      method summary, row-count evidence, and MSA-vs-ESMC correlation evidence
+      for notebook review. These plots support future mask-policy review and do
+      not change the current mask.
   - id: eco1_rt_biohub_esmc_wt_feature_frames
     owner: eco1_rt_repack
     kind: planned_artifact

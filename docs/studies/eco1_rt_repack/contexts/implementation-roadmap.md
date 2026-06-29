@@ -538,13 +538,17 @@ fold-accepted ProteinMPNN candidates, and the materialization accepted all
 `biohub_esmc_request_manifest.yaml`. This lane is for synthetic sequence SAE
 annotation, not Atlas lookup and not fold validation.
 
-The next implementation should not treat current Biohub SAE feature indices as
-the interpreted Atlas feature panel. The all-97 Biohub run used
-`esmc-300m-2024-12-sae-layer23-k64-codebook65536`, so feature ids are tied to
-that exact model, layer, sparsity, and dictionary. The next table should first
-summarize sparse activations over declared Eco1 residue windows, then attach
-biological labels only when a source-backed interpretation exists for the exact
-SAE model.
+The current Biohub SAE review lane uses
+`esmc-6b-2024-12-sae-layer60-k64-codebook16384`, so feature ids and
+source-backed descriptions are tied to the same exact model, layer, sparsity,
+and dictionary. The next table should first summarize sparse activations over
+declared Eco1 residue windows, then attach biological labels only when a
+source-backed interpretation exists for the exact SAE model. The
+[Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
+is the method pattern for this review layer: rank features by activation,
+inspect residue localization and prevalence, and only then decide whether a
+feature deserves a source-backed biological description. It is not a source of
+curated Eco1 function labels by itself.
 
 The materialized review-deliverable foundation makes the first visuals explicit
 rather than free-floating illustrations. It writes a single
@@ -564,11 +568,19 @@ checks and HTML export. The deliverable sequence is:
    sequence identity to WT, sampling temperature/seed, and mutation density.
 4. ColabFold structure review: a cached top/bottom/control structure panel first
    and an all-97 contact sheet only as an optional/heavy cached artifact.
-5. WT Biohub ESMC SAE feature frames: one feature per frame on the WT structure,
+5. Biohub ESMC SAE interpretation foundation: per-protein top feature tables
+   ranked by peak activation and prevalence, WT-active feature localization,
+   candidate retention of the same exact-dictionary features, and a joint
+   SAE-similarity/ColabFold-pLDDT/ESMC-single-substitution-LLR review panel.
+   BOS/EOS positions are excluded from residue rows, `k64` sparsity is
+   validated, and feature indices remain indices unless exact-dictionary
+   source-backed names exist. The LLR side marker is a sum of WT
+   masked-marginal single-substitution scores, not a joint protein likelihood.
+6. WT Biohub ESMC SAE feature frames: one feature per frame on the WT structure,
    labelled by exact SAE model and feature index, with source-backed names only.
-6. Biohub ESMC feature-window heatmap: WT plus candidates sorted by structural
+7. Biohub ESMC feature-window heatmap: WT plus candidates sorted by structural
    review metrics, with a declared feature/window subset instead of all features.
-7. Feasibility and handoff matrix after feasibility and selection tables exist.
+8. Feasibility and handoff matrix after feasibility and selection tables exist.
 
 After the SAE summary and review-deliverable foundation, materialize
 `feasibility_report.parquet`, `selection/candidate_selection_panel.parquet`, and

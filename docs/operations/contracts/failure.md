@@ -1,7 +1,7 @@
 ## OPS failure contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-27
+**Last verified:** 2026-06-29
 
 Maintainer-facing CLI failure contract for `ops`:
 
