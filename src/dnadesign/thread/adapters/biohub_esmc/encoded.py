@@ -43,11 +43,20 @@ def decode_sae_outputs(
     decoded = _decode_payload(payload)
     if not isinstance(decoded, Mapping) or sae_model not in decoded:
         raise ValueError(f"Biohub logits response did not include sae_outputs for {sae_model!r}")
+    value = decoded[sae_model]
+    encoded_sae_bytes = len(payload) if isinstance(payload, str) else 0
+    if isinstance(value, Mapping):
+        return _sparse_dict_to_sparse(
+            value,
+            sae_model=sae_model,
+            sequence_length=sequence_length,
+            encoded_sae_bytes=encoded_sae_bytes,
+        )
     return _tensor_to_sparse(
-        decoded[sae_model],
+        value,
         sae_model=sae_model,
         sequence_length=sequence_length,
-        encoded_sae_bytes=len(payload) if isinstance(payload, str) else 0,
+        encoded_sae_bytes=encoded_sae_bytes,
     )
 
 
@@ -136,6 +145,68 @@ def _tensor_to_sparse(
         token_count=token_count,
         encoded_sae_bytes=encoded_sae_bytes,
     )
+
+
+def _sparse_dict_to_sparse(
+    payload: Mapping[str, Any],
+    *,
+    sae_model: str,
+    sequence_length: int,
+    encoded_sae_bytes: int,
+) -> SparseSaeTensor:
+    """Normalize Biohub's encoded top-k SAE list payload.
+
+    With `normalize_features=True`, the raw REST response serializes each token
+    as parallel `feature_indices` and `values` lists instead of a torch tensor.
+    The lists include BOS/EOS token rows, so we apply the same residue trim as
+    the Biohub feature-interpretation notebook.
+    """
+
+    shape = payload.get("shape")
+    feature_indices_by_token = payload.get("feature_indices")
+    values_by_token = payload.get("values")
+    if not _is_two_int_shape(shape):
+        raise ValueError("Biohub sparse SAE payload must include shape [token_count, feature_count]")
+    token_count = int(shape[0])
+    feature_count = int(shape[1])
+    if not isinstance(feature_indices_by_token, list) or not isinstance(values_by_token, list):
+        raise ValueError("Biohub sparse SAE payload must include feature_indices and values lists")
+    if len(feature_indices_by_token) != token_count or len(values_by_token) != token_count:
+        raise ValueError("Biohub sparse SAE token lists must match the token dimension in shape")
+    offset = _special_token_offset(token_count, sequence_length=sequence_length)
+    residue_indices: list[int] = []
+    feature_indices: list[int] = []
+    activation_values: list[float] = []
+    for token_index, (token_features, token_values) in enumerate(
+        zip(feature_indices_by_token, values_by_token, strict=True)
+    ):
+        residue_index = int(token_index) - offset
+        if residue_index < 0 or residue_index >= sequence_length:
+            continue
+        if not isinstance(token_features, list) or not isinstance(token_values, list):
+            raise ValueError("Biohub sparse SAE per-token entries must be lists")
+        if len(token_features) != len(token_values):
+            raise ValueError("Biohub sparse SAE feature_indices and values must have matching per-token lengths")
+        for feature_index, value in zip(token_features, token_values, strict=True):
+            residue_indices.append(residue_index)
+            feature_indices.append(int(feature_index))
+            activation_values.append(float(value))
+    return SparseSaeTensor(
+        sae_model=sae_model,
+        residue_indices=residue_indices,
+        feature_indices=feature_indices,
+        values=activation_values,
+        sequence_residue_count=sequence_length,
+        feature_count=feature_count,
+        token_count=token_count,
+        encoded_sae_bytes=encoded_sae_bytes,
+    )
+
+
+def _is_two_int_shape(value: Any) -> bool:
+    if not isinstance(value, list | tuple) or len(value) != 2:
+        return False
+    return all(isinstance(item, int) and int(item) > 0 for item in value)
 
 
 def _trim_special_tokens(tensor: Any, *, sequence_length: int) -> Any:

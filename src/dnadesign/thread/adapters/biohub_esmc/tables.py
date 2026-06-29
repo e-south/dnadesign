@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -236,6 +237,7 @@ def validate_biohub_esmc_artifacts(
                 )
             )
         if status == "accepted":
+            issues.extend(_validate_accepted_profile_shape(row, path=row_path))
             if int(row.get("residue_feature_count") or 0) <= 0:
                 issues.append(
                     BiohubEsmcIssue(
@@ -260,7 +262,114 @@ def validate_biohub_esmc_artifacts(
                     path=row_path,
                 )
             )
+    if not issues:
+        issues.extend(_validate_residue_feature_shape(artifacts.residue_features_path, profile_rows))
     return issues
+
+
+def _validate_accepted_profile_shape(row: Mapping[str, Any], *, path: str) -> list[BiohubEsmcIssue]:
+    issues: list[BiohubEsmcIssue] = []
+    sequence_length = int(row.get("sequence_length") or 0)
+    token_count = int(row.get("token_count") or 0)
+    if token_count not in {sequence_length, sequence_length + 2}:
+        issues.append(
+            BiohubEsmcIssue(
+                check_id="thread.biohub_esmc.profile_token_count_mismatch",
+                message=(
+                    "Accepted Biohub ESMC rows must have token_count equal to sequence_length or sequence_length + 2"
+                ),
+                path=path,
+            )
+        )
+    expected_k, expected_codebook = _parse_sae_model_shape(str(row.get("sae_model") or ""))
+    feature_dictionary_size = int(row.get("feature_dictionary_size") or 0)
+    if expected_codebook is not None and feature_dictionary_size != expected_codebook:
+        issues.append(
+            BiohubEsmcIssue(
+                check_id="thread.biohub_esmc.profile_codebook_mismatch",
+                message=f"feature_dictionary_size must match SAE model codebook{expected_codebook}",
+                path=path,
+            )
+        )
+    if expected_k is not None:
+        expected_rows = sequence_length * expected_k
+        residue_feature_count = int(row.get("residue_feature_count") or 0)
+        if residue_feature_count != expected_rows:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id="thread.biohub_esmc.profile_residue_feature_count_mismatch",
+                    message=f"residue_feature_count must equal sequence_length * k ({expected_rows})",
+                    path=path,
+                )
+            )
+    return issues
+
+
+def _validate_residue_feature_shape(path: Path, profile_rows: Sequence[Mapping[str, Any]]) -> list[BiohubEsmcIssue]:
+    accepted = {
+        str(row["candidate_id"]): (
+            int(row.get("sequence_length") or 0),
+            _parse_sae_model_shape(str(row.get("sae_model") or ""))[0],
+        )
+        for row in profile_rows
+        if str(row.get("status") or "") == "accepted"
+    }
+    if not accepted:
+        return []
+    table = pq.read_table(
+        path,
+        columns=["candidate_id", "residue_index_zero_based", "sequence_position_one_based", "feature_index"],
+    )
+    grouped = table.group_by(["candidate_id", "residue_index_zero_based", "sequence_position_one_based"]).aggregate(
+        [("feature_index", "count")]
+    )
+    issues: list[BiohubEsmcIssue] = []
+    observed_position_counts: dict[str, int] = {}
+    for row in grouped.to_pylist():
+        candidate_id = str(row["candidate_id"])
+        if candidate_id not in accepted:
+            continue
+        sequence_length, expected_k = accepted[candidate_id]
+        zero_based = int(row["residue_index_zero_based"])
+        one_based = int(row["sequence_position_one_based"])
+        if expected_k is not None:
+            observed_position_counts[candidate_id] = observed_position_counts.get(candidate_id, 0) + 1
+        if one_based != zero_based + 1 or zero_based < 0 or one_based < 1 or one_based > sequence_length:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id="thread.biohub_esmc.residue_position_out_of_bounds",
+                    message="Residue feature rows must be residue-only positions with aligned zero/one-based indices",
+                    path=f"{path}:{candidate_id}:{zero_based}:{one_based}",
+                )
+            )
+            continue
+        if expected_k is not None and int(row["feature_index_count"]) != expected_k:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id="thread.biohub_esmc.residue_active_feature_count_mismatch",
+                    message=f"Each residue must have exactly k={expected_k} nonzero SAE features",
+                    path=f"{path}:{candidate_id}:{one_based}",
+                )
+            )
+    for candidate_id, (sequence_length, expected_k) in accepted.items():
+        if expected_k is None:
+            continue
+        if observed_position_counts.get(candidate_id, 0) != sequence_length:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id="thread.biohub_esmc.residue_position_coverage_mismatch",
+                    message=f"Accepted Biohub ESMC rows must cover all {sequence_length} sequence residues",
+                    path=f"{path}:{candidate_id}",
+                )
+            )
+    return issues
+
+
+def _parse_sae_model_shape(sae_model: str) -> tuple[int | None, int | None]:
+    match = re.search(r"-k(?P<k>\d+)-codebook(?P<codebook>\d+)", sae_model)
+    if not match:
+        return None, None
+    return int(match.group("k")), int(match.group("codebook"))
 
 
 def _write_table(

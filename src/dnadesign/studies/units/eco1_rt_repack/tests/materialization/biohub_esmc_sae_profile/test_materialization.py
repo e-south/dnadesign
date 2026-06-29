@@ -12,10 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pyarrow.parquet as pq
-import torch
+import pytest
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile import (
     materialize_biohub_esmc_sae_profile,
@@ -23,7 +22,14 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_es
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.atlas_semantic_profile._fixtures import (
     write_foldcheck_report_fixture,
 )
-from dnadesign.thread.adapters.biohub_esmc import DEFAULT_ESMC_SAE_MODEL, BiohubCredential
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.biohub_esmc_sae_profile.fixtures import (
+    FakeBiohubEsmcClient,
+    FakeFeatureDescriptionClient,
+    TimeoutOnceBiohubEsmcClient,
+)
+from dnadesign.thread.adapters.biohub_esmc import FEATURE_DESCRIPTION_SAE_MODEL
+
+_FIXTURE_SAE_MODEL = "fixture-sae-model"
 
 
 def test_biohub_esmc_sae_profile_materializes_wt_only_smoke(tmp_path: Path) -> None:
@@ -33,6 +39,7 @@ def test_biohub_esmc_sae_profile_materializes_wt_only_smoke(tmp_path: Path) -> N
         repo_root=Path.cwd(),
         output_root=tmp_path,
         sequence_limit="1",
+        sae_model=_FIXTURE_SAE_MODEL,
         biohub_client=FakeBiohubEsmcClient(),
         retrieved_at="2026-06-25T00:00:00Z",
     )
@@ -46,6 +53,9 @@ def test_biohub_esmc_sae_profile_materializes_wt_only_smoke(tmp_path: Path) -> N
     manifest_text = result.request_manifest_path.read_text(encoding="utf-8")
     assert "fixture-secret" not in manifest_text
     assert "authorization: <redacted>" in manifest_text
+    assert "esmc_sae_feature_interpretation.ipynb" in manifest_text
+    assert "https://www.biohub.ai/api-reference/logits" in manifest_text
+    assert "https://huggingface.co/biohub/ESMC-6B-sae-layer60-k64-codebook16384" in manifest_text
 
 
 def test_biohub_esmc_sae_profile_caps_new_requests_with_explicit_rows(tmp_path: Path) -> None:
@@ -56,6 +66,7 @@ def test_biohub_esmc_sae_profile_caps_new_requests_with_explicit_rows(tmp_path: 
         output_root=tmp_path,
         sequence_limit="all",
         max_new_requests=1,
+        sae_model=_FIXTURE_SAE_MODEL,
         biohub_client=FakeBiohubEsmcClient(),
         retrieved_at="2026-06-25T00:00:00Z",
     )
@@ -74,6 +85,7 @@ def test_biohub_esmc_sae_profile_resume_reuses_accepted_rows(tmp_path: Path) -> 
         repo_root=Path.cwd(),
         output_root=tmp_path,
         sequence_limit="1",
+        sae_model=_FIXTURE_SAE_MODEL,
         biohub_client=FakeBiohubEsmcClient(),
         retrieved_at="2026-06-25T00:00:00Z",
     )
@@ -84,6 +96,7 @@ def test_biohub_esmc_sae_profile_resume_reuses_accepted_rows(tmp_path: Path) -> 
         sequence_limit="all",
         resume_existing=True,
         max_new_requests=1,
+        sae_model=_FIXTURE_SAE_MODEL,
         biohub_client=fake_client,
         retrieved_at="2026-06-25T00:00:00Z",
     )
@@ -104,6 +117,7 @@ def test_biohub_esmc_sae_profile_writes_timeout_error_row(tmp_path: Path) -> Non
         repo_root=Path.cwd(),
         output_root=tmp_path,
         sequence_limit="all",
+        sae_model=_FIXTURE_SAE_MODEL,
         biohub_client=TimeoutOnceBiohubEsmcClient(),
         retrieved_at="2026-06-25T00:00:00Z",
     )
@@ -118,49 +132,45 @@ def test_biohub_esmc_sae_profile_writes_timeout_error_row(tmp_path: Path) -> Non
     assert "read operation timed out" in failure_reasons["thread_candidate_test"]
 
 
-class FakeBiohubEsmcClient:
-    def __init__(self) -> None:
-        self.credential = BiohubCredential(key_label="bu-dunlop-lab", token="fixture-secret")
-        self.requested_sequences: list[str] = []
+def test_biohub_esmc_sae_profile_can_enrich_exact_dictionary_feature_descriptions(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    feature_description_client = FakeFeatureDescriptionClient()
 
-    def logits_for_sequence(
-        self,
-        sequence: str,
-        *,
-        model: str,
-        sae_model: str,
-        normalize_features: bool,
-    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
-        del model, normalize_features
-        normalized = sequence.strip().upper()
-        self.requested_sequences.append(normalized[:4])
-        tokens = [0, *range(1, len(normalized) + 1), 2]
-        tensor = torch.zeros((len(normalized) + 2, 16), dtype=torch.float32)
-        tensor[1, 3] = 1.5
-        tensor[2, 7] = 2.0
-        tensor[len(normalized), 7] = 4.0
-        return (
-            {"outputs": {"sequence": tokens}, "potential_sequence_of_concern": False},
-            {"sae_outputs": {sae_model or DEFAULT_ESMC_SAE_MODEL: tensor}, "logits": None, "embeddings": None},
-            tokens,
-        )
+    result = materialize_biohub_esmc_sae_profile(
+        repo_root=Path.cwd(),
+        output_root=tmp_path,
+        sequence_limit="1",
+        sae_model=FEATURE_DESCRIPTION_SAE_MODEL,
+        biohub_client=FakeBiohubEsmcClient(),
+        fetch_feature_descriptions=True,
+        feature_description_limit=2,
+        feature_description_client=feature_description_client,
+        retrieved_at="2026-06-25T00:00:00Z",
+    )
+
+    catalog_rows = pq.read_table(result.feature_catalog_path).to_pylist()
+    descriptions = {row["feature_index"]: row["description"] for row in catalog_rows if row["description"]}
+    assert descriptions == {
+        0: "Fixture exact-dictionary description for F0.",
+        1: "Fixture exact-dictionary description for F1.",
+    }
+    assert feature_description_client.requested == [0, 1]
+    manifest_text = result.request_manifest_path.read_text(encoding="utf-8")
+    assert "status: enriched" in manifest_text
+    assert "enriched_feature_count: 2" in manifest_text
 
 
-class TimeoutOnceBiohubEsmcClient(FakeBiohubEsmcClient):
-    def logits_for_sequence(
-        self,
-        sequence: str,
-        *,
-        model: str,
-        sae_model: str,
-        normalize_features: bool,
-    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
-        if len(self.requested_sequences) == 1:
-            self.requested_sequences.append(sequence.strip().upper()[:4])
-            raise TimeoutError("The read operation timed out")
-        return super().logits_for_sequence(
-            sequence,
-            model=model,
-            sae_model=sae_model,
-            normalize_features=normalize_features,
+def test_biohub_esmc_sae_profile_rejects_incompatible_feature_description_fetch(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+
+    with pytest.raises(ValueError, match="source-backed only"):
+        materialize_biohub_esmc_sae_profile(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            sequence_limit="1",
+            sae_model=_FIXTURE_SAE_MODEL,
+            biohub_client=FakeBiohubEsmcClient(),
+            fetch_feature_descriptions=True,
+            feature_description_client=FakeFeatureDescriptionClient(),
+            retrieved_at="2026-06-25T00:00:00Z",
         )

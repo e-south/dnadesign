@@ -39,9 +39,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--sae-model", default=DEFAULT_SAE_MODEL)
     parser.add_argument(
         "--normalize-features",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=DEFAULT_NORMALIZE_FEATURES,
-        help="Request normalized SAE features. Not supported by Biohub for the 300M SAE model.",
+        help="Request Biohub normalized SAE features when supported by the selected SAE model.",
     )
     parser.add_argument("--key-file", type=Path, default=DEFAULT_KEY_FILE)
     parser.add_argument(
@@ -67,6 +67,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         help="Wall-clock timeout for each Biohub POST request.",
     )
+    parser.add_argument(
+        "--fetch-feature-descriptions",
+        action="store_true",
+        help=(
+            "Fetch public Biohub feature descriptions for compatible SAE dictionaries. "
+            "The Eco1 happy path uses the described 6B/layer60/16k dictionary."
+        ),
+    )
+    parser.add_argument(
+        "--feature-description-limit",
+        type=int,
+        default=None,
+        help="Optional cap on feature-description GET requests when enrichment is explicitly enabled.",
+    )
+    parser.add_argument(
+        "--feature-description-sleep-seconds",
+        type=float,
+        default=0.0,
+        help="Delay between feature-description GET requests when enrichment is explicitly enabled.",
+    )
     args = parser.parse_args(argv)
 
     result = materialize_biohub_esmc_sae_profile(
@@ -82,6 +102,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_new_requests=args.max_new_requests,
         request_sleep_seconds=args.request_sleep_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
+        fetch_feature_descriptions=args.fetch_feature_descriptions,
+        feature_description_limit=args.feature_description_limit,
+        feature_description_sleep_seconds=args.feature_description_sleep_seconds,
     )
     print(f"selected_sequences: {result.selected_sequence_count}")
     print(f"biohub_request_hash: {result.biohub_request_hash}")

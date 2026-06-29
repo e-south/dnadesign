@@ -75,6 +75,33 @@ def test_client_uses_encode_then_logits_request_shape() -> None:
     }
 
 
+def test_client_requests_sequence_logits_without_sae_config() -> None:
+    client = _FakeBiohubClient()
+
+    _encode_response, logits_response, tokens = client.sequence_logits_for_sequence("A_DE", model=DEFAULT_ESMC_MODEL)
+
+    assert tokens == [0, 4, 5, 6, 7, 2]
+    assert logits_response["logits"]["sequence"] == [[[0.0, 1.0], [2.0, 3.0]]]
+    assert [request["path"] for request in client.requests] == ["/api/v1/encode", "/api/v1/logits"]
+    encode_payload = client.requests[0]["payload"]
+    logits_payload = client.requests[1]["payload"]
+    assert encode_payload["inputs"]["sequence"] == "A_DE"
+    assert logits_payload["inputs"]["sequence"] == tokens
+    assert logits_payload["logits_config"]["sequence"] is True
+    assert "sae_config" not in logits_payload["logits_config"]
+
+
+def test_client_resolves_amino_acid_token_indices_from_encode() -> None:
+    client = _FakeBiohubClient()
+
+    token_indices = client.amino_acid_token_indices(model=DEFAULT_ESMC_MODEL)
+
+    assert token_indices["A"] == 4
+    assert token_indices["C"] == 5
+    assert len(token_indices) == 20
+    assert all(request["path"] == "/api/v1/encode" for request in client.requests)
+
+
 def test_read_response_body_uses_wall_clock_deadline() -> None:
     assert _read_response_body(_ChunkedResponse([b'{"ok":', b"true}"]), total_timeout_seconds=5, path="/api/test") == (
         '{"ok":true}'
@@ -84,6 +111,8 @@ def test_read_response_body_uses_wall_clock_deadline() -> None:
 
 
 class _FakeBiohubClient(BiohubEsmcClient):
+    _AA_TOKENS = {aa: index + 4 for index, aa in enumerate("ACDEFGHIKLMNPQRSTVWY")}
+
     def __init__(self) -> None:
         super().__init__(credential=BiohubCredential(key_label="bu-dunlop-lab", token="fixture-secret"))
         object.__setattr__(self, "requests", [])
@@ -91,7 +120,15 @@ class _FakeBiohubClient(BiohubEsmcClient):
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         self.requests.append({"path": path, "payload": payload})
         if path.endswith("/encode"):
+            sequence = str(payload["inputs"]["sequence"])
+            if len(sequence) == 1 and sequence in self._AA_TOKENS:
+                return {
+                    "outputs": {"sequence": [0, self._AA_TOKENS[sequence], 2]},
+                    "potential_sequence_of_concern": False,
+                }
             return {"outputs": {"sequence": [0, 4, 5, 6, 7, 2]}, "potential_sequence_of_concern": False}
+        if payload["logits_config"].get("sequence") is True:
+            return {"logits": {"sequence": [[[0.0, 1.0], [2.0, 3.0]]]}, "embeddings": None, "hidden_states": None}
         return {"sae_outputs": {}, "logits": None, "embeddings": None, "hidden_states": None}
 
 

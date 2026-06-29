@@ -25,8 +25,9 @@ DEFAULT_USER_AGENT = "dnadesign-thread-biohub-esmc/0.1"
 BIOHUB_API_VERSION = "v1"
 ENCODE_PATH = "/api/v1/encode"
 LOGITS_PATH = "/api/v1/logits"
-DEFAULT_ESMC_MODEL = "esmc-300m-2024-12"
-DEFAULT_ESMC_SAE_MODEL = "esmc-300m-2024-12-sae-layer23-k64-codebook65536"
+DEFAULT_ESMC_MODEL = "esmc-6b-2024-12"
+DEFAULT_ESMC_SAE_MODEL = "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
+CANONICAL_AMINO_ACIDS = tuple("ACDEFGHIKLMNPQRSTVWY")
 _READ_CHUNK_BYTES = 65536
 _MAX_SOCKET_READ_TIMEOUT_SECONDS = 30.0
 
@@ -118,6 +119,63 @@ class BiohubEsmcClient:
         )
         return encode_response, logits_response, tokens
 
+    def sequence_logits_for_tokens(
+        self,
+        sequence_tokens: list[int],
+        *,
+        model: str = DEFAULT_ESMC_MODEL,
+        potential_sequence_of_concern: bool = False,
+    ) -> dict[str, Any]:
+        """Request amino-acid sequence logits for encoded sequence tokens."""
+
+        if not sequence_tokens:
+            raise ValueError("sequence_tokens must be non-empty")
+        payload: dict[str, Any] = {
+            "model": model,
+            "inputs": {"sequence": [int(token) for token in sequence_tokens]},
+            "logits_config": {
+                "sequence": True,
+                "return_embeddings": False,
+                "return_mean_embedding": False,
+                "return_hidden_states": False,
+                "return_mean_hidden_states": False,
+                "ith_hidden_layer": -1,
+            },
+            "potential_sequence_of_concern": potential_sequence_of_concern,
+        }
+        return self._post_json(LOGITS_PATH, payload)
+
+    def sequence_logits_for_sequence(
+        self,
+        sequence: str,
+        *,
+        model: str = DEFAULT_ESMC_MODEL,
+        potential_sequence_of_concern: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
+        """Encode one sequence and request sequence logits from the encoded tokens."""
+
+        encode_response = self.encode_sequence(
+            sequence,
+            model=model,
+            potential_sequence_of_concern=potential_sequence_of_concern,
+        )
+        tokens = extract_sequence_tokens(encode_response)
+        logits_response = self.sequence_logits_for_tokens(
+            tokens,
+            model=model,
+            potential_sequence_of_concern=potential_sequence_of_concern,
+        )
+        return encode_response, logits_response, tokens
+
+    def amino_acid_token_indices(self, *, model: str = DEFAULT_ESMC_MODEL) -> dict[str, int]:
+        """Resolve canonical amino-acid token ids through the Biohub encode API."""
+
+        token_indices: dict[str, int] = {}
+        for aa in CANONICAL_AMINO_ACIDS:
+            tokens = extract_sequence_tokens(self.encode_sequence(aa, model=model))
+            token_indices[aa] = _single_residue_token(tokens, residue=aa)
+        return token_indices
+
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = self.base_url.rstrip("/") + path
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -171,6 +229,14 @@ def extract_sequence_tokens(response: dict[str, Any]) -> list[int]:
             raise BiohubEsmcRequestError("Biohub encode response sequence tokens must be integers")
         tokens.append(int(token))
     return tokens
+
+
+def _single_residue_token(tokens: list[int], *, residue: str) -> int:
+    if len(tokens) >= 3:
+        return int(tokens[1])
+    if len(tokens) == 1:
+        return int(tokens[0])
+    raise BiohubEsmcRequestError(f"Biohub encode response for residue {residue!r} did not expose one residue token")
 
 
 def _normalize_sequence(sequence: str) -> str:

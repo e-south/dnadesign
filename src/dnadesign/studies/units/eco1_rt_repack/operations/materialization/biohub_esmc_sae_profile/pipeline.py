@@ -40,13 +40,17 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
     resolve_output_root,
 )
 from dnadesign.thread.adapters.biohub_esmc import (
+    FEATURE_DESCRIPTION_SAE_MODEL,
     BiohubEsmcClient,
     BiohubEsmcRequestError,
+    BiohubSaeFeatureDescriptionClient,
+    BiohubSaeFeatureDescriptionError,
     biohub_query_hash,
     biohub_request_hash,
     build_error_profile_row,
     load_biohub_credential,
     normalize_logits_response,
+    supports_feature_description_endpoint,
     validate_biohub_esmc_artifacts,
     write_biohub_esmc_artifacts,
 )
@@ -80,6 +84,10 @@ def materialize_biohub_esmc_sae_profile(
     request_sleep_seconds: float = 0.0,
     request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
     biohub_client: Any | None = None,
+    fetch_feature_descriptions: bool = False,
+    feature_description_limit: int | None = None,
+    feature_description_sleep_seconds: float = 0.0,
+    feature_description_client: Any | None = None,
     retrieved_at: str | None = None,
 ) -> MaterializedBiohubEsmcSaeProfileArtifacts:
     """Query Biohub ESMC logits for fold-accepted Eco1 sequences and write sparse SAE tables."""
@@ -90,6 +98,10 @@ def materialize_biohub_esmc_sae_profile(
         raise ValueError("request_sleep_seconds must be non-negative")
     if request_timeout_seconds <= 0:
         raise ValueError("request_timeout_seconds must be positive")
+    if feature_description_limit is not None and feature_description_limit < 0:
+        raise ValueError("feature_description_limit must be non-negative")
+    if feature_description_sleep_seconds < 0:
+        raise ValueError("feature_description_sleep_seconds must be non-negative")
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
     selection = select_fold_accepted_biohub_esmc_sequences(output_root=out_root, sequence_limit=sequence_limit)
@@ -138,11 +150,18 @@ def materialize_biohub_esmc_sae_profile(
             source_request_hash=selection.source_request_hash,
         )
         if cached is not None:
-            profile_rows.append(cached)
-            protein_feature_rows.extend(existing_rows.protein_feature_rows(record.sequence_id) if existing_rows else [])
-            residue_feature_rows.extend(existing_rows.residue_feature_rows(record.sequence_id) if existing_rows else [])
-            feature_catalog_rows.extend(existing_rows.feature_catalog_rows if existing_rows else [])
-            continue
+            cached_protein_rows = existing_rows.protein_feature_rows(record.sequence_id) if existing_rows else []
+            cached_residue_rows = existing_rows.residue_feature_rows(record.sequence_id) if existing_rows else []
+            if _cached_feature_rows_complete(
+                profile_row=cached,
+                protein_feature_rows=cached_protein_rows,
+                residue_feature_rows=cached_residue_rows,
+            ):
+                profile_rows.append(cached)
+                protein_feature_rows.extend(cached_protein_rows)
+                residue_feature_rows.extend(cached_residue_rows)
+                feature_catalog_rows.extend(existing_rows.feature_catalog_rows if existing_rows else [])
+                continue
         if max_new_requests is not None and new_request_count >= max_new_requests:
             profile_rows.append(
                 build_error_profile_row(
@@ -215,6 +234,17 @@ def materialize_biohub_esmc_sae_profile(
             if request_sleep_seconds:
                 sleep(request_sleep_seconds)
 
+    feature_catalog_rows, feature_description_summary = _maybe_enrich_feature_catalog_rows(
+        feature_catalog_rows,
+        sae_model=sae_model,
+        retrieved_at=timestamp,
+        fetch_feature_descriptions=fetch_feature_descriptions,
+        feature_description_limit=feature_description_limit,
+        feature_description_sleep_seconds=feature_description_sleep_seconds,
+        feature_description_client=feature_description_client,
+        biohub_api_base_url=biohub_api_base_url,
+        request_timeout_seconds=request_timeout_seconds,
+    )
     request_manifest = _request_manifest(
         request_hash=request_hash,
         source_request_hash=selection.source_request_hash,
@@ -226,6 +256,7 @@ def materialize_biohub_esmc_sae_profile(
         key_label=key_label,
         selected_sequence_count=len(selection.records),
         request_timeout_seconds=request_timeout_seconds,
+        feature_description_summary=feature_description_summary,
         retrieved_at=timestamp,
     )
     artifacts = write_biohub_esmc_artifacts(
@@ -314,6 +345,7 @@ def _request_manifest(
     key_label: str,
     selected_sequence_count: int,
     request_timeout_seconds: float,
+    feature_description_summary: dict[str, object],
     retrieved_at: str,
 ) -> dict[str, object]:
     return {
@@ -329,11 +361,130 @@ def _request_manifest(
         "normalize_features": normalize_features,
         "key_label": key_label,
         "authorization": "<redacted>",
+        "method_references": [
+            {
+                "title": "Biohub ESMC SAE feature interpretation notebook",
+                "url": (
+                    "https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/"
+                    "esmc_sae_feature_interpretation.ipynb"
+                ),
+                "role": "SAE feature ranking, residue localization, and interpretation workflow reference",
+            },
+            {
+                "title": "Biohub /api/v1/logits documentation",
+                "url": "https://www.biohub.ai/api-reference/logits",
+                "role": "Authenticated logits endpoint used for ESMC SAE outputs",
+            },
+            {
+                "title": "Biohub ESMC SAE model card",
+                "url": "https://huggingface.co/biohub/ESMC-6B-sae-layer60-k64-codebook16384",
+                "role": (
+                    "SAE model-family provenance, codebook-size semantics, top-k sparsity, "
+                    "and source-backed feature-description availability for this dictionary"
+                ),
+            },
+        ],
         "request_timeout_seconds": float(request_timeout_seconds),
+        "feature_descriptions": feature_description_summary,
         "selected_sequence_count": selected_sequence_count,
         "selected_sequence_ids": sequence_ids,
         "retrieved_at": retrieved_at,
     }
+
+
+def _maybe_enrich_feature_catalog_rows(
+    rows: list[dict[str, object]],
+    *,
+    sae_model: str,
+    retrieved_at: str,
+    fetch_feature_descriptions: bool,
+    feature_description_limit: int | None,
+    feature_description_sleep_seconds: float,
+    feature_description_client: Any | None,
+    biohub_api_base_url: str,
+    request_timeout_seconds: float,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    unique_indices = sorted({int(row["feature_index"]) for row in rows})
+    summary = {
+        "requested": bool(fetch_feature_descriptions),
+        "source": "Biohub public feature-description endpoint",
+        "endpoint_path": "/esm/protein/api/v1alpha1/features/{feature_index}",
+        "supported_sae_model": FEATURE_DESCRIPTION_SAE_MODEL,
+        "sae_model": sae_model,
+        "status": "not_requested",
+        "observed_feature_count": len(unique_indices),
+        "attempted_feature_count": 0,
+        "enriched_feature_count": 0,
+    }
+    if not fetch_feature_descriptions:
+        return rows, summary
+    if not supports_feature_description_endpoint(sae_model):
+        raise ValueError(
+            "Biohub feature-description enrichment was requested, but the public endpoint is "
+            f"source-backed only for {FEATURE_DESCRIPTION_SAE_MODEL}; got {sae_model!r}"
+        )
+    client = feature_description_client or BiohubSaeFeatureDescriptionClient(
+        base_url=biohub_api_base_url,
+        timeout_seconds=request_timeout_seconds,
+    )
+    if feature_description_limit is None:
+        indices_to_fetch = unique_indices
+    else:
+        indices_to_fetch = unique_indices[:feature_description_limit]
+    existing_descriptions: dict[int, tuple[str, str, str]] = {}
+    for row in rows:
+        label = str(row.get("label") or "")
+        description = str(row.get("description") or "")
+        raw_feature_hash = str(row.get("raw_feature_hash") or "")
+        if label or description:
+            existing_descriptions[int(row["feature_index"])] = (label, description, raw_feature_hash)
+    for feature_index in indices_to_fetch:
+        if int(feature_index) in existing_descriptions:
+            continue
+        try:
+            description = client.fetch(sae_model=sae_model, feature_index=feature_index)
+        except BiohubSaeFeatureDescriptionError as error:
+            raise ValueError(str(error)) from error
+        existing_descriptions[int(feature_index)] = (
+            description.label,
+            description.description,
+            description.raw_feature_hash,
+        )
+        if feature_description_sleep_seconds:
+            sleep(feature_description_sleep_seconds)
+    enriched_rows: list[dict[str, object]] = []
+    for row in rows:
+        enriched = dict(row)
+        label, description, raw_feature_hash = existing_descriptions.get(int(row["feature_index"]), ("", "", ""))
+        if label or description:
+            enriched["label"] = label
+            enriched["description"] = description
+            enriched["raw_feature_hash"] = raw_feature_hash
+            enriched["source_retrieved_at"] = retrieved_at
+        enriched_rows.append(enriched)
+    summary.update(
+        {
+            "status": "enriched",
+            "attempted_feature_count": len(indices_to_fetch),
+            "enriched_feature_count": len(existing_descriptions),
+        }
+    )
+    return enriched_rows, summary
+
+
+def _cached_feature_rows_complete(
+    *,
+    profile_row: dict[str, object],
+    protein_feature_rows: list[dict[str, object]],
+    residue_feature_rows: list[dict[str, object]],
+) -> bool:
+    """Return whether a cached accepted profile has its dependent sparse rows."""
+
+    expected_protein_rows = int(profile_row.get("protein_feature_count") or 0)
+    expected_residue_rows = int(profile_row.get("residue_feature_count") or 0)
+    if expected_protein_rows <= 0 or expected_residue_rows <= 0:
+        return False
+    return len(protein_feature_rows) == expected_protein_rows and len(residue_feature_rows) == expected_residue_rows
 
 
 def _timestamp() -> str:
