@@ -108,11 +108,18 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "Protein" in notebook_text
     assert "WT Ec86 control" in combined_text
     assert "SAE feature" in notebook_text
+    assert "is_interactive_structure_deliverable(" in combined_text
+    assert "render_deliverable_details(" in combined_text
+    assert 'if selected_section == "fold_review":' not in notebook_text
     assert "No source-backed description is available for this exact SAE dictionary" in combined_text
     assert "Reference sequence, alignment, and mask" in combined_text
     assert "Reference scaffold and mask evidence" not in combined_text
     assert "ProteinMPNN sequence proposals" in combined_text
     assert "ColabFold structure triage" in combined_text
+    assert 'structure_label = "Structure view"' in notebook_text
+    assert "label=structure_label" in notebook_text
+    assert "selected_deliverable_id=selected_visual_id" in notebook_text
+    assert "_NOTEBOOK_HIDDEN_DELIVERABLE_IDS" in combined_text
     assert "LLR = log P(alternate) - log P(WT)" in combined_text
     assert "Method and row counts" in combined_text
     assert "visual_deliverables" in combined_text
@@ -125,6 +132,8 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "mask_structure_context_orientation_template" not in notebook_text
     assert "structure_overlay_skipped" not in notebook_text
     assert "render_deliverable_artifact(" in runtime_text
+    assert "render_interpretation_note(" in combined_text
+    assert "<strong>Interpretation limit:</strong>" in combined_text
     assert "overflow-x:auto" not in combined_text
     assert "is_wide = aspect_ratio >= 4.0" not in combined_text
     assert "width:100%" in combined_text
@@ -134,6 +143,38 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     for cell in notebook_text.split("@app.cell"):
         if "deliverable_section_ui = mo.ui.dropdown(" in cell:
             assert ".value" not in cell
+
+
+def assert_chimerax_context_scripts(
+    *,
+    manifest_path: Path,
+    deliverables: dict[str, dict[str, Any]],
+    forbidden_path_text: str,
+) -> None:
+    """Assert ChimeraX review scripts are portable and preserve the mask-context contract."""
+
+    chimerax_text = _resolve_manifest_path(
+        manifest_path,
+        deliverables["mask_structure_context_script"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "eco1_rt_clade9_plurality25_direct_contact5a_v1" in chimerax_text
+    assert "set bgColor white" in chimerax_text
+    assert "camera ortho" in chimerax_text
+    assert '2dlabels text "Ec86 reference"' in chimerax_text
+    assert "view orient" in chimerax_text
+    assert "# orientation_preset_id: ec86_reference_thumb_down_v1" in chimerax_text
+    assert "design canvas" in chimerax_text
+    assert "color" in chimerax_text
+    assert forbidden_path_text not in chimerax_text
+
+    orientation_text = _resolve_manifest_path(
+        manifest_path,
+        deliverables["mask_structure_context_orientation_template"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "Manual orientation handoff" in orientation_text
+    assert "save mask_structure_context_orientation.cxs" in orientation_text
+    assert "exit" not in orientation_text
+    assert forbidden_path_text not in orientation_text
 
 
 def _visual_option_source(notebook_text: str) -> str:

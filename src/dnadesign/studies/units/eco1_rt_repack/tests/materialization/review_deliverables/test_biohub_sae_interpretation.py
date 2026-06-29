@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -80,7 +81,10 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert "ProteinMPNN variant ordered by SAE similarity" in fold_llr_text
     assert "Feature rows compare WT-normalized activation" in fold_llr_text
     assert "pLDDT" in fold_llr_text
-    assert "ESMC single-substitution LLR sum" in fold_llr_text
+    assert "single-substitution LLR" in fold_llr_text
+    svg_desc = re.search(r"<desc[^>]*>(.*?)</desc>", fold_llr_text, flags=re.DOTALL)
+    assert svg_desc is not None
+    assert len(svg_desc.group(1)) < 1200
     assert "SAE similarity rank" in fold_llr_comparison["description"]
     assert "not a joint protein likelihood" in fold_llr_comparison["interpretation_limit"]
     assert fold_llr_comparison["evidence_summary"]["sequence_rows"] == 3
@@ -100,6 +104,20 @@ def test_sae_feature_labels_stay_single_line(tmp_path: Path) -> None:
     assert "\n" not in label
     assert len(label) <= 66
     assert all("\n" not in label for label in sae_fold_llr._feature_labels(feature_catalog_path, [101, 202]))
+
+
+def test_sae_fold_llr_svg_description_stays_concise() -> None:
+    description = sae_fold_llr._panel_accessibility_description(
+        {
+            "feature_labels": ["F101 - " + "long description " * 200] * 12,
+            "row_labels": ["WT Ec86"] + [f"V{index:03d}" for index in range(1, 97)],
+            "feature_descriptions": ["full source-backed description " * 500],
+        }
+    )
+
+    assert len(description) < 500
+    assert "full source-backed description" not in description
+    assert "feature inspector" in description
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:

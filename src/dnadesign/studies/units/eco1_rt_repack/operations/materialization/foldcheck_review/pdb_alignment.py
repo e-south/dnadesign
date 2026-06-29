@@ -31,8 +31,30 @@ def write_aligned_pdb_to_reference_ca(
 ) -> float:
     """Align a query PDB to the Eco1 reference over mapped C-alpha atoms."""
 
-    query_atoms = _read_atom_lines(query_path)
-    reference_atoms = _read_atom_lines(reference_path)
+    aligned_text, mapped_ca_rmsd = align_pdb_text_to_reference_ca(
+        query_text=query_path.read_text(encoding="utf-8"),
+        reference_text=reference_path.read_text(encoding="utf-8"),
+        query_start_residue=query_start_residue,
+        reference_start_residue=reference_start_residue,
+        residue_count=residue_count,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(aligned_text, encoding="utf-8")
+    return mapped_ca_rmsd
+
+
+def align_pdb_text_to_reference_ca(
+    *,
+    query_text: str,
+    reference_text: str,
+    query_start_residue: int = 3,
+    reference_start_residue: int = 1,
+    residue_count: int = 309,
+) -> tuple[str, float]:
+    """Return query PDB text aligned to reference over mapped C-alpha atoms."""
+
+    query_atoms = _atom_lines_from_text(query_text)
+    reference_atoms = _atom_lines_from_text(reference_text)
     query_ca = _ca_coordinates_by_residue(query_atoms)
     reference_ca = _ca_coordinates_by_residue(reference_atoms)
     query_coords = []
@@ -51,17 +73,17 @@ def write_aligned_pdb_to_reference_ca(
         np.asarray(query_coords, dtype=float),
         np.asarray(reference_coords, dtype=float),
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        "".join(_transform_pdb_lines(query_path, rotation, query_centroid, reference_centroid)),
-        encoding="utf-8",
-    )
+    aligned_text = "".join(_transform_pdb_text(query_text, rotation, query_centroid, reference_centroid))
     aligned_query = (_as_array(query_coords) - query_centroid) @ rotation + reference_centroid
-    return float(np.sqrt(np.mean(np.sum((aligned_query - _as_array(reference_coords)) ** 2, axis=1))))
+    return aligned_text, float(np.sqrt(np.mean(np.sum((aligned_query - _as_array(reference_coords)) ** 2, axis=1))))
 
 
 def _read_atom_lines(path: Path) -> list[str]:
     return [line for line in path.read_text(encoding="utf-8").splitlines(keepends=True) if line.startswith("ATOM")]
+
+
+def _atom_lines_from_text(text: str) -> list[str]:
+    return [line for line in text.splitlines(keepends=True) if line.startswith("ATOM")]
 
 
 def _ca_coordinates_by_residue(lines: list[str]) -> dict[int, NDArray[np.float64]]:
@@ -94,14 +116,14 @@ def _kabsch(
     return rotation, query_centroid, reference_centroid
 
 
-def _transform_pdb_lines(
-    path: Path,
+def _transform_pdb_text(
+    text: str,
     rotation: NDArray[np.float64],
     query_centroid: NDArray[np.float64],
     reference_centroid: NDArray[np.float64],
 ) -> list[str]:
     transformed: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    for line in text.splitlines(keepends=True):
         if not (line.startswith("ATOM") or line.startswith("HETATM")):
             transformed.append(line)
             continue

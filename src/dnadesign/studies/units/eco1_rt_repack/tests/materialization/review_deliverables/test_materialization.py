@@ -18,10 +18,14 @@ import yaml
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
+    visual_deliverables,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.notebook_assertions import (
+    assert_chimerax_context_scripts,
     assert_manifest_visual_contract,
     assert_review_notebook_contract,
 )
@@ -49,6 +53,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "proteinmpnn_tao_style_fold_validation",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
+        "mask_structure_browser_manifest",
         "msa_plurality_vs_esmc_entropy",
         "msa_plurality_vs_best_alt_llr",
         "msa_esmc_constraint_tracks",
@@ -64,6 +69,16 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_fold_metric_scatter"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
+    assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
+    assert "interactively" in deliverables["mask_structure_browser_manifest"]["title"].lower()
+    assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
+    assert "reference-fitted colabfold" in deliverables["interactive_structure_browser_manifest"]["title"].lower()
+    visual_ids = {entry["deliverable_id"] for entry in visual_deliverables(manifest["deliverables"])}
+    assert "mask_structure_browser_manifest" in visual_ids
+    assert "interactive_structure_browser_manifest" in visual_ids
+    assert "mask_structure_context_png" not in visual_ids
+    assert "foldcheck_review_structure_overlay_panel" not in visual_ids
+    assert "foldcheck_review_structure_overlay_skipped" not in visual_ids
     assert deliverables["wt_esmc_entropy_by_position"]["status"] == "linked_existing"
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
 
@@ -162,29 +177,11 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "25% plurality threshold" in esmc_scatter_text
     assert "model-derived audit" in deliverables["msa_plurality_vs_esmc_entropy"]["interpretation_limit"]
 
-    chimerax_text = _resolve_manifest_path(
-        result.manifest_path,
-        deliverables["mask_structure_context_script"]["path"],
-    ).read_text(encoding="utf-8")
-    assert "eco1_rt_clade9_plurality25_direct_contact5a_v1" in chimerax_text
-    assert "set bgColor white" in chimerax_text
-    assert "camera ortho" in chimerax_text
-    assert '2dlabels text "Ec86 reference"' in chimerax_text
-    assert "view orient" in chimerax_text
-    assert "# orientation_preset_id: ec86_reference_thumb_down_v1" in chimerax_text
-    assert "design canvas" in chimerax_text
-    assert "color" in chimerax_text
-    assert str(tmp_path) not in chimerax_text
-
-    orientation_text = _resolve_manifest_path(
-        result.manifest_path,
-        deliverables["mask_structure_context_orientation_template"]["path"],
-    ).read_text(encoding="utf-8")
-    assert "Manual orientation handoff" in orientation_text
-    assert "save mask_structure_context_orientation.cxs" in orientation_text
-    assert "exit" not in orientation_text
-    assert str(tmp_path) not in orientation_text
-
+    assert_chimerax_context_scripts(
+        manifest_path=result.manifest_path,
+        deliverables=deliverables,
+        forbidden_path_text=str(tmp_path),
+    )
     assert_review_notebook_contract(result.notebook_path.read_text(encoding="utf-8"))
 
 

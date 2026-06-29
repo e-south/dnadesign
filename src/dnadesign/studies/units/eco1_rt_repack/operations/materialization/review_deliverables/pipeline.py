@@ -59,7 +59,7 @@ from .models import MaterializedReviewDeliverables
 from .msa_panel import write_msa_plurality_mask_panel
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
-from .structure_browser import write_interactive_structure_browser_manifest
+from .structure_browser import write_interactive_structure_browser_manifest, write_mask_structure_browser_manifest
 
 
 def materialize_review_deliverables(
@@ -112,6 +112,14 @@ def materialize_review_deliverables(
             reference_backbone_path=reference_backbone_path,
             mask_residues=mask_residues,
             render_png=render_chimerax_png,
+        )
+    )
+    deliverables.append(
+        write_mask_structure_browser_manifest(
+            panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
+            mask_set_path=mask_set_path,
+            reference_backbone_path=reference_backbone_path,
+            mask_residues=mask_residues,
         )
     )
     deliverables.extend(

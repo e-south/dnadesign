@@ -217,17 +217,25 @@ def _render_panel(path: Path, data: dict[str, Any]) -> None:
     colorbar.set_label("log2(feature activation sum / WT)", fontsize=LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
     fig.subplots_adjust(left=0.34, right=0.93, top=0.96, bottom=0.22)
-    feature_description = "; ".join(str(label).replace("\n", " ") for label in data["feature_descriptions"])
     save_accessible_svg(
         fig,
         path,
         title=TITLE,
-        description=(
-            "Columns are WT and ProteinMPNN variants ordered by SAE similarity to WT. Heatmap rows are "
-            "WT-active SAE features. Heatmap color shows WT-normalized feature activation; top markers show "
-            "pLDDT and ESMC single-substitution LLR sum. "
-            f"Features: {feature_description}."
-        ),
+        description=_panel_accessibility_description(data),
+    )
+
+
+def _panel_accessibility_description(data: dict[str, Any]) -> str:
+    """Return concise SVG metadata; full feature text stays in notebook tables."""
+
+    feature_count = len(data["feature_labels"])
+    row_count = len(data["row_labels"])
+    return (
+        f"Heatmap comparing {feature_count} WT-active SAE features across {row_count} sequences. "
+        "Columns are WT and ProteinMPNN variants ordered by SAE similarity to WT. "
+        "Color shows WT-normalized feature activation. Top markers show ColabFold pLDDT "
+        "and summed WT masked-marginal single-substitution LLR. Full feature descriptions "
+        "are available in the notebook feature inspector."
     )
 
 

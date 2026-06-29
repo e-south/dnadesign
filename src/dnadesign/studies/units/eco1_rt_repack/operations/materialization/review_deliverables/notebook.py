@@ -33,8 +33,11 @@ def _():
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
         deliverable_lookup,
         format_deliverable_label,
+        is_interactive_structure_deliverable,
         load_review_manifest,
         render_deliverable_panel,
+        render_deliverable_details,
+        render_interpretation_note,
         render_intro,
         section_deliverables,
         section_label_lookup,
@@ -58,11 +61,14 @@ def _():
     return (
         deliverable_lookup,
         format_deliverable_label,
+        is_interactive_structure_deliverable,
         load_review_manifest,
         load_sae_top_feature_rows,
         load_structure_browser_rows,
         mo,
+        render_deliverable_details,
         render_deliverable_panel,
+        render_interpretation_note,
         render_intro,
         render_sae_feature_inspector,
         render_structure_browser,
@@ -164,13 +170,21 @@ def _(deliverables, load_structure_browser_rows, manifest_root):
 
 
 @app.cell
-def _(mo, selected_section, structure_browser_lookup, structure_browser_rows):
-    structure_map = structure_browser_lookup(structure_browser_rows, selected_section=selected_section)
+def _(mo, selected_section, selected_visual, structure_browser_lookup, structure_browser_rows):
+    selected_visual_id = str(selected_visual.get("deliverable_id") or "") if selected_visual else ""
+    structure_map = structure_browser_lookup(
+        structure_browser_rows,
+        selected_section=selected_section,
+        selected_deliverable_id=selected_visual_id,
+    )
     structure_options = list(structure_map)
+    structure_label = "Structure view"
+    if structure_map:
+        structure_label = str(next(iter(structure_map.values())).get("_control_label") or structure_label)
     structure_ui = mo.ui.dropdown(
         structure_options,
         value=structure_options[0] if structure_options else None,
-        label="Structure",
+        label=structure_label,
         full_width=True,
     )
     return structure_map, structure_ui
@@ -235,9 +249,12 @@ def _(
     deliverable_id_ui,
     deliverable_section_ui,
     deliverables,
+    is_interactive_structure_deliverable,
     manifest_root,
     mo,
+    render_deliverable_details,
     render_deliverable_panel,
+    render_interpretation_note,
     render_sae_feature_inspector,
     render_structure_browser,
     sae_feature_ui,
@@ -251,7 +268,18 @@ def _(
     if selected_visual is None:
         panel = mo.md("No deliverable is available for the selected section.")
     else:
-        rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
+        if is_interactive_structure_deliverable(selected_visual):
+            rendered = [
+                render_structure_browser(
+                    mo=mo,
+                    selected_row=selected_structure_row,
+                    structure_ui=structure_ui,
+                ),
+                render_interpretation_note(selected_visual, mo=mo),
+                render_deliverable_details(selected_visual, mo=mo),
+            ]
+        else:
+            rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
         if selected_section == "biohub_esmc_sae_interpretation":
             rendered.append(
                 render_sae_feature_inspector(
@@ -261,14 +289,6 @@ def _(
                     selected_row=selected_sae_feature,
                     protein_ui=sae_protein_ui,
                     feature_ui=sae_feature_ui,
-                )
-            )
-        if selected_section == "fold_review":
-            rendered.append(
-                render_structure_browser(
-                    mo=mo,
-                    selected_row=selected_structure_row,
-                    structure_ui=structure_ui,
                 )
             )
         panel = mo.vstack(

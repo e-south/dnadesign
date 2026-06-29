@@ -18,6 +18,12 @@ from typing import Any
 
 import yaml
 
+_NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
+    "foldcheck_review_structure_overlay_panel",
+    "foldcheck_review_structure_overlay_skipped",
+    "mask_structure_context_png",
+}
+
 
 def load_review_manifest(notebook_file: str) -> tuple[dict[str, Any], list[dict[str, Any]], Path, Path]:
     """Load the manifest adjacent to the generated notebook."""
@@ -72,7 +78,7 @@ def resolve_manifest_path(manifest_root: Path, value: str) -> Path:
 
 
 def visual_deliverables(deliverables: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return only rendered publication visual rows."""
+    """Return rendered visual and interactive-review rows for notebook selection."""
 
     return [row for row in deliverables if _is_publication_visual(row)]
 
@@ -134,6 +140,30 @@ def render_deliverable_panel(row: dict[str, Any], *, mo: Any, manifest_root: Pat
     """Render one visual plus collapsible method/evidence details."""
 
     body = render_deliverable_artifact(row, mo=mo, manifest_root=manifest_root)
+    return mo.vstack([body, render_deliverable_details(row, mo=mo)], gap=0.35)
+
+
+def render_interpretation_note(row: dict[str, Any], *, mo: Any) -> Any:
+    """Render the claim boundary where reviewers can see it."""
+
+    limit = str(row.get("interpretation_limit") or "").strip()
+    if not limit:
+        return mo.md("")
+    safe_limit = html.escape(limit)
+    return mo.Html(
+        f"""
+        <div style="border-left:3px solid #8c959f; padding:0.38rem 0.55rem;
+                    margin:0.35rem 0 0 0; color:#57606a; background:#f6f8fa;
+                    font-size:0.92rem; line-height:1.35;">
+          <strong>Interpretation limit:</strong> {safe_limit}
+        </div>
+        """
+    )
+
+
+def render_deliverable_details(row: dict[str, Any], *, mo: Any) -> Any:
+    """Render collapsible method/evidence details for one manifest row."""
+
     evidence_rows = [
         {"field": "title", "value": str(row.get("title") or "")},
         {"field": "status", "value": str(row.get("status") or "")},
@@ -157,7 +187,17 @@ def render_deliverable_panel(row: dict[str, Any], *, mo: Any, manifest_root: Pat
             [mo.md(method_text), mo.ui.table(method_rows, page_size=8)],
             gap=0.25,
         )
-    return mo.vstack([body, mo.accordion(detail_panels, multiple=True, lazy=True)], gap=0.35)
+    return mo.accordion(detail_panels, multiple=True, lazy=True)
+
+
+def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
+    """Return whether a manifest row should render as an interactive structure view."""
+
+    if row is None:
+        return False
+    artifact_kind = str(row.get("artifact_kind") or "")
+    status = str(row.get("status") or "")
+    return artifact_kind == "structure_browser_manifest" and status == "rendered"
 
 
 def format_section_label(section: str) -> str:
@@ -180,6 +220,10 @@ def format_deliverable_label(row: dict[str, Any] | str) -> str:
 
 
 def _is_publication_visual(row: dict[str, Any]) -> bool:
+    if str(row.get("deliverable_id") or "") in _NOTEBOOK_HIDDEN_DELIVERABLE_IDS:
+        return False
+    if is_interactive_structure_deliverable(row):
+        return True
     suffix = Path(str(row.get("path") or "")).suffix.lower()
     return suffix in {".svg", ".png"} and str(row.get("status") or "") in {"rendered", "linked_existing"}
 
@@ -189,6 +233,7 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     encoded = base64.b64encode(media_path.read_bytes()).decode("ascii")
     alt_text = html.escape(str(row["alt_text"]), quote=True)
     caption = html.escape(format_deliverable_label(row), quote=True)
+    limit = html.escape(str(row.get("interpretation_limit") or ""), quote=False)
     return mo.Html(
         f"""
         <figure style="margin:0;">
@@ -199,6 +244,11 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
                         height:auto; object-fit:contain;" />
           </div>
           <figcaption style="font-size:0.92rem; color:#57606a; margin-top:0.35rem;">{caption}</figcaption>
+          <div style="border-left:3px solid #8c959f; padding:0.38rem 0.55rem;
+                      margin:0.35rem 0 0 0; color:#57606a; background:#f6f8fa;
+                      font-size:0.92rem; line-height:1.35;">
+            <strong>Interpretation limit:</strong> {limit}
+          </div>
         </figure>
         """
     )
