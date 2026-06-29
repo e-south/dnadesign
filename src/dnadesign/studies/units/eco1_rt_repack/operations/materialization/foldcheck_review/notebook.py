@@ -67,19 +67,27 @@ def _(manifest, mo):
 
 
 @app.cell
-def _(plots):
-    plot_labels = [str(plot["title"]) for plot in plots]
-    plot_lookup = {str(plot["title"]): plot for plot in plots}
+def _(Path, plots):
+    visual_plots = [
+        plot
+        for plot in plots
+        if str(plot.get("status") or "rendered") == "rendered"
+        and Path(str(plot.get("path") or "")).suffix.lower() in {".svg", ".png"}
+    ]
+    plot_labels = [str(plot["title"]) for plot in visual_plots]
+    plot_lookup = {str(plot["title"]): plot for plot in visual_plots}
     plot_inventory_rows = [
         {
             "plot_id": str(plot.get("plot_id") or ""),
+            "status": str(plot.get("status") or "rendered"),
             "title": str(plot.get("title") or ""),
             "path": str(plot.get("path") or ""),
+            "skip_reason": str(plot.get("skip_reason") or ""),
             "sources": ", ".join(str(source) for source in plot.get("data_sources", [])),
         }
         for plot in plots
     ]
-    return plot_inventory_rows, plot_labels, plot_lookup
+    return plot_inventory_rows, plot_labels, plot_lookup, visual_plots
 
 
 @app.cell

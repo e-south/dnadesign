@@ -17,17 +17,27 @@ _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _ROOT_FILES = {
     "__init__.py",
     "__main__.py",
+    "biohub_esmc_sae_fold_llr.py",
+    "biohub_esmc_sae_interpretation.py",
+    "biohub_esmc_sae_tables.py",
     "cli.py",
     "constants.py",
+    "esmc_model_constraint.py",
+    "esmc_model_constraint_metadata.py",
     "manifest.py",
     "mask_rows.py",
     "mask_tracks.py",
     "models.py",
     "msa_panel.py",
     "notebook.py",
+    "notebook_runtime.py",
+    "notebook_sae_features.py",
+    "notebook_structure_browser.py",
     "pipeline.py",
     "proteinmpnn_diversity.py",
+    "proteinmpnn_fold_validation.py",
     "rendering.py",
+    "structure_browser.py",
 }
 
 
@@ -42,4 +52,7 @@ def test_review_deliverables_materializer_uses_semantic_modules() -> None:
     assert "write_msa_plurality_mask_panel" in pipeline_text
     assert "write_linear_mask_tracks" in pipeline_text
     assert "write_proteinmpnn_diversity_panels" in pipeline_text
+    assert "write_esmc_model_constraint_audit_panels" in pipeline_text
+    assert "write_biohub_esmc_sae_interpretation_panels" in pipeline_text
+    assert "write_interactive_structure_browser_manifest" in pipeline_text
     assert "read_mask_residues" in pipeline_text

@@ -132,6 +132,7 @@ _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...
         "dnadesign.thread.candidates",
         "dnadesign.thread.foldcheck",
         "dnadesign.thread.structure_predictions",
+        "dnadesign.thread.structure_views",
     ),
     ("usr", "cruncher"): ("dnadesign.cruncher.ingest.promoters",),
 }

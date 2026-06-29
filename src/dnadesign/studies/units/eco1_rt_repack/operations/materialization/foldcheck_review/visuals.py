@@ -18,17 +18,22 @@ from typing import Any
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    CHIMERAX_DIR_NAME,
     NOTEBOOKS_DIR_NAME,
     PLOTS_DIR_NAME,
     REVIEW_NOTEBOOK_FILE_NAME,
     VISUAL_MANIFEST_FILE_NAME,
     VISUAL_MANIFEST_SCHEMA_ID,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.models import PanelEntry
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.notebook import (
     write_review_notebook,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.plots import (
     write_review_plot_rows,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.structure_overlay import (
+    write_structure_overlay_plot_row,
 )
 
 
@@ -37,6 +42,8 @@ def write_review_visuals(
     review_root: Path,
     output_root: Path,
     ranking_rows: list[dict[str, Any]],
+    reference_local_path: Path,
+    panel_entries: list[PanelEntry],
     source_request_hash: str,
 ) -> tuple[Path, Path, int]:
     """Write compact review plots, a visual manifest, and a scoped marimo notebook."""
@@ -47,6 +54,14 @@ def write_review_visuals(
         plot_root=review_root / PLOTS_DIR_NAME,
         output_root=output_root,
         ranking_rows=ranking_rows,
+    )
+    plots.append(
+        write_structure_overlay_plot_row(
+            plot_root=review_root / PLOTS_DIR_NAME,
+            chimerax_root=review_root / CHIMERAX_DIR_NAME,
+            reference_local_path=reference_local_path,
+            entries=panel_entries,
+        )
     )
     notebook_path = review_root / NOTEBOOKS_DIR_NAME / REVIEW_NOTEBOOK_FILE_NAME
     write_review_notebook(notebook_path)

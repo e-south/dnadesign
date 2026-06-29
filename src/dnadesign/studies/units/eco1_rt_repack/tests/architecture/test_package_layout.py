@@ -23,6 +23,7 @@ _MASKING_TEST_ROOT_FILES = {"__init__.py", "test_rows.py"}
 _MATERIALIZATION_PRIMITIVES = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
+    "biohub_esmc_wt_mutation_scoring",
     "candidate_table",
     "contact",
     "contact_geometry",

@@ -191,6 +191,10 @@ def _stage_model_entry(
         local_model_artifact_path=str(local_path),
         copy_status=copy_status,
         source_model_artifact_hash=source_hash,
+        display_label=_display_label(row, candidate_id=candidate_id),
+        sequence_identity_percent=_sequence_identity_percent(row, candidate_id=candidate_id),
+        proteinmpnn_rank=_optional_int(row.get("proteinmpnn_rank")),
+        wt_runtime_ca_rmsd=_optional_float(row.get("wt_runtime_ca_rmsd")),
     )
 
 
@@ -200,13 +204,38 @@ def _relative_reference_entry(entry: dict[str, str], *, manifest_root: Path) -> 
     return normalized
 
 
-def _relative_panel_entry(entry: PanelEntry, *, manifest_root: Path) -> dict[str, str]:
+def _relative_panel_entry(entry: PanelEntry, *, manifest_root: Path) -> dict[str, Any]:
     normalized = dict(entry.__dict__)
     normalized["local_model_artifact_path"] = _manifest_relative_path(
         Path(entry.local_model_artifact_path),
         manifest_root=manifest_root,
     )
     return normalized
+
+
+def _display_label(row: Mapping[str, Any], *, candidate_id: str) -> str:
+    if candidate_id == "wild_type":
+        return "WT ColabFold baseline"
+    rank = _optional_int(row.get("proteinmpnn_rank"))
+    if rank is not None:
+        return f"ProteinMPNN variant rank {rank}"
+    short_id = candidate_id.removeprefix("thread_candidate_")
+    return f"ProteinMPNN variant {short_id}"
+
+
+def _sequence_identity_percent(row: Mapping[str, Any], *, candidate_id: str) -> float | None:
+    if candidate_id == "wild_type":
+        return 100.0
+    seq_recovery = row.get("seq_recovery")
+    return None if seq_recovery is None else float(seq_recovery) * 100.0
+
+
+def _optional_int(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
+def _optional_float(value: Any) -> float | None:
+    return None if value is None else float(value)
 
 
 def _manifest_relative_path(path: Path, *, manifest_root: Path) -> str:

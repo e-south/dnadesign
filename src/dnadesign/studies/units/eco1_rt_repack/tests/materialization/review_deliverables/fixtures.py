@@ -5,8 +5,6 @@ src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_delivera
 
 Fixtures for Eco1 review-deliverable materialization tests.
 
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -21,6 +19,10 @@ import yaml
 from dnadesign.thread.candidates.proteinmpnn import write_candidate_table
 from dnadesign.thread.foldcheck import sequence_hash
 
+from .biohub_sae_fixtures import write_biohub_esmc_sae_outputs
+from .esmc_fixtures import write_wt_mutation_scoring_outputs
+from .foldcheck_fixtures import write_foldcheck_review_manifest
+
 
 def write_deliverable_inputs(output_root: Path) -> None:
     """Write a compact Eco1-like artifact set for review-deliverable tests."""
@@ -31,7 +33,9 @@ def write_deliverable_inputs(output_root: Path) -> None:
     _write_mask_set(output_root / "mask_set.yaml")
     _write_candidate_table(output_root / "candidate_table.parquet")
     _write_reference_pdb(output_root / "proteinmpnn_request" / "chain_a_backbone.pdb")
-    _write_foldcheck_review_manifest(output_root / "foldcheck_review")
+    write_foldcheck_review_manifest(output_root / "foldcheck_review")
+    write_wt_mutation_scoring_outputs(output_root)
+    write_biohub_esmc_sae_outputs(output_root)
 
 
 def _write_conservation_alignment(output_root: Path) -> None:
@@ -96,6 +100,8 @@ def _write_mask_set(path: Path) -> None:
                 "non_fixed": position in {1, 6},
                 "non_fixed_missing_backbone": False,
                 "mapping_status": "mapped",
+                "manual_mask_reason": "retron_x_naxxh" if position == 3 else "",
+                "rt_interval_review_label": "RT1" if position in {1, 2} else "",
                 "protection_reasons": ["fixture"] if position in {2, 3, 4, 5} else [],
             }
         )
@@ -165,35 +171,3 @@ def _write_reference_pdb(path: Path) -> None:
         atom_suffix = "  1.00  0.00           C"
         lines.append(f"{atom_prefix}    {coords}{atom_suffix}")
     path.write_text("\n".join(lines) + "\nEND\n", encoding="utf-8")
-
-
-def _write_foldcheck_review_manifest(review_root: Path) -> None:
-    plot_root = review_root / "plots"
-    plot_root.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_root / "fold_metric_scatter.svg"
-    plot_path.write_text(
-        '<svg role="img"><title>Fold metrics</title><desc>Fixture fold metrics.</desc></svg>\n',
-        encoding="utf-8",
-    )
-    review_root.joinpath("review_visual_manifest.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "schema_id": "eco1_rt.foldcheck_review_visual_manifest",
-                "status": "materialized",
-                "plot_count": 1,
-                "plots": [
-                    {
-                        "plot_id": "fold_metric_scatter",
-                        "path": "plots/fold_metric_scatter.svg",
-                        "title": "ColabFold fold-check metric scatter",
-                        "alt_text": "Fixture fold metric scatter.",
-                        "description": "Fixture fold-review plot.",
-                        "interpretation_limit": "Fold metrics do not measure activity.",
-                        "data_sources": ["foldcheck_review/foldcheck_candidate_ranking.parquet"],
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )

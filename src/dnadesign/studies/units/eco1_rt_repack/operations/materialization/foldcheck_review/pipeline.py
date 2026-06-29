@@ -150,6 +150,8 @@ def materialize_foldcheck_review(
         review_root=review_root,
         output_root=out_root,
         ranking_rows=ranking_rows,
+        reference_local_path=structures_root / "ec86kit_chain_a_backbone_reference.pdb",
+        panel_entries=entries,
         source_request_hash=source_request_hash,
     )
     return MaterializedFoldCheckReviewArtifacts(

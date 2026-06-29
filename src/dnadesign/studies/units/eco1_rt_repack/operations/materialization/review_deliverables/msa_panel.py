@@ -18,7 +18,7 @@ import matplotlib
 import pyarrow.parquet as pq
 from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, Rectangle
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     CONSERVATION_PROFILE_ID,
@@ -31,6 +31,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     read_mask_residues,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+    LABEL_SIZE,
+    LEGEND_SIZE,
+    OKABE_ITO,
+    TICK_SIZE,
+    TITLE_SIZE,
     save_accessible_svg,
     shorten_label,
 )
@@ -55,44 +60,75 @@ def write_msa_plurality_mask_panel(
         raise ValueError(f"No FASTA records found in {aligned_fasta_path}")
     profile_rows = _read_profile_rows(conservation_profile_path)
     residues = mask_residues if mask_residues is not None else read_mask_residues(mask_set_path)
-    target_id, _target_sequence = records[0]
-    selected_records = [records[0], *records[1:max_display_rows]]
     positions = [int(row["canonical_position"]) for row in profile_rows]
-    matrix = _alignment_matrix(selected_records, profile_rows)
     conserved = {int(row["canonical_position"]) for row in profile_rows if bool(row["passes_conservation_mask"])}
     protected = {int(row["canonical_position"]) for row in residues if bool(row.get("protected"))}
+    selected_records = _select_display_records(
+        records,
+        profile_rows,
+        protected_positions=protected,
+        conserved_positions=conserved,
+        max_display_rows=max_display_rows,
+    )
+    target_id, _target_sequence = records[0]
+    matrix = _alignment_matrix(selected_records, profile_rows)
 
-    fig, ax = plt.subplots(figsize=(12.6, max(5.2, len(selected_records) * 0.19 + 1.8)))
-    ax.imshow(matrix, aspect="auto", interpolation="none", cmap=ListedColormap(["#fbfaf7", "#d3d6d0", "#386c55"]))
+    title = f"The {len(records)}-record clade 9 MSA supplies the 25% plurality mask"
+    fig, ax = plt.subplots(figsize=(13.2, max(5.4, len(selected_records) * 0.22 + 2.0)))
+    ax.imshow(
+        matrix,
+        aspect="auto",
+        interpolation="none",
+        cmap=ListedColormap(["#fffdf7", "#c9c9c9", OKABE_ITO["green"]]),
+    )
     for index, position in enumerate(positions):
         if position in conserved:
-            ax.axvspan(index - 0.5, index + 0.5, color="#efc94c", alpha=0.28, linewidth=0)
+            ax.add_patch(
+                Rectangle(
+                    (index - 0.5, -1.25),
+                    1.0,
+                    0.25,
+                    facecolor=OKABE_ITO["orange"],
+                    edgecolor="none",
+                    clip_on=False,
+                )
+            )
         if position in protected:
-            ax.scatter(index, -0.65, marker="s", s=10, color="#547aa5", clip_on=False)
+            ax.add_patch(
+                Rectangle(
+                    (index - 0.5, -0.9),
+                    1.0,
+                    0.25,
+                    facecolor=OKABE_ITO["blue"],
+                    edgecolor="none",
+                    clip_on=False,
+                )
+            )
     ax.set_yticks(
         range(len(selected_records)),
         [_format_msa_row_label(record_id) for record_id, _seq in selected_records],
-        fontsize=9,
+        fontsize=TICK_SIZE,
     )
     tick_indexes = [index for index, position in enumerate(positions) if position == 1 or position % 40 == 0]
-    ax.set_xticks(tick_indexes, [str(positions[index]) for index in tick_indexes], fontsize=10)
-    ax.set_xlabel("Ec86 canonical residue position", fontsize=11)
-    ax.set_ylabel("Clade 9 record", fontsize=11)
-    ax.set_title("Clade 9 alignment shows which Ec86 positions were protected.", fontsize=13, pad=28)
+    ax.set_xticks(tick_indexes, [str(positions[index]) for index in tick_indexes], fontsize=TICK_SIZE)
+    ax.set_xlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE)
+    ax.set_ylabel("Display subset", fontsize=LABEL_SIZE)
+    ax.set_ylim(len(selected_records) - 0.5, -1.42)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=32)
     ax.spines[["top", "right"]].set_visible(False)
     ax.legend(
         handles=[
-            Patch(facecolor="#386c55", label="Matches Ec86"),
-            Patch(facecolor="#d3d6d0", label="Differs from Ec86"),
+            Patch(facecolor=OKABE_ITO["green"], label="Matches Ec86"),
+            Patch(facecolor="#c9c9c9", label="Differs from Ec86"),
             Patch(facecolor="#fbfaf7", edgecolor="#888888", label="Gap"),
-            Patch(facecolor="#efc94c", alpha=0.45, label="25% WT plurality"),
+            Patch(facecolor=OKABE_ITO["orange"], label="WT plurality >=25% in full clade 9"),
             Line2D(
                 [0],
                 [0],
                 marker="s",
                 color="none",
-                markerfacecolor="#547aa5",
-                markeredgecolor="#547aa5",
+                markerfacecolor=OKABE_ITO["blue"],
+                markeredgecolor=OKABE_ITO["blue"],
                 markersize=6,
                 label="Protected position",
             ),
@@ -101,17 +137,19 @@ def write_msa_plurality_mask_panel(
         bbox_to_anchor=(0.5, 1.01),
         ncol=5,
         frameon=False,
-        fontsize=10.5,
+        fontsize=LEGEND_SIZE,
     )
     fig.tight_layout()
 
     path = panel_root / "msa_plurality_mask_panel.svg"
     alt = (
-        f"Canonical-coordinate MSA panel for {len(selected_records)} displayed rows from "
-        f"{CONSERVATION_PROFILE_ID}. The first row is {target_id}; vertical markings show "
-        "positions passing the 25 percent WT-plurality rule and protected mask positions."
+        f"Canonical-coordinate MSA panel for {len(selected_records)} displayed rows from the "
+        f"{len(records)}-record {CONSERVATION_PROFILE_ID} alignment. The first row is {target_id}; "
+        "the remaining rows are selected for differences from Ec86 at protected or plurality-relevant "
+        "positions. Vertical markings show columns passing the 25 percent WT-plurality rule in the full "
+        "clade 9 denominator and protected mask positions."
     )
-    save_accessible_svg(fig, path, title="Clade 9 alignment protected-position context", description=alt)
+    save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="msa_plurality_mask_panel",
         section="scaffold_and_mask",
@@ -132,14 +170,15 @@ def write_msa_plurality_mask_panel(
         ),
         alt_text=alt,
         description=(
-            "Shows the Eco1/Ec86 anchor row against a readable subset of clade 9 neighbors, "
-            "using canonical residue coordinates so plurality and mask decisions line up with "
-            "the design surface."
+            "Shows the Eco1/Ec86 anchor row against a display subset of clade 9 rows chosen for "
+            "visible differences at mask-relevant columns. The plurality denominator remains the full "
+            "clade 9 denominator used by the current mask policy."
         ),
         interpretation_limit=(
             "This panel explains the conservation and mask context. It does not rank "
             "ProteinMPNN candidates or establish biochemical function."
         ),
+        title=title,
     )
 
 
@@ -184,8 +223,55 @@ def _format_msa_row_label(record_id: str) -> str:
     if record_id.startswith(prefix):
         parts = [part for part in record_id[len(prefix) :].split("__") if part]
         if parts:
-            return f"C9-{shorten_label(parts[-1], max_length=20)}"
+            terminal = parts[-1]
+            return f"C9 row {shorten_label(terminal, max_length=14)}"
+    if record_id.startswith("clade9_neighbor_"):
+        return f"C9 row {record_id.rsplit('_', maxsplit=1)[-1]}"
     return shorten_label(record_id, max_length=28)
+
+
+def _select_display_records(
+    records: list[tuple[str, str]],
+    profile_rows: list[dict[str, Any]],
+    *,
+    protected_positions: set[int],
+    conserved_positions: set[int],
+    max_display_rows: int,
+) -> list[tuple[str, str]]:
+    if len(records) <= max_display_rows:
+        return records
+    target_record = records[0]
+    scored = [
+        (
+            _display_difference_score(sequence, profile_rows, protected_positions, conserved_positions),
+            record_id,
+            sequence,
+        )
+        for record_id, sequence in records[1:]
+    ]
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [target_record, *[(record_id, sequence) for _score, record_id, sequence in scored[: max_display_rows - 1]]]
+
+
+def _display_difference_score(
+    sequence: str,
+    profile_rows: list[dict[str, Any]],
+    protected_positions: set[int],
+    conserved_positions: set[int],
+) -> int:
+    score = 0
+    for row in profile_rows:
+        position = int(row["canonical_position"])
+        column = int(row["msa_column"]) - 1
+        residue = sequence[column] if 0 <= column < len(sequence) else "-"
+        if residue == str(row["wt_aa"]):
+            continue
+        score += 1
+        if position in conserved_positions:
+            score += 3
+        if position in protected_positions:
+            score += 2
+    return score
 
 
 def _alignment_matrix(records: list[tuple[str, str]], profile_rows: list[dict[str, Any]]) -> list[list[int]]:

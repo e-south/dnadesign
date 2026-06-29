@@ -2,19 +2,20 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-06-25
+last_verified: 2026-06-29
 ---
 
 # Thread Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-25
+**Last verified:** 2026-06-29
 
 `dnadesign.thread` is intentionally small right now. Its public surfaces are the
 generic ProteinMPNN adapter, generic ColabFold output normalizer, generic ESM
 Atlas annotation adapter, ProteinMPNN candidate normalization, generic
 fold-check request/report contracts, and a generic structure-prediction
-registry.
+registry. It also exposes a small browser structure-view contract for
+notebook-based review of existing PDB/mmCIF files.
 
 The adapter owns reusable fixed-backbone mechanics:
 
@@ -101,6 +102,13 @@ confidence fields, status, and failure reason. This registry is deliberately
 separate from fold-check reports and Atlas semantic profiles. A ColabFold
 structure used for fold validation and an Atlas/ESMFold-derived structure for
 the same sequence must be two provenance-separated rows, not one merged result.
+
+`dnadesign.thread.structure_views` owns browser-embedded structure-view
+contracts for existing structure files. It defines backend-neutral model/view
+specs and currently renders HTML through py3Dmol. This package is for
+interactive notebook review of structures that already exist; it does not run a
+fold model, pick study structures, capture publication camera poses, or replace
+ChimeraX still renders.
 
 Study packages own biological masks, evidence interpretation, source selection,
 candidate batch policy, fold-check threshold policy, and candidate-ranking

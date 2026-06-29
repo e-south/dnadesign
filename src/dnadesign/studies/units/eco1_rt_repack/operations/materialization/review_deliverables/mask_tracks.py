@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, Rectangle
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
@@ -28,6 +28,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     read_mask_residues,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+    LABEL_SIZE,
+    LEGEND_SIZE,
+    OKABE_ITO,
+    TICK_SIZE,
+    TITLE_SIZE,
     save_accessible_svg,
 )
 
@@ -35,14 +40,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 _TRACKS = (
-    ("motif_protected", "Catalytic motifs", "#bf4b4b"),
-    ("wang_ec86_direct_contact_prior", "Wang/Ec86 priors", "#8b62a8"),
-    ("direct_retained_dna_rna_contact_5a", "DNA/RNA within 5 A", "#d19a33"),
-    ("evolutionarily_conserved_clade9_25pct_plurality", "Clade 9 plurality", "#4d78a8"),
-    ("protected", "Protected union", "#49545a"),
-    ("non_fixed", "Design canvas", "#4f8f63"),
+    ("motif_protected", "Catalytic motifs", OKABE_ITO["vermillion"]),
+    ("wang_ec86_direct_contact_prior", "Wang/Ec86 priors", OKABE_ITO["purple"]),
+    ("direct_retained_dna_rna_contact_5a", "DNA/RNA within 5 A", OKABE_ITO["orange"]),
+    ("evolutionarily_conserved_clade9_25pct_plurality", "Clade 9 plurality", OKABE_ITO["blue"]),
+    ("protected", "Protected union", "#4d4d4d"),
+    ("non_fixed", "Design canvas", OKABE_ITO["green"]),
     ("non_fixed_missing_backbone", "Missing-backbone canvas", "#9a9a9a"),
 )
+_MASK_TRACK_BLOCK_SIZE = 64
 _CHIMERAX_COLOR_ORDER = (
     ("protected", "#d9d2c3", "protected union"),
     ("non_fixed", "#6aa84f", "design canvas"),
@@ -59,6 +65,7 @@ _CHIMERAX_VIEW_COMMANDS = (
     "turn z -72",
     "turn x -8",
     "view",
+    "zoom 1.22",
 )
 
 
@@ -71,27 +78,31 @@ def write_linear_mask_tracks(
     """Render linear mask tracks over canonical residue positions."""
 
     residues = mask_residues if mask_residues is not None else read_mask_residues(mask_set_path)
-    fig, ax = plt.subplots(figsize=(12.0, 4.8))
-    for y_index, (field, label, color) in enumerate(_TRACKS):
-        for start, length in _segments([int(row["canonical_position"]) for row in residues if bool(row.get(field))]):
-            ax.broken_barh([(start - 0.5, length)], (y_index - 0.43, 0.86), facecolors=color)
-    ax.set_xlim(0.5, max(int(row["canonical_position"]) for row in residues) + 0.5)
-    ax.set_ylim(-0.8, len(_TRACKS) - 0.2)
-    ax.set_yticks(range(len(_TRACKS)), [label for _field, label, _color in _TRACKS], fontsize=10)
-    ax.set_xlabel("Ec86 canonical residue position", fontsize=11)
-    ax.set_ylabel("Mask evidence track", fontsize=11)
-    ax.set_title("The Eco1 mask separates protected evidence from the design canvas.", fontsize=13, pad=10)
-    ax.grid(axis="x", alpha=0.18)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(
+    title = "Protected evidence defines fixed residues and the design canvas"
+    residues_by_position = {int(row["canonical_position"]): row for row in residues}
+    positions = sorted(residues_by_position)
+    blocks = _position_blocks(positions, block_size=_MASK_TRACK_BLOCK_SIZE)
+    block_count = len(blocks)
+    fig_height = max(4.8, block_count * 1.76 + 1.45)
+    fig, axes = plt.subplots(block_count, 1, figsize=(14.8, fig_height), squeeze=False)
+    for index, (ax, block_positions) in enumerate(zip(axes.flatten(), blocks, strict=True)):
+        _draw_mask_track_block(
+            ax,
+            block_positions=block_positions,
+            residues_by_position=residues_by_position,
+            panel_title=title if index == 0 else None,
+        )
+    fig.legend(
         handles=[Patch(facecolor=color, label=label) for _field, label, color in _TRACKS],
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.15),
-        ncol=3,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.008),
+        ncol=4,
         frameon=False,
-        fontsize=10,
+        fontsize=LEGEND_SIZE,
     )
-    fig.tight_layout()
+    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.058)
+    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.014)
+    fig.subplots_adjust(left=0.16, right=0.995, bottom=0.115, top=0.925, hspace=0.50)
 
     path = panel_root / "linear_mask_tracks.svg"
     alt = (
@@ -99,7 +110,7 @@ def write_linear_mask_tracks(
         "retained DNA/RNA 5 A contacts, clade 9 plurality protection, protected union, "
         "and mutable design canvas tracks."
     )
-    save_accessible_svg(fig, path, title="Eco1 RT mask evidence tracks", description=alt)
+    save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="linear_mask_tracks",
         section="scaffold_and_mask",
@@ -110,12 +121,14 @@ def write_linear_mask_tracks(
         input_hashes=file_hashes({"mask_set": mask_set_path}),
         alt_text=alt,
         description=(
-            "Separates each protection reason and the remaining design canvas on a single residue-coordinate axis."
+            "Separates each protection reason and the remaining design canvas on a single residue-coordinate axis. "
+            "Each square cell represents one canonical residue in one evidence track."
         ),
         interpretation_limit=(
             "Mask tracks describe what was fixed or mutable for the current ProteinMPNN "
             "run; they do not evaluate candidate quality."
         ),
+        title=title,
     )
 
 
@@ -166,6 +179,7 @@ def write_mask_structure_context(
                 "The script visualizes mask context only. It does not show candidate fold quality or activity."
             ),
             role="review_only",
+            title="ChimeraX recipe for the Ec86 mask-context view",
         ),
         make_deliverable_row(
             deliverable_id="mask_structure_context_orientation_template",
@@ -188,12 +202,17 @@ def write_mask_structure_context(
                 "mask, fold, or candidate evidence."
             ),
             role="operator_review",
+            title="Manual ChimeraX orientation template for the Ec86 reference",
         ),
     ]
     executable = _find_chimerax()
     if not render_png:
-        status = "skipped_optional_render_disabled"
-        skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."
+        if png_path.exists():
+            status = "rendered"
+            skip_reason = "Using an existing ChimeraX PNG; rendering was disabled for this materialization run."
+        else:
+            status = "skipped_optional_render_disabled"
+            skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."
     elif executable:
         chimerax_completed = _run_chimerax(executable=executable, script_path=script_path)
         status = "rendered" if chimerax_completed and png_path.exists() else "skipped_runtime_failed"
@@ -213,10 +232,11 @@ def write_mask_structure_context(
             source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
             input_hashes=input_hashes,
             alt_text="Optional ChimeraX render of the Eco1 RT mask structure context.",
-            description="Optional rendered PNG from the generated ChimeraX mask-context script.",
+            description="Rendered ChimeraX PNG showing the Ec86 reference protein colored by mask category.",
             interpretation_limit="This render is a mask-context view, not a fold-check result.",
             role="optional_heavy",
             skip_reason=skip_reason,
+            title="Ec86 reference structure maps the fixed-residue mask",
         )
     )
     return rows
@@ -241,7 +261,7 @@ def _write_chimerax_script(
     lines.extend(
         [
             *_CHIMERAX_VIEW_COMMANDS,
-            '2dlabels text "Ec86 reference" xpos 0.035 ypos 0.89 size 30 color black bgColor none',
+            '2dlabels text "Ec86 reference" xpos 0.035 ypos 0.90 size 24 color black bgColor none',
             f"save {_relative_chimerax_path(png_path, script_path=path)} width 1800 height 1200 supersample 2",
             "exit",
         ]
@@ -275,7 +295,7 @@ def _write_orientation_template_script(
     lines.extend(
         [
             *_CHIMERAX_VIEW_COMMANDS,
-            '2dlabels text "Ec86 reference" xpos 0.035 ypos 0.89 size 30 color black bgColor none',
+            '2dlabels text "Ec86 reference" xpos 0.035 ypos 0.90 size 24 color black bgColor none',
             "view name eco1_publication_v1",
         ]
     )
@@ -327,6 +347,85 @@ def _segments(positions: list[int]) -> list[tuple[int, int]]:
         start = previous = position
     segments.append((start, previous - start + 1))
     return segments
+
+
+def _position_tick_indexes(positions: list[int]) -> list[int]:
+    if not positions:
+        return []
+    if len(positions) <= 20:
+        return list(range(len(positions)))
+    indexes = [0, *range(4, len(positions), 5)]
+    if indexes[-1] != len(positions) - 1:
+        indexes.append(len(positions) - 1)
+    return indexes
+
+
+def _wt_residue_tick_indexes(positions: list[int]) -> list[int]:
+    if not positions:
+        return []
+    return list(range(len(positions)))
+
+
+def _position_blocks(positions: list[int], *, block_size: int) -> list[list[int]]:
+    return [positions[start : start + block_size] for start in range(0, len(positions), block_size)]
+
+
+def _draw_mask_track_block(
+    ax: Any,
+    *,
+    block_positions: list[int],
+    residues_by_position: dict[int, dict[str, Any]],
+    panel_title: str | None = None,
+) -> None:
+    position_to_index = {position: index for index, position in enumerate(block_positions)}
+    for y_index, (field, _label, color) in enumerate(_TRACKS):
+        for position in block_positions:
+            row = residues_by_position[position]
+            x_index = position_to_index[position]
+            ax.add_patch(
+                Rectangle(
+                    (x_index - 0.5, y_index - 0.5),
+                    1.0,
+                    1.0,
+                    facecolor=color if bool(row.get(field)) else "#f6f8fa",
+                    edgecolor="#ffffff",
+                    linewidth=0.2,
+                )
+            )
+    ax.set_xlim(-0.5, len(block_positions) - 0.5)
+    ax.set_ylim(len(_TRACKS) - 0.5, -0.5)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_yticks(range(len(_TRACKS)), [label for _field, label, _color in _TRACKS], fontsize=TICK_SIZE)
+    bottom_tick_indexes = _position_tick_indexes(block_positions)
+    ax.set_xticks(
+        bottom_tick_indexes,
+        [str(block_positions[index]) for index in bottom_tick_indexes],
+        fontsize=TICK_SIZE,
+    )
+    top_tick_indexes = _wt_residue_tick_indexes(block_positions)
+    top_axis = ax.secondary_xaxis("top")
+    top_axis.set_xticks(
+        top_tick_indexes,
+        [str(residues_by_position[block_positions[index]].get("wt_aa") or "") for index in top_tick_indexes],
+        fontsize=5.4 if len(block_positions) > 48 else TICK_SIZE,
+    )
+    top_axis.tick_params(length=0, pad=2)
+    block_title = f"Ec86 positions {block_positions[0]}-{block_positions[-1]}"
+    if panel_title:
+        ax.set_title(f"{panel_title}\n{block_title}", fontsize=TITLE_SIZE, pad=22)
+    else:
+        ax.text(
+            0.5,
+            1.12,
+            block_title,
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            fontsize=LABEL_SIZE,
+        )
+    ax.grid(axis="x", color="#d0d7de", alpha=0.28, linewidth=0.42)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right"]].set_visible(False)
 
 
 def _selector_for_positions(positions: list[int]) -> str:

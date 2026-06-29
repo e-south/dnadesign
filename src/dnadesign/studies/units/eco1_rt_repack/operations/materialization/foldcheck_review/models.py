@@ -42,3 +42,7 @@ class PanelEntry:
     local_model_artifact_path: str
     copy_status: str
     source_model_artifact_hash: str
+    display_label: str = ""
+    sequence_identity_percent: float | None = None
+    proteinmpnn_rank: int | None = None
+    wt_runtime_ca_rmsd: float | None = None

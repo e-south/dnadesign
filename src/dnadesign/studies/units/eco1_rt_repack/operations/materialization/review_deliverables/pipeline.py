@@ -21,13 +21,25 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
     resolve_output_root,
 )
 
+from .biohub_esmc_sae_interpretation import write_biohub_esmc_sae_interpretation_panels
 from .constants import (
     ALIGNED_FASTA_RELATIVE_PATH,
+    BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
+    BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH,
+    BIOHUB_ESMC_PROTEIN_FEATURES_FILE_NAME,
+    BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
+    BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
+    BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME,
+    BIOHUB_ESMC_SAE_PROFILE_FILE_NAME,
+    BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
     CANDIDATE_TABLE_FILE_NAME,
     CONSERVATION_PROFILE_FILE_NAME,
     DEFAULT_OUTPUT_ROOT,
     DELIVERABLE_DIR_NAME,
+    FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
+    FOLDCHECK_REPORT_FILE_NAME,
     FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH,
+    FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
     MANIFEST_FILE_NAME,
     MASK_CONTEXT_DIR_NAME,
     MASK_SET_FILE_NAME,
@@ -36,7 +48,10 @@ from .constants import (
     NOTEBOOKS_DIR_NAME,
     PROTEINMPNN_DIR_NAME,
     REFERENCE_BACKBONE_RELATIVE_PATH,
+    STRUCTURE_BROWSER_DIR_NAME,
+    WT_MODEL_CONSTRAINT_DIR_NAME,
 )
+from .esmc_model_constraint import write_esmc_model_constraint_audit_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
 from .mask_tracks import write_linear_mask_tracks, write_mask_structure_context
@@ -44,6 +59,7 @@ from .models import MaterializedReviewDeliverables
 from .msa_panel import write_msa_plurality_mask_panel
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
+from .structure_browser import write_interactive_structure_browser_manifest
 
 
 def materialize_review_deliverables(
@@ -102,9 +118,38 @@ def materialize_review_deliverables(
         write_proteinmpnn_diversity_panels(
             panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
             candidate_table_path=candidate_table_path,
+            foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            mask_residues=mask_residues,
         )
     )
     deliverables.extend(_linked_foldcheck_review_rows(out_root / FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH))
+    deliverables.append(
+        write_interactive_structure_browser_manifest(
+            panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
+            full_structure_set_path=out_root / FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
+            foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+        )
+    )
+    deliverables.extend(
+        write_esmc_model_constraint_audit_panels(
+            panel_root=deliverable_root / WT_MODEL_CONSTRAINT_DIR_NAME,
+            mutation_scoring_root=out_root / BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH,
+        )
+    )
+    deliverables.extend(
+        write_biohub_esmc_sae_interpretation_panels(
+            panel_root=deliverable_root / BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME,
+            profile_path=out_root / BIOHUB_ESMC_SAE_PROFILE_FILE_NAME,
+            protein_features_path=out_root / BIOHUB_ESMC_PROTEIN_FEATURES_FILE_NAME,
+            residue_features_path=out_root / BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
+            feature_catalog_path=out_root / BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
+            request_manifest_path=out_root / BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
+            candidate_table_path=candidate_table_path,
+            foldcheck_report_path=out_root / FOLDCHECK_REPORT_FILE_NAME,
+            foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            wt_substitution_llr_path=out_root / BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
+        )
+    )
 
     notebook_path = deliverable_root / NOTEBOOKS_DIR_NAME / NOTEBOOK_FILE_NAME
     write_review_deliverables_notebook(notebook_path)
@@ -144,19 +189,27 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
             continue
         plot_id = str(plot.get("plot_id") or "plot")
         plot_path = _resolve_linked_manifest_path(manifest_path, str(plot.get("path") or ""))
+        plot_status = str(plot.get("status") or "rendered")
+        linked_status = "linked_existing" if plot_status == "rendered" and plot_path.exists() else plot_status
+        if plot_status == "rendered" and not plot_path.exists():
+            linked_status = "skipped_missing_input"
         rows.append(
             make_deliverable_row(
                 deliverable_id=f"foldcheck_review_{plot_id}",
                 section="fold_review",
                 artifact_kind="linked_visual",
-                status="linked_existing",
+                status=linked_status,
                 path=plot_path,
                 source_tables=[str(source) for source in plot.get("data_sources", [])],
                 input_hashes=file_hashes({"foldcheck_review_manifest": manifest_path, "linked_plot": plot_path}),
                 alt_text=str(plot.get("alt_text") or ""),
                 description=str(plot.get("description") or ""),
                 interpretation_limit=str(plot.get("interpretation_limit") or ""),
+                title=str(plot.get("title") or ""),
                 role="review_only",
+                skip_reason=str(plot.get("skip_reason") or "")
+                if linked_status != "skipped_missing_input"
+                else f"Missing linked fold-review visual: {plot_path}",
             )
         )
     return rows

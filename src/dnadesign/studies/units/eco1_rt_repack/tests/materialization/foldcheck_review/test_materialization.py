@@ -88,17 +88,45 @@ def test_foldcheck_review_materializes_ranking_panel_and_atlas_subset(tmp_path: 
     plot_ids = {plot["plot_id"] for plot in visual_manifest["plots"]}
     assert "cryoem_vs_runtime_rmsd" in plot_ids
     assert "review_class_counts" in plot_ids
+    assert "structure_overlay_panel" in plot_ids
+    overlay_row = next(plot for plot in visual_manifest["plots"] if plot["plot_id"] == "structure_overlay_panel")
+    assert "separate ChimeraX-fitted panels" in overlay_row["description"]
+    assert "Reference-fitted" in overlay_row["title"]
+    assert "mapped C-alpha RMSD" in overlay_row["description"]
+    assert "sequence identity" in overlay_row["description"]
+
+    fold_metric_row = next(plot for plot in visual_manifest["plots"] if plot["plot_id"] == "fold_metric_scatter")
+    fold_metric_text = _resolve_manifest_path(result.visual_manifest_path, fold_metric_row["path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "Sequence identity to Ec86 WT" in fold_metric_text
+    assert "continuous review signals" in fold_metric_text
+
+    overlay_index_text = _resolve_manifest_path(result.visual_manifest_path, overlay_row["path"]).with_suffix(".cxc")
+    structure_overlay_index = result.visual_manifest_path.parent / "chimerax" / "ec86_structure_overlay_panel.cxc"
+    structure_overlay_text = structure_overlay_index.read_text(encoding="utf-8")
+    assert "ProteinMPNN variant rank" in structure_overlay_text
+    assert "sequence_identity_percent" in structure_overlay_text
+    assert "mapped_c_alpha_rmsd" in structure_overlay_text
+    assert overlay_index_text.suffix == ".cxc"
     for plot in visual_manifest["plots"]:
+        assert plot["status"] in {"rendered", "skipped_runtime_unavailable", "skipped_missing_input"}
         assert not Path(plot["path"]).is_absolute()
         assert plot["alt_text"].strip()
         assert plot["description"].strip()
         assert plot["interpretation_limit"].strip()
         plot_path = _resolve_manifest_path(result.visual_manifest_path, plot["path"])
-        svg_text = plot_path.read_text(encoding="utf-8")
-        svg_root = ET.parse(plot_path).getroot()
-        assert "<title" in svg_text
-        assert "<desc" in svg_text
-        assert svg_root.findall(".//{http://www.w3.org/2000/svg}text")
+        if plot["status"] != "rendered":
+            assert plot["skip_reason"].strip()
+            continue
+        if plot_path.suffix == ".svg":
+            svg_text = plot_path.read_text(encoding="utf-8")
+            svg_root = ET.parse(plot_path).getroot()
+            assert "<title" in svg_text
+            assert "<desc" in svg_text
+            assert svg_root.findall(".//{http://www.w3.org/2000/svg}text")
+        else:
+            assert plot_path.suffix == ".png"
 
     notebook_text = result.notebook_path.read_text(encoding="utf-8")
     assert "marimo.App" in notebook_text

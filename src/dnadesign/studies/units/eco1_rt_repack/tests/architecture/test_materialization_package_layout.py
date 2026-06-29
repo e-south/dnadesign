@@ -17,6 +17,7 @@ _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _CLI_MATERIALIZATION_PACKAGES = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
+    "biohub_esmc_wt_mutation_scoring",
     "candidate_table",
     "contact_geometry",
     "contact_risk",
@@ -62,10 +63,12 @@ _FOLDCHECK_REVIEW_ROOT_FILES = {
     "constants.py",
     "models.py",
     "notebook.py",
+    "pdb_alignment.py",
     "pipeline.py",
     "plots.py",
     "ranking.py",
     "selection.py",
+    "structure_overlay.py",
     "structures.py",
     "visuals.py",
 }

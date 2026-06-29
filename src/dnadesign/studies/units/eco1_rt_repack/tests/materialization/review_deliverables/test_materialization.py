@@ -11,19 +11,19 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from types import SimpleNamespace
 
 import yaml
-from pytest import MonkeyPatch
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    mask_tracks,
     materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.notebook_assertions import (
+    assert_manifest_visual_contract,
+    assert_review_notebook_contract,
 )
 
 
@@ -46,48 +46,82 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "linear_mask_tracks",
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_mutation_density",
+        "proteinmpnn_tao_style_fold_validation",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
+        "msa_plurality_vs_esmc_entropy",
+        "msa_plurality_vs_best_alt_llr",
+        "msa_esmc_constraint_tracks",
+    }
+    expected_linked_model_constraint = {
+        "wt_esmc_entropy_by_position",
+        "wt_esmc_fraction_negative_alternate_llr",
+        "wt_esmc_substitution_llr_heatmap",
     }
     assert expected_rendered.issubset(deliverables)
+    assert expected_linked_model_constraint.issubset(deliverables)
     assert deliverables["mask_structure_context_png"]["status"] == "skipped_optional_render_disabled"
     assert deliverables["foldcheck_review_fold_metric_scatter"]["status"] == "linked_existing"
+    assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
+    assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
+    assert deliverables["wt_esmc_entropy_by_position"]["status"] == "linked_existing"
+    assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
 
-    for deliverable in manifest["deliverables"]:
-        assert not Path(deliverable["path"]).is_absolute()
-        assert deliverable["alt_text"].strip()
-        assert deliverable["description"].strip()
-        assert deliverable["interpretation_limit"].strip()
-        assert deliverable["source_tables"]
-        assert deliverable["input_hashes"]
-
-    for deliverable_id in expected_rendered:
-        path = _resolve_manifest_path(result.manifest_path, deliverables[deliverable_id]["path"])
-        assert path.exists(), deliverable_id
-        if path.suffix == ".svg":
-            svg_text = path.read_text(encoding="utf-8")
-            svg_root = ET.parse(path).getroot()
-            assert "<title" in svg_text
-            assert "<desc" in svg_text
-            assert svg_root.findall(".//{http://www.w3.org/2000/svg}text")
-            assert "Ec86 clade 9 MSA plurality and mask context" not in svg_text
+    assert_manifest_visual_contract(
+        manifest_path=result.manifest_path,
+        manifest=manifest,
+        deliverables=deliverables,
+        expected_rendered=expected_rendered,
+    )
 
     msa_text = _resolve_manifest_path(
         result.manifest_path,
         deliverables["msa_plurality_mask_panel"]["path"],
     ).read_text(encoding="utf-8")
-    assert "Clade 9 alignment shows which Ec86 positions were protected." in msa_text
+    assert "The 4-record clade 9 MSA supplies the 25% plurality mask" in msa_text
+    assert "display subset" in deliverables["msa_plurality_mask_panel"]["description"]
+    assert "full clade 9 denominator" in deliverables["msa_plurality_mask_panel"]["description"]
     assert "ec86_clade9_conservation_v1__" not in msa_text
-    assert "25% WT plurality" in msa_text
+    assert "WT plurality &gt;=25% in full clade 9" in msa_text
+    assert "C9 row 001" in msa_text
+
+    mask_track_text = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["linear_mask_tracks"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "Protected evidence defines fixed residues and the design canvas" in mask_track_text
+    assert "WT residue" not in mask_track_text
+    assert "Ec86 positions 1-6" in mask_track_text
+    assert "Mask evidence track" in mask_track_text
+    assert "M" in mask_track_text
+    assert "K" in mask_track_text
 
     diversity_text = _resolve_manifest_path(
         result.manifest_path,
         deliverables["proteinmpnn_score_mutation_burden"]["path"],
     ).read_text(encoding="utf-8")
-    assert "ProteinMPNN sampled two temperature settings." in diversity_text
+    assert "ProteinMPNN proposes sequence diversity inside the mutable canvas" in diversity_text
     assert "Sequence identity to Ec86 WT (%)" in diversity_text
     assert "Accepted designs retain a minority of WT residues." not in diversity_text
-    assert "Sampling temperature" not in diversity_text
+    assert "Sampling temperature" in diversity_text
+    assert "Reported ProteinMPNN score" in diversity_text
+
+    mutation_density_text = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["proteinmpnn_mutation_density"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "RT1" in mutation_density_text
+    assert "NAxxH" in mutation_density_text
+
+    tao_text = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["proteinmpnn_tao_style_fold_validation"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text
+    assert "WT-runtime C-alpha RMSD" in tao_text
+    assert "Mean pLDDT" in tao_text
+    assert "Tao-style" in deliverables["proteinmpnn_tao_style_fold_validation"]["description"]
+    assert "single active mask policy" in deliverables["proteinmpnn_tao_style_fold_validation"]["interpretation_limit"]
 
     linked_fold_plot = _resolve_manifest_path(
         result.manifest_path,
@@ -95,6 +129,38 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     )
     assert linked_fold_plot.exists()
     assert linked_fold_plot.parent.name == "plots"
+    linked_structure_overlay = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["foldcheck_review_structure_overlay_panel"]["path"],
+    )
+    assert linked_structure_overlay.exists()
+    assert linked_structure_overlay.suffix == ".png"
+
+    linked_esmc_plot = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["wt_esmc_substitution_llr_heatmap"]["path"],
+    )
+    assert linked_esmc_plot.exists()
+    assert linked_esmc_plot.parent.name == "plots"
+    linked_esmc_text = linked_esmc_plot.read_text(encoding="utf-8")
+    assert "<title" in linked_esmc_text
+    assert "<desc" in linked_esmc_text
+    assert (
+        deliverables["wt_esmc_substitution_llr_heatmap"]["title"]
+        == "ESMC masked-marginal scores form a WT substitution matrix"
+    )
+    assert "LLR = log P(alternate) - log P(WT)" in deliverables["wt_esmc_substitution_llr_heatmap"]["method_summary"]
+    assert deliverables["wt_esmc_substitution_llr_heatmap"]["evidence_summary"]["substitution_llr_rows"] == 114
+
+    esmc_scatter_text = _resolve_manifest_path(
+        result.manifest_path,
+        deliverables["msa_plurality_vs_esmc_entropy"]["path"],
+    ).read_text(encoding="utf-8")
+    assert "High clade 9 plurality usually corresponds to low ESMC entropy" in esmc_scatter_text
+    assert "Pearson r =" in esmc_scatter_text
+    assert "R2 =" in esmc_scatter_text
+    assert "25% plurality threshold" in esmc_scatter_text
+    assert "model-derived audit" in deliverables["msa_plurality_vs_esmc_entropy"]["interpretation_limit"]
 
     chimerax_text = _resolve_manifest_path(
         result.manifest_path,
@@ -119,79 +185,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "exit" not in orientation_text
     assert str(tmp_path) not in orientation_text
 
-    notebook_text = result.notebook_path.read_text(encoding="utf-8")
-    assert 'marimo.App(width="medium")' in notebook_text
-    assert "review_deliverable_manifest.yaml" in notebook_text
-    assert "manifest_root = manifest_path.parent" in notebook_text
-    assert "def resolve_manifest_path(" in notebook_text
-    assert "_resolve_manifest_path(" not in notebook_text
-    assert "deliverable_section_ui = mo.ui.dropdown" in notebook_text
-    assert "deliverable_id_ui = mo.ui.dropdown" in notebook_text
-    assert "sections = []" in notebook_text
-    assert 'sorted({str(row["section"])' not in notebook_text
-    assert "Repacking the Eco1 reverse transcriptase" in notebook_text
-    assert "ProteinMPNN proposes sequence variants" in notebook_text
-    assert "Deliverables:" not in notebook_text
-    assert "Status:" not in notebook_text
-    assert "status_summary_text" not in notebook_text
-    assert "Review section" in notebook_text
-    assert "Visual" in notebook_text
-    assert "mo.hstack" in notebook_text
-    assert "format_section_label(" in notebook_text
-    assert "format_deliverable_label(" in notebook_text
-    assert "visual_deliverables" in notebook_text
-    assert "Section deliverables" not in notebook_text
-    assert "Additional visuals in this section" not in notebook_text
-    assert 'mo.md("## All visuals in this section")' not in notebook_text
-    assert "mask_structure_context_script" not in _visual_option_source(notebook_text)
-    assert "mask_structure_context_orientation_template" not in _visual_option_source(notebook_text)
-    assert "render_deliverable_artifact(" in notebook_text
-    assert "image_aspect_ratio(" in notebook_text
-    assert "overflow-x:auto" in notebook_text
-    assert "width:min(" in notebook_text
-    assert "max-width:100%" in notebook_text
-    assert "max-width:none" not in notebook_text
-    assert "Interpretation limit" in notebook_text
-    assert "\n    deliverable_section_ui\n" not in notebook_text
-    assert "\n    deliverable_id_ui\n" not in notebook_text
-    for cell in notebook_text.split("@app.cell"):
-        if "deliverable_section_ui = mo.ui.dropdown(" in cell:
-            assert ".value" not in cell
-        if "deliverable_id_ui = mo.ui.dropdown(" in cell:
-            assert ".value" not in cell
-
-
-def test_chimerax_render_uses_gui_backed_script_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    script_path = tmp_path / "mask_structure_context.cxc"
-    script_path.write_text("exit\n", encoding="utf-8")
-    recorded_args: list[str] = []
-
-    def fake_run(args: list[str], **_kwargs: object) -> SimpleNamespace:
-        recorded_args.extend(args)
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(mask_tracks.subprocess, "run", fake_run)
-
-    assert mask_tracks._run_chimerax(
-        executable="/Applications/ChimeraX.app/Contents/MacOS/ChimeraX", script_path=script_path
-    )
-    assert recorded_args == [
-        "/Applications/ChimeraX.app/Contents/MacOS/ChimeraX",
-        "--script",
-        str(script_path),
-    ]
-    assert "--nogui" not in recorded_args
+    assert_review_notebook_contract(result.notebook_path.read_text(encoding="utf-8"))
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else manifest_path.parent / path
-
-
-def _visual_option_source(notebook_text: str) -> str:
-    marker = "visual_deliverables = ["
-    start = notebook_text.find(marker)
-    assert start != -1
-    end = notebook_text.find("return", start)
-    assert end != -1
-    return notebook_text[start:end]

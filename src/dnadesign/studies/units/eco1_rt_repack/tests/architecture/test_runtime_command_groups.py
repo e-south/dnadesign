@@ -22,6 +22,7 @@ _DATASETS = "docs/studies/eco1_rt_repack/record/datasets.yaml"
 _EXECUTABLE_LANES = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
+    "biohub_esmc_wt_mutation_scoring",
     "structure_authority",
     "structure_preprocessing",
     "contact_profile",
@@ -107,6 +108,7 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["foldcheck_report"]["owner"] == "thread"
     assert by_id["atlas_semantic_profile"]["owner"] == "thread"
     assert by_id["biohub_esmc_sae_profile"]["owner"] == "thread"
+    assert by_id["biohub_esmc_wt_mutation_scoring"]["owner"] == "permuter"
     assert by_id["assembly_feasibility"]["owner"] == "thread"
     assert by_id["candidate_handoff"]["owner"] == "thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"

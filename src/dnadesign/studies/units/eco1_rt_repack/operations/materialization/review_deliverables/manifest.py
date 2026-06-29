@@ -35,6 +35,9 @@ def make_deliverable_row(
     alt_text: str,
     description: str,
     interpretation_limit: str,
+    title: str | None = None,
+    method_summary: str = "",
+    evidence_summary: dict[str, Any] | None = None,
     role: str = "manuscript_facing",
     skip_reason: str = "",
 ) -> dict[str, Any]:
@@ -42,6 +45,7 @@ def make_deliverable_row(
 
     return {
         "deliverable_id": deliverable_id,
+        "title": title or _default_title(deliverable_id),
         "section": section,
         "artifact_kind": artifact_kind,
         "status": status,
@@ -52,6 +56,8 @@ def make_deliverable_row(
         "alt_text": alt_text,
         "description": description,
         "interpretation_limit": interpretation_limit,
+        "method_summary": method_summary,
+        "evidence_summary": dict(evidence_summary or {}),
         "skip_reason": skip_reason,
     }
 
@@ -81,7 +87,8 @@ def write_manifest(
             "scope": "eco1_rt_repack review deliverables",
             "description": (
                 "Manifest-backed marimo surface for MSA, mask, ProteinMPNN, "
-                "and existing fold-review visual deliverables."
+                "fold-review, WT ESMC model-constraint, and Biohub ESMC SAE "
+                "interpretation visual deliverables."
             ),
         },
         "visual_policy": {
@@ -124,3 +131,7 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _default_title(deliverable_id: str) -> str:
+    return deliverable_id.replace("_", " ").title()

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+import matplotlib.colors as mcolors
 import pyarrow.parquet as pq
 from matplotlib import rc_context
 
@@ -43,6 +44,10 @@ _CLASS_ORDER = (
     "structural_outlier",
     "metric_missing",
 )
+_TITLE_SIZE = 16
+_LABEL_SIZE = 13.5
+_TICK_SIZE = 12
+_LEGEND_SIZE = 12
 
 
 def write_review_plot_rows(
@@ -71,12 +76,12 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
     values = [counts[label] for label in labels]
     fig, ax = plt.subplots(figsize=(7.2, 4.0))
     ax.bar(range(len(labels)), values, color=[_CLASS_COLORS[label] for label in labels])
-    ax.set_xticks(range(len(labels)), [_human_label(label) for label in labels], rotation=22, ha="right", fontsize=10)
-    ax.set_ylabel("Candidate count", fontsize=11)
-    ax.set_title("Fold-review labels summarize continuous structure metrics.", fontsize=13, pad=10)
+    ax.set_xticks(range(len(labels)), [_human_label(label) for label in labels], rotation=22, ha="right", fontsize=12)
+    ax.set_ylabel("Candidate count", fontsize=_LABEL_SIZE)
+    ax.set_title("Fold-review labels summarize continuous structure metrics", fontsize=_TITLE_SIZE, pad=10)
     ax.grid(axis="y", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(axis="y", labelsize=10)
+    ax.tick_params(axis="y", labelsize=_TICK_SIZE)
     fig.tight_layout()
     path = plot_root / "review_class_counts.svg"
     alt = (
@@ -84,7 +89,12 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
         + ", ".join(f"{_human_label(label)}: {counts[label]}" for label in labels)
         + "."
     )
-    _save_accessible_svg(fig, path, title="Fold-review class counts", description=alt)
+    _save_accessible_svg(
+        fig,
+        path,
+        title="Fold-review labels summarize continuous structure metrics",
+        description=alt,
+    )
     return _plot_row(
         plot_id="review_class_counts",
         path=path,
@@ -100,32 +110,50 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
 
 
 def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
-    fig, ax = plt.subplots(figsize=(5.8, 5.8))
-    for label in _CLASS_ORDER:
-        selected = [row for row in rows if str(row.get("review_class")) == label]
-        if selected:
-            _scatter_review_rows(ax, selected, x_key="wt_runtime_ca_rmsd", y_key="plddt", label=label)
-    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=11)
-    ax.set_ylabel("Mean pLDDT", fontsize=11)
-    ax.set_title("Most accepted designs stay close to the WT ColabFold model.", fontsize=13, pad=10)
-    ax.grid(alpha=0.25)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(labelsize=10)
-    _add_legend_if_present(ax)
-    fig.tight_layout()
+    fig, ax = plt.subplots(figsize=(6.8, 6.8))
+    valid_rows = [
+        row
+        for row in rows
+        if row.get("wt_runtime_ca_rmsd") is not None
+        and row.get("plddt") is not None
+        and row.get("seq_recovery") is not None
+    ]
+    sequence_identity = [_float(row.get("seq_recovery")) * 100.0 for row in valid_rows]
+    scatter = ax.scatter(
+        [_float(row.get("wt_runtime_ca_rmsd")) for row in valid_rows],
+        [_float(row.get("plddt")) for row in valid_rows],
+        c=sequence_identity,
+        cmap="viridis",
+        norm=_color_norm(sequence_identity),
+        s=44,
+        alpha=0.88,
+        edgecolors="#ffffff",
+        linewidths=0.45,
+    )
+    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
+    ax.set_ylabel("Mean pLDDT", fontsize=_LABEL_SIZE)
+    ax.set_title("ColabFold metrics show continuous review signals", fontsize=_TITLE_SIZE, pad=10)
+    _style_scatter_axis(ax)
+    colorbar = fig.colorbar(scatter, ax=ax, orientation="horizontal", fraction=0.055, pad=0.13)
+    colorbar.set_label("Sequence identity to Ec86 WT (%)", fontsize=_LEGEND_SIZE)
+    colorbar.ax.tick_params(labelsize=_LEGEND_SIZE)
+    fig.tight_layout(rect=(0, 0.03, 1, 0.99))
     path = plot_root / "fold_metric_scatter.svg"
     alt = (
         "Scatter plot of WT-runtime C-alpha RMSD versus mean pLDDT for Eco1 "
         f"ProteinMPNN candidates. The plot contains {len(rows)} candidate points "
-        "colored by fold-review class."
+        "colored by sequence identity to the Ec86 WT reference."
     )
-    _save_accessible_svg(fig, path, title="ColabFold fold-check metric scatter", description=alt)
+    _save_accessible_svg(fig, path, title="ColabFold metrics show continuous review signals", description=alt)
     return _plot_row(
         plot_id="fold_metric_scatter",
         path=path,
-        title="Accepted designs remain near the WT ColabFold model",
+        title="ColabFold metrics show continuous review signals",
         alt_text=alt,
-        description="Shows confidence and within-run structural drift relative to the WT ColabFold model.",
+        description=(
+            "Shows confidence and within-run structural drift as quantitative axes, "
+            "with point color showing sequence identity to Ec86 WT."
+        ),
         interpretation_limit="This is a structural-fidelity summary, not activity or processivity evidence.",
         data_sources=["foldcheck_review/foldcheck_candidate_ranking.parquet"],
     )
@@ -133,7 +161,7 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
 
 def _write_cryoem_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
     available = [row for row in rows if str(row.get("cryoem_mapped_ca_rmsd_status")) == "available"]
-    fig, ax = plt.subplots(figsize=(5.8, 5.8))
+    fig, ax = plt.subplots(figsize=(6.8, 7.2))
     for label in _CLASS_ORDER:
         selected = [row for row in available if str(row.get("review_class")) == label]
         if selected:
@@ -144,23 +172,26 @@ def _write_cryoem_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) ->
                 y_key="cryoem_mapped_ca_rmsd",
                 label=label,
             )
-    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=11)
-    ax.set_ylabel("cryoEM-reference mapped C-alpha RMSD (A)", fontsize=11)
-    ax.set_title("WT-model similarity and cryoEM similarity are checked separately.", fontsize=13, pad=10)
-    ax.grid(alpha=0.25)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(labelsize=10)
+    ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
+    ax.set_ylabel("cryoEM-reference mapped C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
+    ax.set_title("WT-model similarity and cryoEM similarity are checked separately", fontsize=_TITLE_SIZE, pad=10)
+    _style_scatter_axis(ax)
     if not available:
         ax.text(0.5, 0.5, "CryoEM-reference RMSD unavailable", transform=ax.transAxes, ha="center", va="center")
-    _add_legend_if_present(ax)
-    fig.tight_layout()
+    _add_legend_below(fig, ax, ncol=3)
+    fig.tight_layout(rect=(0, 0.15, 1, 0.98))
     path = plot_root / "cryoem_vs_runtime_rmsd.svg"
     alt = (
         "Scatter plot comparing each candidate's RMSD to the WT ColabFold runtime model "
         "against its mapped-residue RMSD to the ec86kit/7V9U cryoEM-backed reference. "
         f"{len(available)} candidates have available cryoEM-reference RMSD."
     )
-    _save_accessible_svg(fig, path, title="Runtime RMSD versus cryoEM-reference RMSD", description=alt)
+    _save_accessible_svg(
+        fig,
+        path,
+        title="WT-model similarity and cryoEM similarity are checked separately",
+        description=alt,
+    )
     return _plot_row(
         plot_id="cryoem_vs_runtime_rmsd",
         path=path,
@@ -190,12 +221,10 @@ def _write_biohub_profile_summary(plot_root: Path, profile_path: Path) -> dict[s
         color="#5b7fa6",
         edgecolors="none",
     )
-    ax.set_xlabel("Protein-level nonzero SAE features", fontsize=11)
-    ax.set_ylabel("Encoded SAE payload size (KiB)", fontsize=11)
-    ax.set_title("Biohub ESMC returned sparse SAE features for all queries.", fontsize=13, pad=10)
-    ax.grid(alpha=0.25)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(labelsize=10)
+    ax.set_xlabel("Protein-level nonzero SAE features", fontsize=_LABEL_SIZE)
+    ax.set_ylabel("Encoded SAE payload size (KiB)", fontsize=_LABEL_SIZE)
+    ax.set_title("Biohub ESMC returned sparse SAE features for all queries", fontsize=_TITLE_SIZE, pad=10)
+    _style_scatter_axis(ax)
     fig.tight_layout()
     path = plot_root / "biohub_esmc_sae_coverage.svg"
     residue_counts = sorted({int(row.get("residue_feature_count") or 0) for row in accepted})
@@ -203,7 +232,12 @@ def _write_biohub_profile_summary(plot_root: Path, profile_path: Path) -> dict[s
         f"Scatter plot summarizing Biohub ESMC SAE output coverage for {len(accepted)} accepted "
         f"sequences. Per-residue activation counts observed: {residue_counts}."
     )
-    _save_accessible_svg(fig, path, title="Biohub ESMC SAE coverage", description=alt)
+    _save_accessible_svg(
+        fig,
+        path,
+        title="Biohub ESMC returned sparse SAE features for all queries",
+        description=alt,
+    )
     return _plot_row(
         plot_id="biohub_esmc_sae_coverage",
         path=path,
@@ -223,7 +257,8 @@ def _scatter_review_rows(ax: Any, rows: list[dict[str, Any]], *, x_key: str, y_k
         alpha=0.82,
         label=_human_label(label),
         color=_CLASS_COLORS[label],
-        edgecolors="none",
+        edgecolors="#ffffff",
+        linewidths=0.35,
     )
 
 
@@ -239,12 +274,14 @@ def _plot_row(
 ) -> dict[str, Any]:
     return {
         "plot_id": plot_id,
+        "status": "rendered",
         "path": str(path),
         "title": title,
         "alt_text": alt_text,
         "description": description,
         "interpretation_limit": interpretation_limit,
         "data_sources": data_sources,
+        "skip_reason": "",
     }
 
 
@@ -281,7 +318,34 @@ def _float(value: Any) -> float:
     return float(value) if value is not None else float("nan")
 
 
-def _add_legend_if_present(ax: Any) -> None:
+def _style_scatter_axis(ax: Any) -> None:
+    ax.set_axisbelow(True)
+    ax.grid(color="#d0d7de", alpha=0.42, linewidth=0.7)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(labelsize=_TICK_SIZE)
+    ax.set_box_aspect(1)
+
+
+def _add_legend_below(fig: Any, ax: Any, *, ncol: int) -> None:
     handles, labels = ax.get_legend_handles_labels()
     if handles and labels:
-        ax.legend(frameon=False, fontsize=9)
+        fig.legend(
+            handles,
+            labels,
+            frameon=False,
+            fontsize=_LEGEND_SIZE,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.025),
+            ncol=ncol,
+        )
+
+
+def _color_norm(values: list[float]) -> mcolors.Normalize | None:
+    finite = [value for value in values if value == value]
+    if not finite:
+        return None
+    minimum = min(finite)
+    maximum = max(finite)
+    if minimum == maximum:
+        return mcolors.Normalize(vmin=minimum - 1.0, vmax=maximum + 1.0)
+    return mcolors.Normalize(vmin=minimum, vmax=maximum)
