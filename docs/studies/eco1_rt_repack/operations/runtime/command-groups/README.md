@@ -132,9 +132,11 @@ SVGs, a Tao-style ColabFold RMSD/pLDDT joint plot for the current single mask
 policy, a ChimeraX mask-context script/render, WT ESMC model-constraint audit
 SVGs, exact-dictionary Biohub ESMC SAE review plots, interactive
 py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
-organized by progressive analysis sections. The notebook presents reference
-scaffold and mask evidence, ProteinMPNN sequence proposals, ColabFold structure
-triage, WT ESMC substitution constraint, and Biohub ESMC SAE interpretation.
+organized by progressive analysis sections. The notebook presents constraint
+evidence for the design mask, ProteinMPNN variants with fold triage, and
+Biohub ESMC feature review. WT ESMC masked-marginal scoring is shown with the
+constraint evidence as a review-only model-constraint audit, not as a mask
+input.
 Static plots and interactive structure views are selected through the same
 section/visual controls. The scaffold/mask browser highlights one mask or motif
 category at a time on the off-white ec86kit/7V9U reference using a single

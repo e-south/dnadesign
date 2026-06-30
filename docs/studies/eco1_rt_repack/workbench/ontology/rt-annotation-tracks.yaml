@@ -11,7 +11,7 @@ source_basis:
   - id: mestre_et_al_2020_rt0_rt7_clades
     note: Broad retron RT clade work uses MAFFT/HMMER-derived RT0-RT7 alignments and labels region X/Y motif context.
   - id: eco1_rt_v1_profile_manual_mask_anchors
-    note: Checked-in Eco1 profile declares YADD, RT1-RT7, retron X, and retron Y as hard manual mask classes.
+    note: Checked-in Eco1 profile declares YADD as a catalytic mask anchor and RT1-RT7/retron X/retron Y as review-display intervals.
 notes:
   - RT1-RT7 boxes mirror the audited canonical intervals in manual-mask-authority.yaml for display.
   - This file provides visualization annotations only; it does not decide mask membership or designability.

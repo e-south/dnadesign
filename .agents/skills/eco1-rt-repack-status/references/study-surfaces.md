@@ -255,13 +255,15 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   request manifests, fold-check FASTA writing, report schemas, and report
   validation; it does not run ColabFold or choose Eco1 thresholds.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/atlas_semantic_profile/`:
-  thin study-owned wrapper that selects WT plus fold-accepted Eco1 sequences and
+  thin study-owned wrapper that selects WT plus fold-report rows accepted by the
+  validator and
   delegates Atlas lookup/normalization to `src/dnadesign/thread/adapters/esm_atlas/`.
   It writes compact semantic-profile and sparse SAE activation artifacts, plus a
   structure-prediction registry for any explicitly authorized Atlas on-demand
   structures. These are not fold-check or processivity evidence.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sae_profile/`:
-  thin study-owned wrapper that selects fold-accepted Eco1 sequences and
+  thin study-owned wrapper that selects fold-report rows accepted by the
+  validator and
   delegates authenticated ESMC/logits request normalization to
   `src/dnadesign/thread/adapters/biohub_esmc/`. It writes compact query-time SAE
   artifacts for synthetic sequences and keeps the Biohub token out of manifests,
@@ -285,7 +287,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   study-owned materializer for `contact_risk_profile.yaml`. It is a
   review artifact that joins nearest-distance contact evidence, atom-class
   contact geometry, conservation masks, manual-mask authority, Wang/Ec86
-  candidate priors, and selected simple-mask row status.
+  direct-contact mask priors, and selected simple-mask row status.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`:
   contact-risk artifact contract package. It validates review metadata, required
   evidence-availability statuses, and per-row risk-class fields without making

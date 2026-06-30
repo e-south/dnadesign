@@ -134,8 +134,10 @@ explicitly changes the policy.
 
 The selected ec86kit/structure authority has T301. A direct NCBI fetch of
 `WP_099010551.1` observed A301. Position 301 is near the C terminus but is
-resolved in the selected structure and already contact-proximal under the 20 A
-retained-context policy.
+resolved in the selected structure. Under the current
+`eco1_rt_clade9_plurality25_direct_contact5a_v1` policy, position 301 should be
+interpreted through the active clade-9 plurality and 5 A retained-substrate
+contact rules, not the older 15-20 A diagnostic contact shell.
 
 This is a source-authority mismatch, not a biological conclusion. The MSA
 target must be the ec86kit sequence unless a future contract explicitly

@@ -43,9 +43,10 @@ a monolithic recipe:
   the broad homolog panel and II-A3/`42_1` as the Eco1-family panel.
 - Simon et al. provides RT-region and motif annotation grammar for figures and
   audits. Annotation tracks are not automatically mask-authoritative.
-- Wang et al. provides the Eco1/Ec86 structural context and interface priors.
-  Candidate interface residues remain priors until promoted by an explicit
-  mask-authority audit.
+- Wang et al. provides the Eco1/Ec86 structural context and direct-contact
+  priors. The current mask consumes the audited direct-contact rows as active
+  protection evidence; RT1-RT7 intervals remain review labels, not blanket mask
+  authority.
 
 ### Method Posture
 
@@ -135,8 +136,8 @@ they are free of Eco1 biology and have their own contract tests.
 Do not hide model execution behind an implicit run-all framework. Eco1 can call
 the generic ProteinMPNN adapter with an explicit tool root and request manifest,
 then call generic candidate-table construction after sample ingest. Fold
-checking, feasibility analysis, and candidate handoff remain explicit later
-gates.
+checking is now materialized for WT plus the 96 accepted candidates; feasibility
+analysis and RT-only candidate handoff remain explicit later gates.
 
 Use `implementation-roadmap.md` for the exact implementation slice order. That
 page is the current owner of code-home, input/output, and negative-path

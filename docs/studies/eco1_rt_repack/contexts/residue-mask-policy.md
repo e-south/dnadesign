@@ -77,6 +77,9 @@ The method rationale is intentionally plain:
 - Simon supplies RT-region and motif annotation grammar.
 
 Evidence-review artifacts explain the structure context but are not mask inputs.
+WT ESMC masked-marginal entropy and substitution LLRs are also review-only
+model-constraint evidence under this policy; they do not protect or release
+residues unless a future mask policy explicitly promotes them.
 The rule does not search across contact-density, contact-class, or
 conservation-threshold variants.
 The next sampling plan should use the materialized `mask_set.yaml` under

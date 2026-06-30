@@ -341,7 +341,7 @@ not become design positions.
 materializes `contact_risk_profile.yaml` as a contact evidence review after the
 conservative mask set. It joins the retained-context nearest-distance profile,
 atom-class contact geometry, conservation masks, manual mask authority,
-and Wang/Ec86 candidate priors.
+and Wang/Ec86 direct-contact mask priors.
 
 `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/contact_risk/`
 validates the artifact shape and prevents missing evidence-status records from
@@ -413,18 +413,21 @@ into sample rows.
 
 ### Completed Slice: Candidate Table v1
 
-Build `candidate_table.parquet` from accepted `sample_table.parquet` rows. It
+Build `candidate_table.parquet` from `sample_table.parquet` rows where
+`status=accepted`. It
 assigns stable candidate ids, keeps request/sample provenance, summarizes
 mutations against the selected backbone sequence, rejects edits at protected
 positions, and keeps terminal missing-backbone residues out of fixed-backbone
-mutation accounting. The active table contains 96 accepted candidate rows.
+mutation accounting. The active table contains 96 candidate-table rows where
+`status=accepted`.
 
 ### Completed Slice: Fold Check Request v1
 
 `foldcheck_request/input_sequences.fasta` and
 `foldcheck_request/foldcheck_request_manifest.yaml` are materialized from the
-accepted candidate table. The request contains one WT baseline plus 96 accepted
-ProteinMPNN candidates as full 320-aa canonical Eco1 sequences. It is a planned
+candidate table. The request contains one WT baseline plus 96 candidate-table
+rows where `status=accepted`, represented as full 320-aa canonical Eco1
+sequences. It is a planned
 ColabFold `colabfold_batch` CLI request for BU SCC execution; no fold model is
 run by this materializer.
 
@@ -457,7 +460,7 @@ directory is first on `LD_LIBRARY_PATH`. LocalColabFold is the install/runtime
 environment for the ColabFold CLI, not a separate fold model or API. The SCC
 clone was fast-forwarded to the current branch, the materialized fold-check
 request was regenerated there, and BU SCC job `6224446` ran the WT baseline
-plus five accepted candidates.
+plus five candidate-table rows where `status=accepted`.
 
 The smoke raw output lives on SCC project storage under
 `/project/dunlop/esouth/foldcheck/eco1_rt/eco1_colabfold_foldcheck.6224446/`.
@@ -530,8 +533,8 @@ handoff records.
 
 The authenticated Biohub ESMC/logits path is now implemented as a separate
 query-time SAE lane. The current conservative run selected WT plus all 96
-fold-accepted ProteinMPNN candidates, and the materialization accepted all
-97 query rows. It writes
+fold-report candidate rows accepted by the validator, and the materialization
+accepted all 97 query rows. It writes
 `biohub_esmc_sae_profile.parquet`, `biohub_esmc_protein_features.parquet`,
 `biohub_esmc_residue_features.parquet`,
 `biohub_esmc_feature_catalog.parquet`, and a redacted
@@ -546,7 +549,7 @@ declared Eco1 residue windows, then attach biological labels only when a
 source-backed interpretation exists for the exact SAE model. The
 [Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
 is the method pattern for this review layer: rank features by activation,
-inspect residue localization and prevalence, and only then decide whether a
+inspect residue activation patterns and prevalence, and only then decide whether a
 feature deserves a source-backed biological description. It is not a source of
 curated Eco1 function labels by itself.
 
@@ -568,9 +571,10 @@ checks and HTML export. The deliverable sequence is:
    sequence identity to WT, sampling temperature/seed, and mutation density.
 4. ColabFold structure review: a cached top/bottom/control structure panel first
    and an all-97 contact sheet only as an optional/heavy cached artifact.
-5. Biohub ESMC SAE interpretation foundation: per-protein top feature tables
-   ranked by peak activation and prevalence, WT-active feature localization,
-   candidate retention of the same exact-dictionary features, and a joint
+5. Biohub ESMC feature-review foundation: per-protein top feature tables
+   ordered by peak activation and prevalence, WT-active feature activation
+   patterns, candidate/WT activation ratios for the same exact-dictionary
+   features, and a joint
    SAE-similarity/ColabFold-pLDDT/ESMC-single-substitution-LLR review panel.
    BOS/EOS positions are excluded from residue rows, `k64` sparsity is
    validated, and feature indices remain indices unless exact-dictionary
@@ -588,8 +592,8 @@ the RT-only `candidate_handoff.yaml`.
 
 ### Implemented Slice: ESM Atlas Semantic Audit v1
 
-The repo now has a small Atlas semantic-audit lane for WT plus fold-accepted
-Eco1 candidates. The generic API boundary is
+The repo now has a small Atlas semantic-audit lane for WT plus Eco1 fold-report
+rows accepted by the validator. The generic API boundary is
 `dnadesign.thread.adapters.esm_atlas`; the Eco1 wrapper is
 `operations/materialization/atlas_semantic_profile/`. The current command uses
 the all-97 request, explicit on-demand provenance, and a bounded request cap:
@@ -652,7 +656,7 @@ features to stratify a small experimental panel after fold acceptance:
 - semantic-shifted candidates;
 - thumb-retained / fingers-shifted candidates;
 - primer-grip-shifted candidates;
-- random fold-accepted controls.
+- random fold-report-accepted controls.
 
 Before biochemical data are inspected, freeze the feature panel, residue
 windows, normalization rule, fold thresholds, semantic flag definitions,
@@ -691,7 +695,7 @@ interpreted in the study record.
 | Phase 0 scaffold | Study records, schema stubs, policy pages, and negative fixture cases exist. |
 | Phase 1 contract | Profile, artifact-chain, mask, fold, feasibility, and handoff validators reject the known negative cases. |
 | Phase 2 backend ingest | Materialized runtime artifacts exist with nonfixture states, schema-valid fields, and upstream hashes. |
-| Phase 3 fold-check report | Full fold-check report and fold-review artifacts validate for WT plus the accepted candidate set. This is not handoff readiness. |
+| Phase 3 fold-check report | Full fold-check report and fold-review artifacts validate for WT plus the candidate-table rows where `status=accepted`. This is not handoff readiness. |
 | Phase 4 downstream promotion | RT-only candidate handoff is accepted or rejected by the downstream RT-lnRNA contract without creating construct subjects implicitly. |
 
 ### Current Known Gaps

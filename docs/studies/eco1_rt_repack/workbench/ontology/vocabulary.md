@@ -69,9 +69,15 @@
 - Use `*_mask_authority` for study-owned records that are allowed to fix
   residues directly. Do not use annotation-track or panel-spec names for
   designability decisions.
-- Use `candidate_prior_*` or `*_candidate_priors` for structural residues that
-  should inform a later mask review but are not allowed to set
-  `manual_mask=true`.
+- Use `*_mask_prior` for structural residues that are allowed to fix positions
+  under the selected mask policy. The current Wang/Ec86 direct-contact rows
+  retain the stable source token `candidate_prior_not_mask_authoritative` from
+  the original campaign artifact, but the selected mask consumes those rows as
+  active direct-contact mask priors. Rename that source token only under a new
+  mask lineage.
+- Reserve new `candidate_prior_*` or `*_candidate_priors` terms for review-only
+  residues that may inform a future mask policy but are not allowed to fix
+  residues in that policy.
 - Use `*_risk_profile` for evidence-review artifacts that classify upstream evidence and
   missing measurements; never use a risk profile name as a direct mask or
   sampling-plan authority.

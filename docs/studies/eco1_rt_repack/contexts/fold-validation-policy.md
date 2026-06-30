@@ -108,9 +108,12 @@ ColabFold is the structural-fidelity gate. It compares full-length WT and
 candidate sequences against the selected Ec86 cryoEM-backed RT scaffold. The
 claim at this stage is fold preservation, not improved RT activity.
 
-ESM Atlas/SAE is a semantic audit and stratification layer after fold checking.
-It can show whether candidates still occupy an RT-like model neighborhood or
-shift interpretable polymerase feature regions. It does not measure strand
+Biohub ESMC SAE is the query-time semantic annotation layer for WT and synthetic
+candidates after fold checking. It can show whether model-derived feature
+regions are retained or shifted. ESM Atlas remains public-protein neighborhood
+context where a sequence or related public protein is present. WT ESMC
+masked-marginal scoring is a separate model-constraint audit over single
+substitutions in the WT sequence context. None of these outputs measures strand
 displacement, processivity, or structured-template readthrough.
 
 ### Runtime Ownership
@@ -208,21 +211,21 @@ Future smoke runs should use `COLABFOLD_EXTRA_ARGS='--num-models 1'` when the
 goal is runtime-path validation. Full candidate screens should declare model
 count explicitly before submission.
 
-### Atlas Semantic Audit And Stratification
+### Biohub ESMC SAE And Atlas Context
 
-ESM Atlas can be used after full fold-check coverage as an annotation layer for
-WT and fold-accepted candidates. It is not a replacement for
-ColabFold/AlphaFold-family fold QA, and it is not evidence that a candidate has
-improved function. The right study wording is:
+Biohub ESMC SAE can be used after full fold-check coverage as a query-time
+annotation layer for WT and fold-report rows accepted by the validator. It is not a
+replacement for ColabFold/AlphaFold-family fold QA, and it is not evidence that
+a candidate has improved function. The right study wording is:
 
-> Atlas results are model-derived semantic affiliations. They summarize where a
-> query sequence lands in ESMC/SAE representation space and which Atlas
-> proteins, clusters, or features are nearby. They do not measure processivity,
-> strand displacement, or hairpin unwinding.
+> Biohub ESMC SAE results are model-derived feature activations and
+> source-backed feature descriptions for the selected SAE dictionary. Atlas
+> results, when available, are public-protein neighborhood context. Neither
+> source measures processivity, strand displacement, or hairpin unwinding.
 
 The first Eco1 use case is a pre-registered semantic audit: ask whether
-fold-accepted ProteinMPNN candidates remain in an RT-like Ec86 neighborhood and
-whether polymerase feature regions remain visible or shift in controlled ways.
+ProteinMPNN variants that passed the fold-report validator preserve or shift
+polymerase-related model-feature activation patterns in controlled ways.
 For structured RNA templates, the feature panel should be described as
 processivity-related hypotheses:
 
@@ -239,9 +242,10 @@ processivity-related hypotheses:
 feature names because RTs and RdRps share polymerase fold and motif geometry;
 it does not mean Ec86 is an RdRp.
 
-The Atlas/SAE layer may be used for:
+The Biohub ESMC SAE and Atlas context layers may be used for:
 
-- QC: flag variants that no longer look RT-like in Atlas/SAE space.
+- QC: flag variants that no longer look RT-like in model-derived feature or
+  public-neighborhood space.
 - Annotation: expose thumb/palm, primer-grip, fingers/palm, catalytic, and
   gating feature shifts.
 - Stratification: choose a balanced assay panel with semantic-retained and
@@ -263,19 +267,19 @@ language is:
 
 > SAE features will not be interpreted as direct measurements of processivity,
 > strand displacement, or hairpin unwinding. They will be used to annotate
-> fold-accepted Ec86 RT variants and to select a stratified experimental panel
+> fold-report-accepted Ec86 RT variants and to select a stratified experimental panel
 > designed to test whether preservation or perturbation of RT-relevant semantic
 > features correlates with measured biochemical phenotypes.
 
 A first assay panel should be a designed contrast, not a top-N SAE ranking. Use
-fold-accepted variants to fill strata such as:
+fold-report-accepted variants to fill strata such as:
 
 - WT Ec86 baseline.
 - Fold-best / semantic-retained candidates.
 - Fold-best / semantic-shifted candidates.
 - Thumb-retained / fingers-shifted candidates.
 - Primer-grip-shifted candidates with intact catalytic and fold gates.
-- Random fold-accepted controls.
+- Random fold-report-accepted controls.
 
 The [Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
 is the appropriate method reference for the SAE review step. In this study,
@@ -309,7 +313,7 @@ The first dnadesign implementation uses
 `dnadesign.thread.adapters.esm_atlas` for reusable Atlas API normalization and a
 thin Eco1 wrapper at
 `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/atlas_semantic_profile/`.
-The wrapper selects WT plus fold-accepted rows, calls the generic adapter, and
+The wrapper selects WT plus fold-report rows accepted by the validator, calls the generic adapter, and
 writes compact study-local artifacts:
 
 - `atlas_semantic_profile.parquet`: one row per sequence, including query hash,
@@ -349,8 +353,8 @@ same sequence
 
 The current run uses `esmc-6b-2024-12` with
 `esmc-6b-2024-12-sae-layer60-k64-codebook16384` and
-`normalize_features=true`. It materialized WT plus all 96 fold-accepted
-ProteinMPNN candidates. All 97 selected sequences returned sparse query-time
+`normalize_features=true`. It materialized WT plus all 96 fold-report
+candidate rows accepted by the validator. All 97 selected sequences returned sparse query-time
 SAE outputs with 64 active features per residue.
 Store these rows as semantic annotation only.
 Do not use them as a hidden processivity score or as a replacement for
@@ -373,5 +377,5 @@ Source roles:
 - Biohub `/api/v1/encode` and `/api/v1/logits` documentation supplies the
   authenticated query-time ESMC/SAE API shape used for synthetic candidates.
 - The Biohub ESMC SAE feature interpretation notebook supplies the feature
-  ranking, residue-localization, and feature-prevalence review pattern for
+  ranking, residue activation-pattern, and feature-prevalence review pattern for
   exact-dictionary SAE interpretation.
