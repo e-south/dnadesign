@@ -12,11 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 from typing import Any
 
 import matplotlib
 import pyarrow.parquet as pq
+import yaml
+from matplotlib.colors import LinearSegmentedColormap
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
@@ -31,7 +34,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .biohub_esmc_model_provenance import sae_request_manifest_summary
-from .biohub_esmc_sae_fold_llr import write_sae_fold_llr_comparison_panel
 from .biohub_esmc_sae_tables import (
     make_protein_top_feature_table_row,
     write_protein_top_feature_table,
@@ -43,6 +45,15 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 SECTION = SECTION_ESMC_FEATURE_REVIEW
 TOP_FEATURE_COUNT = 12
+_RETIRED_OUTPUT_NAMES = (
+    "candidate_top_sae_feature_activation_ratio.svg",
+    "sae_fold_llr_comparison.svg",
+    "missing_sae_fold_llr_comparison.txt",
+)
+WT_ACTIVATION_CMAP = LinearSegmentedColormap.from_list(
+    "wt_sae_activation_white_to_dark",
+    ["#ffffff", "#d9f0e3", "#4c9f70", "#174a5a"],
+)
 SOURCE_NOTEBOOK = (
     "https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/"
     "esmc_sae_feature_interpretation.ipynb"
@@ -53,9 +64,9 @@ INTERPRETATION_LIMIT = (
 )
 METHOD_SUMMARY = (
     "Rank top SAE features from the Biohub ESMC protein-feature table by peak activation and prevalence, "
-    "inspect where those features activate over residues, and compare candidate feature sums after "
-    "normalizing to WT. Feature names remain blank unless a source-backed interpretation exists for the "
-    "exact SAE model, layer, sparsity, and codebook."
+    "inspect where those features activate over WT residues, and render one selected feature at a time "
+    "across WT plus candidate sequences in the marimo notebook. Feature names remain blank unless a "
+    "source-backed interpretation exists for the exact SAE model, layer, sparsity, and codebook."
 )
 _SOURCE_TABLES = [
     "biohub_esmc_sae_profile.parquet",
@@ -69,15 +80,14 @@ _SOURCE_TABLES = [
 def write_biohub_esmc_sae_interpretation_panels(
     *,
     panel_root: Path,
+    heatmap_root: Path,
     profile_path: Path,
     protein_features_path: Path,
     residue_features_path: Path,
     feature_catalog_path: Path,
     request_manifest_path: Path,
-    candidate_table_path: Path,
-    foldcheck_report_path: Path,
     foldcheck_ranking_path: Path,
-    wt_substitution_llr_path: Path,
+    mask_residues: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Render lightweight SAE interpretation panels from existing sparse Biohub rows."""
 
@@ -96,6 +106,7 @@ def write_biohub_esmc_sae_interpretation_panels(
         return [_missing_row(panel_root, [protein_features_path], reason="WT SAE protein feature rows are absent")]
     selected_features = [int(row["feature_index"]) for row in feature_rows]
     panel_root.mkdir(parents=True, exist_ok=True)
+    _remove_retired_outputs(panel_root)
     top_feature_table_path = panel_root / "protein_top_sae_features.parquet"
     write_protein_top_feature_table(
         path=top_feature_table_path,
@@ -121,26 +132,16 @@ def write_biohub_esmc_sae_interpretation_panels(
             request_manifest_path=request_manifest_path,
             feature_rows=feature_rows,
         ),
-        _write_candidate_activation_ratio_panel(
-            panel_root=panel_root,
+        _write_feature_heatmap_manifest(
+            heatmap_root=heatmap_root,
             protein_features_path=protein_features_path,
+            residue_features_path=residue_features_path,
             feature_catalog_path=feature_catalog_path,
             request_manifest_path=request_manifest_path,
             foldcheck_ranking_path=foldcheck_ranking_path,
             selected_features=selected_features,
             wt_feature_rows=feature_rows,
-        ),
-        write_sae_fold_llr_comparison_panel(
-            panel_root=panel_root,
-            protein_features_path=protein_features_path,
-            feature_catalog_path=feature_catalog_path,
-            candidate_table_path=candidate_table_path,
-            foldcheck_report_path=foldcheck_report_path,
-            foldcheck_ranking_path=foldcheck_ranking_path,
-            wt_substitution_llr_path=wt_substitution_llr_path,
-            request_manifest_path=request_manifest_path,
-            feature_rows=feature_rows,
-            source_tables=_SOURCE_TABLES,
+            mask_residues=mask_residues,
         ),
     ]
 
@@ -174,7 +175,7 @@ def _write_wt_activation_pattern_panel(
     feature_labels = _feature_axis_labels(feature_catalog_path, selected_features)
     fig_height = max(4.8, 0.36 * len(selected_features) + 2.2)
     fig, ax = plt.subplots(figsize=(16.0, fig_height))
-    image = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap="magma")
+    image = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap=WT_ACTIVATION_CMAP, vmin=0.0)
     ax.set_yticks(range(len(selected_features)), feature_labels, fontsize=max(6, TICK_SIZE - 1))
     ax.set_xlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE)
     ax.set_ylabel("Top WT SAE feature", fontsize=LABEL_SIZE)
@@ -218,71 +219,67 @@ def _write_wt_activation_pattern_panel(
     )
 
 
-def _write_candidate_activation_ratio_panel(
+def _write_feature_heatmap_manifest(
     *,
-    panel_root: Path,
+    heatmap_root: Path,
     protein_features_path: Path,
+    residue_features_path: Path,
     feature_catalog_path: Path,
     request_manifest_path: Path,
     foldcheck_ranking_path: Path,
     selected_features: list[int],
     wt_feature_rows: list[dict[str, Any]],
+    mask_residues: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    title = "Candidates vary in WT-active SAE activation ratios"
-    feature_rows = pq.read_table(
-        protein_features_path,
-        filters=[("feature_index", "in", selected_features)],
-        columns=["candidate_id", "feature_index", "activation_sum"],
-    ).to_pylist()
+    title = "Selected SAE feature activation across Eco1 RT variants"
+    heatmap_root.mkdir(parents=True, exist_ok=True)
+    path = heatmap_root / "sae_feature_heatmap_manifest.yaml"
     candidate_order = _candidate_order(protein_features_path, foldcheck_ranking_path)
-    wt_sums = {int(row["feature_index"]): max(float(row["activation_sum"]), 1e-12) for row in wt_feature_rows}
-    feature_to_col = {feature: col_index for col_index, feature in enumerate(selected_features)}
-    candidate_to_row = {candidate_id: row_index for row_index, candidate_id in enumerate(candidate_order)}
-    matrix = [[0.0 for _ in selected_features] for _ in candidate_order]
-    for row in feature_rows:
-        candidate_id = str(row["candidate_id"])
-        feature = int(row["feature_index"])
-        if candidate_id in candidate_to_row and feature in feature_to_col:
-            ratio = float(row["activation_sum"]) / wt_sums[feature]
-            matrix[candidate_to_row[candidate_id]][feature_to_col[feature]] = math.log2(max(ratio, 1e-6))
+    wt_sequence = _wt_sequence_from_mask(mask_residues)
     feature_labels = _feature_axis_labels(feature_catalog_path, selected_features)
-    transposed_matrix = [list(row) for row in zip(*matrix, strict=True)]
-    fig_height = max(5.6, 0.38 * len(selected_features) + 2.3)
-    fig_width = max(12.5, min(20.0, 0.13 * len(candidate_order) + 5.4))
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-    color_limit = _symmetric_color_limit(matrix)
-    image = ax.imshow(
-        transposed_matrix,
-        aspect="auto",
-        interpolation="nearest",
-        cmap="coolwarm",
-        vmin=-color_limit,
-        vmax=color_limit,
-    )
-    _set_candidate_axis_ticks(ax, candidate_order)
-    ax.set_yticks(range(len(selected_features)), feature_labels, fontsize=max(6, TICK_SIZE - 2))
-    ax.set_xlabel("Sequence sorted by fold review", fontsize=LABEL_SIZE)
-    ax.set_ylabel("WT-active SAE feature", fontsize=LABEL_SIZE)
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
-    colorbar = fig.colorbar(image, ax=ax, orientation="horizontal", fraction=0.04, pad=0.18)
-    colorbar.set_label("log2(candidate activation sum / WT activation sum)", fontsize=LEGEND_SIZE)
-    colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
-    fig.subplots_adjust(left=0.34, right=0.985, top=0.86, bottom=0.24)
-    path = panel_root / "candidate_top_sae_feature_activation_ratio.svg"
+    feature_activation_rows = {
+        int(row["feature_index"]): {
+            "feature_index": int(row["feature_index"]),
+            "label": label,
+            "wt_activation_max": float(row["activation_max"]),
+            "wt_activation_sum": float(row["activation_sum"]),
+            "wt_nonzero_residue_count": int(row["nonzero_residue_count"]),
+        }
+        for row, label in zip(wt_feature_rows, feature_labels, strict=True)
+    }
+    payload = {
+        "schema_id": "eco1_rt.biohub_esmc_sae_feature_heatmap",
+        "schema_version": 1,
+        "status": "materialized",
+        "path_policy": "paths_relative_to_this_manifest",
+        "candidate_order": candidate_order,
+        "candidate_count": len(candidate_order),
+        "sequence_length": len(wt_sequence),
+        "wt_sequence": wt_sequence,
+        "features": [feature_activation_rows[feature] for feature in selected_features],
+        "feature_count": len(selected_features),
+        "feature_selection_policy": "top WT features by activation_max, tie-broken by prevalence and activation_sum",
+        "residue_features_path": _relative_to(path.parent, residue_features_path),
+        "protein_features_path": _relative_to(path.parent, protein_features_path),
+        "feature_catalog_path": _relative_to(path.parent, feature_catalog_path),
+        "request_manifest_path": _relative_to(path.parent, request_manifest_path),
+        "source_tables": _SOURCE_TABLES,
+    }
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     alt = (
-        f"Heatmap of WT-normalized activation sums for {len(selected_features)} WT-active SAE features "
-        f"across {len(candidate_order)} Biohub ESMC queries."
+        f"Interactive heatmap for {len(selected_features)} WT-active SAE features across "
+        f"{len(candidate_order)} Biohub ESMC query sequences and {len(wt_sequence)} Ec86 residue positions."
     )
-    save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
-        deliverable_id="biohub_esmc_candidate_top_sae_feature_activation_ratio",
+        deliverable_id="biohub_esmc_sae_feature_activation_heatmap",
         section=SECTION,
-        artifact_kind="svg",
+        artifact_kind="sae_feature_heatmap_manifest",
         status="rendered",
         path=path,
-        source_tables=[*_SOURCE_TABLES, "foldcheck_review/foldcheck_candidate_ranking.parquet"],
+        source_tables=[*_SOURCE_TABLES, "mask_set.yaml", "foldcheck_review/foldcheck_candidate_ranking.parquet"],
         input_hashes=file_hashes(
             {
+                "residue_features": residue_features_path,
                 "protein_features": protein_features_path,
                 "feature_catalog": feature_catalog_path,
                 "request_manifest": request_manifest_path,
@@ -291,15 +288,15 @@ def _write_candidate_activation_ratio_panel(
         ),
         alt_text=alt,
         description=(
-            "Compares all Biohub ESMC query rows against the WT peak-active feature subset. Columns are "
-            "ordered by fold-review metrics when the ranking table is available, with WT first; feature "
-            "labels are kept as single-line row labels for readability."
+            "Lets the notebook render one selected WT-active SAE feature at a time. Rows are WT plus "
+            "ProteinMPNN variants ordered by fold-review ranking, columns are Ec86 canonical positions, "
+            "top tick labels are WT residue letters, and color is the per-residue SAE activation value."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,
         method_summary=METHOD_SUMMARY,
         evidence_summary=_evidence_summary(wt_feature_rows, request_manifest_path=request_manifest_path)
-        | {"sequence_rows": len(candidate_order)},
+        | {"sequence_rows": len(candidate_order), "sequence_length": len(wt_sequence)},
         role="manuscript_facing",
     )
 
@@ -323,6 +320,13 @@ def _missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = 
         role="review_only",
         skip_reason=message,
     )
+
+
+def _remove_retired_outputs(panel_root: Path) -> None:
+    for name in _RETIRED_OUTPUT_NAMES:
+        path = panel_root / name
+        if path.exists():
+            path.unlink()
 
 
 def _top_wt_feature_rows(path: Path, *, top_n: int) -> list[dict[str, Any]]:
@@ -386,27 +390,6 @@ def _set_position_ticks(ax: Any, position_count: int) -> None:
     ax.tick_params(axis="x", length=3)
 
 
-def _set_candidate_ticks(ax: Any, candidate_order: list[str]) -> None:
-    _set_candidate_axis_ticks(ax, candidate_order, axis="y")
-
-
-def _set_candidate_axis_ticks(ax: Any, candidate_order: list[str], *, axis: str = "x") -> None:
-    if len(candidate_order) <= 24:
-        ticks = range(len(candidate_order))
-    else:
-        step = max(1, math.ceil(len(candidate_order) / 16))
-        ticks = list(range(0, len(candidate_order), step))
-        if ticks[-1] != len(candidate_order) - 1:
-            ticks.append(len(candidate_order) - 1)
-    labels = ["WT" if candidate_order[index] == "wild_type" else str(index) for index in ticks]
-    if axis == "y":
-        ax.set_yticks(list(ticks), labels, fontsize=TICK_SIZE)
-        ax.tick_params(axis="x", labelsize=TICK_SIZE)
-        return
-    ax.set_xticks(list(ticks), labels, fontsize=TICK_SIZE)
-    ax.tick_params(axis="x", labelrotation=0, length=3)
-
-
 def _feature_axis_labels(feature_catalog_path: Path, selected_features: list[int]) -> list[str]:
     catalog = {
         int(row["feature_index"]): (str(row.get("label") or ""), str(row.get("description") or ""))
@@ -425,7 +408,7 @@ def _feature_axis_label(feature_index: int, label: str, description: str) -> str
 
 
 def _concise_feature_description(*, label: str, description: str) -> str:
-    source = (description or label).strip()
+    source = (label or description).strip()
     if not source:
         return ""
     if source.lower().startswith("summary:"):
@@ -446,6 +429,15 @@ def _ellipsize(value: str, *, max_chars: int) -> str:
     return value[: max_chars - 1].rstrip() + "…"
 
 
+def _wt_sequence_from_mask(mask_residues: list[dict[str, Any]]) -> str:
+    rows = sorted(mask_residues, key=lambda row: int(row["canonical_position"]))
+    return "".join(str(row.get("wt_aa") or "X")[:1] for row in rows)
+
+
+def _relative_to(path_root: Path, path: Path) -> str:
+    return os.path.relpath(path.resolve(), start=path_root.resolve())
+
+
 def _evidence_summary(feature_rows: list[dict[str, Any]], *, request_manifest_path: Path) -> dict[str, Any]:
     return sae_request_manifest_summary(request_manifest_path) | {
         "source_notebook": SOURCE_NOTEBOOK,
@@ -453,11 +445,3 @@ def _evidence_summary(feature_rows: list[dict[str, Any]], *, request_manifest_pa
         "selected_feature_count": len(feature_rows),
         "selected_feature_indices": [int(row["feature_index"]) for row in feature_rows],
     }
-
-
-def _symmetric_color_limit(matrix: list[list[float]]) -> float:
-    values = sorted(abs(value) for row in matrix for value in row if math.isfinite(value))
-    if not values:
-        return 1.0
-    percentile_index = min(len(values) - 1, max(0, math.ceil(0.98 * len(values)) - 1))
-    return max(0.02, min(0.5, values[percentile_index]))

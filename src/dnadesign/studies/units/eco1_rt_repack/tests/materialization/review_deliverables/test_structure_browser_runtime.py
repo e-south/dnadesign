@@ -48,39 +48,64 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         selected_deliverable_id="interactive_structure_browser_manifest",
     )
-    assert "WT baseline" in group_lookup
-    assert "Low-deviation fold-check candidates" in group_lookup
-    assert "Other fold-check candidates" in group_lookup
+    assert "0 WT ColabFold baseline" in group_lookup
+    assert "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)" in group_lookup
+    assert "2 Intermediate fold review band" in group_lookup
     lookup = structure_browser.structure_browser_lookup(
         rows,
         selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         selected_deliverable_id="interactive_structure_browser_manifest",
-        selected_group=group_lookup["Low-deviation fold-check candidates"],
+        selected_group=group_lookup["1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)"],
     )
     selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
+    highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
+    selected_highlight = next(row for label, row in highlight_lookup.items() if "SAE F101" in label)
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
         selected_row=selected,
         structure_ui="<structure-dropdown>",
         structure_group_ui="<structure-group-dropdown>",
+        structure_highlight_ui="<sae-highlight-dropdown>",
+        selected_highlight_row=selected_highlight,
+        structure_sidechain_ui="<side-chain-toggle>",
+        structure_protein_ui="<protein-color-toggle>",
+        structure_dna_ui="<dna-color-toggle>",
+        structure_rna_ui="<rna-color-toggle>",
+        show_sidechains=True,
     )
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
 
     assert "<iframe" in rendered_text
     assert "3Dmol" in rendered_text
-    assert "ec86kit/7V9U reference" in rendered_text
+    assert "Ec86/7V9U all-atom reference" in rendered_text
     assert "ProteinMPNN variant rank 1" in rendered_text
-    assert "Structure metric summary" in rendered_text
+    assert "Variant dashboard" in rendered_text
+    assert "ESMC additive LLR total" in rendered_text
+    assert "<sae-highlight-dropdown>" in rendered_text
+    assert "<side-chain-toggle>" in rendered_text
+    assert "<protein-color-toggle>" in rendered_text
+    assert "<dna-color-toggle>" in rendered_text
+    assert "<rna-color-toggle>" in rendered_text
+    assert "Selected SAE feature" in rendered_text
+    assert "F101" in rendered_text
+    assert "SAE activation region" in rendered_text
     assert "Mean pLDDT" in rendered_text
     assert "Sequence identity" in rendered_text
     assert "WT-runtime CA RMSD" in rendered_text
     assert "0.82 A" in rendered_text
-    assert "Browser alignment:" in rendered_text
+    assert "Browser alignment:" not in rendered_text
+    assert "Side-chain display:" not in rendered_text
+    assert "Candidate side-chain atoms are present and rendered as sticks" in rendered_text
+    assert "The reference background includes protein side-chain atoms rendered as sticks" in rendered_text
     assert "browser_alignment_status" in rendered_text
     assert "aligned_in_memory_to_reference_ca" in rendered_text
     assert "browser_mapped_ca_rmsd" in rendered_text
+    assert "reference_atom_scope" in rendered_text
+    assert "sidechain_atoms_present" in rendered_text
+    assert "query_atom_scope" in rendered_text
+    assert "sidechain_atoms_present" in rendered_text
     assert "Raw local ColabFold PDB files are not rewritten" in rendered_text
     assert "What this structure view shows" not in rendered_text
     assert "Query coordinates are aligned in memory" in rendered_text
@@ -89,7 +114,10 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
     assert "eco1-rt-repack:interactive_structure_browser_manifest" in rendered_text
     assert "localStorage" in rendered_text
     assert "twoFingerPan" in rendered_text
-    assert '"not":{"atom":["N","CA","C","O"]}' in unescaped_rendered
+    assert '","pdb");' in unescaped_rendered
+    assert '","cif");' not in unescaped_rendered
+    assert '","mmcif");' not in unescaped_rendered
+    assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_rendered
     assert '"stick":{"color":"#009E73","radius":0.16}' in unescaped_rendered
 
 
@@ -106,7 +134,7 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
         rows,
         selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         selected_deliverable_id="interactive_structure_browser_manifest",
-        selected_group="Low-deviation fold-check candidates",
+        selected_group="1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)",
     )
     selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
 
@@ -117,19 +145,23 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
         structure_group_ui="<structure-group-dropdown>",
         structure_background_ui="<reference-background-toggle>",
         structure_mutation_ui="<mutation-toggle>",
+        structure_sidechain_ui="<side-chain-toggle>",
         show_reference_background=False,
         show_mutation_differences=True,
+        show_sidechains=False,
     )
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
 
     assert "<reference-background-toggle>" in rendered_text
     assert "<mutation-toggle>" in rendered_text
+    assert "<side-chain-toggle>" in rendered_text
     assert "Candidate differences" in rendered_text
     assert "canonical_mutations" in rendered_text
     assert "A1G, A2G" in rendered_text
-    assert "ec86kit/7V9U reference" not in rendered_text
+    assert "Ec86/7V9U all-atom reference" not in rendered_text
     assert '"model":0,"resi":[3,4]' in unescaped_rendered
+    assert '"stick":{"color":"#009E73","radius":0.16}' not in unescaped_rendered
     assert "data-selection-id=&quot;candidate_differences&quot;" in rendered_text or (
         'data-selection-id="candidate_differences"' in rendered_text
     )

@@ -17,6 +17,11 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.structure_file_fixtures import (
+    write_mmcif_all_atom_reference,
+    write_pdb,
+)
+
 
 def write_foldcheck_review_manifest(review_root: Path) -> None:
     """Write a compact fold-review manifest and ranking table."""
@@ -126,10 +131,21 @@ def _write_foldcheck_full_structure_set(review_root: Path) -> None:
     structure_root = review_root / "structures" / "full_fold_set"
     structure_root.mkdir(parents=True, exist_ok=True)
     reference_path = review_root / "structures" / "ec86kit_chain_a_backbone_reference.pdb"
-    _write_pdb(reference_path, residue_count=309)
-    _write_pdb(structure_root / "wild_type.pdb", residue_count=311, coordinate_offset=12.0)
-    _write_pdb(structure_root / "thread_candidate_alpha.pdb", residue_count=311, coordinate_offset=18.0)
-    _write_pdb(structure_root / "thread_candidate_beta.pdb", residue_count=311, coordinate_offset=24.0)
+    write_pdb(reference_path, residue_count=309)
+    write_mmcif_all_atom_reference(review_root / "structures" / "ec86kit_protomer1_all_atom_reference.cif")
+    write_pdb(structure_root / "wild_type.pdb", residue_count=311, coordinate_offset=12.0, include_sidechains=True)
+    write_pdb(
+        structure_root / "thread_candidate_alpha.pdb",
+        residue_count=311,
+        coordinate_offset=18.0,
+        include_sidechains=True,
+    )
+    write_pdb(
+        structure_root / "thread_candidate_beta.pdb",
+        residue_count=311,
+        coordinate_offset=24.0,
+        include_sidechains=True,
+    )
     review_root.joinpath("foldcheck_full_structure_set.yaml").write_text(
         yaml.safe_dump(
             {
@@ -173,18 +189,3 @@ def _write_foldcheck_full_structure_set(review_root: Path) -> None:
         ),
         encoding="utf-8",
     )
-
-
-def _write_pdb(path: Path, *, residue_count: int, coordinate_offset: float = 0.0) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = []
-    atom_index = 1
-    for residue_index in range(1, residue_count + 1):
-        x_coord = float(residue_index) + coordinate_offset
-        lines.append(
-            f"ATOM  {atom_index:5d}  CA  GLY A{residue_index:4d}    "
-            f"{x_coord:8.3f}{0.0:8.3f}{0.0:8.3f}  1.00 80.00           C"
-        )
-        atom_index += 1
-    lines.append("END")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")

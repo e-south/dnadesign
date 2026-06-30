@@ -37,7 +37,6 @@ def _():
         load_review_manifest,
         render_deliverable_panel,
         render_deliverable_details,
-        render_interpretation_note,
         render_intro,
         review_lane_lookup,
         section_deliverables,
@@ -50,39 +49,38 @@ def _():
         notebook_structure_browser as structure_runtime,
     )
 
-    load_sae_top_feature_rows = sae_runtime.load_sae_top_feature_rows
+    is_sae_feature_heatmap_deliverable = sae_runtime.is_sae_feature_heatmap_deliverable
+    load_sae_feature_heatmap_manifest = sae_runtime.load_sae_feature_heatmap_manifest
     load_structure_browser_rows = structure_runtime.load_structure_browser_rows
-    render_sae_feature_inspector = sae_runtime.render_sae_feature_inspector
+    render_sae_feature_heatmap = sae_runtime.render_sae_feature_heatmap
+    sae_heatmap_feature_lookup = sae_runtime.sae_heatmap_feature_lookup
     render_structure_browser = structure_runtime.render_structure_browser
-    sae_feature_lookup = sae_runtime.sae_feature_lookup
-    sae_protein_lookup = sae_runtime.sae_protein_lookup
-    selected_sae_feature_rows = sae_runtime.selected_sae_feature_rows
     structure_browser_lookup = structure_runtime.structure_browser_lookup
     structure_group_lookup = structure_runtime.structure_group_lookup
+    structure_highlight_lookup = structure_runtime.structure_highlight_lookup
 
     return (
         deliverable_lookup,
         format_deliverable_label,
         is_interactive_structure_deliverable,
+        is_sae_feature_heatmap_deliverable,
         load_review_manifest,
-        load_sae_top_feature_rows,
+        load_sae_feature_heatmap_manifest,
         load_structure_browser_rows,
         mo,
         render_deliverable_details,
         render_deliverable_panel,
-        render_interpretation_note,
         render_intro,
-        render_sae_feature_inspector,
+        render_sae_feature_heatmap,
         render_structure_browser,
         review_lane_lookup,
-        sae_feature_lookup,
-        sae_protein_lookup,
+        sae_heatmap_feature_lookup,
         section_deliverables,
         section_label_lookup,
         selected_deliverable,
-        selected_sae_feature_rows,
         structure_browser_lookup,
         structure_group_lookup,
+        structure_highlight_lookup,
         visual_deliverables,
     )
 
@@ -182,15 +180,6 @@ def _(deliverable_id_ui, deliverable_map, deliverable_options, selected_delivera
 
 
 @app.cell
-def _(deliverables, load_sae_top_feature_rows, manifest_root):
-    sae_top_feature_rows = load_sae_top_feature_rows(
-        manifest_root=manifest_root,
-        deliverables=deliverables,
-    )
-    return sae_top_feature_rows
-
-
-@app.cell
 def _(deliverables, load_structure_browser_rows, manifest_root):
     structure_browser_rows = load_structure_browser_rows(
         manifest_root=manifest_root,
@@ -262,93 +251,146 @@ def _(structure_map, structure_ui):
 
 
 @app.cell
-def _(mo):
-    structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
-    structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
-    return structure_background_ui, structure_mutation_ui
+def _(mo, selected_structure_row, structure_browser_rows, structure_highlight_lookup):
+    structure_highlight_map = structure_highlight_lookup(
+        structure_browser_rows,
+        selected_row=selected_structure_row,
+    )
+    structure_highlight_options = list(structure_highlight_map)
+    structure_highlight_ui = mo.ui.dropdown(
+        structure_highlight_options,
+        value=structure_highlight_options[0] if structure_highlight_options else None,
+        label="SAE highlight",
+        full_width=True,
+    )
+    return structure_highlight_map, structure_highlight_ui
 
 
 @app.cell
-def _(structure_background_ui, structure_mutation_ui):
+def _(structure_highlight_map, structure_highlight_ui):
+    selected_structure_highlight = None
+    if structure_highlight_ui is not None and structure_highlight_ui.value:
+        selected_structure_highlight = structure_highlight_map.get(str(structure_highlight_ui.value))
+    return selected_structure_highlight
+
+
+@app.cell
+def _(mo):
+    structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
+    structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
+    structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
+    structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
+    structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
+    structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
+    return (
+        structure_background_ui,
+        structure_dna_ui,
+        structure_mutation_ui,
+        structure_protein_ui,
+        structure_rna_ui,
+        structure_sidechain_ui,
+    )
+
+
+@app.cell
+def _(
+    structure_background_ui,
+    structure_dna_ui,
+    structure_mutation_ui,
+    structure_protein_ui,
+    structure_rna_ui,
+    structure_sidechain_ui,
+):
     show_reference_background = True
     show_mutation_differences = False
+    show_sidechains = True
+    highlight_protein = False
+    highlight_dna = False
+    highlight_rna = False
     if structure_background_ui is not None:
         show_reference_background = bool(structure_background_ui.value)
     if structure_mutation_ui is not None:
         show_mutation_differences = bool(structure_mutation_ui.value)
-    return show_mutation_differences, show_reference_background
-
-
-@app.cell
-def _(mo, sae_protein_lookup, sae_top_feature_rows, selected_section):
-    protein_map = sae_protein_lookup(sae_top_feature_rows, selected_section=selected_section)
-    protein_options = list(protein_map)
-    sae_protein_ui = mo.ui.dropdown(
-        protein_options,
-        value=protein_options[0] if protein_options else None,
-        label="Protein",
-        full_width=True,
+    if structure_sidechain_ui is not None:
+        show_sidechains = bool(structure_sidechain_ui.value)
+    if structure_protein_ui is not None:
+        highlight_protein = bool(structure_protein_ui.value)
+    if structure_dna_ui is not None:
+        highlight_dna = bool(structure_dna_ui.value)
+    if structure_rna_ui is not None:
+        highlight_rna = bool(structure_rna_ui.value)
+    return (
+        highlight_dna,
+        highlight_protein,
+        highlight_rna,
+        show_mutation_differences,
+        show_reference_background,
+        show_sidechains,
     )
-    return protein_map, sae_protein_ui
 
 
 @app.cell
-def _(protein_map, sae_protein_ui, sae_top_feature_rows, selected_sae_feature_rows):
-    selected_sae_protein = ""
-    if sae_protein_ui is not None and sae_protein_ui.value:
-        selected_sae_protein = str(protein_map.get(str(sae_protein_ui.value), ""))
-    selected_feature_rows = selected_sae_feature_rows(
-        sae_top_feature_rows,
-        candidate_id=selected_sae_protein,
+def _(load_sae_feature_heatmap_manifest, manifest_root, selected_visual):
+    sae_heatmap_manifest = load_sae_feature_heatmap_manifest(
+        manifest_root=manifest_root,
+        selected_visual=selected_visual,
     )
-    return selected_feature_rows, selected_sae_protein
+    return sae_heatmap_manifest
 
 
 @app.cell
-def _(mo, sae_feature_lookup, selected_feature_rows):
-    feature_map = sae_feature_lookup(selected_feature_rows)
-    feature_options = list(feature_map)
-    sae_feature_ui = mo.ui.dropdown(
-        feature_options,
-        value=feature_options[0] if feature_options else None,
+def _(mo, sae_heatmap_feature_lookup, sae_heatmap_manifest):
+    sae_heatmap_feature_map = sae_heatmap_feature_lookup(sae_heatmap_manifest)
+    sae_heatmap_feature_options = list(sae_heatmap_feature_map)
+    sae_heatmap_feature_ui = mo.ui.dropdown(
+        sae_heatmap_feature_options,
+        value=sae_heatmap_feature_options[0] if sae_heatmap_feature_options else None,
         label="SAE feature",
         full_width=True,
     )
-    return feature_map, sae_feature_ui
+    return sae_heatmap_feature_map, sae_heatmap_feature_ui
 
 
 @app.cell
-def _(feature_map, sae_feature_ui):
-    selected_sae_feature = None
-    if sae_feature_ui is not None and sae_feature_ui.value:
-        selected_sae_feature = feature_map.get(str(sae_feature_ui.value))
-    return selected_sae_feature
+def _(sae_heatmap_feature_map, sae_heatmap_feature_ui):
+    selected_sae_heatmap_feature = None
+    if sae_heatmap_feature_ui is not None and sae_heatmap_feature_ui.value:
+        selected_sae_heatmap_feature = sae_heatmap_feature_map.get(str(sae_heatmap_feature_ui.value))
+    return selected_sae_heatmap_feature
 
 
 @app.cell
 def _(
     deliverable_id_ui,
     deliverable_section_ui,
-    deliverables,
     is_interactive_structure_deliverable,
+    is_sae_feature_heatmap_deliverable,
     manifest_root,
     mo,
     render_deliverable_details,
     render_deliverable_panel,
-    render_interpretation_note,
-    render_sae_feature_inspector,
+    render_sae_feature_heatmap,
     render_structure_browser,
-    sae_feature_ui,
-    sae_protein_ui,
-    selected_section,
-    selected_sae_feature,
+    sae_heatmap_feature_ui,
+    sae_heatmap_manifest,
+    selected_sae_heatmap_feature,
+    selected_structure_highlight,
+    highlight_dna,
+    highlight_protein,
+    highlight_rna,
     show_mutation_differences,
     show_reference_background,
+    show_sidechains,
     structure_background_ui,
+    structure_dna_ui,
+    structure_highlight_ui,
     selected_structure_row,
     selected_visual,
     structure_group_ui,
     structure_mutation_ui,
+    structure_protein_ui,
+    structure_rna_ui,
+    structure_sidechain_ui,
     structure_ui,
     review_lane_ui,
 ):
@@ -362,27 +404,35 @@ def _(
                     selected_row=selected_structure_row,
                     structure_ui=structure_ui,
                     structure_group_ui=structure_group_ui,
+                    structure_highlight_ui=structure_highlight_ui,
+                    selected_highlight_row=selected_structure_highlight,
                     structure_background_ui=structure_background_ui,
                     structure_mutation_ui=structure_mutation_ui,
+                    structure_sidechain_ui=structure_sidechain_ui,
+                    structure_protein_ui=structure_protein_ui,
+                    structure_dna_ui=structure_dna_ui,
+                    structure_rna_ui=structure_rna_ui,
                     show_reference_background=show_reference_background,
                     show_mutation_differences=show_mutation_differences,
+                    show_sidechains=show_sidechains,
+                    highlight_protein=highlight_protein,
+                    highlight_dna=highlight_dna,
+                    highlight_rna=highlight_rna,
                 ),
-                render_interpretation_note(selected_visual, mo=mo),
+                render_deliverable_details(selected_visual, mo=mo),
+            ]
+        elif is_sae_feature_heatmap_deliverable(selected_visual):
+            rendered = [
+                render_sae_feature_heatmap(
+                    mo=mo,
+                    heatmap_manifest=sae_heatmap_manifest,
+                    selected_feature_index=selected_sae_heatmap_feature,
+                    feature_ui=sae_heatmap_feature_ui,
+                ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
         else:
             rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
-        if selected_section == "esmc_feature_review":
-            rendered.append(
-                render_sae_feature_inspector(
-                    mo=mo,
-                    manifest_root=manifest_root,
-                    deliverables=deliverables,
-                    selected_row=selected_sae_feature,
-                    protein_ui=sae_protein_ui,
-                    feature_ui=sae_feature_ui,
-                )
-            )
         panel = mo.vstack(
             [
                 mo.hstack(

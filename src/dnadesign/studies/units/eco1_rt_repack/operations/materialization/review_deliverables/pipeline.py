@@ -22,15 +22,18 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
 )
 
 from .biohub_esmc_sae_interpretation import write_biohub_esmc_sae_interpretation_panels
+from .biohub_esmc_sequence_preference import write_biohub_esmc_sequence_preference_deliverables
 from .constants import (
     ALIGNED_FASTA_RELATIVE_PATH,
     BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
+    BIOHUB_ESMC_FEATURE_HEATMAP_DIR_NAME,
     BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH,
     BIOHUB_ESMC_PROTEIN_FEATURES_FILE_NAME,
     BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
     BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
     BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME,
     BIOHUB_ESMC_SAE_PROFILE_FILE_NAME,
+    BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME,
     BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
     CANDIDATE_TABLE_FILE_NAME,
     CONSERVATION_PROFILE_FILE_NAME,
@@ -38,7 +41,6 @@ from .constants import (
     DEFAULT_OUTPUT_ROOT,
     DELIVERABLE_DIR_NAME,
     FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
-    FOLDCHECK_REPORT_FILE_NAME,
     FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH,
     FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
     MANIFEST_FILE_NAME,
@@ -68,6 +70,7 @@ from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
 from .sae_structure_browser import write_sae_structure_browser_manifest
 from .structure_browser import write_interactive_structure_browser_manifest
+from .structure_browser_common import REFERENCE_STRUCTURE_RELATIVE_PATH, stage_browser_reference_structure
 
 
 def materialize_review_deliverables(
@@ -109,6 +112,12 @@ def materialize_review_deliverables(
     )
 
     mask_residues = read_mask_residues(mask_set_path)
+    foldcheck_review_root = out_root / Path(FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH).parent
+    foldcheck_reference_backbone_path = foldcheck_review_root / REFERENCE_STRUCTURE_RELATIVE_PATH
+    browser_reference = stage_browser_reference_structure(
+        repo_root=root,
+        reference_backbone_path=foldcheck_reference_backbone_path,
+    )
     deliverables: list[dict[str, Any]] = [
         write_msa_plurality_mask_panel(
             panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
@@ -147,7 +156,8 @@ def materialize_review_deliverables(
         write_mask_structure_browser_manifest(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
             mask_set_path=mask_set_path,
-            reference_backbone_path=reference_backbone_path,
+            reference_structure_path=browser_reference.local_path,
+            reference_structure_format=browser_reference.structure_format,
             mask_residues=mask_residues,
         )
     )
@@ -160,12 +170,28 @@ def materialize_review_deliverables(
         )
     )
     deliverables.extend(_linked_foldcheck_review_rows(out_root / FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH))
+    sequence_preference_deliverables = write_biohub_esmc_sequence_preference_deliverables(
+        panel_root=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME,
+        candidate_table_path=candidate_table_path,
+        wt_substitution_llr_path=out_root / BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
+        wt_mutation_scoring_manifest_path=out_root
+        / BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH
+        / "wt_mutation_scoring_manifest.yaml",
+        foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+    )
+    deliverables.extend(sequence_preference_deliverables)
     deliverables.append(
         write_interactive_structure_browser_manifest(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
             full_structure_set_path=out_root / FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            reference_structure_path=browser_reference.local_path,
+            reference_structure_format=browser_reference.structure_format,
+            alignment_reference_path=foldcheck_reference_backbone_path,
             candidate_table_path=candidate_table_path,
+            candidate_preference_table_path=deliverable_root
+            / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME
+            / "biohub_esmc_variant_llr_scores.parquet",
         )
     )
     deliverables.extend(
@@ -177,15 +203,14 @@ def materialize_review_deliverables(
     deliverables.extend(
         write_biohub_esmc_sae_interpretation_panels(
             panel_root=deliverable_root / BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME,
+            heatmap_root=deliverable_root / BIOHUB_ESMC_FEATURE_HEATMAP_DIR_NAME,
             profile_path=out_root / BIOHUB_ESMC_SAE_PROFILE_FILE_NAME,
             protein_features_path=out_root / BIOHUB_ESMC_PROTEIN_FEATURES_FILE_NAME,
             residue_features_path=out_root / BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
             feature_catalog_path=out_root / BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
             request_manifest_path=out_root / BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
-            candidate_table_path=candidate_table_path,
-            foldcheck_report_path=out_root / FOLDCHECK_REPORT_FILE_NAME,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
-            wt_substitution_llr_path=out_root / BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
+            mask_residues=mask_residues,
         )
     )
     deliverables.append(
@@ -196,6 +221,9 @@ def materialize_review_deliverables(
             / "protein_top_sae_features.parquet",
             residue_features_path=out_root / BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
             full_structure_set_path=out_root / FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
+            reference_structure_path=browser_reference.local_path,
+            reference_structure_format=browser_reference.structure_format,
+            alignment_reference_path=foldcheck_reference_backbone_path,
         )
     )
     deliverables.append(_planned_feasibility_handoff_row(deliverable_root))

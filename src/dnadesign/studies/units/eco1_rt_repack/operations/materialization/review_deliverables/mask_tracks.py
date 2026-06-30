@@ -47,14 +47,14 @@ _TRACKS = (
     ("wang_ec86_direct_contact_prior", "Wang/Ec86 priors", OKABE_ITO["purple"]),
     ("direct_retained_dna_rna_contact_5a", "DNA/RNA within 5 A", OKABE_ITO["orange"]),
     ("evolutionarily_conserved_clade9_25pct_plurality", "Clade 9 plurality", OKABE_ITO["blue"]),
-    ("protected", "Protected union", "#4d4d4d"),
-    ("non_fixed", "Design canvas", OKABE_ITO["green"]),
-    ("non_fixed_missing_backbone", "Missing-backbone canvas", "#9a9a9a"),
+    ("protected", "Fixed-residue union", "#4d4d4d"),
+    ("non_fixed", "ProteinMPNN-designable residues", OKABE_ITO["green"]),
+    ("non_fixed_missing_backbone", "Unprotected missing-backbone termini", "#9a9a9a"),
 )
-_MASK_TRACK_BLOCK_SIZE = 64
+_MASK_TRACK_BLOCK_SIZE = 48
 _CHIMERAX_COLOR_ORDER = (
     ("protected", "#d9d2c3", "protected union"),
-    ("non_fixed", "#6aa84f", "design canvas"),
+    ("non_fixed", "#6aa84f", "ProteinMPNN-designable residues"),
     ("evolutionarily_conserved_clade9_25pct_plurality", "#4d78a8", "clade 9 plurality"),
     ("direct_retained_dna_rna_contact_5a", "#d19a33", "5 A DNA/RNA contact"),
     ("wang_ec86_direct_contact_prior", "#8b62a8", "Wang/Ec86 prior"),
@@ -81,39 +81,37 @@ def write_linear_mask_tracks(
     """Render linear mask tracks over canonical residue positions."""
 
     residues = mask_residues if mask_residues is not None else read_mask_residues(mask_set_path)
-    title = "Protected evidence defines fixed residues and the design canvas"
+    title = "Residue mask evidence across Ec86 RT"
     residues_by_position = {int(row["canonical_position"]): row for row in residues}
     positions = sorted(residues_by_position)
-    blocks = _position_blocks(positions, block_size=_MASK_TRACK_BLOCK_SIZE)
-    block_count = len(blocks)
-    fig_height = max(4.8, block_count * 1.76 + 1.32)
-    fig, axes = plt.subplots(block_count, 1, figsize=(16.2, fig_height), squeeze=False)
-    for index, (ax, block_positions) in enumerate(zip(axes.flatten(), blocks, strict=True)):
-        _draw_mask_track_block(
-            ax,
-            block_positions=block_positions,
-            residues_by_position=residues_by_position,
-            panel_title=title if index == 0 else None,
-        )
+    fig_width = max(14.0, min(36.0, len(positions) * 0.105))
+    fig_height = 4.9
+    fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+    _draw_mask_track_matrix(
+        ax,
+        positions=positions,
+        residues_by_position=residues_by_position,
+    )
     fig.legend(
         handles=[Patch(facecolor=color, label=label) for _field, label, color in _TRACKS],
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.012),
+        bbox_to_anchor=(0.5, 0.015),
         ncol=len(_TRACKS),
         frameon=False,
         fontsize=LEGEND_SIZE - 1,
-        columnspacing=1.05,
+        columnspacing=0.95,
         handletextpad=0.45,
     )
-    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.073)
-    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.012)
-    fig.subplots_adjust(left=0.13, right=0.995, bottom=0.135, top=0.92, hspace=0.46)
+    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.11)
+    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.018)
+    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.965)
+    fig.subplots_adjust(left=0.15, right=0.995, bottom=0.25, top=0.79)
 
     path = panel_root / "linear_mask_tracks.svg"
     alt = (
         "Linear Eco1 RT mask-track panel showing motif anchors, Wang/Ec86 priors, "
         "retained DNA/RNA 5 A contacts, clade 9 plurality protection, protected union, "
-        "and mutable design canvas tracks."
+        "and ProteinMPNN-designable residue tracks."
     )
     save_accessible_svg(fig, path, title=title, description=alt, dpi=300)
     return make_deliverable_row(
@@ -126,8 +124,9 @@ def write_linear_mask_tracks(
         input_hashes=file_hashes({"mask_set": mask_set_path}),
         alt_text=alt,
         description=(
-            "Separates each protection reason and the remaining design canvas on a single residue-coordinate axis. "
-            "Each square cell represents one canonical residue in one evidence track."
+            "Separates each protection reason and the remaining ProteinMPNN-designable residues "
+            "on one residue-coordinate matrix. "
+            "Each cell represents one canonical residue in one evidence track."
         ),
         interpretation_limit=(
             "Mask tracks describe what was fixed or mutable for the current ProteinMPNN "
@@ -362,7 +361,10 @@ def _position_tick_indexes(positions: list[int]) -> list[int]:
         return list(range(len(positions)))
     indexes = [0, *range(4, len(positions), 5)]
     if indexes[-1] != len(positions) - 1:
-        indexes.append(len(positions) - 1)
+        if len(positions) - 1 - indexes[-1] < 4:
+            indexes[-1] = len(positions) - 1
+        else:
+            indexes.append(len(positions) - 1)
     return indexes
 
 
@@ -376,16 +378,15 @@ def _position_blocks(positions: list[int], *, block_size: int) -> list[list[int]
     return [positions[start : start + block_size] for start in range(0, len(positions), block_size)]
 
 
-def _draw_mask_track_block(
+def _draw_mask_track_matrix(
     ax: Any,
     *,
-    block_positions: list[int],
+    positions: list[int],
     residues_by_position: dict[int, dict[str, Any]],
-    panel_title: str | None = None,
 ) -> None:
-    position_to_index = {position: index for index, position in enumerate(block_positions)}
+    position_to_index = {position: index for index, position in enumerate(positions)}
     for y_index, (field, _label, color) in enumerate(_TRACKS):
-        for position in block_positions:
+        for position in positions:
             row = residues_by_position[position]
             x_index = position_to_index[position]
             ax.add_patch(
@@ -398,37 +399,25 @@ def _draw_mask_track_block(
                     linewidth=0.2,
                 )
             )
-    ax.set_xlim(-0.5, len(block_positions) - 0.5)
+    ax.set_xlim(-0.5, len(positions) - 0.5)
     ax.set_ylim(len(_TRACKS) - 0.5, -0.5)
-    ax.set_aspect("equal", adjustable="box")
+    ax.set_aspect("auto")
     ax.set_yticks(range(len(_TRACKS)), [label for _field, label, _color in _TRACKS], fontsize=TICK_SIZE)
-    bottom_tick_indexes = _position_tick_indexes(block_positions)
+    bottom_tick_indexes = _position_tick_indexes(positions)
     ax.set_xticks(
         bottom_tick_indexes,
-        [str(block_positions[index]) for index in bottom_tick_indexes],
+        [str(positions[index]) for index in bottom_tick_indexes],
         fontsize=TICK_SIZE,
     )
-    top_tick_indexes = _wt_residue_tick_indexes(block_positions)
+    top_tick_indexes = _wt_residue_tick_indexes(positions)
     top_axis = ax.secondary_xaxis("top")
     top_axis.set_xticks(
         top_tick_indexes,
-        [str(residues_by_position[block_positions[index]].get("wt_aa") or "") for index in top_tick_indexes],
-        fontsize=6.4 if len(block_positions) > 48 else TICK_SIZE,
+        [str(residues_by_position[positions[index]].get("wt_aa") or "") for index in top_tick_indexes],
+        fontsize=6.6 if len(positions) > 120 else 8.2,
     )
-    top_axis.tick_params(length=0, pad=2)
-    block_title = f"Ec86 positions {block_positions[0]}-{block_positions[-1]}"
-    if panel_title:
-        ax.set_title(f"{panel_title}\n{block_title}", fontsize=TITLE_SIZE, pad=22)
-    else:
-        ax.text(
-            0.5,
-            1.12,
-            block_title,
-            transform=ax.transAxes,
-            ha="center",
-            va="bottom",
-            fontsize=LABEL_SIZE,
-        )
+    top_axis.tick_params(length=0, pad=3)
+    top_axis.set_xlabel("WT residue", fontsize=LABEL_SIZE, labelpad=8)
     ax.grid(axis="x", color="#d0d7de", alpha=0.28, linewidth=0.42)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)

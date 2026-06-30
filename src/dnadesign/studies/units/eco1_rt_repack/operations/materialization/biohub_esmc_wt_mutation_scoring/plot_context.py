@@ -42,7 +42,7 @@ def build_position_context_spans(mask_set_path: Path) -> list[dict[str, object]]
         _boolean_spans(
             residues,
             field="protected",
-            label="Protected residues",
+            label="Mask-protected residues",
             color=_PROTECTED_COLOR,
             alpha=0.16,
             zorder=0.24,
@@ -67,12 +67,10 @@ def _rt_interval_spans(residues: list[dict[str, Any]]) -> list[dict[str, object]
                     "start": start,
                     "end": end,
                     "label": label,
-                    "legend_label": "RT1-RT7 review spans",
-                    "annotate_label": label,
+                    "legend_label": "RT1-RT7 annotation intervals",
                     "color": _RT_INTERVAL_COLOR,
                     "alpha": 0.075,
                     "zorder": 0.10,
-                    "label_y": 0.89,
                 }
             )
     return spans
@@ -94,12 +92,10 @@ def _motif_spans(residues: list[dict[str, Any]]) -> list[dict[str, object]]:
                     "start": start,
                     "end": end,
                     "label": label,
-                    "legend_label": "Motif anchors",
-                    "annotate_label": label,
+                    "legend_label": "NAxxH/YADD/VTG motif anchors",
                     "color": _MOTIF_COLOR,
                     "alpha": 0.28,
                     "zorder": 0.28,
-                    "label_y": 0.97,
                 }
             )
     return spans

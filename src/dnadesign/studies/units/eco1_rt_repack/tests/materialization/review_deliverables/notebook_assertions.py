@@ -83,7 +83,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'sorted({str(row["section"])' not in notebook_text
     assert "Repacking Eco1 reverse transcriptase for structured-template assays" in combined_text
     assert "Tao-style fixed-backbone" in combined_text
-    assert "repack the remaining design canvas" in combined_text
+    assert "repack the remaining designable residues" in combined_text
     assert "Mestre-derived clade 9" in combined_text
     assert "active mask uses" in combined_text
     assert "WT ESMC" in combined_text
@@ -117,14 +117,24 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "ESMC feature review" in combined_text
     assert "Feasibility and handoff" in combined_text
     assert "Planned downstream gate" in combined_text
-    assert "biohub_esmc_protein_top_sae_features" in combined_text
-    assert "Protein" in notebook_text
-    assert "WT Ec86 control" in combined_text
+    assert "sae_feature_heatmap_manifest" in combined_text
+    assert "is_sae_feature_heatmap_deliverable" in combined_text
+    assert "render_sae_feature_heatmap" in combined_text
+    assert "sae_heatmap_feature_lookup" in combined_text
+    assert "structure_sidechain_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Side-chain sticks"' in notebook_text
+    assert "structure_protein_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Protein color"' in notebook_text
+    assert "structure_dna_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="DNA color"' in notebook_text
+    assert "structure_rna_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="RNA color"' in notebook_text
+    assert "WT Ec86 control" not in combined_text
     assert "SAE feature" in notebook_text
     assert "is_interactive_structure_deliverable(" in combined_text
     assert "render_deliverable_details(" in combined_text
     assert 'if selected_section == "fold_review":' not in notebook_text
-    assert "No source-backed description is available for this exact SAE dictionary" in combined_text
+    assert "No source-backed description is available for this exact SAE dictionary" not in combined_text
     assert "Reference sequence, alignment, and mask" not in combined_text
     assert "Reference scaffold and mask evidence" not in combined_text
     assert "ProteinMPNN sequence proposals" not in combined_text
@@ -137,6 +147,10 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'label="Reference background"' in notebook_text
     assert "structure_mutation_ui = mo.ui.checkbox" in notebook_text
     assert 'label="Mutation differences"' in notebook_text
+    assert "show_sidechains" in notebook_text
+    assert "highlight_dna" in notebook_text
+    assert "highlight_rna" in notebook_text
+    assert "highlight_protein" in notebook_text
     assert "selected_deliverable_id=selected_visual_id" in notebook_text
     assert "selected_group=selected_structure_group" in notebook_text
     assert "structure_group_lookup" in combined_text
@@ -153,48 +167,19 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "mask_structure_context_orientation_template" not in notebook_text
     assert "structure_overlay_skipped" not in notebook_text
     assert "render_deliverable_artifact(" in runtime_text
-    assert "render_interpretation_note(" in combined_text
-    assert "<strong>Interpretation limit:</strong>" in combined_text
+    assert "render_interpretation_note(" not in combined_text
+    assert "<strong>Interpretation limit:</strong>" not in combined_text
     assert "overflow-x:auto" not in combined_text
+    assert "data-zoom-target" in combined_text
+    assert "visual_zoom_script" in combined_text
+    assert "maxScale = 24.0" in combined_text
     assert "wide_visual" in combined_text
     assert "render_mode" in combined_text
     assert "is_wide_visual" in combined_text
     assert "width:100%" in combined_text
-    assert "max-width:100%" in combined_text
+    assert "max-width:none" in combined_text
     assert "Interpretation limit" in combined_text
     assert "\n    deliverable_section_ui\n" not in notebook_text
     for cell in notebook_text.split("@app.cell"):
         if "deliverable_section_ui = mo.ui.dropdown(" in cell:
             assert ".value" not in cell
-
-
-def assert_chimerax_context_scripts(
-    *,
-    manifest_path: Path,
-    deliverables: dict[str, dict[str, Any]],
-    forbidden_path_text: str,
-) -> None:
-    """Assert ChimeraX review scripts are portable and preserve the mask-context contract."""
-
-    chimerax_text = resolve_manifest_path(
-        manifest_path,
-        deliverables["mask_structure_context_script"]["path"],
-    ).read_text(encoding="utf-8")
-    assert "eco1_rt_clade9_plurality25_direct_contact5a_v1" in chimerax_text
-    assert "set bgColor white" in chimerax_text
-    assert "camera ortho" in chimerax_text
-    assert '2dlabels text "Ec86 reference"' in chimerax_text
-    assert "view orient" in chimerax_text
-    assert "# orientation_preset_id: ec86_reference_thumb_down_v1" in chimerax_text
-    assert "design canvas" in chimerax_text
-    assert "color" in chimerax_text
-    assert forbidden_path_text not in chimerax_text
-
-    orientation_text = resolve_manifest_path(
-        manifest_path,
-        deliverables["mask_structure_context_orientation_template"]["path"],
-    ).read_text(encoding="utf-8")
-    assert "Manual orientation handoff" in orientation_text
-    assert "save mask_structure_context_orientation.cxs" in orientation_text
-    assert "exit" not in orientation_text
-    assert forbidden_path_text not in orientation_text

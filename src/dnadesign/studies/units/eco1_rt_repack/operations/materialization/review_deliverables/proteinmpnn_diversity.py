@@ -49,6 +49,38 @@ _MOTIF_LABELS = {
     "catalytic_yadd": "YADD",
     "retron_y_vtg": "VTG",
 }
+_MUTATION_CONTEXT_LAYERS = (
+    (
+        "rt_interval_review_label",
+        "#6e7781",
+        0.075,
+        "RT1-RT7 annotation intervals",
+    ),
+    (
+        "direct_retained_dna_rna_contact_5a",
+        OKABE_ITO["orange"],
+        0.13,
+        "Retained DNA/RNA <=5 A",
+    ),
+    (
+        "evolutionarily_conserved_clade9_25pct_plurality",
+        OKABE_ITO["blue"],
+        0.11,
+        "Clade 9 >=25% WT plurality",
+    ),
+    (
+        "wang_ec86_direct_contact_prior",
+        OKABE_ITO["purple"],
+        0.16,
+        "Wang/Ec86 direct-contact priors",
+    ),
+    (
+        "motif_protected",
+        OKABE_ITO["vermillion"],
+        0.30,
+        "Motif anchors: NAxxH/YADD/VTG",
+    ),
+)
 
 
 def write_proteinmpnn_diversity_panels(
@@ -98,8 +130,8 @@ def _write_score_mutation_burden(
     rows: list[dict[str, Any]],
     candidate_table_path: Path,
 ) -> dict[str, Any]:
-    title = "ProteinMPNN proposes sequence diversity inside the mutable canvas"
-    fig, axes = plt.subplots(1, 2, figsize=(11.4, 5.4))
+    title = "ProteinMPNN proposal scores and mutation burden"
+    fig, axes = plt.subplots(1, 2, figsize=(10.0, 4.55))
     temperatures = [float(row["temperature"]) for row in rows]
     colors = [_temperature_color(temperature) for temperature in temperatures]
     axes[0].scatter(
@@ -111,7 +143,7 @@ def _write_score_mutation_burden(
         linewidths=0.35,
     )
     axes[0].set_xlabel("Mutation count", fontsize=LABEL_SIZE)
-    axes[0].set_ylabel("Reported ProteinMPNN score (lower is better)", fontsize=LABEL_SIZE)
+    axes[0].set_ylabel("ProteinMPNN score", fontsize=LABEL_SIZE)
     axes[0].set_title("Score versus mutation burden", fontsize=LABEL_SIZE)
     axes[1].scatter(
         [float(row["seq_recovery"]) * 100.0 for row in rows],
@@ -122,7 +154,7 @@ def _write_score_mutation_burden(
         linewidths=0.35,
     )
     axes[1].set_xlabel("Sequence identity to Ec86 WT (%)", fontsize=LABEL_SIZE)
-    axes[1].set_ylabel("Reported global score (lower is better)", fontsize=LABEL_SIZE)
+    axes[1].set_ylabel("Global score", fontsize=LABEL_SIZE)
     axes[1].set_title("Global score versus WT identity", fontsize=LABEL_SIZE)
     for ax in axes:
         style_open_axes(ax)
@@ -146,11 +178,11 @@ def _write_score_mutation_burden(
         title="Sampling temperature",
         title_fontsize=LEGEND_SIZE,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.025),
+        bbox_to_anchor=(0.5, -0.005),
         ncol=len(handles),
     )
-    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.995)
-    fig.tight_layout(rect=(0, 0.16, 1, 0.93))
+    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.965)
+    fig.subplots_adjust(left=0.125, right=0.985, top=0.84, bottom=0.24, wspace=0.24)
 
     path = panel_root / "proteinmpnn_score_mutation_burden.svg"
     alt = (
@@ -193,7 +225,7 @@ def _write_mutation_density(
             if match:
                 counts[int(match.group("position"))] += 1
     positions = sorted(counts)
-    title = "ProteinMPNN mutations concentrate in the mutable design canvas"
+    title = "ProteinMPNN mutation density across allowed residues"
     fig, ax = plt.subplots(figsize=(12.8, 4.8))
     _draw_residue_context_spans(ax, mask_residues)
     ax.bar(
@@ -209,7 +241,7 @@ def _write_mutation_density(
     ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
     style_open_axes(ax)
     _add_context_legend(fig, mask_residues)
-    bottom = 0.20 if mask_residues else 0.12
+    bottom = 0.22 if mask_residues else 0.12
     fig.tight_layout(rect=(0, bottom, 1, 0.96))
 
     path = panel_root / "proteinmpnn_mutation_density.svg"
@@ -228,8 +260,8 @@ def _write_mutation_density(
         alt_text=alt,
         description="Shows where ProteinMPNN sampled mutations under the current mask.",
         interpretation_limit=(
-            "Mutation density describes sampled design variation and does not imply "
-            "residue importance or biochemical effect."
+            "Mutation density describes sampled sequence variation under the current mask. "
+            "It does not imply residue importance or biochemical effect."
         ),
         title=title,
     )
@@ -240,47 +272,32 @@ def _temperature_color(temperature: float) -> str:
 
 
 def _draw_residue_context_spans(ax: Any, mask_residues: list[dict[str, Any]]) -> None:
-    for start, end, label in _rt_interval_segments(mask_residues):
-        _draw_labeled_context_span(
-            ax,
-            start=start,
-            end=end,
-            label=label,
-            color="#111111",
-            alpha=0.075,
-            zorder=0,
-            label_y=0.89,
-        )
-    for start, end in _boolean_segments(mask_residues, "protected"):
-        ax.axvspan(start - 0.5, end + 0.5, color=OKABE_ITO["orange"], alpha=0.16, linewidth=0, zorder=0.2)
-    for start, end, label in _motif_segments(mask_residues):
-        _draw_labeled_context_span(
-            ax,
-            start=start,
-            end=end,
-            label=label,
-            color=OKABE_ITO["vermillion"],
-            alpha=0.28,
-            zorder=0.3,
-            label_y=0.97,
-        )
+    for field, color, alpha, _label in _MUTATION_CONTEXT_LAYERS:
+        if field == "rt_interval_review_label":
+            segments = [(start, end) for start, end, _label in _rt_interval_segments(mask_residues)]
+        elif field == "motif_protected":
+            segments = [(start, end) for start, end, _label in _motif_segments(mask_residues)]
+        else:
+            segments = _boolean_segments(mask_residues, field)
+        for start, end in segments:
+            ax.axvspan(start - 0.5, end + 0.5, color=color, alpha=alpha, linewidth=0, zorder=0)
 
 
 def _add_context_legend(fig: Any, mask_residues: list[dict[str, Any]]) -> None:
     if not mask_residues:
         return
     handles = [
-        Patch(facecolor="#111111", alpha=0.075, label="RT1-RT7 review spans"),
-        Patch(facecolor=OKABE_ITO["orange"], alpha=0.16, label="Protected residues"),
-        Patch(facecolor=OKABE_ITO["vermillion"], alpha=0.28, label="Motif anchors"),
+        Patch(facecolor=color, alpha=alpha, label=label) for _field, color, alpha, label in _MUTATION_CONTEXT_LAYERS
     ]
     fig.legend(
         handles=handles,
         frameon=False,
         fontsize=LEGEND_SIZE,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.025),
+        bbox_to_anchor=(0.5, 0.0),
         ncol=3,
+        columnspacing=1.0,
+        handletextpad=0.42,
     )
 
 
@@ -309,33 +326,6 @@ def _motif_segments(mask_residues: list[dict[str, Any]]) -> list[tuple[int, int,
         label = _MOTIF_LABELS.get(reason, reason.replace("_", " "))
         segments.extend((start, end, label) for start, end in _segments(by_reason[reason]))
     return segments
-
-
-def _draw_labeled_context_span(
-    ax: Any,
-    *,
-    start: int,
-    end: int,
-    label: str,
-    color: str,
-    alpha: float,
-    zorder: float,
-    label_y: float,
-) -> None:
-    ax.axvspan(start - 0.5, end + 0.5, color=color, alpha=alpha, linewidth=0, zorder=zorder)
-    ax.text(
-        (start + end) / 2.0,
-        label_y,
-        label,
-        transform=ax.get_xaxis_transform(),
-        ha="center",
-        va="top",
-        fontsize=8.5,
-        color="#2f363d",
-        bbox={"boxstyle": "round,pad=0.08", "facecolor": "white", "edgecolor": "none", "alpha": 0.72},
-        zorder=5,
-        clip_on=False,
-    )
 
 
 def _boolean_segments(mask_residues: list[dict[str, Any]], field: str) -> list[tuple[int, int]]:

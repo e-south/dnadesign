@@ -67,7 +67,7 @@ def write_tao_style_fold_validation(
     if not joined_rows:
         raise ValueError("No candidate rows could be joined to fold-review ranking rows")
 
-    fig = plt.figure(figsize=(7.4, 8.0))
+    fig = plt.figure(figsize=(7.1, 7.4))
     grid = gridspec.GridSpec(2, 2, width_ratios=[4.0, 1.02], height_ratios=[1.0, 4.0], hspace=0.06, wspace=0.06)
     ax_hist_x = fig.add_subplot(grid[0, 0])
     ax = fig.add_subplot(grid[1, 0], sharex=ax_hist_x)
@@ -107,8 +107,8 @@ def write_tao_style_fold_validation(
     ax_hist_x.spines["bottom"].set_visible(True)
     ax_hist_y.spines["left"].set_visible(True)
     ax.set_box_aspect(1)
-    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.985)
-    fig.subplots_adjust(left=0.12, right=0.96, bottom=0.16, top=0.90)
+    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.965)
+    fig.subplots_adjust(left=0.115, right=0.985, bottom=0.16, top=0.89)
 
     path = panel_root / "proteinmpnn_tao_style_fold_validation.svg"
     alt = (

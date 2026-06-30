@@ -45,12 +45,13 @@ from .esmc_model_constraint_metadata import (
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+_MOTIF_ANCHOR_CLASS = "Motif anchors: NAxxH/YADD/VTG"
 _CLASS_COLORS = {
-    "Motif": OKABE_ITO["purple"],
-    "DNA/RNA contact": OKABE_ITO["blue"],
-    "Clade 9 plurality": OKABE_ITO["green"],
-    "Other protected": OKABE_ITO["orange"],
-    "Mutable": "#9aa1a8",
+    _MOTIF_ANCHOR_CLASS: OKABE_ITO["purple"],
+    "Retained DNA/RNA <=5 A": OKABE_ITO["blue"],
+    "Clade 9 >=25% WT plurality": OKABE_ITO["green"],
+    "Other fixed-mask residues": OKABE_ITO["orange"],
+    "ProteinMPNN-designable residues": "#9aa1a8",
 }
 
 
@@ -150,7 +151,7 @@ def _write_plurality_entropy_scatter(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "High clade 9 plurality usually corresponds to low ESMC entropy"
+    title = "Clade 9 plurality is inversely related to ESMC entropy"
     plurality_values = [float(row["wt_plurality_frequency"]) for row in rows]
     entropy_values = [float(row["canonical_entropy_bits"]) for row in rows]
     pearson_r = _pearson_r(plurality_values, entropy_values)
@@ -170,19 +171,18 @@ def _write_plurality_entropy_scatter(
             edgecolors="#ffffff",
             linewidths=0.35,
         )
-    ax.axvline(0.25, color="#6e7781", linestyle="--", linewidth=1.2)
     annotation_box = {"boxstyle": "round,pad=0.18", "facecolor": "white", "edgecolor": "none", "alpha": 0.82}
-    ax.text(
-        0.255,
-        0.05,
-        "25% plurality threshold",
-        transform=ax.get_xaxis_transform(),
-        fontsize=TICK_SIZE,
-        rotation=90,
-        ha="left",
-        va="bottom",
-        bbox=annotation_box,
-    )
+    fit = _linear_fit(plurality_values, entropy_values)
+    if fit is not None:
+        x_min, x_max, slope, intercept = fit
+        ax.plot(
+            [x_min, x_max],
+            [slope * x_min + intercept, slope * x_max + intercept],
+            color="#24292f",
+            linewidth=1.35,
+            label=f"Linear fit, R2 = {r2:.2f}",
+            zorder=4,
+        )
     ax.set_xlabel("Clade 9 WT plurality frequency", fontsize=LABEL_SIZE)
     ax.set_ylabel("ESMC masked-position entropy (bits)", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
@@ -197,7 +197,7 @@ def _write_plurality_entropy_scatter(
         va="top",
         bbox=annotation_box,
     )
-    _add_class_legend_below(fig, ax, ncol=3)
+    _add_class_legend_below(fig, ax, ncol=2)
     fig.tight_layout(rect=(0, 0.15, 1, 0.98))
 
     path = panel_root / "msa_plurality_vs_esmc_entropy.svg"
@@ -248,20 +248,8 @@ def _write_plurality_best_alt_scatter(
             edgecolors="#ffffff",
             linewidths=0.35,
         )
-    ax.axvline(0.25, color="#6e7781", linestyle="--", linewidth=1.2)
     ax.axhline(0.0, color="#6e7781", linestyle=":", linewidth=1.2)
     annotation_box = {"boxstyle": "round,pad=0.18", "facecolor": "white", "edgecolor": "none", "alpha": 0.82}
-    ax.text(
-        0.255,
-        0.05,
-        "25% plurality threshold",
-        transform=ax.get_xaxis_transform(),
-        fontsize=TICK_SIZE,
-        rotation=90,
-        ha="left",
-        va="bottom",
-        bbox=annotation_box,
-    )
     ax.text(
         0.02,
         0.05,
@@ -399,7 +387,7 @@ def _draw_mask_background(ax: Any, rows: list[dict[str, Any]]) -> None:
             start - 0.5,
             end + 0.5,
             color=_CLASS_COLORS[label],
-            alpha=0.055 if label != "Motif" else 0.10,
+            alpha=0.055 if label != _MOTIF_ANCHOR_CLASS else 0.10,
             linewidth=0,
             zorder=0,
         )
@@ -433,14 +421,14 @@ def _observed_class_handles(rows: list[dict[str, Any]]) -> list[Patch]:
 
 def _constraint_class(row: dict[str, Any]) -> str:
     if bool(row.get("motif_protected")):
-        return "Motif"
+        return _MOTIF_ANCHOR_CLASS
     if bool(row.get("direct_retained_dna_rna_contact_5a")):
-        return "DNA/RNA contact"
+        return "Retained DNA/RNA <=5 A"
     if bool(row.get("evolutionarily_conserved_clade9_25pct_plurality")):
-        return "Clade 9 plurality"
+        return "Clade 9 >=25% WT plurality"
     if bool(row.get("protected")):
-        return "Other protected"
-    return "Mutable"
+        return "Other fixed-mask residues"
+    return "ProteinMPNN-designable residues"
 
 
 def _style_scatter_axes(ax: Any) -> None:
@@ -461,6 +449,22 @@ def _add_class_legend_below(fig: Any, ax: Any, *, ncol: int) -> None:
             bbox_to_anchor=(0.5, 0.025),
             ncol=ncol,
         )
+
+
+def _linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float, float, float] | None:
+    finite_pairs = [(x, y) for x, y in zip(xs, ys, strict=True) if math.isfinite(x) and math.isfinite(y)]
+    if len(finite_pairs) < 2:
+        return None
+    x_values = [pair[0] for pair in finite_pairs]
+    y_values = [pair[1] for pair in finite_pairs]
+    x_mean = sum(x_values) / len(x_values)
+    y_mean = sum(y_values) / len(y_values)
+    denominator = sum((x - x_mean) ** 2 for x in x_values)
+    if denominator == 0.0:
+        return None
+    slope = sum((x - x_mean) * (y - y_mean) for x, y in finite_pairs) / denominator
+    intercept = y_mean - slope * x_mean
+    return min(x_values), max(x_values), slope, intercept
 
 
 def _pearson_r(xs: list[float], ys: list[float]) -> float:

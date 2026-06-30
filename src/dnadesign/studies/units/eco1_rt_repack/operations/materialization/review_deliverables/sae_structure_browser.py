@@ -27,7 +27,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 
 from .structure_browser_common import (
     REFERENCE_COLOR,
-    REFERENCE_STRUCTURE_RELATIVE_PATH,
     display_label,
     nullable_float,
     nullable_int,
@@ -37,7 +36,7 @@ from .structure_browser_common import (
 
 SAE_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "biohub_esmc_sae_structure_browser_manifest.yaml"
 _SAE_HIGHLIGHT_COLOR = "#D55E00"
-_SAE_STRUCTURE_FEATURES_PER_PROTEIN = 2
+_SAE_STRUCTURE_FEATURES_PER_PROTEIN = 10
 
 
 def write_sae_structure_browser_manifest(
@@ -46,6 +45,9 @@ def write_sae_structure_browser_manifest(
     top_feature_table_path: Path,
     residue_features_path: Path,
     full_structure_set_path: Path,
+    reference_structure_path: Path,
+    reference_structure_format: str,
+    alignment_reference_path: Path,
 ) -> dict[str, Any]:
     """Write an interactive structure-browser manifest for SAE activation regions."""
 
@@ -60,9 +62,10 @@ def write_sae_structure_browser_manifest(
     if not isinstance(source, dict) or source.get("schema_id") != "eco1_rt.foldcheck_full_structure_set":
         raise ValueError(f"Expected eco1_rt.foldcheck_full_structure_set at {full_structure_set_path}")
 
-    reference_path = full_structure_set_path.parent / REFERENCE_STRUCTURE_RELATIVE_PATH
-    if not reference_path.exists():
-        raise ValueError(f"SAE structure browser reference path is missing: {reference_path}")
+    if not reference_structure_path.exists():
+        raise ValueError(f"SAE structure browser reference path is missing: {reference_structure_path}")
+    if not alignment_reference_path.exists():
+        raise ValueError(f"SAE structure browser alignment reference path is missing: {alignment_reference_path}")
     structure_paths = _structure_path_by_candidate(
         source_rows=list(source.get("structures") or []),
         source_root=full_structure_set_path.parent,
@@ -75,7 +78,8 @@ def write_sae_structure_browser_manifest(
         top_feature_rows=top_feature_rows,
         residue_features_path=residue_features_path,
         structure_paths=structure_paths,
-        reference_path=reference_path,
+        reference_path=reference_structure_path,
+        reference_structure_format=reference_structure_format,
         manifest_root=manifest_path.parent,
         query_start_residue=3,
         reference_start_residue=1,
@@ -99,11 +103,13 @@ def write_sae_structure_browser_manifest(
             repo_relative_hint(top_feature_table_path),
             repo_relative_hint(residue_features_path),
             repo_relative_hint(full_structure_set_path),
+            repo_relative_hint(reference_structure_path),
         ],
         "reference": {
             "model_id": "ec86kit_7v9u_reference",
-            "display_label": "ec86kit/7V9U reference",
-            "local_path": relative_path(reference_path, manifest_path.parent),
+            "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
+            "local_path": relative_path(reference_structure_path, manifest_path.parent),
+            "structure_format": reference_structure_format,
             "color": REFERENCE_COLOR,
         },
         "alignment": {
@@ -112,6 +118,8 @@ def write_sae_structure_browser_manifest(
             "query_start_residue": 3,
             "reference_start_residue": 1,
             "residue_count": 309,
+            "reference_local_path": relative_path(alignment_reference_path, manifest_path.parent),
+            "reference_structure_format": "pdb",
             "output_policy": "query coordinates are aligned in memory for browser viewing; local PDB files stay raw",
         },
         "control_label": "SAE activation feature",
@@ -144,6 +152,8 @@ def write_sae_structure_browser_manifest(
                 "top_feature_table": top_feature_table_path,
                 "residue_features": residue_features_path,
                 "full_structure_set": full_structure_set_path,
+                "reference_structure": reference_structure_path,
+                "alignment_reference": alignment_reference_path,
             }
         ),
         alt_text="Interactive structure browser for Biohub ESMC SAE feature activation regions.",
@@ -156,6 +166,12 @@ def write_sae_structure_browser_manifest(
         title="Biohub ESMC SAE activation regions can be inspected on structure",
         role="interactive_review",
     )
+
+
+def _reference_display_label(reference_structure_path: Path, reference_structure_format: str) -> str:
+    if reference_structure_format == "mmcif" or "all_atom" in reference_structure_path.stem:
+        return "Ec86/7V9U all-atom reference"
+    return "ec86kit/7V9U reference"
 
 
 def _missing_sae_structure_row(
@@ -210,6 +226,7 @@ def _sae_activation_rows(
     residue_features_path: Path,
     structure_paths: dict[str, Path],
     reference_path: Path,
+    reference_structure_format: str,
     manifest_root: Path,
     query_start_residue: int,
     reference_start_residue: int,
@@ -258,6 +275,7 @@ def _sae_activation_rows(
                 "display_label": _sae_structure_label(top_row),
                 "group": "WT/reference SAE activations" if is_reference else "ProteinMPNN variant SAE activations",
                 "local_path": relative_path(local_path, manifest_root),
+                "structure_format": reference_structure_format if is_reference else "pdb",
                 "color": "#0072B2" if is_reference else "#009E73",
                 "structure_view_mode": "reference_selection" if is_reference else "sae_activation",
                 "description": _sae_structure_description(top_row),

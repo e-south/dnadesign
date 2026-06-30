@@ -410,8 +410,8 @@ def _figure_size(row_count: int) -> tuple[float, float]:
 
 def _figure_width(row_count: int) -> float:
     if row_count <= 80:
-        return 16.2
-    return 17.8
+        return 18.4
+    return 22.4
 
 
 def _figure_height(row_count: int) -> float:
@@ -448,8 +448,8 @@ def _position_tick_indexes(positions: list[int]) -> list[int]:
 
 def _residue_label_size(position_count: int, row_count: int) -> float:
     if row_count <= 80:
-        return 6.6 if position_count <= 180 else 5.8
-    return 5.0
+        return 7.4 if position_count <= 180 else 6.4
+    return 6.0
 
 
 def _display_difference_score(

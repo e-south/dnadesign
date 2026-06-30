@@ -28,7 +28,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 
 from .structure_browser_common import (
     REFERENCE_COLOR,
-    REFERENCE_STRUCTURE_RELATIVE_PATH,
     display_label,
     nullable_float,
     nullable_int,
@@ -45,7 +44,11 @@ def write_interactive_structure_browser_manifest(
     panel_root: Path,
     full_structure_set_path: Path,
     foldcheck_ranking_path: Path,
+    reference_structure_path: Path,
+    reference_structure_format: str,
+    alignment_reference_path: Path,
     candidate_table_path: Path | None = None,
+    candidate_preference_table_path: Path | None = None,
 ) -> dict[str, Any]:
     """Write a compact manifest that lets marimo browse local fold structures."""
 
@@ -59,9 +62,12 @@ def write_interactive_structure_browser_manifest(
         raise ValueError(f"Expected eco1_rt.foldcheck_full_structure_set at {full_structure_set_path}")
 
     ranking = _ranking_by_candidate(foldcheck_ranking_path)
-    reference_path = full_structure_set_path.parent / REFERENCE_STRUCTURE_RELATIVE_PATH
-    if not reference_path.exists():
-        raise ValueError(f"interactive structure browser reference path is missing: {reference_path}")
+    if not reference_structure_path.exists():
+        raise ValueError(f"interactive structure browser reference path is missing: {reference_structure_path}")
+    if not alignment_reference_path.exists():
+        raise ValueError(
+            f"interactive structure browser alignment reference path is missing: {alignment_reference_path}"
+        )
     query_start_residue = 3
     reference_start_residue = 1
     structures = _structure_rows(
@@ -74,6 +80,7 @@ def write_interactive_structure_browser_manifest(
             query_start_residue=query_start_residue,
             reference_start_residue=reference_start_residue,
         ),
+        esmc_scores_by_candidate=_esmc_scores_by_candidate(candidate_preference_table_path),
     )
     source_tables = [
         repo_relative_hint(full_structure_set_path),
@@ -82,10 +89,15 @@ def write_interactive_structure_browser_manifest(
     input_hash_paths = {
         "full_structure_set": full_structure_set_path,
         "foldcheck_ranking": foldcheck_ranking_path,
+        "reference_structure": reference_structure_path,
+        "alignment_reference": alignment_reference_path,
     }
     if candidate_table_path is not None:
         source_tables.append(repo_relative_hint(candidate_table_path))
         input_hash_paths["candidate_table"] = candidate_table_path
+    if candidate_preference_table_path is not None and candidate_preference_table_path.exists():
+        source_tables.append(repo_relative_hint(candidate_preference_table_path))
+        input_hash_paths["candidate_preference_table"] = candidate_preference_table_path
     payload = {
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
         "schema_version": 1,
@@ -97,8 +109,9 @@ def write_interactive_structure_browser_manifest(
         "source_tables": source_tables,
         "reference": {
             "model_id": "ec86kit_7v9u_reference",
-            "display_label": "ec86kit/7V9U reference",
-            "local_path": relative_path(reference_path, manifest_path.parent),
+            "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
+            "local_path": relative_path(reference_structure_path, manifest_path.parent),
+            "structure_format": reference_structure_format,
             "color": REFERENCE_COLOR,
         },
         "alignment": {
@@ -107,6 +120,8 @@ def write_interactive_structure_browser_manifest(
             "query_start_residue": query_start_residue,
             "reference_start_residue": reference_start_residue,
             "residue_count": 309,
+            "reference_local_path": relative_path(alignment_reference_path, manifest_path.parent),
+            "reference_structure_format": "pdb",
             "output_policy": "query coordinates are aligned in memory for browser viewing; local PDB files stay raw",
         },
         "structures": structures,
@@ -125,6 +140,7 @@ def write_interactive_structure_browser_manifest(
         source_tables=[
             "foldcheck_review/foldcheck_full_structure_set.yaml",
             "foldcheck_review/foldcheck_candidate_ranking.parquet",
+            repo_relative_hint(reference_structure_path),
         ],
         input_hashes=file_hashes(input_hash_paths),
         alt_text="Manifest for interactive browser review of reference-fitted local ColabFold structure models.",
@@ -138,6 +154,12 @@ def write_interactive_structure_browser_manifest(
         title="Reference-fitted ColabFold structures can be inspected one at a time",
         role="interactive_review",
     )
+
+
+def _reference_display_label(reference_structure_path: Path, reference_structure_format: str) -> str:
+    if reference_structure_format == "mmcif" or "all_atom" in reference_structure_path.stem:
+        return "Ec86/7V9U all-atom reference"
+    return "ec86kit/7V9U reference"
 
 
 def _missing_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]:
@@ -212,6 +234,7 @@ def _structure_rows(
     manifest_root: Path,
     ranking: dict[str, dict[str, Any]],
     mutations_by_candidate: dict[str, dict[str, Any]],
+    esmc_scores_by_candidate: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for row_index, row in enumerate(source_rows):
@@ -228,12 +251,14 @@ def _structure_rows(
             raise ValueError(f"declared structure path is missing for {candidate_id}: {local_path}")
         rank_row = ranking.get(candidate_id, {})
         mutation_payload = mutations_by_candidate.get(candidate_id, {})
+        esmc_payload = esmc_scores_by_candidate.get(candidate_id, {})
         rows.append(
             {
                 "candidate_id": candidate_id,
                 "display_label": display_label(candidate_id, row),
                 "group": _structure_group(candidate_id, rank_row),
                 "local_path": relative_path(local_path, manifest_root),
+                "structure_format": "pdb",
                 "color": _structure_color(candidate_id, rank_row),
                 "review_rank": nullable_int(rank_row.get("review_rank")),
                 "review_class": str(rank_row.get("review_class") or ""),
@@ -247,20 +272,42 @@ def _structure_rows(
                 or len(mutation_payload.get("canonical_positions") or []),
                 "canonical_mutations": mutation_payload.get("canonical_mutations", []),
                 "mutation_residue_numbers": mutation_payload.get("query_residue_numbers", []),
+                "esmc_llr_total": nullable_float(esmc_payload.get("llr_total")),
+                "esmc_llr_per_mutation": nullable_float(esmc_payload.get("llr_per_mutation")),
+                "esmc_mutations_scored_count": nullable_int(esmc_payload.get("mutations_scored_count")),
+                "esmc_scoring_method_id": str(esmc_payload.get("scoring_method_id") or ""),
             }
         )
     return sorted(rows, key=_structure_sort_key)
 
 
+def _esmc_scores_by_candidate(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    table = pq.read_table(
+        path,
+        columns=[
+            "candidate_id",
+            "scoring_method_id",
+            "mutation_count",
+            "mutations_scored_count",
+            "llr_total",
+            "llr_per_mutation",
+            "status",
+        ],
+    )
+    return {str(row["candidate_id"]): row for row in table.to_pylist()}
+
+
 def _structure_group(candidate_id: str, rank_row: dict[str, Any]) -> str:
     if candidate_id == "wild_type":
-        return "WT baseline"
+        return "0 WT ColabFold baseline"
     review_class = str(rank_row.get("review_class") or "")
     if review_class in {"strong_fold_preserved", "good_fold_preserved"}:
-        return "Low-deviation fold-check candidates"
+        return "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)"
     if review_class in {"structural_outlier", "low_confidence"}:
-        return "Review outliers"
-    return "Other fold-check candidates"
+        return "3 Hold for review (CA RMSD > 5.0 A or pLDDT < 90)"
+    return "2 Intermediate fold review band"
 
 
 def _structure_color(candidate_id: str, rank_row: dict[str, Any]) -> str:

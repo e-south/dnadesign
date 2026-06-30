@@ -74,34 +74,36 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
     counts = Counter(str(row.get("review_class") or "metric_missing") for row in rows)
     labels = [label for label in _CLASS_ORDER if counts.get(label)]
     values = [counts[label] for label in labels]
-    fig, ax = plt.subplots(figsize=(7.2, 4.0))
-    ax.bar(range(len(labels)), values, color=[_CLASS_COLORS[label] for label in labels])
-    ax.set_xticks(range(len(labels)), [_human_label(label) for label in labels], rotation=22, ha="right", fontsize=12)
-    ax.set_ylabel("Candidate count", fontsize=_LABEL_SIZE)
-    ax.set_title("Fold-review labels summarize continuous structure metrics", fontsize=_TITLE_SIZE, pad=10)
-    ax.grid(axis="y", alpha=0.25)
+    fig, ax = plt.subplots(figsize=(6.8, 6.8))
+    y_positions = list(range(len(labels)))
+    ax.barh(y_positions, values, color=[_CLASS_COLORS[label] for label in labels])
+    ax.set_yticks(y_positions, [_review_class_tick_label(label) for label in labels], fontsize=10.5)
+    ax.invert_yaxis()
+    ax.set_xlabel("Candidate count", fontsize=_LABEL_SIZE)
+    ax.set_title("Fold-review bins are threshold summaries", fontsize=_TITLE_SIZE, pad=10)
+    ax.grid(axis="x", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(axis="y", labelsize=_TICK_SIZE)
-    fig.tight_layout()
+    ax.tick_params(axis="x", labelsize=_TICK_SIZE)
+    fig.subplots_adjust(left=0.43, right=0.98, top=0.9, bottom=0.12)
     path = plot_root / "review_class_counts.svg"
     alt = (
         f"Bar chart of Eco1 fold-review classes for {len(rows)} candidates. "
-        + ", ".join(f"{_human_label(label)}: {counts[label]}" for label in labels)
+        + ", ".join(f"{_review_class_plain_label(label)}: {counts[label]}" for label in labels)
         + "."
     )
     _save_accessible_svg(
         fig,
         path,
-        title="Fold-review labels summarize continuous structure metrics",
+        title="Fold-review bins are threshold summaries",
         description=alt,
     )
     return _plot_row(
         plot_id="review_class_counts",
         path=path,
-        title="Fold-review labels summarize continuous structure metrics",
+        title="Fold-review bins are threshold summaries",
         alt_text=alt,
         description=(
-            "Counts candidates in the review labels used for structural inspection. "
+            "Counts candidates in the fold-review bins used for structural inspection. "
             "Use the continuous RMSD and pLDDT plots for metric-level interpretation."
         ),
         interpretation_limit="Review labels are triage summaries, not candidate acceptance decisions.",
@@ -256,7 +258,7 @@ def _scatter_review_rows(ax: Any, rows: list[dict[str, Any]], *, x_key: str, y_k
         [_float(row.get(y_key)) for row in rows],
         s=36,
         alpha=0.82,
-        label=_human_label(label),
+        label=_review_class_plain_label(label),
         color=_CLASS_COLORS[label],
         edgecolors="#ffffff",
         linewidths=0.35,
@@ -312,7 +314,31 @@ def _inject_svg_accessibility(path: Path, *, title: str, description: str) -> No
 
 
 def _human_label(value: str) -> str:
-    return value.replace("_", " ").capitalize()
+    return _review_class_plain_label(value)
+
+
+def _review_class_tick_label(value: str) -> str:
+    labels = {
+        "strong_fold_preserved": "RMSD <= 1.25 A\nand pLDDT >= 91.5",
+        "good_fold_preserved": "RMSD <= 2.0 A\nand pLDDT >= 90",
+        "review_band": "Intermediate review band",
+        "low_confidence": "pLDDT < 90",
+        "structural_outlier": "RMSD > 5.0 A",
+        "metric_missing": "Metric missing",
+    }
+    return labels.get(value, value.replace("_", " "))
+
+
+def _review_class_plain_label(value: str) -> str:
+    labels = {
+        "strong_fold_preserved": "WT-runtime CA RMSD <= 1.25 A and mean pLDDT >= 91.5",
+        "good_fold_preserved": "WT-runtime CA RMSD <= 2.0 A and mean pLDDT >= 90",
+        "review_band": "Intermediate fold-review band",
+        "low_confidence": "Mean pLDDT < 90",
+        "structural_outlier": "WT-runtime CA RMSD > 5.0 A",
+        "metric_missing": "Metric missing",
+    }
+    return labels.get(value, value.replace("_", " "))
 
 
 def _float(value: Any) -> float:

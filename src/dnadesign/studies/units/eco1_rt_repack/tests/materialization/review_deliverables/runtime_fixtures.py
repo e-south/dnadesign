@@ -26,6 +26,8 @@ def mask_row(
 
     return {
         "canonical_position": position,
+        "structure_chain_id": "A" if mapped else "",
+        "structure_residue_id": position if mapped else None,
         "mapping_status": "mapped" if mapped else "unresolved_structure",
         "has_backbone_coordinates": mapped,
         "motif_protected": motif,
@@ -64,6 +66,10 @@ class FakeMo:
     @staticmethod
     def Html(value: str) -> str:
         return value
+
+    @staticmethod
+    def iframe(value: str, **kwargs: Any) -> dict[str, Any]:
+        return {"kind": "iframe", "value": value, "kwargs": kwargs}
 
     @staticmethod
     def hstack(items: list[Any], **kwargs: Any) -> dict[str, Any]:

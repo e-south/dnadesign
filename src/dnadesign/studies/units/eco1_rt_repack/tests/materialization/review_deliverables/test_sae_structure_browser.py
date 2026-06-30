@@ -68,4 +68,6 @@ def test_sae_activation_structure_browser_manifest_renders_feature_regions(tmp_p
     assert "F101" in rendered_text
     assert "Fixture exact-dictionary feature description" in rendered_text
     assert "Candidate SAE activation" in rendered_text
+    assert "Side chains" in rendered_text
+    assert "Candidate side-chain atoms are present and rendered as sticks" in rendered_text
     assert "supports semantic review, not activity" in rendered_text

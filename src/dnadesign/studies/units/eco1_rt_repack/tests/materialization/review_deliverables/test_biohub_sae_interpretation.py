@@ -11,26 +11,25 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import re
+import html
 from pathlib import Path
 
-import pyarrow as pa
 import pyarrow.parquet as pq
-import pytest
 import yaml
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    biohub_esmc_sae_fold_llr as sae_fold_llr,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     biohub_esmc_sae_interpretation as sae_interpretation,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
+    notebook_sae_features,
     sae_structure_browser,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
+    FakeMo,
 )
 
 
@@ -43,13 +42,12 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
 
     activation_pattern = deliverables["biohub_esmc_wt_top_sae_feature_activation_pattern"]
-    activation_ratio = deliverables["biohub_esmc_candidate_top_sae_feature_activation_ratio"]
+    feature_heatmap = deliverables["biohub_esmc_sae_feature_activation_heatmap"]
     top_features = deliverables["biohub_esmc_protein_top_sae_features"]
-    fold_llr_comparison = deliverables["biohub_esmc_sae_fold_llr_comparison"]
     assert top_features["status"] == "materialized"
     assert activation_pattern["status"] == "rendered"
-    assert activation_ratio["status"] == "rendered"
-    assert fold_llr_comparison["status"] == "rendered"
+    assert feature_heatmap["status"] == "rendered"
+    assert feature_heatmap["artifact_kind"] == "sae_feature_heatmap_manifest"
     top_feature_rows = pq.read_table(_resolve_manifest_path(result.manifest_path, top_features["path"])).to_pylist()
     assert {row["candidate_id"] for row in top_feature_rows} == {
         "wild_type",
@@ -73,51 +71,50 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert activation_pattern["evidence_summary"]["model"] == "esmc-6b-2024-12"
     assert activation_pattern["evidence_summary"]["sae_model"] == "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
 
-    activation_ratio_text = _resolve_manifest_path(result.manifest_path, activation_ratio["path"]).read_text(
-        encoding="utf-8"
-    )
-    assert "Candidates vary in WT-active SAE activation ratios" in activation_ratio_text
-    assert "candidate activation sum / WT activation sum" in activation_ratio_text
-    assert "acceptance claims" in activation_ratio["interpretation_limit"]
+    heatmap_manifest = yaml.safe_load(_resolve_manifest_path(result.manifest_path, feature_heatmap["path"]).read_text())
+    assert heatmap_manifest["schema_id"] == "eco1_rt.biohub_esmc_sae_feature_heatmap"
+    assert heatmap_manifest["candidate_order"] == ["wild_type", "thread_candidate_alpha", "thread_candidate_beta"]
+    assert heatmap_manifest["wt_sequence"] == "MKSAYL"
+    assert heatmap_manifest["sequence_length"] == 6
+    assert heatmap_manifest["features"][0]["feature_index"] == 101
+    assert heatmap_manifest["features"][0]["label"].startswith("F101")
+    assert "top tick labels are WT residue letters" in feature_heatmap["description"]
+    assert "acceptance claims" in feature_heatmap["interpretation_limit"]
 
-    fold_llr_text = _resolve_manifest_path(result.manifest_path, fold_llr_comparison["path"]).read_text(
-        encoding="utf-8"
+    loaded_heatmap = notebook_sae_features.load_sae_feature_heatmap_manifest(
+        manifest_root=result.manifest_path.parent,
+        selected_visual=feature_heatmap,
     )
-    assert "SAE similarity, ColabFold confidence, and ESMC mutation scores are compared together" in fold_llr_text
-    assert "WT Ec86" in fold_llr_text
-    assert "V001" in fold_llr_text
-    assert "Fixture exact-dictionary feature description" in fold_llr_text
-    assert "ProteinMPNN variant ordered by SAE similarity" in fold_llr_text
-    assert "WT-normalized SAE feature activation" in fold_llr_text
-    assert "pLDDT" in fold_llr_text
-    assert "single-substitution LLR" in fold_llr_text
-    svg_desc = re.search(r"<desc[^>]*>(.*?)</desc>", fold_llr_text, flags=re.DOTALL)
-    assert svg_desc is not None
-    assert len(svg_desc.group(1)) < 1200
-    assert "SAE similarity to WT" in fold_llr_comparison["description"]
-    assert "rank variants" not in fold_llr_text
-    assert "activation patterns are compared" in fold_llr_text
-    assert "LLR sum, scaled within panel" in fold_llr_text
-    assert "not a joint protein likelihood" in fold_llr_comparison["interpretation_limit"]
-    assert fold_llr_comparison["evidence_summary"]["sequence_rows"] == 3
-    assert fold_llr_comparison["evidence_summary"]["llr_scoring_rule"] == "sum_variant_single_substitution_llrs"
-    assert fold_llr_comparison["evidence_summary"]["sae_model"] == "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
-    assert fold_llr_comparison["evidence_summary"]["wt_mutation_scoring_model"] == "esmc-300m-2024-12"
+    feature_lookup = notebook_sae_features.sae_heatmap_feature_lookup(loaded_heatmap)
+    assert any(label.startswith("F101") for label in feature_lookup)
+    rendered = notebook_sae_features.render_sae_feature_heatmap(
+        mo=FakeMo(),
+        heatmap_manifest=loaded_heatmap,
+        selected_feature_index=101,
+        feature_ui="<feature-dropdown>",
+    )
+    rendered_text = html.unescape(str(rendered))
+    assert "<feature-dropdown>" in rendered_text
+    assert "SAE F101" in rendered_text
+    assert "WT Ec86" in rendered_text
+    assert "V001" in rendered_text
+    assert ">M<" in rendered_text
+    assert ">6<" in rendered_text
+    assert "Missing sparse entries are rendered as zero" in rendered_text
+    assert "data-zoom-target" in rendered_text
 
 
 def test_sae_feature_labels_stay_single_line(tmp_path: Path) -> None:
     write_deliverable_inputs(tmp_path)
 
-    feature_catalog_path = tmp_path / "biohub_esmc_feature_catalog.parquet"
     label = sae_interpretation._feature_axis_label(
         101,
-        "",
+        "Polymerase thumb region",
         "Fixture exact-dictionary feature description for a polymerase-like region.",
     )
-    assert label.startswith("F101 - Fixture exact-dictionary feature description")
+    assert label == "F101 - Polymerase thumb region"
     assert "\n" not in label
     assert len(label) <= 66
-    assert all("\n" not in label for label in sae_fold_llr._feature_labels(feature_catalog_path, [101, 202]))
 
 
 def test_sae_structure_browser_descriptions_stay_concise() -> None:
@@ -133,52 +130,6 @@ def test_sae_structure_browser_descriptions_stay_concise() -> None:
     assert concise.startswith("Right-hand nucleic-acid polymerase module")
     assert "Activation pattern" not in concise
     assert len(concise) <= 261
-
-
-def test_sae_fold_llr_svg_description_stays_concise() -> None:
-    description = sae_fold_llr._panel_accessibility_description(
-        {
-            "feature_labels": ["F101 - " + "long description " * 200] * 12,
-            "row_labels": ["WT Ec86"] + [f"V{index:03d}" for index in range(1, 97)],
-            "feature_descriptions": ["full source-backed description " * 500],
-        }
-    )
-
-    assert len(description) < 500
-    assert "full source-backed description" not in description
-    assert "feature inspector" in description
-
-
-def test_sae_fold_llr_rejects_malformed_candidate_mutations(tmp_path: Path) -> None:
-    candidate_table = tmp_path / "candidate_table.parquet"
-    wt_llr = tmp_path / "wt_substitution_llr.parquet"
-    pq.write_table(
-        pa.Table.from_pylist([{"candidate_id": "thread_candidate_bad", "canonical_mutations": ["bad"]}]),
-        candidate_table,
-    )
-    pq.write_table(
-        pa.Table.from_pylist([{"canonical_position": 1, "alt_aa": "G", "llr": -1.0}]),
-        wt_llr,
-    )
-
-    with pytest.raises(ValueError, match="Malformed canonical mutation"):
-        sae_fold_llr._llr_sum_by_candidate(candidate_table, wt_llr)
-
-
-def test_sae_fold_llr_rejects_missing_substitution_scores(tmp_path: Path) -> None:
-    candidate_table = tmp_path / "candidate_table.parquet"
-    wt_llr = tmp_path / "wt_substitution_llr.parquet"
-    pq.write_table(
-        pa.Table.from_pylist([{"candidate_id": "thread_candidate_bad", "canonical_mutations": ["A1G"]}]),
-        candidate_table,
-    )
-    pq.write_table(
-        pa.Table.from_pylist([{"canonical_position": 1, "alt_aa": "V", "llr": -1.0}]),
-        wt_llr,
-    )
-
-    with pytest.raises(ValueError, match="Missing ESMC LLR"):
-        sae_fold_llr._llr_sum_by_candidate(candidate_table, wt_llr)
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:

@@ -66,9 +66,9 @@ def test_wt_mutation_scoring_materializes_two_position_smoke(tmp_path: Path) -> 
     assert notebook_url in method_urls
     assert "https://www.biohub.ai/api-reference/logits" in method_urls
     entropy_plot_text = (result.plots_root / "wt_entropy_by_position.svg").read_text(encoding="utf-8")
-    assert "RT1-RT7 review spans" in entropy_plot_text
-    assert "Protected residues" in entropy_plot_text
-    assert "Motif anchors" in entropy_plot_text
+    assert "RT1-RT7 annotation intervals" in entropy_plot_text
+    assert "Mask-protected residues" in entropy_plot_text
+    assert "NAxxH/YADD/VTG motif anchors" in entropy_plot_text
 
 
 def test_wt_mutation_scoring_final_run_requires_all_wt_positions(tmp_path: Path) -> None:

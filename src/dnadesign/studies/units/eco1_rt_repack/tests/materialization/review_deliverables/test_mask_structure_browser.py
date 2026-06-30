@@ -61,6 +61,9 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         mo=FakeMo(),
         selected_row=selected,
         structure_ui="<mask-highlight-dropdown>",
+        structure_sidechain_ui="<side-chain-toggle>",
+        structure_dna_ui="<dna-color-toggle>",
+        structure_rna_ui="<rna-color-toggle>",
     )
     rendered_text = str(rendered)
 
@@ -68,8 +71,13 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert "3Dmol" in rendered_text
     assert "Protected union" in rendered_text
     assert "Reference mask evidence" in rendered_text
-    assert "Reference selection:" in rendered_text
+    assert "Reference selection:" not in rendered_text
     assert "No candidate structure is shown" in rendered_text
+    assert "Side-chain display:" not in rendered_text
+    assert "Reference side-chain atoms are present and rendered as sticks" in rendered_text
+    assert "<side-chain-toggle>" in rendered_text
+    assert "<dna-color-toggle>" in rendered_text
+    assert "<rna-color-toggle>" in rendered_text
     assert "What this structure view shows" not in rendered_text
     assert "All residues fixed by at least one active mask rule" in rendered_text
     assert "Interpretation limit:" not in rendered_text
@@ -111,7 +119,8 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
     mask_structure_browser.write_mask_structure_browser_manifest(
         panel_root=tmp_path / "review_deliverables" / "structure_browser",
         mask_set_path=mask_set_path,
-        reference_backbone_path=reference_path,
+        reference_structure_path=reference_path,
+        reference_structure_format="pdb",
         mask_residues=mask_residues,
     )
 

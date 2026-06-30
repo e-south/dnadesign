@@ -89,8 +89,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "biohub_esmc_sae_structure_browser_manifest" in visual_ids
     assert "wt_esmc_entropy_by_position" not in visual_ids
     assert "proteinmpnn_tao_style_fold_validation" in visual_ids
-    assert "biohub_esmc_candidate_top_sae_feature_activation_ratio" in visual_ids
-    assert "biohub_esmc_sae_fold_llr_comparison" in visual_ids
+    assert "biohub_esmc_sae_feature_activation_heatmap" in visual_ids
+    assert "biohub_esmc_candidate_top_sae_feature_activation_ratio" not in visual_ids
+    assert "biohub_esmc_sae_fold_llr_comparison" not in visual_ids
     assert "feasibility_and_handoff_planned" in visual_ids
     assert "wt_esmc_entropy_by_position" in audit_visual_ids
     assert "foldcheck_review_fold_metric_scatter" in audit_visual_ids

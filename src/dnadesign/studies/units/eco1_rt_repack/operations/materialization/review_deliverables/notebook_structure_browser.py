@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import html
 from pathlib import Path
 from typing import Any
 
@@ -25,13 +24,27 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.thread.structure_views import (
     StructureViewModel,
+    StructureViewMoleculeStyle,
     StructureViewSelectionStyle,
     StructureViewSpec,
     render_structure_view_html,
+    summarize_structure_atom_content,
+)
+
+from .notebook_structure_dashboard import (
+    format_float,
+    structure_browser_panel_html,
+    structure_dashboard_rows,
+    structure_metric_rows,
 )
 
 _STRUCTURE_VIEW_WIDTH = 760
 _STRUCTURE_VIEW_HEIGHT = 520
+_MOLECULE_CLASS_COLORS = {
+    "protein": "#0072B2",
+    "dna": "#E69F00",
+    "rna": "#009E73",
+}
 
 
 def load_structure_browser_rows(*, manifest_root: Path, deliverables: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -106,16 +119,50 @@ def structure_group_lookup(
     return groups
 
 
+def structure_highlight_lookup(
+    rows: list[dict[str, Any]],
+    *,
+    selected_row: dict[str, Any] | None,
+) -> dict[str, dict[str, Any] | None]:
+    """Build SAE-highlight options for the currently selected structure."""
+
+    if selected_row is None or str(selected_row.get("structure_view_mode") or "") == "reference_selection":
+        return {}
+    candidate_id = str(selected_row.get("source_candidate_id") or selected_row.get("candidate_id") or "")
+    if not candidate_id:
+        return {}
+    options: dict[str, dict[str, Any] | None] = {"No SAE feature highlight": None}
+    for row in rows:
+        if str(row.get("_deliverable_id") or "") != "biohub_esmc_sae_structure_browser_manifest":
+            continue
+        if str(row.get("source_candidate_id") or row.get("candidate_id") or "") != candidate_id:
+            continue
+        if row.get("feature_index") is None:
+            continue
+        options[_structure_highlight_label(row)] = row
+    return options
+
+
 def render_structure_browser(
     *,
     mo: Any,
     selected_row: dict[str, Any] | None,
     structure_ui: Any,
     structure_group_ui: Any | None = None,
+    structure_highlight_ui: Any | None = None,
+    selected_highlight_row: dict[str, Any] | None = None,
     structure_background_ui: Any | None = None,
     structure_mutation_ui: Any | None = None,
+    structure_sidechain_ui: Any | None = None,
+    structure_protein_ui: Any | None = None,
+    structure_dna_ui: Any | None = None,
+    structure_rna_ui: Any | None = None,
     show_reference_background: bool = True,
     show_mutation_differences: bool = False,
+    show_sidechains: bool = True,
+    highlight_protein: bool = False,
+    highlight_dna: bool = False,
+    highlight_rna: bool = False,
 ) -> Any:
     """Render an interactive browser structure view for one selected fold model."""
 
@@ -127,8 +174,11 @@ def render_structure_browser(
     query_path = resolve_manifest_path(browser_root, str(selected_row.get("local_path") or ""))
     if not reference_path.exists() or not query_path.exists():
         return mo.md("Interactive structure browsing is skipped because a selected PDB path is missing.")
+    reference_format = str(reference.get("structure_format") or "pdb")
+    query_format = str(selected_row.get("structure_format") or "pdb")
     reference_text = reference_path.read_text(encoding="utf-8")
     query_text = query_path.read_text(encoding="utf-8")
+    reference_atom_content = summarize_structure_atom_content(reference_text, structure_format=reference_format)
     alignment_status = "raw_coordinates"
     browser_mapped_ca_rmsd: float | None = None
     alignment = dict(selected_row.get("_alignment") or {})
@@ -137,10 +187,17 @@ def render_structure_browser(
         query_text = ""
         alignment_status = "reference_selection"
     elif str(alignment.get("status") or "") == "enabled":
+        alignment_reference_path = resolve_manifest_path(
+            browser_root,
+            str(alignment.get("reference_local_path") or reference.get("local_path") or ""),
+        )
+        if not alignment_reference_path.exists():
+            return mo.md("Interactive structure alignment is skipped because the alignment reference PDB is missing.")
+        alignment_reference_text = alignment_reference_path.read_text(encoding="utf-8")
         try:
             query_text, browser_mapped_ca_rmsd = align_pdb_text_to_reference_ca(
                 query_text=query_text,
-                reference_text=reference_text,
+                reference_text=alignment_reference_text,
                 query_start_residue=int(alignment.get("query_start_residue", 3)),
                 reference_start_residue=int(alignment.get("reference_start_residue", 1)),
                 residue_count=int(alignment.get("residue_count", 309)),
@@ -148,12 +205,17 @@ def render_structure_browser(
             alignment_status = "aligned_in_memory_to_reference_ca"
         except Exception as exc:  # pragma: no cover - defensive notebook rendering path
             return mo.md(f"Interactive structure alignment failed: `{type(exc).__name__}: {exc}`")
+    query_atom_content = (
+        None if not query_text else summarize_structure_atom_content(query_text, structure_format=query_format)
+    )
     reference_model = StructureViewModel(
         model_id=str(reference.get("model_id") or "reference"),
         structure_text=reference_text,
+        structure_format=reference_format,
         label=str(reference.get("display_label") or "Reference"),
         color=str(reference.get("color") or "#d8d8d8"),
         opacity=0.82,
+        show_sidechains=show_sidechains and reference_atom_content.has_sidechain_atoms,
     )
     query_model_id = str(selected_row.get("source_candidate_id") or selected_row["candidate_id"])
     models = []
@@ -164,12 +226,19 @@ def render_structure_browser(
             StructureViewModel(
                 model_id=query_model_id,
                 structure_text=query_text,
+                structure_format=query_format,
                 label=str(selected_row.get("display_label") or selected_row["candidate_id"]),
                 color=str(selected_row.get("color") or "#0072B2"),
-                show_sidechains=True,
+                show_sidechains=(
+                    show_sidechains and query_atom_content.has_sidechain_atoms
+                    if query_atom_content is not None
+                    else False
+                ),
             )
         )
     selection_styles = _selection_styles(selected_row)
+    if selected_highlight_row is not None and selected_highlight_row is not selected_row:
+        selection_styles += _selection_styles(selected_highlight_row)
     if show_mutation_differences and view_mode != "reference_selection":
         selection_styles += _mutation_selection_styles(selected_row, model_id=query_model_id)
     try:
@@ -180,6 +249,12 @@ def render_structure_browser(
                 description=_structure_browser_description(selected_row),
                 interpretation_limit=_structure_browser_interpretation_limit(selected_row),
                 models=tuple(models),
+                molecule_styles=_molecule_styles(
+                    models,
+                    highlight_protein=highlight_protein,
+                    highlight_dna=highlight_dna,
+                    highlight_rna=highlight_rna,
+                ),
                 selection_styles=selection_styles,
                 width=_STRUCTURE_VIEW_WIDTH,
                 height=_STRUCTURE_VIEW_HEIGHT,
@@ -188,10 +263,26 @@ def render_structure_browser(
         )
     except Exception as exc:  # pragma: no cover - defensive notebook rendering path
         return mo.md(f"Interactive structure viewer failed to render: `{type(exc).__name__}: {exc}`")
-    metric_rows = _structure_metric_rows(
+    metric_rows = structure_metric_rows(
         selected_row,
+        selected_highlight_row=selected_highlight_row,
         alignment_status=alignment_status,
         browser_mapped_ca_rmsd=browser_mapped_ca_rmsd,
+        reference_atom_content=reference_atom_content,
+        query_atom_content=query_atom_content,
+        show_sidechains=show_sidechains,
+    )
+    dashboard_rows = structure_dashboard_rows(
+        selected_row,
+        selected_highlight_row=selected_highlight_row,
+        alignment_status=alignment_status,
+        browser_mapped_ca_rmsd=browser_mapped_ca_rmsd,
+        reference_atom_content=reference_atom_content,
+        query_atom_content=query_atom_content,
+        show_sidechains=show_sidechains,
+        highlight_protein=highlight_protein,
+        highlight_dna=highlight_dna,
+        highlight_rna=highlight_rna,
     )
     return mo.vstack(
         [
@@ -201,8 +292,13 @@ def render_structure_browser(
                     for item in (
                         structure_group_ui,
                         structure_ui,
+                        structure_highlight_ui if view_mode != "reference_selection" else None,
                         structure_background_ui if view_mode != "reference_selection" else None,
                         structure_mutation_ui if view_mode != "reference_selection" else None,
+                        structure_sidechain_ui,
+                        structure_protein_ui,
+                        structure_dna_ui,
+                        structure_rna_ui,
                     )
                     if item is not None
                 ],
@@ -212,9 +308,7 @@ def render_structure_browser(
                 gap=1.0,
                 widths="equal",
             ),
-            mo.Html(html_panel),
-            mo.Html(_structure_metric_summary(selected_row)),
-            mo.Html(_alignment_note(selected_row, alignment_status, browser_mapped_ca_rmsd)),
+            mo.Html(structure_browser_panel_html(html_panel, dashboard_rows, selected_row)),
             mo.accordion(
                 {"Selected structure evidence": mo.ui.table(metric_rows, page_size=8)},
                 multiple=False,
@@ -257,23 +351,7 @@ def _structure_browser_subtitle(row: dict[str, Any]) -> str:
         if residue_count is not None:
             return f"{group} | {int(residue_count)} highlighted residues"
         return group
-    seqid = row.get("sequence_identity_percent")
-    rmsd = row.get("wt_runtime_ca_rmsd")
-    cryoem_rmsd = row.get("cryoem_mapped_ca_rmsd")
-    plddt = row.get("plddt")
-    mutation_count = row.get("mutation_count")
-    details: list[str] = []
-    if plddt is not None:
-        details.append(f"mean pLDDT {float(plddt):.1f}")
-    if rmsd is not None:
-        details.append(f"WT-runtime C-alpha RMSD {float(rmsd):.2f} A")
-    if cryoem_rmsd is not None:
-        details.append(f"direct cryoEM C-alpha RMSD {float(cryoem_rmsd):.2f} A")
-    if seqid is not None:
-        details.append(f"sequence identity {float(seqid):.1f}%")
-    if mutation_count is not None:
-        details.append(f"{int(mutation_count)} mutations")
-    return " | ".join(details)
+    return str(row.get("group") or "Candidate fold overlay")
 
 
 def _structure_browser_description(row: dict[str, Any]) -> str:
@@ -292,132 +370,37 @@ def _camera_memory_key(row: dict[str, Any]) -> str:
     return f"eco1-rt-repack:{deliverable_id}:camera-v2"
 
 
-def _structure_metric_summary(row: dict[str, Any]) -> str:
-    cards = (
-        _reference_metric_cards(row)
-        if str(row.get("structure_view_mode") or "") == "reference_selection"
-        else [
-            ("Mean pLDDT", _format_float(row.get("plddt"), decimals=1)),
-            ("WT-runtime CA RMSD", _format_float(row.get("wt_runtime_ca_rmsd"), decimals=2, suffix=" A")),
-            ("Direct cryoEM CA RMSD", _format_float(row.get("cryoem_mapped_ca_rmsd"), decimals=2, suffix=" A")),
-            ("Sequence identity", _format_float(row.get("sequence_identity_percent"), decimals=1, suffix="%")),
-            ("Mutations", _format_int(row.get("mutation_count"))),
-        ]
-    )
-    card_html = "".join(_metric_card(label, value) for label, value in cards if value)
-    if not card_html:
-        return ""
-    return (
-        '<section aria-label="Structure metric summary" '
-        f'style="margin:0.1rem auto 0 auto; max-width:{_STRUCTURE_VIEW_WIDTH}px; '
-        f'width:min(100%, {_STRUCTURE_VIEW_WIDTH}px);">'
-        '<div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em; '
-        'color:#6e7781; text-align:center; margin-bottom:0.25rem;">Structure metric summary</div>'
-        '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(8.2rem, 1fr)); '
-        'gap:0.35rem;">'
-        f"{card_html}"
-        "</div></section>"
-    )
-
-
-def _reference_metric_cards(row: dict[str, Any]) -> list[tuple[str, str]]:
-    return [
-        ("Highlighted residues", _format_int(row.get("selection_residue_count"))),
-        ("Evidence view", html.escape(str(row.get("group") or "Reference mask evidence"))),
-        ("Base model", "ec86kit/7V9U"),
-    ]
-
-
-def _metric_card(label: str, value: str) -> str:
-    return (
-        '<div style="border:1px solid #d8dee4; border-radius:6px; background:#ffffff; '
-        'padding:0.42rem 0.5rem; text-align:center;">'
-        f'<div style="font-size:0.72rem; color:#6e7781; line-height:1.18;">{html.escape(label)}</div>'
-        f'<div style="font-size:0.98rem; font-weight:650; color:#24292f; line-height:1.25;">'
-        f"{html.escape(value)}</div>"
-        "</div>"
-    )
-
-
-def _format_float(value: Any, *, decimals: int, suffix: str = "") -> str:
-    if value is None:
-        return ""
-    try:
-        return f"{float(value):.{decimals}f}{suffix}"
-    except (TypeError, ValueError):
-        return ""
-
-
-def _format_int(value: Any) -> str:
-    if value is None:
-        return ""
-    try:
-        return str(int(value))
-    except (TypeError, ValueError):
-        return ""
-
-
-def _alignment_note(row: dict[str, Any], alignment_status: str, browser_mapped_ca_rmsd: float | None) -> str:
-    if alignment_status == "reference_selection":
-        group = str(row.get("group") or "")
-        source_text = (
-            "highlighted residues come from the selected SAE activation feature"
-            if "SAE" in group
-            else "highlighted residues come from the current Eco1 mask evidence"
-        )
-        return (
-            '<div style="border-left:3px solid #0969da; padding:0.35rem 0.55rem; '
-            'background:#f6f8fa; color:#24292f; font-size:0.9rem; line-height:1.35;">'
-            f"<strong>Reference selection:</strong> {source_text}. "
-            "No candidate structure is shown in this view."
-            "</div>"
-        )
-    rmsd_text = (
-        "" if browser_mapped_ca_rmsd is None else f" Browser mapped C-alpha RMSD: {browser_mapped_ca_rmsd:.3f} A."
-    )
-    return (
-        '<div style="border-left:3px solid #0969da; padding:0.35rem 0.55rem; '
-        'background:#f6f8fa; color:#24292f; font-size:0.9rem; line-height:1.35;">'
-        f"<strong>Browser alignment:</strong> {alignment_status}.{rmsd_text} "
-        "Raw local ColabFold PDB files are not rewritten."
-        "</div>"
-    )
-
-
-def _structure_metric_rows(
-    row: dict[str, Any],
+def _molecule_styles(
+    models: list[StructureViewModel],
     *,
-    alignment_status: str,
-    browser_mapped_ca_rmsd: float | None,
-) -> list[dict[str, str]]:
-    fields = [
-        "candidate_id",
-        "group",
-        "review_class",
-        "review_rank",
-        "plddt",
-        "wt_runtime_ca_rmsd",
-        "cryoem_mapped_ca_rmsd",
-        "sequence_identity_percent",
-        "mutation_count",
-        "canonical_mutations",
-        "mutation_residue_numbers",
-        "feature_index",
-        "activation_max",
-        "activation_sum",
-        "nonzero_residue_count",
-    ]
-    rows = [{"field": field, "value": _format_metric_value(row.get(field))} for field in fields]
-    rows.extend(
-        [
-            {"field": "browser_alignment_status", "value": alignment_status},
-            {
-                "field": "browser_mapped_ca_rmsd",
-                "value": "" if browser_mapped_ca_rmsd is None else f"{browser_mapped_ca_rmsd:.3f}",
-            },
-        ]
-    )
-    return rows
+    highlight_protein: bool,
+    highlight_dna: bool,
+    highlight_rna: bool,
+) -> tuple[StructureViewMoleculeStyle, ...]:
+    enabled = {
+        "protein": highlight_protein,
+        "dna": highlight_dna,
+        "rna": highlight_rna,
+    }
+    labels = {
+        "protein": "Protein",
+        "dna": "DNA",
+        "rna": "RNA",
+    }
+    styles: list[StructureViewMoleculeStyle] = []
+    for model in models:
+        for molecule_class, is_enabled in enabled.items():
+            if not is_enabled:
+                continue
+            styles.append(
+                StructureViewMoleculeStyle(
+                    molecule_class=molecule_class,  # type: ignore[arg-type]
+                    model_id=model.model_id,
+                    label=labels[molecule_class],
+                    color=_MOLECULE_CLASS_COLORS[molecule_class],
+                )
+            )
+    return tuple(styles)
 
 
 def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle, ...]:
@@ -433,17 +416,23 @@ def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle,
                 residue_numbers=tuple(int(value) for value in item.get("residue_numbers") or []),
                 color=str(item.get("color") or "#D55E00"),
                 opacity=float(item.get("opacity", 1.0)),
+                residue_scope=str(item.get("residue_scope") or "protein"),  # type: ignore[arg-type]
             )
         )
     return tuple(styles)
 
 
-def _format_metric_value(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, (list, tuple)):
-        return ", ".join(str(item) for item in value)
-    return str(value)
+def _structure_highlight_label(row: dict[str, Any]) -> str:
+    feature_index = int(row["feature_index"])
+    rank_text = ""
+    display_label = str(row.get("display_label") or "")
+    if "peak rank " in display_label:
+        rank_text = display_label.split("peak rank ", 1)[1].split("|", 1)[0].strip()
+    activation_max = format_float(row.get("activation_max"), decimals=3)
+    suffix = f" | max {activation_max}" if activation_max else ""
+    if rank_text:
+        return f"SAE F{feature_index} | peak rank {rank_text}{suffix}"
+    return f"SAE F{feature_index}{suffix}"
 
 
 def _mutation_selection_styles(row: dict[str, Any], *, model_id: str) -> tuple[StructureViewSelectionStyle, ...]:

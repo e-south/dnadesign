@@ -24,7 +24,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
-from .structure_browser_common import REFERENCE_COLOR, relative_path, repo_relative_hint
+from .structure_browser_common import (
+    REFERENCE_COLOR,
+    reference_residue_number_by_canonical,
+    reference_selection_coordinate_basis,
+    relative_path,
+    repo_relative_hint,
+)
 
 MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "mask_structure_browser_manifest.yaml"
 _MASK_HIGHLIGHT_COLOR = "#D55E00"
@@ -61,7 +67,7 @@ _MASK_SELECTIONS = (
     ),
     (
         "non_fixed",
-        "ProteinMPNN design canvas",
+        "ProteinMPNN-designable residues",
         "non_fixed",
         "Residues exposed to ProteinMPNN redesign in the current campaign.",
     ),
@@ -72,18 +78,20 @@ def write_mask_structure_browser_manifest(
     *,
     panel_root: Path,
     mask_set_path: Path,
-    reference_backbone_path: Path,
+    reference_structure_path: Path,
+    reference_structure_format: str,
     mask_residues: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Write a manifest for interactive mask-category highlighting on the reference backbone."""
 
     panel_root.mkdir(parents=True, exist_ok=True)
     manifest_path = panel_root / MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME
-    if not reference_backbone_path.exists():
-        return _missing_mask_row(manifest_path, reference_backbone_path)
+    if not reference_structure_path.exists():
+        return _missing_mask_row(manifest_path, reference_structure_path)
     views = _mask_structure_views(
         mask_residues=mask_residues,
-        reference_path=reference_backbone_path,
+        reference_path=reference_structure_path,
+        reference_structure_format=reference_structure_format,
         manifest_root=manifest_path.parent,
     )
     payload = {
@@ -96,12 +104,13 @@ def write_mask_structure_browser_manifest(
         "path_policy": "paths_relative_to_this_manifest",
         "source_tables": [
             repo_relative_hint(mask_set_path),
-            repo_relative_hint(reference_backbone_path),
+            repo_relative_hint(reference_structure_path),
         ],
         "reference": {
             "model_id": "ec86kit_7v9u_reference",
-            "display_label": "ec86kit/7V9U reference",
-            "local_path": relative_path(reference_backbone_path, manifest_path.parent),
+            "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
+            "local_path": relative_path(reference_structure_path, manifest_path.parent),
+            "structure_format": reference_structure_format,
             "color": REFERENCE_COLOR,
         },
         "alignment": {"status": "disabled", "method": "reference_selection"},
@@ -120,17 +129,23 @@ def write_mask_structure_browser_manifest(
         artifact_kind="structure_browser_manifest",
         status="rendered",
         path=manifest_path,
-        source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
-        input_hashes=file_hashes({"mask_set": mask_set_path, "reference_backbone": reference_backbone_path}),
+        source_tables=["mask_set.yaml", repo_relative_hint(reference_structure_path)],
+        input_hashes=file_hashes({"mask_set": mask_set_path, "reference_structure": reference_structure_path}),
         alt_text="Interactive Ec86 reference structure viewer with selectable fixed-residue mask highlights.",
         description=(
-            "Shows the Ec86/7V9U reference backbone with one mask or motif category highlighted at a time. "
+            "Shows the Ec86/7V9U reference structure with one mask or motif category highlighted at a time. "
             "The base structure remains off-white so the selected evidence category is visually separable."
         ),
         interpretation_limit=payload["interpretation_limit"],
         title="Ec86 reference structure maps fixed-residue evidence interactively",
         role="interactive_review",
     )
+
+
+def _reference_display_label(reference_structure_path: Path, reference_structure_format: str) -> str:
+    if reference_structure_format == "mmcif" or "all_atom" in reference_structure_path.stem:
+        return "Ec86/7V9U all-atom reference"
+    return "ec86kit/7V9U reference"
 
 
 def _missing_mask_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]:
@@ -155,10 +170,17 @@ def _mask_structure_views(
     *,
     mask_residues: list[dict[str, Any]],
     reference_path: Path,
+    reference_structure_format: str,
     manifest_root: Path,
 ) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
-    reference_number_by_canonical = _proteinmpnn_export_number_by_canonical(mask_residues)
+    reference_number_by_canonical = reference_residue_number_by_canonical(
+        mask_residues,
+        reference_structure_format=reference_structure_format,
+    )
+    selection_coordinate_basis = reference_selection_coordinate_basis(
+        reference_structure_format=reference_structure_format,
+    )
     for view_id, label, field, description in _MASK_SELECTIONS:
         canonical_residue_numbers = sorted(
             int(row["canonical_position"]) for row in mask_residues if bool(row.get(field))
@@ -176,6 +198,7 @@ def _mask_structure_views(
                 "display_label": label,
                 "group": "Reference mask evidence",
                 "local_path": relative_path(reference_path, manifest_root),
+                "structure_format": reference_structure_format,
                 "color": _MASK_HIGHLIGHT_COLOR,
                 "structure_view_mode": "reference_selection",
                 "description": description,
@@ -185,9 +208,10 @@ def _mask_structure_views(
                         "model_id": "ec86kit_7v9u_reference",
                         "label": label,
                         "source_coordinate_basis": "canonical_position",
-                        "selection_coordinate_basis": "proteinmpnn_export_residue_number",
+                        "selection_coordinate_basis": selection_coordinate_basis,
                         "canonical_residue_numbers": canonical_residue_numbers,
                         "residue_numbers": residue_numbers,
+                        "residue_scope": "protein",
                         "color": _MASK_HIGHLIGHT_COLOR,
                     }
                 ],
@@ -195,15 +219,3 @@ def _mask_structure_views(
             }
         )
     return views
-
-
-def _proteinmpnn_export_number_by_canonical(mask_residues: list[dict[str, Any]]) -> dict[int, int]:
-    mapped_rows = sorted(
-        [
-            row
-            for row in mask_residues
-            if str(row.get("mapping_status") or "") == "mapped" or bool(row.get("has_backbone_coordinates")) is True
-        ],
-        key=lambda row: int(row["canonical_position"]),
-    )
-    return {int(row["canonical_position"]): index for index, row in enumerate(mapped_rows, start=1)}

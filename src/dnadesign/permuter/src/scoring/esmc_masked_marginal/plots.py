@@ -205,10 +205,10 @@ def _render_llr_heatmap(data: pd.DataFrame, *, path: Path) -> None:
     values = matrix.to_numpy(dtype=float)
     limit = float(np.nanmax(np.abs(values))) if np.isfinite(values).any() else 1.0
     limit = max(limit, 0.1)
-    cell_size = 0.21
+    cell_size = 0.24
     heatmap_width = max(8.0, matrix.shape[1] * cell_size)
     heatmap_height = max(2.4, matrix.shape[0] * cell_size)
-    fig, ax = plt.subplots(figsize=(heatmap_width + 1.0, heatmap_height + 1.55))
+    fig, ax = plt.subplots(figsize=(heatmap_width + 1.35, heatmap_height + 1.65))
     image = ax.imshow(values, aspect="equal", cmap="RdBu_r", vmin=-limit, vmax=limit, interpolation="nearest")
     ax.set_title(title, fontsize=_HEATMAP_TITLE_SIZE, pad=14)
     ax.set_xlabel("Ec86 position", fontsize=_HEATMAP_LABEL_SIZE)
@@ -226,14 +226,14 @@ def _render_llr_heatmap(data: pd.DataFrame, *, path: Path) -> None:
     colorbar = fig.colorbar(image, ax=ax, fraction=0.012, pad=0.012)
     colorbar.set_label("LLR vs WT", fontsize=_HEATMAP_LABEL_SIZE)
     colorbar.ax.tick_params(labelsize=_HEATMAP_TICK_SIZE)
-    fig.subplots_adjust(left=0.04, right=0.955, bottom=0.15, top=0.84)
+    fig.subplots_adjust(left=0.035, right=0.965, bottom=0.15, top=0.84)
     _save_accessible_svg(fig, path, title=title, description=description)
     plt.close(fig)
 
 
 def _position_plot_width(data: pd.DataFrame) -> float:
     count = int(len(data))
-    return max(8.0, min(18.0, count / 18.0))
+    return max(10.0, min(28.0, count / 12.0))
 
 
 def _normalize_context_spans(spans: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
@@ -371,12 +371,11 @@ def _add_reference_residue_axis(ax: object, data: pd.DataFrame) -> None:
     }
     if not positions:
         return
-    step = max(1, _nice_step(int(np.ceil(len(positions) / 80))))
-    ticks = [position for position in positions if (position - positions[0]) % step == 0]
+    ticks = positions
     labels = [wt_by_position[position] for position in ticks]
     top = ax.secondary_xaxis("top")
     top.set_xticks(ticks)
-    top.set_xticklabels(labels, fontsize=max(7, _SMALL_TICK_SIZE - 1))
+    top.set_xticklabels(labels, fontsize=8.5 if len(positions) > 160 else _SMALL_TICK_SIZE, family="monospace")
     top.tick_params(length=0, pad=2)
 
 
@@ -403,12 +402,11 @@ def _annotate_lowest_positions(ax: object, data: pd.DataFrame, *, y: str, count:
 def _add_heatmap_reference_residue_axis(ax: object, positions: list[int], wt_by_position: dict[int, str]) -> None:
     if not positions:
         return
-    step = 1 if len(positions) <= 180 else 2
-    tick_indices = list(range(0, len(positions), step))
+    tick_indices = list(range(0, len(positions)))
     labels = [str(wt_by_position.get(positions[index], "")) for index in tick_indices]
     top = ax.secondary_xaxis("top")
     top.set_xticks(tick_indices)
-    top.set_xticklabels(labels, fontsize=6 if len(positions) > 160 else 8, family="monospace")
+    top.set_xticklabels(labels, fontsize=8.0 if len(positions) > 160 else 9.0, family="monospace")
     top.tick_params(length=0, pad=2)
 
 
