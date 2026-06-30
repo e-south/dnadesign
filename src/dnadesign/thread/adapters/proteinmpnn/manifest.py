@@ -23,6 +23,31 @@ from dnadesign.thread.adapters.proteinmpnn.sidecars import fixed_positions_paylo
 SCHEMA_ID = "proteinmpnn.fixed_backbone_request"
 POSITION_BASIS = "chain_local_1_indexed_after_export"
 FALLBACK_POLICY = "explicit_no_fallback"
+_EXECUTABLE_REQUEST_FIELDS = (
+    "schema_id",
+    "schema_version",
+    "backend_kind",
+    "proteinmpnn_name",
+    "proteinmpnn_design_chain",
+    "proteinmpnn_position_basis",
+    "canonical_position_count",
+    "fixed_position_count",
+    "mutable_position_count",
+    "excluded_missing_backbone_positions",
+    "omit_aas",
+    "fallback_policy",
+    "seed_set",
+    "temperature_schedule",
+    "batch_id",
+    "num_seq_per_target",
+    "batch_size",
+    "expected_sample_count",
+    "canonical_to_proteinmpnn_position",
+    "fixed_positions_jsonl",
+    "mutable_positions_by_chain",
+    "sidecar_hashes",
+    "run_commands",
+)
 
 
 def build_request_manifest(
@@ -169,7 +194,12 @@ def proteinmpnn_run_commands(
 
 
 def request_hash(payload: Mapping[str, Any]) -> str:
-    """Hash the canonical request payload."""
+    """Hash the executable ProteinMPNN request payload.
 
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    Provenance fields such as upstream artifact hashes, source paths, and author
+    metadata stay in the manifest but do not define the backend execution.
+    """
+
+    executable_payload = {field: payload[field] for field in _EXECUTABLE_REQUEST_FIELDS if field in payload}
+    encoded = json.dumps(executable_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()

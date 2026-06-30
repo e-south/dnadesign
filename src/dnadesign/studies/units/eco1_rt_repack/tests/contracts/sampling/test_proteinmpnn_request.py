@@ -30,6 +30,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests._helpers import ec86kit_source
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.mask_set._fixtures import (
     materialize_upstream_artifacts,
 )
+from dnadesign.thread.adapters.proteinmpnn import request_hash as proteinmpnn_request_hash
 
 pytestmark = pytest.mark.skipif(
     not ec86kit_source_artifacts_available(),
@@ -82,7 +83,9 @@ def test_proteinmpnn_request_validator_rejects_rehashed_wrong_fixed_sidecar(tmp_
     wrong_fixed_payload = {"chain_a_backbone": {"A": [1, 2, 3]}}
     result.fixed_positions_path.write_text(json.dumps(wrong_fixed_payload, sort_keys=True) + "\n", encoding="utf-8")
     manifest["sidecar_hashes"]["fixed_positions_jsonl"] = "sha256:" + _sha256(result.fixed_positions_path)
-    manifest["request_hash"] = _request_hash({key: value for key, value in manifest.items() if key != "request_hash"})
+    manifest["request_hash"] = proteinmpnn_request_hash(
+        {key: value for key, value in manifest.items() if key != "request_hash"}
+    )
     result.request_manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
     issues = validate_proteinmpnn_request_content(
@@ -104,7 +107,9 @@ def test_proteinmpnn_request_validator_accepts_host_specific_recorded_paths(tmp_
     manifest["sidecar_paths"] = {
         name: f"/other/host/proteinmpnn_request/{Path(path).name}" for name, path in manifest["sidecar_paths"].items()
     }
-    manifest["request_hash"] = _request_hash({key: value for key, value in manifest.items() if key != "request_hash"})
+    manifest["request_hash"] = proteinmpnn_request_hash(
+        {key: value for key, value in manifest.items() if key != "request_hash"}
+    )
     result.request_manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
     issues = validate_proteinmpnn_request_content(
@@ -128,8 +133,3 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _request_hash(payload: dict[str, object]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()

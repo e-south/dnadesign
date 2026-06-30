@@ -53,12 +53,68 @@ def test_py3dmol_backend_renders_interactive_html() -> None:
     assert "<iframe" in html
     assert "srcdoc=" in html
     assert "sandbox=" in html
-    assert "width:min(100%, 732px)" in html
+    assert "width:min(100%, 700px)" in html
+    assert "height:500px" in html
+    assert "height:512px" not in html
     assert "margin:0 auto" in html
     assert "text-align:center" in html
     assert "justify-content:center" in html
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
+
+
+def test_py3dmol_backend_keeps_description_metadata_nonvisual() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Reference mask context",
+            description="Shows the reference backbone with one declared residue set highlighted.",
+            interpretation_limit="This is a review view, not fold validation or activity evidence.",
+            models=(StructureViewModel("reference", _MINIMAL_PDB, label="Reference", color="#f2efe8"),),
+        )
+    )
+
+    assert "What this structure view shows" not in html
+    assert "Shows the reference backbone with one declared residue set highlighted." in html
+    assert "Interpretation limit:" not in html
+    assert "not fold validation or activity evidence" in html
+    assert "structure-view-sr-only" in html
+    assert "aria-describedby=" in html
+
+
+def test_py3dmol_backend_can_show_sidechains_and_persist_camera() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Predicted structure review",
+            models=(
+                StructureViewModel(
+                    "query",
+                    _MINIMAL_PDB,
+                    label="Query",
+                    color="#0072B2",
+                    show_sidechains=True,
+                ),
+            ),
+            camera_memory_key="eco1-review:test-structure-browser",
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert "localStorage" in html
+    assert "eco1-review:test-structure-browser" in html
+    assert "zoom(1.35)" in html
+    assert "translate(0,18)" in html
+    assert "twoFingerPan" in html
+    assert "event.preventDefault()" in html
+    assert "event.stopPropagation()" in html
+    assert "registerPanTarget(container)" in html
+    assert "registerPanTarget(canvas)" in html
+    assert "registerPanTarget(document)" in html
+    assert "{passive: false, capture: true}" in html
+    assert "viewer.translateScene.bind(viewer)" in html
+    assert "const pan = translateScene || translate" in html
+    assert "pan(-event.deltaX * panScale, -event.deltaY * panScale)" in html
+    assert '"not":{"atom":["N","CA","C","O"]}' in unescaped_html
+    assert '"stick":{"color":"#0072B2","radius":0.16}' in unescaped_html
 
 
 def test_structure_view_contract_rejects_unsupported_backend() -> None:
