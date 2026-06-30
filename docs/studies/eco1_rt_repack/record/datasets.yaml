@@ -452,19 +452,15 @@ datasets:
       existing all-97 sparse SAE tables without new API calls. The current
       panels select peak-ranked top WT-active features from the exact
       esmc-6b-2024-12-sae-layer60-k64-codebook16384 dictionary, show their
-      WT residue activation patterns, and compare candidate/WT activation
-      ratios across WT plus ProteinMPNN candidates. The same section also
-      renders `sae_fold_llr_comparison.svg`, which orders WT first and then
-      orders ProteinMPNN variants by SAE-feature similarity to WT while showing
-      ColabFold pLDDT and summed WT masked-marginal single-substitution LLR as
-      side markers. The LLR sum is a review covariate, not a joint protein
-      likelihood. The same directory also
-      stores `protein_top_sae_features.parquet`, a compact per-protein table
-      ranked by peak activation and prevalence for marimo dropdown inspection.
-      Feature names and descriptions come from the exact 6B layer-60 16k
-      feature-description source when available. These visuals are semantic
-      review aids, not fold validation, processivity evidence, or candidate
-      acceptance gates.
+      WT residue activation patterns, and stage an interactive selected-feature
+      heatmap over WT plus ProteinMPNN candidates. Rows are WT plus variants,
+      columns are Ec86 canonical residue positions, and color is the selected
+      feature's per-residue activation value. The directory also stores
+      `protein_top_sae_features.parquet`, a compact per-protein table ranked by
+      peak activation and prevalence. Feature names and descriptions come from
+      the exact 6B layer-60 16k feature-description source when available.
+      These visuals are semantic review aids, not fold validation, processivity
+      evidence, or candidate acceptance gates.
   - id: eco1_rt_biohub_esmc_wt_position_entropy
     owner: eco1_rt_repack
     method_contract_owner: permuter
@@ -637,14 +633,16 @@ datasets:
       explicit interpretation limit.
   - id: eco1_rt_biohub_esmc_feature_heatmap
     owner: eco1_rt_repack
-    kind: planned_artifact
+    kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
-    status: not_generated
+    status: materialized_foundation
     description: >-
-      Planned Biohub ESMC feature-window heatmap. Rows are WT plus candidates
-      sorted by structural review metrics; columns are a declared subset of
-      model-compatible features or windows. It is semantic stratification, not a
-      processivity ranking.
+      Biohub ESMC selected-feature heatmap manifest for the review-deliverables
+      marimo notebook. The notebook renders one WT-active feature at a time
+      with WT plus candidate variants as rows, Ec86 canonical residue positions
+      as columns, WT residue letters on the top axis, and per-residue SAE
+      activation as color. It is semantic stratification, not a processivity
+      ranking or candidate acceptance gate.
   - id: eco1_rt_feasibility_report
     owner: eco1_rt_repack
     kind: planned_artifact

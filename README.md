@@ -25,7 +25,8 @@ Use the docs index to choose a workflow, inspect existing work, or jump to a too
 
 ## Available tools
 
-Choose the package that owns the artifact, workspace, or workflow you need.
+Pick the tool that matches the work you need to do. Each link opens the tool
+README for commands, inputs, and outputs.
 
 ### Workspace and analysis tools
 

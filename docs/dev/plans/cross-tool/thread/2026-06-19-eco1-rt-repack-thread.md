@@ -89,6 +89,12 @@ Materialized inputs for this slice:
   position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
   redacted manifest, and compact plot artifacts. This is a model-constraint
   audit, not an update to the current mask.
+- `review_deliverables/biohub_esmc_sequence_scoring/`: implemented standalone
+  candidate-preference review surface from the complete WT ESMC
+  single-substitution grid. It writes `biohub_esmc_variant_llr_scores.parquet`
+  `esmc_candidate_preference_vs_wt.svg`, and
+  `biohub_esmc_sequence_scoring_manifest.yaml` for all 96 candidates. The score
+  is an additive WT-context LLR sum, not a whole-protein pseudo-likelihood.
 
 Missing by design:
 
@@ -182,6 +188,17 @@ Method note:
 > lower probability to the alternate residue than to the WT residue in that
 > masked context. The stored `fraction_negative_alternate_llr` is computed over
 > the 19 non-WT canonical alternates, not over the WT residue itself.
+
+Biohub ESMC candidate preference:
+
+> The review-deliverables bundle now includes a standalone candidate-preference
+> table and plot. For each ProteinMPNN candidate, it sums the already
+> materialized WT-context single-substitution LLR values over that candidate's
+> canonical mutations and also reports the per-mutation mean. This is useful for
+> ranking whether the proposed substitutions are more or less model-preferred
+> than the WT residue at the same positions under the WT masked context. It is
+> not a joint protein likelihood, not leave-one-out whole-protein
+> pseudo-likelihood, and not an activity measurement.
 
 ESM Atlas:
 
@@ -757,14 +774,14 @@ biohub_esmc_feature_heatmap/
 
 Main outputs:
 
-- `biohub_esmc_feature_window_heatmap.svg`
-- `biohub_esmc_feature_window_heatmap.alt.md`
+- `sae_feature_heatmap_manifest.yaml`
+- marimo-rendered selected-feature heatmap
 
 Purpose:
 
 ```text
-Compare selected Biohub ESMC feature-window activations across WT and the 96
-candidate variants.
+Compare one selected WT-active Biohub ESMC SAE feature at a time across WT and
+the 96 candidate variants.
 ```
 
 Rendering contract:
@@ -851,14 +868,25 @@ or implement selection logic inline.
    - Do not use this lane to update
      `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
 
-2. **SAE feature-window summary**
+2. **Candidate ESMC additive LLR review**
+   - The review-deliverables materializer writes:
+     `review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet`
+     `review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_sequence_scoring_manifest.yaml`
+     and
+     `review_deliverables/biohub_esmc_sequence_scoring/esmc_candidate_preference_vs_wt.svg`.
+   - The current method is `esmc_additive_wt_single_substitution_llr_v1`.
+   - Keep this separate from SAE feature activations and from future
+     leave-one-out whole-protein pseudo-likelihood. Do not label it as joint
+     protein likelihood.
+
+3. **SAE feature-window summary**
    - Add study-owned materializer:
      `operations/materialization/biohub_esmc_feature_windows/`.
    - Keep generic sparse-row utilities in `dnadesign.thread.adapters.biohub_esmc`
      only if they are not Eco1-specific.
    - Validate model id, SAE model id, dictionary size, row counts, and WT joins.
 
-3. **Feasibility report**
+4. **Feasibility report**
    - Add materializer:
      `operations/materialization/feasibility_report/`.
    - Add contract package:
@@ -867,7 +895,7 @@ or implement selection logic inline.
      recombination until parent haplotypes and structural coupling checks are
      explicit.
 
-4. **Selection panel**
+5. **Selection panel**
    - Add materializer:
      `operations/materialization/candidate_selection_panel/`.
    - Reject SAE-only selection and missing feasibility/fold rows.
@@ -883,8 +911,8 @@ or implement selection logic inline.
      with MSA plurality/mask context, linear mask tracks, a ChimeraX mask-context
      script/render, ProteinMPNN candidate diversity, linked fold-review SVG/PNG
      visuals, WT ESMC masked-marginal constraint visuals, exact-dictionary
-     Biohub ESMC SAE interpretation plots, a joint SAE-similarity/fold/LLR
-     review panel, and a manifest-backed marimo notebook.
+     Biohub ESMC SAE interpretation plots, an interactive selected-feature SAE
+     activation heatmap, and a manifest-backed marimo notebook.
    - Visual manifests must use manifest-relative paths, and notebook dogfood
      must include `marimo check` plus HTML export so missing linked media is
      caught before review.

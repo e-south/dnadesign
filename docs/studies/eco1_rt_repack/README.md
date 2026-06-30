@@ -101,8 +101,13 @@ ChimeraX is available, a visual manifest, and a scoped marimo notebook without
 selecting candidates. The active backend batch is
 `eco1_rt_p25_5a_n96_20260624`, with 96 accepted ProteinMPNN samples and 96
 accepted candidate rows. Biohub ESMC query-time SAE coverage is complete for WT
-plus all 96 fold-accepted candidates. Candidate selection still depends on
-structure review, feasibility review, and handoff gates.
+plus all 96 fold-accepted candidates. The review-deliverables bundle also
+materializes a standalone additive WT-context ESMC LLR table, plot, and
+provenance manifest for all 96 candidates. That score compares candidate
+substitutions with the WT residue at the same positions under the WT
+masked-marginal context; it is not a whole-protein pseudo-likelihood or an
+activity measurement. Candidate selection still depends on structure review,
+feasibility review, and handoff gates.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic
