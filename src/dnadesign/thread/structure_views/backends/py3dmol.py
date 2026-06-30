@@ -16,7 +16,12 @@ import html
 import json
 
 from dnadesign.thread.structure_views.models import (
+    DNA_RESIDUE_NAMES,
+    RNA_RESIDUE_NAMES,
+    STANDARD_AMINO_ACID_RESIDUE_NAMES,
+    MoleculeClass,
     StructureViewModel,
+    StructureViewMoleculeStyle,
     StructureViewSelectionStyle,
     StructureViewSpec,
 )
@@ -44,14 +49,27 @@ def render_py3dmol_structure_view(spec: StructureViewSpec) -> str:
     view = py3Dmol.view(width=int(spec.width), height=int(spec.height))
     if hasattr(view, "setBackgroundColor"):
         view.setBackgroundColor(spec.background_color)
+    if spec.projection and hasattr(view, "setProjection"):
+        view.setProjection(spec.projection)
+    if spec.view_style and hasattr(view, "setViewStyle"):
+        view.setViewStyle({"style": spec.view_style})
     model_index_by_id = {}
     for index, model in enumerate(spec.models):
         model_index_by_id[model.model_id] = index
-        view.addModel(model.structure_text, model.structure_format)
+        view.addModel(model.structure_text, _py3dmol_model_format(model.structure_format))
         view.setStyle({"model": index}, _style_for_model(spec, model))
+    for molecule_style in spec.molecule_styles:
+        view.addStyle(
+            _molecule_selection(model_index_by_id[molecule_style.model_id], molecule_style.molecule_class),
+            _style_for_molecule_style(molecule_style),
+        )
     for selection_style in spec.selection_styles:
-        view.setStyle(
-            {"model": model_index_by_id[selection_style.model_id], "resi": list(selection_style.residue_numbers)},
+        view.addStyle(
+            _selection_query(
+                model_index_by_id[selection_style.model_id],
+                selection_style.residue_numbers,
+                molecule_class=selection_style.residue_scope,
+            ),
             _style_for_selection(spec, selection_style),
         )
     for index, model in enumerate(spec.models):
@@ -59,7 +77,7 @@ def render_py3dmol_structure_view(spec: StructureViewSpec) -> str:
             view.addStyle(_sidechain_selection(index), _style_for_sidechains(model))
     view.zoomTo()
     view.zoom(1.35)
-    view.translate(0, 18)
+    view.translate(0, 0)
     viewer_html = view._make_html()
     return _wrap_view_html(spec, viewer_html)
 
@@ -71,8 +89,43 @@ def _style_for_model(spec: StructureViewSpec, model: StructureViewModel) -> dict
     return {spec.style: style}
 
 
+def _py3dmol_model_format(structure_format: str) -> str:
+    if structure_format == "mmcif":
+        return "cif"
+    return structure_format
+
+
 def _sidechain_selection(model_index: int) -> dict[str, object]:
-    return {"model": model_index, "not": {"atom": ["N", "CA", "C", "O"]}}
+    selection = _molecule_selection(model_index, "protein")
+    selection["not"] = {"atom": ["N", "C", "O", "OXT"]}
+    return selection
+
+
+def _selection_query(
+    model_index: int,
+    residue_numbers: tuple[int, ...],
+    *,
+    molecule_class: MoleculeClass,
+) -> dict[str, object]:
+    selection = {"model": model_index, "resi": list(residue_numbers)}
+    selection.update(_molecule_scope(molecule_class))
+    return selection
+
+
+def _molecule_selection(model_index: int, molecule_class: MoleculeClass) -> dict[str, object]:
+    selection = {"model": model_index}
+    selection.update(_molecule_scope(molecule_class))
+    return selection
+
+
+def _molecule_scope(molecule_class: MoleculeClass) -> dict[str, object]:
+    if molecule_class == "protein":
+        return {"resn": sorted(STANDARD_AMINO_ACID_RESIDUE_NAMES)}
+    if molecule_class == "dna":
+        return {"resn": sorted(DNA_RESIDUE_NAMES)}
+    if molecule_class == "rna":
+        return {"resn": sorted(RNA_RESIDUE_NAMES)}
+    raise ValueError(f"Unsupported molecule class: {molecule_class}")
 
 
 def _style_for_sidechains(model: StructureViewModel) -> dict[str, dict[str, object]]:
@@ -82,6 +135,16 @@ def _style_for_sidechains(model: StructureViewModel) -> dict[str, dict[str, obje
             "radius": float(model.sidechain_radius),
         }
     }
+
+
+def _style_for_molecule_style(molecule_style: StructureViewMoleculeStyle) -> dict[str, dict[str, object]]:
+    style_name = molecule_style.style or ("cartoon" if molecule_style.molecule_class == "protein" else "stick")
+    style: dict[str, object] = {"color": molecule_style.color}
+    if style_name == "stick":
+        style["radius"] = float(molecule_style.radius)
+    if molecule_style.opacity < 1.0:
+        style["opacity"] = float(molecule_style.opacity)
+    return {style_name: style}
 
 
 def _style_for_selection(
@@ -121,13 +184,13 @@ def _wrap_view_html(spec: StructureViewSpec, viewer_html: str) -> str:
             f'<span id="{interpretation_limit_id}" class="structure-view-sr-only">{interpretation_limit}</span>'
         )
     legend = "".join(_legend_item(model) for model in spec.models)
+    legend += "".join(_molecule_legend_item(molecule_style) for molecule_style in spec.molecule_styles)
     legend += "".join(_selection_legend_item(selection_style) for selection_style in spec.selection_styles)
     srcdoc = html.escape(_viewer_document(spec, viewer_html), quote=True)
     iframe_title = html.escape(f"Interactive structure view: {spec.title}", quote=True)
     described_by = f' aria-describedby="{" ".join(description_ids)}"' if description_ids else ""
-    panel_width = int(spec.width)
     return f"""
-    <figure style="margin:0 auto; width:min(100%, {panel_width}px);">
+    <figure style="margin:0; width:100%; max-width:100%; min-width:0;">
       <style>
         .structure-view-sr-only {{
           position:absolute;
@@ -292,6 +355,17 @@ def _legend_item(model: StructureViewModel) -> str:
     return (
         f'<span><span style="display:inline-block; width:0.72rem; height:0.72rem; '
         f"background:{color}; border:1px solid #57606a; vertical-align:-0.08rem; "
+        f'margin-right:0.25rem;"></span>{label}</span>'
+    )
+
+
+def _molecule_legend_item(molecule_style: StructureViewMoleculeStyle) -> str:
+    label = html.escape(molecule_style.label)
+    color = html.escape(molecule_style.color)
+    molecule_class = html.escape(molecule_style.molecule_class)
+    return (
+        f'<span data-molecule-class="{molecule_class}"><span style="display:inline-block; width:0.72rem; '
+        f"height:0.72rem; background:{color}; border:1px solid #57606a; vertical-align:-0.08rem; "
         f'margin-right:0.25rem;"></span>{label}</span>'
     )
 
