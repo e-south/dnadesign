@@ -1,8 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/
-review_deliverables/runtime_fixtures.py
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/runtime_fixtures.py
 
 Shared runtime fixtures for Eco1 review-deliverable tests.
 

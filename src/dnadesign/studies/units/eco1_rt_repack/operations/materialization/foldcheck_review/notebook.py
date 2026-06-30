@@ -57,9 +57,10 @@ def _(manifest, mo):
         f"""
         # Eco1 fold-check review
 
-        This notebook reads a scoped visual manifest and displays generated plots
-        with their alt text and interpretation limits. The plots summarize
-        fold-review and Biohub ESMC/SAE artifacts; they do not accept candidates.
+        Fold-review artifacts are read from the scoped visual manifest. The
+        selected surface shows generated plots with alt text and interpretation
+        limits. These plots summarize fold-review and Biohub ESMC/SAE artifacts;
+        they do not accept candidates.
 
         **Plot count:** {manifest["plot_count"]}
         """

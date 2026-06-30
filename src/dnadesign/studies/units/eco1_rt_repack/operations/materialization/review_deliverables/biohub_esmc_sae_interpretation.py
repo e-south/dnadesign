@@ -30,16 +30,18 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
+from .biohub_esmc_model_provenance import sae_request_manifest_summary
 from .biohub_esmc_sae_fold_llr import write_sae_fold_llr_comparison_panel
 from .biohub_esmc_sae_tables import (
     make_protein_top_feature_table_row,
     write_protein_top_feature_table,
 )
+from .constants import SECTION_ESMC_FEATURE_REVIEW
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-SECTION = "biohub_esmc_sae_interpretation"
+SECTION = SECTION_ESMC_FEATURE_REVIEW
 TOP_FEATURE_COUNT = 12
 SOURCE_NOTEBOOK = (
     "https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/"
@@ -211,7 +213,7 @@ def _write_wt_activation_pattern_panel(
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,
         method_summary=METHOD_SUMMARY,
-        evidence_summary=_evidence_summary(feature_rows),
+        evidence_summary=_evidence_summary(feature_rows, request_manifest_path=request_manifest_path),
         role="review_only",
     )
 
@@ -296,8 +298,9 @@ def _write_candidate_activation_ratio_panel(
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,
         method_summary=METHOD_SUMMARY,
-        evidence_summary=_evidence_summary(wt_feature_rows) | {"sequence_rows": len(candidate_order)},
-        role="review_only",
+        evidence_summary=_evidence_summary(wt_feature_rows, request_manifest_path=request_manifest_path)
+        | {"sequence_rows": len(candidate_order)},
+        role="manuscript_facing",
     )
 
 
@@ -443,8 +446,8 @@ def _ellipsize(value: str, *, max_chars: int) -> str:
     return value[: max_chars - 1].rstrip() + "…"
 
 
-def _evidence_summary(feature_rows: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
+def _evidence_summary(feature_rows: list[dict[str, Any]], *, request_manifest_path: Path) -> dict[str, Any]:
+    return sae_request_manifest_summary(request_manifest_path) | {
         "source_notebook": SOURCE_NOTEBOOK,
         "feature_selection_rule": "top WT features by activation_max, tie-broken by prevalence and activation_sum",
         "selected_feature_count": len(feature_rows),

@@ -41,6 +41,8 @@ def write_wt_mutation_scoring_outputs(output_root: Path) -> None:
             {
                 "schema_id": "eco1_rt_repack.biohub_esmc_wt_mutation_scoring.request",
                 "status": "materialized",
+                "biohub_request_hash": "sha256:" + "6" * 64,
+                "model": "esmc-300m-2024-12",
                 "scoring_method_id": "esmc_masked_marginal_v1",
                 "position_count": 6,
                 "changes_current_mask": False,

@@ -113,8 +113,10 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "format_deliverable_label(" in combined_text
     assert 'str(row.get("title") or "")' in runtime_text
     assert "Constraint evidence for the design mask" in combined_text
-    assert "ProteinMPNN variants and fold triage" in combined_text
-    assert "Biohub ESMC feature review" in combined_text
+    assert "ProteinMPNN designs and fold triage" in combined_text
+    assert "ESMC feature review" in combined_text
+    assert "Feasibility and handoff" in combined_text
+    assert "Planned downstream gate" in combined_text
     assert "biohub_esmc_protein_top_sae_features" in combined_text
     assert "Protein" in notebook_text
     assert "WT Ec86 control" in combined_text
@@ -131,6 +133,10 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "label=structure_label" in notebook_text
     assert "structure_group_ui = mo.ui.dropdown" in notebook_text
     assert 'label="Structure group"' in notebook_text
+    assert "structure_background_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Reference background"' in notebook_text
+    assert "structure_mutation_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Mutation differences"' in notebook_text
     assert "selected_deliverable_id=selected_visual_id" in notebook_text
     assert "selected_group=selected_structure_group" in notebook_text
     assert "structure_group_lookup" in combined_text

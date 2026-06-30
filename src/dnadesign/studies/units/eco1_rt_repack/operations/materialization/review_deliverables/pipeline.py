@@ -34,6 +34,7 @@ from .constants import (
     BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
     CANDIDATE_TABLE_FILE_NAME,
     CONSERVATION_PROFILE_FILE_NAME,
+    CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH,
     DEFAULT_OUTPUT_ROOT,
     DELIVERABLE_DIR_NAME,
     FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
@@ -48,25 +49,32 @@ from .constants import (
     NOTEBOOKS_DIR_NAME,
     PROTEINMPNN_DIR_NAME,
     REFERENCE_BACKBONE_RELATIVE_PATH,
+    SECTION_DESIGNS_AND_FOLD_TRIAGE,
+    SECTION_ESMC_FEATURE_REVIEW,
+    SECTION_FEASIBILITY_AND_HANDOFF,
     STRUCTURE_BROWSER_DIR_NAME,
+    SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH,
+    SUBTYPE_CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH,
     WT_MODEL_CONSTRAINT_DIR_NAME,
 )
 from .esmc_model_constraint import write_esmc_model_constraint_audit_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
+from .mask_structure_browser import write_mask_structure_browser_manifest
 from .mask_tracks import write_linear_mask_tracks, write_mask_structure_context
 from .models import MaterializedReviewDeliverables
-from .msa_panel import write_msa_plurality_mask_panel
+from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, source_manifest_accessions, write_msa_plurality_mask_panel
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
-from .structure_browser import write_interactive_structure_browser_manifest, write_mask_structure_browser_manifest
+from .sae_structure_browser import write_sae_structure_browser_manifest
+from .structure_browser import write_interactive_structure_browser_manifest
 
 
 def materialize_review_deliverables(
     *,
     repo_root: Path | None = None,
     output_root: Path | None = None,
-    render_chimerax_png: bool = True,
+    render_chimerax_png: bool = False,
 ) -> MaterializedReviewDeliverables:
     """Materialize the first Eco1 manuscript/review deliverable bundle."""
 
@@ -76,12 +84,18 @@ def materialize_review_deliverables(
     deliverable_root.mkdir(parents=True, exist_ok=True)
 
     aligned_fasta_path = out_root / ALIGNED_FASTA_RELATIVE_PATH
+    subtype_aligned_fasta_path = out_root / SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH
+    conservation_source_manifest_path = out_root / CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH
+    subtype_conservation_source_manifest_path = out_root / SUBTYPE_CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH
     conservation_profile_path = out_root / CONSERVATION_PROFILE_FILE_NAME
     mask_set_path = out_root / MASK_SET_FILE_NAME
     candidate_table_path = out_root / CANDIDATE_TABLE_FILE_NAME
     reference_backbone_path = out_root / REFERENCE_BACKBONE_RELATIVE_PATH
     for required_path in (
         aligned_fasta_path,
+        subtype_aligned_fasta_path,
+        conservation_source_manifest_path,
+        subtype_conservation_source_manifest_path,
         conservation_profile_path,
         mask_set_path,
         candidate_table_path,
@@ -89,12 +103,27 @@ def materialize_review_deliverables(
     ):
         if not required_path.exists():
             raise FileNotFoundError(required_path)
+    _validate_subtype_source_subset(
+        clade_source_manifest_path=conservation_source_manifest_path,
+        subtype_source_manifest_path=subtype_conservation_source_manifest_path,
+    )
 
     mask_residues = read_mask_residues(mask_set_path)
     deliverables: list[dict[str, Any]] = [
         write_msa_plurality_mask_panel(
             panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
+            panel_profile=CLADE9_MSA_PANEL,
             aligned_fasta_path=aligned_fasta_path,
+            source_manifest_path=conservation_source_manifest_path,
+            conservation_profile_path=conservation_profile_path,
+            mask_set_path=mask_set_path,
+            mask_residues=mask_residues,
+        ),
+        write_msa_plurality_mask_panel(
+            panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
+            panel_profile=SUBTYPE_MSA_PANEL,
+            aligned_fasta_path=subtype_aligned_fasta_path,
+            source_manifest_path=subtype_conservation_source_manifest_path,
             conservation_profile_path=conservation_profile_path,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
@@ -136,6 +165,7 @@ def materialize_review_deliverables(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
             full_structure_set_path=out_root / FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            candidate_table_path=candidate_table_path,
         )
     )
     deliverables.extend(
@@ -158,6 +188,17 @@ def materialize_review_deliverables(
             wt_substitution_llr_path=out_root / BIOHUB_ESMC_WT_SUBSTITUTION_LLR_RELATIVE_PATH,
         )
     )
+    deliverables.append(
+        write_sae_structure_browser_manifest(
+            panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
+            top_feature_table_path=deliverable_root
+            / BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME
+            / "protein_top_sae_features.parquet",
+            residue_features_path=out_root / BIOHUB_ESMC_RESIDUE_FEATURES_FILE_NAME,
+            full_structure_set_path=out_root / FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
+        )
+    )
+    deliverables.append(_planned_feasibility_handoff_row(deliverable_root))
 
     notebook_path = deliverable_root / NOTEBOOKS_DIR_NAME / NOTEBOOK_FILE_NAME
     write_review_deliverables_notebook(notebook_path)
@@ -170,12 +211,27 @@ def materialize_review_deliverables(
     )
 
 
+def _validate_subtype_source_subset(*, clade_source_manifest_path: Path, subtype_source_manifest_path: Path) -> None:
+    """Fail fast if the declared Eco1 subtype source set stops being a clade-9 subset."""
+
+    clade_accessions = source_manifest_accessions(clade_source_manifest_path)
+    subtype_accessions = source_manifest_accessions(subtype_source_manifest_path)
+    missing = sorted(subtype_accessions - clade_accessions)
+    if missing:
+        shown = ", ".join(missing[:8])
+        extra = "" if len(missing) <= 8 else f", ... ({len(missing)} total)"
+        raise ValueError(
+            "Eco1 subtype MSA source accessions must be a subset of the clade 9 MSA source accessions; "
+            f"missing from clade 9: {shown}{extra}"
+        )
+
+
 def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
     if not manifest_path.exists():
         return [
             make_deliverable_row(
                 deliverable_id="foldcheck_review_visuals",
-                section="design_and_fold_triage",
+                section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
                 artifact_kind="manifest",
                 status="skipped_missing_input",
                 path=manifest_path,
@@ -201,10 +257,13 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
         linked_status = "linked_existing" if plot_status == "rendered" and plot_path.exists() else plot_status
         if plot_status == "rendered" and not plot_path.exists():
             linked_status = "skipped_missing_input"
+        section = (
+            SECTION_ESMC_FEATURE_REVIEW if plot_id == "biohub_esmc_sae_coverage" else SECTION_DESIGNS_AND_FOLD_TRIAGE
+        )
         rows.append(
             make_deliverable_row(
                 deliverable_id=f"foldcheck_review_{plot_id}",
-                section="design_and_fold_triage",
+                section=section,
                 artifact_kind="linked_visual",
                 status=linked_status,
                 path=plot_path,
@@ -221,6 +280,50 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
             )
         )
     return rows
+
+
+def _planned_feasibility_handoff_row(deliverable_root: Path) -> dict[str, Any]:
+    planned_root = deliverable_root / "feasibility_and_handoff"
+    planned_root.mkdir(parents=True, exist_ok=True)
+    path = planned_root / "planned.md"
+    path.write_text(
+        "\n".join(
+            [
+                "# Feasibility and RT-only handoff remain planned",
+                "",
+                "The review bundle stops before synthesis feasibility and downstream handoff.",
+                "A candidate will need a feasible synthesis row, structure review, and upstream hash closure "
+                "before RT-only handoff.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return make_deliverable_row(
+        deliverable_id="feasibility_and_handoff_planned",
+        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        artifact_kind="planned_section",
+        status="planned",
+        path=path,
+        source_tables=[
+            "operations/contract/readiness/checks/assembly_feasibility.yaml",
+            "operations/contract/readiness/checks/candidate_handoff.yaml",
+            "operations/contract/readiness/checks/downstream_rt_lnrna_handoff.yaml",
+        ],
+        input_hashes=file_hashes({"planned_note": path}),
+        alt_text="Planned feasibility and RT-only handoff section.",
+        description=(
+            "Feasibility, candidate selection, and RT-only downstream handoff are not materialized in this slice. "
+            "They remain explicit downstream gates after fold review and model-derived ESMC review."
+        ),
+        interpretation_limit=(
+            "No candidate is handoff-ready from this section. Downstream structured-template assays "
+            "remain the only evidence for activity, strand displacement, or hairpin readthrough."
+        ),
+        title="Feasibility and RT-only handoff remain downstream gates",
+        role="manuscript_facing",
+        render_mode="planned_section",
+    )
 
 
 def _resolve_linked_manifest_path(manifest_path: Path, value: str) -> Path:

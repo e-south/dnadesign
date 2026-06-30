@@ -110,25 +110,39 @@ def _protein_feature_rows() -> list[dict[str, object]]:
 
 def _residue_feature_rows() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for feature_index, values in {
-        101: [3.0, 4.0, 0.0, 0.0, 5.0, 0.0],
-        202: [0.0, 2.0, 3.0, 0.0, 0.0, 3.0],
-        303: [0.0, 0.0, 1.0, 1.5, 1.5, 0.0],
-    }.items():
-        for position, value in enumerate(values, start=1):
-            if value <= 0:
-                continue
-            rows.append(
-                {
-                    "candidate_id": "wild_type",
-                    "sequence_hash": "sha256:" + "9" * 64,
-                    "sae_model": DEFAULT_ESMC_SAE_MODEL,
-                    "residue_index_zero_based": position - 1,
-                    "sequence_position_one_based": position,
-                    "feature_index": feature_index,
-                    "value": value,
-                }
-            )
+    values_by_candidate = {
+        "wild_type": {
+            101: [3.0, 4.0, 0.0, 0.0, 5.0, 0.0],
+            202: [0.0, 2.0, 3.0, 0.0, 0.0, 3.0],
+            303: [0.0, 0.0, 1.0, 1.5, 1.5, 0.0],
+        },
+        "thread_candidate_alpha": {
+            101: [0.0, 3.0, 0.0, 0.0, 4.0, 2.0],
+            202: [0.0, 0.0, 2.0, 2.5, 0.0, 0.0],
+            303: [1.0, 0.0, 0.0, 0.0, 1.0, 1.0],
+        },
+        "thread_candidate_beta": {
+            101: [0.0, 0.0, 0.0, 1.5, 2.0, 0.0],
+            202: [2.0, 0.0, 2.5, 0.0, 0.0, 2.0],
+            303: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+        },
+    }
+    for candidate_id, feature_values in values_by_candidate.items():
+        for feature_index, values in feature_values.items():
+            for position, value in enumerate(values, start=1):
+                if value <= 0:
+                    continue
+                rows.append(
+                    {
+                        "candidate_id": candidate_id,
+                        "sequence_hash": "sha256:" + "9" * 64,
+                        "sae_model": DEFAULT_ESMC_SAE_MODEL,
+                        "residue_index_zero_based": position - 1,
+                        "sequence_position_one_based": position,
+                        "feature_index": feature_index,
+                        "value": value,
+                    }
+                )
     return rows
 
 

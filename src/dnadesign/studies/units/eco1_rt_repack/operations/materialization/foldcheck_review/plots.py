@@ -223,27 +223,28 @@ def _write_biohub_profile_summary(plot_root: Path, profile_path: Path) -> dict[s
     )
     ax.set_xlabel("Protein-level nonzero SAE features", fontsize=_LABEL_SIZE)
     ax.set_ylabel("Encoded SAE payload size (KiB)", fontsize=_LABEL_SIZE)
-    ax.set_title("Biohub ESMC returned sparse SAE features for all queries", fontsize=_TITLE_SIZE, pad=10)
+    title = "Biohub ESMC coverage is available for accepted query rows"
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     _style_scatter_axis(ax)
     fig.tight_layout()
     path = plot_root / "biohub_esmc_sae_coverage.svg"
     residue_counts = sorted({int(row.get("residue_feature_count") or 0) for row in accepted})
     alt = (
-        f"Scatter plot summarizing Biohub ESMC SAE output coverage for {len(accepted)} accepted "
-        f"sequences. Per-residue activation counts observed: {residue_counts}."
+        f"Scatter plot summarizing Biohub ESMC SAE output coverage for {len(accepted)} accepted query rows. "
+        f"Per-residue activation counts observed: {residue_counts}."
     )
     _save_accessible_svg(
         fig,
         path,
-        title="Biohub ESMC returned sparse SAE features for all queries",
+        title=title,
         description=alt,
     )
     return _plot_row(
         plot_id="biohub_esmc_sae_coverage",
         path=path,
-        title="Biohub ESMC returned sparse SAE features for all queries",
+        title=title,
         alt_text=alt,
-        description="Confirms query-time SAE coverage without loading the full sparse residue table into the notebook.",
+        description="Confirms query-time SAE coverage without loading the full sparse residue table into the UI.",
         interpretation_limit="SAE features are semantic annotations and are not activity measurements.",
         data_sources=["biohub_esmc_sae_profile.parquet"],
     )

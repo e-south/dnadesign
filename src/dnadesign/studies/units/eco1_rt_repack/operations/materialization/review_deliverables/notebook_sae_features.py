@@ -17,6 +17,10 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME,
+    SECTION_ESMC_FEATURE_REVIEW,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
     resolve_manifest_path,
 )
@@ -58,7 +62,7 @@ def biohub_sae_paths(*, manifest_root: Path, deliverables: list[dict[str, Any]])
         None,
     )
     if top_table_row is None:
-        top_table_path = manifest_root / "biohub_esmc_sae_interpretation" / "protein_top_sae_features.parquet"
+        top_table_path = manifest_root / BIOHUB_ESMC_SAE_INTERPRETATION_DIR_NAME / "protein_top_sae_features.parquet"
     else:
         top_table_path = resolve_manifest_path(manifest_root, str(top_table_row["path"]))
     return top_table_path, manifest_root.parent / "biohub_esmc_residue_features.parquet"
@@ -67,7 +71,7 @@ def biohub_sae_paths(*, manifest_root: Path, deliverables: list[dict[str, Any]])
 def sae_protein_lookup(rows: list[dict[str, Any]], *, selected_section: str) -> dict[str, str]:
     """Build protein dropdown labels with WT first."""
 
-    if selected_section != "biohub_esmc_sae_interpretation":
+    if selected_section != SECTION_ESMC_FEATURE_REVIEW:
         return {}
     candidate_ids = sorted({str(row["candidate_id"]) for row in rows})
     candidate_ids = (["wild_type"] if "wild_type" in candidate_ids else []) + [
@@ -111,7 +115,7 @@ def render_sae_feature_inspector(
     metric_rows = _sae_feature_metric_rows(selected_row)
     return mo.vstack(
         [
-            mo.hstack([protein_ui, feature_ui], justify="start", gap=1.0),
+            mo.hstack([protein_ui, feature_ui], justify="start", align="stretch", wrap=True, gap=1.0, widths="equal"),
             mo.Html(svg),
             mo.ui.table(metric_rows),
         ]

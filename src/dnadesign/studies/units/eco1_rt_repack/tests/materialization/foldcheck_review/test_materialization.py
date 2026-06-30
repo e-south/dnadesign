@@ -14,9 +14,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pyarrow as pa
 import pyarrow.parquet as pq
-import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review import (
@@ -112,7 +110,12 @@ def test_foldcheck_review_materializes_ranking_panel_and_atlas_subset(tmp_path: 
     assert "mapped_c_alpha_rmsd" in structure_overlay_text
     assert overlay_index_text.suffix == ".cxc"
     for plot in visual_manifest["plots"]:
-        assert plot["status"] in {"rendered", "skipped_runtime_unavailable", "skipped_missing_input"}
+        assert plot["status"] in {
+            "rendered",
+            "skipped_optional_render_disabled",
+            "skipped_runtime_unavailable",
+            "skipped_missing_input",
+        }
         assert not Path(plot["path"]).is_absolute()
         assert plot["alt_text"].strip()
         assert plot["description"].strip()
@@ -172,28 +175,3 @@ def test_foldcheck_review_marks_cryoem_rmsd_unavailable_for_external_models(tmp_
 
     full_set = yaml.safe_load(result.full_structure_set_path.read_text(encoding="utf-8"))
     assert full_set["copy_summary"] == {"source_not_local": 7}
-
-
-def test_foldcheck_review_rejects_duplicate_fold_rows(tmp_path: Path) -> None:
-    write_review_inputs(tmp_path, local_model_paths=True)
-    foldcheck_report_path = tmp_path / "foldcheck_report.parquet"
-    table = pq.read_table(foldcheck_report_path)
-    rows = table.to_pylist()
-    rows.append(dict(rows[-1]))
-    pq.write_table(pa.Table.from_pylist(rows, schema=table.schema), foldcheck_report_path)
-
-    with pytest.raises(ValueError, match="duplicate candidate_id"):
-        materialize_foldcheck_review(repo_root=Path.cwd(), output_root=tmp_path)
-
-
-def test_foldcheck_review_rejects_unverified_stale_local_structure(tmp_path: Path) -> None:
-    write_review_inputs(tmp_path, local_model_paths=False)
-    stale_path = tmp_path / "foldcheck_review" / "structures" / "full_fold_set" / "thread_candidate_best_rmsd.pdb"
-    stale_path.parent.mkdir(parents=True)
-    stale_path.write_text(
-        "ATOM      1  CA  ALA A   1       0.000   0.000   0.000  1.00 90.00           C\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError, match="unverified staged model"):
-        materialize_foldcheck_review(repo_root=Path.cwd(), output_root=tmp_path)

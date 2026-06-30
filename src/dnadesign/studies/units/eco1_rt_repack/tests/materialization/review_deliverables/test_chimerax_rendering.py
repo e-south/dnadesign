@@ -16,7 +16,13 @@ from types import SimpleNamespace
 
 from pytest import MonkeyPatch
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import mask_tracks
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
+    mask_tracks,
+    materialize_review_deliverables,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
+    write_deliverable_inputs,
+)
 
 
 def test_chimerax_render_uses_gui_backed_script_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -40,3 +46,20 @@ def test_chimerax_render_uses_gui_backed_script_mode(tmp_path: Path, monkeypatch
         str(script_path),
     ]
     assert "--nogui" not in recorded_args
+
+
+def test_review_deliverables_default_does_not_discover_or_launch_chimerax(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    write_deliverable_inputs(tmp_path)
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("default review-deliverables materialization must not touch ChimeraX")
+
+    monkeypatch.setattr(mask_tracks, "_find_chimerax", fail_if_called)
+    monkeypatch.setattr(mask_tracks, "_run_chimerax", fail_if_called)
+
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path)
+
+    assert result.manifest_path.exists()

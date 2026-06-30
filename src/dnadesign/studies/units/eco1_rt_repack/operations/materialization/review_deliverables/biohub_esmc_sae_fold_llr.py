@@ -32,11 +32,14 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
+from .biohub_esmc_model_provenance import combined_sae_fold_llr_model_summary
+from .constants import SECTION_ESMC_FEATURE_REVIEW
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.gridspec import GridSpec  # noqa: E402
 
-SECTION = "biohub_esmc_sae_interpretation"
+SECTION = SECTION_ESMC_FEATURE_REVIEW
 DELIVERABLE_ID = "biohub_esmc_sae_fold_llr_comparison"
 TITLE = "SAE similarity, ColabFold confidence, and ESMC mutation scores are compared together"
 VISIBLE_TITLE = "WT-like SAE activation patterns are compared with fold and LLR side markers"
@@ -97,6 +100,7 @@ def write_sae_fold_llr_comparison_panel(
         selected_features=selected_features,
     )
     path = panel_root / "sae_fold_llr_comparison.svg"
+    wt_mutation_manifest_path = wt_substitution_llr_path.parent / "wt_mutation_scoring_manifest.yaml"
     _render_panel(path, plot_data)
     return make_deliverable_row(
         deliverable_id=DELIVERABLE_ID,
@@ -119,6 +123,7 @@ def write_sae_fold_llr_comparison_panel(
                 "foldcheck_report": foldcheck_report_path,
                 "foldcheck_candidate_ranking": foldcheck_ranking_path,
                 "wt_substitution_llr": wt_substitution_llr_path,
+                "wt_mutation_scoring_manifest": wt_mutation_manifest_path,
                 "request_manifest": request_manifest_path,
             }
         ),
@@ -135,13 +140,17 @@ def write_sae_fold_llr_comparison_panel(
         interpretation_limit=INTERPRETATION_LIMIT,
         title=TITLE,
         method_summary=METHOD_SUMMARY,
-        evidence_summary={
+        evidence_summary=combined_sae_fold_llr_model_summary(
+            sae_request_manifest_path=request_manifest_path,
+            wt_mutation_scoring_manifest_path=wt_mutation_manifest_path,
+        )
+        | {
             "sequence_rows": len(plot_data["row_labels"]),
             "selected_feature_count": len(selected_features),
             "llr_scoring_rule": "sum_variant_single_substitution_llrs",
             "row_sort": "wild_type_first_then_descending_sae_similarity",
         },
-        role="review_only",
+        role="manuscript_facing",
     )
 
 
@@ -161,7 +170,6 @@ def _build_plot_data(
         columns=["candidate_id", "feature_index", "activation_sum"],
     ).to_pylist()
     feature_labels = _feature_labels(feature_catalog_path, selected_features)
-    feature_descriptions = _feature_descriptions(feature_catalog_path, selected_features)
     candidate_ids = _candidate_ids(feature_rows)
     wt_sums = _wt_feature_sums(feature_rows, selected_features)
     vectors = _candidate_feature_vectors(feature_rows, candidate_ids, selected_features, wt_sums)
@@ -179,7 +187,6 @@ def _build_plot_data(
         "ordered_ids": ordered_ids,
         "row_labels": _row_labels(ordered_ids),
         "feature_labels": feature_labels,
-        "feature_descriptions": feature_descriptions,
         "matrix": [vectors[candidate_id] for candidate_id in ordered_ids],
         "similarity": [similarity[candidate_id] for candidate_id in ordered_ids],
         "plddt": [plddt.get(candidate_id) for candidate_id in ordered_ids],
@@ -190,10 +197,11 @@ def _build_plot_data(
 def _render_panel(path: Path, data: dict[str, Any]) -> None:
     row_count = len(data["row_labels"])
     feature_count = len(data["feature_labels"])
-    fig_height = max(6.8, 0.4 * feature_count + 2.9)
+    fig_height = max(7.4, 0.42 * feature_count + 3.6)
     fig_width = max(12.5, min(20.0, 0.13 * row_count + 5.6))
     fig = plt.figure(figsize=(fig_width, fig_height))
-    grid = GridSpec(2, 1, height_ratios=[1.0, max(4.2, 0.45 * feature_count)], hspace=0.08, figure=fig)
+    fig.suptitle(VISIBLE_TITLE, fontsize=TITLE_SIZE, y=0.985)
+    grid = GridSpec(2, 1, height_ratios=[1.25, max(4.2, 0.45 * feature_count)], hspace=0.32, figure=fig)
     metric_ax = fig.add_subplot(grid[0, 0])
     heatmap_ax = fig.add_subplot(grid[1, 0], sharex=metric_ax)
     matrix = data["matrix"]
@@ -212,15 +220,15 @@ def _render_panel(path: Path, data: dict[str, Any]) -> None:
     heatmap_ax.set_xticks(tick_positions, tick_labels, fontsize=max(6, TICK_SIZE - 2))
     heatmap_ax.set_xlabel("ProteinMPNN variant ordered by SAE similarity", fontsize=LABEL_SIZE)
     heatmap_ax.set_ylabel("SAE feature", fontsize=LABEL_SIZE)
-    heatmap_ax.set_title("Feature rows compare WT-normalized activation", fontsize=TITLE_SIZE, pad=8, loc="center")
+    heatmap_ax.set_title("WT-normalized SAE feature activation", fontsize=LABEL_SIZE, pad=12, loc="center")
     llr_scatter = _render_metric_axis(metric_ax, data)
     colorbar = fig.colorbar(image, ax=heatmap_ax, orientation="horizontal", fraction=0.04, pad=0.16)
     colorbar.set_label("log2(feature activation sum / WT)", fontsize=LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
-    llr_colorbar = fig.colorbar(llr_scatter, ax=metric_ax, orientation="horizontal", fraction=0.18, pad=0.22)
+    llr_colorbar = fig.colorbar(llr_scatter, ax=metric_ax, orientation="horizontal", fraction=0.12, pad=0.08)
     llr_colorbar.set_label("LLR sum, scaled within panel", fontsize=LEGEND_SIZE)
     llr_colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
-    fig.subplots_adjust(left=0.34, right=0.93, top=0.96, bottom=0.22)
+    fig.subplots_adjust(left=0.34, right=0.93, top=0.88, bottom=0.22)
     save_accessible_svg(
         fig,
         path,
@@ -230,7 +238,7 @@ def _render_panel(path: Path, data: dict[str, Any]) -> None:
 
 
 def _panel_accessibility_description(data: dict[str, Any]) -> str:
-    """Return concise SVG metadata; full feature text stays in notebook tables."""
+    """Return concise SVG metadata; full feature text stays in feature tables."""
 
     feature_count = len(data["feature_labels"])
     row_count = len(data["row_labels"])
@@ -239,7 +247,7 @@ def _panel_accessibility_description(data: dict[str, Any]) -> str:
         "Columns are WT and ProteinMPNN variants ordered by SAE similarity to WT. "
         "Color shows WT-normalized feature activation. Top markers show ColabFold pLDDT "
         "and summed WT masked-marginal single-substitution LLR. Full feature descriptions "
-        "are available in the notebook feature inspector."
+        "are available in the feature inspector."
     )
 
 
@@ -275,7 +283,6 @@ def _render_metric_axis(ax: Any, data: dict[str, Any]) -> Any:
     _add_plddt_size_legend(ax)
     ax.set_ylim(-0.6, 1.6)
     ax.set_yticks([0, 1], ["LLR sum", "pLDDT"], fontsize=max(6, TICK_SIZE - 2))
-    ax.set_title(VISIBLE_TITLE, fontsize=TITLE_SIZE, pad=8)
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
     ax.tick_params(axis="y", length=0)
     ax.grid(axis="x", color="#eeeeee", linewidth=0.4)
@@ -298,12 +305,12 @@ def _add_plddt_size_legend(ax: Any) -> None:
         )
         for marker_size, label in ((4.5, "pLDDT 75"), (7.5, "pLDDT 85"), (10.5, "pLDDT 95"))
     ]
-    ax.legend(
+    ax.figure.legend(
         handles=handles,
         frameon=False,
         fontsize=max(6, LEGEND_SIZE - 1),
         loc="upper right",
-        bbox_to_anchor=(1.0, 1.05),
+        bbox_to_anchor=(0.93, 0.94),
         ncol=3,
         handletextpad=0.35,
         columnspacing=0.8,
@@ -363,7 +370,7 @@ def _sae_similarity(vector: list[float]) -> float:
 def _feature_labels(feature_catalog_path: Path, selected_features: list[int]) -> list[str]:
     catalog = {
         int(row["feature_index"]): (str(row.get("label") or ""), str(row.get("description") or ""))
-        for row in pq.read_table(feature_catalog_path).to_pylist()
+        for row in pq.read_table(feature_catalog_path, columns=["feature_index", "label", "description"]).to_pylist()
     }
     labels: list[str] = []
     for feature in selected_features:
@@ -374,19 +381,6 @@ def _feature_labels(feature_catalog_path: Path, selected_features: list[int]) ->
         else:
             labels.append(f"F{feature}")
     return labels
-
-
-def _feature_descriptions(feature_catalog_path: Path, selected_features: list[int]) -> list[str]:
-    catalog = {
-        int(row["feature_index"]): (str(row.get("label") or ""), str(row.get("description") or ""))
-        for row in pq.read_table(feature_catalog_path).to_pylist()
-    }
-    descriptions: list[str] = []
-    for feature in selected_features:
-        label, description = catalog.get(feature, ("", ""))
-        text = description or label or "unlabeled"
-        descriptions.append(f"F{feature}: {text}")
-    return descriptions
 
 
 def _concise_feature_description(*, label: str, description: str) -> str:
@@ -484,7 +478,7 @@ def _missing_row(
         input_hashes=file_hashes({f"input_{index}": path for index, path in enumerate(missing)}),
         alt_text="SAE/fold/LLR comparison plot was skipped because required inputs were missing.",
         description=(
-            "This plot requires SAE protein features, candidate mutations, fold metrics, and WT mutation LLR rows."
+            "The plot requires SAE protein features, candidate mutations, fold metrics, and WT mutation LLR rows."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,
         title=TITLE,

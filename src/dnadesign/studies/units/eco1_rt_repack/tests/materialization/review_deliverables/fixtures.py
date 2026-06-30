@@ -5,6 +5,8 @@ src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_delivera
 
 Fixtures for Eco1 review-deliverable materialization tests.
 
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -12,14 +14,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pyarrow as pa
-import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.thread.candidates.proteinmpnn import write_candidate_table
 from dnadesign.thread.foldcheck import sequence_hash
 
 from .biohub_sae_fixtures import write_biohub_esmc_sae_outputs
+from .conservation_fixtures import write_conservation_inputs
 from .esmc_fixtures import write_wt_mutation_scoring_outputs
 from .foldcheck_fixtures import write_foldcheck_review_manifest
 
@@ -28,61 +29,13 @@ def write_deliverable_inputs(output_root: Path) -> None:
     """Write a compact Eco1-like artifact set for review-deliverable tests."""
 
     output_root.mkdir(parents=True, exist_ok=True)
-    _write_conservation_alignment(output_root)
-    _write_conservation_profile(output_root / "conservation_profile.parquet")
+    write_conservation_inputs(output_root)
     _write_mask_set(output_root / "mask_set.yaml")
     _write_candidate_table(output_root / "candidate_table.parquet")
     _write_reference_pdb(output_root / "proteinmpnn_request" / "chain_a_backbone.pdb")
     write_foldcheck_review_manifest(output_root / "foldcheck_review")
     write_wt_mutation_scoring_outputs(output_root)
     write_biohub_esmc_sae_outputs(output_root)
-
-
-def _write_conservation_alignment(output_root: Path) -> None:
-    alignment_root = output_root / "conservation_alignments"
-    alignment_root.mkdir(parents=True, exist_ok=True)
-    alignment_root.joinpath("ec86_clade9_conservation_v1.aligned.fasta").write_text(
-        "\n".join(
-            [
-                ">eco1_rt_ec86kit_reference",
-                "MKSAYL",
-                ">clade9_neighbor_001",
-                "MKSAYL",
-                ">clade9_neighbor_002",
-                "MKSAFL",
-                ">clade9_neighbor_003",
-                "MRSAYI",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def _write_conservation_profile(path: Path) -> None:
-    rows = []
-    for position, wt_aa in enumerate("MKSAYL", start=1):
-        rows.append(
-            {
-                "canonical_position": position,
-                "profile_id": "ec86_clade9_conservation_v1",
-                "wt_aa": wt_aa,
-                "msa_column": position,
-                "non_gap_count": 4,
-                "wt_count": 3 if position in {1, 2, 3, 4, 6} else 2,
-                "wt_frequency": 0.75 if position in {1, 2, 3, 4, 6} else 0.5,
-                "plurality_aa": wt_aa,
-                "wt_is_plurality": True,
-                "conservation_threshold": 0.25,
-                "min_non_gap_count": 2,
-                "passes_conservation_mask": position in {2, 4},
-                "source_hash": "sha256:" + "2" * 64,
-                "target_sequence_hash": "sha256:" + "3" * 64,
-                "mapping_status": "mapped",
-                "evidence_status": "used_for_mask" if position in {2, 4} else "not_conserved",
-            }
-        )
-    pq.write_table(pa.Table.from_pylist(rows), path)
 
 
 def _write_mask_set(path: Path) -> None:

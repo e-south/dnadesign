@@ -67,6 +67,7 @@ def materialize_foldcheck_review(
     *,
     repo_root: Path | None = None,
     output_root: Path | None = None,
+    render_chimerax_overlay: bool = False,
 ) -> MaterializedFoldCheckReviewArtifacts:
     """Materialize ranking, structure-panel, ChimeraX, and Atlas-subset review artifacts."""
 
@@ -153,6 +154,7 @@ def materialize_foldcheck_review(
         reference_local_path=structures_root / "ec86kit_chain_a_backbone_reference.pdb",
         panel_entries=entries,
         source_request_hash=source_request_hash,
+        render_chimerax_overlay=render_chimerax_overlay,
     )
     return MaterializedFoldCheckReviewArtifacts(
         ranking_path=ranking_path,

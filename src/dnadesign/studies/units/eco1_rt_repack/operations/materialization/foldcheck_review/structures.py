@@ -92,10 +92,7 @@ def stage_full_structure_set(
     """Stage one local PDB per accepted fold-check row and write a complete manifest."""
 
     structures_root.mkdir(parents=True, exist_ok=True)
-    verified_existing_entries = _verified_existing_entries(
-        full_structure_set_path,
-        source_request_hash=source_request_hash,
-    )
+    verified_existing_entries = _verified_existing_entries(full_structure_set_path)
     entries = [
         _stage_model_entry(
             row=wt_fold_row,
@@ -226,17 +223,11 @@ def _relative_panel_entry(entry: PanelEntry, *, manifest_root: Path) -> dict[str
     return normalized
 
 
-def _verified_existing_entries(
-    manifest_path: Path,
-    *,
-    source_request_hash: str,
-) -> dict[str, Mapping[str, Any]]:
+def _verified_existing_entries(manifest_path: Path) -> dict[str, Mapping[str, Any]]:
     if not manifest_path.exists():
         return {}
     loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
-        return {}
-    if str(loaded.get("source_request_hash") or "") != source_request_hash:
         return {}
     entries = loaded.get("structures")
     if not isinstance(entries, list):

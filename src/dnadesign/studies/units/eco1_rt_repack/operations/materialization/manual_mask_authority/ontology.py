@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "candidate_prior_not_mask_authoritative"
+WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "active_direct_contact_mask_prior"
 
 
 def structure_residue_ids_for_positions(

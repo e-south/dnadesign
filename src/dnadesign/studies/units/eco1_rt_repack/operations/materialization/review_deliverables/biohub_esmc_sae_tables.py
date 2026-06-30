@@ -97,7 +97,7 @@ def make_protein_top_feature_table_row(
             "Compact table of per-protein top Biohub ESMC SAE features ordered by peak activation and prevalence."
         ),
         description=(
-            "Supports notebook dropdown inspection for each protein. Feature descriptions are populated only "
+            "Supports per-protein feature inspection. Feature descriptions are populated only "
             "when the exact SAE dictionary supplies source-backed labels."
         ),
         interpretation_limit=interpretation_limit,

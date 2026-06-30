@@ -78,7 +78,7 @@ def test_contact_risk_profile_materializer_records_available_and_missing_evidenc
     assert by_position[195]["manual_mask"] is True
     assert by_position[195]["contact_risk_class"] == "motif_anchor_protected"
     assert by_position[257]["wang_candidate_prior"] is True
-    assert by_position[257]["wang_candidate_prior_status"] == "candidate_prior_not_mask_authoritative"
+    assert by_position[257]["wang_candidate_prior_status"] == "active_direct_contact_mask_prior"
     assert by_position[4]["selected_mask_non_fixed"] is True
     assert by_position[3]["sidechain_context_distance_angstrom"] is not None
     assert by_position[3]["backbone_context_distance_angstrom"] is not None

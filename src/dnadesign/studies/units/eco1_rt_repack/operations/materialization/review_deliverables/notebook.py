@@ -262,6 +262,24 @@ def _(structure_map, structure_ui):
 
 
 @app.cell
+def _(mo):
+    structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
+    structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
+    return structure_background_ui, structure_mutation_ui
+
+
+@app.cell
+def _(structure_background_ui, structure_mutation_ui):
+    show_reference_background = True
+    show_mutation_differences = False
+    if structure_background_ui is not None:
+        show_reference_background = bool(structure_background_ui.value)
+    if structure_mutation_ui is not None:
+        show_mutation_differences = bool(structure_mutation_ui.value)
+    return show_mutation_differences, show_reference_background
+
+
+@app.cell
 def _(mo, sae_protein_lookup, sae_top_feature_rows, selected_section):
     protein_map = sae_protein_lookup(sae_top_feature_rows, selected_section=selected_section)
     protein_options = list(protein_map)
@@ -324,9 +342,13 @@ def _(
     sae_protein_ui,
     selected_section,
     selected_sae_feature,
+    show_mutation_differences,
+    show_reference_background,
+    structure_background_ui,
     selected_structure_row,
     selected_visual,
     structure_group_ui,
+    structure_mutation_ui,
     structure_ui,
     review_lane_ui,
 ):
@@ -340,13 +362,17 @@ def _(
                     selected_row=selected_structure_row,
                     structure_ui=structure_ui,
                     structure_group_ui=structure_group_ui,
+                    structure_background_ui=structure_background_ui,
+                    structure_mutation_ui=structure_mutation_ui,
+                    show_reference_background=show_reference_background,
+                    show_mutation_differences=show_mutation_differences,
                 ),
                 render_interpretation_note(selected_visual, mo=mo),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
         else:
             rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
-        if selected_section == "biohub_esmc_sae_interpretation":
+        if selected_section == "esmc_feature_review":
             rendered.append(
                 render_sae_feature_inspector(
                     mo=mo,
@@ -362,7 +388,10 @@ def _(
                 mo.hstack(
                     [review_lane_ui, deliverable_section_ui, deliverable_id_ui],
                     justify="start",
+                    align="stretch",
+                    wrap=True,
                     gap=1.0,
+                    widths="equal",
                 ),
                 *rendered,
             ],

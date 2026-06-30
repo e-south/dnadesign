@@ -31,7 +31,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--repo-root", type=Path, default=None)
     parser.add_argument("--output-root", type=Path, default=None)
-    parser.add_argument("--positions", default=DEFAULT_POSITIONS, help="One-based positions/ranges or 'all'.")
+    parser.add_argument(
+        "--positions",
+        default=DEFAULT_POSITIONS,
+        help="One-based positions/ranges or 'all'; final uncapped runs require all positions.",
+    )
     parser.add_argument("--biohub-api-base-url", default=DEFAULT_BIOHUB_API_BASE_URL)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--key-file", type=Path, default=DEFAULT_KEY_FILE)

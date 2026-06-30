@@ -77,9 +77,7 @@ def test_manual_mask_authority_materializer_writes_protected_motifs_and_rt_revie
     assert candidate_positions == {49, 51, 55, 56, 73, 231, 257, 264}
     active_manual_positions = {row["canonical_position"] for row in authority["residues"]}
     assert candidate_positions & active_manual_positions == set()
-    assert all(
-        row["policy"] == "candidate_prior_not_mask_authoritative" for row in authority["candidate_prior_residues"]
-    )
+    assert all(row["policy"] == "active_direct_contact_mask_prior" for row in authority["candidate_prior_residues"])
     rt_interval_features = [
         feature for feature in authority["features"] if feature["authority_type"] == "rt_core_interval"
     ]

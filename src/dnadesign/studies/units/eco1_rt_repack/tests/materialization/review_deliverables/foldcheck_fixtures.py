@@ -5,6 +5,8 @@ src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_delivera
 
 Fold-review fixtures for Eco1 review-deliverable materialization tests.
 
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -27,13 +29,17 @@ def write_foldcheck_review_manifest(review_root: Path) -> None:
         '<svg role="img"><title>Fold metrics</title><desc>Fixture fold metrics.</desc></svg>\n',
         encoding="utf-8",
     )
+    plot_root.joinpath("biohub_esmc_sae_coverage.svg").write_text(
+        '<svg role="img"><title>SAE coverage</title><desc>Fixture SAE coverage.</desc></svg>\n',
+        encoding="utf-8",
+    )
     plot_root.joinpath("structure_overlay_panel.png").write_bytes(b"\x89PNG\r\n\x1a\nfixture")
     review_root.joinpath("review_visual_manifest.yaml").write_text(
         yaml.safe_dump(
             {
                 "schema_id": "eco1_rt.foldcheck_review_visual_manifest",
                 "status": "materialized",
-                "plot_count": 3,
+                "plot_count": 4,
                 "plots": [
                     {
                         "plot_id": "fold_metric_scatter",
@@ -44,6 +50,17 @@ def write_foldcheck_review_manifest(review_root: Path) -> None:
                         "description": "Fixture fold-review plot.",
                         "interpretation_limit": "Fold metrics do not measure activity.",
                         "data_sources": ["foldcheck_review/foldcheck_candidate_ranking.parquet"],
+                        "skip_reason": "",
+                    },
+                    {
+                        "plot_id": "biohub_esmc_sae_coverage",
+                        "status": "rendered",
+                        "path": "plots/biohub_esmc_sae_coverage.svg",
+                        "title": "Biohub ESMC SAE coverage is complete for fold-reviewed sequences",
+                        "alt_text": "Fixture Biohub ESMC SAE coverage plot.",
+                        "description": "Fixture Biohub ESMC SAE coverage plot.",
+                        "interpretation_limit": "SAE coverage is annotation coverage, not activity evidence.",
+                        "data_sources": ["biohub_esmc_sae_profile.parquet"],
                         "skip_reason": "",
                     },
                     {

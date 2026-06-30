@@ -45,6 +45,7 @@ def write_review_visuals(
     reference_local_path: Path,
     panel_entries: list[PanelEntry],
     source_request_hash: str,
+    render_chimerax_overlay: bool = False,
 ) -> tuple[Path, Path, int]:
     """Write compact review plots, a visual manifest, and a scoped marimo notebook."""
 
@@ -61,6 +62,7 @@ def write_review_visuals(
             chimerax_root=review_root / CHIMERAX_DIR_NAME,
             reference_local_path=reference_local_path,
             entries=panel_entries,
+            render_png=render_chimerax_overlay,
         )
     )
     notebook_path = review_root / NOTEBOOKS_DIR_NAME / REVIEW_NOTEBOOK_FILE_NAME

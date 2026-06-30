@@ -233,6 +233,7 @@ def materialize_biohub_esmc_wt_mutation_scoring(
         position_rows=position_rows,
         substitution_rows=substitution_rows,
         selected_positions=selection.positions,
+        sequence_length=len(selection.sequence),
         max_new_requests=max_new_requests,
     )
     mask_join_path = write_mask_join(
@@ -381,12 +382,18 @@ def _require_complete_final_run(
     position_rows: list[dict[str, object]],
     substitution_rows: list[dict[str, object]],
     selected_positions: tuple[int, ...],
+    sequence_length: int,
     max_new_requests: int | None,
 ) -> None:
-    """Reject uncapped WT mutation-scoring runs with any unaccepted selected position."""
+    """Reject uncapped WT mutation-scoring runs that are not full accepted WT scans."""
 
     if max_new_requests is not None or not selected_positions:
         return
+    if len(selected_positions) != sequence_length:
+        raise ValueError(
+            "Complete Biohub ESMC WT mutation scoring requires all WT positions; "
+            "pass --positions all for a final run, or set --max-new-requests for a smoke or resumable capped run."
+        )
     accepted_positions = {
         int(row["canonical_position"]) for row in position_rows if str(row.get("status") or "") == "accepted"
     }

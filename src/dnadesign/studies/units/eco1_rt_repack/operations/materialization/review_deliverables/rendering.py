@@ -35,12 +35,12 @@ TICK_SIZE = 12
 LEGEND_SIZE = 12
 
 
-def save_accessible_svg(fig: Any, path: Path, *, title: str, description: str) -> None:
+def save_accessible_svg(fig: Any, path: Path, *, title: str, description: str, dpi: int = 180) -> None:
     """Save a Matplotlib figure as an SVG with a title and description node."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with rc_context({"svg.fonttype": "none"}):
-        fig.savefig(path, format="svg", bbox_inches="tight")
+        fig.savefig(path, format="svg", bbox_inches="tight", dpi=dpi)
     _inject_svg_accessibility(path, title=title, description=description)
     plt.close(fig)
 

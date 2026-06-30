@@ -1,8 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/
-biohub_esmc_sae_profile/run_contract.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sae_profile/run_contract.py
 
 Run manifest and completion checks for Eco1 Biohub ESMC SAE-profile outputs.
 

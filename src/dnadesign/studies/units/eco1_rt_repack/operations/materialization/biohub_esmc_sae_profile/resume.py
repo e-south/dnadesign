@@ -54,11 +54,14 @@ def load_existing_rows(output_root: Path) -> ExistingBiohubEsmcRows | None:
     protein_path = output_root / "biohub_esmc_protein_features.parquet"
     residue_path = output_root / "biohub_esmc_residue_features.parquet"
     feature_path = output_root / "biohub_esmc_feature_catalog.parquet"
+    existing_paths = [path for path in (profile_path, protein_path, residue_path, feature_path) if path.exists()]
     if not profile_path.exists():
+        if existing_paths:
+            raise ValueError("stale Biohub ESMC SAE cache: feature tables exist without a profile table")
         return None
     profile_table = pq.read_table(profile_path)
     if "biohub_query_hash" not in profile_table.column_names:
-        return None
+        raise ValueError("stale Biohub ESMC SAE cache: profile table is missing biohub_query_hash")
     return ExistingBiohubEsmcRows(
         profile_rows_by_candidate={str(row["candidate_id"]): dict(row) for row in profile_table.to_pylist()},
         protein_features_path=protein_path if protein_path.exists() else None,

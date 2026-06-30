@@ -91,17 +91,29 @@ def load_cached_rows(scoring_root: Path, *, request_hash: str) -> CachedMutation
 
     position_path = scoring_root / POSITION_ENTROPY_FILE_NAME
     substitution_path = scoring_root / SUBSTITUTION_LLR_FILE_NAME
-    if not position_path.exists() or not substitution_path.exists():
+    if not position_path.exists() and not substitution_path.exists():
         return CachedMutationScoringRows.empty()
+    if not position_path.exists() or not substitution_path.exists():
+        raise ValueError(
+            "stale mutation-scoring cache: expected both position entropy and substitution LLR Parquet files"
+        )
     metadata = pq.read_metadata(position_path).metadata or {}
     if metadata.get(b"request_hash", b"").decode("utf-8") != request_hash:
-        return CachedMutationScoringRows.empty()
+        raise ValueError("stale mutation-scoring cache: request_hash metadata does not match current request")
     position_schema = pq.read_schema(position_path)
     substitution_schema = pq.read_schema(substitution_path)
-    if not _REQUIRED_POSITION_COLUMNS.issubset(set(position_schema.names)):
-        return CachedMutationScoringRows.empty()
-    if not _REQUIRED_SUBSTITUTION_COLUMNS.issubset(set(substitution_schema.names)):
-        return CachedMutationScoringRows.empty()
+    missing_position_columns = sorted(_REQUIRED_POSITION_COLUMNS - set(position_schema.names))
+    missing_substitution_columns = sorted(_REQUIRED_SUBSTITUTION_COLUMNS - set(substitution_schema.names))
+    if missing_position_columns:
+        raise ValueError(
+            "stale mutation-scoring cache: position entropy table is missing required columns "
+            + ", ".join(missing_position_columns)
+        )
+    if missing_substitution_columns:
+        raise ValueError(
+            "stale mutation-scoring cache: substitution LLR table is missing required columns "
+            + ", ".join(missing_substitution_columns)
+        )
     position_rows = pq.read_table(position_path).to_pylist()
     substitution_rows = pq.read_table(substitution_path).to_pylist()
     positions_by_key: dict[tuple[int, str], dict[str, object]] = {}
@@ -110,7 +122,9 @@ def load_cached_rows(scoring_root: Path, *, request_hash: str) -> CachedMutation
         if row.get("status") != "accepted":
             continue
         if not _accepted_position_row_has_current_values(row):
-            continue
+            raise ValueError(
+                "stale mutation-scoring cache: accepted position rows must have current non-null metric columns"
+            )
         key = (int(row["canonical_position"]), str(row["biohub_query_hash"]))
         positions_by_key[key] = dict(row)
     for row in substitution_rows:

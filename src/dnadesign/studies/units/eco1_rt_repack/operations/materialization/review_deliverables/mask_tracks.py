@@ -20,6 +20,9 @@ from typing import Any
 import matplotlib
 from matplotlib.patches import Patch, Rectangle
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    SECTION_CONSTRAINT_EVIDENCE,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
     make_deliverable_row,
@@ -83,8 +86,8 @@ def write_linear_mask_tracks(
     positions = sorted(residues_by_position)
     blocks = _position_blocks(positions, block_size=_MASK_TRACK_BLOCK_SIZE)
     block_count = len(blocks)
-    fig_height = max(4.8, block_count * 1.76 + 1.45)
-    fig, axes = plt.subplots(block_count, 1, figsize=(14.8, fig_height), squeeze=False)
+    fig_height = max(4.8, block_count * 1.76 + 1.32)
+    fig, axes = plt.subplots(block_count, 1, figsize=(16.2, fig_height), squeeze=False)
     for index, (ax, block_positions) in enumerate(zip(axes.flatten(), blocks, strict=True)):
         _draw_mask_track_block(
             ax,
@@ -95,14 +98,16 @@ def write_linear_mask_tracks(
     fig.legend(
         handles=[Patch(facecolor=color, label=label) for _field, label, color in _TRACKS],
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.008),
-        ncol=4,
+        bbox_to_anchor=(0.5, 0.012),
+        ncol=len(_TRACKS),
         frameon=False,
-        fontsize=LEGEND_SIZE,
+        fontsize=LEGEND_SIZE - 1,
+        columnspacing=1.05,
+        handletextpad=0.45,
     )
-    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.058)
-    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.014)
-    fig.subplots_adjust(left=0.16, right=0.995, bottom=0.115, top=0.925, hspace=0.50)
+    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.073)
+    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.012)
+    fig.subplots_adjust(left=0.13, right=0.995, bottom=0.135, top=0.92, hspace=0.46)
 
     path = panel_root / "linear_mask_tracks.svg"
     alt = (
@@ -110,10 +115,10 @@ def write_linear_mask_tracks(
         "retained DNA/RNA 5 A contacts, clade 9 plurality protection, protected union, "
         "and mutable design canvas tracks."
     )
-    save_accessible_svg(fig, path, title=title, description=alt)
+    save_accessible_svg(fig, path, title=title, description=alt, dpi=300)
     return make_deliverable_row(
         deliverable_id="linear_mask_tracks",
-        section="scaffold_and_mask",
+        section=SECTION_CONSTRAINT_EVIDENCE,
         artifact_kind="svg",
         status="rendered",
         path=path,
@@ -161,7 +166,7 @@ def write_mask_structure_context(
     rows = [
         make_deliverable_row(
             deliverable_id="mask_structure_context_script",
-            section="scaffold_and_mask",
+            section=SECTION_CONSTRAINT_EVIDENCE,
             artifact_kind="chimerax_script",
             status="rendered",
             path=script_path,
@@ -183,7 +188,7 @@ def write_mask_structure_context(
         ),
         make_deliverable_row(
             deliverable_id="mask_structure_context_orientation_template",
-            section="scaffold_and_mask",
+            section=SECTION_CONSTRAINT_EVIDENCE,
             artifact_kind="chimerax_script",
             status="rendered",
             path=orientation_template_path,
@@ -205,7 +210,6 @@ def write_mask_structure_context(
             title="Manual ChimeraX orientation template for the Ec86 reference",
         ),
     ]
-    executable = _find_chimerax()
     if not render_png:
         if png_path.exists():
             status = "rendered"
@@ -213,19 +217,21 @@ def write_mask_structure_context(
         else:
             status = "skipped_optional_render_disabled"
             skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."
-    elif executable:
-        chimerax_completed = _run_chimerax(executable=executable, script_path=script_path)
-        status = "rendered" if chimerax_completed and png_path.exists() else "skipped_runtime_failed"
-        skip_reason = (
-            "" if status == "rendered" else "ChimeraX was found, but the command did not write the expected PNG."
-        )
     else:
-        status = "skipped_missing_runtime"
-        skip_reason = "ChimeraX executable was not found on PATH or at the standard macOS app path."
+        executable = _find_chimerax()
+        if executable:
+            chimerax_completed = _run_chimerax(executable=executable, script_path=script_path)
+            status = "rendered" if chimerax_completed and png_path.exists() else "skipped_runtime_failed"
+            skip_reason = (
+                "" if status == "rendered" else "ChimeraX was found, but the command did not write the expected PNG."
+            )
+        else:
+            status = "skipped_missing_runtime"
+            skip_reason = "ChimeraX executable was not found on PATH or at the standard macOS app path."
     rows.append(
         make_deliverable_row(
             deliverable_id="mask_structure_context_png",
-            section="scaffold_and_mask",
+            section=SECTION_CONSTRAINT_EVIDENCE,
             artifact_kind="png",
             status=status,
             path=png_path,
@@ -407,7 +413,7 @@ def _draw_mask_track_block(
     top_axis.set_xticks(
         top_tick_indexes,
         [str(residues_by_position[block_positions[index]].get("wt_aa") or "") for index in top_tick_indexes],
-        fontsize=5.4 if len(block_positions) > 48 else TICK_SIZE,
+        fontsize=6.4 if len(block_positions) > 48 else TICK_SIZE,
     )
     top_axis.tick_params(length=0, pad=2)
     block_title = f"Ec86 positions {block_positions[0]}-{block_positions[-1]}"

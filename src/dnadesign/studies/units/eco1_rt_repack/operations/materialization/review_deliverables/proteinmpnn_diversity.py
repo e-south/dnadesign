@@ -21,6 +21,7 @@ import pyarrow.parquet as pq
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from .constants import SECTION_DESIGNS_AND_FOLD_TRIAGE
 from .manifest import (
     file_hashes,
     make_deliverable_row,
@@ -159,7 +160,7 @@ def _write_score_mutation_burden(
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_score_mutation_burden",
-        section="design_and_fold_triage",
+        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         artifact_kind="svg",
         status="rendered",
         path=path,
@@ -218,7 +219,7 @@ def _write_mutation_density(
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_mutation_density",
-        section="design_and_fold_triage",
+        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         artifact_kind="svg",
         status="rendered",
         path=path,

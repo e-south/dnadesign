@@ -40,6 +40,7 @@ def test_wt_mutation_scoring_materializes_two_position_smoke(tmp_path: Path) -> 
         repo_root=Path.cwd(),
         output_root=tmp_path,
         positions="1-2",
+        max_new_requests=2,
         biohub_client=FakeSequenceLogitsClient(),
         retrieved_at="2026-06-27T00:00:00Z",
     )
@@ -68,6 +69,20 @@ def test_wt_mutation_scoring_materializes_two_position_smoke(tmp_path: Path) -> 
     assert "RT1-RT7 review spans" in entropy_plot_text
     assert "Protected residues" in entropy_plot_text
     assert "Motif anchors" in entropy_plot_text
+
+
+def test_wt_mutation_scoring_final_run_requires_all_wt_positions(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    write_mask_set(tmp_path / "mask_set.yaml", length=4)
+
+    with pytest.raises(ValueError, match="requires all WT positions"):
+        materialize_biohub_esmc_wt_mutation_scoring(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            positions="1-2",
+            biohub_client=FakeSequenceLogitsClient(),
+            retrieved_at="2026-06-27T00:00:00Z",
+        )
 
 
 def test_wt_mutation_scoring_max_new_requests_writes_resumable_error(tmp_path: Path) -> None:
@@ -100,13 +115,13 @@ def test_wt_mutation_scoring_final_run_rejects_timeout_error_row(tmp_path: Path)
         materialize_biohub_esmc_wt_mutation_scoring(
             repo_root=Path.cwd(),
             output_root=tmp_path,
-            positions="1-2",
+            positions="all",
             biohub_client=TimeoutOnceSequenceLogitsClient(),
             retrieved_at="2026-06-27T00:00:00Z",
         )
 
 
-def test_wt_mutation_scoring_resume_ignores_stale_position_schema(tmp_path: Path) -> None:
+def test_wt_mutation_scoring_resume_rejects_stale_position_schema(tmp_path: Path) -> None:
     write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
     write_mask_set(tmp_path / "mask_set.yaml", length=4)
 
@@ -114,27 +129,25 @@ def test_wt_mutation_scoring_resume_ignores_stale_position_schema(tmp_path: Path
         repo_root=Path.cwd(),
         output_root=tmp_path,
         positions="1",
+        max_new_requests=1,
         biohub_client=FakeSequenceLogitsClient(),
         retrieved_at="2026-06-27T00:00:00Z",
     )
     rewrite_position_table_with_old_fraction_name(first.position_entropy_path)
 
-    second = materialize_biohub_esmc_wt_mutation_scoring(
-        repo_root=Path.cwd(),
-        output_root=tmp_path,
-        positions="1",
-        resume_existing=True,
-        max_new_requests=0,
-        biohub_client=FakeSequenceLogitsClient(),
-        retrieved_at="2026-06-27T00:00:00Z",
-    )
-
-    position_rows = pq.read_table(second.position_entropy_path).to_pylist()
-    assert position_rows[0]["status"] == "errored"
-    assert position_rows[0]["failure_reason"] == "biohub_request_not_attempted_due_to_max_new_requests"
+    with pytest.raises(ValueError, match="stale mutation-scoring cache"):
+        materialize_biohub_esmc_wt_mutation_scoring(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            positions="1",
+            resume_existing=True,
+            max_new_requests=0,
+            biohub_client=FakeSequenceLogitsClient(),
+            retrieved_at="2026-06-27T00:00:00Z",
+        )
 
 
-def test_wt_mutation_scoring_resume_ignores_null_accepted_metric(tmp_path: Path) -> None:
+def test_wt_mutation_scoring_resume_rejects_null_accepted_metric(tmp_path: Path) -> None:
     write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
     write_mask_set(tmp_path / "mask_set.yaml", length=4)
 
@@ -142,21 +155,19 @@ def test_wt_mutation_scoring_resume_ignores_null_accepted_metric(tmp_path: Path)
         repo_root=Path.cwd(),
         output_root=tmp_path,
         positions="1",
+        max_new_requests=1,
         biohub_client=FakeSequenceLogitsClient(),
         retrieved_at="2026-06-27T00:00:00Z",
     )
     rewrite_position_table_with_null_alternate_fraction(first.position_entropy_path)
 
-    second = materialize_biohub_esmc_wt_mutation_scoring(
-        repo_root=Path.cwd(),
-        output_root=tmp_path,
-        positions="1",
-        resume_existing=True,
-        max_new_requests=0,
-        biohub_client=FakeSequenceLogitsClient(),
-        retrieved_at="2026-06-27T00:00:00Z",
-    )
-
-    position_rows = pq.read_table(second.position_entropy_path).to_pylist()
-    assert position_rows[0]["status"] == "errored"
-    assert position_rows[0]["failure_reason"] == "biohub_request_not_attempted_due_to_max_new_requests"
+    with pytest.raises(ValueError, match="stale mutation-scoring cache"):
+        materialize_biohub_esmc_wt_mutation_scoring(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            positions="1",
+            resume_existing=True,
+            max_new_requests=0,
+            biohub_client=FakeSequenceLogitsClient(),
+            retrieved_at="2026-06-27T00:00:00Z",
+        )

@@ -18,6 +18,13 @@ from typing import Any
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    SECTION_CONSTRAINT_EVIDENCE,
+    SECTION_DESIGNS_AND_FOLD_TRIAGE,
+    SECTION_ESMC_FEATURE_REVIEW,
+    SECTION_FEASIBILITY_AND_HANDOFF,
+)
+
 _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
     "foldcheck_review_structure_overlay_panel",
     "foldcheck_review_structure_overlay_skipped",
@@ -47,17 +54,19 @@ def render_intro(mo: Any) -> Any:
 
     intro_lead = (
         "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported RNA/DNA-bound scaffold. "
-        "Following the Tao-style fixed-backbone redesign pattern, this study builds a conservative "
-        "redesign set for downstream structured-template assays: protect residues supported by motifs, "
+        "The current Tao-style fixed-backbone workflow builds a conservative redesign set for downstream "
+        "structured-template assays: protect residues supported by motifs, "
         "substrate contacts, and homolog conservation, then repack the remaining design canvas."
     )
     intro_flow = (
-        "The sequence of evidence is scaffold first, then constraint evidence, then design, then review. "
+        "Evidence is ordered as scaffold, constraint evidence, sequence proposal, structure-model review, "
+        "and model-derived annotation. "
         "The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, retained-substrate "
-        "proximity, and Mestre-derived clade 9 plurality. WT ESMC masked-marginal scoring is shown beside "
-        "those inputs as a review-only model-constraint audit. ProteinMPNN proposes variants on the "
-        "unprotected canvas, ColabFold checks fold-model compatibility, and Biohub ESMC SAE features annotate WT "
-        "and candidates. Activity, strand displacement, and structured-template readthrough remain assay questions."
+        "proximity, and Mestre-derived clade 9 plurality at the 25% threshold. WT ESMC masked-marginal "
+        "scoring appears beside those inputs as a review-only model-constraint audit. "
+        "ProteinMPNN proposes variants on the unprotected canvas, ColabFold checks fold-model compatibility, and "
+        "Biohub ESMC SAE features annotate WT and candidate sequences. Activity, strand displacement, "
+        "and structured-template readthrough remain assay questions."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "
@@ -157,6 +166,8 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
 
     media_path = resolve_manifest_path(manifest_root, str(row["path"]))
     suffix = media_path.suffix.lower()
+    if str(row.get("artifact_kind") or "") == "planned_section":
+        return _render_planned_section(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return _render_image(row, mo=mo, media_path=media_path)
     if media_path.exists():
@@ -234,9 +245,10 @@ def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
 
 def format_section_label(section: str) -> str:
     labels = {
-        "scaffold_and_mask": "Constraint evidence for the design mask",
-        "design_and_fold_triage": "ProteinMPNN variants and fold triage",
-        "biohub_esmc_sae_interpretation": "Biohub ESMC feature review",
+        SECTION_CONSTRAINT_EVIDENCE: "Constraint evidence for the design mask",
+        SECTION_DESIGNS_AND_FOLD_TRIAGE: "ProteinMPNN designs and fold triage",
+        SECTION_ESMC_FEATURE_REVIEW: "ESMC feature review",
+        SECTION_FEASIBILITY_AND_HANDOFF: "Feasibility and handoff",
     }
     return labels.get(str(section), str(section).replace("_", " ").title())
 
@@ -252,6 +264,8 @@ def format_deliverable_label(row: dict[str, Any] | str) -> str:
 def _is_publication_visual(row: dict[str, Any]) -> bool:
     if str(row.get("deliverable_id") or "") in _NOTEBOOK_HIDDEN_DELIVERABLE_IDS:
         return False
+    if str(row.get("artifact_kind") or "") == "planned_section":
+        return True
     if is_interactive_structure_deliverable(row):
         return True
     suffix = Path(str(row.get("path") or "")).suffix.lower()
@@ -275,7 +289,7 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     )
     return mo.Html(
         f"""
-        <figure style="margin:0;">
+        <figure style="margin:0; width:100%;">
           <div style="overflow:{container_overflow}; width:100%; border:1px solid #d8dee4;
                       border-radius:6px; background:#ffffff; padding:0.5rem;">
             <img src="data:{mime_type};base64,{encoded}" alt="{alt_text}"
@@ -288,6 +302,26 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
             <strong>Interpretation limit:</strong> {limit}
           </div>
         </figure>
+        """
+    )
+
+
+def _render_planned_section(row: dict[str, Any], *, mo: Any) -> Any:
+    title = html.escape(format_deliverable_label(row))
+    description = html.escape(str(row.get("description") or ""))
+    limit = html.escape(str(row.get("interpretation_limit") or ""))
+    return mo.Html(
+        f"""
+        <section style="border:1px solid #d8dee4; border-radius:6px; background:#ffffff;
+                        padding:0.85rem 0.95rem; max-width:780px;">
+          <div style="font-size:0.78rem; color:#6e7781; text-transform:uppercase;
+                      letter-spacing:0.04em; margin-bottom:0.3rem;">Planned downstream gate</div>
+          <h2 style="font-size:1.25rem; line-height:1.2; margin:0 0 0.45rem 0;">{title}</h2>
+          <p style="margin:0; line-height:1.45; color:#24292f;">{description}</p>
+          <p style="margin:0.55rem 0 0 0; line-height:1.45; color:#57606a;">
+            <strong>Boundary:</strong> {limit}
+          </p>
+        </section>
         """
     )
 

@@ -15,12 +15,15 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    SECTION_CONSTRAINT_EVIDENCE,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
     make_deliverable_row,
 )
 
-SECTION = "scaffold_and_mask"
+SECTION = SECTION_CONSTRAINT_EVIDENCE
 SOURCE_TABLES = [
     "biohub_esmc/mutation_scoring/wt_mutation_scoring_mask_join.parquet",
     "biohub_esmc/mutation_scoring/wt_position_entropy.parquet",

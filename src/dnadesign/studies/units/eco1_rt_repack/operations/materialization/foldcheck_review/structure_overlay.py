@@ -62,8 +62,9 @@ def write_structure_overlay_plot_row(
     chimerax_root: Path,
     reference_local_path: Path,
     entries: list[PanelEntry],
+    render_png: bool = False,
 ) -> dict[str, object]:
-    """Write a ChimeraX overlay script, render it when possible, and return a plot row."""
+    """Write a ChimeraX overlay script and optionally render a PNG."""
 
     plot_root.mkdir(parents=True, exist_ok=True)
     chimerax_root.mkdir(parents=True, exist_ok=True)
@@ -99,6 +100,13 @@ def write_structure_overlay_plot_row(
     elif len(aligned_entries) < 2:
         status = "skipped_missing_input"
         skip_reason = "Fewer than two local fold-check structures are available for an overlay."
+    elif not render_png:
+        if png_path.exists():
+            status = "rendered"
+            skip_reason = "Using an existing ChimeraX PNG; rendering was disabled for this materialization run."
+        else:
+            status = "skipped_optional_render_disabled"
+            skip_reason = "ChimeraX overlay rendering was disabled for this materialization run."
     else:
         executable = _find_chimerax()
         if not executable:

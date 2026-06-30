@@ -19,7 +19,7 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import _DOCS_ROOT
 
-WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "candidate_prior_not_mask_authoritative"
+WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "active_direct_contact_mask_prior"
 
 
 def load_manual_mask_authority_source(repo_root: Path) -> dict[str, Any]:

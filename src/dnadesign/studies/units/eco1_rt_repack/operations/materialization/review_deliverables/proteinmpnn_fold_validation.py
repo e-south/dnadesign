@@ -20,6 +20,9 @@ import pyarrow.parquet as pq
 from matplotlib import gridspec
 from matplotlib.lines import Line2D
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    SECTION_DESIGNS_AND_FOLD_TRIAGE,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
     make_deliverable_row,
@@ -115,7 +118,7 @@ def write_tao_style_fold_validation(
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_tao_style_fold_validation",
-        section="design_and_fold_triage",
+        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         artifact_kind="svg",
         status="rendered",
         path=path,
@@ -132,7 +135,7 @@ def write_tao_style_fold_validation(
             "WT-runtime RMSD for ProteinMPNN designs under the current Eco1 mask."
         ),
         interpretation_limit=(
-            "This plot uses one single active mask policy, not multiple distance-threshold "
+            "The plot uses one single active mask policy, not multiple distance-threshold "
             "redesign sets. RMSD and pLDDT do not measure activity, processivity, strand "
             "displacement, or hairpin readthrough."
         ),
@@ -150,7 +153,7 @@ def _skipped_fold_validation_row(
 ) -> dict[str, Any]:
     return make_deliverable_row(
         deliverable_id="proteinmpnn_tao_style_fold_validation",
-        section="design_and_fold_triage",
+        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         artifact_kind="svg",
         status="skipped_missing_input",
         path=panel_root / "proteinmpnn_tao_style_fold_validation.svg",

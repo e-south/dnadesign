@@ -17,6 +17,7 @@ _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _ROOT_FILES = {
     "__init__.py",
     "__main__.py",
+    "biohub_esmc_model_provenance.py",
     "biohub_esmc_sae_fold_llr.py",
     "biohub_esmc_sae_interpretation.py",
     "biohub_esmc_sae_tables.py",
@@ -27,6 +28,7 @@ _ROOT_FILES = {
     "manifest.py",
     "mask_rows.py",
     "mask_tracks.py",
+    "mask_structure_browser.py",
     "models.py",
     "msa_panel.py",
     "notebook.py",
@@ -37,7 +39,9 @@ _ROOT_FILES = {
     "proteinmpnn_diversity.py",
     "proteinmpnn_fold_validation.py",
     "rendering.py",
+    "sae_structure_browser.py",
     "structure_browser.py",
+    "structure_browser_common.py",
 }
 
 

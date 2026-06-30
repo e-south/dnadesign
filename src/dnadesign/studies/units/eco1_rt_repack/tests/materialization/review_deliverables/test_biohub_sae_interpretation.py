@@ -27,6 +27,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
+    sae_structure_browser,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -69,6 +70,8 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert "source_notebook" in activation_pattern["evidence_summary"]
     assert "esmc_sae_feature_interpretation.ipynb" in str(activation_pattern["evidence_summary"])
     assert "source-backed feature descriptions" in activation_pattern["description"]
+    assert activation_pattern["evidence_summary"]["model"] == "esmc-6b-2024-12"
+    assert activation_pattern["evidence_summary"]["sae_model"] == "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
 
     activation_ratio_text = _resolve_manifest_path(result.manifest_path, activation_ratio["path"]).read_text(
         encoding="utf-8"
@@ -85,7 +88,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert "V001" in fold_llr_text
     assert "Fixture exact-dictionary feature description" in fold_llr_text
     assert "ProteinMPNN variant ordered by SAE similarity" in fold_llr_text
-    assert "Feature rows compare WT-normalized activation" in fold_llr_text
+    assert "WT-normalized SAE feature activation" in fold_llr_text
     assert "pLDDT" in fold_llr_text
     assert "single-substitution LLR" in fold_llr_text
     svg_desc = re.search(r"<desc[^>]*>(.*?)</desc>", fold_llr_text, flags=re.DOTALL)
@@ -98,6 +101,8 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert "not a joint protein likelihood" in fold_llr_comparison["interpretation_limit"]
     assert fold_llr_comparison["evidence_summary"]["sequence_rows"] == 3
     assert fold_llr_comparison["evidence_summary"]["llr_scoring_rule"] == "sum_variant_single_substitution_llrs"
+    assert fold_llr_comparison["evidence_summary"]["sae_model"] == "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
+    assert fold_llr_comparison["evidence_summary"]["wt_mutation_scoring_model"] == "esmc-300m-2024-12"
 
 
 def test_sae_feature_labels_stay_single_line(tmp_path: Path) -> None:
@@ -113,6 +118,21 @@ def test_sae_feature_labels_stay_single_line(tmp_path: Path) -> None:
     assert "\n" not in label
     assert len(label) <= 66
     assert all("\n" not in label for label in sae_fold_llr._feature_labels(feature_catalog_path, [101, 202]))
+
+
+def test_sae_structure_browser_descriptions_stay_concise() -> None:
+    description = (
+        "Summary: Right-hand nucleic-acid polymerase module, with a strong preference for the C-terminal "
+        "helical thumb/CTE and adjacent palm region that contacts and positions the template-product duplex. "
+        "Activation pattern: many long source details that belong in the SAE feature inspector, not the "
+        "structure-browser title region."
+    )
+
+    concise = sae_structure_browser._concise_sae_description(description)
+
+    assert concise.startswith("Right-hand nucleic-acid polymerase module")
+    assert "Activation pattern" not in concise
+    assert len(concise) <= 261
 
 
 def test_sae_fold_llr_svg_description_stays_concise() -> None:

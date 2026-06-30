@@ -30,7 +30,8 @@ from dnadesign.thread.structure_views import (
     render_structure_view_html,
 )
 
-_STRUCTURE_VIEW_SIZE = 640
+_STRUCTURE_VIEW_WIDTH = 760
+_STRUCTURE_VIEW_HEIGHT = 520
 
 
 def load_structure_browser_rows(*, manifest_root: Path, deliverables: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -59,6 +60,11 @@ def load_structure_browser_rows(*, manifest_root: Path, deliverables: list[dict[
             enriched["_deliverable_id"] = str(manifest_row.get("deliverable_id") or "")
             enriched["_section"] = str(manifest_row.get("section") or "")
             enriched["_control_label"] = str(payload.get("control_label") or "Structure view")
+            enriched["_deliverable_description"] = str(manifest_row.get("description") or "")
+            enriched["_deliverable_alt_text"] = str(manifest_row.get("alt_text") or "")
+            enriched["_interpretation_limit"] = str(
+                payload.get("interpretation_limit") or manifest_row.get("interpretation_limit") or ""
+            )
             rows.append(enriched)
     return rows
 
@@ -106,6 +112,10 @@ def render_structure_browser(
     selected_row: dict[str, Any] | None,
     structure_ui: Any,
     structure_group_ui: Any | None = None,
+    structure_background_ui: Any | None = None,
+    structure_mutation_ui: Any | None = None,
+    show_reference_background: bool = True,
+    show_mutation_differences: bool = False,
 ) -> Any:
     """Render an interactive browser structure view for one selected fold model."""
 
@@ -138,33 +148,42 @@ def render_structure_browser(
             alignment_status = "aligned_in_memory_to_reference_ca"
         except Exception as exc:  # pragma: no cover - defensive notebook rendering path
             return mo.md(f"Interactive structure alignment failed: `{type(exc).__name__}: {exc}`")
-    models = [
-        StructureViewModel(
-            model_id=str(reference.get("model_id") or "reference"),
-            structure_text=reference_text,
-            label=str(reference.get("display_label") or "Reference"),
-            color=str(reference.get("color") or "#d8d8d8"),
-            opacity=0.82,
-        )
-    ]
+    reference_model = StructureViewModel(
+        model_id=str(reference.get("model_id") or "reference"),
+        structure_text=reference_text,
+        label=str(reference.get("display_label") or "Reference"),
+        color=str(reference.get("color") or "#d8d8d8"),
+        opacity=0.82,
+    )
+    query_model_id = str(selected_row.get("source_candidate_id") or selected_row["candidate_id"])
+    models = []
+    if view_mode == "reference_selection" or show_reference_background:
+        models.append(reference_model)
     if view_mode != "reference_selection":
         models.append(
             StructureViewModel(
-                model_id=str(selected_row["candidate_id"]),
+                model_id=query_model_id,
                 structure_text=query_text,
                 label=str(selected_row.get("display_label") or selected_row["candidate_id"]),
                 color=str(selected_row.get("color") or "#0072B2"),
+                show_sidechains=True,
             )
         )
+    selection_styles = _selection_styles(selected_row)
+    if show_mutation_differences and view_mode != "reference_selection":
+        selection_styles += _mutation_selection_styles(selected_row, model_id=query_model_id)
     try:
         html_panel = render_structure_view_html(
             StructureViewSpec(
                 title=_structure_browser_title(selected_row),
                 subtitle=_structure_browser_subtitle(selected_row),
+                description=_structure_browser_description(selected_row),
+                interpretation_limit=_structure_browser_interpretation_limit(selected_row),
                 models=tuple(models),
-                selection_styles=_selection_styles(selected_row),
-                width=_STRUCTURE_VIEW_SIZE,
-                height=_STRUCTURE_VIEW_SIZE,
+                selection_styles=selection_styles,
+                width=_STRUCTURE_VIEW_WIDTH,
+                height=_STRUCTURE_VIEW_HEIGHT,
+                camera_memory_key=_camera_memory_key(selected_row),
             )
         )
     except Exception as exc:  # pragma: no cover - defensive notebook rendering path
@@ -177,13 +196,25 @@ def render_structure_browser(
     return mo.vstack(
         [
             mo.hstack(
-                [item for item in (structure_group_ui, structure_ui) if item is not None],
+                [
+                    item
+                    for item in (
+                        structure_group_ui,
+                        structure_ui,
+                        structure_background_ui if view_mode != "reference_selection" else None,
+                        structure_mutation_ui if view_mode != "reference_selection" else None,
+                    )
+                    if item is not None
+                ],
                 justify="center",
+                align="stretch",
+                wrap=True,
                 gap=1.0,
+                widths="equal",
             ),
             mo.Html(html_panel),
             mo.Html(_structure_metric_summary(selected_row)),
-            mo.Html(_alignment_note(alignment_status, browser_mapped_ca_rmsd)),
+            mo.Html(_alignment_note(selected_row, alignment_status, browser_mapped_ca_rmsd)),
             mo.accordion(
                 {"Selected structure evidence": mo.ui.table(metric_rows, page_size=8)},
                 multiple=False,
@@ -222,9 +253,10 @@ def _structure_browser_title(row: dict[str, Any]) -> str:
 def _structure_browser_subtitle(row: dict[str, Any]) -> str:
     if str(row.get("structure_view_mode") or "") == "reference_selection":
         residue_count = row.get("selection_residue_count")
+        group = str(row.get("group") or "Reference selection")
         if residue_count is not None:
-            return f"Reference mask evidence | {int(residue_count)} highlighted residues"
-        return "Reference mask evidence"
+            return f"{group} | {int(residue_count)} highlighted residues"
+        return group
     seqid = row.get("sequence_identity_percent")
     rmsd = row.get("wt_runtime_ca_rmsd")
     cryoem_rmsd = row.get("cryoem_mapped_ca_rmsd")
@@ -244,6 +276,22 @@ def _structure_browser_subtitle(row: dict[str, Any]) -> str:
     return " | ".join(details)
 
 
+def _structure_browser_description(row: dict[str, Any]) -> str:
+    row_description = str(row.get("description") or "").strip()
+    if row_description:
+        return row_description
+    return str(row.get("_deliverable_description") or "").strip()
+
+
+def _structure_browser_interpretation_limit(row: dict[str, Any]) -> str:
+    return str(row.get("_interpretation_limit") or "").strip()
+
+
+def _camera_memory_key(row: dict[str, Any]) -> str:
+    deliverable_id = str(row.get("_deliverable_id") or "structure_browser")
+    return f"eco1-rt-repack:{deliverable_id}:camera-v2"
+
+
 def _structure_metric_summary(row: dict[str, Any]) -> str:
     cards = (
         _reference_metric_cards(row)
@@ -261,7 +309,8 @@ def _structure_metric_summary(row: dict[str, Any]) -> str:
         return ""
     return (
         '<section aria-label="Structure metric summary" '
-        'style="margin:0.1rem auto 0 auto; max-width:672px; width:min(100%, 672px);">'
+        f'style="margin:0.1rem auto 0 auto; max-width:{_STRUCTURE_VIEW_WIDTH}px; '
+        f'width:min(100%, {_STRUCTURE_VIEW_WIDTH}px);">'
         '<div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em; '
         'color:#6e7781; text-align:center; margin-bottom:0.25rem;">Structure metric summary</div>'
         '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(8.2rem, 1fr)); '
@@ -308,13 +357,19 @@ def _format_int(value: Any) -> str:
         return ""
 
 
-def _alignment_note(alignment_status: str, browser_mapped_ca_rmsd: float | None) -> str:
+def _alignment_note(row: dict[str, Any], alignment_status: str, browser_mapped_ca_rmsd: float | None) -> str:
     if alignment_status == "reference_selection":
+        group = str(row.get("group") or "")
+        source_text = (
+            "highlighted residues come from the selected SAE activation feature"
+            if "SAE" in group
+            else "highlighted residues come from the current Eco1 mask evidence"
+        )
         return (
             '<div style="border-left:3px solid #0969da; padding:0.35rem 0.55rem; '
             'background:#f6f8fa; color:#24292f; font-size:0.9rem; line-height:1.35;">'
-            "<strong>Reference selection:</strong> highlighted residues come from the current "
-            "Eco1 mask evidence. No candidate structure is shown in this view."
+            f"<strong>Reference selection:</strong> {source_text}. "
+            "No candidate structure is shown in this view."
             "</div>"
         )
     rmsd_text = (
@@ -345,8 +400,14 @@ def _structure_metric_rows(
         "cryoem_mapped_ca_rmsd",
         "sequence_identity_percent",
         "mutation_count",
+        "canonical_mutations",
+        "mutation_residue_numbers",
+        "feature_index",
+        "activation_max",
+        "activation_sum",
+        "nonzero_residue_count",
     ]
-    rows = [{"field": field, "value": str(row.get(field) if row.get(field) is not None else "")} for field in fields]
+    rows = [{"field": field, "value": _format_metric_value(row.get(field))} for field in fields]
     rows.extend(
         [
             {"field": "browser_alignment_status", "value": alignment_status},
@@ -375,3 +436,26 @@ def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle,
             )
         )
     return tuple(styles)
+
+
+def _format_metric_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def _mutation_selection_styles(row: dict[str, Any], *, model_id: str) -> tuple[StructureViewSelectionStyle, ...]:
+    residue_numbers = tuple(int(value) for value in row.get("mutation_residue_numbers") or [])
+    if not residue_numbers:
+        return ()
+    return (
+        StructureViewSelectionStyle(
+            selection_id="candidate_differences",
+            model_id=model_id,
+            label="Candidate differences",
+            residue_numbers=residue_numbers,
+            color="#D55E00",
+        ),
+    )

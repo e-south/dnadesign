@@ -170,7 +170,10 @@ def _reference_coordinates(path: Path, *, mapped_position_count: int) -> Any | N
         return None
     coords = ca_coordinates(path)
     if len(coords) != mapped_position_count:
-        return None
+        raise ValueError(
+            "reference backbone CA count does not match mapped residue count; "
+            f"expected {mapped_position_count}, observed {len(coords)} at {path}"
+        )
     return coords
 
 
@@ -199,7 +202,12 @@ def _cryoem_mapped_rmsd(
     elif len(mobile_coords) == len(mapped_positions):
         selected = mobile_coords
     else:
-        return None, "model_artifact_length_mismatch"
+        raise ValueError(
+            f"unverified staged model or candidate {candidate_id} ColabFold model CA count does not match "
+            "full sequence or mapped-residue basis; "
+            f"observed {len(mobile_coords)}, mapped residues {len(mapped_positions)}, "
+            f"max mapped position {max(mapped_positions)}"
+        )
     rmsd = ca_rmsd(selected, reference_coords)
     if rmsd is None:
         return None, "rmsd_calculation_failed"
