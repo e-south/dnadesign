@@ -144,7 +144,14 @@ def write_exemplar_rows(
     return path
 
 
-def write_panel_spec(tmp_path: Path, *, high_gap_trim_threshold: float = 0.9) -> Path:
+def write_panel_spec(
+    tmp_path: Path,
+    *,
+    high_gap_trim_threshold: float = 0.9,
+    row_source: str = "exemplar_rows",
+    max_display_rows: int | str = 4,
+    profiles: dict[str, object] | None = None,
+) -> Path:
     """Write a generic display-only panel spec fixture."""
 
     path = tmp_path / "panel_spec.yaml"
@@ -158,12 +165,15 @@ def write_panel_spec(tmp_path: Path, *, high_gap_trim_threshold: float = 0.9) ->
         },
         "overview": {
             "enabled": True,
-            "max_display_rows": 4,
+            "row_source": row_source,
+            "max_display_rows": max_display_rows,
         },
         "consensus_histogram": {
             "enabled": True,
         },
         "sidecar_note": "Display sidecar only; not a conservation denominator.",
     }
+    if profiles is not None:
+        payload["profiles"] = profiles
     path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     return path

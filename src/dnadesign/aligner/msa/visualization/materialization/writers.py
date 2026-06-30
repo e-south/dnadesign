@@ -92,6 +92,7 @@ def write_html_report(
     written_exemplar_svg_paths: dict[str, Path],
     has_exemplar_rows: bool,
     has_alignment_overview: bool,
+    alignment_overview_label: str,
     has_consensus_histogram: bool,
 ) -> None:
     """Write a lightweight HTML report linking generated sidecars."""
@@ -143,8 +144,9 @@ def write_html_report(
                 (
                     "<figure>"
                     f'<img src="{html.escape(qc.profile_alignment_overview_svg_path.name)}" '
-                    f'alt="{html.escape(qc.profile_id)} selected-row overview">'
-                    f"<figcaption>{html.escape(qc.profile_id)} selected-row whole-alignment overview</figcaption>"
+                    f'alt="{html.escape(qc.profile_id)} {html.escape(alignment_overview_label)} overview">'
+                    f"<figcaption>{html.escape(qc.profile_id)} {html.escape(alignment_overview_label)} "
+                    "whole-alignment overview</figcaption>"
                     "</figure>"
                     if has_alignment_overview
                     else ""

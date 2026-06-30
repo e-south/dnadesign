@@ -31,16 +31,17 @@ def write_alignment_overview_svg(
     records: dict[str, str],
     target_row_id: str,
     tracks: tuple[AnnotationTrack, ...],
-    exemplar_rows: tuple[ExemplarRow, ...],
+    overview_rows: tuple[ExemplarRow, ...],
     panel_spec: MsaPanelSpec,
 ) -> None:
-    """Write a selected-row whole-alignment overview in target coordinates."""
+    """Write a whole-alignment overview in target coordinates."""
 
-    selected_rows = exemplar_rows[: panel_spec.max_display_rows]
-    if not selected_rows:
-        raise ValueError("alignment overview requires at least one exemplar row")
+    if not overview_rows:
+        raise ValueError("alignment overview requires at least one row")
     target_aligned = records[target_row_id]
     target_columns = _target_column_by_position(target_aligned)
+    full_record_panel = panel_spec.overview_row_source == "all_records"
+    panel_label = "all-record" if full_record_panel else "selected-row"
     width = 1440
     left_margin = 310
     right_margin = 36
@@ -51,21 +52,22 @@ def write_alignment_overview_svg(
     title_height = 68
     axis_y = title_height + feature_band_height + 18
     row_start_y = axis_y + 34
-    height = row_start_y + len(selected_rows) * row_height + 50
+    height = row_start_y + len(overview_rows) * row_height + 50
     parts = [
         (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}" role="img">'
         ),
-        f"<title>{html.escape(qc.profile_id)} selected-row MSA overview</title>",
+        f"<title>{html.escape(qc.profile_id)} {panel_label} MSA overview</title>",
         '<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>',
         (
             f'<text x="18" y="25" font-family="Arial, sans-serif" font-size="16" '
-            f'font-weight="700">{html.escape(qc.profile_id)} selected-row overview</text>'
+            f'font-weight="700">{html.escape(qc.profile_id)} {panel_label} overview</text>'
         ),
         (
             '<text x="18" y="44" font-family="Arial, sans-serif" font-size="11" fill="#555">'
-            f"{qc.record_count} records scored; this panel shows {len(selected_rows)} explicit display rows in "
+            f"{qc.record_count} records scored; this panel shows "
+            f"{_displayed_row_count_text(len(overview_rows), full_record_panel=full_record_panel)} in "
             "target-position coordinates.</text>"
         ),
     ]
@@ -78,7 +80,7 @@ def write_alignment_overview_svg(
         y=axis_y,
     )
 
-    for row_index, row in enumerate(selected_rows):
+    for row_index, row in enumerate(overview_rows):
         row_y = row_start_y + row_index * row_height
         sequence = records[row.record_id]
         parts.append(
@@ -270,6 +272,12 @@ def _overview_fill(*, residue: str, target_residue: str, is_target: bool) -> str
     if residue in {"F", "W", "Y", "A", "V", "I", "L", "M", "P", "G", "C"}:
         return "#4393c3"
     return "#92c5de"
+
+
+def _displayed_row_count_text(row_count: int, *, full_record_panel: bool) -> str:
+    if full_record_panel:
+        return f"all {row_count} aligned rows"
+    return f"{row_count} explicit display rows"
 
 
 def _target_column_by_position(target_aligned: str) -> dict[int, int]:

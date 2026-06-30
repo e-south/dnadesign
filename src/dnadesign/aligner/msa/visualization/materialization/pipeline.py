@@ -27,6 +27,7 @@ from dnadesign.aligner.msa.visualization.contracts.models import (
     PositionQc,
     ProfileQc,
 )
+from dnadesign.aligner.msa.visualization.contracts.overview_rows import build_overview_rows
 from dnadesign.aligner.msa.visualization.contracts.panel_spec import load_panel_spec
 from dnadesign.aligner.msa.visualization.materialization.qc import (
     build_position_qc,
@@ -96,8 +97,19 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         )
         exemplar_rows = exemplar_spec.rows_for_profile(profile_id)
         validate_exemplar_rows(profile_id=profile_id, records=records, rows=exemplar_rows)
-        if panel_spec.overview_enabled and not exemplar_rows:
-            raise ValueError(f"{profile_id} alignment overview requires exemplar rows")
+        overview_rows = ()
+        if panel_spec.overview_enabled:
+            overview_rows = build_overview_rows(
+                profile_id=profile_id,
+                records=records,
+                target_row_id=request.target_row_id,
+                exemplar_rows=exemplar_rows,
+                panel_spec=panel_spec,
+            )
+            if not overview_rows:
+                if panel_spec.overview_row_source == "exemplar_rows":
+                    raise ValueError(f"{profile_id} alignment overview requires exemplar rows")
+                raise ValueError(f"{profile_id} alignment overview requires at least one row")
         write_profile_qc(qc, request)
         write_profile_qc_svg(qc, positions, annotation_tracks)
         if annotation_tracks and exemplar_rows:
@@ -116,7 +128,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
                 records=records,
                 target_row_id=request.target_row_id,
                 tracks=annotation_tracks,
-                exemplar_rows=exemplar_rows,
+                overview_rows=overview_rows,
                 panel_spec=panel_spec,
             )
         if panel_spec.consensus_histogram_enabled:
@@ -144,6 +156,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
         written_exemplar_svg_paths=written_exemplar_svg_paths,
         has_exemplar_rows=exemplar_spec.has_rows,
         has_alignment_overview=panel_spec.overview_enabled,
+        alignment_overview_label=_alignment_overview_label(panel_spec.overview_row_source),
         has_consensus_histogram=panel_spec.consensus_histogram_enabled,
     )
 
@@ -178,3 +191,7 @@ def materialize_msa_visualizations(request: MsaVisualizationRequest) -> MsaVisua
             if panel_spec.consensus_histogram_enabled
         },
     )
+
+
+def _alignment_overview_label(row_source: str) -> str:
+    return "all-record" if row_source == "all_records" else "selected-row"

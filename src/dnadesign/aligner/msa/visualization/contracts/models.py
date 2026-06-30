@@ -11,8 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
+
+_PROFILE_ID_STEM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,8 @@ class MsaVisualizationRequest:
             raise ValueError("profile_ids must be non-empty")
         if any(not profile_id.strip() for profile_id in self.profile_ids):
             raise ValueError("profile_ids must contain only non-empty values")
+        for profile_id in self.profile_ids:
+            _validate_profile_id_stem(profile_id)
         if len(set(self.profile_ids)) != len(self.profile_ids):
             raise ValueError("profile_ids must be unique")
         if not self.target_row_id.strip():
@@ -148,3 +153,19 @@ class PositionQc:
     plurality_aa: str
     plurality_count: int
     plurality_frequency: float
+
+
+def _validate_profile_id_stem(profile_id: str) -> None:
+    """Reject profile ids that cannot be safely interpolated into filenames."""
+
+    if (
+        profile_id != profile_id.strip()
+        or profile_id in {".", ".."}
+        or ".." in profile_id
+        or "/" in profile_id
+        or "\\" in profile_id
+        or not _PROFILE_ID_STEM_RE.fullmatch(profile_id)
+    ):
+        raise ValueError(
+            "profile_ids must be file-safe stems containing only letters, digits, dots, hyphens, or underscores"
+        )
