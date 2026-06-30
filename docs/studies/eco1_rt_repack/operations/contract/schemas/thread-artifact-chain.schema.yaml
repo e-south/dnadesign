@@ -7,6 +7,7 @@ artifact_order:
   - residue_map
   - conservation_profile
   - contact_profile
+  - contact_geometry_profile
   - mask_set
   - thread_plan
   - proteinmpnn_request
@@ -66,6 +67,35 @@ artifacts:
       - contact_threshold_angstrom
       - passes_contact_mask
       - source_hash
+    role: diagnostic_contact_review
+  contact_geometry_profile:
+    required_columns:
+      - canonical_position
+      - wt_aa
+      - structure_chain_id
+      - structure_residue_id
+      - mapping_status
+      - nearest_context_atom_distance_angstrom
+      - nearest_sidechain_context_distance_angstrom
+      - nearest_backbone_context_distance_angstrom
+      - nearest_dna_distance_angstrom
+      - nearest_rna_distance_angstrom
+      - nearest_context_chain_id
+      - nearest_context_molecule_type
+      - nearest_context_atom_name
+      - sidechain_atom_status
+      - contact_atom_count_within_4a
+      - contact_atom_count_within_6a
+      - contact_atom_count_within_8a
+      - contact_atom_count_within_10a
+      - contact_atom_count_within_12a
+      - contact_atom_count_within_15a
+      - contact_atom_count_within_20a
+      - retained_context_chain_count_within_8a
+      - retained_context_chain_count_within_12a
+      - retained_context_chain_count_within_15a
+      - retained_context_chain_count_within_20a
+    role: active_5a_mask_input
   mask_set:
     required_columns:
       - canonical_position

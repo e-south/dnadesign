@@ -92,12 +92,17 @@ def stage_full_structure_set(
     """Stage one local PDB per accepted fold-check row and write a complete manifest."""
 
     structures_root.mkdir(parents=True, exist_ok=True)
+    verified_existing_entries = _verified_existing_entries(
+        full_structure_set_path,
+        source_request_hash=source_request_hash,
+    )
     entries = [
         _stage_model_entry(
             row=wt_fold_row,
             selection_stratum="full_fold_set",
             structures_root=structures_root,
             fallback_model_root=None,
+            verified_existing_entries=verified_existing_entries,
         )
     ]
     entries.extend(
@@ -106,6 +111,7 @@ def stage_full_structure_set(
             selection_stratum="full_fold_set",
             structures_root=structures_root,
             fallback_model_root=None,
+            verified_existing_entries=verified_existing_entries,
         )
         for row in ranking_rows
     )
@@ -158,6 +164,7 @@ def _stage_model_entry(
     selection_stratum: str,
     structures_root: Path,
     fallback_model_root: Path | None,
+    verified_existing_entries: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> PanelEntry:
     candidate_id = str(row["candidate_id"])
     source_path = Path(str(row.get("model_artifact_path", "")))
@@ -179,8 +186,14 @@ def _stage_model_entry(
         copy_status = "copied_from_local_full_set"
         source_hash = sha256_uri(fallback_path)
     elif local_path.exists():
-        copy_status = "already_local"
-        source_hash = sha256_uri(local_path)
+        source_hash = _verified_existing_source_hash(
+            candidate_id=candidate_id,
+            source_path=source_path,
+            local_path=local_path,
+            structures_root=structures_root,
+            verified_existing_entries=verified_existing_entries,
+        )
+        copy_status = "already_local_verified"
     else:
         copy_status = "source_not_local"
         source_hash = ""
@@ -211,6 +224,69 @@ def _relative_panel_entry(entry: PanelEntry, *, manifest_root: Path) -> dict[str
         manifest_root=manifest_root,
     )
     return normalized
+
+
+def _verified_existing_entries(
+    manifest_path: Path,
+    *,
+    source_request_hash: str,
+) -> dict[str, Mapping[str, Any]]:
+    if not manifest_path.exists():
+        return {}
+    loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        return {}
+    if str(loaded.get("source_request_hash") or "") != source_request_hash:
+        return {}
+    entries = loaded.get("structures")
+    if not isinstance(entries, list):
+        return {}
+    return {
+        str(entry["candidate_id"]): entry
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("candidate_id") is not None
+    }
+
+
+def _verified_existing_source_hash(
+    *,
+    candidate_id: str,
+    source_path: Path,
+    local_path: Path,
+    structures_root: Path,
+    verified_existing_entries: Mapping[str, Mapping[str, Any]] | None,
+) -> str:
+    existing_entry = (verified_existing_entries or {}).get(candidate_id)
+    local_hash = sha256_uri(local_path)
+    if existing_entry is None:
+        raise ValueError(
+            f"Found unverified staged model for {candidate_id!r} at {local_path}; "
+            "remove it or regenerate from a reachable source path."
+        )
+    if str(existing_entry.get("source_model_artifact_path") or "") != str(source_path):
+        raise ValueError(
+            f"Found unverified staged model for {candidate_id!r}: source path changed from "
+            f"{existing_entry.get('source_model_artifact_path')!r} to {str(source_path)!r}."
+        )
+    recorded_hash = str(existing_entry.get("source_model_artifact_hash") or "")
+    if recorded_hash != local_hash:
+        raise ValueError(
+            f"Found unverified staged model for {candidate_id!r}: local hash does not match the previous manifest."
+        )
+    previous_local_path = _resolve_manifest_relative_path(
+        str(existing_entry.get("local_model_artifact_path") or ""),
+        manifest_root=structures_root.parent.parent,
+    )
+    if previous_local_path != local_path:
+        raise ValueError(
+            f"Found unverified staged model for {candidate_id!r}: local path does not match the previous manifest."
+        )
+    return local_hash
+
+
+def _resolve_manifest_relative_path(value: str, *, manifest_root: Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else manifest_root / path
 
 
 def _display_label(row: Mapping[str, Any], *, candidate_id: str) -> str:

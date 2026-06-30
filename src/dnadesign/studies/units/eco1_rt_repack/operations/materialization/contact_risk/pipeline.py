@@ -221,7 +221,7 @@ def _contact_risk_class(
     if manual_mask:
         return "motif_anchor_protected", "audited NAxxH, YADD, or VTG motif anchor protects this residue"
     if wang_candidate_prior:
-        return "wang_interface_candidate_prior", "Wang/Ec86 interface prior protects this residue"
+        return "wang_direct_contact_mask_prior", "Wang/Ec86 direct-contact mask prior protects this residue"
     if conservation_mask:
         return "evolutionarily_conserved", "Eco1 residue passes the clade 9 25% WT plurality conservation rule"
     if nearest_distance is None:

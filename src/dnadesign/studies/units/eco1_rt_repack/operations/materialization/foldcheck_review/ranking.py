@@ -64,7 +64,7 @@ def build_foldcheck_ranking_rows(
     candidate_rows = [
         row for row in pq.read_table(candidate_table_path).to_pylist() if str(row.get("status")) == "accepted"
     ]
-    fold_rows = {str(row["candidate_id"]): row for row in pq.read_table(foldcheck_report_path).to_pylist()}
+    fold_rows = _fold_rows_by_candidate_id(foldcheck_report_path)
     mapped_positions = _mapped_canonical_positions(residue_map_path)
     reference_coords = _reference_coordinates(reference_backbone_path, mapped_position_count=len(mapped_positions))
 
@@ -147,6 +147,22 @@ def _mapped_canonical_positions(residue_map_path: Path) -> list[int]:
     if not mapped:
         raise ValueError("residue_map.parquet must contain mapped canonical positions")
     return sorted(mapped)
+
+
+def _fold_rows_by_candidate_id(foldcheck_report_path: Path) -> dict[str, dict[str, Any]]:
+    rows = pq.read_table(foldcheck_report_path).to_pylist()
+    by_candidate_id: dict[str, dict[str, Any]] = {}
+    duplicate_ids: set[str] = set()
+    for row in rows:
+        candidate_id = str(row["candidate_id"])
+        if candidate_id in by_candidate_id:
+            duplicate_ids.add(candidate_id)
+            continue
+        by_candidate_id[candidate_id] = row
+    if duplicate_ids:
+        formatted = ", ".join(sorted(duplicate_ids))
+        raise ValueError(f"foldcheck_report.parquet contains duplicate candidate_id rows: {formatted}")
+    return by_candidate_id
 
 
 def _reference_coordinates(path: Path, *, mapped_position_count: int) -> Any | None:
@@ -236,7 +252,7 @@ def _review_class(*, plddt: float | None, wt_runtime_ca_rmsd: float | None) -> s
 def wild_type_reference_row(foldcheck_report_path: Path) -> dict[str, Any]:
     """Return the accepted WT fold-check row."""
 
-    for row in pq.read_table(foldcheck_report_path).to_pylist():
-        if str(row["candidate_id"]) == WT_SEQUENCE_ID and str(row.get("status")) == "accepted":
-            return row
+    row = _fold_rows_by_candidate_id(foldcheck_report_path).get(WT_SEQUENCE_ID)
+    if row is not None and str(row.get("status")) == "accepted":
+        return row
     raise ValueError("foldcheck_report.parquet must contain an accepted wild_type row")

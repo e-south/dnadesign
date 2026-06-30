@@ -19,6 +19,8 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.constants import _DOCS_ROOT
 
+WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "candidate_prior_not_mask_authoritative"
+
 
 def load_manual_mask_authority_source(repo_root: Path) -> dict[str, Any]:
     """Load the checked-in manual mask-authority ontology source."""
@@ -30,8 +32,8 @@ def load_manual_mask_authority_source(repo_root: Path) -> dict[str, Any]:
     return loaded
 
 
-def candidate_prior_positions_from_source(authority_source: Mapping[str, Any]) -> set[int]:
-    """Return candidate-prior positions declared by the ontology source."""
+def wang_direct_contact_prior_positions_from_source(authority_source: Mapping[str, Any]) -> set[int]:
+    """Return Wang/Ec86 direct-contact prior positions declared by the ontology source."""
 
     positions: set[int] = set()
     candidate_sets = authority_source.get("candidate_authority_sets")
@@ -40,7 +42,7 @@ def candidate_prior_positions_from_source(authority_source: Mapping[str, Any]) -
     for candidate_set in candidate_sets:
         if not isinstance(candidate_set, Mapping):
             continue
-        if candidate_set.get("policy") != "candidate_prior_not_mask_authoritative":
+        if candidate_set.get("policy") != WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY:
             continue
         residues = candidate_set.get("residues")
         if not isinstance(residues, list):

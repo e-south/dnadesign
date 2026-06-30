@@ -56,9 +56,9 @@ def ca_rmsd(mobile: np.ndarray, reference: np.ndarray) -> float | None:
     reference_centered = reference - reference.mean(axis=0)
     covariance = mobile_centered.T @ reference_centered
     left, _, right_t = np.linalg.svd(covariance)
-    determinant = np.linalg.det(right_t.T @ left.T)
-    correction = np.diag([1.0, 1.0, determinant])
-    rotation = right_t.T @ correction @ left.T
+    correction = np.eye(3)
+    correction[2, 2] = np.sign(np.linalg.det(left @ right_t))
+    rotation = left @ correction @ right_t
     aligned = mobile_centered @ rotation
     squared = np.sum((aligned - reference_centered) ** 2) / len(mobile)
     return round(float(math.sqrt(squared)), 3)

@@ -72,7 +72,10 @@ def _validate_materialized_evidence_and_mask_artifacts(
         issues.append(
             ContractIssue(
                 check_id="eco1_rt.evidence.contact_profile_not_materialized",
-                message="Phase 1 mask construction requires a materialized contact_profile.parquet",
+                message=(
+                    "Phase 1 diagnostic contact review requires a materialized contact_profile.parquet; "
+                    "the active 5 A mask input is contact_geometry_profile.parquet"
+                ),
                 path=str(contact_profile),
             )
         )

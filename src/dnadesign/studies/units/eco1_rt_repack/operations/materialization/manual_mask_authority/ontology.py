@@ -14,6 +14,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY = "candidate_prior_not_mask_authoritative"
+
 
 def structure_residue_ids_for_positions(
     canonical_positions: list[int],
@@ -36,7 +38,7 @@ def materialize_candidate_prior_residues(
     *,
     residue_by_position: Mapping[int, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Validate and emit non-authoritative Wang/Ec86 candidate prior rows."""
+    """Validate and emit Wang/Ec86 direct-contact mask-prior rows."""
 
     candidate_sets = authority_source.get("candidate_authority_sets", [])
     if not isinstance(candidate_sets, list):
@@ -50,9 +52,9 @@ def materialize_candidate_prior_residues(
         set_id = _require_text(candidate_set, "id")
         policy = _require_text(candidate_set, "policy")
         status = _require_text(candidate_set, "status")
-        if status != "candidate_prior_not_mask_authoritative":
-            raise ValueError(f"candidate authority set {set_id!r} must not be mask-authoritative")
-        if policy != "candidate_prior_not_mask_authoritative":
+        if status != WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY:
+            raise ValueError(f"candidate authority set {set_id!r} must be a direct-contact mask prior")
+        if policy != WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY:
             raise ValueError(f"candidate authority set {set_id!r} has invalid policy {policy!r}")
         for candidate in _as_list(candidate_set.get("residues"), f"candidate_authority_sets[{set_id}].residues"):
             if not isinstance(candidate, Mapping):

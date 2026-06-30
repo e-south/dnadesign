@@ -23,8 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.masks.rt_interv
     validate_rt_interval_authority,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.masks.source import (
-    candidate_prior_positions_from_source,
+    WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY,
     load_manual_mask_authority_source,
+    wang_direct_contact_prior_positions_from_source,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
 
@@ -230,13 +231,13 @@ def _validate_wang_priors(
 ) -> None:
     _validate_wang_source_basis(issues, manual_mask_authority=manual_mask_authority, path=path)
     authority_source = load_manual_mask_authority_source(repo_root)
-    expected_candidate_positions = candidate_prior_positions_from_source(authority_source)
+    expected_candidate_positions = wang_direct_contact_prior_positions_from_source(authority_source)
     candidate_rows = manual_mask_authority.get("candidate_prior_residues")
     if not isinstance(candidate_rows, list) or not candidate_rows:
         issues.append(
             ContractIssue(
                 check_id="eco1_rt.mask.manual_mask_authority_missing_candidate_priors",
-                message="manual_mask_authority.yaml must retain Wang/Ec86 candidate prior rows",
+                message="manual_mask_authority.yaml must retain Wang/Ec86 direct-contact mask-prior rows",
                 path=str(path),
             )
         )
@@ -301,7 +302,7 @@ def _validate_wang_candidate_rows(
             or residue.get("wt_aa") != row.get("wt_aa")
             or residue.get("structure_chain_id") != row.get("structure_chain_id")
             or residue.get("structure_residue_id") != row.get("structure_residue_id")
-            or row.get("policy") != "candidate_prior_not_mask_authoritative"
+            or row.get("policy") != WANG_DIRECT_CONTACT_MASK_PRIOR_POLICY
             or not row.get("source_locator")
             or not row.get("evidence_basis")
         ):
@@ -311,7 +312,7 @@ def _validate_wang_candidate_rows(
             ContractIssue(
                 check_id="eco1_rt.mask.manual_mask_authority_candidate_prior_mismatch",
                 message=(
-                    "manual_mask_authority.yaml Wang/Ec86 candidate priors must match audited "
+                    "manual_mask_authority.yaml Wang/Ec86 direct-contact mask priors must match audited "
                     f"ontology positions {sorted(expected_positions)}"
                 ),
                 path=str(path),

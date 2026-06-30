@@ -34,6 +34,7 @@ _EXPECTED_ARTIFACT_ORDER = (
     "residue_map",
     "conservation_profile",
     "contact_profile",
+    "contact_geometry_profile",
     "mask_set",
     "thread_plan",
     "proteinmpnn_request",
