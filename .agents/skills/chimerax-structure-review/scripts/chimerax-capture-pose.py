@@ -4,11 +4,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+_SAFE_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_SAFE_COLOR_RE = re.compile(r"^(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_.-]*)$")
 
 
 def _sha256(path: Path) -> str | None:
@@ -55,6 +59,19 @@ def _resolve_manifest_defaults(args: argparse.Namespace) -> None:
         args.structure_path = Path(values["source_structure_path"])
     if args.opened_model_id is None and values.get("opened_model_id"):
         args.opened_model_id = values["opened_model_id"]
+
+
+def _validate_capture_options(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if not _SAFE_IDENTIFIER_RE.fullmatch(args.pose_id):
+        parser.error("--pose-id may contain only letters, numbers, dots, underscores, and hyphens")
+    if not _SAFE_COLOR_RE.fullmatch(args.background_color):
+        parser.error("--background-color must be a named color or #RRGGBB value")
+    if _has_command_separator(args.title):
+        parser.error("--title must not contain ChimeraX command separators")
+
+
+def _has_command_separator(value: str) -> bool:
+    return any(token in value for token in (";", "\n", "\r"))
 
 
 def _send(*, port: int, command: str, timeout_seconds: float) -> dict[str, Any]:
@@ -158,6 +175,7 @@ def main() -> int:
         parser.error("provide --port or --session-manifest")
     if args.port < 1024 or args.port > 65535:
         parser.error("--port must be from 1024 to 65535")
+    _validate_capture_options(args, parser)
     if args.structure_path and not args.structure_path.exists():
         parser.error(f"--structure-path does not exist: {args.structure_path}")
     if not args.structure_path and not args.preopened_session:

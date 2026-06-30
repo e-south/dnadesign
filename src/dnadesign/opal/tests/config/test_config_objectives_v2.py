@@ -127,6 +127,48 @@ selection:
     assert cfg.data.candidate_scope.id_column == "id"
 
 
+def test_load_config_resolves_candidate_scope_from_campaign_root_for_configs_dir(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "campaign"
+    configs_dir = campaign_root / "configs"
+    scope_path = campaign_root / "scopes" / "heldout_ids.csv"
+    scope_path.parent.mkdir(parents=True)
+    configs_dir.mkdir(parents=True)
+    cfg_path = _write_config(
+        configs_dir / "campaign.yaml",
+        """
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: { kind: local, path: "./records.parquet" }
+  x_column_name: "X"
+  y_column_name: "Y"
+  candidate_scope:
+    kind: id_list
+    path: "scopes/heldout_ids.csv"
+    id_column: id
+transforms_x: { name: identity, params: {} }
+transforms_y: { name: scalar_from_table_v1, params: {} }
+model: { name: random_forest, params: { n_estimators: 5, random_state: 0 } }
+objectives:
+  - { name: scalar_identity_v1, params: {} }
+selection:
+  name: top_n
+  params:
+    top_k: 2
+    score_ref: "scalar_identity_v1/scalar"
+    objective_mode: maximize
+    tie_handling: competition_rank
+""".strip(),
+    )
+
+    cfg = load_config(cfg_path)
+
+    assert cfg.data.candidate_scope is not None
+    assert cfg.data.candidate_scope.path == str(scope_path.resolve())
+
+
 def test_load_config_accepts_candidate_eligibility_restriction_site_rule(tmp_path: Path) -> None:
     cfg_path = _write_config(
         tmp_path / "campaign.yaml",

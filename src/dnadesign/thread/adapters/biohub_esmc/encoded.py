@@ -71,7 +71,7 @@ def _decode_payload(payload: Any) -> Any:
         raise RuntimeError("torch is required to decode Biohub encoded SAE outputs") from error
     compressed = base64.b64decode(payload)
     raw = _zstd_decompress(compressed)
-    return torch.load(BytesIO(raw), map_location="cpu", weights_only=False)
+    return torch.load(BytesIO(raw), map_location="cpu", weights_only=True)
 
 
 def _zstd_decompress(payload: bytes) -> bytes:

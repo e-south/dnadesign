@@ -16,6 +16,7 @@ from io import BytesIO
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 import torch
 import zstd
 
@@ -171,6 +172,30 @@ def test_normalize_logits_response_decodes_normalized_string_sae_payload() -> No
         (1, 2, 4, 3.0),
         (1, 2, 5, 4.0),
     ]
+
+
+def test_normalize_logits_response_rejects_pickle_object_sae_payload() -> None:
+    sequence = "AC"
+    sae_model = "fixture-sae-k2-codebook8"
+
+    with pytest.raises(Exception, match="weights_only|Weights only|Unsupported global|safe"):
+        normalize_logits_response(
+            candidate_id="candidate_a",
+            sequence=sequence,
+            sequence_hash=sequence_hash(sequence),
+            encode_response={"outputs": {"sequence": [0, 1, 2, 3]}},
+            logits_response={"sae_outputs": _encoded_sae_payload({sae_model: _UnsafePickleFixture()})},
+            source_request_hash=_SOURCE_REQUEST_HASH,
+            biohub_request_hash=_request_hash(("candidate_a",), sae_model=sae_model, normalize_features=True),
+            biohub_query_hash=_query_hash(sequence, sae_model=sae_model, normalize_features=True),
+            biohub_api_base_url="https://biohub.ai",
+            biohub_api_version="v1",
+            model=DEFAULT_ESMC_MODEL,
+            sae_model=sae_model,
+            normalize_features=True,
+            key_label="bu-dunlop-lab",
+            retrieved_at=_RETRIEVED_AT,
+        )
 
 
 def test_biohub_esmc_artifact_writer_validates_expected_candidates(tmp_path: Path) -> None:
@@ -358,6 +383,11 @@ def _logits_response(sequence: str) -> dict[str, object]:
     tensor[2, 7] = 2.0
     tensor[4, 7] = 4.0
     return {"sae_outputs": {_FIXTURE_SAE_MODEL: tensor}, "logits": None, "embeddings": None}
+
+
+class _UnsafePickleFixture:
+    def __reduce__(self) -> tuple[object, tuple[str]]:
+        return eval, ("'unsafe_object'",)
 
 
 def _encoded_sae_payload(payload: object) -> str:

@@ -401,7 +401,7 @@ def load_config(path: Path | str) -> RootConfig:
         candidate_scope=(
             CandidateScope(
                 kind=str(pyd.data.candidate_scope.kind),
-                path=_abs(pyd.data.candidate_scope.path),
+                path=_abs(pyd.data.candidate_scope.path, base_dir=campaign_root),
                 id_column=str(pyd.data.candidate_scope.id_column),
             )
             if pyd.data.candidate_scope is not None

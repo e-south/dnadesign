@@ -164,13 +164,13 @@ def _stage_model_entry(
     verified_existing_entries: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> PanelEntry:
     candidate_id = str(row["candidate_id"])
-    source_path = Path(str(row.get("model_artifact_path", "")))
+    source_path = _optional_model_artifact_path(row.get("model_artifact_path"))
     local_path = structures_root / f"{candidate_id}.pdb"
-    if source_path.exists():
+    if source_path is not None and source_path.exists():
         shutil.copyfile(source_path, local_path)
         copy_status = "copied"
         source_hash = sha256_uri(source_path)
-    elif (structures_root / source_path.name).exists():
+    elif source_path is not None and (structures_root / source_path.name).exists():
         mirrored_source_path = structures_root / source_path.name
         source_hash = sha256_uri(mirrored_source_path)
         if mirrored_source_path != local_path:
@@ -185,7 +185,7 @@ def _stage_model_entry(
     elif local_path.exists():
         source_hash = _verified_existing_source_hash(
             candidate_id=candidate_id,
-            source_path=source_path,
+            source_path=source_path or Path(""),
             local_path=local_path,
             structures_root=structures_root,
             verified_existing_entries=verified_existing_entries,
@@ -197,7 +197,7 @@ def _stage_model_entry(
     return PanelEntry(
         candidate_id=candidate_id,
         selection_stratum=selection_stratum,
-        source_model_artifact_path=str(source_path),
+        source_model_artifact_path="" if source_path is None else str(source_path),
         local_model_artifact_path=str(local_path),
         copy_status=copy_status,
         source_model_artifact_hash=source_hash,
@@ -206,6 +206,13 @@ def _stage_model_entry(
         proteinmpnn_rank=_optional_int(row.get("proteinmpnn_rank")),
         wt_runtime_ca_rmsd=_optional_float(row.get("wt_runtime_ca_rmsd")),
     )
+
+
+def _optional_model_artifact_path(value: Any) -> Path | None:
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return None
+    return Path(text)
 
 
 def _relative_reference_entry(entry: dict[str, str], *, manifest_root: Path) -> dict[str, str]:

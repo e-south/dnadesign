@@ -76,7 +76,7 @@ def build_foldcheck_ranking_rows(
             raise ValueError(f"foldcheck_report.parquet is missing candidate {candidate_id!r}")
         cryoem_rmsd, cryoem_status = _cryoem_mapped_rmsd(
             candidate_id=candidate_id,
-            model_artifact_path=Path(str(fold.get("model_artifact_path", ""))),
+            model_artifact_path=_optional_model_artifact_path(fold.get("model_artifact_path")),
             mapped_positions=mapped_positions,
             reference_coords=reference_coords,
             local_model_root=local_model_root,
@@ -180,14 +180,14 @@ def _reference_coordinates(path: Path, *, mapped_position_count: int) -> Any | N
 def _cryoem_mapped_rmsd(
     *,
     candidate_id: str,
-    model_artifact_path: Path,
+    model_artifact_path: Path | None,
     mapped_positions: list[int],
     reference_coords: Any | None,
     local_model_root: Path | None,
 ) -> tuple[float | None, str]:
     if reference_coords is None:
         return None, "reference_backbone_unavailable"
-    if not str(model_artifact_path):
+    if model_artifact_path is None:
         return None, "model_artifact_missing"
     resolved_model_artifact_path = _resolve_local_model_artifact_path(
         candidate_id=candidate_id,
@@ -212,6 +212,13 @@ def _cryoem_mapped_rmsd(
     if rmsd is None:
         return None, "rmsd_calculation_failed"
     return rmsd, "available"
+
+
+def _optional_model_artifact_path(value: Any) -> Path | None:
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return None
+    return Path(text)
 
 
 def _resolve_local_model_artifact_path(

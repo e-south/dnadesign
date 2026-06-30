@@ -159,6 +159,19 @@ for rejected_command in \
   fi
 done
 
+tmp_capture_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_capture_dir"' EXIT
+for rejected_capture_args in \
+  '--pose-id pose;exit --background-color white --title ok' \
+  '--pose-id pose_ok --background-color "white; close session" --title ok' \
+  '--pose-id pose_ok --background-color white --title "review; close session"'; do
+  if bash -lc "\"$SCRIPT_DIR/chimerax-capture-pose.py\" --port 65535 --preopened-session --output-dir \"$tmp_capture_dir\" $rejected_capture_args" >/dev/null 2>&1; then
+    fail "rejects unsafe capture options: $rejected_capture_args"
+  else
+    pass "rejects unsafe capture options: $rejected_capture_args"
+  fi
+done
+
 for shell_script in "$SCRIPT_DIR"/chimerax-*.sh "$SCRIPT_DIR"/audit-chimerax-structure-review-skill.sh; do
   if bash -n "$shell_script"; then
     pass "shell script parses: ${shell_script#$REPO_ROOT/}"
