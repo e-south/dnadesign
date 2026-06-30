@@ -87,6 +87,8 @@ def write_interactive_structure_browser_manifest(
 
     ranking = _ranking_by_candidate(foldcheck_ranking_path)
     reference_path = full_structure_set_path.parent / REFERENCE_STRUCTURE_RELATIVE_PATH
+    if not reference_path.exists():
+        raise ValueError(f"interactive structure browser reference path is missing: {reference_path}")
     structures = _structure_rows(
         source_rows=list(source.get("structures") or []),
         source_root=full_structure_set_path.parent,
@@ -129,7 +131,7 @@ def write_interactive_structure_browser_manifest(
     manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return make_deliverable_row(
         deliverable_id="interactive_structure_browser_manifest",
-        section="fold_review",
+        section="design_and_fold_triage",
         artifact_kind="structure_browser_manifest",
         status="rendered",
         path=manifest_path,
@@ -224,7 +226,7 @@ def write_mask_structure_browser_manifest(
 def _missing_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]:
     return make_deliverable_row(
         deliverable_id="interactive_structure_browser_manifest",
-        section="fold_review",
+        section="design_and_fold_triage",
         artifact_kind="structure_browser_manifest",
         status="skipped_missing_input",
         path=manifest_path,
@@ -264,8 +266,16 @@ def _mask_structure_views(
     manifest_root: Path,
 ) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
+    reference_number_by_canonical = _proteinmpnn_export_number_by_canonical(mask_residues)
     for view_id, label, field, description in _MASK_SELECTIONS:
-        residue_numbers = sorted(int(row["canonical_position"]) for row in mask_residues if bool(row.get(field)))
+        canonical_residue_numbers = sorted(
+            int(row["canonical_position"]) for row in mask_residues if bool(row.get(field))
+        )
+        residue_numbers = [
+            reference_number_by_canonical[position]
+            for position in canonical_residue_numbers
+            if position in reference_number_by_canonical
+        ]
         if not residue_numbers:
             continue
         views.append(
@@ -282,6 +292,9 @@ def _mask_structure_views(
                         "selection_id": view_id,
                         "model_id": "ec86kit_7v9u_reference",
                         "label": label,
+                        "source_coordinate_basis": "canonical_position",
+                        "selection_coordinate_basis": "proteinmpnn_export_residue_number",
+                        "canonical_residue_numbers": canonical_residue_numbers,
                         "residue_numbers": residue_numbers,
                         "color": _MASK_HIGHLIGHT_COLOR,
                     }
@@ -290,6 +303,18 @@ def _mask_structure_views(
             }
         )
     return views
+
+
+def _proteinmpnn_export_number_by_canonical(mask_residues: list[dict[str, Any]]) -> dict[int, int]:
+    mapped_rows = sorted(
+        [
+            row
+            for row in mask_residues
+            if str(row.get("mapping_status") or "") == "mapped" or bool(row.get("has_backbone_coordinates")) is True
+        ],
+        key=lambda row: int(row["canonical_position"]),
+    )
+    return {int(row["canonical_position"]): index for index, row in enumerate(mapped_rows, start=1)}
 
 
 def _ranking_by_candidate(path: Path) -> dict[str, dict[str, Any]]:
@@ -319,14 +344,18 @@ def _structure_rows(
     ranking: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for row in source_rows:
+    for row_index, row in enumerate(source_rows):
         if not isinstance(row, dict):
-            continue
+            raise ValueError(f"full structure-set row {row_index} is not a mapping")
         candidate_id = str(row.get("candidate_id") or "")
         local_value = str(row.get("local_model_artifact_path") or "")
         local_path = source_root / local_value
-        if not candidate_id or not local_value or not local_path.exists():
-            continue
+        if not candidate_id:
+            raise ValueError(f"full structure-set row {row_index} is missing candidate_id")
+        if not local_value:
+            raise ValueError(f"full structure-set row {row_index} is missing local_model_artifact_path")
+        if not local_path.exists():
+            raise ValueError(f"declared structure path is missing for {candidate_id}: {local_path}")
         rank_row = ranking.get(candidate_id, {})
         rows.append(
             {
@@ -363,10 +392,10 @@ def _structure_group(candidate_id: str, rank_row: dict[str, Any]) -> str:
         return "WT baseline"
     review_class = str(rank_row.get("review_class") or "")
     if review_class in {"strong_fold_preserved", "good_fold_preserved"}:
-        return "Fold-preserved candidates"
+        return "Low-deviation fold-check candidates"
     if review_class in {"structural_outlier", "low_confidence"}:
         return "Review outliers"
-    return "Other fold-accepted candidates"
+    return "Other fold-check candidates"
 
 
 def _structure_color(candidate_id: str, rank_row: dict[str, Any]) -> str:

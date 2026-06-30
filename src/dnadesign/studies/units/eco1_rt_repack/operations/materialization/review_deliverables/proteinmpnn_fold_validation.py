@@ -115,7 +115,7 @@ def write_tao_style_fold_validation(
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_tao_style_fold_validation",
-        section="proteinmpnn",
+        section="design_and_fold_triage",
         artifact_kind="svg",
         status="rendered",
         path=path,
@@ -150,7 +150,7 @@ def _skipped_fold_validation_row(
 ) -> dict[str, Any]:
     return make_deliverable_row(
         deliverable_id="proteinmpnn_tao_style_fold_validation",
-        section="proteinmpnn",
+        section="design_and_fold_triage",
         artifact_kind="svg",
         status="skipped_missing_input",
         path=panel_root / "proteinmpnn_tao_style_fold_validation.svg",

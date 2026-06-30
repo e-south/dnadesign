@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/biohub_esmc_sae_interpretation.py
 
-Biohub ESMC SAE interpretation review panels for Eco1 RT repack.
+Biohub ESMC SAE feature-review panels for Eco1 RT repack.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -112,14 +112,14 @@ def write_biohub_esmc_sae_interpretation_panels(
             method_summary=METHOD_SUMMARY,
             source_notebook=SOURCE_NOTEBOOK,
         ),
-        _write_wt_localization_panel(
+        _write_wt_activation_pattern_panel(
             panel_root=panel_root,
             residue_features_path=residue_features_path,
             feature_catalog_path=feature_catalog_path,
             request_manifest_path=request_manifest_path,
             feature_rows=feature_rows,
         ),
-        _write_candidate_retention_panel(
+        _write_candidate_activation_ratio_panel(
             panel_root=panel_root,
             protein_features_path=protein_features_path,
             feature_catalog_path=feature_catalog_path,
@@ -143,7 +143,7 @@ def write_biohub_esmc_sae_interpretation_panels(
     ]
 
 
-def _write_wt_localization_panel(
+def _write_wt_activation_pattern_panel(
     *,
     panel_root: Path,
     residue_features_path: Path,
@@ -151,7 +151,7 @@ def _write_wt_localization_panel(
     request_manifest_path: Path,
     feature_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    title = "WT-active SAE features localize to specific Ec86 regions"
+    title = "WT-active SAE features have distinct residue activation patterns"
     selected_features = [int(row["feature_index"]) for row in feature_rows]
     residue_rows = pq.read_table(
         residue_features_path,
@@ -182,14 +182,14 @@ def _write_wt_localization_panel(
     colorbar.set_label("Per-residue activation", fontsize=LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
     fig.subplots_adjust(left=0.36, right=0.985, top=0.88, bottom=0.18)
-    path = panel_root / "wt_top_sae_feature_localization.svg"
+    path = panel_root / "wt_top_sae_feature_activation_pattern.svg"
     alt = (
         f"Heatmap of WT Ec86 residue activations for the {len(selected_features)} strongest "
         "Biohub ESMC SAE features selected from the WT protein-feature table."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
-        deliverable_id="biohub_esmc_wt_top_sae_feature_localization",
+        deliverable_id="biohub_esmc_wt_top_sae_feature_activation_pattern",
         section=SECTION,
         artifact_kind="svg",
         status="rendered",
@@ -204,7 +204,7 @@ def _write_wt_localization_panel(
         ),
         alt_text=alt,
         description=(
-            "Shows where the WT sequence activates the strongest peak-ranked Biohub ESMC SAE features. "
+            "Shows where the WT sequence activates the strongest peak-ordered Biohub ESMC SAE features. "
             "The panel uses feature indices rather than names unless the exact SAE dictionary has "
             "source-backed feature descriptions."
         ),
@@ -216,7 +216,7 @@ def _write_wt_localization_panel(
     )
 
 
-def _write_candidate_retention_panel(
+def _write_candidate_activation_ratio_panel(
     *,
     panel_root: Path,
     protein_features_path: Path,
@@ -226,7 +226,7 @@ def _write_candidate_retention_panel(
     selected_features: list[int],
     wt_feature_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    title = "Candidates retain or shift WT-active SAE features"
+    title = "Candidates vary in WT-active SAE activation ratios"
     feature_rows = pq.read_table(
         protein_features_path,
         filters=[("feature_index", "in", selected_features)],
@@ -266,14 +266,14 @@ def _write_candidate_retention_panel(
     colorbar.set_label("log2(candidate activation sum / WT activation sum)", fontsize=LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
     fig.subplots_adjust(left=0.34, right=0.985, top=0.86, bottom=0.24)
-    path = panel_root / "candidate_top_sae_feature_retention.svg"
+    path = panel_root / "candidate_top_sae_feature_activation_ratio.svg"
     alt = (
         f"Heatmap of WT-normalized activation sums for {len(selected_features)} WT-active SAE features "
         f"across {len(candidate_order)} Biohub ESMC queries."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
-        deliverable_id="biohub_esmc_candidate_top_sae_feature_retention",
+        deliverable_id="biohub_esmc_candidate_top_sae_feature_activation_ratio",
         section=SECTION,
         artifact_kind="svg",
         status="rendered",
@@ -302,7 +302,7 @@ def _write_candidate_retention_panel(
 
 
 def _missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = None) -> dict[str, Any]:
-    message = reason or "Missing Biohub ESMC SAE interpretation input: " + ", ".join(str(path) for path in missing)
+    message = reason or "Missing Biohub ESMC SAE feature-review input: " + ", ".join(str(path) for path in missing)
     return make_deliverable_row(
         deliverable_id="biohub_esmc_sae_interpretation",
         section=SECTION,
@@ -311,10 +311,10 @@ def _missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = 
         path=panel_root / "missing_biohub_esmc_sae_interpretation.txt",
         source_tables=_SOURCE_TABLES,
         input_hashes=file_hashes({f"input_{index}": path for index, path in enumerate(missing)}),
-        alt_text="Biohub ESMC SAE interpretation visuals were skipped because sparse SAE inputs were missing.",
-        description="The SAE interpretation section requires profile, protein-feature, and residue-feature tables.",
+        alt_text="Biohub ESMC SAE feature-review visuals were skipped because sparse SAE inputs were missing.",
+        description="The SAE feature-review section requires profile, protein-feature, and residue-feature tables.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title="Biohub ESMC SAE interpretation",
+        title="Biohub ESMC SAE feature review",
         method_summary=METHOD_SUMMARY,
         evidence_summary={"source_notebook": SOURCE_NOTEBOOK},
         role="review_only",

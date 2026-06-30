@@ -51,6 +51,18 @@ class FakeSequenceLogitsClient:
         )
 
 
+class TimeoutOnceSequenceLogitsClient(FakeSequenceLogitsClient):
+    def sequence_logits_for_sequence(
+        self,
+        sequence: str,
+        *,
+        model: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
+        if self.requested_sequences:
+            raise OSError("read operation timed out")
+        return super().sequence_logits_for_sequence(sequence, model=model)
+
+
 def write_mask_set(path: Path, *, length: int) -> None:
     residues = [
         {

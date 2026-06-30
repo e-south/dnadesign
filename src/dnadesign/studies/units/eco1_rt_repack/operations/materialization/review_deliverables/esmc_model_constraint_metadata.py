@@ -20,7 +20,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
-SECTION = "wt_model_constraint_audit"
+SECTION = "scaffold_and_mask"
 SOURCE_TABLES = [
     "biohub_esmc/mutation_scoring/wt_mutation_scoring_mask_join.parquet",
     "biohub_esmc/mutation_scoring/wt_position_entropy.parquet",

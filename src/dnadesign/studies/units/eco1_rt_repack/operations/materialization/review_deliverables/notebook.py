@@ -39,6 +39,7 @@ def _():
         render_deliverable_details,
         render_interpretation_note,
         render_intro,
+        review_lane_lookup,
         section_deliverables,
         section_label_lookup,
         selected_deliverable,
@@ -57,6 +58,7 @@ def _():
     sae_protein_lookup = sae_runtime.sae_protein_lookup
     selected_sae_feature_rows = sae_runtime.selected_sae_feature_rows
     structure_browser_lookup = structure_runtime.structure_browser_lookup
+    structure_group_lookup = structure_runtime.structure_group_lookup
 
     return (
         deliverable_lookup,
@@ -72,6 +74,7 @@ def _():
         render_intro,
         render_sae_feature_inspector,
         render_structure_browser,
+        review_lane_lookup,
         sae_feature_lookup,
         sae_protein_lookup,
         section_deliverables,
@@ -79,6 +82,7 @@ def _():
         selected_deliverable,
         selected_sae_feature_rows,
         structure_browser_lookup,
+        structure_group_lookup,
         visual_deliverables,
     )
 
@@ -95,8 +99,34 @@ def _(mo, render_intro):
 
 
 @app.cell
-def _(deliverables, section_label_lookup, visual_deliverables):
-    visual_rows = visual_deliverables(deliverables)
+def _(deliverables, review_lane_lookup):
+    lane_lookup = review_lane_lookup(deliverables)
+    lane_options = list(lane_lookup)
+    return lane_lookup, lane_options
+
+
+@app.cell
+def _(lane_options, mo):
+    review_lane_ui = mo.ui.dropdown(
+        lane_options,
+        value=lane_options[0] if lane_options else None,
+        label="Deliverable lane",
+        full_width=True,
+    )
+    return review_lane_ui
+
+
+@app.cell
+def _(lane_lookup, review_lane_ui):
+    selected_lane = "main_review"
+    if review_lane_ui is not None and review_lane_ui.value is not None:
+        selected_lane = str(lane_lookup.get(str(review_lane_ui.value), selected_lane))
+    return selected_lane
+
+
+@app.cell
+def _(deliverables, section_label_lookup, selected_lane, visual_deliverables):
+    visual_rows = visual_deliverables(deliverables, selected_lane=selected_lane)
     section_lookup = section_label_lookup(visual_rows)
     section_options = list(section_lookup)
     return section_lookup, section_options, visual_rows
@@ -134,7 +164,7 @@ def _(deliverable_options, mo):
     deliverable_id_ui = mo.ui.dropdown(
         deliverable_options,
         value=deliverable_options[0] if deliverable_options else None,
-        label="Visual",
+        label="Figure / browser",
         full_width=True,
     )
     return deliverable_id_ui
@@ -170,12 +200,45 @@ def _(deliverables, load_structure_browser_rows, manifest_root):
 
 
 @app.cell
-def _(mo, selected_section, selected_visual, structure_browser_lookup, structure_browser_rows):
+def _(mo, selected_section, selected_visual, structure_browser_rows, structure_group_lookup):
     selected_visual_id = str(selected_visual.get("deliverable_id") or "") if selected_visual else ""
+    structure_group_map = structure_group_lookup(
+        structure_browser_rows,
+        selected_section=selected_section,
+        selected_deliverable_id=selected_visual_id,
+    )
+    structure_group_options = list(structure_group_map)
+    structure_group_ui = mo.ui.dropdown(
+        structure_group_options,
+        value=structure_group_options[0] if structure_group_options else None,
+        label="Structure group",
+        full_width=True,
+    )
+    return selected_visual_id, structure_group_map, structure_group_ui
+
+
+@app.cell
+def _(structure_group_map, structure_group_ui):
+    selected_structure_group = ""
+    if structure_group_ui is not None and structure_group_ui.value:
+        selected_structure_group = str(structure_group_map.get(str(structure_group_ui.value), ""))
+    return selected_structure_group
+
+
+@app.cell
+def _(
+    mo,
+    selected_section,
+    selected_structure_group,
+    selected_visual_id,
+    structure_browser_lookup,
+    structure_browser_rows,
+):
     structure_map = structure_browser_lookup(
         structure_browser_rows,
         selected_section=selected_section,
         selected_deliverable_id=selected_visual_id,
+        selected_group=selected_structure_group,
     )
     structure_options = list(structure_map)
     structure_label = "Structure view"
@@ -263,7 +326,9 @@ def _(
     selected_sae_feature,
     selected_structure_row,
     selected_visual,
+    structure_group_ui,
     structure_ui,
+    review_lane_ui,
 ):
     if selected_visual is None:
         panel = mo.md("No deliverable is available for the selected section.")
@@ -274,6 +339,7 @@ def _(
                     mo=mo,
                     selected_row=selected_structure_row,
                     structure_ui=structure_ui,
+                    structure_group_ui=structure_group_ui,
                 ),
                 render_interpretation_note(selected_visual, mo=mo),
                 render_deliverable_details(selected_visual, mo=mo),
@@ -292,7 +358,14 @@ def _(
                 )
             )
         panel = mo.vstack(
-            [mo.hstack([deliverable_section_ui, deliverable_id_ui], justify="start", gap=1.0), *rendered],
+            [
+                mo.hstack(
+                    [review_lane_ui, deliverable_section_ui, deliverable_id_ui],
+                    justify="start",
+                    gap=1.0,
+                ),
+                *rendered,
+            ],
             gap=0.45,
         )
     panel

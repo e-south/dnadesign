@@ -75,7 +75,7 @@ def write_proteinmpnn_diversity_panels(
     ).to_pylist()
     accepted_rows = [row for row in rows if str(row.get("status")) == "accepted"]
     if not accepted_rows:
-        raise ValueError(f"No accepted candidate rows found in {candidate_table_path}")
+        raise ValueError(f"No candidate_table rows with status=accepted found in {candidate_table_path}")
     deliverables = [
         _write_score_mutation_burden(panel_root, accepted_rows, candidate_table_path),
         _write_mutation_density(panel_root, accepted_rows, candidate_table_path, mask_residues=mask_residues or []),
@@ -153,13 +153,13 @@ def _write_score_mutation_burden(
 
     path = panel_root / "proteinmpnn_score_mutation_burden.svg"
     alt = (
-        f"ProteinMPNN diversity panel for {len(rows)} accepted candidates, showing "
+        f"ProteinMPNN diversity panel for {len(rows)} candidate-table rows with status=accepted, showing "
         "mutation count versus score and WT sequence recovery versus global score."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_score_mutation_burden",
-        section="proteinmpnn",
+        section="design_and_fold_triage",
         artifact_kind="svg",
         status="rendered",
         path=path,
@@ -168,7 +168,7 @@ def _write_score_mutation_burden(
         alt_text=alt,
         description=(
             "Summarizes ProteinMPNN proposal scores, global scores, mutation burden, "
-            "and sequence identity for accepted candidates."
+            "and sequence identity for candidate-table rows with status=accepted."
         ),
         interpretation_limit=(
             "Sequence recovery and ProteinMPNN scores are descriptive proposal metrics. "
@@ -218,7 +218,7 @@ def _write_mutation_density(
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
         deliverable_id="proteinmpnn_mutation_density",
-        section="proteinmpnn",
+        section="design_and_fold_triage",
         artifact_kind="svg",
         status="rendered",
         path=path,

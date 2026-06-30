@@ -171,9 +171,12 @@ def _sae_feature_svg(selected_row: dict[str, Any], residue_rows: list[dict[str, 
               y2="{top + plot_height:.2f}" stroke="#333" stroke-width="1"/>
         {"".join(bars)}
         {"".join(ticks)}
-        <text x="{left}" y="{height - 42}" font-size="12">Description status: {html.escape(description_status)}</text>
-        <text x="{left}" y="{height - 24}" font-size="12">Description: {html.escape(description_text)}</text>
       </svg>
+      <figcaption style="font-size:0.9rem; line-height:1.4; margin-top:0.45rem; color:#57606a;">
+        <strong>Description status:</strong> {html.escape(description_status)}
+        <br/>
+        <strong>Description:</strong> {html.escape(description_text)}
+      </figcaption>
     </figure>
     """
 

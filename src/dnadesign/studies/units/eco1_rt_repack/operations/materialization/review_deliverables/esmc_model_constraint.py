@@ -97,9 +97,9 @@ def _linked_permuter_plot_rows(mutation_scoring_root: Path) -> list[dict[str, An
         ),
         (
             "wt_esmc_fraction_negative_alternate_llr",
-            "ESMC alternate-residue rejection varies across WT residues",
+            "Lower-LLR alternate fraction varies across WT residues",
             plot_root / "wt_fraction_negative_alternate_llr_by_position.svg",
-            "ESMC alternate-residue rejection across WT.",
+            "Fraction of non-WT alternates with lower ESMC LLR than WT.",
             "Scatter plot of the fraction of alternate residues with negative LLR at each WT position.",
             "Shows positions where most single-residue alternatives score worse than the WT residue.",
         ),
@@ -136,6 +136,9 @@ def _linked_permuter_plot_rows(mutation_scoring_root: Path) -> list[dict[str, An
                 method_summary=METHOD_SUMMARY,
                 evidence_summary=evidence_summary,
                 role="review_only",
+                render_mode=(
+                    "wide_visual" if deliverable_id == "wt_esmc_substitution_llr_heatmap" else "standard_visual"
+                ),
                 skip_reason=skip_reason,
             )
         )
@@ -324,7 +327,7 @@ def _write_constraint_tracks(
         ),
         ("ESMC entropy\n(bits)", [float(row["canonical_entropy_bits"]) for row in rows], OKABE_ITO["blue"], None),
         (
-            "Negative alternate\nLLR fraction",
+            "Lower-LLR\nalternate fraction",
             [float(row["fraction_negative_alternate_llr"]) for row in rows],
             OKABE_ITO["purple"],
             (0.0, 1.05),
@@ -367,8 +370,8 @@ def _write_constraint_tracks(
         input_hashes=file_hashes({"mask_join": mask_join_path}),
         alt_text=alt,
         description=(
-            "Shows where MSA plurality, ESMC masked-marginal entropy, ESMC alternate-residue rejection, "
-            "and the current mask align along the WT sequence."
+            "Shows where MSA plurality, ESMC masked-marginal entropy, the fraction of non-WT alternates "
+            "with lower LLR than WT, and the current mask align along the WT sequence."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,

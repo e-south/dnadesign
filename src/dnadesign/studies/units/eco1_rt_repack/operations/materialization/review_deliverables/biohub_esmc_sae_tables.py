@@ -94,14 +94,14 @@ def make_protein_top_feature_table_row(
             }
         ),
         alt_text=(
-            "Compact table of per-protein top Biohub ESMC SAE features ranked by peak activation and prevalence."
+            "Compact table of per-protein top Biohub ESMC SAE features ordered by peak activation and prevalence."
         ),
         description=(
             "Supports notebook dropdown inspection for each protein. Feature descriptions are populated only "
             "when the exact SAE dictionary supplies source-backed labels."
         ),
         interpretation_limit=interpretation_limit,
-        title="Per-protein top SAE features are ranked by peak activation and prevalence",
+        title="Per-protein top SAE features are ordered by peak activation and prevalence",
         method_summary=method_summary,
         evidence_summary={
             "source_notebook": source_notebook,

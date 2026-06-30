@@ -29,6 +29,9 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
     assert_manifest_visual_contract,
     assert_review_notebook_contract,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
+    resolve_manifest_path,
+)
 
 
 def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path: Path) -> None:
@@ -38,7 +41,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_id"] == "eco1_rt.review_deliverables"
-    assert manifest["status"] == "materialized"
+    assert manifest["status"] == "materialized_complete"
     assert manifest["deliverable_count"] == len(manifest["deliverables"])
     assert manifest["visual_policy"]["requires_alt_text"] is True
     assert manifest["notebook"]["path"] == "notebooks/eco1_review_deliverables.py"
@@ -74,13 +77,25 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
     assert "reference-fitted colabfold" in deliverables["interactive_structure_browser_manifest"]["title"].lower()
     visual_ids = {entry["deliverable_id"] for entry in visual_deliverables(manifest["deliverables"])}
+    audit_visual_ids = {
+        entry["deliverable_id"]
+        for entry in visual_deliverables(manifest["deliverables"], selected_lane="audit_supplement")
+    }
     assert "mask_structure_browser_manifest" in visual_ids
     assert "interactive_structure_browser_manifest" in visual_ids
+    assert "wt_esmc_entropy_by_position" not in visual_ids
+    assert "proteinmpnn_tao_style_fold_validation" in visual_ids
+    assert "wt_esmc_entropy_by_position" in audit_visual_ids
+    assert "foldcheck_review_fold_metric_scatter" in audit_visual_ids
     assert "mask_structure_context_png" not in visual_ids
     assert "foldcheck_review_structure_overlay_panel" not in visual_ids
     assert "foldcheck_review_structure_overlay_skipped" not in visual_ids
     assert deliverables["wt_esmc_entropy_by_position"]["status"] == "linked_existing"
+    assert deliverables["wt_esmc_entropy_by_position"]["section"] == "scaffold_and_mask"
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
+    assert deliverables["proteinmpnn_score_mutation_burden"]["section"] == "design_and_fold_triage"
+    assert deliverables["proteinmpnn_tao_style_fold_validation"]["section"] == "design_and_fold_triage"
+    assert deliverables["interactive_structure_browser_manifest"]["section"] == "design_and_fold_triage"
 
     assert_manifest_visual_contract(
         manifest_path=result.manifest_path,
@@ -89,7 +104,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         expected_rendered=expected_rendered,
     )
 
-    msa_text = _resolve_manifest_path(
+    msa_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["msa_plurality_mask_panel"]["path"],
     ).read_text(encoding="utf-8")
@@ -100,7 +115,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "WT plurality &gt;=25% in full clade 9" in msa_text
     assert "C9 row 001" in msa_text
 
-    mask_track_text = _resolve_manifest_path(
+    mask_track_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["linear_mask_tracks"]["path"],
     ).read_text(encoding="utf-8")
@@ -111,7 +126,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "M" in mask_track_text
     assert "K" in mask_track_text
 
-    diversity_text = _resolve_manifest_path(
+    diversity_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["proteinmpnn_score_mutation_burden"]["path"],
     ).read_text(encoding="utf-8")
@@ -121,14 +136,14 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "Sampling temperature" in diversity_text
     assert "Reported ProteinMPNN score" in diversity_text
 
-    mutation_density_text = _resolve_manifest_path(
+    mutation_density_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["proteinmpnn_mutation_density"]["path"],
     ).read_text(encoding="utf-8")
     assert "RT1" in mutation_density_text
     assert "NAxxH" in mutation_density_text
 
-    tao_text = _resolve_manifest_path(
+    tao_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["proteinmpnn_tao_style_fold_validation"]["path"],
     ).read_text(encoding="utf-8")
@@ -138,20 +153,19 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "Tao-style" in deliverables["proteinmpnn_tao_style_fold_validation"]["description"]
     assert "single active mask policy" in deliverables["proteinmpnn_tao_style_fold_validation"]["interpretation_limit"]
 
-    linked_fold_plot = _resolve_manifest_path(
+    linked_fold_plot = resolve_manifest_path(
         result.manifest_path,
         deliverables["foldcheck_review_fold_metric_scatter"]["path"],
     )
     assert linked_fold_plot.exists()
     assert linked_fold_plot.parent.name == "plots"
-    linked_structure_overlay = _resolve_manifest_path(
+    linked_structure_overlay = resolve_manifest_path(
         result.manifest_path,
         deliverables["foldcheck_review_structure_overlay_panel"]["path"],
     )
     assert linked_structure_overlay.exists()
-    assert linked_structure_overlay.suffix == ".png"
 
-    linked_esmc_plot = _resolve_manifest_path(
+    linked_esmc_plot = resolve_manifest_path(
         result.manifest_path,
         deliverables["wt_esmc_substitution_llr_heatmap"]["path"],
     )
@@ -164,10 +178,11 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         deliverables["wt_esmc_substitution_llr_heatmap"]["title"]
         == "ESMC masked-marginal scores form a WT substitution matrix"
     )
+    assert deliverables["wt_esmc_substitution_llr_heatmap"]["render_mode"] == "wide_visual"
     assert "LLR = log P(alternate) - log P(WT)" in deliverables["wt_esmc_substitution_llr_heatmap"]["method_summary"]
     assert deliverables["wt_esmc_substitution_llr_heatmap"]["evidence_summary"]["substitution_llr_rows"] == 114
 
-    esmc_scatter_text = _resolve_manifest_path(
+    esmc_scatter_text = resolve_manifest_path(
         result.manifest_path,
         deliverables["msa_plurality_vs_esmc_entropy"]["path"],
     ).read_text(encoding="utf-8")
@@ -183,8 +198,3 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         forbidden_path_text=str(tmp_path),
     )
     assert_review_notebook_contract(result.notebook_path.read_text(encoding="utf-8"))
-
-
-def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
-    path = Path(value)
-    return path if path.is_absolute() else manifest_path.parent / path

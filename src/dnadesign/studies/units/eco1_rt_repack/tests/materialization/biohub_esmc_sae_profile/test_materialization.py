@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.atlas_semantic
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.biohub_esmc_sae_profile.fixtures import (
     FakeBiohubEsmcClient,
     FakeFeatureDescriptionClient,
+    MalformedBiohubEsmcClient,
     TimeoutOnceBiohubEsmcClient,
 )
 from dnadesign.thread.adapters.biohub_esmc import FEATURE_DESCRIPTION_SAE_MODEL
@@ -107,29 +108,35 @@ def test_biohub_esmc_sae_profile_resume_reuses_accepted_rows(tmp_path: Path) -> 
     assert fake_client.requested_sequences == ["AAAE"]
 
 
-def test_biohub_esmc_sae_profile_writes_timeout_error_row(tmp_path: Path) -> None:
+def test_biohub_esmc_sae_profile_final_run_rejects_timeout_error_row(tmp_path: Path) -> None:
     write_foldcheck_report_fixture(
         tmp_path,
         accepted_candidate_ids={"wild_type", "thread_candidate_test"},
     )
 
-    result = materialize_biohub_esmc_sae_profile(
-        repo_root=Path.cwd(),
-        output_root=tmp_path,
-        sequence_limit="all",
-        sae_model=_FIXTURE_SAE_MODEL,
-        biohub_client=TimeoutOnceBiohubEsmcClient(),
-        retrieved_at="2026-06-25T00:00:00Z",
-    )
+    with pytest.raises(ValueError, match="requires every selected sequence to be accepted"):
+        materialize_biohub_esmc_sae_profile(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            sequence_limit="all",
+            sae_model=_FIXTURE_SAE_MODEL,
+            biohub_client=TimeoutOnceBiohubEsmcClient(),
+            retrieved_at="2026-06-25T00:00:00Z",
+        )
 
-    profile_rows = pq.read_table(result.profile_path).to_pylist()
-    statuses = {row["candidate_id"]: row["status"] for row in profile_rows}
-    failure_reasons = {row["candidate_id"]: row["failure_reason"] for row in profile_rows}
-    assert statuses == {
-        "wild_type": "accepted",
-        "thread_candidate_test": "errored",
-    }
-    assert "read operation timed out" in failure_reasons["thread_candidate_test"]
+
+def test_biohub_esmc_sae_profile_raises_on_malformed_logits_schema(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+
+    with pytest.raises(ValueError, match="sae_outputs"):
+        materialize_biohub_esmc_sae_profile(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            sequence_limit="1",
+            sae_model=_FIXTURE_SAE_MODEL,
+            biohub_client=MalformedBiohubEsmcClient(),
+            retrieved_at="2026-06-25T00:00:00Z",
+        )
 
 
 def test_biohub_esmc_sae_profile_can_enrich_exact_dictionary_feature_descriptions(tmp_path: Path) -> None:

@@ -39,6 +39,7 @@ def make_deliverable_row(
     method_summary: str = "",
     evidence_summary: dict[str, Any] | None = None,
     role: str = "manuscript_facing",
+    render_mode: str = "standard_visual",
     skip_reason: str = "",
 ) -> dict[str, Any]:
     """Build one manifest row with the required evidence fields."""
@@ -50,6 +51,7 @@ def make_deliverable_row(
         "artifact_kind": artifact_kind,
         "status": status,
         "role": role,
+        "render_mode": render_mode,
         "path": str(path),
         "source_tables": list(source_tables),
         "input_hashes": dict(input_hashes),
@@ -76,7 +78,7 @@ def write_manifest(
     manifest = {
         "schema_id": SCHEMA_ID,
         "schema_version": 1,
-        "status": "materialized",
+        "status": _manifest_status(relative_deliverables),
         "path_policy": "manifest_relative",
         "deliverable_count": len(relative_deliverables),
         "deliverables": relative_deliverables,
@@ -86,14 +88,17 @@ def write_manifest(
             "input_manifest": path.name,
             "scope": "eco1_rt_repack review deliverables",
             "description": (
-                "Manifest-backed marimo surface for MSA, mask, ProteinMPNN, "
-                "fold-review, WT ESMC model-constraint, and Biohub ESMC SAE "
-                "interpretation visual deliverables."
+                "Manifest-backed marimo surface for mask-constraint evidence, "
+                "ProteinMPNN variant and fold-triage evidence, and Biohub ESMC "
+                "SAE feature-review deliverables."
             ),
         },
         "visual_policy": {
             "requires_alt_text": True,
             "requires_interpretation_limit": True,
+            "complete_status": "materialized_complete",
+            "degraded_status": "materialized_degraded",
+            "degraded_when_statuses": ["skipped_missing_input", "errored"],
             "candidate_acceptance_gate": False,
             "plain_language_limit": (
                 "Visuals support review and concise methods writing. They do "
@@ -103,6 +108,15 @@ def write_manifest(
         },
     }
     path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+
+def _manifest_status(deliverables: list[dict[str, Any]]) -> str:
+    degraded_prefixes = ("errored", "skipped_missing_input")
+    for row in deliverables:
+        status = str(row.get("status") or "")
+        if status.startswith(degraded_prefixes):
+            return "materialized_degraded"
+    return "materialized_complete"
 
 
 def _with_manifest_relative_path(row: dict[str, Any], manifest_root: Path) -> dict[str, Any]:

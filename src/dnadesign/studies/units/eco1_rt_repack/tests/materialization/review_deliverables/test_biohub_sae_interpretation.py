@@ -14,7 +14,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
@@ -39,13 +41,13 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
 
-    localization = deliverables["biohub_esmc_wt_top_sae_feature_localization"]
-    retention = deliverables["biohub_esmc_candidate_top_sae_feature_retention"]
+    activation_pattern = deliverables["biohub_esmc_wt_top_sae_feature_activation_pattern"]
+    activation_ratio = deliverables["biohub_esmc_candidate_top_sae_feature_activation_ratio"]
     top_features = deliverables["biohub_esmc_protein_top_sae_features"]
     fold_llr_comparison = deliverables["biohub_esmc_sae_fold_llr_comparison"]
     assert top_features["status"] == "materialized"
-    assert localization["status"] == "rendered"
-    assert retention["status"] == "rendered"
+    assert activation_pattern["status"] == "rendered"
+    assert activation_ratio["status"] == "rendered"
     assert fold_llr_comparison["status"] == "rendered"
     top_feature_rows = pq.read_table(_resolve_manifest_path(result.manifest_path, top_features["path"])).to_pylist()
     assert {row["candidate_id"] for row in top_feature_rows} == {
@@ -57,19 +59,23 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert "peak activation and prevalence" in top_features["title"]
     assert "source_backed_exact_dictionary_description" in {row["description_status"] for row in top_feature_rows}
 
-    localization_text = _resolve_manifest_path(result.manifest_path, localization["path"]).read_text(encoding="utf-8")
-    assert "WT-active SAE features localize to specific Ec86 regions" in localization_text
-    assert "F101" in localization_text
-    assert "activation_max" in localization["evidence_summary"]["feature_selection_rule"]
-    assert "exact SAE model" not in localization["title"]
-    assert "source_notebook" in localization["evidence_summary"]
-    assert "esmc_sae_feature_interpretation.ipynb" in str(localization["evidence_summary"])
-    assert "source-backed feature descriptions" in localization["description"]
+    activation_pattern_text = _resolve_manifest_path(result.manifest_path, activation_pattern["path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "WT-active SAE features have distinct residue activation patterns" in activation_pattern_text
+    assert "F101" in activation_pattern_text
+    assert "activation_max" in activation_pattern["evidence_summary"]["feature_selection_rule"]
+    assert "exact SAE model" not in activation_pattern["title"]
+    assert "source_notebook" in activation_pattern["evidence_summary"]
+    assert "esmc_sae_feature_interpretation.ipynb" in str(activation_pattern["evidence_summary"])
+    assert "source-backed feature descriptions" in activation_pattern["description"]
 
-    retention_text = _resolve_manifest_path(result.manifest_path, retention["path"]).read_text(encoding="utf-8")
-    assert "Candidates retain or shift WT-active SAE features" in retention_text
-    assert "candidate activation sum / WT activation sum" in retention_text
-    assert "acceptance claims" in retention["interpretation_limit"]
+    activation_ratio_text = _resolve_manifest_path(result.manifest_path, activation_ratio["path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "Candidates vary in WT-active SAE activation ratios" in activation_ratio_text
+    assert "candidate activation sum / WT activation sum" in activation_ratio_text
+    assert "acceptance claims" in activation_ratio["interpretation_limit"]
 
     fold_llr_text = _resolve_manifest_path(result.manifest_path, fold_llr_comparison["path"]).read_text(
         encoding="utf-8"
@@ -85,7 +91,10 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     svg_desc = re.search(r"<desc[^>]*>(.*?)</desc>", fold_llr_text, flags=re.DOTALL)
     assert svg_desc is not None
     assert len(svg_desc.group(1)) < 1200
-    assert "SAE similarity rank" in fold_llr_comparison["description"]
+    assert "SAE similarity to WT" in fold_llr_comparison["description"]
+    assert "rank variants" not in fold_llr_text
+    assert "activation patterns are compared" in fold_llr_text
+    assert "LLR sum, scaled within panel" in fold_llr_text
     assert "not a joint protein likelihood" in fold_llr_comparison["interpretation_limit"]
     assert fold_llr_comparison["evidence_summary"]["sequence_rows"] == 3
     assert fold_llr_comparison["evidence_summary"]["llr_scoring_rule"] == "sum_variant_single_substitution_llrs"
@@ -118,6 +127,38 @@ def test_sae_fold_llr_svg_description_stays_concise() -> None:
     assert len(description) < 500
     assert "full source-backed description" not in description
     assert "feature inspector" in description
+
+
+def test_sae_fold_llr_rejects_malformed_candidate_mutations(tmp_path: Path) -> None:
+    candidate_table = tmp_path / "candidate_table.parquet"
+    wt_llr = tmp_path / "wt_substitution_llr.parquet"
+    pq.write_table(
+        pa.Table.from_pylist([{"candidate_id": "thread_candidate_bad", "canonical_mutations": ["bad"]}]),
+        candidate_table,
+    )
+    pq.write_table(
+        pa.Table.from_pylist([{"canonical_position": 1, "alt_aa": "G", "llr": -1.0}]),
+        wt_llr,
+    )
+
+    with pytest.raises(ValueError, match="Malformed canonical mutation"):
+        sae_fold_llr._llr_sum_by_candidate(candidate_table, wt_llr)
+
+
+def test_sae_fold_llr_rejects_missing_substitution_scores(tmp_path: Path) -> None:
+    candidate_table = tmp_path / "candidate_table.parquet"
+    wt_llr = tmp_path / "wt_substitution_llr.parquet"
+    pq.write_table(
+        pa.Table.from_pylist([{"candidate_id": "thread_candidate_bad", "canonical_mutations": ["A1G"]}]),
+        candidate_table,
+    )
+    pq.write_table(
+        pa.Table.from_pylist([{"canonical_position": 1, "alt_aa": "V", "llr": -1.0}]),
+        wt_llr,
+    )
+
+    with pytest.raises(ValueError, match="Missing ESMC LLR"):
+        sae_fold_llr._llr_sum_by_candidate(candidate_table, wt_llr)
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:

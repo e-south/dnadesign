@@ -72,6 +72,26 @@ class TimeoutOnceBiohubEsmcClient(FakeBiohubEsmcClient):
         )
 
 
+class MalformedBiohubEsmcClient(FakeBiohubEsmcClient):
+    def logits_for_sequence(
+        self,
+        sequence: str,
+        *,
+        model: str,
+        sae_model: str,
+        normalize_features: bool,
+    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
+        del model, sae_model, normalize_features
+        normalized = sequence.strip().upper()
+        self.requested_sequences.append(normalized[:4])
+        tokens = [0, *range(1, len(normalized) + 1), 2]
+        return (
+            {"outputs": {"sequence": tokens}, "potential_sequence_of_concern": False},
+            {"sae_outputs": {}, "logits": None, "embeddings": None},
+            tokens,
+        )
+
+
 class FakeFeatureDescriptionClient:
     def __init__(self) -> None:
         self.requested: list[int] = []

@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring import (
@@ -24,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.atlas_semantic
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.biohub_esmc_wt_mutation_scoring._fixtures import (
     FakeSequenceLogitsClient,
+    TimeoutOnceSequenceLogitsClient,
     rewrite_position_table_with_null_alternate_fraction,
     rewrite_position_table_with_old_fraction_name,
     write_mask_set,
@@ -88,6 +90,20 @@ def test_wt_mutation_scoring_max_new_requests_writes_resumable_error(tmp_path: P
     assert statuses == {1: "accepted", 2: "errored"}
     assert failure_reasons[2] == "biohub_request_not_attempted_due_to_max_new_requests"
     assert len(substitution_rows) == 19
+
+
+def test_wt_mutation_scoring_final_run_rejects_timeout_error_row(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    write_mask_set(tmp_path / "mask_set.yaml", length=4)
+
+    with pytest.raises(ValueError, match="requires every selected position to be accepted"):
+        materialize_biohub_esmc_wt_mutation_scoring(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            positions="1-2",
+            biohub_client=TimeoutOnceSequenceLogitsClient(),
+            retrieved_at="2026-06-27T00:00:00Z",
+        )
 
 
 def test_wt_mutation_scoring_resume_ignores_stale_position_schema(tmp_path: Path) -> None:

@@ -177,7 +177,7 @@ def materialize_biohub_esmc_wt_mutation_scoring(
             )
             position_rows.append(normalized.position_row)
             substitution_rows.extend(normalized.substitution_rows)
-        except (BiohubEsmcRequestError, OSError, RuntimeError, ValueError) as error:
+        except (BiohubEsmcRequestError, OSError) as error:
             position_rows.append(
                 build_error_position_row(
                     job=job,
@@ -190,10 +190,11 @@ def materialize_biohub_esmc_wt_mutation_scoring(
             )
         finally:
             new_request_count += 1
-            if request_sleep_seconds:
-                sleep(request_sleep_seconds)
+        if request_sleep_seconds:
+            sleep(request_sleep_seconds)
 
     token_map_hash = biohub_request_hash(token_map or {})
+    status_summary = _position_status_summary(position_rows)
     manifest = _request_manifest(
         request_hash=request_hash,
         source_request_hash=selection.source_request_hash,
@@ -206,6 +207,9 @@ def materialize_biohub_esmc_wt_mutation_scoring(
         request_timeout_seconds=request_timeout_seconds,
         token_map_hash=token_map_hash,
         mask_set_hash="sha256:" + sha256(thread_root / MASK_SET_FILE_NAME),
+        accepted_position_count=int(status_summary["accepted"]),
+        errored_position_count=int(status_summary["errored"]),
+        max_new_requests=max_new_requests,
         retrieved_at=timestamp,
     )
     artifacts = write_masked_marginal_artifacts(
@@ -225,6 +229,12 @@ def materialize_biohub_esmc_wt_mutation_scoring(
     )
     if issues:
         raise ValueError("Biohub ESMC WT mutation scoring validation failed: " + "; ".join(issues))
+    _require_complete_final_run(
+        position_rows=position_rows,
+        substitution_rows=substitution_rows,
+        selected_positions=selection.positions,
+        max_new_requests=max_new_requests,
+    )
     mask_join_path = write_mask_join(
         position_entropy_path=artifacts.position_entropy_path,
         mask_set_path=thread_root / MASK_SET_FILE_NAME,
@@ -305,6 +315,9 @@ def _request_manifest(
     request_timeout_seconds: float,
     token_map_hash: str,
     mask_set_hash: str,
+    accepted_position_count: int,
+    errored_position_count: int,
+    max_new_requests: int | None,
     retrieved_at: str,
 ) -> dict[str, object]:
     return {
@@ -347,9 +360,51 @@ def _request_manifest(
         "authorization": "<redacted>",
         "request_timeout_seconds": float(request_timeout_seconds),
         "token_map_hash": token_map_hash,
+        "accepted_position_count": accepted_position_count,
+        "errored_position_count": errored_position_count,
+        "materialization_mode": "complete_required" if max_new_requests is None else "resumable_capped",
+        "materialization_status": "complete" if errored_position_count == 0 else "partial",
+        "max_new_requests": max_new_requests,
         "artifact_hashes": {"mask_set": mask_set_hash},
         "retrieved_at": retrieved_at,
     }
+
+
+def _position_status_summary(rows: list[dict[str, object]]) -> dict[str, int]:
+    accepted = sum(1 for row in rows if str(row.get("status") or "") == "accepted")
+    errored = sum(1 for row in rows if str(row.get("status") or "") != "accepted")
+    return {"accepted": accepted, "errored": errored}
+
+
+def _require_complete_final_run(
+    *,
+    position_rows: list[dict[str, object]],
+    substitution_rows: list[dict[str, object]],
+    selected_positions: tuple[int, ...],
+    max_new_requests: int | None,
+) -> None:
+    """Reject uncapped WT mutation-scoring runs with any unaccepted selected position."""
+
+    if max_new_requests is not None or not selected_positions:
+        return
+    accepted_positions = {
+        int(row["canonical_position"]) for row in position_rows if str(row.get("status") or "") == "accepted"
+    }
+    missing_or_errored = [position for position in selected_positions if position not in accepted_positions]
+    if missing_or_errored:
+        preview = ", ".join(str(position) for position in missing_or_errored[:12])
+        if len(missing_or_errored) > 12:
+            preview += f", ... (+{len(missing_or_errored) - 12} more)"
+        raise ValueError(
+            "Complete Biohub ESMC WT mutation scoring requires every selected position to be accepted; "
+            f"missing_or_errored_positions: {preview}"
+        )
+    expected_substitution_rows = len(selected_positions) * 19
+    if len(substitution_rows) != expected_substitution_rows:
+        raise ValueError(
+            "Complete Biohub ESMC WT mutation scoring requires 19 substitution LLR rows per selected position; "
+            f"expected {expected_substitution_rows}, observed {len(substitution_rows)}"
+        )
 
 
 def _timestamp() -> str:

@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
+    resolve_manifest_path,
+)
 
 
 def assert_manifest_visual_contract(
@@ -38,7 +41,7 @@ def assert_manifest_visual_contract(
         assert deliverable["input_hashes"]
 
     for deliverable_id in expected_rendered:
-        path = _resolve_manifest_path(manifest_path, deliverables[deliverable_id]["path"])
+        path = resolve_manifest_path(manifest_path, deliverables[deliverable_id]["path"])
         assert path.exists(), deliverable_id
         if path.suffix == ".svg":
             svg_text = path.read_text(encoding="utf-8")
@@ -73,15 +76,21 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "_resolve_manifest_path(" not in notebook_text
     assert "deliverable_section_ui = mo.ui.dropdown" in notebook_text
     assert "deliverable_id_ui = mo.ui.dropdown" in notebook_text
+    assert "review_lane_ui = mo.ui.dropdown" in notebook_text
+    assert 'label="Deliverable lane"' in notebook_text
     assert "selected_deliverable(" in notebook_text
     assert "sections: list[str] = []" in runtime_text
     assert 'sorted({str(row["section"])' not in notebook_text
-    assert "Repacking Eco1 reverse transcriptase while preserving the RT scaffold" in combined_text
+    assert "Repacking Eco1 reverse transcriptase for structured-template assays" in combined_text
     assert "Tao-style fixed-backbone" in combined_text
-    assert "redesign can repack" in combined_text
+    assert "repack the remaining design canvas" in combined_text
     assert "Mestre-derived clade 9" in combined_text
-    assert "alignments and ESMC" in combined_text
-    assert "ProteinMPNN proposes sequences" in combined_text
+    assert "active mask uses" in combined_text
+    assert "WT ESMC" in combined_text
+    assert "review-only model-constraint audit" in combined_text
+    assert "Biohub ESMC SAE features annotate WT" in combined_text
+    assert "alignments and ESMC" not in combined_text
+    assert "ProteinMPNN proposes variants" in combined_text
     assert "unprotected" in combined_text
     assert "review surface follows" not in combined_text
     assert "does not rerun ProteinMPNN" not in combined_text
@@ -95,15 +104,17 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "Status:" not in combined_text
     assert "status_summary_text" not in combined_text
     assert "Analysis section" in notebook_text
-    assert 'label="Visual"' in notebook_text
-    assert "mo.hstack([deliverable_section_ui, deliverable_id_ui]" in notebook_text
+    assert 'label="Figure / browser"' in notebook_text
+    assert "mo.hstack(" in notebook_text
+    assert "[review_lane_ui, deliverable_section_ui, deliverable_id_ui]" in notebook_text.replace("\n", "")
     assert "section_deliverables" in combined_text
     assert "mo.accordion(visual_panels, multiple=False, lazy=True)" not in combined_text
     assert "format_section_label(" in combined_text
     assert "format_deliverable_label(" in combined_text
     assert 'str(row.get("title") or "")' in runtime_text
-    assert "WT ESMC substitution constraint" in combined_text
-    assert "Biohub ESMC SAE interpretation" in combined_text
+    assert "Constraint evidence for the design mask" in combined_text
+    assert "ProteinMPNN variants and fold triage" in combined_text
+    assert "Biohub ESMC feature review" in combined_text
     assert "biohub_esmc_protein_top_sae_features" in combined_text
     assert "Protein" in notebook_text
     assert "WT Ec86 control" in combined_text
@@ -112,13 +123,17 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "render_deliverable_details(" in combined_text
     assert 'if selected_section == "fold_review":' not in notebook_text
     assert "No source-backed description is available for this exact SAE dictionary" in combined_text
-    assert "Reference sequence, alignment, and mask" in combined_text
+    assert "Reference sequence, alignment, and mask" not in combined_text
     assert "Reference scaffold and mask evidence" not in combined_text
-    assert "ProteinMPNN sequence proposals" in combined_text
-    assert "ColabFold structure triage" in combined_text
+    assert "ProteinMPNN sequence proposals" not in combined_text
+    assert "ColabFold structure triage" not in combined_text
     assert 'structure_label = "Structure view"' in notebook_text
     assert "label=structure_label" in notebook_text
+    assert "structure_group_ui = mo.ui.dropdown" in notebook_text
+    assert 'label="Structure group"' in notebook_text
     assert "selected_deliverable_id=selected_visual_id" in notebook_text
+    assert "selected_group=selected_structure_group" in notebook_text
+    assert "structure_group_lookup" in combined_text
     assert "_NOTEBOOK_HIDDEN_DELIVERABLE_IDS" in combined_text
     assert "LLR = log P(alternate) - log P(WT)" in combined_text
     assert "Method and row counts" in combined_text
@@ -135,7 +150,9 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "render_interpretation_note(" in combined_text
     assert "<strong>Interpretation limit:</strong>" in combined_text
     assert "overflow-x:auto" not in combined_text
-    assert "is_wide = aspect_ratio >= 4.0" not in combined_text
+    assert "wide_visual" in combined_text
+    assert "render_mode" in combined_text
+    assert "is_wide_visual" in combined_text
     assert "width:100%" in combined_text
     assert "max-width:100%" in combined_text
     assert "Interpretation limit" in combined_text
@@ -153,7 +170,7 @@ def assert_chimerax_context_scripts(
 ) -> None:
     """Assert ChimeraX review scripts are portable and preserve the mask-context contract."""
 
-    chimerax_text = _resolve_manifest_path(
+    chimerax_text = resolve_manifest_path(
         manifest_path,
         deliverables["mask_structure_context_script"]["path"],
     ).read_text(encoding="utf-8")
@@ -167,7 +184,7 @@ def assert_chimerax_context_scripts(
     assert "color" in chimerax_text
     assert forbidden_path_text not in chimerax_text
 
-    orientation_text = _resolve_manifest_path(
+    orientation_text = resolve_manifest_path(
         manifest_path,
         deliverables["mask_structure_context_orientation_template"]["path"],
     ).read_text(encoding="utf-8")
@@ -175,17 +192,3 @@ def assert_chimerax_context_scripts(
     assert "save mask_structure_context_orientation.cxs" in orientation_text
     assert "exit" not in orientation_text
     assert forbidden_path_text not in orientation_text
-
-
-def _visual_option_source(notebook_text: str) -> str:
-    marker = "visual_deliverables = ["
-    start = notebook_text.find(marker)
-    assert start != -1
-    end = notebook_text.find("return", start)
-    assert end != -1
-    return notebook_text[start:end]
-
-
-def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
-    path = Path(value)
-    return path if path.is_absolute() else manifest_path.parent / path

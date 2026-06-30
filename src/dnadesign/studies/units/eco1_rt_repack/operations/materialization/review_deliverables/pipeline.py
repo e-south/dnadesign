@@ -175,7 +175,7 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
         return [
             make_deliverable_row(
                 deliverable_id="foldcheck_review_visuals",
-                section="fold_review",
+                section="design_and_fold_triage",
                 artifact_kind="manifest",
                 status="skipped_missing_input",
                 path=manifest_path,
@@ -204,7 +204,7 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
         rows.append(
             make_deliverable_row(
                 deliverable_id=f"foldcheck_review_{plot_id}",
-                section="fold_review",
+                section="design_and_fold_triage",
                 artifact_kind="linked_visual",
                 status=linked_status,
                 path=plot_path,

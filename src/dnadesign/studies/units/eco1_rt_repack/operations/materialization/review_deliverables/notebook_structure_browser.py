@@ -68,6 +68,7 @@ def structure_browser_lookup(
     *,
     selected_section: str,
     selected_deliverable_id: str = "",
+    selected_group: str = "",
 ) -> dict[str, dict[str, Any]]:
     """Build dropdown labels for the selected interactive structure deliverable."""
 
@@ -76,7 +77,27 @@ def structure_browser_lookup(
         for row in rows
         if str(row.get("_section") or "") == selected_section
         and str(row.get("_deliverable_id") or "") == selected_deliverable_id
+        and (not selected_group or str(row.get("group") or "") == selected_group)
     }
+
+
+def structure_group_lookup(
+    rows: list[dict[str, Any]],
+    *,
+    selected_section: str,
+    selected_deliverable_id: str = "",
+) -> dict[str, str]:
+    """Build structure group dropdown labels for the selected structure deliverable."""
+
+    groups: dict[str, str] = {}
+    for row in rows:
+        if str(row.get("_section") or "") != selected_section:
+            continue
+        if str(row.get("_deliverable_id") or "") != selected_deliverable_id:
+            continue
+        group = str(row.get("group") or "Ungrouped structures")
+        groups.setdefault(group, group)
+    return groups
 
 
 def render_structure_browser(
@@ -84,6 +105,7 @@ def render_structure_browser(
     mo: Any,
     selected_row: dict[str, Any] | None,
     structure_ui: Any,
+    structure_group_ui: Any | None = None,
 ) -> Any:
     """Render an interactive browser structure view for one selected fold model."""
 
@@ -154,7 +176,11 @@ def render_structure_browser(
     )
     return mo.vstack(
         [
-            mo.hstack([structure_ui], justify="center", gap=1.0),
+            mo.hstack(
+                [item for item in (structure_group_ui, structure_ui) if item is not None],
+                justify="center",
+                gap=1.0,
+            ),
             mo.Html(html_panel),
             mo.Html(_structure_metric_summary(selected_row)),
             mo.Html(_alignment_note(alignment_status, browser_mapped_ca_rmsd)),

@@ -23,6 +23,14 @@ _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
     "foldcheck_review_structure_overlay_skipped",
     "mask_structure_context_png",
 }
+_NOTEBOOK_LANE_ROLES = {
+    "main_review": {"manuscript_facing", "interactive_review"},
+    "audit_supplement": {"review_only", "operator_review", "optional_heavy"},
+}
+_NOTEBOOK_LANE_LABELS = {
+    "main_review": "Main review",
+    "audit_supplement": "Audit / supplement",
+}
 
 
 def load_review_manifest(notebook_file: str) -> tuple[dict[str, Any], list[dict[str, Any]], Path, Path]:
@@ -38,17 +46,18 @@ def render_intro(mo: Any) -> Any:
     """Render the study premise without code-self-referential copy."""
 
     intro_lead = (
-        "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported fold that "
-        "wraps the retron RNA/DNA substrate. This study tests whether Tao-style fixed-backbone "
-        "redesign can repack residues outside catalytic and substrate-contact constraints "
-        "while preserving the RT scaffold."
+        "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported RNA/DNA-bound scaffold. "
+        "Following the Tao-style fixed-backbone redesign pattern, this study builds a conservative "
+        "redesign set for downstream structured-template assays: protect residues supported by motifs, "
+        "substrate contacts, and homolog conservation, then repack the remaining design canvas."
     )
     intro_flow = (
-        "The evidence stack is sequential: Mestre-derived clade 9 alignments and ESMC "
-        "masked-marginal scores flag constrained WT residues, the cryoEM structure defines "
-        "substrate-proximal positions, ProteinMPNN proposes sequences only in the unprotected "
-        "canvas, and ColabFold checks whether those full-length variants retain the fold. "
-        "Activity, strand displacement, and structured-template readthrough remain assay questions."
+        "The sequence of evidence is scaffold first, then constraint evidence, then design, then review. "
+        "The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, retained-substrate "
+        "proximity, and Mestre-derived clade 9 plurality. WT ESMC masked-marginal scoring is shown beside "
+        "those inputs as a review-only model-constraint audit. ProteinMPNN proposes variants on the "
+        "unprotected canvas, ColabFold checks fold-model compatibility, and Biohub ESMC SAE features annotate WT "
+        "and candidates. Activity, strand displacement, and structured-template readthrough remain assay questions."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "
@@ -61,7 +70,7 @@ def render_intro(mo: Any) -> Any:
           <h1 style="margin:0 0 0.42rem 0; font-size:2.15rem; line-height:1.12;
                      font-family:ui-serif, Georgia, 'Times New Roman', serif;
                      font-weight:650; letter-spacing:0;">
-            Repacking Eco1 reverse transcriptase while preserving the RT scaffold
+            Repacking Eco1 reverse transcriptase for structured-template assays
           </h1>
           <p style="{paragraph_style}">{intro_lead}</p>
           <p style="{paragraph_style}; margin-top:0.5rem;">{intro_flow}</p>
@@ -77,10 +86,32 @@ def resolve_manifest_path(manifest_root: Path, value: str) -> Path:
     return candidate if candidate.is_absolute() else manifest_root / candidate
 
 
-def visual_deliverables(deliverables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def review_lane_lookup(deliverables: list[dict[str, Any]]) -> dict[str, str]:
+    """Return available notebook lanes, preserving the intended default order."""
+
+    observed_roles = {str(row.get("role") or "manuscript_facing") for row in deliverables}
+    lanes: dict[str, str] = {}
+    for lane_id, roles in _NOTEBOOK_LANE_ROLES.items():
+        if roles & observed_roles:
+            lanes[_NOTEBOOK_LANE_LABELS[lane_id]] = lane_id
+    return lanes
+
+
+def visual_deliverables(
+    deliverables: list[dict[str, Any]],
+    *,
+    selected_lane: str = "main_review",
+) -> list[dict[str, Any]]:
     """Return rendered visual and interactive-review rows for notebook selection."""
 
-    return [row for row in deliverables if _is_publication_visual(row)]
+    allowed_roles = _NOTEBOOK_LANE_ROLES.get(selected_lane)
+    if allowed_roles is None:
+        raise ValueError(f"unknown review deliverable lane: {selected_lane}")
+    return [
+        row
+        for row in deliverables
+        if str(row.get("role") or "manuscript_facing") in allowed_roles and _is_publication_visual(row)
+    ]
 
 
 def section_label_lookup(rows: list[dict[str, Any]]) -> dict[str, str]:
@@ -169,6 +200,7 @@ def render_deliverable_details(row: dict[str, Any], *, mo: Any) -> Any:
         {"field": "status", "value": str(row.get("status") or "")},
         {"field": "path", "value": str(row.get("path") or "")},
         {"field": "role", "value": str(row.get("role") or "")},
+        {"field": "render_mode", "value": str(row.get("render_mode") or "")},
         {"field": "sources", "value": ", ".join(row.get("source_tables", []))},
         {"field": "alt_text", "value": str(row.get("alt_text") or "")},
         {"field": "skip_reason", "value": str(row.get("skip_reason") or "")},
@@ -202,11 +234,9 @@ def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
 
 def format_section_label(section: str) -> str:
     labels = {
-        "scaffold_and_mask": "Reference sequence, alignment, and mask",
-        "proteinmpnn": "ProteinMPNN sequence proposals",
-        "fold_review": "ColabFold structure triage",
-        "wt_model_constraint_audit": "WT ESMC substitution constraint",
-        "biohub_esmc_sae_interpretation": "Biohub ESMC SAE interpretation",
+        "scaffold_and_mask": "Constraint evidence for the design mask",
+        "design_and_fold_triage": "ProteinMPNN variants and fold triage",
+        "biohub_esmc_sae_interpretation": "Biohub ESMC feature review",
     }
     return labels.get(str(section), str(section).replace("_", " ").title())
 
@@ -234,14 +264,22 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     alt_text = html.escape(str(row["alt_text"]), quote=True)
     caption = html.escape(format_deliverable_label(row), quote=True)
     limit = html.escape(str(row.get("interpretation_limit") or ""), quote=False)
+    is_wide = is_wide_visual(row)
+    container_overflow = "auto" if is_wide else "hidden"
+    image_style = (
+        "display:block; width:auto; min-width:min(1120px, 100%); max-width:none; max-height:none; height:auto;"
+        if is_wide
+        else (
+            "display:block; width:100%; max-width:100%; max-height:min(72vh, 780px); height:auto; object-fit:contain;"
+        )
+    )
     return mo.Html(
         f"""
         <figure style="margin:0;">
-          <div style="overflow:hidden; width:100%; border:1px solid #d8dee4;
+          <div style="overflow:{container_overflow}; width:100%; border:1px solid #d8dee4;
                       border-radius:6px; background:#ffffff; padding:0.5rem;">
             <img src="data:{mime_type};base64,{encoded}" alt="{alt_text}"
-                 style="display:block; width:100%; max-width:100%; max-height:min(72vh, 780px);
-                        height:auto; object-fit:contain;" />
+                 style="{image_style}" />
           </div>
           <figcaption style="font-size:0.92rem; color:#57606a; margin-top:0.35rem;">{caption}</figcaption>
           <div style="border-left:3px solid #8c959f; padding:0.38rem 0.55rem;
@@ -252,3 +290,9 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
         </figure>
         """
     )
+
+
+def is_wide_visual(row: dict[str, Any]) -> bool:
+    """Return whether a visual should preserve horizontal detail instead of squeezing to fit."""
+
+    return str(row.get("render_mode") or "") == "wide_visual"

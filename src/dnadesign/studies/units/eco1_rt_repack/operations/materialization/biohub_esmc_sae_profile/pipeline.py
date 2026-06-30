@@ -32,6 +32,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_es
     cached_profile_row,
     load_existing_rows,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.run_contract import (
+    build_request_manifest,
+    profile_status_summary,
+    require_complete_final_run,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.selection import (
     select_fold_accepted_biohub_esmc_sequences,
 )
@@ -160,7 +165,6 @@ def materialize_biohub_esmc_sae_profile(
                 profile_rows.append(cached)
                 protein_feature_rows.extend(cached_protein_rows)
                 residue_feature_rows.extend(cached_residue_rows)
-                feature_catalog_rows.extend(existing_rows.feature_catalog_rows if existing_rows else [])
                 continue
         if max_new_requests is not None and new_request_count >= max_new_requests:
             profile_rows.append(
@@ -210,7 +214,7 @@ def materialize_biohub_esmc_sae_profile(
             protein_feature_rows.extend(normalized.protein_feature_rows)
             residue_feature_rows.extend(normalized.residue_feature_rows)
             feature_catalog_rows.extend(normalized.feature_catalog_rows)
-        except (BiohubEsmcRequestError, OSError, RuntimeError, ValueError) as error:
+        except (BiohubEsmcRequestError, OSError) as error:
             profile_rows.append(
                 build_error_profile_row(
                     candidate_id=record.sequence_id,
@@ -234,6 +238,9 @@ def materialize_biohub_esmc_sae_profile(
             if request_sleep_seconds:
                 sleep(request_sleep_seconds)
 
+    if existing_rows is not None:
+        feature_catalog_rows.extend(existing_rows.feature_catalog_rows)
+
     feature_catalog_rows, feature_description_summary = _maybe_enrich_feature_catalog_rows(
         feature_catalog_rows,
         sae_model=sae_model,
@@ -245,7 +252,8 @@ def materialize_biohub_esmc_sae_profile(
         biohub_api_base_url=biohub_api_base_url,
         request_timeout_seconds=request_timeout_seconds,
     )
-    request_manifest = _request_manifest(
+    status_summary = profile_status_summary(profile_rows)
+    request_manifest = build_request_manifest(
         request_hash=request_hash,
         source_request_hash=selection.source_request_hash,
         sequence_ids=[record.sequence_id for record in selection.records],
@@ -255,6 +263,9 @@ def materialize_biohub_esmc_sae_profile(
         normalize_features=normalize_features,
         key_label=key_label,
         selected_sequence_count=len(selection.records),
+        accepted_sequence_count=int(status_summary["accepted"]),
+        errored_sequence_count=int(status_summary["errored"]),
+        max_new_requests=max_new_requests,
         request_timeout_seconds=request_timeout_seconds,
         feature_description_summary=feature_description_summary,
         retrieved_at=timestamp,
@@ -276,6 +287,11 @@ def materialize_biohub_esmc_sae_profile(
     if issues:
         joined = "; ".join(f"{issue.check_id}: {issue.message}" for issue in issues)
         raise ValueError(f"Biohub ESMC SAE-profile validation failed: {joined}")
+    require_complete_final_run(
+        profile_rows=profile_rows,
+        selected_sequence_ids=[record.sequence_id for record in selection.records],
+        max_new_requests=max_new_requests,
+    )
     return MaterializedBiohubEsmcSaeProfileArtifacts(
         profile_path=artifacts.profile_path,
         protein_features_path=artifacts.protein_features_path,
@@ -331,65 +347,6 @@ def _biohub_query_hash(
             "normalize_features": normalize_features,
         }
     )
-
-
-def _request_manifest(
-    *,
-    request_hash: str,
-    source_request_hash: str,
-    sequence_ids: list[str],
-    biohub_api_base_url: str,
-    model: str,
-    sae_model: str,
-    normalize_features: bool,
-    key_label: str,
-    selected_sequence_count: int,
-    request_timeout_seconds: float,
-    feature_description_summary: dict[str, object],
-    retrieved_at: str,
-) -> dict[str, object]:
-    return {
-        "schema_id": "thread.biohub_esmc.request",
-        "schema_version": 1,
-        "biohub_request_hash": request_hash,
-        "source_request_hash": source_request_hash,
-        "biohub_api_base_url": biohub_api_base_url,
-        "biohub_api_version": DEFAULT_BIOHUB_API_VERSION,
-        "endpoint_flow": ["POST /api/v1/encode", "POST /api/v1/logits"],
-        "model": model,
-        "sae_model": sae_model,
-        "normalize_features": normalize_features,
-        "key_label": key_label,
-        "authorization": "<redacted>",
-        "method_references": [
-            {
-                "title": "Biohub ESMC SAE feature interpretation notebook",
-                "url": (
-                    "https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/"
-                    "esmc_sae_feature_interpretation.ipynb"
-                ),
-                "role": "SAE feature ranking, residue localization, and interpretation workflow reference",
-            },
-            {
-                "title": "Biohub /api/v1/logits documentation",
-                "url": "https://www.biohub.ai/api-reference/logits",
-                "role": "Authenticated logits endpoint used for ESMC SAE outputs",
-            },
-            {
-                "title": "Biohub ESMC SAE model card",
-                "url": "https://huggingface.co/biohub/ESMC-6B-sae-layer60-k64-codebook16384",
-                "role": (
-                    "SAE model-family provenance, codebook-size semantics, top-k sparsity, "
-                    "and source-backed feature-description availability for this dictionary"
-                ),
-            },
-        ],
-        "request_timeout_seconds": float(request_timeout_seconds),
-        "feature_descriptions": feature_description_summary,
-        "selected_sequence_count": selected_sequence_count,
-        "selected_sequence_ids": sequence_ids,
-        "retrieved_at": retrieved_at,
-    }
 
 
 def _maybe_enrich_feature_catalog_rows(

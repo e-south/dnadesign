@@ -12,8 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
@@ -22,8 +22,15 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.structure_browser import (
+    write_mask_structure_browser_manifest,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
+    FakeMo,
+    mask_row,
 )
 
 
@@ -36,17 +43,27 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         manifest_root=result.manifest_path.parent,
         deliverables=manifest["deliverables"],
     )
+    group_lookup = structure_browser.structure_group_lookup(
+        rows,
+        selected_section="design_and_fold_triage",
+        selected_deliverable_id="interactive_structure_browser_manifest",
+    )
+    assert "WT baseline" in group_lookup
+    assert "Low-deviation fold-check candidates" in group_lookup
+    assert "Other fold-check candidates" in group_lookup
     lookup = structure_browser.structure_browser_lookup(
         rows,
-        selected_section="fold_review",
+        selected_section="design_and_fold_triage",
         selected_deliverable_id="interactive_structure_browser_manifest",
+        selected_group=group_lookup["Low-deviation fold-check candidates"],
     )
     selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
 
     rendered = structure_browser.render_structure_browser(
-        mo=_FakeMo(),
+        mo=FakeMo(),
         selected_row=selected,
         structure_ui="<structure-dropdown>",
+        structure_group_ui="<structure-group-dropdown>",
     )
     rendered_text = str(rendered)
 
@@ -74,15 +91,22 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         manifest_root=result.manifest_path.parent,
         deliverables=manifest["deliverables"],
     )
-    lookup = structure_browser.structure_browser_lookup(
+    group_lookup = structure_browser.structure_group_lookup(
         rows,
         selected_section="scaffold_and_mask",
         selected_deliverable_id="mask_structure_browser_manifest",
     )
+    assert group_lookup == {"Reference mask evidence": "Reference mask evidence"}
+    lookup = structure_browser.structure_browser_lookup(
+        rows,
+        selected_section="scaffold_and_mask",
+        selected_deliverable_id="mask_structure_browser_manifest",
+        selected_group="Reference mask evidence",
+    )
     selected = lookup["Protected union | 4 residues"]
 
     rendered = structure_browser.render_structure_browser(
-        mo=_FakeMo(),
+        mo=FakeMo(),
         selected_row=selected,
         structure_ui="<mask-highlight-dropdown>",
     )
@@ -107,31 +131,52 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert selection_colors == {"#D55E00"}
 
 
-class _FakeUi:
-    @staticmethod
-    def table(rows: list[dict[str, str]], page_size: int) -> dict[str, Any]:
-        return {"kind": "table", "rows": rows, "page_size": page_size}
+def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path: Path) -> None:
+    mask_set_path = tmp_path / "mask_set.yaml"
+    mask_set_path.write_text("schema_id: thread.mask_set\nresidues: []\n", encoding="utf-8")
+    reference_path = tmp_path / "proteinmpnn_request" / "chain_a_backbone.pdb"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(
+        "ATOM      1  CA  SER A   1       1.000   0.000   0.000  1.00  0.00           C\n"
+        "ATOM      2  CA  ALA A   2       2.000   0.000   0.000  1.00  0.00           C\n"
+        "ATOM      3  CA  GLU A   3       3.000   0.000   0.000  1.00  0.00           C\n"
+        "END\n",
+        encoding="utf-8",
+    )
+    mask_residues = [
+        mask_row(1, mapped=False),
+        mask_row(2, mapped=False),
+        mask_row(3, motif=True),
+        mask_row(4, motif=True),
+        mask_row(5, protected=True),
+    ]
+
+    write_mask_structure_browser_manifest(
+        panel_root=tmp_path / "review_deliverables" / "structure_browser",
+        mask_set_path=mask_set_path,
+        reference_backbone_path=reference_path,
+        mask_residues=mask_residues,
+    )
+
+    manifest = yaml.safe_load(
+        (tmp_path / "review_deliverables" / "structure_browser" / "mask_structure_browser_manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    motif = next(row for row in manifest["structures"] if row["candidate_id"] == "motif_protected")
+    style = motif["selection_styles"][0]
+    assert style["source_coordinate_basis"] == "canonical_position"
+    assert style["selection_coordinate_basis"] == "proteinmpnn_export_residue_number"
+    assert style["canonical_residue_numbers"] == [3, 4]
+    assert style["residue_numbers"] == [1, 2]
 
 
-class _FakeMo:
-    ui = _FakeUi()
+def test_structure_browser_manifest_rejects_missing_declared_pdb(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    full_structure_set_path = tmp_path / "foldcheck_review" / "foldcheck_full_structure_set.yaml"
+    payload = yaml.safe_load(full_structure_set_path.read_text(encoding="utf-8"))
+    payload["structures"][0]["local_model_artifact_path"] = "structures/full_fold_set/missing_model.pdb"
+    full_structure_set_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    @staticmethod
-    def md(value: str) -> str:
-        return value
-
-    @staticmethod
-    def Html(value: str) -> str:
-        return value
-
-    @staticmethod
-    def hstack(items: list[Any], **kwargs: Any) -> dict[str, Any]:
-        return {"kind": "hstack", "items": items, "kwargs": kwargs}
-
-    @staticmethod
-    def vstack(items: list[Any], **kwargs: Any) -> dict[str, Any]:
-        return {"kind": "vstack", "items": items, "kwargs": kwargs}
-
-    @staticmethod
-    def accordion(items: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
-        return {"kind": "accordion", "items": items, "kwargs": kwargs}
+    with pytest.raises(ValueError, match="declared structure path is missing"):
+        materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)

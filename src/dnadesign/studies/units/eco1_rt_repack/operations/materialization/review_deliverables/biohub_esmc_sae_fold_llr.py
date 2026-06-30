@@ -18,6 +18,7 @@ from typing import Any
 
 import matplotlib
 import pyarrow.parquet as pq
+from matplotlib.lines import Line2D
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
@@ -38,7 +39,7 @@ from matplotlib.gridspec import GridSpec  # noqa: E402
 SECTION = "biohub_esmc_sae_interpretation"
 DELIVERABLE_ID = "biohub_esmc_sae_fold_llr_comparison"
 TITLE = "SAE similarity, ColabFold confidence, and ESMC mutation scores are compared together"
-VISIBLE_TITLE = "WT-like SAE features rank variants with fold and LLR side markers"
+VISIBLE_TITLE = "WT-like SAE activation patterns are compared with fold and LLR side markers"
 INTERPRETATION_LIMIT = (
     "This is a review plot. SAE similarity is model-derived, pLDDT is a structure-model confidence "
     "summary, and the ESMC LLR value is a sum of WT masked-marginal single-substitution scores, "
@@ -127,8 +128,8 @@ def write_sae_fold_llr_comparison_panel(
         ),
         description=(
             "Compares all Biohub ESMC query rows in one review panel. The WT column is first; variants are "
-            "ordered by SAE similarity rank relative to WT. Heatmap rows are WT-active SAE features, "
-            "heatmap color encodes log2 feature-retention ratio, marker size encodes ColabFold pLDDT, "
+            "ordered by SAE similarity to WT. Heatmap rows are WT-active SAE features, "
+            "heatmap color encodes log2 candidate/WT activation ratio, marker size encodes ColabFold pLDDT, "
             "and marker color encodes summed ESMC LLR."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,
@@ -202,7 +203,7 @@ def _render_panel(path: Path, data: dict[str, Any]) -> None:
         transposed_matrix,
         aspect="auto",
         interpolation="nearest",
-        cmap="coolwarm",
+        cmap="RdBu_r",
         vmin=-limit,
         vmax=limit,
     )
@@ -212,10 +213,13 @@ def _render_panel(path: Path, data: dict[str, Any]) -> None:
     heatmap_ax.set_xlabel("ProteinMPNN variant ordered by SAE similarity", fontsize=LABEL_SIZE)
     heatmap_ax.set_ylabel("SAE feature", fontsize=LABEL_SIZE)
     heatmap_ax.set_title("Feature rows compare WT-normalized activation", fontsize=TITLE_SIZE, pad=8, loc="center")
-    _render_metric_axis(metric_ax, data)
+    llr_scatter = _render_metric_axis(metric_ax, data)
     colorbar = fig.colorbar(image, ax=heatmap_ax, orientation="horizontal", fraction=0.04, pad=0.16)
     colorbar.set_label("log2(feature activation sum / WT)", fontsize=LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
+    llr_colorbar = fig.colorbar(llr_scatter, ax=metric_ax, orientation="horizontal", fraction=0.18, pad=0.22)
+    llr_colorbar.set_label("LLR sum, scaled within panel", fontsize=LEGEND_SIZE)
+    llr_colorbar.ax.tick_params(labelsize=LEGEND_SIZE)
     fig.subplots_adjust(left=0.34, right=0.93, top=0.96, bottom=0.22)
     save_accessible_svg(
         fig,
@@ -239,7 +243,7 @@ def _panel_accessibility_description(data: dict[str, Any]) -> str:
     )
 
 
-def _render_metric_axis(ax: Any, data: dict[str, Any]) -> None:
+def _render_metric_axis(ax: Any, data: dict[str, Any]) -> Any:
     columns = range(len(data["row_labels"]))
     llr_values = [value for value in data["llr"] if value is not None]
     llr_limit = max([abs(value) for value in llr_values] + [1.0])
@@ -254,26 +258,56 @@ def _render_metric_axis(ax: Any, data: dict[str, Any]) -> None:
             edgecolor="white",
             linewidth=0.45,
         )
+    llr_scatter = None
     for column_index, llr_value in zip(columns, data["llr"], strict=True):
         color_value = 0.0 if llr_value is None else max(-1.0, min(1.0, llr_value / llr_limit))
-        ax.scatter(
+        llr_scatter = ax.scatter(
             [column_index],
             [0],
             s=42,
             c=[color_value],
-            cmap="coolwarm",
+            cmap="RdBu_r",
             vmin=-1,
             vmax=1,
             marker="D",
             edgecolor="white",
         )
+    _add_plddt_size_legend(ax)
     ax.set_ylim(-0.6, 1.6)
     ax.set_yticks([0, 1], ["LLR sum", "pLDDT"], fontsize=max(6, TICK_SIZE - 2))
+    ax.set_title(VISIBLE_TITLE, fontsize=TITLE_SIZE, pad=8)
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
     ax.tick_params(axis="y", length=0)
     ax.grid(axis="x", color="#eeeeee", linewidth=0.4)
     for spine in ax.spines.values():
         spine.set_visible(False)
+    return llr_scatter
+
+
+def _add_plddt_size_legend(ax: Any) -> None:
+    handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor="#4c78a8",
+            markeredgecolor="white",
+            markersize=marker_size,
+            label=label,
+        )
+        for marker_size, label in ((4.5, "pLDDT 75"), (7.5, "pLDDT 85"), (10.5, "pLDDT 95"))
+    ]
+    ax.legend(
+        handles=handles,
+        frameon=False,
+        fontsize=max(6, LEGEND_SIZE - 1),
+        loc="upper right",
+        bbox_to_anchor=(1.0, 1.05),
+        ncol=3,
+        handletextpad=0.35,
+        columnspacing=0.8,
+    )
 
 
 def _readable_column_ticks(row_labels: list[str]) -> tuple[list[int], list[str]]:
@@ -398,13 +432,17 @@ def _llr_sum_by_candidate(candidate_table_path: Path, wt_substitution_llr_path: 
     values = {"wild_type": 0.0}
     candidate_rows = pq.read_table(candidate_table_path, columns=["candidate_id", "canonical_mutations"]).to_pylist()
     for row in candidate_rows:
+        candidate_id = str(row["candidate_id"])
         total = 0.0
         for mutation in row.get("canonical_mutations") or []:
             match = _MUTATION_PATTERN.match(str(mutation))
             if not match:
-                continue
-            total += llr_by_substitution.get((int(match.group("position")), match.group("alt")), 0.0)
-        values[str(row["candidate_id"])] = total
+                raise ValueError(f"Malformed canonical mutation for {candidate_id}: {mutation!r}")
+            key = (int(match.group("position")), match.group("alt"))
+            if key not in llr_by_substitution:
+                raise ValueError(f"Missing ESMC LLR for {candidate_id} mutation {mutation!r}")
+            total += llr_by_substitution[key]
+        values[candidate_id] = total
     return values
 
 
