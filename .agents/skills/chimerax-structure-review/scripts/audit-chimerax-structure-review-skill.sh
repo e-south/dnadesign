@@ -94,6 +94,12 @@ else
   fail "collaboration pause points missing"
 fi
 
+if grep -q -- "--version" "$SCRIPT_DIR/chimerax-preflight.sh"; then
+  fail "preflight must not launch ChimeraX for version checks"
+else
+  pass "preflight avoids executable version launch"
+fi
+
 if grep -q "schema_id: chimerax_control_session_v1" "$SKILL_DIR/assets/control_session_manifest.schema.yaml" \
   && grep -q "command_log_path" "$SKILL_DIR/assets/control_session_manifest.schema.yaml"; then
   pass "control-session schema captures live collaboration handle"

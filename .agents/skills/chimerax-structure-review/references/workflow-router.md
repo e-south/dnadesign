@@ -15,6 +15,9 @@ Load:
 Run:
 - `scripts/chimerax-preflight.sh`
 
+Behavior:
+- Do not open ChimeraX. Preflight reports executable discovery and version only.
+
 ## `manual-pose-handoff`
 
 Use when:
@@ -29,6 +32,7 @@ Load:
 Behavior:
 - Tell the user what session/script to open.
 - Wait for "capture now" or equivalent before sending capture commands.
+- Do not open a GUI unless the user has asked for live collaboration, manual pose work, or capture.
 
 Preferred script:
 - `scripts/chimerax-session-start.sh` opens a visible session and writes a control-session manifest.

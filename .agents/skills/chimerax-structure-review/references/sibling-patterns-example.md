@@ -26,9 +26,13 @@ This page records useful visual-interaction patterns from the sibling `ec86kit` 
 
 ## Evidence
 
-- `/Users/Shockwing/Dropbox/projects/phd/ec86kit/src/ec86kit/chx_scripts/apply_map.py`
-- `/Users/Shockwing/Dropbox/projects/phd/ec86kit/src/ec86kit/chx_scripts/chx_utils.py`
-- `/Users/Shockwing/Dropbox/projects/phd/ec86kit/src/ec86kit/chx_scripts/pairing.py`
+- Sibling `ec86kit` apply-map script, when that sibling checkout is available.
+- Sibling `ec86kit` ChimeraX command utility, when that sibling checkout is
+  available.
+- Sibling `ec86kit` pairing script, when that sibling checkout is available.
+
+Do not record machine-local absolute paths in this skill. These examples are
+portable pattern names, not required files.
 
 ## Boundary
 
