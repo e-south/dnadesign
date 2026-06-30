@@ -1,8 +1,20 @@
+---
+doc_id: quality-score
+surface: system-of-record
+owner: dnadesign-maintainers
+last_verified: 2026-04-24
+freshness_status: stale_review_due
+next_refresh_due: 2026-05-24
+---
+
 # QUALITY SCORE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-04-24
+**Freshness:** stale by the monthly cadence below. Treat score rows as last
+verified evidence, not as a current scorecard, until the evidence links and
+dates are refreshed.
 
 ## At a glance
 This document defines how `dnadesign` grades quality across tool domains and architectural layers.

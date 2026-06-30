@@ -35,10 +35,10 @@ field_contract:
       - downstream_binding_status
       - accepted_at
   accepted_candidate_ids:
-    source: candidate_handoff.selected_candidate_ids
+    source: candidate_handoff.candidates[].candidate_id
     empty_allowed: true
   rejected_candidate_ids:
-    source: candidate_handoff.selected_candidate_ids
+    source: candidate_handoff.candidates[].candidate_id
     empty_allowed: true
   decision_status:
     allowed_values:
@@ -51,7 +51,7 @@ field_contract:
       - rt_only_rejected
       - construct_binding_deferred
 invariants:
-  - accepted_and_rejected_ids_must_partition_selected_candidate_ids
+  - accepted_and_rejected_ids_must_partition_handoff_candidate_ids
   - no_construct_subject_id_before_downstream_construct_binding
   - no_permuter_var_id_before_explicit_permuter_import
   - rt_sequence_authority_must_match_candidate_handoff_sequence_hashes

@@ -117,9 +117,9 @@ only the pixi-based install path that provides this command on BU SCC.
 
 `foldcheck_review` ranks the full 96-candidate fold report and writes a selected
 structure-panel manifest, full local structure-set manifest, ChimeraX scripts,
-Atlas subset manifest, visual manifest, SVG review plots, a selected-structure
-ChimeraX overlay PNG when the local executable is available, and a scoped marimo
-notebook. It does not copy the full SCC ColabFold output tree.
+Atlas subset manifest, visual manifest, SVG review plots, and a scoped marimo
+notebook. It does not launch ChimeraX by default and does not copy the full SCC
+ColabFold output tree.
 The local structure set is one normalized PDB per accepted fold row, suitable
 for full ChimeraX viewing while preserving SCC source paths in the manifest. The
 review plots include alt text and interpretation limits; they summarize model
@@ -129,14 +129,14 @@ metrics and SAE coverage for inspection, not candidate acceptance.
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
 Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
 SVGs, a Tao-style ColabFold RMSD/pLDDT joint plot for the current single mask
-policy, a ChimeraX mask-context script/render, WT ESMC model-constraint audit
+policy, a ChimeraX mask-context script, WT ESMC model-constraint audit
 SVGs, exact-dictionary Biohub ESMC SAE review plots, interactive
 py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
 organized by progressive analysis sections. The notebook presents constraint
-evidence for the design mask, ProteinMPNN variants with fold triage, and
-Biohub ESMC feature review. WT ESMC masked-marginal scoring is shown with the
-constraint evidence as a review-only model-constraint audit, not as a mask
-input.
+evidence for the design mask, ProteinMPNN designs with fold triage, ESMC
+feature review, and a planned feasibility/handoff gate. WT ESMC
+masked-marginal scoring is shown with the constraint evidence as a review-only
+model-constraint audit, not as a mask input.
 Static plots and interactive structure views are selected through the same
 section/visual controls. The scaffold/mask browser highlights one mask or motif
 category at a time on the off-white ec86kit/7V9U reference using a single
@@ -145,6 +145,7 @@ PDBs, fits the selected query to the reference in memory over mapped C-alpha
 atoms, and displays a compact metric strip for pLDDT, RMSD, sequence identity,
 and mutation burden. It does not rewrite or duplicate the raw ColabFold PDB
 files; ChimeraX remains the still-render and pose-capture path. The command
+does not launch ChimeraX unless an operator passes the explicit render flag. It
 does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
 WT SAE structure frames, feature-window heatmaps, SAE-to-structure overlays,
 and feasibility/selection matrices are planned follow-ons, not part of the
@@ -185,6 +186,21 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 Use `--sequence-limit all --resume-existing` only after deciding to spend the
 remaining hosted requests. These rows are semantic annotation, not fold
 validation or processivity evidence.
+
+`biohub_esmc_wt_mutation_scoring` is a WT-only masked-marginal model-constraint
+audit. A final uncapped run must use all 320 WT positions; short position
+ranges are smoke tests only and must be capped with `--max-new-requests`.
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring \
+  --repo-root . \
+  --positions all \
+  --key-file ../key.md \
+  --model esmc-300m-2024-12 \
+  --resume-existing \
+  --request-sleep-seconds 1.5 \
+  --request-timeout-seconds 180
+```
 
 The review-deliverables command now also renders a lightweight SAE
 interpretation section from the existing sparse Biohub ESMC tables. That pass

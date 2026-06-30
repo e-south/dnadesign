@@ -82,7 +82,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   selections that ground motif-window visualization; they are not conservation
   denominators or representative-set claims.
 - `workbench/ontology/msa-panel-spec.yaml`: Eco1-owned display contract for
-  selected-row whole-alignment overview and plurality/gap histogram panels; it
+  all-record whole-alignment overview and plurality/gap histogram panels; it
   is not a conservation denominator, mask source, or designability rule.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/`:
   study-owned orchestration package that validates Eco1 source-bundle
@@ -106,8 +106,10 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 
 ## Study-Owned Source
 
-- `src/dnadesign/studies/units/eco1_rt_repack/`: reserved for future
-  study-owned helpers only.
+- `src/dnadesign/studies/units/eco1_rt_repack/`: study-owned implementation,
+  materialization, contract-validation, workspace, and test package for this
+  checked-in record. Reusable mechanics should still move to their owning
+  generic package when they are no longer Eco1-specific.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py`:
   Phase 0/1 CLI entrypoint for checked-in contract validation.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/`:
@@ -215,14 +217,13 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   not copy full raw ColabFold output trees or accept candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/`:
   study-owned visual-deliverable wrapper. It writes
-  `review_deliverable_manifest.yaml`, canonical-coordinate MSA plurality/mask
-  context, linear mask tracks, a ChimeraX mask-context script/render,
-  ProteinMPNN diversity panels, linked foldcheck_review SVG/PNG visuals, linked
-  WT ESMC masked-marginal plots, MSA-vs-ESMC model-constraint audit plots, and
-  a manifest-backed marimo notebook. Manifest paths are relative to the manifest
-  location, and notebook dogfood includes static checks plus HTML export. It does
-  not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate
-  selection.
+  `review_deliverable_manifest.yaml` and a manifest-backed marimo notebook
+  organized as constraint evidence for the design mask, ProteinMPNN designs and
+  fold triage, ESMC feature review, and a planned feasibility/handoff gate. It
+  includes py3Dmol structure-browser manifests for notebook inspection and keeps
+  ChimeraX as the explicit manual pose/still-render path. Manifest paths are
+  relative to the manifest location. It does not rerun ProteinMPNN, ColabFold,
+  Biohub, Atlas, or candidate selection.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
   fold-check request/report contract package. It validates the request
   manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted

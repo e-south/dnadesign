@@ -488,7 +488,14 @@ for package_name in sorted(expected_visualization_packages):
     if not (package / "__init__.py").is_file():
         problems.append(f"missing aligner/msa/visualization/{package_name}/__init__.py")
 
-expected_visualization_test_files = {"__init__.py", "_fixtures.py", "test_exemplar_manifest.py", "test_materialization.py"}
+expected_visualization_test_files = {
+    "__init__.py",
+    "_fixtures.py",
+    "test_exemplar_manifest.py",
+    "test_materialization.py",
+    "test_panel_overview.py",
+    "test_profile_id_contract.py",
+}
 observed_visualization_test_files = {path.name for path in visualization_tests_root.glob("*.py")}
 if observed_visualization_test_files != expected_visualization_test_files:
     problems.append(
@@ -685,7 +692,7 @@ require_pattern 'materialization/conservation_alignments/' "study surfaces route
 require_pattern 'manual-mask-authority.yaml' "study surfaces route manual mask-authority ontology" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'materialization/manual_mask_authority/' "study surfaces route manual mask-authority materializer package" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'wang_et_al_2022_ec86_cryoem_structure_priors' "manual mask authority source records Wang/Ec86 structural priors" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
-require_pattern 'candidate_prior_not_mask_authoritative' "manual mask authority keeps the current Wang interface source token stable" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
+require_pattern 'active_direct_contact_mask_prior' "manual mask authority names Wang interface rows as active direct-contact mask priors" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
 require_pattern 'active direct-contact mask priors' "ontology vocabulary declares Wang/Ec86 rows are consumed by the active mask policy" "$STUDY_ROOT/workbench/ontology/vocabulary.md"
 require_pattern 'rt7_interval' "manual mask authority source materializes RT1-RT7 interval spans" "$STUDY_ROOT/workbench/ontology/manual-mask-authority.yaml"
 require_pattern 'materialization/mask_set/' "study surfaces route mask-set materializer package" "$REFERENCE_DIR/study-surfaces.md"

@@ -173,9 +173,9 @@ authority_sets:
           - ec86kit_7v9u_protomer1_reference_sequence
 candidate_authority_sets:
   - id: ec86_rt_msdna_msrna_interface_residues
-    label: Wang/Ec86 RT-msDNA/msrRNA interface candidate priors
-    status: candidate_prior_not_mask_authoritative
-    policy: candidate_prior_not_mask_authoritative
+    label: Wang/Ec86 RT-msDNA/msrRNA interface active mask priors
+    status: active_direct_contact_mask_prior
+    policy: active_direct_contact_mask_prior
     reason: Wang/Ec86 direct substrate-contact candidates are protected by the selected simple policy, while RT1-RT7 intervals remain annotation/review labels rather than blanket hard masks.
     residues:
       - canonical_position: 49

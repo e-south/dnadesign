@@ -119,9 +119,10 @@ handled separately.
   96-row candidate ranking, a selected structure-panel manifest, a full
   local fold-structure manifest, a selected-panel ChimeraX command script, a
   full-fold-set ChimeraX command script, an Atlas subset manifest, and a visual
-  review manifest. The visual manifest points to four SVG plots and one
-  rendered ChimeraX PNG structure-overlay panel with alt text, plain
-  descriptions, and a scoped marimo notebook. The structure overlay aligns WT
+  review manifest. The visual manifest points to four SVG plots, a ChimeraX
+  structure-overlay script, and a scoped marimo notebook with alt text and plain
+  descriptions. The optional structure-overlay PNG is rendered only when an
+  operator passes the explicit ChimeraX render flag. The structure overlay aligns WT
   and selected candidate model residues `3-311` to ec86kit/7V9U reference
   residues `1-309` over C-alpha atoms before rendering; this matches the
   mapped-residue review frame and avoids relying on an interactive ChimeraX
@@ -145,15 +146,16 @@ handled separately.
 - `review_deliverables/` is materialized as a study-owned visual bundle. It
   writes `review_deliverable_manifest.yaml`, a canonical-coordinate
   Mestre-derived clade 9 alignment panel, linear mask tracks, a ChimeraX
-  mask-context script/render, ProteinMPNN diversity SVGs, a Tao-style
+  mask-context script, ProteinMPNN diversity SVGs, a Tao-style
   ColabFold RMSD/pLDDT joint plot for the current single mask policy, WT ESMC
-  model-constraint audit plots, a Biohub ESMC feature-review section, two
+  model-constraint audit plots, an ESMC feature-review section, two
   interactive structure-browser manifests, and a manifest-backed marimo
   notebook. The notebook is organized as a progressive analysis surface:
-  constraint evidence for the design mask, ProteinMPNN variants and fold triage,
-  and Biohub ESMC feature review. WT ESMC masked-marginal scoring is shown with
-  the mask-constraint evidence as a review-only model-constraint audit, not as a
-  current mask input. Structure views are selected through the same
+  constraint evidence for the design mask, ProteinMPNN designs and fold triage,
+  ESMC feature review, and a planned feasibility/handoff section. WT ESMC
+  masked-marginal scoring is shown with the mask-constraint evidence as a
+  review-only model-constraint audit, not as a current mask input. Structure
+  views are selected through the same
   section/visual controls as static plots. In the reference section, the browser
   shows the off-white ec86kit/7V9U backbone and lets the reviewer switch among
   mask and motif highlight categories. Each mask category uses the same
@@ -161,15 +163,15 @@ handled separately.
   time. Mask highlights are translated from canonical Ec86 residue positions to
   the exported backbone residue-number basis before rendering, so terminal
   missing-backbone residues do not shift the displayed selections. In the
-  ColabFold section, the browser loads one selected PDB plus the
-  ec86kit/7V9U reference into a browser-native 3D view for mouse-driven
-  inspection. The notebook aligns each selected query model to the reference in
-  memory over mapped C-alpha atoms before rendering, so local raw ColabFold PDB
-  files remain unchanged. The selected structure view now shows a compact
-  metric strip for mean pLDDT, WT-runtime C-alpha RMSD, direct cryoEM mapped
-  C-alpha RMSD, sequence identity, and mutation count. These browser views use
-  `dnadesign.thread.structure_views` and are
-  review-only; ChimeraX remains the still-render and pose-capture path. The
+  ProteinMPNN design and fold-triage section, the browser loads one selected
+  PDB plus the ec86kit/7V9U reference into a browser-native 3D view for
+  mouse-driven inspection. The notebook aligns each selected query model to the
+  reference in memory over mapped C-alpha atoms before rendering, so local raw
+  ColabFold PDB files remain unchanged. The selected structure view now shows a
+  compact metric strip for mean pLDDT, WT-runtime C-alpha RMSD, direct cryoEM
+  mapped C-alpha RMSD, sequence identity, and mutation count. These browser
+  views use `dnadesign.thread.structure_views` and are review-only; ChimeraX
+  remains the explicit opt-in still-render and pose-capture path. The
   notebook fits visual previews to the column and keeps full artifact paths in
   the evidence details. The manifest also links the existing foldcheck_review
   SVG/PNG visuals and Permuter-style WT ESMC masked-marginal SVGs instead of
@@ -193,8 +195,9 @@ handled separately.
   paths are relative to the manifest location, so the visual bundle can move
   with the study workspace. The generated ChimeraX scripts use relative paths
   for staged local structures and keep raw remote paths out of the local review
-  command path. The ChimeraX mask-context PNG is rendered when a local ChimeraX
-  executable is available and otherwise records an explicit skipped status.
+  command path. The ChimeraX mask-context PNG is an opt-in render; ordinary
+  materialization records a skipped optional-render status unless an existing
+  PNG is being retained.
   Every deliverable row carries a display title, input hashes, alt text, a
   plain description, and an interpretation
   limit. WT model-constraint rows also carry the masked-marginal method summary
@@ -330,17 +333,17 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    and reviewing feature prevalence; it does not make model-derived feature
    descriptions into curated functional annotations.
 3. Inspect the `review_deliverables/` marimo surface. It currently covers
-   constraint evidence for the design mask, ProteinMPNN variants and fold triage
-   with static and interactive structure views, and a first exact-dictionary
-   Biohub ESMC feature-review view. WT SAE structure frames and the Biohub ESMC
+   constraint evidence for the design mask, ProteinMPNN designs and fold triage
+   with static and interactive structure views, ESMC feature review, and a
+   planned feasibility/handoff gate. WT SAE structure frames and the Biohub ESMC
    feature-window heatmap remain downstream of `sae_feature_window_summary`.
 4. Add a separate Atlas sequence-similarity materializer if synthetic-candidate
    Atlas neighborhood context is needed through the no-auth Atlas API. Do not
    keep retrying the hash-lookup/on-demand endpoint for the 96 synthetics unless
    the API behavior changes.
 5. Build the assembly/synthesis feasibility report.
-6. Build a candidate selection panel from accepted fold-check rows, structure
-   review, feasibility review, and optional SAE strata.
+6. Build a candidate selection panel from fold-report rows accepted by the
+   validator, structure review, feasibility review, and SAE annotation strata.
 7. Select candidates only from rows with accepted fold-check coverage and
    feasibility review, then
    define the downstream RT-lnRNA candidate handoff accepted by

@@ -405,6 +405,9 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review
         - --repo-root
         - .
+    runtime_policy:
+      launches_gui_by_default: false
+      gui_opt_in_flag: --render-chimerax-overlay
     validation:
       - argv:
           - uv
@@ -508,8 +511,6 @@ lanes:
         - --model
         - esmc-300m-2024-12
         - --resume-existing
-        - --max-new-requests
-        - "10"
         - --request-sleep-seconds
         - "1.5"
         - --request-timeout-seconds
@@ -530,6 +531,8 @@ lanes:
         - --model
         - esmc-300m-2024-12
         - --resume-existing
+        - --max-new-requests
+        - "3"
         - --request-sleep-seconds
         - "1.5"
         - --request-timeout-seconds
@@ -562,6 +565,7 @@ lanes:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_sae_interpretation/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/mask_structure_browser_manifest.yaml
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/interactive_structure_browser_manifest.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/feasibility_and_handoff/planned.md
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
     planned_follow_on_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
@@ -576,6 +580,9 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables
         - --repo-root
         - .
+    runtime_policy:
+      launches_gui_by_default: false
+      gui_opt_in_flag: --render-chimerax-png
     validation:
       - argv:
           - uv

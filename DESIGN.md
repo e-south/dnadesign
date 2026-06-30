@@ -1,3 +1,10 @@
+---
+doc_id: design
+surface: system-of-record
+owner: dnadesign-maintainers
+last_verified: 2026-04-24
+---
+
 # DESIGN
 
 **Type:** system-of-record

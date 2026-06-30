@@ -20,4 +20,5 @@ checks:
       artifact: rt_lnrna_candidate_acceptance_schema
       validator_intent:
         rejects_construct_subject_preclaim: true
-        accepted_ids_partition_selected_candidate_ids: true
+        accepted_ids_partition_handoff_candidate_ids: true
+        candidate_id_source: candidate_handoff.candidates[].candidate_id

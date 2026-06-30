@@ -1,7 +1,14 @@
+---
+doc_id: documentation-index
+surface: docs-router
+owner: dnadesign-maintainers
+last_verified: 2026-06-30
+---
+
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-06-30
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -69,14 +76,10 @@ Use these when data moves through more than one tool and the shared record lives
 
 ### Checked-In Study Routes
 
-Use this table when the task names one concrete study. Do not borrow a status
-provider across studies.
-
-| Study | First route | Status surface | When to use Ops |
-| --- | --- | --- | --- |
-| `stress_ethanol_cipro_growth` | [routes](studies/stress_ethanol_cipro_growth/routes/README.md) | [status](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md), [preflight](studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) | Use `ops progress show` for status, blocker, or readiness questions. |
-| `regulondb_native_promoter_panel` | [routes](studies/regulondb_native_promoter_panel/routes/README.md) | record-only: `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml` | Do not use Ops status/preflight; no provider is registered. |
-| `retron_hairpin_design` | [routes](studies/retron_hairpin_design/routes/README.md) | [status](studies/retron_hairpin_design/operations/catalog/contracts/status.md), [preflight](studies/retron_hairpin_design/operations/catalog/contracts/preflight.md) | Use Ops only for explicit progress/readiness questions; deliverable requests route to materialize. |
+Use [Study records index](studies/README.md) when the task names one concrete
+study. That index is the source-of-record live-study route table, including
+record-only studies and study-specific status skills. Do not duplicate study
+rows here or borrow a status provider across studies.
 
 #### Scheduler and environment workflows
 

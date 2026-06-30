@@ -17,8 +17,8 @@ campaign.
 
 | Surface | Owns | First implementation obligation |
 | --- | --- | --- |
-| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, study selection decisions, and downstream promotion policy. | Validate that pending Eco1 structure and numbering decisions block runtime artifacts. |
-| `thread` | Generic fixed-backbone artifact contracts, residue maps, mask algebra, backend request/result normalization, candidate ids, fold-check interpretation, and handoff hash closure. | Materialize and validate the artifact chain against fixtures and negative cases. |
+| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, feasibility policy, study selection decisions, and downstream promotion policy. | Validate that pending Eco1 structure and numbering decisions block runtime artifacts. |
+| `thread` | Generic fixed-backbone artifact contracts, residue maps, mask algebra, backend request/result normalization, candidate ids, fold-check contracts, and neutral handoff hash closure. | Materialize and validate the artifact chain against fixtures and negative cases. |
 | `infer` | Optional model-process execution and writeback for declared backends. | Expose backend run ids and result manifests if it executes MPNN or fold-check jobs. |
 | `construct` | Later sequence realization and placement/window feasibility. | Accept only explicit downstream promotion records, not raw `thread` candidates. |
 | `permuter` | DMS and explicit variant records through public APIs. | Import redesigned RT candidates only through a later public handoff contract. |
@@ -37,8 +37,8 @@ campaign.
 | `candidate-builder` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, non-deterministic ordering, or mask violations are accepted |
 | `foldcheck-normalizer` | `thread.adapters` or `infer` handoff | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, or errored rows are missing |
 | `atlas-semantic-profiler` | `thread.adapters` plus study wrapper | accepted fold-check rows and candidate sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, query hashes are missing, or API schema drift is hidden |
-| `feasibility-assessor` | `thread.candidates` plus study policy | accepted full-sequence candidates | `feasibility_report.parquet` | windowed candidates lack nearest-parent or structural-coupling evidence |
-| `candidate-handoff-builder` | `thread.handoffs` plus study selection policy | candidate, fold, and feasibility reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, or downstream target are missing |
+| `feasibility-assessor` | study policy plus `thread.candidates` inputs | accepted full-sequence candidates | `feasibility_report.parquet` | candidate rows lack parent-distance, synthesis-tier, blocker, or feasibility-status evidence |
+| `candidate-handoff-builder` | neutral handoff builder plus study selection policy | candidate, fold, feasibility, and selection-panel reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, feasible rows, selection-panel rows, or RT-only handoff fields are missing |
 | `rt-lnrna-promotion-check` | downstream study | RT-only candidate handoff | downstream accept/reject record | construct-subject ids are preclaimed before downstream binding |
 
 ### Implemented Slice: Phase 0 Contract Validator

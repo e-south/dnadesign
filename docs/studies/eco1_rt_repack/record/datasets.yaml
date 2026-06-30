@@ -109,7 +109,7 @@ datasets:
     kind: checked_in_code
     path: src/dnadesign/aligner/msa/visualization/
     status: generic_msa_visualization_api
-    description: Generic diagnostic sidecar API for accepted aligned FASTA inputs; writes per-profile QC YAML, per-position QC CSV, SVG, HTML, optional target-position annotation tracks, explicit exemplar-row windows, selected-row overview panels, plurality/gap histograms, and an index manifest without owning Eco1 source authority, conservation scoring, or designability.
+    description: Generic diagnostic sidecar API for accepted aligned FASTA inputs; writes per-profile QC YAML, per-position QC CSV, SVG, HTML, optional target-position annotation tracks, explicit exemplar-row windows, all-record overview panels, plurality/gap histograms, and an index manifest without owning Eco1 source authority, conservation scoring, or designability.
   - id: eco1_rt_annotation_tracks
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -133,7 +133,7 @@ datasets:
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/ontology/msa-panel-spec.yaml
     status: first_pass_publication_panel_spec
-    description: Study-owned display contract for Simon/Mestre-inspired selected-row overview and plurality/gap histogram panels; not used as the conservation denominator or mask evidence.
+    description: Study-owned display contract for Simon/Mestre-inspired all-record overview and plurality/gap histogram panels; not used as the conservation denominator or mask evidence.
   - id: eco1_rt_conservation_source_sequence_materializer
     owner: eco1_rt_repack
     kind: checked_in_code
@@ -247,7 +247,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
     status: materialized_local
-    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API for both selected conservation profiles, with Eco1-owned RT1-RT7 interval and motif-anchor annotations, exemplar-row windows, selected-row overview panels, plurality/gap histograms, HTML report, and index manifest.
+    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API for both selected conservation profiles, with Eco1-owned RT1-RT7 interval and motif-anchor annotations, exemplar-row windows, all-record overview panels, plurality/gap histograms, HTML report, and index manifest.
   - id: eco1_rt_manual_mask_authority
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -355,7 +355,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
     status: materialized_local_review
-    description: Local generated fold-review visuals. The set includes SVG plots for review-class counts, ColabFold fold metrics, cryoEM-reference RMSD comparison, and Biohub ESMC SAE coverage, plus a ChimeraX-rendered PNG overlay of selected structures against the ec86kit/7V9U reference. Each visual is referenced by the visual manifest and carries alt text plus interpretation limits.
+    description: Local generated fold-review visuals. The set includes SVG plots for review-class counts, ColabFold fold metrics, cryoEM-reference RMSD comparison, and Biohub ESMC SAE coverage, plus a ChimeraX overlay script for selected structures against the ec86kit/7V9U reference. The optional PNG overlay is rendered only through the explicit ChimeraX opt-in flag. Each visual is referenced by the visual manifest and carries alt text plus interpretation limits.
   - id: eco1_rt_foldcheck_review_notebook
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -518,14 +518,14 @@ datasets:
       Materialized manifest for manuscript-facing and review-only visual
       deliverables. It records figure paths, display titles, input hashes, alt
       text, plain descriptions, interpretation limits, and whether each
-      deliverable is rendered, linked, skipped, or optional-heavy.
+      deliverable is rendered, linked, skipped, optional-heavy, or planned.
   - id: eco1_rt_msa_plurality_mask_panel
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
     status: materialized_foundation
     description: >-
-      Reference scaffold and mask-evidence deliverable. It uses the accepted
+      Constraint-evidence deliverable for the design mask. It uses the accepted
       Mestre-derived Ec86 clade 9 alignment, places the Eco1/Ec86 target row
       first, marks >=25% WT-plurality columns and protected mask positions on
       canonical residue coordinates, and keeps full-row inspection in marimo
@@ -540,9 +540,9 @@ datasets:
       the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
       with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
       priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
-      positions, and the mutable design canvas. The PNG render is materialized
-      when a local ChimeraX executable is available and otherwise records an
-      explicit skipped status in the manifest.
+      positions, and the mutable design canvas. The PNG render is opt-in; normal
+      materialization records a skipped optional-render status unless an existing
+      render is being retained.
   - id: eco1_rt_mask_structure_browser_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -566,8 +566,8 @@ datasets:
       ProteinMPNN candidate-diversity visuals for score/global score, sequence
       recovery to WT, mutation count, sampling temperature, and mutation density.
       In the review notebook these live with ColabFold fold-triage artifacts as
-      the design-variant review section. Sequence recovery is descriptive and not
-      an acceptance criterion.
+      the ProteinMPNN designs and fold-triage section. Sequence recovery is
+      descriptive and not an acceptance criterion.
   - id: eco1_rt_colabfold_structure_review_panels
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -600,6 +600,16 @@ datasets:
       pLDDT, RMSD, sequence identity, and mutation burden. This is review
       context only; ChimeraX remains the publication still-render and
       pose-capture path.
+  - id: eco1_rt_review_deliverables_feasibility_handoff_planned
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/feasibility_and_handoff/planned.md
+    status: planned_gate
+    description: >-
+      Notebook-visible planned gate stating that synthesis feasibility,
+      candidate selection, and RT-only downstream handoff are not materialized
+      by the review-deliverables slice. It is a boundary note, not a candidate
+      decision artifact.
   - id: eco1_rt_wt_model_constraint_audit_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -636,11 +646,14 @@ datasets:
       model-compatible features or windows. It is semantic stratification, not a
       processivity ranking.
   - id: eco1_rt_feasibility_report
-    owner: thread
+    owner: eco1_rt_repack
     kind: planned_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
     status: not_generated
-    description: Planned mutation-window and parent-haplotype feasibility report; Eco1 synthesis decisions remain study policy.
+    description: >-
+      Planned study-owned feasibility report for mutation windows, parent
+      distance, synthesis tier, blockers, and feasibility status. Eco1
+      synthesis economics remain study policy.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: planned_artifact
@@ -648,14 +661,14 @@ datasets:
     status: not_generated
     description: >-
       Planned study-owned review table that combines candidate-table rows with
-      `status=accepted`, fold-check review, feasibility review, and optional SAE
-      strata before RT-only handoff selection.
+      `status=accepted`, fold-check review, feasibility review, and SAE
+      annotation strata before RT-only handoff selection.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
     status: not_generated
-    description: Planned RT-only handoff bundle emitted by `thread`; Eco1 selection policy and downstream acceptance remain study-owned.
+    description: Planned RT-only handoff bundle; no RT-lnRNA construct subject is created before downstream acceptance.
 downstream_collaboration:
   - study_id: rt_lnrna_sponging_construct_triage
     relationship: downstream_construct_promotion_candidate

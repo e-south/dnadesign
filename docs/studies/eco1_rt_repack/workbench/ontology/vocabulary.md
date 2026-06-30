@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Vocabulary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-06-30
 
 | Term | Meaning |
 | --- | --- |
@@ -18,7 +18,7 @@
 | `NonFixedMissingBackbone` | Terminal Eco1 positions 1, 2, and 312-320. They are not protected by `eco1_rt_clade9_plurality25_direct_contact5a_v1`, but fixed-backbone ProteinMPNN cannot mutate them directly until coordinates are supplied or handled separately. |
 | `RtAnnotationTracks` | Study-owned target-position motif annotations that can be rendered by generic `aligner.msa.visualization` sidecars without controlling designability. |
 | `MsaExemplarRows` | Study-owned explicit aligned FASTA row selections used to render local motif windows; these rows ground visualization only and are not the denominator for plurality. |
-| `MsaPanelSpec` | Study-owned display contract for selected-row overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
+| `MsaPanelSpec` | Study-owned display contract for all-record overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
 | `ManualMaskAuthority` | Study-owned mask ontology and generated runtime artifact. It records audited motif anchors, RT1-RT7 annotation/review spans, and Wang/Ec86 substrate-contact priors. RT1-RT7 spans do not blanket hard-fix residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
 | `MaskRowAlgebra` | Study-local executable contract for composing protected, non-fixed mapped, and non-fixed missing-backbone rows under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. Implemented under `operations/masking/`, not inside a runtime writer. |
 | `EvidenceReviewArtifacts` | Contact-risk and contact-geometry review artifacts that explain structure context. They do not protect or release residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
@@ -29,12 +29,12 @@
 | `ThreadSample` | Raw backend output sequence with backend provenance and scores. |
 | `ThreadCandidate` | Deduplicated fixed-backbone design candidate with provenance. |
 | `FoldCheckReport` | Computational structural QA report for candidate sequences. |
-| `AssemblyFeasibilityReport` | Computational report deciding full-gene, bounded-window, sparse recombination, or reject posture. |
-| `CandidateHandoff` | Selected candidates plus upstream hashes and downstream target. |
+| `AssemblyFeasibilityReport` | Study-owned computational report for mutation windows, parent distance, synthesis tier, blockers, and feasibility status. It informs purchase or bounded-window decisions; it is not a generic `thread` economic policy. |
+| `CandidateHandoff` | RT-only candidate evidence bundle with source artifacts, selection policy, and candidate rows. It does not create an RT-lnRNA construct subject. |
 | `RtLnrnaCandidateAcceptance` | Downstream accept/reject record for RT-only candidate handoffs before any construct subject exists. |
 | `mask_source` | A named reason that fixes or protects a residue. |
-| `window_haplotype` | A bounded coding-window sequence segment derived from one accepted full-protein parent. |
-| `nearest_parent_candidate` | The accepted full-protein candidate closest to a recombined sequence. |
+| `parent_haplotype_id` | Identifier for a bounded coding-window segment derived from one accepted full-protein parent. |
+| `nearest_parent_id` | Identifier for the accepted full-protein candidate closest to another sequence under the declared feasibility distance rule. |
 
 ### Naming Rules
 
@@ -57,6 +57,10 @@
   artifacts without owning model-process execution.
 - Use `*_acceptance` for downstream accept/reject records that do not create
   new domain subjects by implication.
+- Use `handoff_kind: rt_only_candidate_handoff`,
+  `subject_kind: reverse_transcriptase_protein_only`, and
+  `construct_subject_created: false` until a downstream study explicitly
+  accepts and binds an RT candidate into a construct context.
 - Use `*_annotation_tracks` for visualization annotations over an already
   selected target coordinate space; these tracks are not evidence profiles or
   mask sources by themselves. Label placement and border/fill styling are
@@ -70,11 +74,9 @@
   residues directly. Do not use annotation-track or panel-spec names for
   designability decisions.
 - Use `*_mask_prior` for structural residues that are allowed to fix positions
-  under the selected mask policy. The current Wang/Ec86 direct-contact rows
-  retain the stable source token `candidate_prior_not_mask_authoritative` from
-  the original campaign artifact, but the selected mask consumes those rows as
-  active direct-contact mask priors. Rename that source token only under a new
-  mask lineage.
+  under the selected mask policy. The current Wang/Ec86 direct-contact rows use
+  `active_direct_contact_mask_prior` because the selected mask consumes them as
+  active direct-contact mask priors.
 - Reserve new `candidate_prior_*` or `*_candidate_priors` terms for review-only
   residues that may inform a future mask policy but are not allowed to fix
   residues in that policy.

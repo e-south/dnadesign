@@ -369,10 +369,13 @@ src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/ou
 src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.manifest.yaml
 ```
 
-The accepted clade-9 alignment has 303 records and aligned length 853. The
-accepted II-A3/`42_1` alignment has 45 records and aligned length 527. Both
-include the pinned `eco1_rt_ec86kit_reference` target row and hash-linked
-manifests.
+The current mask uses `ec86_clade9_conservation_v1` for the Tao-style
+`>=25%` WT-plurality conservation rule. The accepted clade-9 alignment has 303
+records: the pinned Ec86 target row plus 302 accepted Mestre clade-9 source
+records. The narrower `ec86_iia3_cluster42_1_conservation_v1` panel is also
+materialized for audit context; it has 45 records: the pinned target row plus
+44 accepted Mestre II-A3/`42_1` source records. Both aligned FASTA files carry
+hash-linked manifests.
 
 ### MSA Visualization Sidecars
 
@@ -443,18 +446,19 @@ therefore emits four complementary layers:
 
 1. a global target-position QC track for gap/plurality inspection; and
 2. local exemplar-row windows around annotated motif anchors;
-3. selected-row whole-alignment overview panels; and
+3. all-record whole-alignment overview panels; and
 4. target-position plurality/gap histograms.
 
-The exemplar rows and panel spec make motif-local and whole-alignment variation
-visible without changing the conservation denominator. Rows are not selected
-automatically from FASTA order, because that would introduce avoidable
-footguns: hidden row-order bias, over-representation of near-duplicates,
-accidental inclusion of a target duplicate, and cherry-picked examples that
-make plurality look stronger than it is. The panel spec can declare
+The exemplar rows make motif-local variation legible in compact windows. The
+whole-alignment overview uses `row_source: all_records`, so it renders every
+accepted aligned FASTA row rather than an arbitrary or order-dependent subset.
+Display labels are compact source-manifest-backed labels such as `c9 node 1284
+fig|1184720.6.peg.2708`; they preserve the Mestre node and provider accession
+without renaming stable FASTA record IDs. The panel spec can declare
 display-only high-gap trimming for publication views, but conservation scoring
 must use the untrimmed accepted aligned FASTA. Any publication figure should
-label exemplar-row source and selection rule explicitly.
+label whether it is showing the clade-9 denominator or the narrower
+II-A3/`42_1` audit panel.
 
 Simon-style cross-family controls such as RT-Mxa1, RT-Sen2, Group II RT-RI, or
 DGR bRT are not silently inserted into the current conservation MSA. They would
@@ -494,11 +498,12 @@ uv run python -m dnadesign.aligner.msa.visualization \
 ```
 
 The sidecars include per-profile MSA QC YAML, per-position QC CSV, SVG tracks,
-selected-row overview panels, plurality/gap histograms, an HTML summary, and an
-index manifest. They are inspection aids only. They do not decide designability
-and do not replace `conservation_profile.parquet` or `mask_set.yaml`. Eco1
-source authority, provider ledgers, conservation scoring, and mask policy must
-not move into `aligner`.
+exemplar-row motif windows, all-record overview panels, plurality/gap
+histograms, an HTML summary, and an index manifest. They are inspection aids
+only. They do not decide designability and do not replace
+`conservation_profile.parquet` or `mask_set.yaml`. Eco1 source authority,
+provider ledgers, conservation scoring, and mask policy must not move into
+`aligner`.
 
 ### MAFFT Runtime Log Interpretation
 

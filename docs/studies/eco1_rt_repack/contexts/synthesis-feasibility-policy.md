@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-synthesis-feasibility-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-19
+last_verified: 2026-06-30
 ---
 
 ## Synthesis Feasibility Policy
@@ -24,16 +24,39 @@ protocol and not a Construct placement contract.
 The report is a computational planning artifact. It must include:
 
 - `candidate_id`
-- `full_sequence_hash`
-- `mutation_count`
-- `mutation_windows`
-- `window_ids`
-- `window_haplotype_ids`
-- `nearest_parent_candidate_id`
-- `distance_to_nearest_parent`
-- `structural_coupling_flags`
-- `recommended_synthesis_tier`
-- `rejection_reason`
+- `sequence_hash`
+- `parent_sequence_id`
+- `parent_sequence_hash`
+- `mutation_count_total`
+- `mutation_count_mutable_region`
+- `mutation_count_protected_region`
+- `protected_mutation_violation_count`
+- `protected_mutation_violations_json`
+- `mutation_windows_json`
+- `max_mutation_window_length`
+- `max_mutation_window_mutation_count`
+- `mutation_window_density_max`
+- `nearest_parent_id`
+- `nearest_parent_distance_aa`
+- `nearest_parent_distance_fraction`
+- `parent_haplotype_id`
+- `parent_haplotype_distance_aa`
+- `synthesis_tier`
+- `synthesis_blockers_json`
+- `codon_policy_id`
+- `sequence_complexity_flags_json`
+- `feasibility_status`
+- `feasibility_reason`
+- `feasibility_policy_id`
+- `input_candidate_table_hash`
+- `input_mask_policy_hash`
+- `input_foldcheck_report_hash`
+- `created_at_utc`
+- `created_by`
+
+Allowed `synthesis_tier` values are `easy`, `standard`, `difficult`,
+`blocked`, and `unknown`. Allowed `feasibility_status` values are `feasible`,
+`review`, `blocked`, and `missing_inputs`.
 
 Window ids are derived from accepted full-sequence candidates. They are not a
 license to generate an unlimited Cartesian library.

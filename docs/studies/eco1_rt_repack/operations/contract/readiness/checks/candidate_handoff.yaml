@@ -38,11 +38,21 @@ checks:
     - kind: path_exists
       check_id: eco1_rt.thread.materialized_candidate_handoff
       check_group: candidate_handoff
-      summary: Real backend ingest requires candidate_handoff.yaml with selected candidate ids and upstream hashes.
+      summary: Real backend ingest requires RT-only candidate_handoff.yaml after feasibility and selection-panel review.
       required: true
       artifact: planned_candidate_handoff
       validator_intent:
         required_state: materialized
+        required_fields:
+          - handoff_id
+          - handoff_kind
+          - study_id
+          - subject_kind
+          - construct_subject_created
+          - downstream_acceptance_required
+          - source_artifacts
+          - selection_policy
+          - candidates
         required_upstream_hashes:
           - eco1_rt_v1_profile
           - planned_backbone_bundle
@@ -55,4 +65,9 @@ checks:
           - planned_candidate_table
           - planned_foldcheck_report
           - planned_feasibility_report
+          - planned_candidate_selection_panel
+        required_handoff_kind: rt_only_candidate_handoff
+        required_subject_kind: reverse_transcriptase_protein_only
+        requires_construct_subject_created_false: true
         rejects_construct_subject_id: true
+        rejects_sae_acceptance_gate: true

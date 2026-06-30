@@ -140,7 +140,9 @@ artifact without importing Eco1 biology.
 - `threshold_values`
 - `plddt`
 - `pae_summary`
-- `backbone_rmsd_to_reference`
+- `wt_runtime_ca_rmsd`
+- `cryoem_mapped_ca_rmsd`
+- `cryoem_mapped_ca_rmsd_status`
 - `protected_contact_retention`
 - `status`
 - `rejection_reason`
@@ -157,7 +159,9 @@ settings before variant thresholds are interpreted.
 | `plddt` | Global confidence summary from the fold runtime. | Reject substantial degradation from WT baseline or threshold-free acceptance. |
 | `core_plddt` | Confidence over mapped RT core/palm/fingers/thumb regions. | Reject if the catalytic core is low confidence. |
 | `pae_summary` | Domain-orientation uncertainty summary. | Reject high uncertainty between palm, fingers, and thumb. |
-| `backbone_rmsd_to_reference` | C-alpha or declared backbone RMSD after alignment to the reference. | Reject first-pass candidates with major structure drift. |
+| `wt_runtime_ca_rmsd` | Candidate-to-WT ColabFold runtime C-alpha RMSD from the normalized fold-check report. | Flag candidates that diverge from the same-runtime WT baseline. |
+| `cryoem_mapped_ca_rmsd` | Direct mapped-position C-alpha RMSD to the ec86kit/7V9U-backed reference when local model files are available. | Review whether a candidate still preserves the cryoEM-supported scaffold. |
+| `cryoem_mapped_ca_rmsd_status` | Availability/status field for the direct cryoEM-reference comparison. | Prevent missing local structures or coordinate-basis failures from being read as measured RMSD. |
 | `protected_region_rmsd` | RMSD over protected catalytic/contact regions. | Reject protected-region movement beyond the declared threshold. |
 | `protected_contact_retention` | Whether modeled protected contacts remain geometrically plausible after superposition. | Reject loss of retained nucleic-acid/contact geometry. |
 
