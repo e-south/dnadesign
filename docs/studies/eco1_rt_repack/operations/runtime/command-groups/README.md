@@ -144,7 +144,7 @@ class first, then the remaining array after the smoke writes its per-class
 `candidate_table.parquet`:
 
 ```bash
-qsub -t 1-1 \
+qsub -t 1 \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
 qsub -t 2-5 \

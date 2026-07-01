@@ -34,7 +34,7 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
-qsub -t 1-1 \
+qsub -t 1 \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
 qsub \
@@ -171,7 +171,7 @@ Use a one-task smoke first:
 
 ```bash
 mkdir -p /project/dunlop/esouth/proteinmpnn/eco1_rt_design_classes/sge_logs
-qsub -t 1-1 \
+qsub -t 1 \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
 ```

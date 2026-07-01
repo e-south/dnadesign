@@ -30,7 +30,7 @@ def test_eco1_proteinmpnn_design_class_qsub_is_submit_ready() -> None:
 
     assert qsub_script.startswith("#!/bin/bash -l")
     assert "#$ -P dunlop" in qsub_script
-    assert "#$ -t 1-5" in qsub_script
+    assert "#$ -t" not in qsub_script
     assert "#$ -now y" not in qsub_script
     assert 'export OMP_NUM_THREADS="${NSLOTS:-4}"' in qsub_script
     assert "SGE_TASK_ID" in qsub_script
@@ -53,7 +53,7 @@ def test_bu_scc_jobs_readme_documents_design_class_smoke_and_array_submit() -> N
     assert "eco1-proteinmpnn-design-class.qsub" in jobs_readme
     assert "Eco1 ProteinMPNN design-class submissions" in jobs_readme
     assert "PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn" in jobs_readme
-    assert "qsub -t 1-1" in jobs_readme
+    assert "qsub -t 1" in jobs_readme
     assert "qsub -t 1-5" in jobs_readme
     assert "candidate_pool_manifest.yaml" in jobs_readme
 
@@ -71,7 +71,7 @@ def test_eco1_command_groups_include_scc_design_class_execution_lanes() -> None:
 
     smoke_argv = by_id["design_class_proteinmpnn_scc_smoke"]["command"]["argv"]
     array_argv = by_id["design_class_proteinmpnn_scc_array"]["command"]["argv"]
-    assert smoke_argv[:3] == ["qsub", "-t", "1-1"]
+    assert smoke_argv[:3] == ["qsub", "-t", "1"]
     assert array_argv[:3] == ["qsub", "-t", "1-5"]
     assert any("PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn" in arg for arg in smoke_argv)
     assert "docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub" in array_argv
