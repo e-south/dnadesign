@@ -39,6 +39,8 @@ def test_eco1_proteinmpnn_design_class_qsub_is_submit_ready() -> None:
     assert "ECO1_DESIGN_CLASS_IDS" in qsub_script
     assert 'proteinmpnn_root="${PROTEINMPNN_ROOT:-.var/tools/proteinmpnn}"' in qsub_script
     assert "protein_mpnn_run.py" in qsub_script
+    assert "requests_lock=" in qsub_script
+    assert "flock 9" in qsub_script
     assert "materialization.design_classes" in qsub_script
     assert "materialization.proteinmpnn_sample_ingest" in qsub_script
     assert "materialization.candidate_table" in qsub_script
