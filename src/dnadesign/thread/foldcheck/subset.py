@@ -38,6 +38,7 @@ def materialize_foldcheck_sequence_subset(
     request_manifest_path: Path,
     sequence_limit: str,
     sequence_start: int = 1,
+    allow_short_final_shard: bool = False,
     input_fasta_path: Path,
     run_manifest_path: Path,
     output_dir: Path,
@@ -49,7 +50,12 @@ def materialize_foldcheck_sequence_subset(
     manifest = _read_manifest(request_manifest_path)
     source_records = _read_request_fasta(request_manifest_path, manifest)
     _validate_records_against_manifest(source_records, manifest)
-    selected_records = _select_records(source_records, sequence_limit, sequence_start=sequence_start)
+    selected_records = _select_records(
+        source_records,
+        sequence_limit,
+        sequence_start=sequence_start,
+        allow_short_final_shard=allow_short_final_shard,
+    )
 
     input_fasta_path.parent.mkdir(parents=True, exist_ok=True)
     input_fasta_path.write_text(_fasta_text(selected_records), encoding="utf-8")
@@ -64,6 +70,7 @@ def materialize_foldcheck_sequence_subset(
         "selected_sequence_start": sequence_start,
         "selected_sequence_end": selected_end,
         "selected_sequence_count": len(selected_records),
+        "allow_short_final_shard": allow_short_final_shard,
         "selected_sequence_ids": [record.sequence_id for record in selected_records],
         "input_fasta": str(input_fasta_path),
         "output_dir": str(output_dir),
@@ -79,6 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--request-manifest", required=True, type=Path)
     parser.add_argument("--sequence-limit", required=True)
     parser.add_argument("--sequence-start", default=1, type=int)
+    parser.add_argument("--allow-short-final-shard", action="store_true")
     parser.add_argument("--input-fasta", required=True, type=Path)
     parser.add_argument("--run-manifest", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
@@ -90,6 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         request_manifest_path=args.request_manifest,
         sequence_limit=args.sequence_limit,
         sequence_start=args.sequence_start,
+        allow_short_final_shard=args.allow_short_final_shard,
         input_fasta_path=args.input_fasta,
         run_manifest_path=args.run_manifest,
         output_dir=args.output_dir,
@@ -166,7 +175,11 @@ def _validate_records_against_manifest(records: Sequence[FastaRecord], manifest:
 
 
 def _select_records(
-    records: Sequence[FastaRecord], sequence_limit: str, *, sequence_start: int = 1
+    records: Sequence[FastaRecord],
+    sequence_limit: str,
+    *,
+    sequence_start: int = 1,
+    allow_short_final_shard: bool = False,
 ) -> list[FastaRecord]:
     if sequence_start < 1:
         raise ValueError("sequence_start must be a one-based positive integer")
@@ -182,6 +195,8 @@ def _select_records(
     if limit < 1:
         raise ValueError("sequence_limit must be a positive integer or 'all'")
     if start_index + limit > len(records):
+        if allow_short_final_shard:
+            return list(records[start_index:])
         raise ValueError(
             f"sequence_start {sequence_start} with sequence_limit {limit} exceeds request sequence count {len(records)}"
         )

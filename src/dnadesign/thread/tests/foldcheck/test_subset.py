@@ -67,6 +67,32 @@ def test_materialize_foldcheck_sequence_subset_supports_one_based_start(tmp_path
     assert run_manifest["selected_sequence_start"] == 2
     assert run_manifest["selected_sequence_end"] == 3
     assert run_manifest["selected_sequence_count"] == 2
+    assert run_manifest["allow_short_final_shard"] is False
+    assert run_manifest["selected_sequence_ids"] == ["candidate_a", "candidate_b"]
+
+
+def test_materialize_foldcheck_sequence_subset_allows_short_final_shard(tmp_path: Path) -> None:
+    request_dir = tmp_path / "request"
+    request_dir.mkdir()
+    _write_request_fixture(request_dir)
+
+    run_manifest = materialize_foldcheck_sequence_subset(
+        request_manifest_path=request_dir / "foldcheck_request_manifest.yaml",
+        sequence_limit="3",
+        sequence_start=2,
+        allow_short_final_shard=True,
+        input_fasta_path=tmp_path / "run/input_sequences.fasta",
+        run_manifest_path=tmp_path / "run/colabfold_run_manifest.yaml",
+        output_dir=tmp_path / "run/colabfold_outputs",
+    )
+
+    assert (tmp_path / "run/input_sequences.fasta").read_text(encoding="utf-8") == (
+        ">candidate_a\nACDF\n>candidate_b\nACDG\n"
+    )
+    assert run_manifest["selected_sequence_start"] == 2
+    assert run_manifest["selected_sequence_end"] == 3
+    assert run_manifest["selected_sequence_count"] == 2
+    assert run_manifest["allow_short_final_shard"] is True
     assert run_manifest["selected_sequence_ids"] == ["candidate_a", "candidate_b"]
 
 

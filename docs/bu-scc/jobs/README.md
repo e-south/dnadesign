@@ -242,11 +242,14 @@ qsub \
   not fall back to the older system `libstdc++`.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
   full 97-record baseline request. For larger expanded requests, pass
-  `FOLDCHECK_SEQUENCE_START=<one-based-start>` with a bounded
-  `FOLDCHECK_SEQUENCE_LIMIT=<count>` and submit shards with separate
-  `FOLDCHECK_RUN_ROOT` values. The template delegates FASTA subsetting and run
-  manifest writing to `python -m dnadesign.thread.foldcheck.subset`, which
-  validates FASTA ids and sequence hashes against the request manifest.
+  `FOLDCHECK_SHARD_SIZE=<count>` with `qsub -t <start>-<end> -tc <limit>`.
+  The wrapper derives `FOLDCHECK_SEQUENCE_START` from `SGE_TASK_ID`, allows a
+  shorter final shard, and writes each shard under `FOLDCHECK_RUN_ROOT/shard_N`.
+  For one-off manual shards, pass `FOLDCHECK_SEQUENCE_START=<one-based-start>`
+  with a bounded `FOLDCHECK_SEQUENCE_LIMIT=<count>`. The template delegates
+  FASTA subsetting and run manifest writing to
+  `python -m dnadesign.thread.foldcheck.subset`, which validates FASTA ids and
+  sequence hashes against the request manifest.
 - runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
   preflight smoke runs and the first full coverage screen; reserve heavier
   multi-model checks for selected candidates after this first pass

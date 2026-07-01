@@ -32,7 +32,27 @@ cd "$repo_root"
 request_manifest="${FOLDCHECK_REQUEST_MANIFEST:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml}"
 sequence_limit="${FOLDCHECK_SEQUENCE_LIMIT:-6}"
 sequence_start="${FOLDCHECK_SEQUENCE_START:-1}"
-run_root="${FOLDCHECK_RUN_ROOT:-/project/dunlop/esouth/foldcheck/eco1_rt/${JOB_NAME}.${JOB_ID:-manual}}"
+shard_size="${FOLDCHECK_SHARD_SIZE:-}"
+run_root_base="${FOLDCHECK_RUN_ROOT:-/project/dunlop/esouth/foldcheck/eco1_rt/${JOB_NAME}.${JOB_ID:-manual}}"
+subset_args=()
+
+if [[ -n "$shard_size" ]]; then
+  if [[ -z "${SGE_TASK_ID:-}" ]]; then
+    echo "FOLDCHECK_SHARD_SIZE requires SGE_TASK_ID from an array job." >&2
+    exit 2
+  fi
+  if [[ ! "$shard_size" =~ ^[0-9]+$ || "$shard_size" -lt 1 ]]; then
+    echo "FOLDCHECK_SHARD_SIZE must be a positive integer." >&2
+    exit 2
+  fi
+  sequence_start=$(( (SGE_TASK_ID - 1) * shard_size + 1 ))
+  sequence_limit="$shard_size"
+  subset_args+=(--allow-short-final-shard)
+  run_root="${run_root_base}/shard_${SGE_TASK_ID}"
+else
+  run_root="$run_root_base"
+fi
+
 input_fasta="$run_root/input_sequences.fasta"
 output_dir="$run_root/colabfold_outputs"
 run_manifest="$run_root/colabfold_run_manifest.yaml"
@@ -53,6 +73,7 @@ uv run python -m dnadesign.thread.foldcheck.subset \
   --request-manifest "$request_manifest" \
   --sequence-limit "$sequence_limit" \
   --sequence-start "$sequence_start" \
+  "${subset_args[@]}" \
   --input-fasta "$input_fasta" \
   --run-manifest "$run_manifest" \
   --output-dir "$output_dir" \
