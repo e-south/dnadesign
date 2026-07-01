@@ -2,7 +2,7 @@
 #$ -N eco1_proteinmpnn_design_class
 #$ -P dunlop
 #$ -l h_rt=04:00:00
-#$ -pe omp 4
+#$ -pe omp 1
 #$ -l mem_per_core=8G
 #$ -j y
 #$ -o /project/dunlop/esouth/proteinmpnn/eco1_rt_design_classes/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
@@ -15,7 +15,7 @@ set -euo pipefail
 
 module purge
 
-export OMP_NUM_THREADS="${NSLOTS:-4}"
+export OMP_NUM_THREADS="${NSLOTS:-1}"
 
 repo_root="${DNADESIGN_REPO:-$PWD}"
 cd "$repo_root"

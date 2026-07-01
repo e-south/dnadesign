@@ -32,7 +32,8 @@ def test_eco1_proteinmpnn_design_class_qsub_is_submit_ready() -> None:
     assert "#$ -P dunlop" in qsub_script
     assert "#$ -t" not in qsub_script
     assert "#$ -now y" not in qsub_script
-    assert 'export OMP_NUM_THREADS="${NSLOTS:-4}"' in qsub_script
+    assert "#$ -pe omp 1" in qsub_script
+    assert 'export OMP_NUM_THREADS="${NSLOTS:-1}"' in qsub_script
     assert "SGE_TASK_ID" in qsub_script
     assert "DESIGN_CLASS_ID" in qsub_script
     assert "ECO1_DESIGN_CLASS_IDS" in qsub_script
