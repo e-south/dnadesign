@@ -44,6 +44,9 @@ def materialize_thread_plan(
     repo_root: Path | None = None,
     output_root: Path | None = None,
     created_at: str = _DEFAULT_CREATED_AT,
+    expected_mask_policy_id: str = _MASK_POLICY_ID,
+    sampling_policy_overrides: Mapping[str, Any] | None = None,
+    artifact_id: str = _THREAD_PLAN_ARTIFACT_ID,
 ) -> MaterializedThreadPlanArtifacts:
     """Materialize a planned backend request without running a backend."""
 
@@ -71,6 +74,9 @@ def materialize_thread_plan(
             "mask_set": mask_set_path,
         },
         created_at=created_at,
+        expected_mask_policy_id=expected_mask_policy_id,
+        sampling_policy_overrides=sampling_policy_overrides,
+        artifact_id=artifact_id,
     )
     thread_plan_path = out_root / "thread_plan.yaml"
     thread_plan_path.write_text(yaml.safe_dump(thread_plan, sort_keys=False), encoding="utf-8")
@@ -83,9 +89,14 @@ def _build_thread_plan(
     mask_set: Mapping[str, Any],
     paths: Mapping[str, Path],
     created_at: str,
+    expected_mask_policy_id: str,
+    sampling_policy_overrides: Mapping[str, Any] | None = None,
+    artifact_id: str,
 ) -> dict[str, Any]:
-    _require_mask_policy(mask_set)
-    sampling_policy = _require_mapping(profile.get("sampling_policy"), "sampling_policy")
+    mask_policy_id = _require_mask_policy(mask_set, expected_mask_policy_id=expected_mask_policy_id)
+    sampling_policy = dict(_require_mapping(profile.get("sampling_policy"), "sampling_policy"))
+    if sampling_policy_overrides:
+        sampling_policy.update(dict(sampling_policy_overrides))
     backend_kind = _selected_backend(sampling_policy)
     seed_set = _require_positive_int_list(sampling_policy.get("seed_set"), "sampling_policy.seed_set")
     temperatures = _require_positive_number_list(
@@ -113,13 +124,13 @@ def _build_thread_plan(
         raise ValueError("non_fixed_missing_backbone positions cannot be emitted as fixed-backbone mutable")
 
     profile_id = _require_text(profile, "profile_id")
-    backend_run_id = f"{profile_id}.{backend_kind}.{_MASK_POLICY_ID}.planned"
+    backend_run_id = f"{profile_id}.{backend_kind}.{mask_policy_id}.planned"
     upstream_hashes = {name: "sha256:" + _sha256(path) for name, path in paths.items()}
     source = {
         "artifact_id": _require_text(mask_set, "artifact_id"),
         "path": str(paths["mask_set"]),
         "hash": upstream_hashes["mask_set"],
-        "mask_policy_id": _MASK_POLICY_ID,
+        "mask_policy_id": mask_policy_id,
     }
     request_manifest = {
         "request_schema_id": "proteinmpnn.fixed_backbone_request.v1",
@@ -127,7 +138,7 @@ def _build_thread_plan(
         "backend_kind": backend_kind,
         "backend_run_id": backend_run_id,
         "profile_id": profile_id,
-        "mask_policy_id": _MASK_POLICY_ID,
+        "mask_policy_id": mask_policy_id,
         "backbone_bundle_path": str(paths["backbone_bundle"]),
         "residue_map_path": str(paths["residue_map"]),
         "mask_set_path": str(paths["mask_set"]),
@@ -147,12 +158,12 @@ def _build_thread_plan(
     plan_without_hash = {
         "schema_id": "thread.thread_plan",
         "schema_version": 1,
-        "artifact_id": _THREAD_PLAN_ARTIFACT_ID,
+        "artifact_id": artifact_id,
         "status": "materialized",
         "created_by": _CREATED_BY,
         "created_at": created_at,
         "profile_id": profile_id,
-        "mask_policy_id": _MASK_POLICY_ID,
+        "mask_policy_id": mask_policy_id,
         "backend_kind": backend_kind,
         "backend_run_id": backend_run_id,
         "backend_request_manifest": request_manifest,
@@ -186,11 +197,13 @@ def _request_hash(payload: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def _require_mask_policy(mask_set: Mapping[str, Any]) -> None:
-    if mask_set.get("mask_policy_id") != _MASK_POLICY_ID:
-        raise ValueError(f"mask_set.yaml must use {_MASK_POLICY_ID}")
+def _require_mask_policy(mask_set: Mapping[str, Any], *, expected_mask_policy_id: str) -> str:
+    observed = _require_text(mask_set, "mask_policy_id")
+    if observed != expected_mask_policy_id:
+        raise ValueError(f"mask_set.yaml must use {expected_mask_policy_id}")
     if mask_set.get("sampling_allowed") is not True:
         raise ValueError("mask_set.yaml must allow sampling before thread_plan.yaml can be materialized")
+    return observed
 
 
 def _require_rows(mask_set: Mapping[str, Any]) -> list[Mapping[str, Any]]:

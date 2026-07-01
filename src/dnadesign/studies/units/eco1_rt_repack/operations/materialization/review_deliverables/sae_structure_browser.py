@@ -26,7 +26,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .structure_browser_common import (
+    CANDIDATE_PASS_COLOR,
+    PROTEIN_CLASS_COLOR,
     REFERENCE_COLOR,
+    RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
     display_label,
     nullable_float,
     nullable_int,
@@ -35,7 +38,7 @@ from .structure_browser_common import (
 )
 
 SAE_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "biohub_esmc_sae_structure_browser_manifest.yaml"
-_SAE_HIGHLIGHT_COLOR = "#D55E00"
+_SAE_HIGHLIGHT_COLOR = RESIDUE_CATEGORY_HIGHLIGHT_COLOR
 _SAE_STRUCTURE_FEATURES_PER_PROTEIN = 10
 
 
@@ -276,7 +279,7 @@ def _sae_activation_rows(
                 "group": "WT/reference SAE activations" if is_reference else "ProteinMPNN variant SAE activations",
                 "local_path": relative_path(local_path, manifest_root),
                 "structure_format": reference_structure_format if is_reference else "pdb",
-                "color": "#0072B2" if is_reference else "#009E73",
+                "color": PROTEIN_CLASS_COLOR if is_reference else CANDIDATE_PASS_COLOR,
                 "structure_view_mode": "reference_selection" if is_reference else "sae_activation",
                 "description": _sae_structure_description(top_row),
                 "selection_styles": [

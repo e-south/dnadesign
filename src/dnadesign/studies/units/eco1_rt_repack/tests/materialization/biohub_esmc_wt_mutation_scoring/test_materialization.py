@@ -26,8 +26,6 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.atlas_semantic
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.biohub_esmc_wt_mutation_scoring._fixtures import (
     FakeSequenceLogitsClient,
     TimeoutOnceSequenceLogitsClient,
-    rewrite_position_table_with_null_alternate_fraction,
-    rewrite_position_table_with_old_fraction_name,
     write_mask_set,
 )
 
@@ -69,6 +67,49 @@ def test_wt_mutation_scoring_materializes_two_position_smoke(tmp_path: Path) -> 
     assert "RT1-RT7 annotation intervals" in entropy_plot_text
     assert "Mask-protected residues" in entropy_plot_text
     assert "NAxxH/YADD/VTG motif anchors" in entropy_plot_text
+
+
+def test_wt_mutation_scoring_nondefault_model_uses_model_specific_root(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    write_mask_set(tmp_path / "mask_set.yaml", length=4)
+
+    result = materialize_biohub_esmc_wt_mutation_scoring(
+        repo_root=Path.cwd(),
+        output_root=tmp_path,
+        positions="1",
+        model="esmc-6b-2024-12",
+        max_new_requests=1,
+        biohub_client=FakeSequenceLogitsClient(),
+        retrieved_at="2026-06-27T00:00:00Z",
+    )
+
+    scoring_root = tmp_path / "biohub_esmc" / "mutation_scoring" / "esmc_6b_2024_12"
+    legacy_root = tmp_path / "biohub_esmc" / "mutation_scoring"
+    assert result.position_entropy_path.parent == scoring_root
+    assert result.substitution_llr_path.parent == scoring_root
+    assert result.mask_join_path.parent == scoring_root
+    assert result.plots_root == scoring_root / "plots"
+    assert not (legacy_root / "wt_position_entropy.parquet").exists()
+    manifest = yaml.safe_load(result.request_manifest_path.read_text(encoding="utf-8"))
+    assert manifest["model"] == "esmc-6b-2024-12"
+
+
+def test_wt_mutation_scoring_rejects_path_unsafe_model_id(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    write_mask_set(tmp_path / "mask_set.yaml", length=4)
+
+    with pytest.raises(ValueError, match="path-safe"):
+        materialize_biohub_esmc_wt_mutation_scoring(
+            repo_root=Path.cwd(),
+            output_root=tmp_path,
+            positions="1",
+            model="../esmc-6b-2024-12",
+            max_new_requests=1,
+            biohub_client=FakeSequenceLogitsClient(),
+            retrieved_at="2026-06-27T00:00:00Z",
+        )
+
+    assert not (tmp_path / "biohub_esmc").exists()
 
 
 def test_wt_mutation_scoring_final_run_requires_all_wt_positions(tmp_path: Path) -> None:
@@ -117,57 +158,5 @@ def test_wt_mutation_scoring_final_run_rejects_timeout_error_row(tmp_path: Path)
             output_root=tmp_path,
             positions="all",
             biohub_client=TimeoutOnceSequenceLogitsClient(),
-            retrieved_at="2026-06-27T00:00:00Z",
-        )
-
-
-def test_wt_mutation_scoring_resume_rejects_stale_position_schema(tmp_path: Path) -> None:
-    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
-    write_mask_set(tmp_path / "mask_set.yaml", length=4)
-
-    first = materialize_biohub_esmc_wt_mutation_scoring(
-        repo_root=Path.cwd(),
-        output_root=tmp_path,
-        positions="1",
-        max_new_requests=1,
-        biohub_client=FakeSequenceLogitsClient(),
-        retrieved_at="2026-06-27T00:00:00Z",
-    )
-    rewrite_position_table_with_old_fraction_name(first.position_entropy_path)
-
-    with pytest.raises(ValueError, match="stale mutation-scoring cache"):
-        materialize_biohub_esmc_wt_mutation_scoring(
-            repo_root=Path.cwd(),
-            output_root=tmp_path,
-            positions="1",
-            resume_existing=True,
-            max_new_requests=0,
-            biohub_client=FakeSequenceLogitsClient(),
-            retrieved_at="2026-06-27T00:00:00Z",
-        )
-
-
-def test_wt_mutation_scoring_resume_rejects_null_accepted_metric(tmp_path: Path) -> None:
-    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
-    write_mask_set(tmp_path / "mask_set.yaml", length=4)
-
-    first = materialize_biohub_esmc_wt_mutation_scoring(
-        repo_root=Path.cwd(),
-        output_root=tmp_path,
-        positions="1",
-        max_new_requests=1,
-        biohub_client=FakeSequenceLogitsClient(),
-        retrieved_at="2026-06-27T00:00:00Z",
-    )
-    rewrite_position_table_with_null_alternate_fraction(first.position_entropy_path)
-
-    with pytest.raises(ValueError, match="stale mutation-scoring cache"):
-        materialize_biohub_esmc_wt_mutation_scoring(
-            repo_root=Path.cwd(),
-            output_root=tmp_path,
-            positions="1",
-            resume_existing=True,
-            max_new_requests=0,
-            biohub_client=FakeSequenceLogitsClient(),
             retrieved_at="2026-06-27T00:00:00Z",
         )

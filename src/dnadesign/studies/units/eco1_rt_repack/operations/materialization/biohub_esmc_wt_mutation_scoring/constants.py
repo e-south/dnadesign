@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import re
 from pathlib import Path
 
 from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
@@ -33,3 +34,19 @@ PLOTS_DIR_NAME = "plots"
 REQUEST_MANIFEST_RELATIVE_PATH = "foldcheck_request/foldcheck_request_manifest.yaml"
 FOLDCHECK_REPORT_FILE_NAME = "foldcheck_report.parquet"
 MASK_SET_FILE_NAME = "mask_set.yaml"
+
+
+def scoring_relative_root_for_model(model: str) -> Path:
+    """Return the model-scoped mutation-scoring artifact root."""
+
+    model_id = model.strip()
+    if not model_id:
+        raise ValueError("Biohub ESMC model id must be non-empty")
+    if "/" in model_id or "\\" in model_id or ".." in model_id:
+        raise ValueError(f"Biohub ESMC model id is not path-safe: {model!r}")
+    if model_id == DEFAULT_MODEL:
+        return SCORING_RELATIVE_ROOT
+    component = re.sub(r"[^A-Za-z0-9]+", "_", model_id).strip("_").lower()
+    if not component:
+        raise ValueError(f"Biohub ESMC model id is not path-safe: {model!r}")
+    return SCORING_RELATIVE_ROOT / component

@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-29
+last_verified: 2026-07-01
 status_surface: record-only
 ---
 
@@ -98,6 +98,16 @@ handled separately.
   mutations. The
   named batch table is also retained at
   `candidate_tables/eco1_rt_p25_5a_n96_20260624.parquet`.
+- `design_classes/` is materialized as an expansion request surface. It keeps
+  the current 5 A class as the baseline and adds five class-specific
+  ProteinMPNN request roots: clade 9 p25 contact 6/8/10 A, clade 9 p50 contact
+  5 A, and II-A3/`42_1` p50 contact 5 A. Each generated class has its own
+  `mask_set.yaml`, `thread_plan.yaml`, and `proteinmpnn_request/` sidecars.
+  The aggregate `candidate_pool.parquet` currently contains only the 96
+  baseline candidates and marks all five generated classes as pending
+  ProteinMPNN candidate tables. Expanded fold-check request generation is
+  intentionally blocked until at least one generated class contributes accepted
+  candidates.
 - `foldcheck_request/foldcheck_request_manifest.yaml` and
   `foldcheck_request/input_sequences.fasta` are materialized locally. The FASTA
   contains one WT baseline plus the 96 candidate-table rows where
@@ -266,7 +276,20 @@ handled separately.
   `log P(alternate) - log P(WT)`. The `fraction_negative_alternate_llr` field is
   over the 19 non-WT canonical alternates, not over the WT residue. This is a
   model-constraint audit for future mask-policy review, not experimental deep
-  mutational scanning and not a current-mask update.
+  mutational scanning and not a current-mask update. The 300M ESMC grid remains
+  under `biohub_esmc/mutation_scoring/`; the materializer routes non-default
+  models such as `esmc-6b-2024-12` to model-specific subdirectories so
+  rescoring does not overwrite that grid. A separate 6B ESMC WT grid is now
+  materialized under `biohub_esmc/mutation_scoring/esmc_6b_2024_12/` with 320
+  accepted position rows, 6,080 accepted non-WT substitution rows, and request
+  hash `sha256:2d2c5114e15734e51c5694a105aa2e43496218fae5e952c69b6dedb5601b3c2c`.
+  The review-deliverables bundle derives a separate 6B additive candidate LLR
+  table and plot from that grid. All 96 synthetic candidates are negative under
+  the 6B additive WT-context LLR total (`-146.945` to `-72.598`), so the 6B
+  signal should be used for relative ranking and model-stability review rather
+  than as a nonnegative threshold. The 300M-versus-6B candidate-rank comparison
+  has Spearman rank correlation `0.6610`, top-10 overlap `6/10`, and 89
+  candidate sign changes.
 
 ### Mask Counts
 

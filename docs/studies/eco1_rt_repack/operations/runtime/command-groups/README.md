@@ -125,6 +125,53 @@ for full ChimeraX viewing while preserving SCC source paths in the manifest. The
 review plots include alt text and interpretation limits; they summarize model
 metrics and SAE coverage for inspection, not candidate acceptance.
 
+### Design-Class Expansion
+
+The 5 A class remains the baseline. The design-class materializer adds request
+surfaces for five additional classes without overwriting the baseline artifacts:
+clade 9 p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and II-A3/`42_1` p50
+contact 5 A.
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . requests
+```
+
+Each generated class gets its own `mask_set.yaml`, `thread_plan.yaml`, and
+ProteinMPNN request sidecars under `outputs/thread/design_classes/<class-id>/`.
+Run ProteinMPNN for those classes on BU SCC through the submit-ready job
+template in `docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub`. Submit one
+class first, then the remaining array after the smoke writes its per-class
+`candidate_table.parquet`:
+
+```bash
+qsub -t 1-1 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
+qsub -t 2-5 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
+```
+
+After those runs are ingested into per-class `candidate_table.parquet` files,
+rebuild the nonredundant pool:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
+```
+
+The pool keeps one row per `sequence_hash` and records duplicate class
+provenance. Only after the pool includes at least one generated class should the
+expanded fold-check request be written:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . foldcheck-request
+```
+
+The expanded fold-check, ColabFold normalization, Biohub ESMC SAE profile, and
+ESMC additive LLR review should then use the `design_classes/` output root so
+the new variants carry the same feature families as the current 96-candidate
+baseline.
+
 `review_deliverables` builds the first broader manuscript/review bundle from
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
 Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
@@ -189,7 +236,10 @@ validation or processivity evidence.
 
 `biohub_esmc_wt_mutation_scoring` is a WT-only masked-marginal model-constraint
 audit. A final uncapped run must use all 320 WT positions; short position
-ranges are smoke tests only and must be capped with `--max-new-requests`.
+ranges are smoke tests only and must be capped with `--max-new-requests`. The
+default 300M run writes to `biohub_esmc/mutation_scoring/`. Non-default models
+write under a model-specific subdirectory, so a 6B rescore does not overwrite
+the 300M grid.
 
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring \
@@ -201,6 +251,30 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --request-sleep-seconds 1.5 \
   --request-timeout-seconds 180
 ```
+
+To rescore the same WT masked contexts with the 6B model:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring \
+  --repo-root . \
+  --positions all \
+  --key-file ../key.md \
+  --model esmc-6b-2024-12 \
+  --request-sleep-seconds 1.5 \
+  --request-timeout-seconds 180
+```
+
+That command writes to
+`biohub_esmc/mutation_scoring/esmc_6b_2024_12/`. The review-deliverables
+materializer derives a separate 6B additive candidate-LLR table and plot when
+that directory exists, then renders a 300M-versus-6B rank-stability plot. These
+scores remain WT-context masked-marginal additive LLR values, not whole-protein
+likelihoods.
+
+Do not expect a capped position smoke test to resume into `--positions all`.
+The request hash includes the selected position set. Use `--resume-existing`
+only when rerunning the same model and same position set, such as a completed
+all-position 6B grid.
 
 The review-deliverables command now also renders a lightweight SAE
 interpretation section from the existing sparse Biohub ESMC tables. That pass

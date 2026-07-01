@@ -46,7 +46,7 @@ STANDARD_AMINO_ACID_RESIDUE_NAMES = frozenset(
 ViewProjection = Literal["", "orthographic", "perspective"]
 ViewStyle = Literal["", "outline"]
 MoleculeClass = Literal["protein", "dna", "rna"]
-MoleculeRenderStyle = Literal["", "cartoon", "line", "stick"]
+MoleculeRenderStyle = Literal["", "cartoon", "line", "stick", "surface"]
 
 
 @dataclass(frozen=True)
@@ -201,7 +201,7 @@ class StructureViewMoleculeStyle:
             raise ValueError(f"StructureViewMoleculeStyle.label is required for {self.molecule_class}")
         if not (0.0 < float(self.opacity) <= 1.0):
             raise ValueError(f"StructureViewMoleculeStyle.opacity must be in (0, 1] for {self.molecule_class}")
-        if self.style not in {"", "cartoon", "line", "stick"}:
+        if self.style not in {"", "cartoon", "line", "stick", "surface"}:
             raise ValueError(f"Unsupported molecule render style: {self.style}")
         if float(self.radius) <= 0.0:
             raise ValueError(f"StructureViewMoleculeStyle.radius must be positive for {self.molecule_class}")
@@ -247,6 +247,7 @@ class StructureViewSpec:
     interpretation_limit: str = ""
     molecule_styles: tuple[StructureViewMoleculeStyle, ...] = ()
     selection_styles: tuple[StructureViewSelectionStyle, ...] = ()
+    hidden_molecule_classes: tuple[MoleculeClass, ...] = ()
     width: int = 700
     height: int = 500
     background_color: str = "#ffffff"
@@ -277,6 +278,9 @@ class StructureViewSpec:
         for model in self.models:
             model.validate()
         model_ids = {model.model_id for model in self.models}
+        hidden_molecule_classes = set(self.hidden_molecule_classes)
+        if hidden_molecule_classes - {"protein", "dna", "rna"}:
+            raise ValueError(f"Unsupported hidden molecule class: {sorted(hidden_molecule_classes)}")
         for molecule_style in self.molecule_styles:
             molecule_style.validate(model_ids=model_ids)
         for selection_style in self.selection_styles:

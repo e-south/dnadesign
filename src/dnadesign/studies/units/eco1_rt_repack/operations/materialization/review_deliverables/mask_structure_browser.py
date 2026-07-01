@@ -26,6 +26,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 
 from .structure_browser_common import (
     REFERENCE_COLOR,
+    RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
     reference_residue_number_by_canonical,
     reference_selection_coordinate_basis,
     relative_path,
@@ -33,7 +34,7 @@ from .structure_browser_common import (
 )
 
 MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "mask_structure_browser_manifest.yaml"
-_MASK_HIGHLIGHT_COLOR = "#D55E00"
+_MASK_HIGHLIGHT_COLOR = RESIDUE_CATEGORY_HIGHLIGHT_COLOR
 _MASK_SELECTIONS = (
     (
         "motif_protected",

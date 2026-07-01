@@ -33,6 +33,7 @@ dependencies = [
   "seaborn",
   "tqdm",
   "typer",
+  "umap-learn>=0.5.11",
   "duckdb>=0.10.0",
   "xlrd",
   # Torch 2.10 is the current patched floor for active PyTorch advisories with fixed releases.

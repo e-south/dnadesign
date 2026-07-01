@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-24
+last_verified: 2026-07-01
 ---
 
 ## Residue Mask Policy
@@ -80,10 +80,39 @@ Evidence-review artifacts explain the structure context but are not mask inputs.
 WT ESMC masked-marginal entropy and substitution LLRs are also review-only
 model-constraint evidence under this policy; they do not protect or release
 residues unless a future mask policy explicitly promotes them.
-The rule does not search across contact-density, contact-class, or
-conservation-threshold variants.
-The next sampling plan should use the materialized `mask_set.yaml` under
-`eco1_rt_clade9_plurality25_direct_contact5a_v1`.
+
+### Design-Class Expansion
+
+The 5 A class remains the baseline. Additional classes are now separate
+ProteinMPNN request surfaces, not replacements for the baseline and not
+candidate-handoff decisions. Each class has its own `mask_set.yaml`,
+`thread_plan.yaml`, and `proteinmpnn_request/request_manifest.yaml` under:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/
+```
+
+The expansion classes are:
+
+| Class | Purpose | Mutable mapped positions |
+| --- | --- | ---: |
+| `eco1_rt_clade9_plurality25_contact5a_v1` | Existing baseline: clade 9 25% WT plurality and 5 A retained DNA/RNA contact | 123 |
+| `eco1_rt_clade9_plurality25_contact6a_v1` | Modest contact-shell sensitivity | 103 |
+| `eco1_rt_clade9_plurality25_contact8a_v1` | Stronger contact-shell sensitivity | 51 |
+| `eco1_rt_clade9_plurality25_contact10a_v1` | Conservative sentinel class with a small mutable surface | 32 |
+| `eco1_rt_clade9_plurality50_contact5a_v1` | Less restrictive clade 9 conservation threshold with the 5 A contact rule | 139 |
+| `eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1` | Closer II-A3/`42_1` family conservation denominator with the 5 A contact rule | 118 |
+
+The candidate pool is nonredundant by `sequence_hash`. If the same sequence is
+produced in more than one class, the pool keeps one row and records the duplicate
+class ids and source candidate ids. The baseline has priority so the original 96
+candidate identities stay stable.
+
+Downstream fold-check, ESMC SAE, and ESMC LLR feature tables should be generated
+from the nonredundant class pool after the new ProteinMPNN candidate tables are
+present. The expanded fold-check request intentionally fails if only baseline
+candidates are available, because a baseline-only expanded FASTA would look
+complete while containing no new designs.
 
 ### Implementation Contract
 

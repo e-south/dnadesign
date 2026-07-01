@@ -51,8 +51,10 @@ ATOM      4  C   ALA A   1       2.000   1.400   0.000  1.00 80.00           C
 ATOM      5  O   ALA A   1       1.300   2.300   0.000  1.00 80.00           O
 HETATM    6  P    DA B   1       4.000   0.000   0.000  1.00 80.00           P
 HETATM    7  O3'  DA B   1       4.500   0.500   0.000  1.00 80.00           O
-HETATM    8  P     U C   2       5.000   0.000   0.000  1.00 80.00           P
-HETATM    9  O3'   U C   2       5.500   0.500   0.000  1.00 80.00           O
+HETATM    8  N1   DA B   1       4.900   0.900   0.000  1.00 80.00           N
+HETATM    9  P     U C   2       5.000   0.000   0.000  1.00 80.00           P
+HETATM   10  O3'   U C   2       5.500   0.500   0.000  1.00 80.00           O
+HETATM   11  N1    U C   2       5.900   0.900   0.000  1.00 80.00           N
 END
 """
 
@@ -184,7 +186,80 @@ def test_py3dmol_backend_scopes_residue_highlights_to_protein_residues() -> None
         '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",'
         '"LEU","LYS","MET","PHE","PRO","SER","THR","TRP","TYR","VAL"]'
     ) in unescaped_html
+    assert '"resi":[1],"resn":["DA","DC","DG","DT"]' not in unescaped_html
+    assert '"resi":[1],"resn":["A","C","G","I","U"]' not in unescaped_html
+
+
+def test_py3dmol_backend_keeps_nucleic_acid_cartoons_without_color_toggles() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Default nucleic-acid context",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert '"resn":["DA","DC","DG","DT"]' in unescaped_html
+    assert '"resn":["A","C","G","I","U"]' in unescaped_html
+    assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_html
+    assert (
+        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#F7F3EA","colorfunc":function(atom){return"#F7F3EA";}}'
+    ) in unescaped_html
+    assert "#C58A00" not in html
+    assert "#D6604D" not in html
+    assert '"stick":{"radius":0.18}' not in unescaped_html
+
+
+def test_py3dmol_backend_can_hide_nucleic_acid_classes() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Hidden nucleic-acid context",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle("dna", "reference", label="DNA", color="#E69F00"),
+                StructureViewMoleculeStyle("rna", "reference", label="RNA", color="#009E73"),
+            ),
+            hidden_molecule_classes=("dna",),
+        )
+    )
+
+    unescaped_payload = html_lib.unescape(html)
+    unescaped_html = unescaped_payload.replace(" ", "")
+    assert "HETATM    6  P    DA B   1" not in unescaped_payload
+    assert "HETATM    8  N1   DA B   1" not in unescaped_payload
+    assert "HETATM    9  P     U C   2" in unescaped_payload
+    assert "HETATM   11  N1    U C   2" in unescaped_payload
     assert '"resn":["DA","DC","DG","DT"]' not in unescaped_html
+    assert '"resn":["A","C","G","I","U"]' in unescaped_html
+    assert "#E69F00" not in html
+    assert "DNA" not in html
+    assert '"cartoon":{"color":"#E69F00"}' not in unescaped_html
+    assert '"stick":{"color":"#E69F00","radius":0.18}' not in unescaped_html
+    assert (
+        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#009E73","colorfunc":function(atom){return"#009E73";}}'
+    ) in unescaped_html
+    assert '"stick":{"color":"#009E73","radius":0.18}' not in unescaped_html
+
+    hidden_all_html = render_structure_view_html(
+        StructureViewSpec(
+            title="Hidden nucleic-acid context",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle("dna", "reference", label="DNA", color="#E69F00"),
+                StructureViewMoleculeStyle("rna", "reference", label="RNA", color="#009E73"),
+            ),
+            hidden_molecule_classes=("dna", "rna"),
+        )
+    )
+
+    hidden_all_payload = html_lib.unescape(hidden_all_html)
+    hidden_all_unescaped = hidden_all_payload.replace(" ", "")
+    assert "HETATM    6  P    DA B   1" not in hidden_all_payload
+    assert "HETATM    9  P     U C   2" not in hidden_all_payload
+    assert '"resn":["DA","DC","DG","DT"]' not in hidden_all_unescaped
+    assert '"resn":["A","C","G","I","U"]' not in hidden_all_unescaped
+    assert "#E69F00" not in hidden_all_html
+    assert "#009E73" not in hidden_all_html
 
 
 def test_py3dmol_backend_can_color_molecule_classes_independently() -> None:
@@ -206,9 +281,172 @@ def test_py3dmol_backend_can_color_molecule_classes_independently() -> None:
     assert "RNA" in html
     assert '"resn":["DA","DC","DG","DT"]' in unescaped_html
     assert '"resn":["A","C","G","I","U"]' in unescaped_html
+    assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_html
     assert '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",' in unescaped_html
-    assert '"stick":{"color":"#E69F00","radius":0.18}' in unescaped_html
-    assert '"stick":{"color":"#009E73","radius":0.18}' in unescaped_html
+    assert (
+        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#E69F00","colorfunc":function(atom){return"#E69F00";}}'
+    ) in unescaped_html
+    assert '"stick":{"color":"#E69F00","radius":0.18}' not in unescaped_html
+    assert '"atom":["N1"]' not in unescaped_html
+    assert (
+        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#009E73","colorfunc":function(atom){return"#009E73";}}'
+    ) in unescaped_html
+    assert '"stick":{"color":"#009E73","radius":0.18}' not in unescaped_html
+
+
+def test_py3dmol_backend_colors_nucleic_acid_selection_backbone_and_bases_together() -> None:
+    dna_html = render_structure_view_html(
+        StructureViewSpec(
+            title="DNA-scoped selection",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            selection_styles=(
+                StructureViewSelectionStyle(
+                    selection_id="dna_site",
+                    model_id="reference",
+                    label="DNA residue 1",
+                    residue_numbers=(1,),
+                    residue_scope="dna",
+                    color="#D55E00",
+                ),
+            ),
+        )
+    )
+
+    unescaped_dna = html_lib.unescape(dna_html).replace(" ", "")
+    assert "DNA residue 1" in dna_html
+    assert '"resi":[1],"resn":["DA","DC","DG","DT"]' in unescaped_dna
+    assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_dna
+    assert '"cartoon":{"style":"rectangle","ribbon":true,"color":"#D55E00"' in unescaped_dna
+    assert '"colorfunc":function(atom){return"#D55E00";}' in unescaped_dna
+    assert '"stick":{"color":"#D55E00","radius":0.18}' not in unescaped_dna
+
+    rna_html = render_structure_view_html(
+        StructureViewSpec(
+            title="RNA-scoped selection",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            selection_styles=(
+                StructureViewSelectionStyle(
+                    selection_id="rna_site",
+                    model_id="reference",
+                    label="RNA residue 2",
+                    residue_numbers=(2,),
+                    residue_scope="rna",
+                    color="#D55E00",
+                ),
+            ),
+        )
+    )
+
+    unescaped_rna = html_lib.unescape(rna_html).replace(" ", "")
+    assert "RNA residue 2" in rna_html
+    assert '"resi":[2],"resn":["A","C","G","I","U"]' in unescaped_rna
+    assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_rna
+    assert '"cartoon":{"style":"rectangle","ribbon":true,"color":"#D55E00"' in unescaped_rna
+    assert '"colorfunc":function(atom){return"#D55E00";}' in unescaped_rna
+    assert '"stick":{"color":"#D55E00","radius":0.18}' not in unescaped_rna
+
+
+def test_py3dmol_backend_colors_visible_protein_sidechains_with_molecule_class() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Protein-class coloring",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    _SIDECHAIN_PDB,
+                    label="Reference",
+                    color="#8c959f",
+                    show_sidechains=True,
+                    sidechain_color="#8c959f",
+                ),
+            ),
+            molecule_styles=(StructureViewMoleculeStyle("protein", "reference", label="Protein", color="#0072B2"),),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_html
+    assert '"cartoon":{"color":"#0072B2"}' in unescaped_html
+    assert '"stick":{"color":"#0072B2","radius":0.16}' in unescaped_html
+    assert '"stick":{"color":"#8c959f","radius":0.16}' not in unescaped_html
+
+
+def test_py3dmol_backend_applies_selection_after_visible_sidechain_styles() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Selected side-chain coloring",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    _SIDECHAIN_PDB,
+                    label="Reference",
+                    color="#0072B2",
+                    show_sidechains=True,
+                ),
+            ),
+            selection_styles=(
+                StructureViewSelectionStyle(
+                    selection_id="active_site",
+                    model_id="reference",
+                    label="Active-site residues",
+                    residue_numbers=(1,),
+                    color="#D55E00",
+                ),
+            ),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    base_sticks = '"stick":{"color":"#0072B2","radius":0.16}'
+    highlighted_sticks = '"stick":{"color":"#D55E00","radius":0.22}'
+    assert base_sticks in unescaped_html
+    assert highlighted_sticks in unescaped_html
+    assert unescaped_html.index(base_sticks) < unescaped_html.index(highlighted_sticks)
+
+
+def test_py3dmol_backend_shows_selected_protein_sidechains_without_global_sidechains() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Selected side-chain-only emphasis",
+            models=(StructureViewModel("reference", _SIDECHAIN_PDB, label="Reference", color="#F7F3EA"),),
+            selection_styles=(
+                StructureViewSelectionStyle(
+                    selection_id="active_site",
+                    model_id="reference",
+                    label="Active-site residues",
+                    residue_numbers=(1,),
+                    color="#C00000",
+                ),
+            ),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert '"stick":{"color":"#F7F3EA","radius":0.16}' not in unescaped_html
+    assert '"stick":{"color":"#C00000","radius":0.22}' in unescaped_html
+
+
+def test_py3dmol_backend_can_emit_explicit_molecule_surface_style() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Protein surface style",
+            models=(StructureViewModel("reference", _SIDECHAIN_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle(
+                    "protein",
+                    "reference",
+                    label="Protein surface",
+                    color="#D55E00",
+                    opacity=0.42,
+                    style="surface",
+                ),
+            ),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert 'addSurface("VDW",{"color":"#D55E00","opacity":0.42}' in unescaped_html
+    assert '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",' in unescaped_html
 
 
 def test_py3dmol_backend_maps_mmcif_contract_to_3dmol_cif_loader() -> None:

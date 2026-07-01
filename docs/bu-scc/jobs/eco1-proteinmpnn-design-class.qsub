@@ -1,0 +1,94 @@
+#!/bin/bash -l
+#$ -N eco1_proteinmpnn_design_class
+#$ -P dunlop
+#$ -l h_rt=04:00:00
+#$ -pe omp 4
+#$ -l mem_per_core=8G
+#$ -t 1-5
+#$ -j y
+#$ -o /project/dunlop/esouth/proteinmpnn/eco1_rt_design_classes/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
+
+set -euo pipefail
+
+# Eco1 ProteinMPNN design-class runtime lane.
+# This job consumes class-specific request manifests and writes the per-class
+# sample and candidate tables needed by the expanded nonredundant pool.
+
+module purge
+
+export OMP_NUM_THREADS="${NSLOTS:-4}"
+
+repo_root="${DNADESIGN_REPO:-$PWD}"
+cd "$repo_root"
+
+design_classes_root="${ECO1_DESIGN_CLASSES_ROOT:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes}"
+class_ids_csv="${ECO1_DESIGN_CLASS_IDS:-eco1_rt_clade9_plurality25_contact6a_v1,eco1_rt_clade9_plurality25_contact8a_v1,eco1_rt_clade9_plurality25_contact10a_v1,eco1_rt_clade9_plurality50_contact5a_v1,eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1}"
+proteinmpnn_root="${PROTEINMPNN_ROOT:-.var/tools/proteinmpnn}"
+
+IFS=',' read -r -a class_ids <<<"$class_ids_csv"
+
+if [[ -n "${DESIGN_CLASS_ID:-}" ]]; then
+  design_class_id="$DESIGN_CLASS_ID"
+else
+  task_id="${SGE_TASK_ID:-1}"
+  if ! [[ "$task_id" =~ ^[0-9]+$ ]]; then
+    echo "SGE_TASK_ID must be numeric when DESIGN_CLASS_ID is not set: $task_id" >&2
+    exit 2
+  fi
+  class_index=$((task_id - 1))
+  if ((class_index < 0 || class_index >= ${#class_ids[@]})); then
+    echo "SGE_TASK_ID $task_id is outside the class map with ${#class_ids[@]} entries." >&2
+    exit 2
+  fi
+  design_class_id="${class_ids[$class_index]}"
+fi
+
+if [[ ! -f "$proteinmpnn_root/protein_mpnn_run.py" ]]; then
+  echo "PROTEINMPNN_ROOT must point to an official ProteinMPNN checkout containing protein_mpnn_run.py: $proteinmpnn_root" >&2
+  exit 2
+fi
+
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes \
+  --repo-root . \
+  requests
+
+class_root="$design_classes_root/$design_class_id"
+request_manifest="$class_root/proteinmpnn_request/request_manifest.yaml"
+sample_table="$class_root/sample_table.parquet"
+candidate_table="$class_root/candidate_table.parquet"
+
+if [[ ! -f "$request_manifest" ]]; then
+  echo "Design-class ProteinMPNN request manifest does not exist: $request_manifest" >&2
+  exit 2
+fi
+
+overwrite_args=()
+if [[ "${ECO1_PROTEINMPNN_OVERWRITE:-0}" == "1" ]]; then
+  overwrite_args+=(--overwrite)
+fi
+
+echo "Running Eco1 design class: $design_class_id"
+echo "Request manifest: $request_manifest"
+echo "ProteinMPNN root: $proteinmpnn_root"
+
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest \
+  --repo-root . \
+  --output-root "$class_root" \
+  --proteinmpnn-root "$proteinmpnn_root" \
+  "${overwrite_args[@]}"
+
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table \
+  --repo-root . \
+  --output-root "$class_root"
+
+if [[ ! -f "$sample_table" ]]; then
+  echo "ProteinMPNN sample table was not written: $sample_table" >&2
+  exit 2
+fi
+if [[ ! -f "$candidate_table" ]]; then
+  echo "Design-class candidate_table.parquet was not written: $candidate_table" >&2
+  exit 2
+fi
+
+echo "Wrote $sample_table"
+echo "Wrote $candidate_table"

@@ -3,7 +3,7 @@ doc_id: dev-thread-eco1-rt-repack-candidate-review
 surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-29
+last_verified: 2026-07-01
 status: active_next_slice
 primary_slice: assembly-feasibility-report-v1
 ---
@@ -89,12 +89,24 @@ Materialized inputs for this slice:
   position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
   redacted manifest, and compact plot artifacts. This is a model-constraint
   audit, not an update to the current mask.
+- `biohub_esmc/mutation_scoring/esmc_6b_2024_12/`: implemented model-specific
+  output root for the same WT masked-marginal grid under `esmc-6b-2024-12`.
+  The materialized 6B grid has 320 accepted position rows and 6,080 non-WT
+  single-substitution LLR rows. Non-default models route to model-specific
+  roots so this rescore cannot overwrite the current 300M run.
 - `review_deliverables/biohub_esmc_sequence_scoring/`: implemented standalone
   candidate-preference review surface from the complete WT ESMC
   single-substitution grid. It writes `biohub_esmc_variant_llr_scores.parquet`
   `esmc_candidate_preference_vs_wt.svg`, and
   `biohub_esmc_sequence_scoring_manifest.yaml` for all 96 candidates. The score
   is an additive WT-context LLR sum, not a whole-protein pseudo-likelihood.
+  When the 6B WT grid exists, the same bundle also writes a separate 6B
+  candidate-preference table/plot under
+  `review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/` plus a
+  300M-versus-6B rank-stability plot. Treat both as model-derived review
+  covariates. In the current 6B run, all 96 synthetic candidates have negative
+  additive WT-context LLR totals, so use the 6B result for relative ranking and
+  rank-stability review rather than as a nonnegative eligibility gate.
 
 Missing by design:
 
@@ -875,6 +887,14 @@ or implement selection logic inline.
      and
      `review_deliverables/biohub_esmc_sequence_scoring/esmc_candidate_preference_vs_wt.svg`.
    - The current method is `esmc_additive_wt_single_substitution_llr_v1`.
+   - A 6B WT-grid rescore uses the same WT-context masked-marginal additive
+     calculation but writes a separate method id,
+     `esmc_6b_2024_12_additive_wt_single_substitution_llr_v1`, and a separate
+     review-deliverables subdirectory. Compare 300M and 6B ranks with the
+     emitted model-stability plot before using this covariate for panel
+     triage. Do not require nonnegative 6B additive totals under the current
+     rescore because every synthetic candidate is negative on that absolute
+     scale.
    - Keep this separate from SAE feature activations and from future
      leave-one-out whole-protein pseudo-likelihood. Do not label it as joint
      protein likelihood.

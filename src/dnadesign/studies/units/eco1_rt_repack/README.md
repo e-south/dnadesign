@@ -37,10 +37,18 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.mask_set --repo-root .
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.thread_plan --repo-root .
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request --repo-root .
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . requests
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest --repo-root . --proteinmpnn-root .var/tools/proteinmpnn --overwrite
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table --repo-root .
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request --repo-root .
 ```
+
+The `design_classes` requests command does not run ProteinMPNN. It writes
+class-specific request roots for additional mask classes while keeping the
+current 5 A class as the baseline. Rebuild the design-class candidate pool only
+after per-class ProteinMPNN runs have been ingested into their own
+`candidate_table.parquet` files.
 
 Validate the current gates:
 

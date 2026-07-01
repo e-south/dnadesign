@@ -52,8 +52,8 @@ from .constants import (
     PLOTS_DIR_NAME,
     POSITION_ENTROPY_FILE_NAME,
     REQUEST_MANIFEST_FILE_NAME,
-    SCORING_RELATIVE_ROOT,
     SUBSTITUTION_LLR_FILE_NAME,
+    scoring_relative_root_for_model,
 )
 from .mask_join import write_mask_join
 from .plot_context import build_position_context_spans
@@ -102,7 +102,7 @@ def materialize_biohub_esmc_wt_mutation_scoring(
         raise ValueError("request_timeout_seconds must be positive")
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     thread_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
-    scoring_root = thread_root / SCORING_RELATIVE_ROOT
+    scoring_root = thread_root / scoring_relative_root_for_model(model)
     selection = select_wt_mutation_scoring_sequence(output_root=thread_root, positions=positions)
     jobs = build_masked_marginal_jobs(
         ProteinDmsRequest(ref_name=selection.sequence_id, sequence=selection.sequence, positions=selection.positions),

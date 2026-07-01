@@ -27,7 +27,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .structure_browser_common import (
+    CANDIDATE_LOW_CONFIDENCE_COLOR,
+    CANDIDATE_PASS_COLOR,
+    PROTEIN_CLASS_COLOR,
     REFERENCE_COLOR,
+    RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
     display_label,
     nullable_float,
     nullable_int,
@@ -312,13 +316,13 @@ def _structure_group(candidate_id: str, rank_row: dict[str, Any]) -> str:
 
 def _structure_color(candidate_id: str, rank_row: dict[str, Any]) -> str:
     if candidate_id == "wild_type":
-        return "#0072B2"
+        return PROTEIN_CLASS_COLOR
     review_class = str(rank_row.get("review_class") or "")
     if review_class == "structural_outlier":
-        return "#D55E00"
+        return RESIDUE_CATEGORY_HIGHLIGHT_COLOR
     if review_class == "low_confidence":
-        return "#CC79A7"
-    return "#009E73"
+        return CANDIDATE_LOW_CONFIDENCE_COLOR
+    return CANDIDATE_PASS_COLOR
 
 
 def _structure_sort_key(row: dict[str, Any]) -> tuple[int, int, str]:

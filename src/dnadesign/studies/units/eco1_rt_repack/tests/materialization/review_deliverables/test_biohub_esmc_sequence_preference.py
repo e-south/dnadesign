@@ -24,6 +24,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.esmc_fixtures import (
+    write_wt_mutation_scoring_outputs,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
@@ -71,10 +74,48 @@ def test_biohub_esmc_sequence_preference_deliverables_are_rendered(tmp_path: Pat
     assert score_rows[0]["scoring_method_id"] == "esmc_additive_wt_single_substitution_llr_v1"
 
     plot_text = _resolve_manifest_path(result.manifest_path, plot_row["path"]).read_text(encoding="utf-8")
-    assert "Candidate ESMC additive LLR vs WT" in plot_text
+    assert "Candidate ESMC additive LLR versus wild type" in plot_text
     assert "WT-context single-substitution LLR sum" in plot_text
     assert "thread_candidate_alpha" not in plot_text
     assert "Activity" not in plot_text
+
+
+def test_biohub_esmc_sequence_preference_adds_6b_lane_and_model_stability(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    write_wt_mutation_scoring_outputs(
+        tmp_path,
+        scoring_root=tmp_path / "biohub_esmc" / "mutation_scoring" / "esmc_6b_2024_12",
+        model="esmc-6b-2024-12",
+        request_hash_tail="8",
+        llr_shift=0.2,
+    )
+
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
+    assert deliverables["biohub_esmc_6b_sequence_scoring_manifest"]["status"] == "materialized"
+    assert deliverables["biohub_esmc_6b_variant_llr_scores"]["status"] == "materialized"
+    assert deliverables["biohub_esmc_6b_candidate_preference_vs_wt"]["status"] == "rendered"
+    assert deliverables["biohub_esmc_candidate_preference_model_stability"]["status"] == "rendered"
+
+    six_b_manifest = yaml.safe_load(
+        _resolve_manifest_path(
+            result.manifest_path,
+            deliverables["biohub_esmc_6b_sequence_scoring_manifest"]["path"],
+        ).read_text(encoding="utf-8")
+    )
+    assert six_b_manifest["model"] == "esmc-6b-2024-12"
+    assert six_b_manifest["scoring_method_id"] == "esmc_6b_2024_12_additive_wt_single_substitution_llr_v1"
+
+    stability_row = deliverables["biohub_esmc_candidate_preference_model_stability"]
+    assert stability_row["evidence_summary"]["candidate_count"] == 2
+    assert stability_row["evidence_summary"]["left_model"] == "esmc-300m-2024-12"
+    assert stability_row["evidence_summary"]["right_model"] == "esmc-6b-2024-12"
+    stability_plot_text = _resolve_manifest_path(result.manifest_path, stability_row["path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "300M and 6B ESMC additive LLR comparison" in stability_plot_text
 
 
 def test_sequence_preference_rejects_malformed_candidate_mutations(tmp_path: Path) -> None:

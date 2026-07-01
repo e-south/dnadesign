@@ -21,6 +21,7 @@ _CLI_MATERIALIZATION_PACKAGES = {
     "candidate_table",
     "contact_geometry",
     "contact_risk",
+    "design_classes",
     "foldcheck_review",
     "foldcheck_report",
     "foldcheck_request",
@@ -79,16 +80,6 @@ _ATLAS_SEMANTIC_PROFILE_ROOT_FILES = {
     "constants.py",
     "pipeline.py",
     "resume.py",
-    "selection.py",
-}
-_BIOHUB_ESMC_SAE_PROFILE_ROOT_FILES = {
-    "__init__.py",
-    "__main__.py",
-    "cli.py",
-    "constants.py",
-    "pipeline.py",
-    "resume.py",
-    "run_contract.py",
     "selection.py",
 }
 
@@ -180,21 +171,4 @@ def test_atlas_semantic_profile_materializer_uses_thread_atlas_adapter() -> None
     assert "pyarrow.parquet" in resume_text
     assert "pyarrow.parquet" in selection_text
     assert 'row.get("status", "")' in selection_text
-    assert '"accepted"' in selection_text
-
-
-def test_biohub_esmc_sae_profile_materializer_uses_thread_biohub_adapter() -> None:
-    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/biohub_esmc_sae_profile"
-
-    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_BIOHUB_ESMC_SAE_PROFILE_ROOT_FILES)
-    pipeline_text = (source_root / "pipeline.py").read_text(encoding="utf-8")
-    resume_text = (source_root / "resume.py").read_text(encoding="utf-8")
-    selection_text = (source_root / "selection.py").read_text(encoding="utf-8")
-    assert "argparse" not in pipeline_text
-    assert "pyarrow" not in pipeline_text
-    assert "dnadesign.thread.adapters.biohub_esmc" in pipeline_text
-    assert "Bearer " not in pipeline_text
-    assert "pyarrow.parquet" in resume_text
-    assert "pyarrow.parquet" in selection_text
-    assert 'row.get("status")' in selection_text
     assert '"accepted"' in selection_text

@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-06-29
+last_verified: 2026-07-01
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -278,6 +278,18 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
     status: materialized_local
     description: Local generated ProteinMPNN helper-compatible request sidecars. The Eco1 wrapper resolves study paths and selected structure provenance, while dnadesign.thread.adapters.proteinmpnn owns protein-only chain export, canonical-to-chain-local position mapping, parsed-PDB/assigned-chain/fixed-position JSONL, request hashing, --omit_AAs C, and explicit no-fallback request validation.
+  - id: eco1_rt_design_class_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_manifest.yaml
+    status: materialized_local_planned_not_run
+    description: "Local generated design-class expansion manifest. It keeps the current 5 A class as the baseline and records five additional ProteinMPNN request classes: clade 9 p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and II-A3/42_1 p50 contact 5 A. The manifest points to each class-specific mask set, thread plan, and ProteinMPNN request sidecars."
+  - id: eco1_rt_design_class_candidate_pool
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_pool_manifest.yaml
+    status: materialized_baseline_only_pending_generated_candidate_tables
+    description: "Local generated candidate-pool manifest for design-class expansion. It deduplicates accepted candidates by sequence_hash, gives the existing 5 A baseline priority, and records duplicate class provenance. It currently contains only the 96 baseline candidates because generated class ProteinMPNN runs have not been ingested yet."
   - id: eco1_rt_sample_table
     owner: thread
     kind: generated_artifact
@@ -496,6 +508,35 @@ datasets:
       plurality frequency, and retained DNA/RNA contact distance. This is an
       audit table for future mask-policy review; it does not change the
       current mask.
+  - id: eco1_rt_biohub_esmc_6b_wt_position_entropy
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_position_entropy.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      6B ESMC WT-only masked-marginal position table for the same 320 Ec86 WT
+      residue contexts as the 300M grid. This is a model-derived rescore for
+      candidate review, not whole-protein likelihood and not assay evidence.
+  - id: eco1_rt_biohub_esmc_6b_wt_substitution_llr
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_substitution_llr.parquet
+    status: materialized_full_wt_6080_rows
+    description: >-
+      6B ESMC WT-context single-substitution table with 6,080 accepted rows for
+      320 positions x 19 non-WT canonical amino-acid substitutions. Candidate
+      review sums these rows over ProteinMPNN-designed substitutions.
+  - id: eco1_rt_biohub_esmc_6b_wt_mutation_scoring_mask_join
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_mutation_scoring_mask_join.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      Study-owned join from the 6B WT ESMC mutation-scoring rows to the current
+      Eco1 mask context. This supports comparison with the 300M grid and does
+      not change the current mask.
   - id: eco1_rt_biohub_esmc_sae_feature_window_summary
     owner: eco1_rt_repack
     kind: planned_artifact

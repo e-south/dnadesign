@@ -30,6 +30,7 @@ _MATERIALIZATION_PRIMITIVES = {
     "contact_risk",
     "conservation",
     "conservation_alignments",
+    "design_classes",
     "foldcheck_review",
     "foldcheck_report",
     "foldcheck_request",

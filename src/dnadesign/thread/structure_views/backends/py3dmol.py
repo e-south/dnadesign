@@ -11,9 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
 import json
+import re
+import shlex
 
 from dnadesign.thread.structure_views.models import (
     DNA_RESIDUE_NAMES,
@@ -24,6 +27,16 @@ from dnadesign.thread.structure_views.models import (
     StructureViewMoleculeStyle,
     StructureViewSelectionStyle,
     StructureViewSpec,
+)
+
+_NUCLEIC_ACID_CLASSES: frozenset[MoleculeClass] = frozenset({"dna", "rna"})
+_DEFAULT_NUCLEIC_ACID_COLORS: dict[MoleculeClass, str] = {
+    "dna": "#F7F3EA",
+    "rna": "#F7F3EA",
+}
+_NUCLEIC_ACID_COLORFUNC_PLACEHOLDER_PREFIX = "__DNADESIGN_NUCLEIC_ACID_COLORFUNC_"
+_NUCLEIC_ACID_COLORFUNC_PLACEHOLDER_RE = re.compile(
+    rf'"{_NUCLEIC_ACID_COLORFUNC_PLACEHOLDER_PREFIX}([A-Za-z0-9_-]+)__"'
 )
 
 
@@ -51,35 +64,127 @@ def render_py3dmol_structure_view(spec: StructureViewSpec) -> str:
         view.setBackgroundColor(spec.background_color)
     if spec.projection and hasattr(view, "setProjection"):
         view.setProjection(spec.projection)
-    if spec.view_style and hasattr(view, "setViewStyle"):
-        view.setViewStyle({"style": spec.view_style})
     model_index_by_id = {}
+    model_by_id = {}
+    visible_molecule_classes = _visible_molecule_classes(spec)
+    view_style = "" if spec.hidden_molecule_classes else spec.view_style
+    if view_style and hasattr(view, "setViewStyle"):
+        view.setViewStyle({"style": view_style})
     for index, model in enumerate(spec.models):
         model_index_by_id[model.model_id] = index
-        view.addModel(model.structure_text, _py3dmol_model_format(model.structure_format))
-        view.setStyle({"model": index}, _style_for_model(spec, model))
-    for molecule_style in spec.molecule_styles:
-        view.addStyle(
-            _molecule_selection(model_index_by_id[molecule_style.model_id], molecule_style.molecule_class),
-            _style_for_molecule_style(molecule_style),
+        model_by_id[model.model_id] = model
+        structure_text = _filter_structure_text_for_visible_molecule_classes(
+            model.structure_text,
+            structure_format=model.structure_format,
+            visible_molecule_classes=visible_molecule_classes,
         )
+        view.addModel(structure_text, _py3dmol_model_format(model.structure_format))
+        if "protein" in visible_molecule_classes:
+            view.setStyle(_molecule_selection(index, "protein"), _style_for_model(spec, model))
+        if "dna" in visible_molecule_classes:
+            view.setStyle(_molecule_selection(index, "dna"), _style_for_default_nucleic_acid_cartoon("dna"))
+        if "rna" in visible_molecule_classes:
+            view.setStyle(_molecule_selection(index, "rna"), _style_for_default_nucleic_acid_cartoon("rna"))
+    molecule_style_by_model_class = {
+        (molecule_style.model_id, molecule_style.molecule_class): molecule_style
+        for molecule_style in spec.molecule_styles
+    }
+    for molecule_style in spec.molecule_styles:
+        if molecule_style.molecule_class not in visible_molecule_classes:
+            continue
+        molecule_selection = _molecule_selection(
+            model_index_by_id[molecule_style.model_id], molecule_style.molecule_class
+        )
+        _apply_molecule_style(
+            view,
+            molecule_selection,
+            molecule_style,
+        )
+    for index, model in enumerate(spec.models):
+        if model.show_sidechains and "protein" in visible_molecule_classes:
+            protein_style = molecule_style_by_model_class.get((model.model_id, "protein"))
+            view.addStyle(_sidechain_selection(index), _style_for_sidechains(model, molecule_style=protein_style))
     for selection_style in spec.selection_styles:
+        if selection_style.residue_scope not in visible_molecule_classes:
+            continue
         view.addStyle(
             _selection_query(
                 model_index_by_id[selection_style.model_id],
                 selection_style.residue_numbers,
                 molecule_class=selection_style.residue_scope,
             ),
-            _style_for_selection(spec, selection_style),
+            _style_for_selection(
+                spec,
+                selection_style,
+                model=model_by_id[selection_style.model_id],
+            ),
         )
-    for index, model in enumerate(spec.models):
-        if model.show_sidechains:
-            view.addStyle(_sidechain_selection(index), _style_for_sidechains(model))
     view.zoomTo()
     view.zoom(1.35)
     view.translate(0, 0)
-    viewer_html = view._make_html()
+    viewer_html = _inject_nucleic_acid_colorfuncs(view._make_html())
     return _wrap_view_html(spec, viewer_html)
+
+
+def _visible_molecule_classes(spec: StructureViewSpec) -> tuple[MoleculeClass, ...]:
+    hidden = set(spec.hidden_molecule_classes)
+    return tuple(molecule_class for molecule_class in ("protein", "dna", "rna") if molecule_class not in hidden)
+
+
+def _filter_structure_text_for_visible_molecule_classes(
+    structure_text: str,
+    *,
+    structure_format: str,
+    visible_molecule_classes: tuple[MoleculeClass, ...],
+) -> str:
+    hidden = {"protein", "dna", "rna"} - set(visible_molecule_classes)
+    if not hidden:
+        return structure_text
+    if structure_format == "pdb":
+        return "\n".join(
+            line
+            for line in structure_text.splitlines()
+            if not _pdb_atom_line_has_hidden_molecule_class(line, hidden_molecule_classes=hidden)
+        )
+    if structure_format == "mmcif":
+        return "\n".join(
+            line
+            for line in structure_text.splitlines()
+            if not _mmcif_atom_line_has_hidden_molecule_class(line, hidden_molecule_classes=hidden)
+        )
+    return structure_text
+
+
+def _pdb_atom_line_has_hidden_molecule_class(line: str, *, hidden_molecule_classes: set[str]) -> bool:
+    if not line.startswith(("ATOM  ", "HETATM")):
+        return False
+    molecule_class = _molecule_class_for_residue_name(line[17:20].strip())
+    return molecule_class in hidden_molecule_classes
+
+
+def _mmcif_atom_line_has_hidden_molecule_class(line: str, *, hidden_molecule_classes: set[str]) -> bool:
+    stripped = line.strip()
+    if not stripped.startswith(("ATOM ", "HETATM ")):
+        return False
+    try:
+        parts = shlex.split(stripped)
+    except ValueError:
+        return False
+    if len(parts) < 6:
+        return False
+    molecule_class = _molecule_class_for_residue_name(parts[5])
+    return molecule_class in hidden_molecule_classes
+
+
+def _molecule_class_for_residue_name(residue_name: str) -> MoleculeClass | None:
+    normalized = residue_name.strip().upper()
+    if normalized in STANDARD_AMINO_ACID_RESIDUE_NAMES:
+        return "protein"
+    if normalized in DNA_RESIDUE_NAMES:
+        return "dna"
+    if normalized in RNA_RESIDUE_NAMES:
+        return "rna"
+    return None
 
 
 def _style_for_model(spec: StructureViewSpec, model: StructureViewModel) -> dict[str, dict[str, object]]:
@@ -128,33 +233,118 @@ def _molecule_scope(molecule_class: MoleculeClass) -> dict[str, object]:
     raise ValueError(f"Unsupported molecule class: {molecule_class}")
 
 
-def _style_for_sidechains(model: StructureViewModel) -> dict[str, dict[str, object]]:
-    return {
-        "stick": {
-            "color": model.sidechain_color or model.color,
-            "radius": float(model.sidechain_radius),
-        }
-    }
+def _style_for_sidechains(
+    model: StructureViewModel,
+    *,
+    molecule_style: StructureViewMoleculeStyle | None = None,
+) -> dict[str, dict[str, object]]:
+    color = molecule_style.color if molecule_style is not None else model.sidechain_color or model.color
+    opacity = molecule_style.opacity if molecule_style is not None else 1.0
+    return {"stick": _stick_payload(color=color, opacity=opacity, radius=float(model.sidechain_radius))}
+
+
+def _style_for_default_nucleic_acid_cartoon(molecule_class: MoleculeClass) -> dict[str, dict[str, object]]:
+    color = _DEFAULT_NUCLEIC_ACID_COLORS[molecule_class]
+    return {"cartoon": _nucleic_acid_cartoon_payload(color=color)}
+
+
+def _apply_molecule_style(
+    view: object,
+    selection: dict[str, object],
+    molecule_style: StructureViewMoleculeStyle,
+) -> None:
+    if molecule_style.style == "surface":
+        view.addSurface("VDW", _style_payload(color=molecule_style.color, opacity=molecule_style.opacity), selection)
+        return
+    view.setStyle(selection, _style_for_molecule_style(molecule_style))
 
 
 def _style_for_molecule_style(molecule_style: StructureViewMoleculeStyle) -> dict[str, dict[str, object]]:
-    style_name = molecule_style.style or ("cartoon" if molecule_style.molecule_class == "protein" else "stick")
-    style: dict[str, object] = {"color": molecule_style.color}
-    if style_name == "stick":
-        style["radius"] = float(molecule_style.radius)
-    if molecule_style.opacity < 1.0:
-        style["opacity"] = float(molecule_style.opacity)
-    return {style_name: style}
+    if molecule_style.molecule_class in _NUCLEIC_ACID_CLASSES and molecule_style.style != "surface":
+        return {
+            "cartoon": _nucleic_acid_cartoon_payload(
+                color=molecule_style.color,
+                opacity=molecule_style.opacity,
+            )
+        }
+    if molecule_style.style:
+        if molecule_style.style == "stick":
+            return {
+                "stick": _stick_payload(
+                    color=molecule_style.color,
+                    opacity=molecule_style.opacity,
+                    radius=float(molecule_style.radius),
+                )
+            }
+        return {
+            molecule_style.style: _style_payload(
+                color=molecule_style.color,
+                opacity=molecule_style.opacity,
+            )
+        }
+    return {"cartoon": _style_payload(color=molecule_style.color, opacity=molecule_style.opacity)}
 
 
 def _style_for_selection(
     spec: StructureViewSpec,
     selection_style: StructureViewSelectionStyle,
+    *,
+    model: StructureViewModel,
 ) -> dict[str, dict[str, object]]:
-    style: dict[str, object] = {"color": selection_style.color}
-    if selection_style.opacity < 1.0:
-        style["opacity"] = float(selection_style.opacity)
-    return {spec.style: style}
+    style = _style_payload(color=selection_style.color, opacity=selection_style.opacity)
+    styles = {spec.style: style}
+    if selection_style.residue_scope == "protein":
+        styles["stick"] = _stick_payload(
+            color=selection_style.color,
+            opacity=selection_style.opacity,
+            radius=max(0.22, float(model.sidechain_radius)),
+        )
+    elif selection_style.residue_scope in _NUCLEIC_ACID_CLASSES:
+        styles = {
+            "cartoon": _nucleic_acid_cartoon_payload(
+                color=selection_style.color,
+                opacity=selection_style.opacity,
+            )
+        }
+    return styles
+
+
+def _nucleic_acid_cartoon_payload(*, color: str = "", opacity: float = 1.0) -> dict[str, object]:
+    payload: dict[str, object] = {"style": "rectangle", "ribbon": True}
+    if color:
+        payload["color"] = color
+        payload["colorfunc"] = _nucleic_acid_colorfunc_placeholder(color)
+    if opacity < 1.0:
+        payload["opacity"] = float(opacity)
+    return payload
+
+
+def _nucleic_acid_colorfunc_placeholder(color: str) -> str:
+    encoded = base64.urlsafe_b64encode(color.encode("utf-8")).decode("ascii").rstrip("=")
+    return f"{_NUCLEIC_ACID_COLORFUNC_PLACEHOLDER_PREFIX}{encoded}__"
+
+
+def _inject_nucleic_acid_colorfuncs(viewer_html: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        encoded = match.group(1)
+        padding = "=" * (-len(encoded) % 4)
+        color = base64.urlsafe_b64decode(f"{encoded}{padding}").decode("utf-8")
+        return f"function(atom){{return {json.dumps(color)};}}"
+
+    return _NUCLEIC_ACID_COLORFUNC_PLACEHOLDER_RE.sub(replace, viewer_html)
+
+
+def _style_payload(*, color: str, opacity: float) -> dict[str, object]:
+    style: dict[str, object] = {"color": color}
+    if opacity < 1.0:
+        style["opacity"] = float(opacity)
+    return style
+
+
+def _stick_payload(*, color: str, opacity: float, radius: float) -> dict[str, object]:
+    style = _style_payload(color=color, opacity=opacity)
+    style["radius"] = float(radius)
+    return style
 
 
 def _wrap_view_html(spec: StructureViewSpec, viewer_html: str) -> str:
@@ -184,8 +374,17 @@ def _wrap_view_html(spec: StructureViewSpec, viewer_html: str) -> str:
             f'<span id="{interpretation_limit_id}" class="structure-view-sr-only">{interpretation_limit}</span>'
         )
     legend = "".join(_legend_item(model) for model in spec.models)
-    legend += "".join(_molecule_legend_item(molecule_style) for molecule_style in spec.molecule_styles)
-    legend += "".join(_selection_legend_item(selection_style) for selection_style in spec.selection_styles)
+    visible_molecule_classes = set(_visible_molecule_classes(spec))
+    legend += "".join(
+        _molecule_legend_item(molecule_style)
+        for molecule_style in spec.molecule_styles
+        if molecule_style.molecule_class in visible_molecule_classes
+    )
+    legend += "".join(
+        _selection_legend_item(selection_style)
+        for selection_style in spec.selection_styles
+        if selection_style.residue_scope in visible_molecule_classes
+    )
     srcdoc = html.escape(_viewer_document(spec, viewer_html), quote=True)
     iframe_title = html.escape(f"Interactive structure view: {spec.title}", quote=True)
     described_by = f' aria-describedby="{" ".join(description_ids)}"' if description_ids else ""

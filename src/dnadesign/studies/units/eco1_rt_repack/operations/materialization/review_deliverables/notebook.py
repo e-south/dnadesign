@@ -280,14 +280,18 @@ def _(mo):
     structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
     structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
     structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
+    structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
     structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
+    structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
     structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
     return (
         structure_background_ui,
         structure_dna_ui,
+        structure_dna_visible_ui,
         structure_mutation_ui,
         structure_protein_ui,
         structure_rna_ui,
+        structure_rna_visible_ui,
         structure_sidechain_ui,
     )
 
@@ -296,14 +300,18 @@ def _(mo):
 def _(
     structure_background_ui,
     structure_dna_ui,
+    structure_dna_visible_ui,
     structure_mutation_ui,
     structure_protein_ui,
     structure_rna_ui,
+    structure_rna_visible_ui,
     structure_sidechain_ui,
 ):
     show_reference_background = True
     show_mutation_differences = False
     show_sidechains = True
+    show_dna = True
+    show_rna = True
     highlight_protein = False
     highlight_dna = False
     highlight_rna = False
@@ -313,6 +321,10 @@ def _(
         show_mutation_differences = bool(structure_mutation_ui.value)
     if structure_sidechain_ui is not None:
         show_sidechains = bool(structure_sidechain_ui.value)
+    if structure_dna_visible_ui is not None:
+        show_dna = bool(structure_dna_visible_ui.value)
+    if structure_rna_visible_ui is not None:
+        show_rna = bool(structure_rna_visible_ui.value)
     if structure_protein_ui is not None:
         highlight_protein = bool(structure_protein_ui.value)
     if structure_dna_ui is not None:
@@ -323,8 +335,10 @@ def _(
         highlight_dna,
         highlight_protein,
         highlight_rna,
+        show_dna,
         show_mutation_differences,
         show_reference_background,
+        show_rna,
         show_sidechains,
     )
 
@@ -378,11 +392,14 @@ def _(
     highlight_dna,
     highlight_protein,
     highlight_rna,
+    show_dna,
     show_mutation_differences,
     show_reference_background,
+    show_rna,
     show_sidechains,
     structure_background_ui,
     structure_dna_ui,
+    structure_dna_visible_ui,
     structure_highlight_ui,
     selected_structure_row,
     selected_visual,
@@ -390,6 +407,7 @@ def _(
     structure_mutation_ui,
     structure_protein_ui,
     structure_rna_ui,
+    structure_rna_visible_ui,
     structure_sidechain_ui,
     structure_ui,
     review_lane_ui,
@@ -412,9 +430,13 @@ def _(
                     structure_protein_ui=structure_protein_ui,
                     structure_dna_ui=structure_dna_ui,
                     structure_rna_ui=structure_rna_ui,
+                    structure_dna_visible_ui=structure_dna_visible_ui,
+                    structure_rna_visible_ui=structure_rna_visible_ui,
                     show_reference_background=show_reference_background,
                     show_mutation_differences=show_mutation_differences,
                     show_sidechains=show_sidechains,
+                    show_dna=show_dna,
+                    show_rna=show_rna,
                     highlight_protein=highlight_protein,
                     highlight_dna=highlight_dna,
                     highlight_rna=highlight_rna,

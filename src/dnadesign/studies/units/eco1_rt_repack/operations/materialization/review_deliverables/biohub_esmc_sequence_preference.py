@@ -17,7 +17,6 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
-import matplotlib
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
@@ -26,21 +25,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     file_hashes,
     make_deliverable_row,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
-    LABEL_SIZE,
-    LEGEND_SIZE,
-    OKABE_ITO,
-    TICK_SIZE,
-    TITLE_SIZE,
-    save_accessible_svg,
-    style_open_axes,
-)
 
+from .biohub_esmc_sequence_preference_plot import render_candidate_preference_plot
 from .constants import SECTION_ESMC_FEATURE_REVIEW
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import Patch  # noqa: E402
 
 SECTION = SECTION_ESMC_FEATURE_REVIEW
 VARIANT_LLR_FILE_NAME = "biohub_esmc_variant_llr_scores.parquet"
@@ -49,10 +36,13 @@ SEQUENCE_SCORING_MANIFEST_FILE_NAME = "biohub_esmc_sequence_scoring_manifest.yam
 VARIANT_LLR_SCHEMA_ID = "eco1_rt.biohub_esmc.variant_llr_scores"
 SEQUENCE_SCORING_MANIFEST_SCHEMA_ID = "eco1_rt.biohub_esmc.sequence_scoring_manifest"
 SCORING_METHOD_ID = "esmc_additive_wt_single_substitution_llr_v1"
+MODEL_6B = "esmc-6b-2024-12"
+MODEL_6B_CANDIDATE_SCORING_METHOD_ID = "esmc_6b_2024_12_additive_wt_single_substitution_llr_v1"
 PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_vs_wt"
 TABLE_DELIVERABLE_ID = "biohub_esmc_variant_llr_scores"
 MANIFEST_DELIVERABLE_ID = "biohub_esmc_sequence_scoring_manifest"
-TITLE = "Candidate ESMC additive LLR vs WT"
+TITLE = "Candidate ESMC additive LLR versus wild type"
+TITLE_6B = "6B ESMC WT-context additive LLR ranks Eco1 ProteinMPNN candidates relative to wild type"
 INTERPRETATION_LIMIT = (
     "This plot sums WT-context masked-marginal single-substitution LLR values for each candidate. "
     "It is not a whole-protein pseudo-likelihood, not a joint likelihood, and not an activity measurement."
@@ -93,13 +83,17 @@ def write_biohub_esmc_sequence_preference_deliverables(
     wt_substitution_llr_path: Path,
     wt_mutation_scoring_manifest_path: Path,
     foldcheck_ranking_path: Path,
+    deliverable_id_prefix: str | None = None,
+    title: str = TITLE,
+    source_tables: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Write a standalone candidate-preference table and plot from WT ESMC LLR rows."""
 
+    deliverable_ids = _deliverable_ids(deliverable_id_prefix)
     required = (candidate_table_path, wt_substitution_llr_path, wt_mutation_scoring_manifest_path)
     missing = [path for path in required if not path.exists()]
     if missing:
-        return [_missing_row(panel_root, missing)]
+        return [_missing_row(panel_root, missing, deliverable_id=deliverable_ids["plot"], title=title)]
     panel_root.mkdir(parents=True, exist_ok=True)
     score_rows = build_variant_llr_score_rows(
         candidate_table_path=candidate_table_path,
@@ -108,11 +102,19 @@ def write_biohub_esmc_sequence_preference_deliverables(
         foldcheck_ranking_path=foldcheck_ranking_path,
     )
     if not score_rows:
-        return [_missing_row(panel_root, [candidate_table_path], reason="No candidate rows were available")]
+        return [
+            _missing_row(
+                panel_root,
+                [candidate_table_path],
+                reason="No candidate rows were available",
+                deliverable_id=deliverable_ids["plot"],
+                title=title,
+            )
+        ]
     table_path = panel_root / VARIANT_LLR_FILE_NAME
     write_variant_llr_score_table(table_path, rows=score_rows)
     plot_path = panel_root / PREFERENCE_PLOT_FILE_NAME
-    _render_candidate_preference_plot(plot_path, score_rows)
+    render_candidate_preference_plot(plot_path, score_rows, title=title)
     lane_manifest_path = panel_root / SEQUENCE_SCORING_MANIFEST_FILE_NAME
     upstream_manifest = _load_manifest(wt_mutation_scoring_manifest_path)
     write_sequence_scoring_manifest(
@@ -122,7 +124,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
         table_path=table_path,
         plot_path=plot_path,
     )
-    source_tables = [
+    source_tables = source_tables or [
         "candidate_table.parquet",
         "foldcheck_review/foldcheck_candidate_ranking.parquet",
         "biohub_esmc/mutation_scoring/wt_substitution_llr.parquet",
@@ -139,7 +141,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
     evidence = _evidence_summary(score_rows)
     return [
         make_deliverable_row(
-            deliverable_id=MANIFEST_DELIVERABLE_ID,
+            deliverable_id=deliverable_ids["manifest"],
             section=SECTION,
             artifact_kind="yaml",
             status="materialized",
@@ -159,7 +161,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
             render_mode="manifest",
         ),
         make_deliverable_row(
-            deliverable_id=TABLE_DELIVERABLE_ID,
+            deliverable_id=deliverable_ids["table"],
             section=SECTION,
             artifact_kind="parquet",
             status="materialized",
@@ -179,7 +181,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
             render_mode="table",
         ),
         make_deliverable_row(
-            deliverable_id=PLOT_DELIVERABLE_ID,
+            deliverable_id=deliverable_ids["plot"],
             section=SECTION,
             artifact_kind="svg",
             status="rendered",
@@ -196,7 +198,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
                 "additive LLR; colors show fold-review class when available."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title=TITLE,
+            title=title,
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="manuscript_facing",
@@ -216,6 +218,7 @@ def build_variant_llr_score_rows(
 
     manifest = _load_manifest(wt_mutation_scoring_manifest_path)
     model = str(manifest.get("model") or "")
+    scoring_method_id = _candidate_scoring_method_id(model)
     source_scoring_method_id = str(manifest.get("scoring_method_id") or "")
     wt_request_hash = str(manifest.get("biohub_request_hash") or "")
     llr_by_substitution = _llr_lookup(wt_substitution_llr_path)
@@ -242,7 +245,7 @@ def build_variant_llr_score_rows(
                 "candidate_id": candidate_id,
                 "sequence_hash": str(candidate.get("sequence_hash") or ""),
                 "model": model,
-                "scoring_method_id": SCORING_METHOD_ID,
+                "scoring_method_id": scoring_method_id,
                 "source_scoring_method_id": source_scoring_method_id,
                 "wt_mutation_scoring_request_hash": wt_request_hash,
                 "mutation_count": mutation_count,
@@ -267,7 +270,8 @@ def write_variant_llr_score_table(path: Path, *, rows: list[dict[str, object]]) 
     metadata = dict(table.schema.metadata or {})
     metadata[b"schema_id"] = VARIANT_LLR_SCHEMA_ID.encode("utf-8")
     metadata[b"schema_version"] = b"1"
-    metadata[b"scoring_method_id"] = SCORING_METHOD_ID.encode("utf-8")
+    scoring_method_id = str(rows[0].get("scoring_method_id") or "") if rows else ""
+    metadata[b"scoring_method_id"] = scoring_method_id.encode("utf-8")
     pq.write_table(table.replace_schema_metadata(metadata), path)
 
 
@@ -299,6 +303,7 @@ def _sequence_scoring_manifest(
 ) -> dict[str, object]:
     accepted_count = sum(1 for row in rows if str(row.get("status") or "") == "accepted")
     mutation_counts = [int(row["mutation_count"]) for row in rows]
+    scoring_method_id = str(rows[0].get("scoring_method_id") or "") if rows else ""
     upstream_endpoint_flow = upstream_manifest.get("endpoint_flow")
     endpoint_flow = (
         [str(value) for value in upstream_endpoint_flow]
@@ -310,7 +315,7 @@ def _sequence_scoring_manifest(
         "schema_version": 1,
         "status": "materialized",
         "materialization_mode": "derived_from_wt_single_substitution_grid",
-        "scoring_method_id": SCORING_METHOD_ID,
+        "scoring_method_id": scoring_method_id,
         "source_scoring_method_id": str(upstream_manifest.get("scoring_method_id") or ""),
         "model": str(upstream_manifest.get("model") or ""),
         "biohub_api_base_url": str(upstream_manifest.get("biohub_api_base_url") or "https://biohub.ai"),
@@ -335,48 +340,6 @@ def _sequence_scoring_manifest(
         "method_references": upstream_manifest.get("method_references") or [],
         "artifact_hashes": file_hashes({"variant_llr_scores": table_path, "candidate_preference_plot": plot_path}),
     }
-
-
-def _render_candidate_preference_plot(path: Path, rows: list[dict[str, object]]) -> None:
-    ordered = list(rows)
-    values = [float(row["llr_total"]) for row in ordered]
-    y_positions = list(range(len(ordered)))
-    labels = [_rank_label(index, str(row["candidate_id"])) for index, row in enumerate(ordered, start=1)]
-    fig_width = max(9.0, min(16.0, 0.06 * len(ordered) + 9.0))
-    fig_height = max(5.2, min(18.0, 0.22 * len(ordered) + 2.6))
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-    colors = [_review_class_color(str(row.get("review_class") or "")) for row in ordered]
-    ax.barh(y_positions, values, color=colors, edgecolor="#ffffff", linewidth=0.45)
-    ax.axvline(0.0, color="#24292f", linewidth=1.0)
-    ax.set_yticks(y_positions, labels, fontsize=max(6, min(TICK_SIZE, 9)))
-    ax.invert_yaxis()
-    ax.set_xlabel("WT-context single-substitution LLR sum", fontsize=LABEL_SIZE)
-    ax.set_ylabel("ProteinMPNN candidate rank by ESMC additive LLR", fontsize=LABEL_SIZE)
-    ax.set_title(TITLE, fontsize=TITLE_SIZE, pad=10)
-    style_open_axes(ax, grid=True)
-    ax.grid(axis="y", visible=False)
-    ax.tick_params(axis="x", labelsize=TICK_SIZE)
-    ax.legend(
-        handles=_legend_handles(ordered),
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.26),
-        ncol=min(4, max(1, len({str(row.get("review_class") or "") for row in ordered}))),
-        frameon=False,
-        fontsize=LEGEND_SIZE,
-        handletextpad=0.45,
-        columnspacing=1.0,
-    )
-    fig.subplots_adjust(left=0.22, right=0.98, top=0.9, bottom=0.22)
-    save_accessible_svg(
-        fig,
-        path,
-        title=TITLE,
-        description=(
-            f"Ranked bar plot of additive WT-context ESMC LLR sums for {len(ordered)} ProteinMPNN "
-            "candidate sequences. Positive values indicate that the ESMC masked-marginal grid assigns "
-            "higher probability to the candidate substitutions than to the WT residues at those positions."
-        ),
-    )
 
 
 def _llr_lookup(path: Path) -> dict[tuple[int, str], float]:
@@ -409,58 +372,17 @@ def _evidence_summary(rows: list[dict[str, object]]) -> dict[str, object]:
     values = [float(row["llr_total"]) for row in rows]
     per_mutation = [float(row["llr_per_mutation"]) for row in rows if row.get("llr_per_mutation") is not None]
     model = str(rows[0].get("model") or "") if rows else ""
+    scoring_method_id = str(rows[0].get("scoring_method_id") or "") if rows else ""
     return {
         "candidate_count": len(rows),
         "model": model,
-        "scoring_method_id": SCORING_METHOD_ID,
+        "scoring_method_id": scoring_method_id,
         "llr_total_min": min(values) if values else None,
         "llr_total_median": median(values) if values else None,
         "llr_total_max": max(values) if values else None,
         "llr_per_mutation_median": median(per_mutation) if per_mutation else None,
         "whole_protein_pseudolikelihood_status": "not_materialized_request_heavy",
     }
-
-
-def _rank_label(index: int, candidate_id: str) -> str:
-    return f"V{index:03d} {candidate_id.removeprefix('thread_candidate_')[:8]}"
-
-
-def _review_class_color(review_class: str) -> str:
-    palette = {
-        "strong_fold_preserved": OKABE_ITO["blue"],
-        "review_band": OKABE_ITO["orange"],
-        "fold_watch": OKABE_ITO["purple"],
-        "": OKABE_ITO["gray"],
-    }
-    return palette.get(review_class, OKABE_ITO["green"])
-
-
-def _legend_handles(rows: list[dict[str, object]]) -> list[Patch]:
-    classes = sorted({str(row.get("review_class") or "") for row in rows})
-    if "" in classes:
-        classes.remove("")
-        classes.append("")
-    return [
-        Patch(
-            facecolor=_review_class_color(review_class),
-            edgecolor="none",
-            label=_review_class_label(review_class),
-        )
-        for review_class in classes
-    ]
-
-
-def _review_class_label(review_class: str) -> str:
-    labels = {
-        "strong_fold_preserved": "CA RMSD <= 1.25 A; pLDDT >= 91.5",
-        "good_fold_preserved": "CA RMSD <= 2.0 A; pLDDT >= 90",
-        "review_band": "Intermediate fold-review band",
-        "low_confidence": "pLDDT < 90",
-        "structural_outlier": "CA RMSD > 5.0 A",
-        "metric_missing": "Fold metric missing",
-        "": "Fold class unavailable",
-    }
-    return labels.get(review_class, review_class.replace("_", " "))
 
 
 def _optional_float(value: object) -> float | None:
@@ -475,10 +397,52 @@ def _optional_float(value: object) -> float | None:
     return number
 
 
-def _missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = None) -> dict[str, Any]:
+def _candidate_scoring_method_id(model: str) -> str:
+    if model == MODEL_6B:
+        return MODEL_6B_CANDIDATE_SCORING_METHOD_ID
+    if not model or model == "esmc-300m-2024-12":
+        return SCORING_METHOD_ID
+    return f"{_safe_model_component(model)}_additive_wt_single_substitution_llr_v1"
+
+
+def _safe_model_component(model: str) -> str:
+    model_id = model.strip()
+    if not model_id:
+        raise ValueError("Biohub ESMC model id must be non-empty")
+    if "/" in model_id or "\\" in model_id or ".." in model_id:
+        raise ValueError(f"Biohub ESMC model id is not path-safe: {model!r}")
+    component = re.sub(r"[^A-Za-z0-9]+", "_", model_id).strip("_").lower()
+    if not component:
+        raise ValueError(f"Biohub ESMC model id is not path-safe: {model!r}")
+    return component
+
+
+def _deliverable_ids(deliverable_id_prefix: str | None) -> dict[str, str]:
+    if not deliverable_id_prefix:
+        return {
+            "manifest": MANIFEST_DELIVERABLE_ID,
+            "table": TABLE_DELIVERABLE_ID,
+            "plot": PLOT_DELIVERABLE_ID,
+        }
+    prefix = deliverable_id_prefix.strip("_")
+    return {
+        "manifest": f"{prefix}_sequence_scoring_manifest",
+        "table": f"{prefix}_variant_llr_scores",
+        "plot": f"{prefix}_candidate_preference_vs_wt",
+    }
+
+
+def _missing_row(
+    panel_root: Path,
+    missing: list[Path],
+    *,
+    reason: str | None = None,
+    deliverable_id: str = PLOT_DELIVERABLE_ID,
+    title: str = TITLE,
+) -> dict[str, Any]:
     message = reason or "Missing Biohub ESMC sequence-preference input: " + ", ".join(str(path) for path in missing)
     return make_deliverable_row(
-        deliverable_id=PLOT_DELIVERABLE_ID,
+        deliverable_id=deliverable_id,
         section=SECTION,
         artifact_kind="svg",
         status="skipped_missing_input",
@@ -492,7 +456,7 @@ def _missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = 
         alt_text="Biohub ESMC candidate-preference plot was skipped because required inputs were missing.",
         description="The plot requires candidate mutations and the WT ESMC masked-marginal substitution table.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title=TITLE,
+        title=title,
         method_summary=METHOD_SUMMARY,
         evidence_summary={"scoring_method_id": SCORING_METHOD_ID},
         role="review_only",

@@ -23,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
+    structure_browser_common as browser_colors,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
 )
@@ -118,7 +121,22 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
     assert '","cif");' not in unescaped_rendered
     assert '","mmcif");' not in unescaped_rendered
     assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_rendered
-    assert '"stick":{"color":"#009E73","radius":0.16}' in unescaped_rendered
+    assert (
+        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.REFERENCE_COLOR}",'
+        f'"colorfunc":function(atom){{return"{browser_colors.REFERENCE_COLOR}";}}}}' in unescaped_rendered
+    )
+    assert f'"color":"{browser_colors.DNA_CLASS_COLOR}"' not in unescaped_rendered
+    assert f'"color":"{browser_colors.RNA_CLASS_COLOR}"' not in unescaped_rendered
+    assert f'"stick":{{"color":"{browser_colors.REFERENCE_COLOR}","radius":0.16}}' in unescaped_rendered
+    assert f'"stick":{{"color":"{browser_colors.CANDIDATE_PASS_COLOR}","radius":0.16}}' not in unescaped_rendered
+    assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
+        unescaped_rendered
+    )
+    assert unescaped_rendered.index(
+        f'"stick":{{"color":"{browser_colors.REFERENCE_COLOR}","radius":0.16}}'
+    ) < unescaped_rendered.index(
+        f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}'
+    )
 
 
 def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp_path: Path) -> None:
@@ -161,7 +179,7 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
     assert "A1G, A2G" in rendered_text
     assert "Ec86/7V9U all-atom reference" not in rendered_text
     assert '"model":0,"resi":[3,4]' in unescaped_rendered
-    assert '"stick":{"color":"#009E73","radius":0.16}' not in unescaped_rendered
+    assert f'"stick":{{"color":"{browser_colors.CANDIDATE_PASS_COLOR}","radius":0.16}}' not in unescaped_rendered
     assert "data-selection-id=&quot;candidate_differences&quot;" in rendered_text or (
         'data-selection-id="candidate_differences"' in rendered_text
     )

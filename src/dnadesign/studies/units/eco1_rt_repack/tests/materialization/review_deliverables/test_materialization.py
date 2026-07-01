@@ -54,6 +54,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "linear_mask_tracks",
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_mutation_density",
+        "proteinmpnn_variant_similarity_heatmap",
         "proteinmpnn_tao_style_fold_validation",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
@@ -102,6 +103,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["wt_esmc_entropy_by_position"]["section"] == SECTION_CONSTRAINT_EVIDENCE
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
     assert deliverables["proteinmpnn_score_mutation_burden"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
+    assert deliverables["proteinmpnn_variant_similarity_heatmap"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["proteinmpnn_tao_style_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["interactive_structure_browser_manifest"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["feasibility_and_handoff_planned"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF

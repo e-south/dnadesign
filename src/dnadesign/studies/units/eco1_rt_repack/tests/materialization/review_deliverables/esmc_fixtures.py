@@ -20,10 +20,17 @@ import yaml
 _CANONICAL_AMINO_ACIDS = tuple("ACDEFGHIKLMNPQRSTVWY")
 
 
-def write_wt_mutation_scoring_outputs(output_root: Path) -> None:
+def write_wt_mutation_scoring_outputs(
+    output_root: Path,
+    *,
+    scoring_root: Path | None = None,
+    model: str = "esmc-300m-2024-12",
+    request_hash_tail: str = "6",
+    llr_shift: float = 0.0,
+) -> None:
     """Write compact WT ESMC masked-marginal fixture outputs."""
 
-    scoring_root = output_root / "biohub_esmc" / "mutation_scoring"
+    scoring_root = scoring_root or output_root / "biohub_esmc" / "mutation_scoring"
     plot_root = scoring_root / "plots"
     plot_root.mkdir(parents=True, exist_ok=True)
     for plot_name in (
@@ -41,12 +48,12 @@ def write_wt_mutation_scoring_outputs(output_root: Path) -> None:
             {
                 "schema_id": "eco1_rt_repack.biohub_esmc_wt_mutation_scoring.request",
                 "status": "materialized",
-                "biohub_request_hash": "sha256:" + "6" * 64,
+                "biohub_request_hash": "sha256:" + request_hash_tail * 64,
                 "source_request_hash": "sha256:" + "7" * 64,
                 "biohub_api_base_url": "https://biohub.ai",
                 "biohub_api_version": "v1",
                 "endpoint_flow": ["POST /api/v1/encode", "POST /api/v1/logits"],
-                "model": "esmc-300m-2024-12",
+                "model": model,
                 "scoring_method_id": "esmc_masked_marginal_v1",
                 "position_count": 6,
                 "accepted_position_count": 6,
@@ -69,7 +76,10 @@ def write_wt_mutation_scoring_outputs(output_root: Path) -> None:
         encoding="utf-8",
     )
     pq.write_table(pa.Table.from_pylist(_position_entropy_rows()), scoring_root / "wt_position_entropy.parquet")
-    pq.write_table(pa.Table.from_pylist(_substitution_llr_rows()), scoring_root / "wt_substitution_llr.parquet")
+    pq.write_table(
+        pa.Table.from_pylist(_substitution_llr_rows(llr_shift=llr_shift)),
+        scoring_root / "wt_substitution_llr.parquet",
+    )
     pq.write_table(pa.Table.from_pylist(_mask_join_rows()), scoring_root / "wt_mutation_scoring_mask_join.parquet")
 
 
@@ -127,7 +137,7 @@ def _position_entropy_rows() -> list[dict[str, object]]:
     ]
 
 
-def _substitution_llr_rows() -> list[dict[str, object]]:
+def _substitution_llr_rows(*, llr_shift: float = 0.0) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for position_row in _mask_join_rows():
         wt_aa = str(position_row["wt_aa"])
@@ -141,7 +151,7 @@ def _substitution_llr_rows() -> list[dict[str, object]]:
                     "canonical_position": position_row["canonical_position"],
                     "wt_aa": wt_aa,
                     "alt_aa": alt_aa,
-                    "llr": float(index) / 10.0 - 1.0,
+                    "llr": float(index) / 10.0 - 1.0 + llr_shift,
                     "status": position_row["status"],
                 }
             )

@@ -37,13 +37,20 @@ from .notebook_structure_dashboard import (
     structure_dashboard_rows,
     structure_metric_rows,
 )
+from .structure_browser_common import (
+    DNA_CLASS_COLOR,
+    PROTEIN_CLASS_COLOR,
+    REFERENCE_COLOR,
+    RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
+    RNA_CLASS_COLOR,
+)
 
 _STRUCTURE_VIEW_WIDTH = 760
 _STRUCTURE_VIEW_HEIGHT = 520
 _MOLECULE_CLASS_COLORS = {
-    "protein": "#0072B2",
-    "dna": "#E69F00",
-    "rna": "#009E73",
+    "protein": PROTEIN_CLASS_COLOR,
+    "dna": DNA_CLASS_COLOR,
+    "rna": RNA_CLASS_COLOR,
 }
 
 
@@ -157,9 +164,13 @@ def render_structure_browser(
     structure_protein_ui: Any | None = None,
     structure_dna_ui: Any | None = None,
     structure_rna_ui: Any | None = None,
+    structure_dna_visible_ui: Any | None = None,
+    structure_rna_visible_ui: Any | None = None,
     show_reference_background: bool = True,
     show_mutation_differences: bool = False,
     show_sidechains: bool = True,
+    show_dna: bool = True,
+    show_rna: bool = True,
     highlight_protein: bool = False,
     highlight_dna: bool = False,
     highlight_rna: bool = False,
@@ -208,6 +219,17 @@ def render_structure_browser(
     query_atom_content = (
         None if not query_text else summarize_structure_atom_content(query_text, structure_format=query_format)
     )
+    query_model_id = str(selected_row.get("source_candidate_id") or selected_row["candidate_id"])
+    selection_styles = _selection_styles(selected_row)
+    selected_highlight_selection_styles = ()
+    if selected_highlight_row is not None and selected_highlight_row is not selected_row:
+        selected_highlight_selection_styles = _selection_styles(selected_highlight_row)
+    mutation_selection_styles = ()
+    if show_mutation_differences and view_mode != "reference_selection":
+        mutation_selection_styles = _mutation_selection_styles(selected_row, model_id=query_model_id)
+    residue_interest_overlay_active = bool(
+        selection_styles or selected_highlight_selection_styles or mutation_selection_styles
+    )
     reference_model = StructureViewModel(
         model_id=str(reference.get("model_id") or "reference"),
         structure_text=reference_text,
@@ -217,7 +239,6 @@ def render_structure_browser(
         opacity=0.82,
         show_sidechains=show_sidechains and reference_atom_content.has_sidechain_atoms,
     )
-    query_model_id = str(selected_row.get("source_candidate_id") or selected_row["candidate_id"])
     models = []
     if view_mode == "reference_selection" or show_reference_background:
         models.append(reference_model)
@@ -228,7 +249,9 @@ def render_structure_browser(
                 structure_text=query_text,
                 structure_format=query_format,
                 label=str(selected_row.get("display_label") or selected_row["candidate_id"]),
-                color=str(selected_row.get("color") or "#0072B2"),
+                color=REFERENCE_COLOR
+                if residue_interest_overlay_active
+                else str(selected_row.get("color") or PROTEIN_CLASS_COLOR),
                 show_sidechains=(
                     show_sidechains and query_atom_content.has_sidechain_atoms
                     if query_atom_content is not None
@@ -236,11 +259,7 @@ def render_structure_browser(
                 ),
             )
         )
-    selection_styles = _selection_styles(selected_row)
-    if selected_highlight_row is not None and selected_highlight_row is not selected_row:
-        selection_styles += _selection_styles(selected_highlight_row)
-    if show_mutation_differences and view_mode != "reference_selection":
-        selection_styles += _mutation_selection_styles(selected_row, model_id=query_model_id)
+    selection_styles += selected_highlight_selection_styles + mutation_selection_styles
     try:
         html_panel = render_structure_view_html(
             StructureViewSpec(
@@ -256,6 +275,7 @@ def render_structure_browser(
                     highlight_rna=highlight_rna,
                 ),
                 selection_styles=selection_styles,
+                hidden_molecule_classes=_hidden_molecule_classes(show_dna=show_dna, show_rna=show_rna),
                 width=_STRUCTURE_VIEW_WIDTH,
                 height=_STRUCTURE_VIEW_HEIGHT,
                 camera_memory_key=_camera_memory_key(selected_row),
@@ -280,6 +300,8 @@ def render_structure_browser(
         reference_atom_content=reference_atom_content,
         query_atom_content=query_atom_content,
         show_sidechains=show_sidechains,
+        show_dna=show_dna,
+        show_rna=show_rna,
         highlight_protein=highlight_protein,
         highlight_dna=highlight_dna,
         highlight_rna=highlight_rna,
@@ -297,7 +319,9 @@ def render_structure_browser(
                         structure_mutation_ui if view_mode != "reference_selection" else None,
                         structure_sidechain_ui,
                         structure_protein_ui,
+                        structure_dna_visible_ui,
                         structure_dna_ui,
+                        structure_rna_visible_ui,
                         structure_rna_ui,
                     )
                     if item is not None
@@ -403,6 +427,15 @@ def _molecule_styles(
     return tuple(styles)
 
 
+def _hidden_molecule_classes(*, show_dna: bool, show_rna: bool) -> tuple[str, ...]:
+    hidden: list[str] = []
+    if not show_dna:
+        hidden.append("dna")
+    if not show_rna:
+        hidden.append("rna")
+    return tuple(hidden)
+
+
 def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle, ...]:
     styles: list[StructureViewSelectionStyle] = []
     for item in row.get("selection_styles") or []:
@@ -414,7 +447,7 @@ def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle,
                 model_id=str(item.get("model_id") or ""),
                 label=str(item.get("label") or ""),
                 residue_numbers=tuple(int(value) for value in item.get("residue_numbers") or []),
-                color=str(item.get("color") or "#D55E00"),
+                color=str(item.get("color") or RESIDUE_CATEGORY_HIGHLIGHT_COLOR),
                 opacity=float(item.get("opacity", 1.0)),
                 residue_scope=str(item.get("residue_scope") or "protein"),  # type: ignore[arg-type]
             )
@@ -445,6 +478,6 @@ def _mutation_selection_styles(row: dict[str, Any], *, model_id: str) -> tuple[S
             model_id=model_id,
             label="Candidate differences",
             residue_numbers=residue_numbers,
-            color="#D55E00",
+            color=RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
         ),
     )

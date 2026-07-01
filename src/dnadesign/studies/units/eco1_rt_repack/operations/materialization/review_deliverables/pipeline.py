@@ -22,9 +22,15 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
 )
 
 from .biohub_esmc_sae_interpretation import write_biohub_esmc_sae_interpretation_panels
-from .biohub_esmc_sequence_preference import write_biohub_esmc_sequence_preference_deliverables
+from .biohub_esmc_sequence_preference import (
+    TITLE_6B,
+    VARIANT_LLR_FILE_NAME,
+    write_biohub_esmc_sequence_preference_deliverables,
+)
+from .biohub_esmc_sequence_preference_model_stability import write_biohub_esmc_model_stability_deliverables
 from .constants import (
     ALIGNED_FASTA_RELATIVE_PATH,
+    BIOHUB_ESMC_6B_MUTATION_SCORING_RELATIVE_PATH,
     BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
     BIOHUB_ESMC_FEATURE_HEATMAP_DIR_NAME,
     BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH,
@@ -41,6 +47,7 @@ from .constants import (
     DEFAULT_OUTPUT_ROOT,
     DELIVERABLE_DIR_NAME,
     FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH,
+    FOLDCHECK_REQUEST_INPUT_FASTA_RELATIVE_PATH,
     FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH,
     FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
     MANIFEST_FILE_NAME,
@@ -166,6 +173,8 @@ def materialize_review_deliverables(
             panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
             candidate_table_path=candidate_table_path,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            foldcheck_fasta_path=out_root / FOLDCHECK_REQUEST_INPUT_FASTA_RELATIVE_PATH,
+            mask_set_path=mask_set_path,
             mask_residues=mask_residues,
         )
     )
@@ -180,6 +189,42 @@ def materialize_review_deliverables(
         foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
     )
     deliverables.extend(sequence_preference_deliverables)
+    six_b_sequence_scoring_root = deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME / "esmc_6b_2024_12"
+    six_b_wt_substitution_llr_path = (
+        out_root / BIOHUB_ESMC_6B_MUTATION_SCORING_RELATIVE_PATH / "wt_substitution_llr.parquet"
+    )
+    six_b_wt_manifest_path = (
+        out_root / BIOHUB_ESMC_6B_MUTATION_SCORING_RELATIVE_PATH / "wt_mutation_scoring_manifest.yaml"
+    )
+    if six_b_wt_substitution_llr_path.exists() or six_b_wt_manifest_path.exists():
+        six_b_sequence_preference_deliverables = write_biohub_esmc_sequence_preference_deliverables(
+            panel_root=six_b_sequence_scoring_root,
+            candidate_table_path=candidate_table_path,
+            wt_substitution_llr_path=six_b_wt_substitution_llr_path,
+            wt_mutation_scoring_manifest_path=six_b_wt_manifest_path,
+            foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            deliverable_id_prefix="biohub_esmc_6b",
+            title=TITLE_6B,
+            source_tables=[
+                "candidate_table.parquet",
+                "foldcheck_review/foldcheck_candidate_ranking.parquet",
+                "biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_substitution_llr.parquet",
+                "biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_mutation_scoring_manifest.yaml",
+            ],
+        )
+        deliverables.extend(six_b_sequence_preference_deliverables)
+        deliverables.extend(
+            write_biohub_esmc_model_stability_deliverables(
+                panel_root=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME,
+                left_table_path=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME / VARIANT_LLR_FILE_NAME,
+                right_table_path=six_b_sequence_scoring_root / VARIANT_LLR_FILE_NAME,
+            )
+        )
+    candidate_preference_table_path = (
+        six_b_sequence_scoring_root / VARIANT_LLR_FILE_NAME
+        if (six_b_sequence_scoring_root / VARIANT_LLR_FILE_NAME).exists()
+        else deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME / VARIANT_LLR_FILE_NAME
+    )
     deliverables.append(
         write_interactive_structure_browser_manifest(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
@@ -189,9 +234,7 @@ def materialize_review_deliverables(
             reference_structure_format=browser_reference.structure_format,
             alignment_reference_path=foldcheck_reference_backbone_path,
             candidate_table_path=candidate_table_path,
-            candidate_preference_table_path=deliverable_root
-            / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME
-            / "biohub_esmc_variant_llr_scores.parquet",
+            candidate_preference_table_path=candidate_preference_table_path,
         )
     )
     deliverables.extend(
@@ -210,6 +253,7 @@ def materialize_review_deliverables(
             feature_catalog_path=out_root / BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
             request_manifest_path=out_root / BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
+            candidate_preference_table_path=candidate_preference_table_path,
             mask_residues=mask_residues,
         )
     )

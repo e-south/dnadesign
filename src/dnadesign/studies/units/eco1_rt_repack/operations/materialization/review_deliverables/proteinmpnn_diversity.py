@@ -27,6 +27,7 @@ from .manifest import (
     make_deliverable_row,
 )
 from .proteinmpnn_fold_validation import write_tao_style_fold_validation
+from .proteinmpnn_variant_similarity import write_variant_similarity_heatmap
 from .rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
@@ -88,6 +89,8 @@ def write_proteinmpnn_diversity_panels(
     panel_root: Path,
     candidate_table_path: Path,
     foldcheck_ranking_path: Path | None = None,
+    foldcheck_fasta_path: Path | None = None,
+    mask_set_path: Path | None = None,
     mask_residues: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Render compact ProteinMPNN diversity panels."""
@@ -103,7 +106,9 @@ def write_proteinmpnn_diversity_panels(
             "temperature",
             "mutation_count",
             "canonical_mutations",
+            "sequence",
             "status",
+            "rank",
         ],
     ).to_pylist()
     accepted_rows = [row for row in rows if str(row.get("status")) == "accepted"]
@@ -112,6 +117,15 @@ def write_proteinmpnn_diversity_panels(
     deliverables = [
         _write_score_mutation_burden(panel_root, accepted_rows, candidate_table_path),
         _write_mutation_density(panel_root, accepted_rows, candidate_table_path, mask_residues=mask_residues or []),
+        write_variant_similarity_heatmap(
+            panel_root,
+            accepted_rows,
+            candidate_table_path,
+            foldcheck_ranking_path=foldcheck_ranking_path,
+            foldcheck_fasta_path=foldcheck_fasta_path,
+            mask_set_path=mask_set_path,
+            mask_residues=mask_residues or [],
+        ),
     ]
     if foldcheck_ranking_path is not None:
         deliverables.append(

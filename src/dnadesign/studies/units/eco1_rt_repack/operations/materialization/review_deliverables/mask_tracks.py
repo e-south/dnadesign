@@ -85,27 +85,28 @@ def write_linear_mask_tracks(
     residues_by_position = {int(row["canonical_position"]): row for row in residues}
     positions = sorted(residues_by_position)
     fig_width = max(14.0, min(36.0, len(positions) * 0.105))
-    fig_height = 4.9
+    fig_height = 5.25
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
     _draw_mask_track_matrix(
         ax,
         positions=positions,
         residues_by_position=residues_by_position,
     )
+    margins = {"left": 0.17, "right": 0.995, "bottom": 0.28, "top": 0.77}
+    legend_center_x = (margins["left"] + margins["right"]) / 2.0
     fig.legend(
         handles=[Patch(facecolor=color, label=label) for _field, label, color in _TRACKS],
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.015),
+        bbox_to_anchor=(legend_center_x, 0.018),
         ncol=len(_TRACKS),
         frameon=False,
-        fontsize=LEGEND_SIZE - 1,
-        columnspacing=0.95,
-        handletextpad=0.45,
+        fontsize=LEGEND_SIZE,
+        columnspacing=1.0,
+        handletextpad=0.5,
     )
-    fig.supxlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE, y=0.11)
-    fig.supylabel("Mask evidence track", fontsize=LABEL_SIZE, x=0.018)
-    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.965)
-    fig.subplots_adjust(left=0.15, right=0.995, bottom=0.25, top=0.79)
+    ax.set_xlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE + 1.0, labelpad=11)
+    ax.set_title(title, fontsize=TITLE_SIZE + 1.2, pad=29)
+    fig.subplots_adjust(**margins)
 
     path = panel_root / "linear_mask_tracks.svg"
     alt = (
@@ -402,22 +403,22 @@ def _draw_mask_track_matrix(
     ax.set_xlim(-0.5, len(positions) - 0.5)
     ax.set_ylim(len(_TRACKS) - 0.5, -0.5)
     ax.set_aspect("auto")
-    ax.set_yticks(range(len(_TRACKS)), [label for _field, label, _color in _TRACKS], fontsize=TICK_SIZE)
+    ax.set_yticks(range(len(_TRACKS)), [label for _field, label, _color in _TRACKS], fontsize=TICK_SIZE + 1.2)
+    ax.tick_params(axis="y", pad=5)
     bottom_tick_indexes = _position_tick_indexes(positions)
     ax.set_xticks(
         bottom_tick_indexes,
         [str(positions[index]) for index in bottom_tick_indexes],
-        fontsize=TICK_SIZE,
+        fontsize=TICK_SIZE + 0.8,
     )
     top_tick_indexes = _wt_residue_tick_indexes(positions)
     top_axis = ax.secondary_xaxis("top")
     top_axis.set_xticks(
         top_tick_indexes,
         [str(residues_by_position[positions[index]].get("wt_aa") or "") for index in top_tick_indexes],
-        fontsize=6.6 if len(positions) > 120 else 8.2,
+        fontsize=7.4 if len(positions) > 120 else 8.8,
     )
-    top_axis.tick_params(length=0, pad=3)
-    top_axis.set_xlabel("WT residue", fontsize=LABEL_SIZE, labelpad=8)
+    top_axis.tick_params(length=0, pad=4)
     ax.grid(axis="x", color="#d0d7de", alpha=0.28, linewidth=0.42)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)

@@ -21,6 +21,7 @@ _DATASETS = "docs/studies/eco1_rt_repack/record/datasets.yaml"
 
 _EXECUTABLE_LANES = {
     "atlas_semantic_profile",
+    "biohub_esmc_6b_wt_mutation_scoring",
     "biohub_esmc_sae_profile",
     "biohub_esmc_wt_mutation_scoring",
     "structure_authority",
@@ -37,6 +38,8 @@ _EXECUTABLE_LANES = {
     "manual_mask_authority",
     "mask_contract",
     "contact_risk_profile",
+    "design_class_requests",
+    "design_class_candidate_pool",
     "sampling_plan",
     "sample_ingest",
     "candidate_table",
@@ -46,7 +49,11 @@ _EXECUTABLE_LANES = {
     "phase1_contract_validation",
     "phase2_contract_validation",
 }
-_EXTERNAL_LANES = {"colabfold_scc_smoke"}
+_EXTERNAL_LANES = {
+    "colabfold_scc_smoke",
+    "design_class_proteinmpnn_scc_array",
+    "design_class_proteinmpnn_scc_smoke",
+}
 _PLANNED_LANES = {
     "refine_dev_spec",
     "assembly_feasibility",
@@ -105,14 +112,19 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["sample_ingest"]["owner"] == "thread"
     assert by_id["foldcheck_request"]["owner"] == "eco1_rt_repack"
     assert by_id["colabfold_scc_smoke"]["owner"] == "bu_scc_runtime"
+    assert by_id["design_class_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
+    assert by_id["design_class_proteinmpnn_scc_array"]["owner"] == "bu_scc_runtime"
     assert by_id["foldcheck_report"]["owner"] == "thread"
     assert by_id["atlas_semantic_profile"]["owner"] == "thread"
     assert by_id["biohub_esmc_sae_profile"]["owner"] == "thread"
+    assert by_id["biohub_esmc_6b_wt_mutation_scoring"]["owner"] == "permuter"
     assert by_id["biohub_esmc_wt_mutation_scoring"]["owner"] == "permuter"
     assert by_id["assembly_feasibility"]["owner"] == "thread"
     assert by_id["candidate_handoff"]["owner"] == "thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
+    assert by_id["design_class_requests"]["owner"] == "eco1_rt_repack"
+    assert by_id["design_class_candidate_pool"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]
     assert "dnadesign.aligner.msa.visualization" in by_id["conservation_visualizations"]["command"]["argv"]
 

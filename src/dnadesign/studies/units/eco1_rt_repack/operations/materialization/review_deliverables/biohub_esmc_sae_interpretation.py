@@ -34,10 +34,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .biohub_esmc_model_provenance import sae_request_manifest_summary
+from .biohub_esmc_sae_audit import sae_provenance_audit
 from .biohub_esmc_sae_tables import (
     make_protein_top_feature_table_row,
     write_protein_top_feature_table,
 )
+from .biohub_esmc_sae_umap import write_sae_delta_umap_panel
 from .constants import SECTION_ESMC_FEATURE_REVIEW
 
 matplotlib.use("Agg")
@@ -87,6 +89,7 @@ def write_biohub_esmc_sae_interpretation_panels(
     feature_catalog_path: Path,
     request_manifest_path: Path,
     foldcheck_ranking_path: Path,
+    candidate_preference_table_path: Path,
     mask_residues: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Render lightweight SAE interpretation panels from existing sparse Biohub rows."""
@@ -105,6 +108,11 @@ def write_biohub_esmc_sae_interpretation_panels(
     if not feature_rows:
         return [_missing_row(panel_root, [protein_features_path], reason="WT SAE protein feature rows are absent")]
     selected_features = [int(row["feature_index"]) for row in feature_rows]
+    provenance_audit = sae_provenance_audit(
+        profile_path=profile_path,
+        protein_features_path=protein_features_path,
+        residue_features_path=residue_features_path,
+    )
     panel_root.mkdir(parents=True, exist_ok=True)
     _remove_retired_outputs(panel_root)
     top_feature_table_path = panel_root / "protein_top_sae_features.parquet"
@@ -131,6 +139,14 @@ def write_biohub_esmc_sae_interpretation_panels(
             feature_catalog_path=feature_catalog_path,
             request_manifest_path=request_manifest_path,
             feature_rows=feature_rows,
+            sae_provenance_audit=provenance_audit,
+        ),
+        write_sae_delta_umap_panel(
+            panel_root=panel_root,
+            profile_path=profile_path,
+            protein_features_path=protein_features_path,
+            request_manifest_path=request_manifest_path,
+            candidate_preference_table_path=candidate_preference_table_path,
         ),
         _write_feature_heatmap_manifest(
             heatmap_root=heatmap_root,
@@ -142,6 +158,7 @@ def write_biohub_esmc_sae_interpretation_panels(
             selected_features=selected_features,
             wt_feature_rows=feature_rows,
             mask_residues=mask_residues,
+            sae_provenance_audit=provenance_audit,
         ),
     ]
 
@@ -153,6 +170,7 @@ def _write_wt_activation_pattern_panel(
     feature_catalog_path: Path,
     request_manifest_path: Path,
     feature_rows: list[dict[str, Any]],
+    sae_provenance_audit: dict[str, Any],
 ) -> dict[str, Any]:
     title = "WT-active SAE features have distinct residue activation patterns"
     selected_features = [int(row["feature_index"]) for row in feature_rows]
@@ -214,7 +232,11 @@ def _write_wt_activation_pattern_panel(
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,
         method_summary=METHOD_SUMMARY,
-        evidence_summary=_evidence_summary(feature_rows, request_manifest_path=request_manifest_path),
+        evidence_summary=_evidence_summary(
+            feature_rows,
+            request_manifest_path=request_manifest_path,
+            sae_provenance_audit=sae_provenance_audit,
+        ),
         role="review_only",
     )
 
@@ -230,6 +252,7 @@ def _write_feature_heatmap_manifest(
     selected_features: list[int],
     wt_feature_rows: list[dict[str, Any]],
     mask_residues: list[dict[str, Any]],
+    sae_provenance_audit: dict[str, Any],
 ) -> dict[str, Any]:
     title = "Selected SAE feature activation across Eco1 RT variants"
     heatmap_root.mkdir(parents=True, exist_ok=True)
@@ -263,6 +286,7 @@ def _write_feature_heatmap_manifest(
         "protein_features_path": _relative_to(path.parent, protein_features_path),
         "feature_catalog_path": _relative_to(path.parent, feature_catalog_path),
         "request_manifest_path": _relative_to(path.parent, request_manifest_path),
+        "sae_provenance_audit": sae_provenance_audit,
         "source_tables": _SOURCE_TABLES,
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -295,7 +319,11 @@ def _write_feature_heatmap_manifest(
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,
         method_summary=METHOD_SUMMARY,
-        evidence_summary=_evidence_summary(wt_feature_rows, request_manifest_path=request_manifest_path)
+        evidence_summary=_evidence_summary(
+            wt_feature_rows,
+            request_manifest_path=request_manifest_path,
+            sae_provenance_audit=sae_provenance_audit,
+        )
         | {"sequence_rows": len(candidate_order), "sequence_length": len(wt_sequence)},
         role="manuscript_facing",
     )
@@ -438,10 +466,18 @@ def _relative_to(path_root: Path, path: Path) -> str:
     return os.path.relpath(path.resolve(), start=path_root.resolve())
 
 
-def _evidence_summary(feature_rows: list[dict[str, Any]], *, request_manifest_path: Path) -> dict[str, Any]:
-    return sae_request_manifest_summary(request_manifest_path) | {
+def _evidence_summary(
+    feature_rows: list[dict[str, Any]],
+    *,
+    request_manifest_path: Path,
+    sae_provenance_audit: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    summary = sae_request_manifest_summary(request_manifest_path) | {
         "source_notebook": SOURCE_NOTEBOOK,
         "feature_selection_rule": "top WT features by activation_max, tie-broken by prevalence and activation_sum",
         "selected_feature_count": len(feature_rows),
         "selected_feature_indices": [int(row["feature_index"]) for row in feature_rows],
     }
+    if sae_provenance_audit is not None:
+        summary["sae_provenance_audit"] = dict(sae_provenance_audit)
+    return summary

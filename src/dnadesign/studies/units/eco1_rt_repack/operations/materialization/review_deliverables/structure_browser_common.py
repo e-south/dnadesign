@@ -25,7 +25,13 @@ from dnadesign.thread.structure_views.models import STANDARD_AMINO_ACID_RESIDUE_
 REFERENCE_STRUCTURE_RELATIVE_PATH = "structures/ec86kit_chain_a_backbone_reference.pdb"
 REFERENCE_ALL_ATOM_RELATIVE_PATH = "structures/ec86kit_protomer1_all_atom_reference.cif"
 REFERENCE_BROWSER_PDB_RELATIVE_PATH = "structures/ec86kit_protomer1_all_atom_reference.pdb"
-REFERENCE_COLOR = "#efece3"
+REFERENCE_COLOR = "#F7F3EA"
+PROTEIN_CLASS_COLOR = "#005AB5"
+DNA_CLASS_COLOR = "#C58A00"
+RNA_CLASS_COLOR = "#D6604D"
+RESIDUE_CATEGORY_HIGHLIGHT_COLOR = "#C00000"
+CANDIDATE_PASS_COLOR = "#0072B2"
+CANDIDATE_LOW_CONFIDENCE_COLOR = "#6A3D9A"
 _STRUCTURE_PREPROCESSING_PROVENANCE_PATH = Path(
     "docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml"
 )

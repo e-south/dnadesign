@@ -52,7 +52,7 @@ def test_review_deliverable_visual_content_is_plain_and_linked(tmp_path: Path) -
 
 def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
     msa_text = _read_deliverable(manifest_path, deliverables, "msa_plurality_mask_panel")
-    assert "4-record clade 9 MSA: 25% plurality mask" in msa_text
+    assert "The 4-record clade 9 MSA shows the active 25% WT-plurality mask denominator" in msa_text
     assert "all accepted clade 9 alignment rows" in str(deliverables["msa_plurality_mask_panel"]["description"])
     assert "current conservation mask uses this clade 9 denominator" in str(
         deliverables["msa_plurality_mask_panel"]["description"]
@@ -64,7 +64,7 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "Mask-protected" in msa_text
 
     subtype_text = _read_deliverable(manifest_path, deliverables, "msa_subtype_plurality_panel")
-    assert "3-record II-A3/42_1 Eco1 subtype MSA" in subtype_text
+    assert "The 3-record Eco1 subtype II-A3/42_1 MSA shows the narrower subtype conservation context" in subtype_text
     assert "all accepted II-A3/42_1 subtype alignment rows" in str(
         deliverables["msa_subtype_plurality_panel"]["description"]
     )
@@ -76,9 +76,9 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     mask_text = _read_deliverable(manifest_path, deliverables, "linear_mask_tracks")
     assert "Residue mask evidence across Ec86 RT" in mask_text
     assert "ProteinMPNN-designable residues" in mask_text
-    assert "WT residue" in mask_text
+    assert "WT residue" not in mask_text
     assert "Ec86 positions 1-6" not in mask_text
-    assert "Mask evidence track" in mask_text
+    assert "Mask evidence track" not in mask_text
     assert "M" in mask_text
     assert "K" in mask_text
 
@@ -97,6 +97,16 @@ def _assert_proteinmpnn_content(manifest_path: Path, deliverables: dict[str, dic
     assert "RT1-RT7 annotation intervals" in mutation_density_text
     assert "Retained DNA/RNA &lt;=5 A" in mutation_density_text
     assert "Motif anchors: NAxxH/YADD/VTG" in mutation_density_text
+
+    similarity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_variant_similarity_heatmap")
+    assert "ProteinMPNN variants are mapped against the Ec86 WT sequence" in similarity_text
+    assert "Same as WT" in similarity_text
+    assert "Different from WT" in similarity_text
+    assert "Missing backbone context" in similarity_text
+    assert "canonical positions" in str(deliverables["proteinmpnn_variant_similarity_heatmap"]["description"])
+    assert "descriptive sequence-similarity view" in str(
+        deliverables["proteinmpnn_variant_similarity_heatmap"]["interpretation_limit"]
+    )
 
     tao_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_tao_style_fold_validation")
     assert "ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text

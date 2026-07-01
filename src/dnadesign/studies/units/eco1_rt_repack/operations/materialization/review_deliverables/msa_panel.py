@@ -176,6 +176,8 @@ def write_msa_plurality_mask_panel(
     ax.set_ylim(len(selected_records) - 0.5, -1.42)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=24)
     ax.spines[["top", "right"]].set_visible(False)
+    margins = _figure_margins(len(selected_records), fig_height=fig_height)
+    legend_center_x = _axes_center_x(margins)
     fig.legend(
         handles=[
             Patch(facecolor=OKABE_ITO["green"], label="Matches Ec86"),
@@ -194,7 +196,7 @@ def write_msa_plurality_mask_panel(
             ),
         ],
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.012),
+        bbox_to_anchor=(legend_center_x, 0.012),
         ncol=5,
         frameon=False,
         fontsize=LEGEND_SIZE - 0.8,
@@ -202,7 +204,6 @@ def write_msa_plurality_mask_panel(
         handletextpad=0.5,
         borderaxespad=0.2,
     )
-    margins = _figure_margins(len(selected_records), fig_height=fig_height)
     fig.subplots_adjust(**margins)
 
     path = panel_root / panel_profile.file_name
@@ -249,8 +250,8 @@ def write_msa_plurality_mask_panel(
 
 def _panel_title(*, record_count: int, panel_profile: MsaPanelProfile) -> str:
     if panel_profile.current_mask_denominator:
-        return f"{record_count}-record clade 9 MSA: 25% plurality mask"
-    return f"{record_count}-record II-A3/42_1 Eco1 subtype MSA"
+        return f"The {record_count}-record clade 9 MSA shows the active 25% WT-plurality mask denominator"
+    return f"The {record_count}-record Eco1 subtype II-A3/42_1 MSA shows the narrower subtype conservation context"
 
 
 def _panel_description(panel_profile: MsaPanelProfile) -> str:
@@ -432,6 +433,10 @@ def _figure_margins(row_count: int, *, fig_height: float) -> dict[str, float]:
         "bottom": bottom,
         "top": top,
     }
+
+
+def _axes_center_x(margins: dict[str, float]) -> float:
+    return (float(margins["left"]) + float(margins["right"])) / 2.0
 
 
 def _row_label_size(row_count: int) -> float:

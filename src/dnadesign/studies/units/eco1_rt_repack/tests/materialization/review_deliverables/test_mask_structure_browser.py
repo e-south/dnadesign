@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import html as html_lib
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
+    structure_browser_common as browser_colors,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_CONSTRAINT_EVIDENCE,
@@ -66,6 +70,7 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         structure_rna_ui="<rna-color-toggle>",
     )
     rendered_text = str(rendered)
+    unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
 
     assert "<iframe" in rendered_text
     assert "3Dmol" in rendered_text
@@ -87,13 +92,16 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert (
         "data-selection-id=&quot;protected&quot;" in rendered_text or 'data-selection-id="protected"' in rendered_text
     )
+    assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
+        unescaped_rendered
+    )
     selection_colors = {
         str(style["color"])
         for row in rows
         if str(row.get("structure_view_mode") or "") == "reference_selection"
         for style in row.get("selection_styles", [])
     }
-    assert selection_colors == {"#D55E00"}
+    assert selection_colors == {browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}
 
 
 def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path: Path) -> None:

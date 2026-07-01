@@ -151,12 +151,12 @@ def _heatmap_svg(
     feature_label = str(feature_row.get("label") or f"F{feature_index}")
     sequence_length = len(wt_sequence)
     row_count = len(candidate_order)
-    cell_width = 9.0
-    row_height = 12.0
-    left = 190.0
-    top = 74.0
-    right = 64.0
-    bottom = 88.0
+    cell_width = 4.8
+    row_height = 13.6
+    left = 176.0
+    top = 130.0
+    right = 76.0
+    bottom = 104.0
     plot_width = cell_width * sequence_length
     plot_height = row_height * row_count
     width = int(left + plot_width + right)
@@ -167,7 +167,8 @@ def _heatmap_svg(
         if float(row.get("value") or 0.0) > 0.0
     }
     max_value = max(values.values()) if values else 1.0
-    title = f"SAE {feature_label} across Eco1 RT variants"
+    title = f"SAE F{feature_index} activation across Eco1 RT variants"
+    subtitle = feature_label if feature_label != f"F{feature_index}" else "Selected WT-active SAE feature"
     desc = (
         f"Feature {feature_index} activation heatmap over {row_count} sequences and "
         f"{sequence_length} residue positions. White cells indicate zero recorded sparse activation."
@@ -189,19 +190,19 @@ def _heatmap_svg(
             )
         row_labels.append(
             f'<text x="{left - 8:.1f}" y="{y + row_height * 0.72:.1f}" text-anchor="end" '
-            f'font-size="7.6" fill="#24292f">{html.escape(_candidate_label(candidate_id, row_index))}</text>'
+            f'font-size="8.3" fill="#24292f">{html.escape(_candidate_label(candidate_id, row_index))}</text>'
         )
     top_letters = []
     bottom_positions = []
     for position, residue in enumerate(wt_sequence, start=1):
         x = left + (position - 0.5) * cell_width
         top_letters.append(
-            f'<text x="{x:.1f}" y="{top - 16:.1f}" text-anchor="middle" font-size="8.2" '
+            f'<text x="{x:.1f}" y="{top - 18:.1f}" text-anchor="middle" font-size="8.7" '
             f'fill="#24292f">{html.escape(residue)}</text>'
         )
         bottom_positions.append(
-            f'<text x="{x:.1f}" y="{top + plot_height + 17:.1f}" text-anchor="start" font-size="6.7" '
-            f'fill="#57606a" transform="rotate(90 {x:.1f} {top + plot_height + 17:.1f})">{position}</text>'
+            f'<text x="{x:.1f}" y="{top + plot_height + 19:.1f}" text-anchor="start" font-size="7.2" '
+            f'fill="#57606a" transform="rotate(90 {x:.1f} {top + plot_height + 19:.1f})">{position}</text>'
         )
     heatmap_cells = []
     row_index_by_candidate = {candidate_id: index for index, candidate_id in enumerate(candidate_order)}
@@ -221,12 +222,14 @@ def _heatmap_svg(
         for position in range(0, sequence_length + 1, 10)
     ]
     axis_labels_svg = (
-        f'<text x="{left - 8:.1f}" y="{top - 16:.1f}" text-anchor="end" '
-        'font-size="9.2" fill="#57606a">WT residue</text>'
-        f'<text x="{left - 8:.1f}" y="{top + plot_height + 20:.1f}" text-anchor="end" '
-        'font-size="9.2" fill="#57606a">Position</text>'
+        f'<text x="{left - 8:.1f}" y="{top - 18:.1f}" text-anchor="end" '
+        'font-size="10.4" fill="#57606a">WT residue</text>'
+        f'<text x="{left - 8:.1f}" y="{top + plot_height + 21:.1f}" text-anchor="end" '
+        'font-size="10.4" fill="#57606a">Position</text>'
     )
-    colorbar = _colorbar_svg(left=left, y=height - 26, width=360, max_value=max_value)
+    colorbar_width = min(460.0, max(320.0, plot_width * 0.34))
+    colorbar_left = left + (plot_width - colorbar_width) / 2.0
+    colorbar = _colorbar_svg(left=colorbar_left, y=height - 34, width=colorbar_width, max_value=max_value)
     return zoom_frame_html(
         body_html=f"""
       {zoom_controls}
@@ -240,8 +243,12 @@ def _heatmap_svg(
           <title id="{svg_id}-title">{html.escape(title)}</title>
           <desc id="{svg_id}-desc">{html.escape(desc)}</desc>
           <rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>
-          <text x="{left:.1f}" y="28" font-size="16" font-weight="650" fill="#24292f">{html.escape(title)}</text>
-          <text x="{left:.1f}" y="50" font-size="11" fill="#57606a">
+          <text x="{left + plot_width / 2.0:.1f}" y="30" text-anchor="middle"
+                font-size="19" font-weight="650" fill="#24292f">{html.escape(title)}</text>
+          <text x="{left + plot_width / 2.0:.1f}" y="53" text-anchor="middle"
+                font-size="12.2" fill="#57606a">{html.escape(subtitle)}</text>
+          <text x="{left + plot_width / 2.0:.1f}" y="72" text-anchor="middle"
+                font-size="11.2" fill="#57606a">
             Rows are WT plus ProteinMPNN variants; columns are Ec86 canonical positions.
           </text>
           {axis_labels_svg}
@@ -318,7 +325,7 @@ def _colorbar_svg(*, left: float, y: float, width: float, max_value: float) -> s
 
 
 def _feature_metric_rows(row: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, str]]:
-    return [
+    rows = [
         {"field": "feature_index", "value": str(row["feature_index"])},
         {"field": "feature_label", "value": str(row.get("label") or "")},
         {"field": "wt_activation_max", "value": f"{float(row.get('wt_activation_max') or 0.0):.4f}"},
@@ -328,3 +335,36 @@ def _feature_metric_rows(row: dict[str, Any], payload: dict[str, Any]) -> list[d
         {"field": "sequence_length", "value": str(payload.get("sequence_length") or "")},
         {"field": "feature_selection_policy", "value": str(payload.get("feature_selection_policy") or "")},
     ]
+    audit = payload.get("sae_provenance_audit")
+    if isinstance(audit, dict):
+        rows.extend(
+            [
+                {
+                    "field": "accepted_sae_profiles",
+                    "value": f"{audit.get('accepted_profile_count', 0)} of {audit.get('profile_row_count', 0)}",
+                },
+                {
+                    "field": "sequence_length_range",
+                    "value": f"{audit.get('sequence_length_min', 0)}-{audit.get('sequence_length_max', 0)}",
+                },
+                {"field": "unique_sequence_hashes", "value": str(audit.get("unique_sequence_hash_count") or 0)},
+                {
+                    "field": "unique_raw_logits_hashes",
+                    "value": str(audit.get("unique_raw_logits_response_hash_count") or 0),
+                },
+                {
+                    "field": "wt_activation_cosine_range",
+                    "value": _cosine_range_label(
+                        audit.get("wt_activation_cosine_min"),
+                        audit.get("wt_activation_cosine_max"),
+                    ),
+                },
+            ]
+        )
+    return rows
+
+
+def _cosine_range_label(minimum: Any, maximum: Any) -> str:
+    if minimum is None or maximum is None:
+        return "not available"
+    return f"{float(minimum):.4f}-{float(maximum):.4f}"

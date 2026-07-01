@@ -113,6 +113,8 @@ def structure_dashboard_rows(
     reference_atom_content: StructureAtomContent,
     query_atom_content: StructureAtomContent | None,
     show_sidechains: bool,
+    show_dna: bool,
+    show_rna: bool,
     highlight_protein: bool,
     highlight_dna: bool,
     highlight_rna: bool,
@@ -135,6 +137,8 @@ def structure_dashboard_rows(
             reference_atom_content=reference_atom_content,
             query_atom_content=query_atom_content,
             show_sidechains=show_sidechains,
+            show_dna=show_dna,
+            show_rna=show_rna,
             highlight_protein=highlight_protein,
             highlight_dna=highlight_dna,
             highlight_rna=highlight_rna,
@@ -245,6 +249,8 @@ def _browser_dashboard_rows(
     reference_atom_content: StructureAtomContent,
     query_atom_content: StructureAtomContent | None,
     show_sidechains: bool,
+    show_dna: bool,
+    show_rna: bool,
     highlight_protein: bool,
     highlight_dna: bool,
     highlight_rna: bool,
@@ -268,6 +274,10 @@ def _browser_dashboard_rows(
                 query_atom_content=query_atom_content,
                 show_sidechains=show_sidechains,
             ),
+        },
+        {
+            "metric": "Molecule visibility",
+            "value": molecule_visibility_dashboard_value(show_dna=show_dna, show_rna=show_rna),
         },
         {
             "metric": "Molecule colors",
@@ -356,7 +366,7 @@ def molecule_color_dashboard_value(
     enabled = [
         label
         for label, is_enabled in (
-            ("protein", highlight_protein),
+            ("Protein", highlight_protein),
             ("DNA", highlight_dna),
             ("RNA", highlight_rna),
         )
@@ -365,3 +375,12 @@ def molecule_color_dashboard_value(
     if not enabled:
         return "Off."
     return "On for " + ", ".join(enabled) + "."
+
+
+def molecule_visibility_dashboard_value(*, show_dna: bool, show_rna: bool) -> str:
+    visible = ["Protein"]
+    if show_dna:
+        visible.append("DNA")
+    if show_rna:
+        visible.append("RNA")
+    return ", ".join(visible) + "."
