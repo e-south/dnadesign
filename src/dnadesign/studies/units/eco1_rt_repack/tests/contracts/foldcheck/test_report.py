@@ -11,25 +11,51 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
-from dnadesign.studies.units.eco1_rt_repack.operations.contracts.suite import validate_checked_in_contracts
-from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
+import pytest
+
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling import artifacts as sampling_artifacts
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.artifacts import (
+    validate_sampling_artifacts,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 
 
-def test_phase3_requires_materialized_foldcheck_report_when_phase2_artifacts_exist(tmp_path: Path) -> None:
-    root = repo_root()
-    source_output_root = root / DEFAULT_THREAD_OUTPUT_ROOT
-    output_root = tmp_path / "thread-output"
-    shutil.copytree(source_output_root, output_root, ignore=shutil.ignore_patterns("foldcheck_report.parquet"))
+def test_phase3_requires_materialized_foldcheck_report_when_phase2_artifacts_exist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _accept_phase2_artifact_content(monkeypatch)
+    _write_phase2_artifact_placeholders(tmp_path)
 
-    report = validate_checked_in_contracts(
-        repo_root=root,
+    issues = validate_sampling_artifacts(
+        repo_root=repo_root(),
+        structure_root=tmp_path,
         phase="phase3_foldcheck_report",
-        output_root=output_root,
     )
 
-    assert report.passed is False
-    assert {issue.check_id for issue in report.issues} == {"eco1_rt.foldcheck_report.not_materialized"}
+    assert [issue.check_id for issue in issues] == ["eco1_rt.foldcheck_report.not_materialized"]
+
+
+def _accept_phase2_artifact_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "validate_thread_plan_content",
+        "validate_proteinmpnn_request_content",
+        "validate_sample_table_content",
+        "validate_candidate_table_content",
+        "validate_foldcheck_request_content",
+    ):
+        monkeypatch.setattr(sampling_artifacts, name, lambda *args, **kwargs: [])
+
+
+def _write_phase2_artifact_placeholders(output_root: Path) -> None:
+    for relative_path in (
+        "thread_plan.yaml",
+        "proteinmpnn_request/request_manifest.yaml",
+        "sample_table.parquet",
+        "candidate_table.parquet",
+        "foldcheck_request/foldcheck_request_manifest.yaml",
+    ):
+        path = output_root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("fixture: true\n", encoding="utf-8")
