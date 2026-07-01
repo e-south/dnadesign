@@ -241,7 +241,10 @@ qsub \
   wrapper prepends the sibling `lib/` directory to `LD_LIBRARY_PATH` so SCC does
   not fall back to the older system `libstdc++`.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
-  full materialized request. The template delegates FASTA subsetting and run
+  full 97-record baseline request. For larger expanded requests, pass
+  `FOLDCHECK_SEQUENCE_START=<one-based-start>` with a bounded
+  `FOLDCHECK_SEQUENCE_LIMIT=<count>` and submit shards with separate
+  `FOLDCHECK_RUN_ROOT` values. The template delegates FASTA subsetting and run
   manifest writing to `python -m dnadesign.thread.foldcheck.subset`, which
   validates FASTA ids and sequence hashes against the request manifest.
 - runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast

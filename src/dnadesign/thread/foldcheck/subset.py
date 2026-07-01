@@ -37,6 +37,7 @@ def materialize_foldcheck_sequence_subset(
     *,
     request_manifest_path: Path,
     sequence_limit: str,
+    sequence_start: int = 1,
     input_fasta_path: Path,
     run_manifest_path: Path,
     output_dir: Path,
@@ -48,10 +49,11 @@ def materialize_foldcheck_sequence_subset(
     manifest = _read_manifest(request_manifest_path)
     source_records = _read_request_fasta(request_manifest_path, manifest)
     _validate_records_against_manifest(source_records, manifest)
-    selected_records = _select_records(source_records, sequence_limit)
+    selected_records = _select_records(source_records, sequence_limit, sequence_start=sequence_start)
 
     input_fasta_path.parent.mkdir(parents=True, exist_ok=True)
     input_fasta_path.write_text(_fasta_text(selected_records), encoding="utf-8")
+    selected_end = sequence_start + len(selected_records) - 1
 
     run_payload = {
         "schema_id": _require_nonempty(schema_id, "schema_id"),
@@ -59,6 +61,8 @@ def materialize_foldcheck_sequence_subset(
         "source_request_manifest": str(request_manifest_path),
         "source_request_hash": _require_nonempty(str(manifest.get("request_hash", "")), "request_hash"),
         "source_sequence_count": int(manifest["sequence_count"]),
+        "selected_sequence_start": sequence_start,
+        "selected_sequence_end": selected_end,
         "selected_sequence_count": len(selected_records),
         "selected_sequence_ids": [record.sequence_id for record in selected_records],
         "input_fasta": str(input_fasta_path),
@@ -74,6 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Write a fold-check subset FASTA from a request manifest.")
     parser.add_argument("--request-manifest", required=True, type=Path)
     parser.add_argument("--sequence-limit", required=True)
+    parser.add_argument("--sequence-start", default=1, type=int)
     parser.add_argument("--input-fasta", required=True, type=Path)
     parser.add_argument("--run-manifest", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
@@ -84,6 +89,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     payload = materialize_foldcheck_sequence_subset(
         request_manifest_path=args.request_manifest,
         sequence_limit=args.sequence_limit,
+        sequence_start=args.sequence_start,
         input_fasta_path=args.input_fasta,
         run_manifest_path=args.run_manifest,
         output_dir=args.output_dir,
@@ -159,18 +165,27 @@ def _validate_records_against_manifest(records: Sequence[FastaRecord], manifest:
             raise ValueError(f"fold-check FASTA sequence hash mismatch for {record.sequence_id!r}")
 
 
-def _select_records(records: Sequence[FastaRecord], sequence_limit: str) -> list[FastaRecord]:
+def _select_records(
+    records: Sequence[FastaRecord], sequence_limit: str, *, sequence_start: int = 1
+) -> list[FastaRecord]:
+    if sequence_start < 1:
+        raise ValueError("sequence_start must be a one-based positive integer")
+    start_index = sequence_start - 1
+    if start_index >= len(records):
+        raise ValueError(f"sequence_start {sequence_start} exceeds request sequence count {len(records)}")
     if sequence_limit.lower() == "all":
-        return list(records)
+        return list(records[start_index:])
     try:
         limit = int(sequence_limit)
     except ValueError as error:
         raise ValueError("sequence_limit must be a positive integer or 'all'") from error
     if limit < 1:
         raise ValueError("sequence_limit must be a positive integer or 'all'")
-    if limit > len(records):
-        raise ValueError(f"sequence_limit {limit} exceeds request sequence count {len(records)}")
-    return list(records[:limit])
+    if start_index + limit > len(records):
+        raise ValueError(
+            f"sequence_start {sequence_start} with sequence_limit {limit} exceeds request sequence count {len(records)}"
+        )
+    return list(records[start_index : start_index + limit])
 
 
 def _fasta_text(records: Sequence[FastaRecord]) -> str:

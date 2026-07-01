@@ -41,8 +41,73 @@ def test_materialize_foldcheck_sequence_subset_writes_fasta_and_manifest(tmp_pat
     assert manifest == run_manifest
     assert manifest["schema_id"] == "eco1_rt.colabfold_scc_run_manifest"
     assert manifest["source_sequence_count"] == 3
+    assert manifest["selected_sequence_start"] == 1
+    assert manifest["selected_sequence_end"] == 2
     assert manifest["selected_sequence_count"] == 2
     assert manifest["selected_sequence_ids"] == ["wild_type", "candidate_a"]
+
+
+def test_materialize_foldcheck_sequence_subset_supports_one_based_start(tmp_path: Path) -> None:
+    request_dir = tmp_path / "request"
+    request_dir.mkdir()
+    _write_request_fixture(request_dir)
+
+    run_manifest = materialize_foldcheck_sequence_subset(
+        request_manifest_path=request_dir / "foldcheck_request_manifest.yaml",
+        sequence_limit="2",
+        sequence_start=2,
+        input_fasta_path=tmp_path / "run/input_sequences.fasta",
+        run_manifest_path=tmp_path / "run/colabfold_run_manifest.yaml",
+        output_dir=tmp_path / "run/colabfold_outputs",
+    )
+
+    assert (tmp_path / "run/input_sequences.fasta").read_text(encoding="utf-8") == (
+        ">candidate_a\nACDF\n>candidate_b\nACDG\n"
+    )
+    assert run_manifest["selected_sequence_start"] == 2
+    assert run_manifest["selected_sequence_end"] == 3
+    assert run_manifest["selected_sequence_count"] == 2
+    assert run_manifest["selected_sequence_ids"] == ["candidate_a", "candidate_b"]
+
+
+def test_materialize_foldcheck_sequence_subset_rejects_start_limit_overflow(tmp_path: Path) -> None:
+    request_dir = tmp_path / "request"
+    request_dir.mkdir()
+    _write_request_fixture(request_dir)
+
+    try:
+        materialize_foldcheck_sequence_subset(
+            request_manifest_path=request_dir / "foldcheck_request_manifest.yaml",
+            sequence_limit="3",
+            sequence_start=2,
+            input_fasta_path=tmp_path / "run/input_sequences.fasta",
+            run_manifest_path=tmp_path / "run/colabfold_run_manifest.yaml",
+            output_dir=tmp_path / "run/colabfold_outputs",
+        )
+    except ValueError as error:
+        assert "sequence_start 2 with sequence_limit 3 exceeds request sequence count 3" in str(error)
+    else:
+        raise AssertionError("Expected start plus limit overflow to fail")
+
+
+def test_materialize_foldcheck_sequence_subset_rejects_zero_start(tmp_path: Path) -> None:
+    request_dir = tmp_path / "request"
+    request_dir.mkdir()
+    _write_request_fixture(request_dir)
+
+    try:
+        materialize_foldcheck_sequence_subset(
+            request_manifest_path=request_dir / "foldcheck_request_manifest.yaml",
+            sequence_limit="1",
+            sequence_start=0,
+            input_fasta_path=tmp_path / "run/input_sequences.fasta",
+            run_manifest_path=tmp_path / "run/colabfold_run_manifest.yaml",
+            output_dir=tmp_path / "run/colabfold_outputs",
+        )
+    except ValueError as error:
+        assert "sequence_start must be a one-based positive integer" in str(error)
+    else:
+        raise AssertionError("Expected zero sequence start to fail")
 
 
 def test_materialize_foldcheck_sequence_subset_rejects_hash_mismatch(tmp_path: Path) -> None:
