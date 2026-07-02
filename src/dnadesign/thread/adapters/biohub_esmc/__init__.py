@@ -35,6 +35,7 @@ from dnadesign.thread.adapters.biohub_esmc.tables import (
     BiohubEsmcArtifacts,
     validate_biohub_esmc_artifacts,
     write_biohub_esmc_artifacts,
+    write_biohub_esmc_feature_catalog,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "supports_feature_description_endpoint",
     "validate_biohub_esmc_artifacts",
     "write_biohub_esmc_artifacts",
+    "write_biohub_esmc_feature_catalog",
 ]

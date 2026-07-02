@@ -162,6 +162,24 @@ def write_biohub_esmc_artifacts(
     return artifacts
 
 
+def write_biohub_esmc_feature_catalog(
+    path: Path,
+    feature_catalog_rows: Sequence[Mapping[str, Any]],
+    *,
+    request_hash: str,
+) -> Path:
+    """Write only the Biohub ESMC feature-catalog table."""
+
+    _write_table(
+        path,
+        _deduplicate_feature_rows(feature_catalog_rows),
+        schema=_FEATURE_CATALOG_SCHEMA,
+        schema_id=BIOHUB_ESMC_FEATURE_CATALOG_SCHEMA_ID,
+        request_hash=request_hash,
+    )
+    return path
+
+
 def validate_biohub_esmc_artifacts(
     *,
     output_root: Path,

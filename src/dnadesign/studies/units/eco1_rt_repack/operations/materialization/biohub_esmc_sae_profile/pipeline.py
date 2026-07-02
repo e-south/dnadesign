@@ -17,6 +17,8 @@ from pathlib import Path
 from time import sleep
 from typing import Any
 
+import yaml
+
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.constants import (
     DEFAULT_BIOHUB_API_BASE_URL,
     DEFAULT_BIOHUB_API_VERSION,
@@ -58,7 +60,10 @@ from dnadesign.thread.adapters.biohub_esmc import (
     supports_feature_description_endpoint,
     validate_biohub_esmc_artifacts,
     write_biohub_esmc_artifacts,
+    write_biohub_esmc_feature_catalog,
 )
+
+FEATURE_DESCRIPTION_MANIFEST_FILE_NAME = "biohub_esmc_feature_description_manifest.yaml"
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,16 @@ class MaterializedBiohubEsmcSaeProfileArtifacts:
     request_manifest_path: Path
     biohub_request_hash: str
     selected_sequence_count: int
+
+
+@dataclass(frozen=True)
+class MaterializedBiohubEsmcFeatureDescriptions:
+    """Paths emitted by feature-catalog-only description enrichment."""
+
+    feature_catalog_path: Path
+    manifest_path: Path
+    observed_feature_count: int
+    enriched_feature_count: int
 
 
 def materialize_biohub_esmc_sae_profile(
@@ -303,6 +318,76 @@ def materialize_biohub_esmc_sae_profile(
     )
 
 
+def enrich_existing_biohub_esmc_feature_catalog(
+    *,
+    repo_root: Path | None = None,
+    output_root: Path | None = None,
+    biohub_api_base_url: str = DEFAULT_BIOHUB_API_BASE_URL,
+    sae_model: str = DEFAULT_SAE_MODEL,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    feature_description_limit: int | None = None,
+    feature_description_sleep_seconds: float = 0.0,
+    feature_description_client: Any | None = None,
+    retrieved_at: str | None = None,
+) -> MaterializedBiohubEsmcFeatureDescriptions:
+    """Enrich an existing Biohub ESMC feature catalog without rebuilding large SAE tables."""
+
+    if request_timeout_seconds <= 0:
+        raise ValueError("request_timeout_seconds must be positive")
+    if feature_description_limit is not None and feature_description_limit < 0:
+        raise ValueError("feature_description_limit must be non-negative")
+    if feature_description_sleep_seconds < 0:
+        raise ValueError("feature_description_sleep_seconds must be non-negative")
+    root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
+    out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
+    existing_rows = load_existing_rows(out_root)
+    if existing_rows is None or existing_rows.feature_catalog_path is None:
+        raise FileNotFoundError(out_root / "biohub_esmc_feature_catalog.parquet")
+    feature_catalog_rows = existing_rows.feature_catalog_rows
+    if not feature_catalog_rows:
+        raise ValueError("Biohub ESMC feature catalog contains no rows to enrich")
+    request_hash = _existing_request_hash(existing_rows.profile_rows_by_candidate)
+    timestamp = retrieved_at or _timestamp()
+    enriched_rows, feature_description_summary = _maybe_enrich_feature_catalog_rows(
+        feature_catalog_rows,
+        sae_model=sae_model,
+        retrieved_at=timestamp,
+        fetch_feature_descriptions=True,
+        feature_description_limit=feature_description_limit,
+        feature_description_sleep_seconds=feature_description_sleep_seconds,
+        feature_description_client=feature_description_client,
+        biohub_api_base_url=biohub_api_base_url,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    feature_catalog_path = write_biohub_esmc_feature_catalog(
+        existing_rows.feature_catalog_path,
+        enriched_rows,
+        request_hash=request_hash,
+    )
+    manifest_path = out_root / FEATURE_DESCRIPTION_MANIFEST_FILE_NAME
+    manifest_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_id": "eco1_rt.biohub_esmc.feature_description_enrichment",
+                "schema_version": 1,
+                "status": "enriched",
+                "feature_catalog_path": str(feature_catalog_path),
+                "biohub_request_hash": request_hash,
+                "feature_descriptions": feature_description_summary,
+                "retrieved_at": timestamp,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return MaterializedBiohubEsmcFeatureDescriptions(
+        feature_catalog_path=feature_catalog_path,
+        manifest_path=manifest_path,
+        observed_feature_count=int(feature_description_summary["observed_feature_count"]),
+        enriched_feature_count=int(feature_description_summary["enriched_feature_count"]),
+    )
+
+
 def _biohub_request_hash(
     *,
     source_request_hash: str,
@@ -347,6 +432,14 @@ def _biohub_query_hash(
             "normalize_features": normalize_features,
         }
     )
+
+
+def _existing_request_hash(rows_by_candidate: dict[str, dict[str, object]]) -> str:
+    request_hashes = {str(row.get("biohub_request_hash") or "") for row in rows_by_candidate.values()}
+    request_hashes.discard("")
+    if len(request_hashes) != 1:
+        raise ValueError("Existing Biohub ESMC profile rows must carry one biohub_request_hash")
+    return next(iter(request_hashes))
 
 
 def _maybe_enrich_feature_catalog_rows(

@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_es
     DEFAULT_SEQUENCE_LIMIT,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.pipeline import (
+    enrich_existing_biohub_esmc_feature_catalog,
     materialize_biohub_esmc_sae_profile,
 )
 
@@ -33,6 +34,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Materialize Eco1 Biohub ESMC SAE-profile artifacts.")
     parser.add_argument("--repo-root", type=Path, default=None)
     parser.add_argument("--output-root", type=Path, default=None)
+    parser.add_argument(
+        "--feature-descriptions-only",
+        action="store_true",
+        help="Enrich only the existing feature catalog; do not rebuild profile or sparse feature tables.",
+    )
     parser.add_argument("--sequence-limit", default=DEFAULT_SEQUENCE_LIMIT)
     parser.add_argument("--biohub-api-base-url", default=DEFAULT_BIOHUB_API_BASE_URL)
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -88,6 +94,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Delay between feature-description GET requests when enrichment is explicitly enabled.",
     )
     args = parser.parse_args(argv)
+
+    if args.feature_descriptions_only:
+        result = enrich_existing_biohub_esmc_feature_catalog(
+            repo_root=args.repo_root,
+            output_root=args.output_root,
+            biohub_api_base_url=args.biohub_api_base_url,
+            sae_model=args.sae_model,
+            request_timeout_seconds=args.request_timeout_seconds,
+            feature_description_limit=args.feature_description_limit,
+            feature_description_sleep_seconds=args.feature_description_sleep_seconds,
+        )
+        print(f"feature_catalog: {result.feature_catalog_path}")
+        print(f"feature_description_manifest: {result.manifest_path}")
+        print(f"observed_feature_count: {result.observed_feature_count}")
+        print(f"enriched_feature_count: {result.enriched_feature_count}")
+        return 0
 
     result = materialize_biohub_esmc_sae_profile(
         repo_root=args.repo_root,
