@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-29
+last_verified: 2026-07-02
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -92,22 +92,28 @@ sidecars do not belong in this checked-in record root.
 ### Implementation Boundary
 
 The current executable chain materializes structure, conservation, mask, thread
-plan, ProteinMPNN request, sample table, candidate table, fold-check request, a
-full WT plus 96-candidate ColabFold report, fold-check review bundle, local
-full-fold PDB set, and selected-panel ESM Atlas lookup. The fold-check review
-bundle ranks candidates and writes selected-panel and full-set ChimeraX scripts,
-alt-text-backed review plots, a rendered selected-structure overlay when
-ChimeraX is available, a visual manifest, and a scoped marimo notebook without
-selecting candidates. The active backend batch is
-`eco1_rt_p25_5a_n96_20260624`, with 96 accepted ProteinMPNN samples and 96
-accepted candidate rows. Biohub ESMC query-time SAE coverage is complete for WT
-plus all 96 fold-accepted candidates. The review-deliverables bundle also
-materializes a standalone additive WT-context ESMC LLR table, plot, and
-provenance manifest for all 96 candidates. That score compares candidate
-substitutions with the WT residue at the same positions under the WT
-masked-marginal context; it is not a whole-protein pseudo-likelihood or an
-activity measurement. Candidate selection still depends on structure review,
-feasibility review, and handoff gates.
+plan, ProteinMPNN request, sample table, candidate table, fold-check request,
+fold-check reports, fold-check review bundles, local fold PDB staging, and
+selected-panel ESM Atlas lookup. The baseline batch
+`eco1_rt_p25_5a_n96_20260624` has 96 accepted ProteinMPNN samples and 96
+accepted candidate rows. The expanded design-class bundle adds five
+conservative or sensitivity classes and now contains 576 nonredundant synthetic
+candidates plus WT for fold and SAE review. These are fold-preserved,
+model-annotated candidates, not selected assay winners.
+
+The review-deliverables bundle materializes additive WT-context ESMC LLR tables
+and plots. That score compares candidate substitutions with the WT residue at
+the same positions under a WT masked-marginal context; it is not a whole-protein
+pseudo-likelihood and not an activity measurement. Whole-protein ESMC
+pseudo-likelihood is not part of the v1 six-variant panel.
+
+The assay-panel layer is now materialized for the expanded pool under
+`outputs/thread/design_classes/selection/`. It contains a computational
+full-gene feasibility report, a candidate triage table, and a six-row panel
+with one feasible fold-preserved representative from each design class. SAE
+windows remain WT-like across the pool and are recorded as review evidence, not
+used for selection. The review fields explain the panel; they are not a single
+combined score.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic
@@ -120,7 +126,8 @@ activation normalization. `dnadesign.thread.adapters.biohub_esmc` owns
 authenticated Biohub ESMC `/api/v1/encode` -> `/api/v1/logits` query-time SAE
 normalization for synthetic sequences that are not present in Atlas. These
 Biohub ESMC rows are semantic annotation only; they are not fold validation,
-processivity evidence, or candidate acceptance.
+processivity evidence, or candidate acceptance. Whole-protein ESMC
+pseudo-likelihood is deferred and is not required for the v1 six-variant panel.
 `dnadesign.thread.structure_predictions` owns the generic registry for
 model-predicted structures, so an Atlas/ESMFold structure and a ColabFold
 fold-check structure for the same sequence remain separate provenance records.

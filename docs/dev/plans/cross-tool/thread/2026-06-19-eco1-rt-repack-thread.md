@@ -3,9 +3,9 @@ doc_id: dev-thread-eco1-rt-repack-candidate-review
 surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-01
+last_verified: 2026-07-02
 status: active_next_slice
-primary_slice: assembly-feasibility-report-v1
+primary_slice: assay-panel-preparation-v1
 ---
 
 ## Eco1 RT Repack Candidate Review, Feasibility, And RT-Only Handoff
@@ -13,33 +13,48 @@ primary_slice: assembly-feasibility-report-v1
 This spec is the current cross-tool development surface for the next Eco1 RT
 repack slice. The study has already moved past the original tracer bullet:
 ProteinMPNN sampling, candidate normalization, ColabFold fold checking,
-fold-check review, local PDB staging, and all-97 Biohub ESMC query-time SAE
-collection are materialized. The next engineering task is to make candidate
-review deterministic enough for feasibility assessment and an RT-only handoff.
+fold-check review, local PDB staging, Biohub ESMC query-time SAE collection, and
+the expanded design-class candidate pool are materialized locally.
 
-### Decision Summary
+The current task is to prepare a small assay panel from the 576 synthetic
+candidates. The selection-readiness layer now checks computational
+buildability, keeps fold-risk candidates out, records that SAE windows remain
+WT-like, and selects one fold-preserved representative from each design class.
+These steps prepare the assay; they do not predict improved strand
+displacement.
 
-Primary implementation slice:
+### Scientific Flow
 
-```text
-assembly-feasibility-report-v1
-```
-
-The hard handoff eligibility rule is:
+The panel path is:
 
 ```text
 accepted candidate row
 + accepted fold-check row
 + reviewed structure metrics
 + feasible synthesis row
++ deterministic selection slot
 + upstream hash closure
 -> RT-only candidate_handoff eligibility
 ```
 
-Biohub ESMC/SAE data are semantic annotation and stratification evidence. They
-must not become a hidden processivity score, a fold-validation substitute, or an
-acceptance gate. A biochemical assay remains the only evidence for processivity,
-strand displacement, or hairpin readthrough.
+The selection-readiness deliverables are materialized under
+`outputs/thread/design_classes/selection/`:
+`feasibility_report.parquet`, `candidate_triage_table.parquet`, and
+`candidate_selection_panel.parquet`. The panel has six rows, one per design
+class. Feasibility can exclude candidates. Fold class is the first review
+filter. ESMC LLR and sequence distance are tie-breaks inside the eligible set.
+SAE windows are retained as review evidence, but they are not used for
+selection because they do not meaningfully stratify the current pool.
+
+Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings, Tranception,
+Evo2, computational stability prediction, whole-protein ESMC
+pseudo-likelihood, and global SAE clustering unless a later v1.1/v2 task opens
+one of those lanes explicitly. For the first panel, stability is handled by
+fold plausibility, build feasibility, and later empirical expression or
+thermal-screen data when those data exist. Biohub ESMC/SAE data remain semantic
+review evidence. They are not fold validation, processivity evidence, or
+candidate acceptance gates. A biochemical assay remains the only evidence for
+processivity, strand displacement, or hairpin readthrough.
 
 ### Current Record Posture
 
@@ -68,22 +83,39 @@ Materialized inputs for this slice:
 - `conservation_visualizations/`: existing MSA QC sidecars, position plots,
   selected-row overviews, and plurality/gap summaries from the generic
   `aligner.msa.visualization` API.
-- `candidate_table.parquet`: 96 accepted ProteinMPNN candidates.
-- `foldcheck_report.parquet`: WT plus all 96 candidates, all accepted.
-- `foldcheck_review/foldcheck_candidate_ranking.parquet`: 96 candidate rows with
-  ProteinMPNN metrics, ColabFold confidence, WT-runtime RMSD, direct
-  ec86kit/7V9U mapped-residue RMSD, and review classes.
-- `foldcheck_review/foldcheck_full_structure_set.yaml`: local normalized PDBs
-  for WT plus all 96 candidates, with raw ColabFold trees still on BU SCC.
-- `biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits materialization
-  accepted all 97 query rows.
-- `biohub_esmc_protein_features.parquet`: 204,935 sparse per-sequence SAE
-  feature summary rows.
-- `biohub_esmc_residue_features.parquet`: 1,986,560 sparse per-residue SAE
-  rows, equal to 97 sequences x 320 residues x 64 active features.
-- `biohub_esmc_feature_catalog.parquet`: 2,328 observed feature indices from
-  the exact current Biohub SAE dictionary. Labels and descriptions are fetched
-  for this same dictionary.
+- Baseline `candidate_table.parquet`: 96 accepted ProteinMPNN candidates from
+  `eco1_rt_clade9_plurality25_contact5a_v1`.
+- `design_classes/candidate_pool.parquet`: 576 nonredundant synthetic
+  candidates, 96 per design class across the baseline 5 A policy plus clade 9
+  p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and
+  II-A3/`42_1` p50 contact 5 A. Sequence hashes are unique.
+- `design_classes/foldcheck_report.parquet`: WT plus all 576 expanded
+  candidates, all accepted in the normalized fold-check report.
+- `design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet`: 576
+  candidate rows with ProteinMPNN metrics, ColabFold confidence, WT-runtime
+  RMSD, direct ec86kit/7V9U mapped-residue RMSD, and review classes. Current
+  expanded fold-review counts are `strong_fold_preserved: 280`,
+  `good_fold_preserved: 188`, `low_confidence: 105`, and `review_band: 3`.
+- Baseline `foldcheck_review/foldcheck_full_structure_set.yaml`: local
+  normalized PDBs for WT plus the first 96 baseline candidates, with raw
+  ColabFold trees still on BU SCC. The expanded design-class fold-check root is
+  the current source for 576-row assay-panel preparation.
+- Baseline `biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits
+  materialization accepted all 97 query rows.
+- `design_classes/biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits
+  materialization accepted WT plus the expanded 576-candidate pool.
+- `design_classes/biohub_esmc_protein_features.parquet`: 1,216,696 sparse
+  per-sequence SAE feature summary rows.
+- `design_classes/biohub_esmc_residue_features.parquet`: 11,816,960 sparse
+  per-residue SAE rows, equal to 577 sequences x 320 residues x 64 active
+  features.
+- `design_classes/biohub_esmc_feature_catalog.parquet`: observed exact-dictionary
+  Biohub ESMC SAE feature rows for the expanded pool. Labels and descriptions
+  must refer to the same 6B layer-60 16k dictionary.
+- `design_classes/biohub_esmc/sae_feature_window_summary.parquet`: materialized
+  three-window SAE summary with 1,731 rows, covering 577 sequences across the
+  23-position catalytic-palm control, 120-position nucleic-acid contact surface,
+  and 107-position mutable substrate-proximal annulus/basic-surface windows.
 - `biohub_esmc/mutation_scoring/`: implemented WT-only ESMC masked-marginal
   mutation-scoring lane. The full 320-position WT run is materialized with
   position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
@@ -96,22 +128,21 @@ Materialized inputs for this slice:
   roots so this rescore cannot overwrite the current 300M run.
 - `review_deliverables/biohub_esmc_sequence_scoring/`: implemented standalone
   candidate-preference review surface from the complete WT ESMC
-  single-substitution grid. It writes `biohub_esmc_variant_llr_scores.parquet`
+  single-substitution grid. It writes `biohub_esmc_variant_llr_scores.parquet`,
   `esmc_candidate_preference_vs_wt.svg`, and
-  `biohub_esmc_sequence_scoring_manifest.yaml` for all 96 candidates. The score
-  is an additive WT-context LLR sum, not a whole-protein pseudo-likelihood.
+  `biohub_esmc_sequence_scoring_manifest.yaml`. The score is an additive
+  WT-context LLR sum, not a whole-protein pseudo-likelihood.
   When the 6B WT grid exists, the same bundle also writes a separate 6B
   candidate-preference table/plot under
   `review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/` plus a
   300M-versus-6B rank-stability plot. Treat both as model-derived review
-  covariates. In the current 6B run, all 96 synthetic candidates have negative
-  additive WT-context LLR totals, so use the 6B result for relative ranking and
-  rank-stability review rather than as a nonnegative eligibility gate.
+  covariates. In the expanded 576-candidate run, the 300M additive total is
+  positive for most candidates while the 6B additive total is negative for every
+  synthetic candidate. Use both as relative rank and penalty covariates; do not
+  require nonnegative 6B additive totals.
 
-Missing by design:
+Remaining handoff blockers:
 
-- `feasibility_report.parquet`
-- `candidate_selection_panel.parquet`
 - `candidate_handoff.yaml`
 - downstream RT-lnRNA accept/reject record
 
@@ -133,7 +164,7 @@ proves activity. Do not write that SAE features measure processivity.
 
 The closest methods analogue is Tao-style fixed-backbone RT redesign: protect
 functionally important or conserved residues, use ProteinMPNN to propose
-sequences on the remaining design canvas, and use AlphaFold-family structure
+sequences at the remaining mutable positions, and use AlphaFold-family structure
 prediction as a structural filter. Eco1 differs in the biological details:
 Wang/Ec86/7V9U supplies the specific cryoEM scaffold and substrate-contact
 context, Mestre clade 9 supplies the selected conservation denominator, and the
@@ -174,10 +205,11 @@ ColabFold:
 Biohub ESMC/SAE:
 
 > Biohub ESMC/logits was used to collect query-time SAE activations for WT plus
-> all 96 fold-accepted candidate sequences. These rows are model-derived
-> semantic annotation. They can support review and assay-panel stratification,
-> but they cannot by themselves establish processivity, strand displacement, or
-> structured-template readthrough.
+> the fold-accepted candidate sequences. Baseline coverage is WT plus 96
+> candidates; the expanded design-class coverage is WT plus 576 candidates.
+> These rows are model-derived semantic annotation. They can support review and
+> assay-panel stratification, but they cannot by themselves establish
+> processivity, strand displacement, or structured-template readthrough.
 
 Biohub ESMC masked-marginal mutation scoring:
 
@@ -211,6 +243,15 @@ Biohub ESMC candidate preference:
 > than the WT residue at the same positions under the WT masked context. It is
 > not a joint protein likelihood, not leave-one-out whole-protein
 > pseudo-likelihood, and not an activity measurement.
+
+Stability/developability boundary:
+
+> Computational stability prediction is not part of the v1 selection funnel for
+> the many-mutant Eco1 RT designs. The first panel uses fold plausibility,
+> buildability, sequence diversity, ESMC covariates, and local SAE summaries.
+> Expression, solubility, DSF/nanoDSF, basal RT activity, or a later explicit
+> structure-energy review can be recorded when those data exist, but they are not
+> required inputs for the current triage table.
 
 ESM Atlas:
 
@@ -282,19 +323,19 @@ The next implementation should use two layers:
 
 ### SAE Window Summary
 
-Materialize:
+The expanded design-class run now has a compact source table:
 
 ```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
 ```
 
-Use a subdirectory for new Biohub-derived summaries to avoid adding more flat
-root-level files. Do not move the existing all-97 source tables in this slice.
+Use the existing sparse Biohub ESMC SAE tables as inputs. Do not rerun Biohub
+requests for this summary. Do not cluster whole-protein SAE vectors for v1.
 
 One row per:
 
 ```text
-candidate_id x feature_index x window_id
+candidate_id x window_id
 ```
 
 Required fields:
@@ -302,54 +343,58 @@ Required fields:
 ```yaml
 candidate_id: string
 sequence_hash: string
-feature_panel_id: string
+design_class_id: string | null
+model: string
 sae_model: string
 feature_dictionary_size: int
-feature_index: int
-feature_label: string | null
 window_id: string
-window_start_0based: int
-window_end_0based_exclusive: int
+window_label: string
+residue_count: int
+residue_positions_1based_json: string
+window_purpose: string
+window_vector_hash: string
+wt_window_vector_hash: string
+cosine_distance_to_wt: float
 activation_sum: float
-activation_mean: float
-activation_max: float
-activation_argmax_residue_0based: int | null
-activation_argmax_residue_1based: int | null
-coverage_fraction_above_threshold: float
-fragment_count_above_threshold: int
-peak_shift_vs_wt: int | null
-wt_activation_sum: float | null
-delta_vs_wt_sum: float | null
-ratio_vs_wt_sum: float | null
-zscore_across_candidates: float | null
+wt_activation_sum: float
+activation_delta_sum_vs_wt: float
+top5_signed_feature_deltas_json: string
+nearest_candidate_id: string
+nearest_candidate_window_cosine_distance: float | null
+window_redundancy_rank: int | null
+window_redundancy_group: string | null
 window_status: string
-interpretation_role: string
+used_for_selection: bool
+method_id: string
+interpretation_limit: string
 ```
 
-Declared Eco1 windows for the first pass:
+Declared Eco1 windows for v1:
 
-| Window id | Residues, zero-based half-open | Purpose |
-| --- | --- | --- |
-| `nterm_fingers_0_53` | `0-53` | N-terminal/fingers-side model-feature shifts. |
-| `fingers_palm_0_113` | `0-113` | Forward template-contact region review. |
-| `primer_grip_71_121` | `71-121` | Template-primer positioning region review. |
-| `motif_a_101_131` | `101-131` | Motif A catalytic-environment review. |
-| `intermotif_136_148` | `136-148` | Inter-motif structural hub review. |
-| `precatalytic_helix_171_195` | `171-195` | Active-site gating-region review. |
-| `dxd_yadd_187_203` | `187-203` | YADD/DxD catalytic motif review. |
-| `thumb_206_319` | `206-319` | C-terminal thumb/palm scaffold review. |
-| `thumb_core_279_295` | `279-295` | Thumb-core peak-window review. |
+| Window id | Purpose |
+| --- | --- |
+| `catalytic_palm_control` | Negative-control window around the catalytic palm. It should remain WT-like; large shifts are concerning, not exciting. |
+| `thumb_palm_na_binding_surface` | Mechanism-adjacent thumb/palm surface near nucleic-acid handling. Use as a soft contrast axis after hard gates. |
+| `mutable_substrate_proximal_annulus_basic_surface` | Mutable substrate-proximal annulus and basic surface. This is the minimal local proxy for strand-displacement-relevant surface changes. |
 
 Allowed status values:
 
 ```text
-wt_like
-enriched
-depleted
-shifted
-fragmented
-missing
-not_interpreted
+accepted
+wt_control
+```
+
+Current selection posture:
+
+```text
+SAE confirms retention of the RT semantic basin and is not used for selection.
+```
+
+Future rule if a later pool separates in SAE-window space:
+
+```text
+SAE can nominate at most one review contrast only after feasibility and fold
+gates pass. It cannot be an acceptance gate.
 ```
 
 Forbidden column names:
@@ -360,18 +405,86 @@ strand_displacement_score
 hairpin_unwinding_score
 activity_score
 enzyme_efficiency_score
+sae_master_score
 ```
+
+### Candidate Triage Table
+
+Materialized:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
+```
+
+This table is the reviewer-facing filter surface for the expanded candidate
+pool. It combines existing fold and ESMC evidence with feasibility,
+SAE-window, and sequence-diversity fields. It reports inclusion and exclusion
+reasons without reducing them to one combined rank.
+
+One row per nonredundant synthetic candidate. WT can appear in companion summary
+views, but WT is not a selectable six-variant slot.
+
+Required field groups:
+
+```yaml
+candidate_id: string
+sequence_hash: string
+design_class_id: string
+mask_policy_id: string
+mutation_count_total: int
+sequence_distance_to_wt: int
+nearest_selected_distance_aa: int | null
+fold_review_class: string
+mean_plddt: float
+wt_runtime_ca_rmsd: float | null
+cryoem_mapped_ca_rmsd: float | null
+esmc_300m_additive_llr_total: float | null
+esmc_6b_additive_llr_total: float | null
+sae_window_status: string
+sae_mechanistic_contrast_window_id: string | null
+sae_mechanistic_contrast_rank: int | null
+feasibility_status: string
+hard_gate_status: string
+hard_gate_failure_reasons_json: string
+slot_candidate_status: string
+input_candidate_pool_hash: string
+input_foldcheck_review_hash: string
+input_feasibility_report_hash: string
+input_sae_window_summary_hash: string | null
+```
+
+Allowed `hard_gate_status` values:
+
+```text
+eligible
+ineligible
+needs_review
+missing_inputs
+```
+
+Hard gates stay narrow:
+
+- accepted candidate row;
+- zero protected-position mutations;
+- accepted fold-check row;
+- fold-review class allowed by the selection policy;
+- feasible synthesis/buildability row;
+- required upstream hashes present.
+
+ESMC additive LLR, SAE windows, mutation burden, design class, temperature, seed,
+and sequence diversity remain covariates and tie-breaks.
 
 ### Feasibility Report
 
-Materialize the already-registered planned artifact:
+Materialized for the expanded design-class pool:
 
 ```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
 ```
 
-One row per ProteinMPNN candidate. WT may appear only as an optional baseline
-row if the policy explicitly says so; handoff eligibility is candidate-only.
+One row per nonredundant synthetic candidate in the selected candidate pool. WT
+may appear only as an optional baseline row if the policy explicitly says so;
+handoff eligibility is candidate-only.
 
 Required fields:
 
@@ -429,7 +542,8 @@ missing_inputs
 
 Fail-fast rules:
 
-- exactly 96 candidate rows unless an explicit baseline policy adds WT;
+- row count matches the selected nonredundant candidate pool unless an explicit
+  baseline policy adds WT;
 - unique `candidate_id`;
 - no missing sequence hashes;
 - no `feasible` row with protected mutation violations;
@@ -439,41 +553,48 @@ Fail-fast rules:
 
 ### Candidate Selection Panel
 
-Materialize:
+Materialized:
 
 ```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
 ```
 
-This table is the review surface between feasibility and handoff. It should not
-replace `candidate_table.parquet`.
+This six-row table is the review surface between feasibility and handoff. It
+does not replace `candidate_table.parquet` or `candidate_triage_table.parquet`.
 
 Required fields:
 
 ```yaml
 candidate_id: string
+sequence_hash: string
+design_class_id: string
 eligible_for_handoff: bool
-rank_within_eligible: int | null
-fold_preservation_rank: int
-cryoem_preservation_rank: int
-feasibility_rank: int | null
-semantic_stratum: string
-selection_bucket: string
+selection_slot: string
+slot_rank: int | null
+selected_for_panel: bool
 selection_reason: string
+tie_break_trace_json: string
+nearest_selected_distance_aa: int | null
+fold_review_class: string
+feasibility_status: string
+esmc_penalty_rank: int | null
+sae_window_contrast_rank: int | null
+hard_gate_status: string
+input_candidate_triage_table_hash: string
 input_foldcheck_review_hash: string
 input_feasibility_report_hash: string
 input_sae_window_summary_hash: string | null
 ```
 
-Allowed `selection_bucket` values:
+For v1, `selection_slot` is the design class represented by the selected row:
 
 ```text
-primary_candidate
-structural_control
-semantic_diversity_candidate
-outlier_for_review
-feasibility_blocked
-excluded
+eco1_rt_clade9_plurality25_contact5a_v1
+eco1_rt_clade9_plurality25_contact6a_v1
+eco1_rt_clade9_plurality25_contact8a_v1
+eco1_rt_clade9_plurality25_contact10a_v1
+eco1_rt_clade9_plurality50_contact5a_v1
+eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1
 ```
 
 Eligibility rule:
@@ -487,8 +608,28 @@ AND protected_mutation_violation_count == 0
 AND required upstream hashes are present
 ```
 
-SAE rows may diversify candidates inside the fold-accepted and feasible set.
-They must not select a candidate on their own.
+SAE rows are recorded but do not select a candidate in the current panel.
+
+Deterministic tie-break order:
+
+1. feasibility pass;
+2. `strong_fold_preserved` before `good_fold_preserved`;
+3. nonredundancy to already selected variants;
+4. fold metrics inside the same fold class;
+5. ESMC 6B additive LLR as a weak penalty covariate;
+6. `sequence_hash` lexical order.
+
+The panel tests the design policies themselves, not the top six rows by a
+combined score:
+
+| Design class | Panel role |
+| --- | --- |
+| `eco1_rt_clade9_plurality25_contact5a_v1` | Baseline 5 A clade 9 p25 design class. |
+| `eco1_rt_clade9_plurality25_contact6a_v1` | Modestly stricter 6 A substrate-contact shell. |
+| `eco1_rt_clade9_plurality25_contact8a_v1` | Stronger 8 A substrate-contact shell. |
+| `eco1_rt_clade9_plurality25_contact10a_v1` | Conservative 10 A sentinel class. |
+| `eco1_rt_clade9_plurality50_contact5a_v1` | Less restrictive clade 9 conservation threshold. |
+| `eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1` | Closer-family conservation denominator. |
 
 ### RT-Only Candidate Handoff
 
@@ -594,7 +735,7 @@ Rendering contract:
 - A full-row view belongs in HTML or marimo, not a dense static SVG.
 - Column backgrounds should mark `>=25%` WT-plurality protected positions.
 - Separate tracks should mark NAxxH, YADD, VTG, Wang/Ec86 direct-contact priors,
-  retained DNA/RNA 5 A contacts, and the mutable design canvas.
+  retained DNA/RNA 5 A contacts, and the mutable ProteinMPNN positions.
 - Y-axis labels must be source labels from the declared row metadata, not FASTA
   order guesses.
 
@@ -900,25 +1041,26 @@ or implement selection logic inline.
      protein likelihood.
 
 3. **SAE feature-window summary**
-   - Add study-owned materializer:
-     `operations/materialization/biohub_esmc_feature_windows/`.
+   - Use the materialized study-owned materializer:
+     `operations/materialization/sae_window_summary/`.
    - Keep generic sparse-row utilities in `dnadesign.thread.adapters.biohub_esmc`
      only if they are not Eco1-specific.
    - Validate model id, SAE model id, dictionary size, row counts, and WT joins.
+   - Emit only the three v1 windows declared above.
+   - Compute cosine distance to WT, summed activation delta to WT, top 5 signed
+     feature deltas, and window-space redundancy. Do not emit a long feature
+     interpretation narrative.
 
-4. **Feasibility report**
-   - Add materializer:
-     `operations/materialization/feasibility_report/`.
-   - Add contract package:
-     `operations/contracts/feasibility/`.
-   - Start with full-sequence candidate feasibility. Do not introduce pooled
-     recombination until parent haplotypes and structural coupling checks are
-     explicit.
-
-5. **Selection panel**
-   - Add materializer:
-     `operations/materialization/candidate_selection_panel/`.
-   - Reject SAE-only selection and missing feasibility/fold rows.
+4. **Selection readiness**
+   - Materialized in `operations/materialization/selection_readiness/`.
+   - Emits `selection/feasibility_report.parquet`,
+     `selection/candidate_triage_table.parquet`,
+     `selection/candidate_selection_panel.parquet`, and a manifest under the
+     expanded design-class output root.
+   - Joins candidate pool, fold-review rows, ESMC additive LLR rows, SAE
+     windows, sequence diversity, and feasibility.
+   - Rejects missing required inputs. Does not compute or store a combined
+     score. Does not use SAE as a selection gate.
 
 5. **RT-only handoff**
    - Add materializer:
@@ -926,7 +1068,7 @@ or implement selection logic inline.
    - Reuse generic handoff/hashing helpers only after the Eco1 shape is stable.
    - Keep downstream RT-lnRNA acceptance as a separate contract.
 
-6. **Visual bundle extension**
+8. **Visual bundle extension**
    - Foundation materialized in `operations/materialization/review_deliverables/`
      with MSA plurality/mask context, linear mask tracks, a ChimeraX mask-context
      script/render, ProteinMPNN candidate diversity, linked fold-review SVG/PNG
@@ -951,7 +1093,17 @@ or implement selection logic inline.
    - Keep SVGs and PNGs alt-text-backed, manifest-recorded, and sequentially
      useful for a concise scientific methods/results narrative.
 
-7. **Phase wording cleanup**
+9. **Deferred v1.1/v2 metrics**
+   - Whole-protein ESMC pseudo-likelihood is implemented as a resumable method
+     surface but is not required for the first assay panel. A full expanded run
+     is request-heavy: WT plus 576 candidates at 320 positions requires 184,640
+     masked sequence-logit calls.
+   - Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings,
+     Tranception, Evo2, computational stability prediction, and global SAE
+     clustering unless a later task opens one of those lanes with a specific
+     question.
+
+10. **Phase wording cleanup**
    - Use `phase3_foldcheck_report` for current fold-check validation.
    - Reserve `phase4_downstream_promotion` for RT-only handoff and downstream
      accept/reject readiness.
@@ -996,6 +1148,7 @@ This slice is done when:
 ```text
 sae_feature_window_summary.parquet exists and validates
 feasibility_report.parquet exists and validates
+candidate_triage_table.parquet exists and validates
 candidate_selection_panel.parquet exists and validates
 candidate_handoff.yaml exists and validates
 review_deliverable_manifest.yaml exists and validates
@@ -1005,6 +1158,7 @@ ProteinMPNN sequence-diversity visuals render from candidate_table.parquet
 cached ColabFold structure-review panel renders from local staged PDBs
 WT Biohub ESMC SAE feature frames render for a declared feature subset
 Biohub ESMC feature-window heatmap renders from sae_feature_window_summary.parquet
+candidate triage table exposes feasibility, SAE-window, ESMC, fold-review, and sequence-diversity fields without a combined rank
 selection visuals render from materialized feasibility/selection inputs
 all visual manifests include alt text and interpretation limits
 status.md, datasets.yaml, routes, and command groups name the new state

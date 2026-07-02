@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.11
+  version: 0.1.14
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -12,7 +12,7 @@ metadata:
 ## Purpose
 
 Answer `where is eco1_rt_repack now?` from the checked-in study record and
-route follow-up work to the current `thread` planning surfaces.
+route follow-up work to the current study and `thread` surfaces.
 
 ## Scope
 
@@ -40,13 +40,15 @@ Out of scope:
 
 - Status answers come from `record/status.md`, `record/datasets.yaml`,
   `record/campaign.yaml`, and `operations/ops.study.yaml`.
-- The answer distinguishes the implemented ProteinMPNN request, sample-ingest,
-  candidate-table, fold-check request/report, ColabFold normalization, full
-  fold-check coverage, study-owned fold-review bundle, local full-fold PDB set,
-  alt-text-backed fold-review plots, scoped fold-review marimo notebook,
-  study-owned review-deliverables bundle, selected-panel Atlas lookup surfaces,
-  all-97 Biohub ESMC query-time SAE profile, and structure-prediction registry
-  from feasibility and handoff tooling.
+- Status answers describe the scientific flow directly: Eco1/Ec86 source
+  authority, conservation/MSA evidence, protected-residue mask, ProteinMPNN
+  proposals, ColabFold fold review, ESMC/SAE annotation, synthesis
+  feasibility, six-variant panel selection, and RT-only handoff.
+- The answer distinguishes materialized evidence from missing decision records:
+  the baseline WT-plus-96 and expanded WT-plus-576 fold/ESMC/SAE evidence are
+  available; computational feasibility, candidate triage, and a six-row
+  one-per-design-class panel are materialized under the expanded design-class
+  selection root. RT-only handoff is not yet finished.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
@@ -61,6 +63,11 @@ Out of scope:
   and handoff tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
+- Report ESMC LLR and SAE windows as review evidence only. They can preserve
+  panel diversity or explain local model-derived changes, but they do not show
+  improved strand displacement. Whole-protein ESMC pseudo-likelihood and
+  computational stability prediction stay deferred unless a later task
+  explicitly reopens those paths.
 - Missing or mismatched `study_id` fails visibly.
 
 ## Workflow
@@ -130,6 +137,8 @@ Out of scope:
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume
   explicit candidate intent later through a public handoff contract.
+- Treat whole-protein ESMC pseudo-likelihood as outside the current v1
+  panel-selection path.
 - Do not promote candidates into RT-lnRNA construct subjects without the
   downstream study's explicit acceptance contract.
 

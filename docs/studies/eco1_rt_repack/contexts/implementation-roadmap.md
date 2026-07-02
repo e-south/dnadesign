@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-26
+last_verified: 2026-07-02
 ---
 
 ## Implementation Roadmap
@@ -17,7 +17,7 @@ campaign.
 
 | Surface | Owns | First implementation obligation |
 | --- | --- | --- |
-| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, feasibility policy, study selection decisions, and downstream promotion policy. | Validate that pending Eco1 structure and numbering decisions block runtime artifacts. |
+| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, feasibility policy, study selection decisions, and downstream promotion policy. | Prepare the assay panel with explicit feasibility, local-SAE, selection, and handoff records. |
 | `thread` | Generic fixed-backbone artifact contracts, residue maps, mask algebra, backend request/result normalization, candidate ids, fold-check contracts, and neutral handoff hash closure. | Materialize and validate the artifact chain against fixtures and negative cases. |
 | `infer` | Optional model-process execution and writeback for declared backends. | Expose backend run ids and result manifests if it executes MPNN or fold-check jobs. |
 | `construct` | Later sequence realization and placement/window feasibility. | Accept only explicit downstream promotion records, not raw `thread` candidates. |
@@ -37,8 +37,9 @@ campaign.
 | `candidate-builder` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, non-deterministic ordering, or mask violations are accepted |
 | `foldcheck-normalizer` | `thread.adapters` or `infer` handoff | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, or errored rows are missing |
 | `atlas-semantic-profiler` | `thread.adapters` plus study wrapper | accepted fold-check rows and candidate sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, query hashes are missing, or API schema drift is hidden |
-| `feasibility-assessor` | study policy plus `thread.candidates` inputs | accepted full-sequence candidates | `feasibility_report.parquet` | candidate rows lack parent-distance, synthesis-tier, blocker, or feasibility-status evidence |
-| `candidate-handoff-builder` | neutral handoff builder plus study selection policy | candidate, fold, feasibility, and selection-panel reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, feasible rows, selection-panel rows, or RT-only handoff fields are missing |
+| `selection-readiness-builder` | study policy plus expanded candidate and fold-review inputs | accepted full-sequence candidates | `selection/feasibility_report.parquet`, `selection/candidate_triage_table.parquet`, `selection/candidate_selection_panel.parquet` | selected rows are not one-per-design-class, SAE becomes a gate, a combined score is stored, or required exclusion inputs are missing |
+| `sae-window-summarizer` | study wrapper around Biohub ESMC sparse tables | exact-dictionary SAE rows and declared windows | `sae_feature_window_summary.parquet` | global SAE clustering or long feature prose replaces local WT-delta summaries |
+| `candidate-handoff-builder` | neutral handoff builder plus study selection policy | candidate, fold, feasibility, triage, and selection-panel reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, feasible rows, selection-panel rows, or RT-only handoff fields are missing |
 | `rt-lnrna-promotion-check` | downstream study | RT-only candidate handoff | downstream accept/reject record | construct-subject ids are preclaimed before downstream binding |
 
 ### Implemented Slice: Phase 0 Contract Validator
@@ -566,7 +567,8 @@ checks and HTML export. The deliverable sequence is:
    marimo, and background markings for `>=25%` WT-plurality protected columns.
 2. Linear-plus-3D mask context: an off-white Ec86 RT scaffold with categorical
    overlays for catalytic anchors, Wang/Ec86 direct-contact priors, retained
-   DNA/RNA 5 A contacts, clade 9 plurality protection, and mutable design canvas.
+   DNA/RNA 5 A contacts, clade 9 plurality protection, and mutable ProteinMPNN
+   positions.
 3. ProteinMPNN candidate diversity: score/global score, mutation count,
    sequence identity to WT, sampling temperature/seed, and mutation density.
 4. ColabFold structure review: a cached top/bottom/control structure panel first
@@ -586,9 +588,11 @@ checks and HTML export. The deliverable sequence is:
    review metrics, with a declared feature/window subset instead of all features.
 8. Feasibility and handoff matrix after feasibility and selection tables exist.
 
-After the SAE summary and review-deliverable foundation, materialize
-`feasibility_report.parquet`, `selection/candidate_selection_panel.parquet`, and
-the RT-only `candidate_handoff.yaml`.
+After the review-deliverable foundation, materialize
+`feasibility_report.parquet`, `selection/candidate_triage_table.parquet`,
+`selection/candidate_selection_panel.parquet`, and the RT-only
+`candidate_handoff.yaml`. The three-window SAE summary is already materialized
+and should feed the triage table as local review evidence.
 
 ### Implemented Slice: ESM Atlas Semantic Audit v1
 

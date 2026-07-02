@@ -219,11 +219,19 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   study-owned visual-deliverable wrapper. It writes
   `review_deliverable_manifest.yaml` and a manifest-backed marimo notebook
   organized as constraint evidence for the design mask, ProteinMPNN designs and
-  fold triage, ESMC feature review, and a planned feasibility/handoff gate. It
+  fold triage, and ESMC feature review. The expanded feasibility, triage, and
+  six-row selection tables exist under `design_classes/selection/`, but this
+  foundation notebook does not yet present them as a first-class lane. It
   includes py3Dmol structure-browser manifests for notebook inspection and keeps
   ChimeraX as the explicit manual pose/still-render path. Manifest paths are
   relative to the manifest location. It does not rerun ProteinMPNN, ColabFold,
   Biohub, Atlas, or candidate selection.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/design_classes/`:
+  study-owned design-class expansion package. It materializes class-specific
+  mask/thread/request roots, builds the nonredundant 576-candidate pool, builds
+  the expanded WT-plus-candidate fold-check request, stages expanded downstream
+  inputs, and derives expanded additive ESMC LLR review tables from existing WT
+  grids. It does not choose assay candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
   fold-check request/report contract package. It validates the request
   manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted
@@ -276,6 +284,17 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   writes WT-only masked-marginal position entropy and substitution LLR tables,
   plus a mask-context join. This is model-derived mutation-scoring evidence for
   review, not experimental DMS and not a current-mask update.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/sae_window_summary/`:
+  study-owned window summary over the expanded Biohub ESMC sparse SAE tables.
+  It writes one row per candidate and declared Eco1 window, with WT-delta
+  activation fields, top signed feature deltas, and window-space redundancy
+  fields. It does not rerun Biohub requests and does not cluster whole-protein
+  SAE vectors.
+- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sequence_pseudolikelihood/`:
+  deferred study-owned wrapper for request-heavy ESMC leave-one-out
+  pseudo-likelihood. The method surface is resumable, but it is not required for
+  the first assay panel and must not be described as calibrated natural
+  occurrence probability.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/sampling/`:
   sampling artifact contract package. Phase 2 validates `thread_plan.yaml` and
   `proteinmpnn_request/request_manifest.yaml` separately from
@@ -311,9 +330,15 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- Broader reusable fold-model execution, feasibility, and handoff mechanics are
-  still planned; the current executable `thread` surfaces are the generic
-  ProteinMPNN adapter, candidate-table package, and fold-check contract package.
+- Computational feasibility, candidate triage, and a six-row
+  one-per-design-class panel are materialized under the expanded design-class
+  selection root. RT-only handoff is the remaining assay-panel blocker. The
+  three-window SAE summary is materialized, but the current pool remains
+  WT-like in those windows, so SAE is not used for selection. Broader reusable
+  fold-model execution and handoff mechanics are still planned; the current
+  executable `thread` surfaces are the generic ProteinMPNN adapter,
+  candidate-table package, Biohub adapter, ColabFold normalizer, and fold-check
+  contract package.
 
 ## Router Rule
 

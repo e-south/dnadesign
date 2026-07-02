@@ -282,14 +282,14 @@ datasets:
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_manifest.yaml
-    status: materialized_local_planned_not_run
-    description: "Local generated design-class expansion manifest. It keeps the current 5 A class as the baseline and records five additional ProteinMPNN request classes: clade 9 p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and II-A3/42_1 p50 contact 5 A. The manifest points to each class-specific mask set, thread plan, and ProteinMPNN request sidecars."
+    status: materialized_local_generated_classes_complete
+    description: "Local generated design-class expansion manifest. It keeps the current 5 A class as the baseline and records five additional ProteinMPNN request classes: clade 9 p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and II-A3/42_1 p50 contact 5 A. The generated class candidate tables have been materialized locally and feed the expanded nonredundant candidate pool."
   - id: eco1_rt_design_class_candidate_pool
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_pool_manifest.yaml
-    status: materialized_baseline_only_pending_generated_candidate_tables
-    description: "Local generated candidate-pool manifest for design-class expansion. It deduplicates accepted candidates by sequence_hash, gives the existing 5 A baseline priority, and records duplicate class provenance. It currently contains only the 96 baseline candidates because generated class ProteinMPNN runs have not been ingested yet."
+    status: materialized_expanded_576_nonredundant
+    description: "Local generated candidate-pool manifest for design-class expansion. It deduplicates accepted candidates by sequence_hash, gives the existing 5 A baseline priority, and records duplicate class provenance. The current local pool contains 576 nonredundant synthetic candidates: 96 from the baseline and 96 from each of the five generated design classes."
   - id: eco1_rt_sample_table
     owner: thread
     kind: generated_artifact
@@ -332,6 +332,18 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
     status: materialized_local_review
     description: Local generated fold-check review ranking for the 96 ProteinMPNN candidates. It carries ProteinMPNN metrics, pLDDT, PAE summaries, WT-runtime C-alpha RMSD, direct cryoEM-reference RMSD from the staged local full structure set, and plain review classes.
+  - id: eco1_rt_design_class_foldcheck_report
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_report.parquet
+    status: materialized_expanded_577_rows
+    description: Local generated expanded fold-validation report for WT plus 576 nonredundant design-class candidates. The normalized report has all rows accepted and is the fold evidence source for assay-panel preparation.
+  - id: eco1_rt_design_class_foldcheck_candidate_ranking
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet
+    status: materialized_expanded_review
+    description: Local generated expanded fold-check review ranking for 576 synthetic candidates. Current review classes are 280 strong_fold_preserved, 188 good_fold_preserved, 105 low_confidence, and 3 review_band. Use these classes as fold-review evidence, not activity evidence.
   - id: eco1_rt_foldcheck_structure_panel
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -537,15 +549,55 @@ datasets:
       Study-owned join from the 6B WT ESMC mutation-scoring rows to the current
       Eco1 mask context. This supports comparison with the 300M grid and does
       not change the current mask.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_position_pll
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/position_pll.parquet
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred Biohub ESMC 6B leave-one-out position table for fold-accepted
+      canonical Eco1 RT sequences. Each row masks one residue, reads sequence
+      logits through the public Biohub encode-to-logits API path, and stores
+      log P(observed residue | remaining sequence). This is not fold validation
+      and not activity evidence. It is not required for the v1 six-variant
+      selection funnel.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_sequence_pll
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/sequence_pll.parquet
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred per-sequence pseudo-likelihood summary for the same Biohub ESMC
+      6B leave-one-out run. Rows report total pseudo-log-likelihood,
+      per-residue mean pseudo-log-likelihood, pseudo-perplexity, and delta
+      versus WT. This is a masked-language-model plausibility review field, not
+      a calibrated probability of natural occurrence or a candidate acceptance
+      gate. It is not required for the first assay panel.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_manifest
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/sequence_pseudolikelihood_manifest.yaml
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred redacted provenance manifest for the 6B ESMC sequence
+      pseudo-likelihood run, including source request hash, model, endpoint
+      flow, request counts, accepted/partial sequence counts, and method
+      interpretation limits. Whole-protein pseudo-likelihood is a later
+      review lane, not a v1 selection requirement.
   - id: eco1_rt_biohub_esmc_sae_feature_window_summary
     owner: eco1_rt_repack
-    kind: planned_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
-    status: not_generated
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
+    status: materialized_expanded_1731_rows
     description: >-
-      Planned model-compatible summary of sparse Biohub ESMC SAE activations
-      over declared Eco1 residue windows. This is a semantic stratification
-      artifact, not a processivity score and not a candidate acceptance gate.
+      Model-compatible summary of sparse Biohub ESMC SAE activations over three
+      declared Eco1 windows: catalytic-palm negative control, thumb/palm
+      nucleic-acid-binding surface, and mutable substrate-proximal
+      annulus/basic-surface region. This is local semantic review evidence, not
+      a processivity score and not a candidate acceptance gate.
   - id: eco1_rt_review_deliverable_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -577,7 +629,7 @@ datasets:
       the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
       with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
       priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
-      positions, and the mutable design canvas. The PNG render is opt-in; normal
+      positions, and mutable ProteinMPNN positions. The PNG render is opt-in; normal
       materialization records a skipped optional-render status unless an existing
       render is being retained.
   - id: eco1_rt_mask_structure_browser_manifest
@@ -591,7 +643,7 @@ datasets:
       ec86kit/7V9U reference backbone and exposes dropdown views for catalytic
       motif anchors, Wang/Ec86 substrate-contact priors, retained DNA/RNA 5 A
       contacts, clade 9 plurality-protected residues, the protected union, and
-      the ProteinMPNN design canvas. It uses the generic
+      mutable ProteinMPNN positions. It uses the generic
       `dnadesign.thread.structure_views` residue-selection contract and is
       review context only.
   - id: eco1_rt_proteinmpnn_candidate_diversity_visuals
@@ -686,22 +738,34 @@ datasets:
       ranking or candidate acceptance gate.
   - id: eco1_rt_feasibility_report
     owner: eco1_rt_repack
-    kind: planned_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
-    status: not_generated
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
+    status: materialized_expanded_576_rows
     description: >-
-      Planned study-owned feasibility report for mutation windows, parent
-      distance, synthesis tier, blockers, and feasibility status. Eco1
-      synthesis economics remain study policy.
+      Study-owned computational feasibility report for the expanded
+      nonredundant candidate pool. It records mutation windows, parent
+      distance, synthesis tier, blockers, and feasibility status. It is not a
+      synthesis quote or wet-lab assembly plan.
+  - id: eco1_rt_candidate_triage_table
+    owner: eco1_rt_repack
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
+    status: materialized_expanded_576_rows
+    description: >-
+      Study-owned table for the expanded nonredundant candidate pool. It joins
+      fold-review classes, ESMC additive LLR fields, three-window SAE WT-delta
+      fields, sequence-diversity fields, and feasibility status. It is a triage
+      surface, not a combined-score table.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
-    kind: planned_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
-    status: not_generated
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
+    status: materialized_six_row_panel
     description: >-
-      Planned study-owned review table that combines candidate-table rows with
-      `status=accepted`, fold-check review, feasibility review, and SAE
-      annotation strata before RT-only handoff selection.
+      Study-owned six-row panel table built from the candidate triage table.
+      It selects one feasible fold-preserved representative per design class
+      rather than descending by a combined score. SAE windows are recorded but
+      not used for selection.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

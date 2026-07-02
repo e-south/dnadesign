@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-01
+last_verified: 2026-07-02
 status_surface: record-only
 ---
 
@@ -11,13 +11,16 @@ status_surface: record-only
 
 ### Current Phase
 
-Phase 3 fold-check report validation passes locally for the full WT plus
-96-candidate ColabFold report. The study has the required structure, source,
+Phase 3 fold-check report validation passes locally for the baseline WT plus
+96-candidate ColabFold report and for the expanded design-class review bundle
+used for assay-panel preparation. The study has the required structure, source,
 alignment, conservation evidence, manual mask authority, mask set, explicit
-thread plan, ProteinMPNN request, backend run manifest, sample/candidate tables,
-fold-check request, and compact fold-check report under
+thread plan, ProteinMPNN request, backend run manifests, sample/candidate
+tables, fold-check requests, compact fold-check reports, and expanded review
+covariates under
 `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
-This is full fold-check coverage, not downstream candidate-handoff readiness.
+This is full fold-check and model-annotation coverage for candidate review, not
+downstream candidate-handoff readiness.
 The selected mask rule is:
 
 ```text
@@ -90,8 +93,7 @@ handled separately.
   `eco1_rt_p25_5a_n96_20260624`: seeds `101`, `202`, `303`, temperatures
   `0.1` and `0.3`, and `num_seq_per_target: 16`.
 - `sample_table.parquet` is materialized locally with 96 ProteinMPNN rows where
-  `status=accepted`.
-  rows. The named batch table is also retained at
+  `status=accepted`. The named batch table is also retained at
   `sample_tables/eco1_rt_p25_5a_n96_20260624.parquet`.
 - `candidate_table.parquet` is materialized locally with 96 rows where
   `status=accepted` and no protected-position or outside-mutable-position
@@ -103,11 +105,9 @@ handled separately.
   ProteinMPNN request roots: clade 9 p25 contact 6/8/10 A, clade 9 p50 contact
   5 A, and II-A3/`42_1` p50 contact 5 A. Each generated class has its own
   `mask_set.yaml`, `thread_plan.yaml`, and `proteinmpnn_request/` sidecars.
-  The aggregate `candidate_pool.parquet` currently contains only the 96
-  baseline candidates and marks all five generated classes as pending
-  ProteinMPNN candidate tables. Expanded fold-check request generation is
-  intentionally blocked until at least one generated class contributes accepted
-  candidates.
+  The aggregate `candidate_pool.parquet` now contains 576 nonredundant
+  synthetic candidates: 96 from the baseline 5 A class plus 96 from each of the
+  five added classes. Sequence hashes are unique across the pool.
 - `foldcheck_request/foldcheck_request_manifest.yaml` and
   `foldcheck_request/input_sequences.fasta` are materialized locally. The FASTA
   contains one WT baseline plus the 96 candidate-table rows where
@@ -115,6 +115,9 @@ handled separately.
   request is intended for the ColabFold
   `colabfold_batch` CLI on BU SCC; LocalColabFold provides the pixi environment
   that exposes that command.
+- `design_classes/foldcheck_request/` and `design_classes/foldcheck_report.parquet`
+  are materialized for WT plus all 576 expanded candidates. The normalized
+  expanded report has one WT row and 576 accepted synthetic rows.
 - `foldcheck_report.parquet` is materialized from BU SCC ColabFold full job
   `6228979`, run under `/project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42/`.
   The compact report was normalized on SCC and synced back locally. It covers
@@ -153,6 +156,10 @@ handled separately.
   Review classes are `strong_fold_preserved: 17`,
   `good_fold_preserved: 53`, `low_confidence: 9`, `review_band: 14`, and
   `structural_outlier: 3`.
+- `design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet` is
+  materialized for the 576-candidate expanded pool. Current review classes are
+  `strong_fold_preserved: 280`, `good_fold_preserved: 188`,
+  `low_confidence: 105`, and `review_band: 3`.
 - `review_deliverables/` is materialized as a study-owned visual bundle. It
   writes `review_deliverable_manifest.yaml`, a canonical-coordinate
   Mestre-derived clade 9 alignment panel, linear mask tracks, a ChimeraX
@@ -162,7 +169,10 @@ handled separately.
   interactive structure-browser manifests, and a manifest-backed marimo
   notebook. The notebook is organized as a progressive analysis surface:
   constraint evidence for the design mask, ProteinMPNN designs and fold triage,
-  ESMC feature review, and a planned feasibility/handoff section. WT ESMC
+  ESMC feature review, and a planned feasibility/handoff section. The
+  expanded selection-readiness tables exist under `design_classes/selection/`,
+  but this foundation notebook has not yet been regenerated into a compact
+  selection-readiness review lane. WT ESMC
   masked-marginal scoring is shown with the mask-constraint evidence as a
   review-only model-constraint audit, not as a current mask input. Structure
   views are selected through the same
@@ -191,10 +201,10 @@ handled separately.
   constraint tracks. In the current WT table, plurality and entropy are
   inversely correlated (`Pearson r = -0.7838`, `R2 = 0.6144`). This is a review
   aid for future mask-policy discussion, not a current-mask update. The SAE
-  feature-review section uses the existing all-97 Biohub ESMC sparse tables to
+  feature-review section uses the existing baseline Biohub ESMC sparse tables to
   show WT-active residue activation patterns and candidate/WT activation ratios
-  for those same exact-dictionary features. It does not attach Atlas labels or claim
-  processivity. The same section includes a joint review panel that places WT
+  for those same exact-dictionary features. It does not attach Atlas labels or
+  claim processivity. The same section includes a joint review panel that places WT
   first, orders ProteinMPNN variants by SAE-feature similarity to WT, and shows
   ColabFold pLDDT plus summed WT masked-marginal single-substitution LLR as
   side markers. The LLR sum is a review covariate, not a joint protein
@@ -259,6 +269,18 @@ handled separately.
   Biohub 6B layer-60 16k dictionary used in this run. They are model-derived
   descriptions from the Biohub interpretation workflow, not curated functional
   annotations and not assay evidence.
+- The expanded design-class Biohub ESMC/logits SAE profile is also materialized
+  under `design_classes/`. It covers WT plus all 576 nonredundant synthetic
+  candidates with 577 accepted profiles, 1,216,696 protein-feature rows, and
+  11,816,960 residue-feature rows. This supports windowed semantic review and
+  candidate triage; it is not a hard acceptance gate.
+- The three-window SAE summary is materialized under
+  `design_classes/biohub_esmc/sae_feature_window_summary.parquet`. It has 1,731
+  rows: 577 sequences across the 23-position catalytic-palm control,
+  120-position nucleic-acid contact surface, and 107-position mutable
+  substrate-proximal annulus/basic-surface windows. It reports WT-delta
+  activation summaries, top signed feature deltas, and window-space redundancy;
+  it is local semantic review evidence, not a selection gate.
 - A WT-only Biohub ESMC masked-marginal mutation-scoring materializer is
   implemented at
   `operations/materialization/biohub_esmc_wt_mutation_scoring/`. It uses the
@@ -283,13 +305,13 @@ handled separately.
   materialized under `biohub_esmc/mutation_scoring/esmc_6b_2024_12/` with 320
   accepted position rows, 6,080 accepted non-WT substitution rows, and request
   hash `sha256:2d2c5114e15734e51c5694a105aa2e43496218fae5e952c69b6dedb5601b3c2c`.
-  The review-deliverables bundle derives a separate 6B additive candidate LLR
-  table and plot from that grid. All 96 synthetic candidates are negative under
-  the 6B additive WT-context LLR total (`-146.945` to `-72.598`), so the 6B
-  signal should be used for relative ranking and model-stability review rather
-  than as a nonnegative threshold. The 300M-versus-6B candidate-rank comparison
-  has Spearman rank correlation `0.6610`, top-10 overlap `6/10`, and 89
-  candidate sign changes.
+  The review-deliverables bundle derives separate 300M and 6B additive
+  candidate LLR tables and plots from those grids. In the expanded
+  576-candidate pool, the 300M additive total is positive for 505 candidates
+  and negative for 71, with median `12.871`. The 6B additive total is negative
+  for all 576 synthetic candidates, with median `-78.647`. Use both LLR lanes
+  as relative ranking and penalty covariates, not as nonnegative eligibility
+  thresholds and not as whole-protein likelihood.
 
 ### Mask Counts
 
@@ -344,33 +366,22 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Inspect the fold-check structure panel and review plots, especially the two
-   high-RMSD outliers, low-pLDDT rows, and candidates where WT-runtime RMSD and
-   cryoEM-reference RMSD tell different stories, before candidate selection.
-2. Materialize a Biohub ESMC SAE feature-window summary before using SAE rows
-   for stratification. The current Biohub SAE run uses the source-described
-   `esmc-6b-2024-12-sae-layer60-k64-codebook16384` dictionary, so feature ids
-   and descriptions now refer to the same model, layer, sparsity, and codebook.
-   The Biohub SAE feature interpretation notebook should be treated as the
-   method pattern for ranking features, locating residue-level activation peaks,
-   and reviewing feature prevalence; it does not make model-derived feature
-   descriptions into curated functional annotations.
-3. Inspect the `review_deliverables/` marimo surface. It currently covers
-   constraint evidence for the design mask, ProteinMPNN designs and fold triage
-   with static and interactive structure views, ESMC feature review, and a
-   planned feasibility/handoff gate. WT SAE structure frames and the Biohub ESMC
-   feature-window heatmap remain downstream of `sae_feature_window_summary`.
-4. Add a separate Atlas sequence-similarity materializer if synthetic-candidate
-   Atlas neighborhood context is needed through the no-auth Atlas API. Do not
-   keep retrying the hash-lookup/on-demand endpoint for the 96 synthetics unless
-   the API behavior changes.
-5. Build the assembly/synthesis feasibility report.
-6. Build a candidate selection panel from fold-report rows accepted by the
-   validator, structure review, feasibility review, and SAE annotation strata.
-7. Select candidates only from rows with accepted fold-check coverage and
-   feasibility review, then
-   define the downstream RT-lnRNA candidate handoff accepted by
-   `rt_lnrna_sponging_construct_triage`.
+1. Review the materialized expanded selection-readiness bundle under
+   `outputs/thread/design_classes/selection/`.
+2. Treat `feasibility_report.parquet` as computational full-gene feasibility,
+   not a synthesis quote or wet-lab assembly plan. All 576 expanded synthetic
+   rows are currently feasible under this computational gate.
+3. Use `candidate_triage_table.parquet` as the reviewer filter surface. It has
+   468 eligible rows, 105 low-confidence rows marked ineligible, and 3
+   review-band rows marked as manual reserve only.
+4. Use `candidate_selection_panel.parquet` as the current six-row assay-panel
+   proposal. It selects one feasible, fold-preserved representative from each
+   design class. The selected rows are all `strong_fold_preserved`.
+5. Keep SAE windowing as review evidence only. The current table records
+   `wt_like_not_used_for_selection` for every synthetic row, so SAE does not
+   nominate a mechanistic slot.
+6. Emit `candidate_handoff.yaml` only after the selected rows are reviewed,
+   hash-linked, and accepted by the RT-only handoff contract.
 
 ### Blockers
 
@@ -381,13 +392,16 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   `colabfold_batch --help` succeeds when the pixi environment `lib/` directory
   is on `LD_LIBRARY_PATH`. This is local CLI execution, not a hosted ColabFold
   API and not the native DeepMind AlphaFold2 distribution.
-- Atlas hash-lookup/on-demand coverage has been probed for the all-97 request.
+- Atlas hash-lookup/on-demand coverage has been probed for the baseline all-97 request.
   WT is accepted; the first synthetic candidate requests still return explicit
   404 rows even with `fold_on_miss=true`, and the remaining synthetic rows are
   intentionally unattempted. Atlas remains an optional post-fold semantic audit
   and stratification layer, not a candidate acceptance gate.
-- No assembly feasibility report exists.
-- No RT-only candidate handoff or RT-lnRNA acceptance record exists.
+- RT-only `candidate_handoff.yaml` is not materialized.
+- Downstream RT-lnRNA acceptance or rejection is not materialized.
+- The foundation review-deliverables marimo notebook does not yet present the
+  expanded feasibility, triage, and six-row selection panel as a first-class
+  review lane.
 
 ### Non-Goals
 
