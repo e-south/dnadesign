@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -216,7 +217,17 @@ def validate_biohub_esmc_artifacts(
     if issues:
         return issues
     profile_rows = pq.read_table(artifacts.profile_path).to_pylist()
-    observed = {str(row["candidate_id"]) for row in profile_rows}
+    candidate_ids = [str(row["candidate_id"]) for row in profile_rows]
+    observed = set(candidate_ids)
+    for candidate_id, count in sorted(Counter(candidate_ids).items()):
+        if count > 1:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id="thread.biohub_esmc.profile_duplicate_candidate_id",
+                    message=f"Biohub ESMC profile contains {count} rows for candidate id {candidate_id!r}",
+                    path=str(artifacts.profile_path),
+                )
+            )
     missing = sorted(expected_candidate_ids - observed)
     unexpected = sorted(observed - expected_candidate_ids)
     if missing:
@@ -280,6 +291,22 @@ def validate_biohub_esmc_artifacts(
                     path=row_path,
                 )
             )
+    issues.extend(
+        _validate_feature_table_candidate_hashes(
+            artifacts.protein_features_path,
+            profile_rows,
+            table_label="protein_features",
+            expected_count_field="protein_feature_count",
+        )
+    )
+    issues.extend(
+        _validate_feature_table_candidate_hashes(
+            artifacts.residue_features_path,
+            profile_rows,
+            table_label="residue_features",
+            expected_count_field="residue_feature_count",
+        )
+    )
     if not issues:
         issues.extend(_validate_residue_feature_shape(artifacts.residue_features_path, profile_rows))
     return issues
@@ -377,6 +404,65 @@ def _validate_residue_feature_shape(path: Path, profile_rows: Sequence[Mapping[s
                 BiohubEsmcIssue(
                     check_id="thread.biohub_esmc.residue_position_coverage_mismatch",
                     message=f"Accepted Biohub ESMC rows must cover all {sequence_length} sequence residues",
+                    path=f"{path}:{candidate_id}",
+                )
+            )
+    return issues
+
+
+def _validate_feature_table_candidate_hashes(
+    path: Path,
+    profile_rows: Sequence[Mapping[str, Any]],
+    *,
+    table_label: str,
+    expected_count_field: str,
+) -> list[BiohubEsmcIssue]:
+    accepted_hashes: dict[str, str] = {}
+    expected_counts: dict[str, int] = {}
+    for row in profile_rows:
+        if str(row.get("status") or "") != "accepted":
+            continue
+        candidate_id = str(row["candidate_id"])
+        accepted_hashes[candidate_id] = str(row["sequence_hash"])
+        expected_counts[candidate_id] = int(row.get(expected_count_field) or 0)
+    if not accepted_hashes:
+        return []
+    table = pq.read_table(path, columns=["candidate_id", "sequence_hash"])
+    grouped = table.group_by(["candidate_id", "sequence_hash"]).aggregate([("sequence_hash", "count")])
+    issues: list[BiohubEsmcIssue] = []
+    observed_counts: dict[str, int] = {}
+    for row in grouped.to_pylist():
+        candidate_id = str(row["candidate_id"])
+        observed_counts[candidate_id] = observed_counts.get(candidate_id, 0) + int(row["sequence_hash_count"])
+        expected_hash = accepted_hashes.get(candidate_id)
+        if expected_hash is None:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id=f"thread.biohub_esmc.{table_label}_unexpected_candidate",
+                    message=f"{table_label} contains rows for non-accepted candidate id {candidate_id!r}",
+                    path=f"{path}:{candidate_id}",
+                )
+            )
+            continue
+        observed_hash = str(row["sequence_hash"])
+        if observed_hash != expected_hash:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id=f"thread.biohub_esmc.{table_label}_sequence_hash_mismatch",
+                    message=f"{table_label} sequence_hash for {candidate_id!r} does not match the profile row",
+                    path=f"{path}:{candidate_id}",
+                )
+            )
+    for candidate_id, expected_count in expected_counts.items():
+        observed_count = observed_counts.get(candidate_id, 0)
+        if observed_count != expected_count:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id=f"thread.biohub_esmc.{table_label}_row_count_mismatch",
+                    message=(
+                        f"{table_label} row count for {candidate_id!r} must equal "
+                        f"{expected_count_field} ({expected_count}); got {observed_count}"
+                    ),
                     path=f"{path}:{candidate_id}",
                 )
             )

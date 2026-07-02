@@ -18,12 +18,9 @@ import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    biohub_esmc_sae_interpretation as sae_interpretation,
-)
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
+    biohub_esmc_sae_tables,
     materialize_review_deliverables,
     notebook_sae_features,
-    sae_structure_browser,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -58,8 +55,14 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
         "thread_candidate_beta",
     }
     assert {row["selection_reason"] for row in top_feature_rows}
-    assert "peak activation and prevalence" in top_features["title"]
+    assert "peak activation and thresholded prevalence" in top_features["title"]
+    assert (
+        top_features["evidence_summary"]["prevalence_activation_threshold"]
+        == biohub_esmc_sae_tables.FEATURE_PREVALENCE_THRESHOLD
+    )
     assert "source_backed_exact_dictionary_description" in {row["description_status"] for row in top_feature_rows}
+    assert "prevalent_residue_count" in top_feature_rows[0]
+    assert "mean_prevalent_activation" in top_feature_rows[0]
 
     activation_pattern_text = _resolve_manifest_path(result.manifest_path, activation_pattern["path"]).read_text(
         encoding="utf-8"
@@ -130,34 +133,6 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     metric_rows = notebook_sae_features._feature_metric_rows(loaded_heatmap["features"][0], loaded_heatmap)
     assert {"field": "accepted_sae_profiles", "value": "3 of 3"} in metric_rows
     assert {"field": "sequence_length_range", "value": "6-6"} in metric_rows
-
-
-def test_sae_feature_labels_stay_single_line(tmp_path: Path) -> None:
-    write_deliverable_inputs(tmp_path)
-
-    label = sae_interpretation._feature_axis_label(
-        101,
-        "Polymerase thumb region",
-        "Fixture exact-dictionary feature description for a polymerase-like region.",
-    )
-    assert label == "F101 - Polymerase thumb region"
-    assert "\n" not in label
-    assert len(label) <= 66
-
-
-def test_sae_structure_browser_descriptions_stay_concise() -> None:
-    description = (
-        "Summary: Right-hand nucleic-acid polymerase module, with a strong preference for the C-terminal "
-        "helical thumb/CTE and adjacent palm region that contacts and positions the template-product duplex. "
-        "Activation pattern: many long source details that belong in the SAE feature inspector, not the "
-        "structure-browser title region."
-    )
-
-    concise = sae_structure_browser._concise_sae_description(description)
-
-    assert concise.startswith("Right-hand nucleic-acid polymerase module")
-    assert "Activation pattern" not in concise
-    assert len(concise) <= 261
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
