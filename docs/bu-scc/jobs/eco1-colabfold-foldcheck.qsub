@@ -5,6 +5,7 @@
 #$ -pe omp 4
 #$ -l mem_per_core=8G
 #$ -l gpus=1
+#$ -l gpu_compute_capability=6.0
 #$ -j y
 #$ -o /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
 

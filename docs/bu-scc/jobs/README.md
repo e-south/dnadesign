@@ -240,6 +240,10 @@ qsub \
   environment. When `COLABFOLD_BATCH` points into a pixi environment, the
   wrapper prepends the sibling `lib/` directory to `LD_LIBRARY_PATH` so SCC does
   not fall back to the older system `libstdc++`.
+- GPU floor: the template requests `gpus=1` and
+  `gpu_compute_capability=6.0`. ColabFold on this LocalColabFold environment
+  failed on a lower-capability GPU path with DNN initialization errors during
+  the expanded design-class run.
 - subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
   full 97-record baseline request. For larger expanded requests, pass
   `FOLDCHECK_SHARD_SIZE=<count>` with `qsub -t <start>-<end> -tc <limit>`.

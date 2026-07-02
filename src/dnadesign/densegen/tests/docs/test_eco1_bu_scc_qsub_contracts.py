@@ -61,6 +61,14 @@ def test_bu_scc_jobs_readme_documents_design_class_smoke_and_array_submit() -> N
     assert "candidate_pool_manifest.yaml" in jobs_readme
 
 
+def test_eco1_colabfold_qsub_requires_modern_gpu_capability() -> None:
+    qsub_script = _read(BU_SCC_JOBS / "eco1-colabfold-foldcheck.qsub")
+
+    assert "#$ -l gpus=1" in qsub_script
+    assert "#$ -l gpu_compute_capability=6.0" in qsub_script
+    assert "$TASK_ID" in qsub_script
+
+
 def test_eco1_command_groups_include_scc_design_class_execution_lanes() -> None:
     command_groups = _read(ECO1_COMMAND_GROUPS / "README.md")
     pipeline = yaml.safe_load(_read(ECO1_COMMAND_GROUPS / "pipeline.yaml"))
