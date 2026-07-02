@@ -24,8 +24,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_es
     DEFAULT_SAE_MODEL,
     DEFAULT_SEQUENCE_LIMIT,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.pipeline import (
+
+from .feature_description_enrichment import (
     enrich_existing_biohub_esmc_feature_catalog,
+)
+from .pipeline import (
     materialize_biohub_esmc_sae_profile,
 )
 

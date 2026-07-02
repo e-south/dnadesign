@@ -9,10 +9,12 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile.pipeline import (
+from .feature_description_enrichment import (
     MaterializedBiohubEsmcFeatureDescriptions,
-    MaterializedBiohubEsmcSaeProfileArtifacts,
     enrich_existing_biohub_esmc_feature_catalog,
+)
+from .pipeline import (
+    MaterializedBiohubEsmcSaeProfileArtifacts,
     materialize_biohub_esmc_sae_profile,
 )
 

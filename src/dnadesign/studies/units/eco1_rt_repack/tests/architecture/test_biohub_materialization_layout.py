@@ -19,6 +19,7 @@ _BIOHUB_ESMC_SAE_PROFILE_ROOT_FILES = {
     "__main__.py",
     "cli.py",
     "constants.py",
+    "feature_description_enrichment.py",
     "pipeline.py",
     "resume.py",
     "run_contract.py",
