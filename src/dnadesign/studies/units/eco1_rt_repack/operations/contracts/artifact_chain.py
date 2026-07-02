@@ -66,7 +66,7 @@ def validate_artifact_chain_schema_payload(
         issues.append(
             ContractIssue(
                 check_id="thread.artifact_chain.order_mismatch",
-                message="artifact order must match the phase1 tracer-bullet chain exactly",
+                message="artifact order must match the current thread artifact chain exactly",
                 path="artifact_order",
             )
         )

@@ -45,6 +45,9 @@ _EXECUTABLE_LANES = {
     "candidate_table",
     "foldcheck_request",
     "foldcheck_report",
+    "assembly_feasibility",
+    "candidate_triage_table",
+    "candidate_selection_panel",
     "phase0_contract_validation",
     "phase1_contract_validation",
     "phase2_contract_validation",
@@ -56,7 +59,6 @@ _EXTERNAL_LANES = {
 }
 _PLANNED_LANES = {
     "refine_dev_spec",
-    "assembly_feasibility",
     "candidate_handoff",
     "rt_lnrna_handoff",
 }
@@ -119,7 +121,7 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["biohub_esmc_sae_profile"]["owner"] == "thread"
     assert by_id["biohub_esmc_6b_wt_mutation_scoring"]["owner"] == "permuter"
     assert by_id["biohub_esmc_wt_mutation_scoring"]["owner"] == "permuter"
-    assert by_id["assembly_feasibility"]["owner"] == "thread"
+    assert by_id["assembly_feasibility"]["owner"] == "eco1_rt_repack"
     assert by_id["candidate_handoff"]["owner"] == "thread"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"

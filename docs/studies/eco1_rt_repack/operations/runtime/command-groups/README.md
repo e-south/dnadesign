@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Command Groups
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-25
+**Last verified:** 2026-07-02
 
 This directory is the reproducibility route for the study-owned Eco1 RT repack
 materialization path. It is not a hidden run-all pipeline. Each lane in
@@ -115,7 +115,7 @@ must be opened as an explicit policy change before it can feed sampling.
 The SCC runtime uses the ColabFold `colabfold_batch` command. LocalColabFold is
 only the pixi-based install path that provides this command on BU SCC.
 
-`foldcheck_review` ranks the full 96-candidate fold report and writes a selected
+`foldcheck_review` ranks the baseline 96-candidate fold report and writes a selected
 structure-panel manifest, full local structure-set manifest, ChimeraX scripts,
 Atlas subset manifest, visual manifest, SVG review plots, and a scoped marimo
 notebook. It does not launch ChimeraX by default and does not copy the full SCC
@@ -152,15 +152,16 @@ qsub -t 2-5 \
   docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
 ```
 
-After those runs are ingested into per-class `candidate_table.parquet` files,
-rebuild the nonredundant pool:
+The current local workspace already has the five generated class candidate
+tables. To refresh them after reruns, rebuild the nonredundant pool:
 
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
 ```
 
 The pool keeps one row per `sequence_hash` and records duplicate class
-provenance. Only after the pool includes at least one generated class should the
+provenance. The current expanded pool contains 576 nonredundant synthetic
+candidates. Only after the pool includes at least one generated class should the
 expanded fold-check request be written:
 
 ```bash
@@ -168,10 +169,10 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 ```
 
 The expanded fold-check, ColabFold normalization, Biohub ESMC SAE profile, and
-ESMC additive LLR review should then use the `design_classes/` output root so
-the new variants carry the same feature families as the current 96-candidate
-baseline. After the expanded ColabFold report is normalized, stage the shared
-non-mask inputs that downstream fold-review and ESMC lanes need:
+ESMC additive LLR review use the `design_classes/` output root so the new
+variants carry the same feature families as the baseline. After the expanded
+ColabFold report is normalized, stage the shared non-mask inputs that downstream
+fold-review and ESMC lanes need:
 
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . downstream-inputs
@@ -195,6 +196,19 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 These outputs are WT-context masked-marginal additive LLR review covariates.
 They are not whole-protein likelihoods and are not assay measurements.
 
+### Assay-Panel Preparation
+
+The next local summaries prepare the expanded candidate pool for a six-variant
+assay panel. They explain buildability and local SAE changes; they do not
+predict strand displacement.
+
+The SAE window summary uses existing Biohub ESMC sparse tables and does not make
+new Biohub requests:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.sae_window_summary --repo-root .
+```
+
 `review_deliverables` builds the first broader manuscript/review bundle from
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
 Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
@@ -204,7 +218,11 @@ SVGs, exact-dictionary Biohub ESMC SAE review plots, interactive
 py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
 organized by progressive analysis sections. The notebook presents constraint
 evidence for the design mask, ProteinMPNN designs with fold triage, ESMC
-feature review, and a planned feasibility/handoff gate. WT ESMC
+feature review, and a planned feasibility/handoff gate. The expanded
+selection-readiness tables are materialized separately under
+`outputs/thread/design_classes/selection/`; the foundation notebook still needs
+a compact selection-readiness lane before it should be used as the panel-review
+surface. WT ESMC
 masked-marginal scoring is shown with the constraint evidence as a review-only
 model-constraint audit, not as a mask input.
 Static plots and interactive structure views are selected through the same
@@ -217,9 +235,8 @@ and mutation burden. It does not rewrite or duplicate the raw ColabFold PDB
 files; ChimeraX remains the still-render and pose-capture path. The command
 does not launch ChimeraX unless an operator passes the explicit render flag. It
 does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
-WT SAE structure frames, feature-window heatmaps, SAE-to-structure overlays,
-and feasibility/selection matrices are planned follow-ons, not part of the
-materialized foundation bundle.
+Feature-window heatmaps and feasibility/triage/selection matrices are planned
+follow-ons, not part of the materialized foundation bundle.
 
 `atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
 operator explicitly opts into on-demand folding. Use `--selection-manifest` for
@@ -235,8 +252,9 @@ separate sequence-similarity artifact rather than retrying the hash-lookup path.
 `biohub_esmc_sae_profile` uses the authenticated Biohub `POST /api/v1/encode`
 then `POST /api/v1/logits` path for query-time ESMC SAE activations. Keep the
 key in the sibling `../key.md` file or another operator-supplied path; the
-materializer records the key label and redacted authorization only. The current
-all-97 profile is materialized; this command is the safe resumable form:
+materializer records the key label and redacted authorization only. The baseline
+all-97 profile and expanded WT-plus-576 design-class profile are materialized;
+this command is the safe resumable form:
 
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile \

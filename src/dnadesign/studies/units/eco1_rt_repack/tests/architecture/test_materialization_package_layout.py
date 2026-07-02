@@ -30,6 +30,8 @@ _CLI_MATERIALIZATION_PACKAGES = {
     "proteinmpnn_request",
     "proteinmpnn_sample_ingest",
     "review_deliverables",
+    "sae_window_summary",
+    "selection_readiness",
     "structure_preprocessing",
     "thread_plan",
 }

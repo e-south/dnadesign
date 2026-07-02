@@ -372,7 +372,7 @@ lanes:
         - .
   - id: design_class_candidate_pool
     owner: eco1_rt_repack
-    status: baseline_only_pending_generated_candidate_tables
+    status: materialized_expanded_576_nonredundant
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_pool_manifest.yaml
     command:
       argv:
@@ -700,19 +700,60 @@ lanes:
         - "180"
   - id: biohub_esmc_sae_feature_windows
     owner: eco1_rt_repack
-    status: planned
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
-    command: null
+    status: materialized_expanded_1731_rows
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.sae_window_summary
+        - --repo-root
+        - .
   - id: assembly_feasibility
-    owner: thread
-    status: planned
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
-    command: null
+    owner: eco1_rt_repack
+    status: materialized_expanded_576_rows
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/selection_readiness_manifest.yaml
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
+        - --repo-root
+        - .
+  - id: candidate_triage_table
+    owner: eco1_rt_repack
+    status: materialized_expanded_576_rows
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
+        - --repo-root
+        - .
   - id: candidate_selection_panel
     owner: eco1_rt_repack
-    status: planned
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
-    command: null
+    status: materialized_six_row_panel
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
+        - --repo-root
+        - .
   - id: review_deliverables
     owner: eco1_rt_repack
     status: materialized_foundation

@@ -15,6 +15,8 @@ artifact_order:
   - candidate_table
   - foldcheck_report
   - feasibility_report
+  - candidate_triage_table
+  - candidate_selection_panel
   - candidate_handoff
 shared_required_fields:
   - schema_id
@@ -209,6 +211,28 @@ artifacts:
       - input_foldcheck_report_hash
       - created_at_utc
       - created_by
+  candidate_triage_table:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - design_class_id
+      - fold_review_class
+      - feasibility_status
+      - sae_window_status
+      - hard_gate_status
+      - input_candidate_pool_hash
+      - input_foldcheck_review_hash
+      - input_feasibility_report_hash
+  candidate_selection_panel:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - selection_slot
+      - selected_for_panel
+      - eligible_for_handoff
+      - selection_reason
+      - tie_break_trace_json
+      - input_candidate_triage_table_hash
   candidate_handoff:
     required_fields:
       - handoff_id
@@ -223,9 +247,10 @@ artifacts:
 invariants:
   - artifact_order_is_linear_for_current_readiness_path
   - every_downstream_artifact_hashes_all_required_upstream_artifacts
-  - candidate_handoff_hashes_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_feasibility_selection
+  - candidate_handoff_hashes_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_feasibility_triage_selection
   - candidate_handoff_is_rt_only_until_downstream_acceptance
   - fallback_policy_must_be_explicit_no_fallback_for_sampling
   - fixture_artifacts_cannot_satisfy_materialized_handoff
   - missing_metrics_require_reason_fields
   - no_candidate_handoff_without_foldcheck_and_feasibility_reports
+  - no_candidate_handoff_without_foldcheck_feasibility_triage_and_selection_reports

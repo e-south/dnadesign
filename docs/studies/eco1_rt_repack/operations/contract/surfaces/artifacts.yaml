@@ -92,14 +92,17 @@ planned_foldcheck_report:
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
   coverage: full WT plus 96-candidate ColabFold report materialized.
 planned_biohub_esmc_sae_feature_window_summary:
-  status: planned
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sae_feature_window_summary.parquet
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
 planned_feasibility_report:
-  status: planned
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/feasibility_report.parquet
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
+planned_candidate_triage_table:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
 planned_candidate_selection_panel:
-  status: planned
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/selection/candidate_selection_panel.parquet
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
 review_deliverable_manifest:
   status: materialized_foundation
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml

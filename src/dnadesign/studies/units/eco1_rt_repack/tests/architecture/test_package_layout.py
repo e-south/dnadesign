@@ -23,6 +23,7 @@ _MASKING_TEST_ROOT_FILES = {"__init__.py", "test_rows.py"}
 _MATERIALIZATION_PRIMITIVES = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
+    "biohub_esmc_sequence_pseudolikelihood",
     "biohub_esmc_wt_mutation_scoring",
     "candidate_table",
     "contact",
@@ -39,6 +40,8 @@ _MATERIALIZATION_PRIMITIVES = {
     "proteinmpnn_request",
     "proteinmpnn_sample_ingest",
     "review_deliverables",
+    "sae_window_summary",
+    "selection_readiness",
     "source_sequences",
     "structure",
     "structure_preprocessing",
