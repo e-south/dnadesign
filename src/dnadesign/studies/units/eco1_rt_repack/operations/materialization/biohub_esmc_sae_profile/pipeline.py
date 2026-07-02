@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -326,8 +327,10 @@ def enrich_existing_biohub_esmc_feature_catalog(
     sae_model: str = DEFAULT_SAE_MODEL,
     request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
     feature_description_limit: int | None = None,
+    feature_description_batch_size: int | None = 100,
     feature_description_sleep_seconds: float = 0.0,
     feature_description_client: Any | None = None,
+    progress_callback: Callable[[dict[str, object]], None] | None = None,
     retrieved_at: str | None = None,
 ) -> MaterializedBiohubEsmcFeatureDescriptions:
     """Enrich an existing Biohub ESMC feature catalog without rebuilding large SAE tables."""
@@ -336,6 +339,8 @@ def enrich_existing_biohub_esmc_feature_catalog(
         raise ValueError("request_timeout_seconds must be positive")
     if feature_description_limit is not None and feature_description_limit < 0:
         raise ValueError("feature_description_limit must be non-negative")
+    if feature_description_batch_size is not None and feature_description_batch_size <= 0:
+        raise ValueError("feature_description_batch_size must be positive")
     if feature_description_sleep_seconds < 0:
         raise ValueError("feature_description_sleep_seconds must be non-negative")
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
@@ -348,16 +353,81 @@ def enrich_existing_biohub_esmc_feature_catalog(
         raise ValueError("Biohub ESMC feature catalog contains no rows to enrich")
     request_hash = _existing_request_hash(existing_rows.profile_rows_by_candidate)
     timestamp = retrieved_at or _timestamp()
-    enriched_rows, feature_description_summary = _maybe_enrich_feature_catalog_rows(
-        feature_catalog_rows,
-        sae_model=sae_model,
-        retrieved_at=timestamp,
-        fetch_feature_descriptions=True,
-        feature_description_limit=feature_description_limit,
-        feature_description_sleep_seconds=feature_description_sleep_seconds,
-        feature_description_client=feature_description_client,
-        biohub_api_base_url=biohub_api_base_url,
-        request_timeout_seconds=request_timeout_seconds,
+    attempted_count = 0
+    new_enriched_count = 0
+    batch_count = 0
+    remaining_limit = feature_description_limit
+    feature_description_summary: dict[str, object] | None = None
+    enriched_rows = feature_catalog_rows
+    while True:
+        effective_limit = feature_description_batch_size
+        if remaining_limit is not None:
+            effective_limit = remaining_limit if effective_limit is None else min(effective_limit, remaining_limit)
+        if effective_limit == 0:
+            break
+        enriched_rows, batch_summary = _maybe_enrich_feature_catalog_rows(
+            enriched_rows,
+            sae_model=sae_model,
+            retrieved_at=timestamp,
+            fetch_feature_descriptions=True,
+            feature_description_limit=effective_limit,
+            feature_description_sleep_seconds=feature_description_sleep_seconds,
+            feature_description_client=feature_description_client,
+            biohub_api_base_url=biohub_api_base_url,
+            request_timeout_seconds=request_timeout_seconds,
+        )
+        batch_count += 1
+        attempted_count += int(batch_summary["attempted_feature_count"])
+        new_enriched_count += int(batch_summary.get("new_enriched_feature_count", 0))
+        feature_catalog_path = write_biohub_esmc_feature_catalog(
+            existing_rows.feature_catalog_path,
+            enriched_rows,
+            request_hash=request_hash,
+        )
+        batch_summary.update(
+            {
+                "batch_count": batch_count,
+                "cumulative_attempted_feature_count": attempted_count,
+                "cumulative_new_enriched_feature_count": new_enriched_count,
+                "feature_catalog_path": str(feature_catalog_path),
+            }
+        )
+        if progress_callback is not None:
+            progress_callback(batch_summary)
+        feature_description_summary = batch_summary
+        attempted_in_batch = int(batch_summary["attempted_feature_count"])
+        if remaining_limit is not None:
+            remaining_limit -= attempted_in_batch
+        if (
+            attempted_in_batch == 0
+            or int(batch_summary.get("missing_feature_description_count", 0)) == 0
+            or (remaining_limit is not None and remaining_limit <= 0)
+        ):
+            break
+    if feature_description_summary is None:
+        enriched_rows, feature_description_summary = _maybe_enrich_feature_catalog_rows(
+            enriched_rows,
+            sae_model=sae_model,
+            retrieved_at=timestamp,
+            fetch_feature_descriptions=True,
+            feature_description_limit=0,
+            feature_description_sleep_seconds=feature_description_sleep_seconds,
+            feature_description_client=feature_description_client,
+            biohub_api_base_url=biohub_api_base_url,
+            request_timeout_seconds=request_timeout_seconds,
+        )
+    missing_count = int(feature_description_summary.get("missing_feature_description_count", 0))
+    if missing_count:
+        feature_description_summary["status"] = "limit_reached"
+    else:
+        feature_description_summary["status"] = "enriched"
+    feature_description_summary.update(
+        {
+            "attempted_feature_count": attempted_count,
+            "new_enriched_feature_count": new_enriched_count,
+            "batch_size": feature_description_batch_size,
+            "batch_count": batch_count,
+        }
     )
     feature_catalog_path = write_biohub_esmc_feature_catalog(
         existing_rows.feature_catalog_path,
@@ -370,7 +440,7 @@ def enrich_existing_biohub_esmc_feature_catalog(
             {
                 "schema_id": "eco1_rt.biohub_esmc.feature_description_enrichment",
                 "schema_version": 1,
-                "status": "enriched",
+                "status": feature_description_summary["status"],
                 "feature_catalog_path": str(feature_catalog_path),
                 "biohub_request_hash": request_hash,
                 "feature_descriptions": feature_description_summary,
@@ -486,11 +556,15 @@ def _maybe_enrich_feature_catalog_rows(
         label = str(row.get("label") or "")
         description = str(row.get("description") or "")
         raw_feature_hash = str(row.get("raw_feature_hash") or "")
-        if label or description:
+        if label or description or raw_feature_hash:
             existing_descriptions[int(row["feature_index"])] = (label, description, raw_feature_hash)
+    preexisting_description_count = len(existing_descriptions)
+    missing_indices = [feature_index for feature_index in unique_indices if feature_index not in existing_descriptions]
+    if feature_description_limit is None:
+        indices_to_fetch = missing_indices
+    else:
+        indices_to_fetch = missing_indices[:feature_description_limit]
     for feature_index in indices_to_fetch:
-        if int(feature_index) in existing_descriptions:
-            continue
         try:
             description = client.fetch(sae_model=sae_model, feature_index=feature_index)
         except BiohubSaeFeatureDescriptionError as error:
@@ -516,7 +590,10 @@ def _maybe_enrich_feature_catalog_rows(
         {
             "status": "enriched",
             "attempted_feature_count": len(indices_to_fetch),
+            "preexisting_feature_description_count": preexisting_description_count,
+            "new_enriched_feature_count": len(existing_descriptions) - preexisting_description_count,
             "enriched_feature_count": len(existing_descriptions),
+            "missing_feature_description_count": len(unique_indices) - len(existing_descriptions),
         }
     )
     return enriched_rows, summary

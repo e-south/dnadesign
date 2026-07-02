@@ -88,6 +88,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Optional cap on feature-description GET requests when enrichment is explicitly enabled.",
     )
     parser.add_argument(
+        "--feature-description-batch-size",
+        type=int,
+        default=100,
+        help="Checkpoint feature-description enrichment after this many GET requests.",
+    )
+    parser.add_argument(
         "--feature-description-sleep-seconds",
         type=float,
         default=0.0,
@@ -103,7 +109,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             sae_model=args.sae_model,
             request_timeout_seconds=args.request_timeout_seconds,
             feature_description_limit=args.feature_description_limit,
+            feature_description_batch_size=args.feature_description_batch_size,
             feature_description_sleep_seconds=args.feature_description_sleep_seconds,
+            progress_callback=_print_feature_description_progress,
         )
         print(f"feature_catalog: {result.feature_catalog_path}")
         print(f"feature_description_manifest: {result.manifest_path}")
@@ -136,3 +144,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"feature_catalog: {result.feature_catalog_path}")
     print(f"request_manifest: {result.request_manifest_path}")
     return 0
+
+
+def _print_feature_description_progress(summary: dict[str, object]) -> None:
+    print(
+        "feature_description_batch: "
+        f"batch={summary['batch_count']} "
+        f"attempted={summary['cumulative_attempted_feature_count']} "
+        f"enriched={summary['enriched_feature_count']} "
+        f"missing={summary['missing_feature_description_count']}",
+        flush=True,
+    )
