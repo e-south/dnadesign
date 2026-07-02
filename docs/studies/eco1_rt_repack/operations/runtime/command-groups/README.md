@@ -170,7 +170,30 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 The expanded fold-check, ColabFold normalization, Biohub ESMC SAE profile, and
 ESMC additive LLR review should then use the `design_classes/` output root so
 the new variants carry the same feature families as the current 96-candidate
-baseline.
+baseline. After the expanded ColabFold report is normalized, stage the shared
+non-mask inputs that downstream fold-review and ESMC lanes need:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . downstream-inputs
+```
+
+This writes `design_classes/candidate_table.parquet` from the nonredundant
+candidate pool and copies shared residue-map, backbone, MSA, source-manifest,
+and WT ESMC mutation-scoring inputs. It does not write a root-level
+`mask_set.yaml`: the expanded pool contains multiple `mask_policy_id` values,
+so mask-specific review must read the per-class mask sets instead of treating
+one mask as the whole pool.
+
+After `foldcheck_review` is materialized against the `design_classes/` root,
+derive expanded 300M and 6B additive ESMC candidate-preference outputs without
+new Biohub requests:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . esmc-sequence-preference
+```
+
+These outputs are WT-context masked-marginal additive LLR review covariates.
+They are not whole-protein likelihoods and are not assay measurements.
 
 `review_deliverables` builds the first broader manuscript/review bundle from
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a

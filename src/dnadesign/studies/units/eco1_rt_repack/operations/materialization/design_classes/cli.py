@@ -18,6 +18,8 @@ from pathlib import Path
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes import (
     materialize_design_class_candidate_pool,
+    materialize_design_class_downstream_inputs,
+    materialize_design_class_esmc_sequence_preference,
     materialize_design_class_foldcheck_request,
     materialize_design_class_requests,
 )
@@ -42,6 +44,14 @@ def build_parser() -> argparse.ArgumentParser:
     pool = subparsers.add_parser("candidate-pool", help="Write nonredundant candidate pool from available tables.")
     pool.add_argument("--baseline-candidate-table-path", type=Path, default=None)
     subparsers.add_parser("foldcheck-request", help="Write ColabFold request for the nonredundant candidate pool.")
+    subparsers.add_parser(
+        "downstream-inputs",
+        help="Stage expanded root inputs for fold review and ESMC lanes without adding a root mask set.",
+    )
+    subparsers.add_parser(
+        "esmc-sequence-preference",
+        help="Write expanded ESMC additive candidate-preference tables and plots from WT grids.",
+    )
     subparsers.add_parser("all-local", help="Run local non-execution materialization steps.")
     return parser
 
@@ -83,6 +93,23 @@ def main(argv: list[str] | None = None) -> int:
             )
             payload["foldcheck_input_fasta_path"] = str(result.input_fasta_path)
             payload["foldcheck_request_manifest_path"] = str(result.request_manifest_path)
+        if command == "downstream-inputs":
+            result = materialize_design_class_downstream_inputs(
+                repo_root=args.repo_root,
+                output_root=args.output_root,
+                source_output_root=args.source_output_root,
+            )
+            payload["candidate_table_path"] = str(result.candidate_table_path)
+            payload["downstream_inputs_manifest_path"] = str(result.manifest_path)
+            payload["copied_file_count"] = result.copied_file_count
+        if command == "esmc-sequence-preference":
+            result = materialize_design_class_esmc_sequence_preference(
+                repo_root=args.repo_root,
+                output_root=args.output_root,
+                source_output_root=args.source_output_root,
+            )
+            payload["esmc_sequence_preference_manifest_path"] = str(result.manifest_path)
+            payload["deliverable_count"] = result.deliverable_count
     except (FileNotFoundError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

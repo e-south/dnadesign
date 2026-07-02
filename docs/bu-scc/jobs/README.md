@@ -255,6 +255,8 @@ qsub \
   multi-model checks for selected candidates after this first pass
 - durable output root: `FOLDCHECK_RUN_ROOT` defaults to
   `/project/dunlop/esouth/foldcheck/eco1_rt/$JOB_NAME.$JOB_ID`
+- log path: array tasks write task-specific stdout/stderr files under
+  `/project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/`
 - compact run manifest: `colabfold_run_manifest.yaml` records the source
   request hash, selected sequence ids, input FASTA, and output directory
 
@@ -265,7 +267,7 @@ study wrapper around `dnadesign.thread.adapters.colabfold`:
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report \
   --repo-root . \
-  --colabfold-output-root /project/dunlop/esouth/foldcheck/eco1_rt/<run_id>/colabfold_outputs \
+  --colabfold-output-root /project/dunlop/esouth/foldcheck/eco1_rt/<run_id> \
   --runtime-version <colabfold_version>
 ```
 

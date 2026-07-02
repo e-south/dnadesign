@@ -63,3 +63,20 @@ class MaterializedDesignClassFoldCheckRequest:
 
     input_fasta_path: Path
     request_manifest_path: Path
+
+
+@dataclass(frozen=True)
+class MaterializedDesignClassDownstreamInputs:
+    """Paths emitted by expanded downstream-input staging."""
+
+    candidate_table_path: Path
+    manifest_path: Path
+    copied_file_count: int
+
+
+@dataclass(frozen=True)
+class MaterializedDesignClassEsmcSequencePreference:
+    """Paths emitted by expanded ESMC candidate-preference materialization."""
+
+    manifest_path: Path
+    deliverable_count: int

@@ -437,6 +437,65 @@ lanes:
         - <scc_colabfold_outputs>
         - --runtime-version
         - <colabfold_version>
+  - id: design_class_downstream_inputs
+    owner: eco1_rt_repack
+    status: planned_after_expanded_foldcheck_report
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/downstream_inputs_manifest.yaml
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_table.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/proteinmpnn_request/chain_a_backbone.pdb
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/mutation_scoring/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
+        - --repo-root
+        - .
+        - downstream-inputs
+    notes:
+      - Does not stage a root-level mask_set.yaml because expanded rows carry multiple mask_policy_id values.
+  - id: design_class_foldcheck_review
+    owner: eco1_rt_repack
+    status: planned_after_expanded_foldcheck_report
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review
+        - --repo-root
+        - .
+        - --output-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes
+    runtime_policy:
+      launches_gui_by_default: false
+      gui_opt_in_flag: --render-chimerax-overlay
+  - id: design_class_esmc_sequence_preference
+    owner: eco1_rt_repack
+    status: planned_after_design_class_foldcheck_review
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_esmc_sequence_preference_manifest.yaml
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/esmc_candidate_preference_model_stability.parquet
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
+        - --repo-root
+        - .
+        - esmc-sequence-preference
+    notes:
+      - Derived from existing WT-context masked-marginal grids; no additional Biohub requests.
+      - Additive LLR is a review covariate, not a whole-protein likelihood or assay score.
   - id: foldcheck_review
     owner: eco1_rt_repack
     status: materialized_local_review
