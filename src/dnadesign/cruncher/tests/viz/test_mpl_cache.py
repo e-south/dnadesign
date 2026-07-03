@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
+from dnadesign.cruncher.viz.mpl import ensure_mpl_cache, ensure_workspace_mpl_cache
 
 
 def test_ensure_mpl_cache_defaults_to_repo_shared_cache_dir(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -25,6 +25,17 @@ def test_ensure_mpl_cache_defaults_to_repo_shared_cache_dir(monkeypatch: pytest.
     assert resolved == expected
     assert resolved.exists()
     assert resolved.is_dir()
+
+
+def test_workspace_mpl_cache_defaults_to_repo_shared_cache_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+    workspace = tmp_path / "external-demo-workspace"
+    resolved = ensure_workspace_mpl_cache(workspace)
+    expected = Path(__file__).resolve().parents[5] / ".cache" / "matplotlib" / "cruncher"
+    assert resolved == expected
+    assert resolved.exists()
+    assert resolved.is_dir()
+    assert workspace not in resolved.parents
 
 
 def test_ensure_mpl_cache_uses_env_override_when_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

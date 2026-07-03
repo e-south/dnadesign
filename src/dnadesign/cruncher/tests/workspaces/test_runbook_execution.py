@@ -314,7 +314,7 @@ def test_runbook_sets_writable_home_for_child_processes_when_home_is_not_writabl
     assert workspace not in expected_home.parents
 
 
-def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
+def test_runbook_sets_repo_shared_mpl_cache_for_child_processes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "workspace"
@@ -348,6 +348,8 @@ def test_runbook_sets_workspace_local_mpl_cache_for_child_processes(
     assert Path(str(env["MPLCONFIGDIR"])).resolve() == expected_cache
     assert expected_cache.is_dir()
     assert workspace not in expected_cache.parents
+    assert expected_cache.name == "cruncher"
+    assert expected_cache.parent.name == "matplotlib"
 
 
 def test_runbook_normalizes_c_utf8_locale_for_child_processes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
