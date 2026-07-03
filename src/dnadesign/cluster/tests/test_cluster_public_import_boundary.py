@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign import cluster
 
@@ -84,7 +86,67 @@ def test_cluster_public_api_does_not_shell_back_into_cli() -> None:
     assert ".src.cli.app" not in text
 
 
-def test_cluster_public_api_executes_workspace_flow(tmp_path: Path) -> None:
+def _register_fast_public_api_method() -> str:
+    method_id = "toy_public_api"
+
+    def resolve_params(preset=None, raw_params=None):
+        raw = dict(raw_params or {})
+        return {
+            "neighbors": int(raw.get("neighbors", 2)),
+            "resolution": float(raw.get("resolution", 0.2)),
+        }
+
+    def fit(X, **_):
+        return np.arange(X.shape[0], dtype=int) % 2
+
+    def sweep(X, *, method_params, res_min, res_max, step, seeds, out_dir):
+        (out_dir / "toy_sweep.json").write_text(
+            json.dumps(
+                {
+                    "rows": int(X.shape[0]),
+                    "params": dict(method_params),
+                    "res_min": float(res_min),
+                    "res_max": float(res_max),
+                    "step": float(step),
+                    "seeds": [int(seed) for seed in seeds],
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    cluster.register_method(
+        cluster.ClusteringMethod(
+            method_id=method_id,
+            display_name="Toy public API",
+            default_run_prefix=method_id,
+            fit_param_names=frozenset({"neighbors", "resolution"}),
+            resolve_fit_params=resolve_params,
+            fit=fit,
+            slug_params=lambda params: {
+                "n": int(params["neighbors"]),
+                "r": float(params["resolution"]),
+            },
+            operations={"resolution_sweep": sweep},
+        ),
+        replace=True,
+    )
+    return method_id
+
+
+def test_cluster_public_api_executes_workspace_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dnadesign.cluster.src.umap.compute as umap_compute_mod
+
+    method_id = _register_fast_public_api_method()
+    monkeypatch.setattr(
+        umap_compute_mod,
+        "compute",
+        lambda X, neighbors, min_dist, metric, seed: np.column_stack(
+            (np.arange(X.shape[0], dtype=np.float32), np.arange(X.shape[0], dtype=np.float32) + 1.0)
+        ),
+    )
+
     records_path = tmp_path / "records.csv"
     pd.DataFrame(
         {
@@ -106,7 +168,7 @@ fit:
   name: "api_ws"
   key_col: "id"
   x_cols: "x1,x2"
-  method: "leiden"
+  method: "{method_id}"
   method_params:
     neighbors: 2
     resolution: 0.2
@@ -127,6 +189,7 @@ umap:
   allow_overwrite: true
   inplace: true
   plot:
+    enabled: false
     dims: [4, 4]
     alpha: 0.7
     size: 10.0
@@ -136,7 +199,7 @@ analyze:
   group_by: "source"
   composition: true
   plots: false
-""".strip()
+""".format(method_id=method_id).strip()
         + "\n",
         encoding="utf-8",
     )
@@ -147,7 +210,7 @@ analyze:
     sweep_result = cluster.run_sweep_workspace(
         workspace_dir,
         overrides={
-            "method": "leiden",
+            "method": method_id,
             "method_params": {"neighbors": 2},
             "res_min": 0.1,
             "res_max": 0.1,
@@ -162,10 +225,22 @@ analyze:
     assert umap_result.artifact_path.is_dir()
     assert analyze_result.artifact_path.is_dir()
     assert sweep_result.artifact_path.is_dir()
+    assert (sweep_result.artifact_path / "toy_sweep.json").is_file()
     assert {"fit", "umap", "analysis", "sweep"} <= set(runs["kind"].tolist())
 
 
-def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path) -> None:
+def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dnadesign.cluster.src.umap.compute as umap_compute_mod
+
+    method_id = _register_fast_public_api_method()
+    monkeypatch.setattr(
+        umap_compute_mod,
+        "compute",
+        lambda X, neighbors, min_dist, metric, seed: np.column_stack(
+            (np.arange(X.shape[0], dtype=np.float32), np.arange(X.shape[0], dtype=np.float32) + 1.0)
+        ),
+    )
+
     records_path = tmp_path / "records.csv"
     pd.DataFrame(
         {
@@ -183,7 +258,7 @@ def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path) -> None:
         name="adhoc_ws",
         key_col="id",
         x_cols=("x1", "x2"),
-        method="leiden",
+        method=method_id,
         method_params={"neighbors": 2, "resolution": 0.2},
         write=True,
         allow_overwrite=True,
@@ -203,6 +278,7 @@ def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path) -> None:
         write=True,
         allow_overwrite=True,
         inplace=True,
+        render_plots=False,
         plot={"dims": [4, 4], "alpha": 0.7, "size": 10.0},
     )
     analyze_result = cluster.run_analyze(
@@ -218,7 +294,7 @@ def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path) -> None:
         file=records_path,
         key_col="id",
         x_cols=("x1", "x2"),
-        method="leiden",
+        method=method_id,
         method_params={"neighbors": 2},
         res_min=0.1,
         res_max=0.1,
@@ -232,6 +308,7 @@ def test_cluster_public_api_executes_ad_hoc_flow(tmp_path: Path) -> None:
     assert umap_result.artifact_path.is_dir()
     assert analyze_result.artifact_path.is_dir()
     assert sweep_result.artifact_path.is_dir()
+    assert (sweep_result.artifact_path / "toy_sweep.json").is_file()
     assert {"fit", "umap", "analysis", "sweep"} <= set(runs["kind"].tolist())
 
 
