@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -47,9 +48,19 @@ def _study_unit(study_id: str) -> Path:
     return _repo_root() / "src" / "dnadesign" / "studies" / "units" / study_id
 
 
+@lru_cache(maxsize=None)
+def _workspace_context(workspace: Path):
+    return load_workspace_config(workspace)
+
+
+@lru_cache(maxsize=None)
+def _notebook_controls(workspace: Path, notebook_id: str = "latent_geometry_browser"):
+    return build_workspace_notebook_controls_payload(_workspace_context(workspace), notebook_id=notebook_id)
+
+
 def _study_deliverable_docs_root(study_id: str) -> Path:
     if study_id == "stress_ethanol_cipro_growth":
-        context = load_workspace_config(_live_workspace())
+        context = _workspace_context(_live_workspace())
         assert context.config.study_binding is not None
         return _repo_root() / context.config.study_binding.deliverable_docs_root
     return _study_unit(study_id)
@@ -162,8 +173,8 @@ def _expected_browser_default_layout(controls) -> str:
 
 def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    context = _workspace_context(workspace)
+    controls = _notebook_controls(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
@@ -265,8 +276,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
 
 def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> None:
     for workspace in [_live_workspace(), _regulondb_workspace()]:
-        context = load_workspace_config(workspace)
-        controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+        controls = _notebook_controls(workspace)
         projections_by_view = {row.view_id: list(row.projection_ids) for row in controls.geometry_controls.geometries}
 
         for layout in controls.geometry_controls.layout_presets:
@@ -277,8 +287,7 @@ def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> N
 
 
 def test_live_stress_reference_diagnostics_do_not_become_projection_browser_panels() -> None:
-    context = load_workspace_config(_live_workspace())
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(_live_workspace())
     browser_view_ids = {row.view_id for row in controls.geometry_controls.geometries}
     layout_view_ids = {
         view_id
@@ -294,7 +303,7 @@ def test_live_stress_reference_diagnostics_do_not_become_projection_browser_pane
 
 
 def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
     generate_step = appendix_steps["generate_latent_geometry_browser"]
     reference_context_umap_steps = {
@@ -309,8 +318,7 @@ def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> 
 
 
 def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fixed_grids() -> None:
-    context = load_workspace_config(_regulondb_workspace())
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(_regulondb_workspace())
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
     projection_grid_views = [
         "intermediate_embedding_7b_native_source_record_seq_mean",
@@ -344,7 +352,7 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
 
 def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
     workspace = _regulondb_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     notebook = context.require_notebook("latent_geometry_browser")
     ordered_plot_ids = set(notebook.ordered_plots)
     covered_plot_ids: set[str] = set()
@@ -365,7 +373,7 @@ def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
 
 
 def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
-    context = load_workspace_config(_regulondb_workspace())
+    context = _workspace_context(_regulondb_workspace())
     expected_hues = [
         "gc_fraction",
         "regulondb__sigma_factor_set",
@@ -389,7 +397,7 @@ def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
 
 
 def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
-    context = load_workspace_config(_rt_lnrna_workspace())
+    context = _workspace_context(_rt_lnrna_workspace())
 
     for source_base, view_name in _RT_LNRNA_SOURCE_VIEW_SELECTORS.items():
         intermediate_source = context.config.sources[f"{source_base}_intermediate"]
@@ -413,7 +421,7 @@ def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
 
 
 def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views() -> None:
-    context = load_workspace_config(_rt_lnrna_workspace())
+    context = _workspace_context(_rt_lnrna_workspace())
     gallery = context.config.candidate_sets["rt_lnrna_construct_gallery_v1"]
     output_layer_diagnostics = context.config.candidate_sets["rt_lnrna_output_layer_diagnostics_v1"]
     opal_gate = context.config.candidate_sets["rt_lnrna_opal_x_review_v1"]
@@ -440,7 +448,7 @@ def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views(
 
 
 def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> None:
-    context = load_workspace_config(_rt_lnrna_workspace())
+    context = _workspace_context(_rt_lnrna_workspace())
     umap_gallery = context.config.plots["appendix_umap_gallery"]
     dataset_overview = context.config.plots["rt_lnrna_dataset_overview"]
     source_structure = context.config.plots["rt_lnrna_source_structure_summary"]
@@ -694,7 +702,7 @@ def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
     }
 
     for (workspace, plot_id), phrases in requirements.items():
-        context = load_workspace_config(workspace)
+        context = _workspace_context(workspace)
         semantics = resolve_plot_semantics(context, plot_id=plot_id)
         visible_text = "\n".join(
             [
@@ -713,7 +721,7 @@ def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
 
 
 def test_live_study_representation_health_compares_first_class_intermediate_and_output_layer_views() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     recipe = context.config.recipes["pre_assay_representation_triage_recipe"]
     health_step = next(step for step in recipe.steps if step.id == "build_representation_health_summary_metrics")
     candidates = {str(row["view_id"]) for row in health_step.params["candidates"]}
@@ -735,7 +743,7 @@ def test_live_study_representation_health_compares_first_class_intermediate_and_
 
 
 def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_derivations() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     source_ids = [source_id for source_id in context.config.sources if source_id.startswith("reference_context_7b_")]
 
     assert source_ids
@@ -747,9 +755,9 @@ def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_d
 
 def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(workspace)
 
     assert snapshot["schema_version"] == "latentdna.workspace_snapshot.v1"
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
@@ -1082,7 +1090,7 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
 
 def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
     native_tf_steps = {step.id: step for step in _recipe_steps(context, "native_tf_axis_orientation_audit_recipe")}
@@ -1438,7 +1446,7 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
 
 def test_live_generated_catalog_and_controls_do_not_publish_retired_plot_surfaces() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     workspace_catalog_from_context(context)
     catalog = json.loads((workspace / "outputs" / "catalog.json").read_text(encoding="utf-8"))
     controls = build_workspace_notebook_controls_payload(
