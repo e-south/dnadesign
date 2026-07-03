@@ -11,12 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.cruncher.scar_nick.profiles import classify_pair_profile
+from dnadesign.cruncher.scar_nick.profiles import classify_pair_profile, profile_label_s3s2s1s0
 
 
 def test_s3_s2_s1_s0_profile_matches_reference_controls() -> None:
     assert classify_pair_profile("CGGG", "ACAG").profile_s3s2s1s0 == "MXMX"
     assert classify_pair_profile("CAAG", "CTCG").profile_s3s2s1s0 == "MXMM"
+    assert profile_label_s3s2s1s0("CGGG", "ACAG") == "MXMX"
+    assert profile_label_s3s2s1s0("CAAG", "CTCG") == "MXMM"
 
 
 def test_profile_reports_pair_classes_in_s3_s2_s1_s0_order() -> None:
@@ -40,12 +42,14 @@ def test_gt_wobble_is_explicit_when_allowed() -> None:
     strict = classify_pair_profile("GGGG", "TTTC", allow_gt_wobble=False)
 
     assert wobble.profile_s3s2s1s0 == "MWWW"
+    assert profile_label_s3s2s1s0("GGGG", "TTTC", allow_gt_wobble=True) == "MWWW"
     assert wobble.wobble_count == 3
     assert wobble.middle_wobble_count == 2
     assert wobble.hard_mismatch_count == 0
     assert wobble.hard_mismatch_tier_sum == 0
     assert wobble.non_watson_crick_count == 3
     assert strict.profile_s3s2s1s0 == "MXXX"
+    assert profile_label_s3s2s1s0("GGGG", "TTTC", allow_gt_wobble=False) == "MXXX"
     assert strict.hard_mismatch_count == 3
     assert strict.worst_hard_mismatch_tier == 0
     assert strict.hard_mismatch_tier_sum == 0
