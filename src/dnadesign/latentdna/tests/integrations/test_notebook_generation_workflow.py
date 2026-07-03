@@ -19,11 +19,13 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.latentdna.src.cli import app
 from dnadesign.latentdna.src.contracts.deliverable import DeliverableStatusResult
+from dnadesign.latentdna.src.services import projection_service
 
 _RUNNER = CliRunner()
 
@@ -185,6 +187,29 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+@pytest.fixture(autouse=True)
+def _fast_projection_artifact_for_notebook_workflows(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fake_fit_projection_artifact(
+        context,
+        *,
+        view_id: str,
+        projection_id: str,
+        sample_id: str,
+        metric: str,
+        seed: int,
+        artifact_dir: Path | None = None,
+    ) -> tuple[Path, int]:
+        del view_id, metric, seed
+        sample_rows = pq.read_table(context.output_root / "samples" / sample_id / "rows.parquet").to_pylist()
+        projected_rows = [{**row, "x": float(index), "y": float(index % 2)} for index, row in enumerate(sample_rows)]
+        target_dir = artifact_dir or (context.output_root / "projections" / projection_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        pq.write_table(pa.Table.from_pylist(projected_rows), target_dir / "coords.parquet")
+        return target_dir, len(projected_rows)
+
+    monkeypatch.setattr(projection_service, "_fit_projection_artifact", _fake_fit_projection_artifact)
 
 
 def test_notebook_generation_flow(tmp_path: Path) -> None:
