@@ -34,6 +34,13 @@ from .effects.registry import draw_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
 
+
+def _add_fixed_layout_patch(ax, patch):
+    """Add a patch without autoscale work; this renderer sets layout-derived limits explicitly."""
+    ax.add_artist(patch)
+    return patch
+
+
 _NEAR_FEATURE_ANNOTATION_SOURCES = frozenset(
     {
         "densegen_promoter",
@@ -1525,7 +1532,8 @@ def _draw_span_backdrops(
         x = layout.x_left + start * layout.cw
         y0 = min(bound[0] for bound in row_bounds)
         y1 = max(bound[1] for bound in row_bounds)
-        ax.add_patch(
+        _add_fixed_layout_patch(
+            ax,
             FancyBboxPatch(
                 (x, y0),
                 (end - start) * layout.cw,
@@ -1537,7 +1545,7 @@ def _draw_span_backdrops(
                 zorder=0.6,
                 clip_on=False,
                 gid=f"sequence_backdrop:{index}",
-            )
+            ),
         )
 
 
@@ -2011,7 +2019,7 @@ def _draw_sequence(
         if is_highlighted:
             gid = f"{gid}:highlight"
         patch.set_gid(gid)
-        ax.add_patch(patch)
+        _add_fixed_layout_patch(ax, patch)
         x += cw
 
 
@@ -2033,7 +2041,8 @@ def _draw_feature_box(
     pad_x = float(style.kmer.pad_x_px)
     edge_color = _darken_rgb(facecolor, factor=0.78)
 
-    ax.add_patch(
+    _add_fixed_layout_patch(
+        ax,
         FancyBboxPatch(
             (x - pad_x, y - h / 2),
             w + 2 * pad_x,
@@ -2045,7 +2054,7 @@ def _draw_feature_box(
             edgecolor=edge_color,
             zorder=3,
             clip_on=False,
-        )
+        ),
     )
 
     if not draw_label or not label:
@@ -2064,7 +2073,8 @@ def _draw_feature_box(
         gy = ((gb.y0 + gb.y1) / 2.0) * px_per_pt
         x_center = x + (idx + 0.5) * cw
         trans = Affine2D().scale(px_per_pt).translate(x_center - gx, y_text_center - gy) + ax.transData
-        ax.add_patch(
+        _add_fixed_layout_patch(
+            ax,
             PathPatch(
                 tp,
                 transform=trans,
@@ -2073,7 +2083,7 @@ def _draw_feature_box(
                 linewidth=0.0,
                 zorder=4,
                 clip_on=False,
-            )
+            ),
         )
 
 
@@ -2279,6 +2289,7 @@ def _draw_motif_scale_bar(
     _draw_bar(x=x, y0=ref.y0, y1=ref.y0 + ref.height, baseline=ref.baseline)
 
 
+@lru_cache(maxsize=4096)
 def _text_px_width(text: str, family: str, size_pt: int, dpi: int) -> float:
     prop = FontProperties(family=family, size=size_pt)
     bbox = TextPath((0, 0), text, prop=prop).get_extents()
@@ -2498,7 +2509,8 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
             tag, label = legend[idx]
             color = palette.color_for(tag)
             edge_color = _darken_rgb(color, factor=0.76)
-            ax.add_patch(
+            _add_fixed_layout_patch(
+                ax,
                 FancyBboxPatch(
                     (x, y),
                     patch_w,
@@ -2510,7 +2522,7 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
                     edgecolor=edge_color,
                     zorder=10,
                     clip_on=False,
-                )
+                ),
             )
             ax.text(
                 x + patch_w + gap_patch_text,
