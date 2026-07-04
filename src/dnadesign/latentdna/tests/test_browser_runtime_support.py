@@ -474,16 +474,19 @@ def test_render_matplotlib_figure_prefers_raster_image_in_app_run_mode(monkeypat
     monkeypatch.setattr(notebook_rendering.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
 
     fig, ax = plt.subplots()
-    ax.plot([0, 1], [1, 0])
+    try:
+        ax.plot([0, 1], [1, 0])
 
-    rendered = render_matplotlib_figure(fig, alt="run mode figure")
+        rendered = render_matplotlib_figure(fig, alt="run mode figure")
 
-    assert isinstance(rendered, mo.Html)
-    assert "run mode figure" in rendered.text
-    assert "<img" in rendered.text
-    assert "image/png" in rendered.text
-    assert "overflow-x: auto" in rendered.text
-    assert "max-width: 100%" in rendered.text
+        assert isinstance(rendered, mo.Html)
+        assert "run mode figure" in rendered.text
+        assert "<img" in rendered.text
+        assert "image/png" in rendered.text
+        assert "overflow-x: auto" in rendered.text
+        assert "max-width: 100%" in rendered.text
+    finally:
+        plt.close(fig)
 
 
 def test_render_plot_asset_wraps_svg_as_data_uri_image(tmp_path: Path) -> None:
@@ -598,17 +601,19 @@ def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
         }
     )
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["spyp"],
+            x_column="wildtype_margin_ethanol_vs_control",
+            y_column="wildtype_margin_cipro_vs_control",
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["spyp"],
-        x_column="wildtype_margin_ethanol_vs_control",
-        y_column="wildtype_margin_cipro_vs_control",
-    )
-
-    assert len(ax.collections) == 1
-    assert any(text.get_text() == "spyP" for text in ax.texts)
+        assert len(ax.collections) == 1
+        assert any(text.get_text() == "spyP" for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
@@ -620,16 +625,18 @@ def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
         }
     )
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["J23105"],
+            reference_display_labels={"J23105": "Anderson J23105"},
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["J23105"],
-        reference_display_labels={"J23105": "Anderson J23105"},
-    )
-
-    assert len(ax.collections) == 1
-    assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
+        assert len(ax.collections) == 1
+        assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_separates_close_reference_annotations() -> None:
@@ -641,15 +648,18 @@ def test_draw_reference_labels_separates_close_reference_annotations() -> None:
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
-    ax.set_xlim(-0.1, 0.2)
-    ax.set_ylim(-0.1, 0.2)
+    try:
+        ax.set_xlim(-0.1, 0.2)
+        ax.set_ylim(-0.1, 0.2)
 
-    draw_reference_labels(ax, frame, reference_labels=["spyp", "sulAp", "J23105"])
-    fig.canvas.draw()
-    text_positions = [tuple(round(value, 3) for value in text.get_position()) for text in ax.texts]
+        draw_reference_labels(ax, frame, reference_labels=["spyp", "sulAp", "J23105"])
+        fig.canvas.draw()
+        text_positions = [tuple(round(value, 3) for value in text.get_position()) for text in ax.texts]
 
-    assert len(text_positions) == 3
-    assert len(set(text_positions)) == 3
+        assert len(text_positions) == 3
+        assert len(set(text_positions)) == 3
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> None:
@@ -662,17 +672,19 @@ def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> Non
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=labels,
+            reference_label_limit=len(labels),
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=labels,
-        reference_label_limit=len(labels),
-    )
-
-    assert len(ax.texts) == len(labels)
-    assert max(text.get_fontsize() for text in ax.texts) <= 7.8
-    assert all("_context1kb" not in text.get_text() for text in ax.texts)
+        assert len(ax.texts) == len(labels)
+        assert max(text.get_fontsize() for text in ax.texts) <= 7.8
+        assert all("_context1kb" not in text.get_text() for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
@@ -684,29 +696,33 @@ def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
+    try:
+        draw_reference_labels(ax, frame, reference_labels=["spyp"])
 
-    draw_reference_labels(ax, frame, reference_labels=["spyp"])
-
-    assert len(ax.texts) == 1
-    bbox_patch = ax.texts[0].get_bbox_patch()
-    assert bbox_patch is not None
-    assert bbox_patch.get_alpha() == 0.82
+        assert len(ax.texts) == 1
+        bbox_patch = ax.texts[0].get_bbox_patch()
+        assert bbox_patch is not None
+        assert bbox_patch.get_alpha() == 0.82
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> None:
     frame = pd.DataFrame({"usr_label__primary": ["spyp"], "other_metric": [0.4]})
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["spyp"],
+            x_column="wildtype_margin_ethanol_vs_control",
+            y_column="wildtype_margin_cipro_vs_control",
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["spyp"],
-        x_column="wildtype_margin_ethanol_vs_control",
-        y_column="wildtype_margin_cipro_vs_control",
-    )
-
-    assert len(ax.collections) == 0
-    assert len(ax.texts) == 0
+        assert len(ax.collections) == 0
+        assert len(ax.texts) == 0
+    finally:
+        plt.close(fig)
 
 
 def test_resolve_reference_annotation_does_not_fallback_to_default_labels_for_unknown_set(
