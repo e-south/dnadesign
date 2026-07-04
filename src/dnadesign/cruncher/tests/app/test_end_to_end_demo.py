@@ -283,8 +283,9 @@ def test_demo_multitf_local_only_generates_plots(tmp_path: Path) -> None:
     cruncher_cfg["sample"]["optimizer"]["chains"] = 2
     cruncher_cfg["sample"]["elites"]["k"] = 3
     cruncher_cfg["sample"]["elites"]["select"]["pool_size"] = 64
+    cruncher_cfg["analysis"]["plot_format"] = "png"
     cruncher_cfg["analysis"]["max_points"] = 200
-    cruncher_cfg["analysis"]["plot_dpi"] = 100
+    cruncher_cfg["analysis"]["plot_dpi"] = 72
     cruncher_cfg["analysis"]["trajectory_video"]["enabled"] = False
     config_path.write_text(yaml.safe_dump(config_payload))
 
@@ -344,8 +345,9 @@ def test_demo_pairwise_low_budget_analyze_survives_nonfinite_trajectory(tmp_path
     cruncher_cfg["sample"]["optimizer"]["chains"] = 2
     cruncher_cfg["sample"]["elites"]["k"] = 3
     cruncher_cfg["sample"]["elites"]["select"]["pool_size"] = 64
+    cruncher_cfg["analysis"]["plot_format"] = "png"
     cruncher_cfg["analysis"]["max_points"] = 200
-    cruncher_cfg["analysis"]["plot_dpi"] = 100
+    cruncher_cfg["analysis"]["plot_dpi"] = 72
     cruncher_cfg["analysis"]["fimo_compare"]["enabled"] = False
     cruncher_cfg["analysis"]["trajectory_video"]["enabled"] = False
     config_path.write_text(yaml.safe_dump(config_payload))
@@ -385,3 +387,6 @@ def test_demo_pairwise_low_budget_analyze_survives_nonfinite_trajectory(tmp_path
     manifest_payload = json.loads(manifest_file.read_text())
     plots = {entry["key"]: entry for entry in manifest_payload.get("plots", []) if isinstance(entry, dict)}
     assert "chain_trajectory_sweep" in plots
+    assert plots["chain_trajectory_sweep"]["generated"] is True
+    assert plots["chain_trajectory_sweep"]["outputs"] == [{"path": "plots/chain_trajectory_sweep.png", "exists": True}]
+    assert (workspace / "outputs" / "plots" / "chain_trajectory_sweep.png").is_file()
