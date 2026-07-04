@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from dnadesign.latentdna.src.notebooks.browser_runtime import _parse_deliverable_markdown
-from dnadesign.latentdna.src.services.catalog_service import workspace_catalog_from_context
 from dnadesign.latentdna.src.services.notebook_controls_service import build_workspace_notebook_controls_payload
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 from dnadesign.latentdna.src.workspaces.plot_semantics import resolve_plot_semantics
@@ -54,8 +53,21 @@ def _workspace_context(workspace: Path):
 
 
 @lru_cache(maxsize=None)
+def _workspace_catalog_payload(workspace: Path) -> dict[str, object] | None:
+    catalog_path = workspace / "outputs" / "catalog.json"
+    if not catalog_path.is_file():
+        return None
+    payload = json.loads(catalog_path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else None
+
+
+@lru_cache(maxsize=None)
 def _notebook_controls(workspace: Path, notebook_id: str = "latent_geometry_browser"):
-    return build_workspace_notebook_controls_payload(_workspace_context(workspace), notebook_id=notebook_id)
+    return build_workspace_notebook_controls_payload(
+        _workspace_context(workspace),
+        notebook_id=notebook_id,
+        catalog_payload=_workspace_catalog_payload(workspace),
+    )
 
 
 def _study_deliverable_docs_root(study_id: str) -> Path:
@@ -1447,8 +1459,8 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
 def test_live_generated_catalog_and_controls_do_not_publish_retired_plot_surfaces() -> None:
     workspace = _live_workspace()
     context = _workspace_context(workspace)
-    workspace_catalog_from_context(context)
-    catalog = json.loads((workspace / "outputs" / "catalog.json").read_text(encoding="utf-8"))
+    catalog = _workspace_catalog_payload(workspace)
+    assert catalog is not None
     controls = build_workspace_notebook_controls_payload(
         context,
         notebook_id="latent_geometry_browser",
