@@ -385,6 +385,7 @@ def test_densegen_cpu_qsub_real_local_resume_extend_flow(tmp_path: Path) -> None
 
     env = dict(os.environ)
     env["DENSEGEN_CONFIG"] = str(cfg_path)
+    env["DENSEGEN_VALIDATE_ARGS"] = ""
     env["DENSEGEN_RUN_ARGS"] = "--fresh --no-plot"
     env["JOB_ID"] = "9001"
     env["SGE_TASK_ID"] = "3"
