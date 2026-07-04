@@ -19,9 +19,19 @@ import pytest
 
 from dnadesign.cruncher.utils.numba_cache import temporary_numba_cache_dir
 
+
+def _repo_root() -> Path:
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    raise RuntimeError("Unable to locate repository root for Cruncher test cache.")
+
+
 _SESSION_HOME = Path(tempfile.mkdtemp(prefix="cruncher-test-home-session-"))
+_SESSION_MPLCONFIGDIR = _repo_root() / ".cache" / "matplotlib" / "cruncher"
+_SESSION_MPLCONFIGDIR.mkdir(parents=True, exist_ok=True)
 os.environ["HOME"] = str(_SESSION_HOME)
-os.environ["MPLCONFIGDIR"] = str(_SESSION_HOME / ".matplotlib")
+os.environ["MPLCONFIGDIR"] = str(_SESSION_MPLCONFIGDIR)
 os.environ["ARVIZ_DATA"] = str(_SESSION_HOME / "arviz_data")
 
 
@@ -53,7 +63,7 @@ def _cruncher_test_environment() -> None:
         with tempfile.TemporaryDirectory(prefix="cruncher-test-home-") as tmp_home:
             home_path = Path(tmp_home)
             os.environ["HOME"] = str(home_path)
-            os.environ["MPLCONFIGDIR"] = str(home_path / ".matplotlib")
+            os.environ["MPLCONFIGDIR"] = str(_SESSION_MPLCONFIGDIR)
             os.environ["ARVIZ_DATA"] = str(home_path / "arviz_data")
             with temporary_numba_cache_dir():
                 yield
