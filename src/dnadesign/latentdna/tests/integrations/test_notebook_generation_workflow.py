@@ -46,7 +46,7 @@ def _write_workspace_config(workspace_dir: Path, usr_root: Path) -> None:
                     "analysis_dtype": "float32",
                     "metric": "euclidean",
                     "random_seed": 17,
-                    "plot_formats": ["svg", "png"],
+                    "plot_formats": ["svg"],
                     "neighbor_backend": "auto",
                 },
                 "sources": {
