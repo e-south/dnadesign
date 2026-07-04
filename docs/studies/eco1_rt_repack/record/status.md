@@ -169,10 +169,14 @@ handled separately.
   screening.
 - `review_deliverables/` is materialized as the study visual bundle. It writes
   `review_deliverable_manifest.yaml`, the clade 9 and subtype MSA panels,
-  linear mask tracks, a ChimeraX mask-context script, baseline ProteinMPNN
-  audit plots, WT ESMC model-check plots, ESMC/SAE check plots, three
-  interactive structure-browser manifests, expanded panel-selection plots, the
-  selected-protein sequence CSV link, and a marimo notebook. The notebook is organized by
+  linear mask tracks, a design-class mask overview, a ChimeraX mask-context
+  script, baseline ProteinMPNN audit plots, an expanded design-class
+  ProteinMPNN/ColabFold fold-validation plot, WT ESMC model-check plots,
+  ESMC/SAE check plots, three interactive structure-browser manifests,
+  expanded panel-selection plots, the selected-protein sequence CSV link, and a
+  marimo notebook. The MSA panels show the 25% mask denominator, the 50%
+  design-class threshold cue, and subtype membership in the clade 9 source set.
+  The notebook is organized by
   scientific question: mask basis, sequence proposals and fold checks, panel
   selection, and ESMC/SAE checks. WT ESMC masked-marginal scoring appears with
   the mask evidence as a model check, not as a mask input. ESMC scores disagree
@@ -189,6 +193,10 @@ handled separately.
   for each selected candidate when the structure-browser manifest is regenerated
   from the current materializer. Query coordinates are aligned to the reference in memory
   over mapped C-alpha atoms, and local raw ColabFold PDB files are unchanged.
+  Structure-control labels are section-specific: mask evidence category for the
+  reference mask browser, fold-review group for baseline fold browsing, and
+  design class for selected-panel browsing. Molecule-visibility toggles remain
+  stable as a reviewer moves between sections.
   ChimeraX remains the explicit opt-in still-render and pose-capture path.
   Manifest paths are relative to the manifest location, so the visual bundle can
   move with the study workspace. The ChimeraX mask-context PNG is an opt-in

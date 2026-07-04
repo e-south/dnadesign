@@ -212,13 +212,15 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 
 `review_deliverables` builds the first broader manuscript/review bundle from
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
-Mestre-derived clade 9 scaffold/mask-evidence panel, baseline ProteinMPNN
-SVGs, a baseline sequence-difference map, a ChimeraX mask-context script,
-WT ESMC model-check SVGs, exact-dictionary Biohub ESMC SAE review
-plots, interactive py3Dmol-backed structure-browser manifests, and a scoped
-marimo notebook organized by progressive analysis sections. The notebook
-presents constraint evidence for the design mask, baseline ProteinMPNN review,
-expanded-pool panel-selection evidence, and ESMC/SAE checks when those
+Mestre-derived clade 9 scaffold/mask-evidence panel, 25% and 50% conservation
+threshold cues, subtype row marking in the clade 9 MSA, a design-class mask
+overview, baseline ProteinMPNN SVGs, a baseline sequence-difference map, an
+expanded design-class ProteinMPNN/ColabFold fold-validation SVG, a ChimeraX
+mask-context script, WT ESMC model-check SVGs, exact-dictionary Biohub ESMC SAE
+review plots, interactive py3Dmol-backed structure-browser manifests, and a
+scoped marimo notebook organized by progressive analysis sections. The notebook
+presents constraint evidence for the design mask, baseline ProteinMPNN audit
+views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when those
 manifests exist. The expanded panel-selection tables are materialized separately under
 `outputs/thread/design_classes/selection/`; the review notebook links the
 compact gate-count, panel-axis, and selected-sequence-difference SVGs from
@@ -230,8 +232,10 @@ category at a time on the off-white ec86kit/7V9U reference using a single
 high-contrast highlight color. The ColabFold browser reuses local ColabFold
 PDBs, fits the selected query to the reference in memory over mapped C-alpha
 atoms, and displays a compact metric strip for pLDDT, RMSD, sequence identity,
-and mutation burden. It does not rewrite or duplicate the raw ColabFold PDB
-files; ChimeraX remains the still-render and pose-capture path. The command
+and mutation burden. Structure-control labels are section-specific, and
+molecule-visibility toggles stay stable when switching between visual sections.
+It does not rewrite or duplicate the raw ColabFold PDB files; ChimeraX remains
+the still-render and pose-capture path. The command
 does not launch ChimeraX unless an operator passes the explicit render flag. It
 does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
 The review notebook does not compute selection; it reads the selection manifest

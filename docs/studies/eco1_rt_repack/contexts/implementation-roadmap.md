@@ -565,13 +565,17 @@ checks and HTML export. The deliverable sequence is:
 
 1. MSA plurality/mask context: Eco1/Ec86 target row first, declared display
    subset for the 303-row clade 9 alignment, full-row inspection in HTML or
-   marimo, and background markings for `>=25%` WT-plurality protected columns.
+   marimo, background markings for `>=25%` WT-plurality protected columns,
+   a `>=50%` design-class threshold cue, and subtype row marking inside the
+   clade 9 source set.
 2. Linear-plus-3D mask context: an off-white Ec86 RT scaffold with categorical
    overlays for catalytic anchors, Wang/Ec86 direct-contact priors, retained
    DNA/RNA 5 A contacts, clade 9 plurality protection, and mutable ProteinMPNN
-   positions.
+   positions, plus a design-class overview that compares the six mask policies.
 3. ProteinMPNN candidate diversity: score/global score, mutation count,
-   sequence identity to WT, sampling temperature/seed, and mutation density.
+   sequence identity to WT, sampling temperature/seed, mutation density, and an
+   expanded design-class fold-validation plot with design class as color,
+   sampling temperature as marker shape, and selected panel rows outlined.
 4. ColabFold structure review: a cached top/bottom/control structure panel first
    and an all-97 contact sheet only as an optional/heavy cached artifact.
 5. Biohub ESMC feature-review foundation: per-protein top feature tables

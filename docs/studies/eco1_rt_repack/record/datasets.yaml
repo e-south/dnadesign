@@ -629,7 +629,9 @@ datasets:
       the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
       with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
       priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
-      positions, and mutable ProteinMPNN positions. The PNG render is opt-in; normal
+      positions, and mutable ProteinMPNN positions. The same directory now also
+      contains a design-class mask overview comparing the six conservation and
+      retained-substrate proximity policies. The PNG render is opt-in; normal
       materialization records a skipped optional-render status unless an existing
       render is being retained.
   - id: eco1_rt_mask_structure_browser_manifest
@@ -654,6 +656,9 @@ datasets:
     description: >-
       ProteinMPNN candidate-diversity visuals for score/global score, sequence
       recovery to WT, mutation count, sampling temperature, and mutation density.
+      The directory also contains the expanded design-class fold-validation plot
+      that joins the 576-candidate pool to ColabFold RMSD/pLDDT metrics and
+      outlines the selected panel rows.
       In the review notebook these live with ColabFold fold-triage artifacts as
       the ProteinMPNN designs and fold-triage section. Sequence recovery is
       descriptive and not an acceptance criterion.
