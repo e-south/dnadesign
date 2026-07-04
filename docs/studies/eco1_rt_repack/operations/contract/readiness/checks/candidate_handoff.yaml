@@ -64,10 +64,10 @@ checks:
           - planned_sample_table
           - planned_candidate_table
           - planned_foldcheck_report
-          - planned_feasibility_report
-          - planned_biohub_esmc_sae_feature_window_summary
-          - planned_candidate_triage_table
-          - planned_candidate_selection_panel
+          - feasibility_report
+          - biohub_esmc_sae_feature_window_summary
+          - candidate_triage_table
+          - candidate_selection_panel
         required_handoff_kind: rt_only_candidate_handoff
         required_subject_kind: reverse_transcriptase_protein_only
         requires_construct_subject_created_false: true

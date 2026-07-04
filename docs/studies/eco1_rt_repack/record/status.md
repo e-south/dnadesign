@@ -17,7 +17,7 @@ used for assay-panel preparation. The study has the required structure, source,
 alignment, conservation evidence, manual mask authority, mask set, explicit
 thread plan, ProteinMPNN request, backend run manifests, sample/candidate
 tables, fold-check requests, compact fold-check reports, and expanded review
-covariates under
+evidence under
 `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
 This is full fold-check and model-annotation coverage for candidate review, not
 downstream candidate-handoff readiness.
@@ -139,9 +139,9 @@ handled separately.
   and selected candidate model residues `3-311` to ec86kit/7V9U reference
   residues `1-309` over C-alpha atoms before rendering; this matches the
   mapped-residue review frame and avoids relying on an interactive ChimeraX
-  alignment command. The notebook reads the manifest and presents the figures
-  through a dropdown review surface with evidence rows and interpretation
-  limits. These visuals summarize fold-review classes, ColabFold pLDDT/RMSD,
+  alignment command. The notebook presents the figures through dropdowns with
+  source rows and interpretation limits. These visuals summarize fold-review
+  classes, ColabFold pLDDT/RMSD,
   cryoEM-reference RMSD, representative structure overlays, and Biohub ESMC SAE
   coverage; they are review aids, not candidate acceptance gates. The
   local full structure set contains one normalized PDB for the WT runtime model
@@ -160,67 +160,34 @@ handled separately.
   materialized for the 576-candidate expanded pool. Current review classes are
   `strong_fold_preserved: 280`, `good_fold_preserved: 188`,
   `low_confidence: 105`, and `review_band: 3`.
-- `review_deliverables/` is materialized as a study-owned visual bundle. It
-  writes `review_deliverable_manifest.yaml`, a canonical-coordinate
-  Mestre-derived clade 9 alignment panel, linear mask tracks, a ChimeraX
-  mask-context script, ProteinMPNN diversity SVGs, a Tao-style
-  ColabFold RMSD/pLDDT joint plot for the current single mask policy, WT ESMC
-  model-constraint audit plots, an ESMC feature-review section, two
-  interactive structure-browser manifests, and a manifest-backed marimo
-  notebook. The notebook is organized as a progressive analysis surface:
-  constraint evidence for the design mask, ProteinMPNN designs and fold triage,
-  ESMC feature review, and a planned feasibility/handoff section. The
-  expanded selection-readiness tables exist under `design_classes/selection/`,
-  but this foundation notebook has not yet been regenerated into a compact
-  selection-readiness review lane. WT ESMC
-  masked-marginal scoring is shown with the mask-constraint evidence as a
-  review-only model-constraint audit, not as a current mask input. Structure
-  views are selected through the same
-  section/visual controls as static plots. In the reference section, the browser
-  shows the off-white ec86kit/7V9U backbone and lets the reviewer switch among
-  mask and motif highlight categories. Each mask category uses the same
-  high-contrast highlight color because only one category is displayed at a
-  time. Mask highlights are translated from canonical Ec86 residue positions to
-  the exported backbone residue-number basis before rendering, so terminal
-  missing-backbone residues do not shift the displayed selections. In the
-  ProteinMPNN design and fold-triage section, the browser loads one selected
-  PDB plus the ec86kit/7V9U reference into a browser-native 3D view for
-  mouse-driven inspection. The notebook aligns each selected query model to the
-  reference in memory over mapped C-alpha atoms before rendering, so local raw
-  ColabFold PDB files remain unchanged. The selected structure view now shows a
-  compact metric strip for mean pLDDT, WT-runtime C-alpha RMSD, direct cryoEM
-  mapped C-alpha RMSD, sequence identity, and mutation count. These browser
-  views use `dnadesign.thread.structure_views` and are review-only; ChimeraX
-  remains the explicit opt-in still-render and pose-capture path. The
-  notebook fits visual previews to the column and keeps full artifact paths in
-  the evidence details. The manifest also links the existing foldcheck_review
-  SVG/PNG visuals and Permuter-style WT ESMC masked-marginal SVGs instead of
-  duplicating them. The
-  model-constraint audit compares clade 9 WT plurality
-  with ESMC masked-marginal entropy, best alternate LLR, and residue-wise
-  constraint tracks. In the current WT table, plurality and entropy are
-  inversely correlated (`Pearson r = -0.7838`, `R2 = 0.6144`). This is a review
-  aid for future mask-policy discussion, not a current-mask update. The SAE
-  feature-review section uses the existing baseline Biohub ESMC sparse tables to
-  show WT-active residue activation patterns and candidate/WT activation ratios
-  for those same exact-dictionary features. It does not attach Atlas labels or
-  claim processivity. The same section includes a joint review panel that places WT
-  first, orders ProteinMPNN variants by SAE-feature similarity to WT, and shows
-  ColabFold pLDDT plus summed WT masked-marginal single-substitution LLR as
-  side markers. The LLR sum is a review covariate, not a joint protein
-  likelihood, and the panel is not an activity or acceptance score. Mapping
-  selected SAE feature activations onto the same interactive structure-view
-  contract is a planned follow-on that requires an explicit feature/residue
-  selection policy; it is not part of the current mask browser. Manifest
-  paths are relative to the manifest location, so the visual bundle can move
-  with the study workspace. The generated ChimeraX scripts use relative paths
-  for staged local structures and keep raw remote paths out of the local review
-  command path. The ChimeraX mask-context PNG is an opt-in render; ordinary
-  materialization records a skipped optional-render status unless an existing
-  PNG is being retained.
+- `review_deliverables/` is materialized as the study visual bundle. It writes
+  `review_deliverable_manifest.yaml`, the clade 9 and subtype MSA panels,
+  linear mask tracks, a ChimeraX mask-context script, baseline ProteinMPNN
+  audit plots, WT ESMC model-check plots, ESMC/SAE check plots, three
+  interactive structure-browser manifests, expanded panel-selection plots, and
+  a marimo notebook. The notebook is organized by
+  scientific question: mask basis, sequence proposals and fold checks, panel
+  selection, and ESMC/SAE checks. WT ESMC masked-marginal scoring appears with
+  the mask evidence as a model check, not as a mask input. ESMC scores disagree
+  across model sizes, and SAE windows remain WT-like across the expanded pool,
+  so neither signal selects panel rows or implies activity.
+  Structure views are selected through the same section/visual controls as
+  static plots. The reference browser shows the off-white ec86kit/7V9U backbone
+  and lets the reviewer switch among mask and motif highlight categories. The
+  baseline ColabFold browser loads one selected PDB plus the ec86kit/7V9U
+  reference into a browser-native 3D view. The panel-selection browser uses the
+  expanded fold-check structure set and shows WT plus the six selected variants
+  with fold metrics, mutation counts, MSA support, and nucleic-acid-facing
+  chemistry fields. Query coordinates are aligned to the reference in memory
+  over mapped C-alpha atoms, and local raw ColabFold PDB files are unchanged.
+  ChimeraX remains the explicit opt-in still-render and pose-capture path.
+  Manifest paths are relative to the manifest location, so the visual bundle can
+  move with the study workspace. The ChimeraX mask-context PNG is an opt-in
+  render; ordinary materialization records a skipped optional-render status
+  unless an existing PNG is being retained.
   Every deliverable row carries a display title, input hashes, alt text, a
   plain description, and an interpretation
-  limit. WT model-constraint rows also carry the masked-marginal method summary
+  limit. WT model check rows also carry the masked-marginal method summary
   and row-count evidence used by the marimo notebook. SVG outputs keep editable
   text nodes plus embedded title/description metadata.
 - An all-97 ESM Atlas semantic-profile probe has been materialized through
@@ -297,7 +264,7 @@ handled separately.
   canonical amino acids, and compute each alternate-residue LLR as
   `log P(alternate) - log P(WT)`. The `fraction_negative_alternate_llr` field is
   over the 19 non-WT canonical alternates, not over the WT residue. This is a
-  model-constraint audit for future mask-policy review, not experimental deep
+  model check for future mask-policy review, not experimental deep
   mutational scanning and not a current-mask update. The 300M ESMC grid remains
   under `biohub_esmc/mutation_scoring/`; the materializer routes non-default
   models such as `esmc-6b-2024-12` to model-specific subdirectories so
@@ -309,9 +276,9 @@ handled separately.
   candidate LLR tables and plots from those grids. In the expanded
   576-candidate pool, the 300M additive total is positive for 505 candidates
   and negative for 71, with median `12.871`. The 6B additive total is negative
-  for all 576 synthetic candidates, with median `-78.647`. Use both LLR lanes
-  as relative ranking and penalty covariates, not as nonnegative eligibility
-  thresholds and not as whole-protein likelihood.
+  for all 576 synthetic candidates, with median `-78.647`. These LLR lanes are
+  model-review evidence only. They are not nonnegative eligibility thresholds,
+  panel tie-breaks, or whole-protein likelihoods.
 
 ### Mask Counts
 
@@ -366,21 +333,33 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 
 ### Current Next Actions
 
-1. Review the materialized expanded selection-readiness bundle under
+1. Review the expanded panel-selection bundle under
    `outputs/thread/design_classes/selection/`.
 2. Treat `feasibility_report.parquet` as computational full-gene feasibility,
    not a synthesis quote or wet-lab assembly plan. All 576 expanded synthetic
    rows are currently feasible under this computational gate.
 3. Use `candidate_triage_table.parquet` as the reviewer filter surface. It has
    468 eligible rows, 105 low-confidence rows marked ineligible, and 3
-   review-band rows marked as manual reserve only.
-4. Use `candidate_selection_panel.parquet` as the current six-row assay-panel
+   review-band rows marked as manual reserve only. The regenerated table now
+   adds MSA support, mutation-geography, nucleic-acid-facing chemistry, and
+   source-artifact hashes for those review axes.
+4. Use the four panel-selection SVGs under `selection/plots/` for notebook
+   review. They show gate counts by design class, the six selected rows across
+   MSA support, nucleic-acid-facing mutation geography and local-chemistry
+   warnings, the selected-row sequence-difference map, and the selected-row
+   mutation chemistry/geography map.
+5. Use `candidate_selection_panel.parquet` as the current six-row assay-panel
    proposal. It selects one feasible, fold-preserved representative from each
-   design class. The selected rows are all `strong_fold_preserved`.
-5. Keep SAE windowing as review evidence only. The current table records
+   design class by MSA support, nucleic-acid-facing mutation geography, local
+   chemistry warnings, sequence nonredundancy, and fold metrics. The selected
+   rows are all `strong_fold_preserved`: `thread_candidate_f8de74828ad8`,
+   `thread_candidate_3b8ec09dffa4`, `thread_candidate_8145a7ffbfd6`,
+   `thread_candidate_9545e08c9ab9`, `thread_candidate_b134f9a1f060`, and
+   `thread_candidate_7d5861f87291`.
+6. Keep SAE windowing as review evidence only. The current table records
    `wt_like_not_used_for_selection` for every synthetic row, so SAE does not
    nominate a mechanistic slot.
-6. Emit `candidate_handoff.yaml` only after the selected rows are reviewed,
+7. Emit `candidate_handoff.yaml` only after the selected rows are reviewed,
    hash-linked, and accepted by the RT-only handoff contract.
 
 ### Blockers
@@ -395,13 +374,15 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 - Atlas hash-lookup/on-demand coverage has been probed for the baseline all-97 request.
   WT is accepted; the first synthetic candidate requests still return explicit
   404 rows even with `fold_on_miss=true`, and the remaining synthetic rows are
-  intentionally unattempted. Atlas remains an optional post-fold semantic audit
+  intentionally unattempted. Atlas remains optional post-fold semantic context
   and stratification layer, not a candidate acceptance gate.
 - RT-only `candidate_handoff.yaml` is not materialized.
 - Downstream RT-lnRNA acceptance or rejection is not materialized.
-- The foundation review-deliverables marimo notebook does not yet present the
-  expanded feasibility, triage, and six-row selection panel as a first-class
-  review lane.
+- The review-deliverables marimo notebook includes the expanded panel-selection
+  table and plots: gate counts, selected-row review axes, a selected
+  sequence-difference map, a selected mutation chemistry/geography map, the
+  selected-panel structure browser, the handoff-boundary note, and the compact
+  selected-panel table.
 
 ### Non-Goals
 

@@ -79,10 +79,10 @@ Fold-review plots are generated from the same ranking table and Biohub ESMC
 profile summary. Each plot is recorded in `review_visual_manifest.yaml` with alt
 text, a plain description, data-source paths, and an interpretation limit. The
 marimo notebook under `foldcheck_review/notebooks/` reads that manifest instead
-of hard-coding figure paths. The notebook presents those plots as a single
-dropdown review surface, then shows the selected image with an evidence table
-and interpretation-limit accordion. This keeps visual review scoped to the
-study workspace and keeps the distinction clear: figures summarize
+of hard-coding figure paths. The notebook presents those plots through a
+dropdown, then shows the selected image with source rows and an
+interpretation-limit accordion. This keeps visual review scoped to the study
+workspace and keeps the distinction clear: figures summarize
 model-derived metrics, but selection still requires feasibility and handoff
 review.
 
@@ -112,7 +112,7 @@ Biohub ESMC SAE is the query-time semantic annotation layer for WT and synthetic
 candidates after fold checking. It can show whether model-derived feature
 regions are retained or shifted. ESM Atlas remains public-protein neighborhood
 context where a sequence or related public protein is present. WT ESMC
-masked-marginal scoring is a separate model-constraint audit over single
+masked-marginal scoring is a separate model check over single
 substitutions in the WT sequence context. None of these outputs measures strand
 displacement, processivity, or structured-template readthrough.
 
@@ -227,7 +227,7 @@ a candidate has improved function. The right study wording is:
 > results, when available, are public-protein neighborhood context. Neither
 > source measures processivity, strand displacement, or hairpin unwinding.
 
-The first Eco1 use case is a pre-registered semantic audit: ask whether
+The first Eco1 use case is a semantic context check: ask whether
 ProteinMPNN variants that passed the fold-report validator preserve or shift
 polymerase-related model-feature activation patterns in controlled ways.
 For structured RNA templates, the feature panel should be described as
@@ -254,7 +254,7 @@ The Biohub ESMC SAE and Atlas context layers may be used for:
   gating feature shifts.
 - Stratification: choose a balanced assay panel with semantic-retained and
   semantic-shifted variants.
-- Learning: provide covariates for supervised models after biochemical data
+- Learning: provide model-derived input fields for supervised models after biochemical data
   exist.
 
 It may not be used for:

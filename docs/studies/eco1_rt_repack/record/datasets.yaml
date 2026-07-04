@@ -385,13 +385,13 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
     status: materialized_local_review
-    description: Local generated marimo review notebook scoped to Eco1 fold-check review. It reads review_visual_manifest.yaml and presents generated plots through a dropdown review surface with alt text, evidence rows, and interpretation limits.
+    description: Local generated marimo review notebook scoped to Eco1 fold-check review. It reads review_visual_manifest.yaml and presents generated plots through dropdowns with alt text, source rows, and interpretation limits.
   - id: eco1_rt_foldcheck_atlas_subset_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/atlas_subset_manifest.yaml
     status: materialized_local_review
-    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later semantic annotation. Atlas remains a post-fold semantic audit and assay-stratification layer, not a candidate acceptance gate.
+    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later semantic annotation. Atlas remains post-fold semantic context, not a candidate acceptance gate.
   - id: eco1_rt_atlas_semantic_profile
     owner: thread
     kind: generated_artifact
@@ -689,23 +689,32 @@ datasets:
       pLDDT, RMSD, sequence identity, and mutation burden. This is review
       context only; ChimeraX remains the publication still-render and
       pose-capture path.
-  - id: eco1_rt_review_deliverables_feasibility_handoff_planned
+  - id: eco1_rt_selection_design_class_gate_counts
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/feasibility_and_handoff/planned.md
-    status: planned_gate
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_gate_counts.svg
+    status: materialized_selection_readiness_visual
     description: >-
-      Notebook-visible planned gate stating that synthesis feasibility,
-      candidate selection, and RT-only downstream handoff are not materialized
-      by the review-deliverables slice. It is a boundary note, not a candidate
-      decision artifact.
-  - id: eco1_rt_wt_model_constraint_audit_visuals
+      Compact review visual showing eligible, manual-reserve, excluded, and
+      missing-input candidate counts for each design class. It supports panel
+      review but does not measure RT activity or handoff acceptance.
+  - id: eco1_rt_selection_panel_review_axes
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_constraint_audit/
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_panel_review_axes.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual for the six selected panel rows. It shows
+      selected-denominator MSA support, nucleic-acid-facing mutation geography,
+      and local-chemistry warning burden. It explains the current panel
+      rationale without creating a combined score.
+  - id: eco1_rt_wt_model_check_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_check/
     status: materialized_foundation
     description: >-
-      WT-only model-constraint review visuals that compare clade-9 WT plurality
+      WT-only model-check visuals that compare clade-9 WT plurality
       against ESMC masked-marginal entropy, best alternate-residue LLR, and
       residue-wise constraint tracks. The review manifest also links the
       Permuter-style WT ESMC entropy, fraction-negative-alternate-LLR, and
@@ -753,9 +762,10 @@ datasets:
     status: materialized_expanded_576_rows
     description: >-
       Study-owned table for the expanded nonredundant candidate pool. It joins
-      fold-review classes, ESMC additive LLR fields, three-window SAE WT-delta
-      fields, sequence-diversity fields, and feasibility status. It is a triage
-      surface, not a combined-score table.
+      fold-review classes, MSA support, mutation geography,
+      nucleic-acid-facing chemistry, sequence-diversity fields, ESMC additive
+      LLR fields, three-window SAE WT-delta fields, and feasibility status. It
+      is a triage surface, not a combined-score table.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: materialized_artifact
@@ -764,8 +774,9 @@ datasets:
     description: >-
       Study-owned six-row panel table built from the candidate triage table.
       It selects one feasible fold-preserved representative per design class
-      rather than descending by a combined score. SAE windows are recorded but
-      not used for selection.
+      rather than descending by a combined score. MSA support, mutation
+      geography, local chemistry, and sequence nonredundancy explain the panel
+      choices. ESMC and SAE are recorded but not used for selection.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

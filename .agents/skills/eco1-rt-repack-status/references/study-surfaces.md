@@ -217,11 +217,12 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   not copy full raw ColabFold output trees or accept candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/`:
   study-owned visual-deliverable wrapper. It writes
-  `review_deliverable_manifest.yaml` and a manifest-backed marimo notebook
-  organized as constraint evidence for the design mask, ProteinMPNN designs and
-  fold triage, and ESMC feature review. The expanded feasibility, triage, and
-  six-row selection tables exist under `design_classes/selection/`, but this
-  foundation notebook does not yet present them as a first-class lane. It
+  `review_deliverable_manifest.yaml` and a marimo notebook organized as mask
+  evidence, sequence proposals and fold checks, ESMC/SAE checks, and panel
+  selection. The
+  expanded feasibility, triage, six-row selection table, and compact
+  panel-selection plots exist under `design_classes/selection/`; the
+  review notebook links those plots through the selection manifest. It
   includes py3Dmol structure-browser manifests for notebook inspection and keeps
   ChimeraX as the explicit manual pose/still-render path. Manifest paths are
   relative to the manifest location. It does not rerun ProteinMPNN, ColabFold,
@@ -333,10 +334,11 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 - Computational feasibility, candidate triage, and a six-row
   one-per-design-class panel are materialized under the expanded design-class
   selection root. RT-only handoff is the remaining assay-panel blocker. The
-  three-window SAE summary is materialized, but the current pool remains
-  WT-like in those windows, so SAE is not used for selection. Broader reusable
-  fold-model execution and handoff mechanics are still planned; the current
-  executable `thread` surfaces are the generic ProteinMPNN adapter,
+  current panel uses MSA support, mutation geography, nucleic-acid-facing
+  chemistry, and sequence nonredundancy after fold and feasibility gates. ESMC
+  and SAE are recorded for review only; they do not select rows. Broader
+  reusable fold-model execution and handoff mechanics are still planned; the
+  current executable `thread` surfaces are the generic ProteinMPNN adapter,
   candidate-table package, Biohub adapter, ColabFold normalizer, and fold-check
   contract package.
 

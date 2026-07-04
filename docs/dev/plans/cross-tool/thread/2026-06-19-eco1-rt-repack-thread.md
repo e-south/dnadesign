@@ -17,11 +17,10 @@ fold-check review, local PDB staging, Biohub ESMC query-time SAE collection, and
 the expanded design-class candidate pool are materialized locally.
 
 The current task is to prepare a small assay panel from the 576 synthetic
-candidates. The selection-readiness layer now checks computational
-buildability, keeps fold-risk candidates out, records that SAE windows remain
-WT-like, and selects one fold-preserved representative from each design class.
-These steps prepare the assay; they do not predict improved strand
-displacement.
+candidates. The current panel path checks computational buildability, removes
+fold-risk candidates, records that SAE windows remain WT-like, and selects one
+fold-preserved representative from each design class. These steps prepare the
+assay; they do not predict improved strand displacement.
 
 ### Scientific Flow
 
@@ -32,19 +31,21 @@ accepted candidate row
 + accepted fold-check row
 + reviewed structure metrics
 + feasible synthesis row
-+ deterministic selection slot
++ one planned design-class slot
 + upstream hash closure
 -> RT-only candidate_handoff eligibility
 ```
 
-The selection-readiness deliverables are materialized under
+The panel-selection deliverables are materialized under
 `outputs/thread/design_classes/selection/`:
 `feasibility_report.parquet`, `candidate_triage_table.parquet`, and
 `candidate_selection_panel.parquet`. The panel has six rows, one per design
 class. Feasibility can exclude candidates. Fold class is the first review
-filter. ESMC LLR and sequence distance are tie-breaks inside the eligible set.
-SAE windows are retained as review evidence, but they are not used for
-selection because they do not meaningfully stratify the current pool.
+filter. The panel tie-breaks use MSA support, mutation geography,
+nucleic-acid-facing chemistry, and sequence nonredundancy inside the eligible
+set. ESMC LLR and SAE windows are retained as review evidence, but they are
+not used for selection because they do not meaningfully stratify the current
+pool.
 
 Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings, Tranception,
 Evo2, computational stability prediction, whole-protein ESMC
@@ -119,15 +120,15 @@ Materialized inputs for this slice:
 - `biohub_esmc/mutation_scoring/`: implemented WT-only ESMC masked-marginal
   mutation-scoring lane. The full 320-position WT run is materialized with
   position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
-  redacted manifest, and compact plot artifacts. This is a model-constraint
-  audit, not an update to the current mask.
+  redacted manifest, and compact plot artifacts. This is a WT sequence-model
+  check, not an update to the current mask.
 - `biohub_esmc/mutation_scoring/esmc_6b_2024_12/`: implemented model-specific
   output root for the same WT masked-marginal grid under `esmc-6b-2024-12`.
   The materialized 6B grid has 320 accepted position rows and 6,080 non-WT
   single-substitution LLR rows. Non-default models route to model-specific
   roots so this rescore cannot overwrite the current 300M run.
 - `review_deliverables/biohub_esmc_sequence_scoring/`: implemented standalone
-  candidate-preference review surface from the complete WT ESMC
+  candidate-preference comparison from the complete WT ESMC
   single-substitution grid. It writes `biohub_esmc_variant_llr_scores.parquet`,
   `esmc_candidate_preference_vs_wt.svg`, and
   `biohub_esmc_sequence_scoring_manifest.yaml`. The score is an additive
@@ -135,11 +136,12 @@ Materialized inputs for this slice:
   When the 6B WT grid exists, the same bundle also writes a separate 6B
   candidate-preference table/plot under
   `review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/` plus a
-  300M-versus-6B rank-stability plot. Treat both as model-derived review
-  covariates. In the expanded 576-candidate run, the 300M additive total is
+  300M-versus-6B model-comparison plot. Treat both as model-derived review
+  context. In the expanded 576-candidate run, the 300M additive total is
   positive for most candidates while the 6B additive total is negative for every
-  synthetic candidate. Use both as relative rank and penalty covariates; do not
-  require nonnegative 6B additive totals.
+  synthetic candidate. Use these rows as model-review context only; do not
+  require nonnegative 6B additive totals and do not use either model size to
+  select panel rows.
 
 Remaining handoff blockers:
 
@@ -216,7 +218,7 @@ Biohub ESMC masked-marginal mutation scoring:
 > Biohub ESMC/logits can also be used on masked WT contexts to produce
 > DMS-shaped in silico single-substitution scores. For Eco1 this lane is
 > WT-only: 320 masked positions and 6,080 non-WT amino-acid substitutions. It
-> is a model-constraint audit that can be compared with the current mask, not
+> is a model check that can be compared with the current mask, not
 > experimental deep mutational scanning and not a change to the current mask.
 
 Method note:
@@ -248,7 +250,8 @@ Stability/developability boundary:
 
 > Computational stability prediction is not part of the v1 selection funnel for
 > the many-mutant Eco1 RT designs. The first panel uses fold plausibility,
-> buildability, sequence diversity, ESMC covariates, and local SAE summaries.
+> buildability, MSA support, mutation geography, nucleic-acid-facing chemistry,
+> and sequence diversity.
 > Expression, solubility, DSF/nanoDSF, basal RT activity, or a later explicit
 > structure-energy review can be recorded when those data exist, but they are not
 > required inputs for the current triage table.
@@ -374,7 +377,7 @@ Declared Eco1 windows for v1:
 | Window id | Purpose |
 | --- | --- |
 | `catalytic_palm_control` | Negative-control window around the catalytic palm. It should remain WT-like; large shifts are concerning, not exciting. |
-| `thumb_palm_na_binding_surface` | Mechanism-adjacent thumb/palm surface near nucleic-acid handling. Use as a soft contrast axis after hard gates. |
+| `thumb_palm_na_binding_surface` | Mechanism-adjacent thumb/palm surface near nucleic-acid handling. Use only after feasibility and fold checks. |
 | `mutable_substrate_proximal_annulus_basic_surface` | Mutable substrate-proximal annulus and basic surface. This is the minimal local proxy for strand-displacement-relevant surface changes. |
 
 Allowed status values:
@@ -443,6 +446,28 @@ esmc_6b_additive_llr_total: float | null
 sae_window_status: string
 sae_mechanistic_contrast_window_id: string | null
 sae_mechanistic_contrast_rank: int | null
+clade9_alt_observed_fraction: float | null
+clade9_alt_frequency_mean: float | null
+clade9_unobserved_mutation_count: int | null
+clade9_rare_or_unobserved_mutation_count: int | null
+subtype_alt_observed_fraction: float | null
+subtype_alt_frequency_mean: float | null
+subtype_unobserved_mutation_count: int | null
+subtype_rare_or_unobserved_mutation_count: int | null
+selection_support_profile_id: string
+selection_support_alt_observed_fraction: float | null
+selection_support_alt_frequency_mean: float | null
+selection_support_unobserved_mutation_count: int | null
+catalytic_or_direct_contact_mutation_count: int | null
+nucleic_acid_facing_mutation_count: int | null
+thumb_contact_track_mutation_count: int | null
+distal_scaffold_mutation_count: int | null
+nucleic_acid_facing_charge_delta: int | null
+nucleic_acid_facing_basic_gain_count: int | null
+nucleic_acid_facing_basic_loss_count: int | null
+nucleic_acid_facing_acidic_gain_count: int | null
+nucleic_acid_facing_proline_glycine_gain_count: int | null
+nucleic_acid_facing_chemistry_warning_count: int | null
 feasibility_status: string
 hard_gate_status: string
 hard_gate_failure_reasons_json: string
@@ -451,6 +476,10 @@ input_candidate_pool_hash: string
 input_foldcheck_review_hash: string
 input_feasibility_report_hash: string
 input_sae_window_summary_hash: string | null
+input_conservation_profile_hash: string
+input_clade9_alignment_hash: string
+input_subtype_alignment_hash: string
+input_contact_geometry_profile_hash: string
 ```
 
 Allowed `hard_gate_status` values:
@@ -471,8 +500,10 @@ Hard gates stay narrow:
 - feasible synthesis/buildability row;
 - required upstream hashes present.
 
-ESMC additive LLR, SAE windows, mutation burden, design class, temperature, seed,
-and sequence diversity remain covariates and tie-breaks.
+ESMC additive LLR and SAE windows remain review fields only. Panel tie-breaks
+use natural-sequence support from the selected MSA denominator, mutation
+geography, nucleic-acid-facing chemistry, sequence nonredundancy, and fold
+metrics after feasibility and fold checks pass.
 
 ### Feasibility Report
 
@@ -559,7 +590,7 @@ Materialized:
 src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
 ```
 
-This six-row table is the review surface between feasibility and handoff. It
+This six-row table records the proposed assay panel between feasibility and handoff. It
 does not replace `candidate_table.parquet` or `candidate_triage_table.parquet`.
 
 Required fields:
@@ -577,8 +608,6 @@ tie_break_trace_json: string
 nearest_selected_distance_aa: int | null
 fold_review_class: string
 feasibility_status: string
-esmc_penalty_rank: int | null
-sae_window_contrast_rank: int | null
 hard_gate_status: string
 input_candidate_triage_table_hash: string
 input_foldcheck_review_hash: string
@@ -608,16 +637,21 @@ AND protected_mutation_violation_count == 0
 AND required upstream hashes are present
 ```
 
-SAE rows are recorded but do not select a candidate in the current panel.
+ESMC and SAE rows are recorded but do not select a candidate in the current
+panel.
 
 Deterministic tie-break order:
 
 1. feasibility pass;
 2. `strong_fold_preserved` before `good_fold_preserved`;
-3. nonredundancy to already selected variants;
-4. fold metrics inside the same fold class;
-5. ESMC 6B additive LLR as a weak penalty covariate;
-6. `sequence_hash` lexical order.
+3. higher selected-denominator MSA support for designed residues;
+4. fewer designed residues absent from the selected MSA denominator;
+5. more mutations in the nucleic-acid-facing review region;
+6. fewer local nucleic-acid-facing chemistry warnings;
+7. nonredundancy to already selected variants;
+8. fold metrics inside the same fold class;
+9. lower mutation count;
+10. `sequence_hash` lexical order.
 
 The panel tests the design policies themselves, not the top six rows by a
 combined score:
@@ -688,14 +722,18 @@ persisted figure, frame, or notebook input must record:
 
 Current foundation status: `review-deliverable-foundation-v1` is materialized.
 It writes the visual manifest, canonical-coordinate MSA plurality/mask SVG,
-linear mask-track SVG, ChimeraX mask-context script/render, ProteinMPNN
-diversity SVGs, and a manifest-backed marimo notebook. It also links existing
-foldcheck_review SVG/PNG visuals instead of duplicating them. The visual
-manifests use manifest-relative paths so the review bundle can move with the
-study workspace. Static marimo checks and HTML export are the dogfood path for
-notebook resolution. Biohub ESMC feature-window heatmaps, WT SAE feature
-structure frames, feasibility matrices, and handoff panels remain follow-on
-deliverables.
+linear mask-track SVG, ChimeraX mask-context script/render, baseline
+ProteinMPNN audit SVGs, and a
+marimo notebook that reads the visual manifest. It links existing foldcheck_review SVG/PNG
+visuals instead of duplicating them. The visual manifests use
+manifest-relative paths so the review bundle can move with the study workspace.
+Static marimo checks and HTML export are the dogfood path for notebook
+resolution. Biohub ESMC feature-window heatmaps and WT SAE feature structure
+frames are materialized figures. The panel-selection plots and table
+show the expanded-pool panel decision, including a selected mutation
+chemistry/geography map and a selected-panel py3Dmol browser from the expanded
+fold-check structure set. RT-only handoff remains a downstream record, not a
+notebook-derived decision.
 
 #### Deliverable 1: MSA Plurality And Mask Context
 
@@ -730,9 +768,9 @@ Inputs:
 Rendering contract:
 
 - The Eco1/Ec86 target row must be first.
-- The main static figure should use a declared display subset, not silently plot
-  all 303 clade 9 rows with unreadable labels.
-- A full-row view belongs in HTML or marimo, not a dense static SVG.
+- Static MSA figures should show the declared denominator rows. Full-row SVGs
+  are acceptable when the notebook provides zoom/scroll and labels remain
+  legible; do not apply an arbitrary row cutoff.
 - Column backgrounds should mark `>=25%` WT-plurality protected positions.
 - Separate tracks should mark NAxxH, YADD, VTG, Wang/Ec86 direct-contact priors,
   retained DNA/RNA 5 A contacts, and the mutable ProteinMPNN positions.
@@ -959,37 +997,43 @@ The heatmap shows which model-derived feature activations are retained, shifted,
 or depleted across candidates. It does not rank processivity.
 ```
 
-#### Deliverable 7: Feasibility And Handoff Matrix
+#### Deliverable 7: Selection Readiness And Handoff Boundary
 
 Artifact group:
 
 ```text
-selection_and_feasibility/
+design_classes/selection/
 ```
 
 Main outputs:
 
-- `synthesis_feasibility_matrix.svg`
-- `candidate_selection_panel.svg`
+- `feasibility_report.parquet`
+- `candidate_triage_table.parquet`
+- `candidate_selection_panel.parquet`
+- `plots/selection_design_class_gate_counts.svg`
+- `plots/selection_panel_review_axes.svg`
 
 Purpose:
 
 ```text
-Show which structurally reviewed candidates are feasible, selected, blocked, or
-reserved as controls.
+Show which candidates pass feasibility and fold gates, then explain the six
+class-balanced panel rows with MSA support, mutation geography, local chemistry,
+and sequence nonredundancy.
 ```
 
 Inputs:
 
 - `feasibility_report.parquet`;
+- `candidate_triage_table.parquet`;
 - `candidate_selection_panel.parquet`;
 - `candidate_handoff.yaml` when present.
 
-This deliverable must not render until feasibility exists.
+These plots render only after feasibility, triage, and the selection panel are
+materialized. They do not create handoff eligibility by themselves.
 
 #### Notebook Surface
 
-The marimo notebook should stay manifest-backed. It should expose dropdowns for:
+The marimo notebook should read the manifest and expose dropdowns for:
 
 - MSA and mask context;
 - linear/3D mask context;
@@ -997,7 +1041,7 @@ The marimo notebook should stay manifest-backed. It should expose dropdowns for:
 - fold-review structure panels;
 - WT SAE feature frames;
 - variant SAE heatmap;
-- feasibility and handoff once present.
+- panel-selection plots and the RT-only handoff boundary.
 
 The notebook must read manifests and pre-rendered artifacts. It must not
 hard-code plot paths, rerun Biohub requests, rerender all ChimeraX structures,
@@ -1032,8 +1076,8 @@ or implement selection logic inline.
      calculation but writes a separate method id,
      `esmc_6b_2024_12_additive_wt_single_substitution_llr_v1`, and a separate
      review-deliverables subdirectory. Compare 300M and 6B ranks with the
-     emitted model-stability plot before using this covariate for panel
-     triage. Do not require nonnegative 6B additive totals under the current
+     emitted model-comparison plot before using either table as explanatory
+     review context. Do not require nonnegative 6B additive totals under the current
      rescore because every synthetic candidate is negative on that absolute
      scale.
    - Keep this separate from SAE feature activations and from future
@@ -1057,10 +1101,11 @@ or implement selection logic inline.
      `selection/candidate_triage_table.parquet`,
      `selection/candidate_selection_panel.parquet`, and a manifest under the
      expanded design-class output root.
-   - Joins candidate pool, fold-review rows, ESMC additive LLR rows, SAE
-     windows, sequence diversity, and feasibility.
+   - Joins candidate pool, fold-review rows, MSA support, mutation geography,
+     nucleic-acid-facing chemistry, sequence diversity, ESMC additive LLR rows,
+     SAE windows, and feasibility.
    - Rejects missing required inputs. Does not compute or store a combined
-     score. Does not use SAE as a selection gate.
+     score. Does not use ESMC or SAE as selection gates or panel tie-breaks.
 
 5. **RT-only handoff**
    - Add materializer:
@@ -1074,7 +1119,7 @@ or implement selection logic inline.
      script/render, ProteinMPNN candidate diversity, linked fold-review SVG/PNG
      visuals, WT ESMC masked-marginal constraint visuals, exact-dictionary
      Biohub ESMC SAE interpretation plots, an interactive selected-feature SAE
-     activation heatmap, and a manifest-backed marimo notebook.
+     activation heatmap, and a manifest-driven marimo notebook.
    - Visual manifests must use manifest-relative paths, and notebook dogfood
      must include `marimo check` plus HTML export so missing linked media is
      caught before review.
@@ -1083,7 +1128,7 @@ or implement selection logic inline.
      manifests, not as required paths inside the local review script.
    - SVG outputs should retain editable text nodes and include title/desc
      metadata plus manifest alt text. Display titles belong in the manifest so
-     marimo remains a manifest-backed review surface rather than a second label
+     marimo reads manifest titles rather than maintaining a second label
      registry.
    - Next visual extension starts after `sae_feature_window_summary.parquet`:
      WT SAE structure frames and the Biohub ESMC feature-window heatmap.

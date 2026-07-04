@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.14
+  version: 0.1.16
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -43,12 +43,15 @@ Out of scope:
 - Status answers describe the scientific flow directly: Eco1/Ec86 source
   authority, conservation/MSA evidence, protected-residue mask, ProteinMPNN
   proposals, ColabFold fold review, ESMC/SAE annotation, synthesis
-  feasibility, six-variant panel selection, and RT-only handoff.
+  feasibility, MSA/geography/chemistry triage, six-variant panel selection,
+  and RT-only handoff.
 - The answer distinguishes materialized evidence from missing decision records:
   the baseline WT-plus-96 and expanded WT-plus-576 fold/ESMC/SAE evidence are
-  available; computational feasibility, candidate triage, and a six-row
-  one-per-design-class panel are materialized under the expanded design-class
-  selection root. RT-only handoff is not yet finished.
+  available; computational feasibility, candidate triage, compact
+  panel-selection plots, and a six-row one-per-design-class panel are
+  materialized under the expanded design-class selection root and linked into
+  the review notebook when the selection manifest is present. RT-only handoff
+  is not yet finished.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
@@ -63,11 +66,12 @@ Out of scope:
   and handoff tooling remain planned.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
-- Report ESMC LLR and SAE windows as review evidence only. They can preserve
-  panel diversity or explain local model-derived changes, but they do not show
-  improved strand displacement. Whole-protein ESMC pseudo-likelihood and
-  computational stability prediction stay deferred unless a later task
-  explicitly reopens those paths.
+- Report ESMC LLR and SAE windows as review evidence only. They do not select
+  panel rows, do not define candidate acceptance, and do not show improved
+  strand displacement. Current panel tie-breaks use MSA support, mutation
+  geography, nucleic-acid-facing chemistry, and sequence nonredundancy after
+  feasibility and fold checks. Whole-protein ESMC pseudo-likelihood and computational stability
+  prediction stay deferred unless a later task explicitly reopens those paths.
 - Missing or mismatched `study_id` fails visibly.
 
 ## Workflow

@@ -110,10 +110,11 @@ pseudo-likelihood is not part of the v1 six-variant panel.
 The assay-panel layer is now materialized for the expanded pool under
 `outputs/thread/design_classes/selection/`. It contains a computational
 full-gene feasibility report, a candidate triage table, and a six-row panel
-with one feasible fold-preserved representative from each design class. SAE
-windows remain WT-like across the pool and are recorded as review evidence, not
-used for selection. The review fields explain the panel; they are not a single
-combined score.
+with one feasible fold-preserved representative from each design class. The
+triage table now records MSA support for designed residues, mutation geography,
+nucleic-acid-facing chemistry, and sequence nonredundancy. ESMC and SAE remain
+review evidence only. The review fields explain the panel; they are not a
+single combined score.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic

@@ -18,7 +18,7 @@ checks:
       check_group: assembly_feasibility
       summary: Real backend ingest requires feasibility_report rows before candidate_handoff.yaml.
       required: true
-      artifact: planned_feasibility_report
+      artifact: feasibility_report
       validator_intent:
         required_state: materialized
         required_columns:

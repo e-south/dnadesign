@@ -193,8 +193,9 @@ new Biohub requests:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . esmc-sequence-preference
 ```
 
-These outputs are WT-context masked-marginal additive LLR review covariates.
-They are not whole-protein likelihoods and are not assay measurements.
+These outputs are WT-context masked-marginal additive LLR review tables. They
+are not whole-protein likelihoods, assay measurements, or panel-selection
+inputs.
 
 ### Assay-Panel Preparation
 
@@ -211,20 +212,18 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 
 `review_deliverables` builds the first broader manuscript/review bundle from
 existing artifacts. It writes `review_deliverable_manifest.yaml`, a
-Mestre-derived clade 9 scaffold/mask-evidence panel, ProteinMPNN diversity
-SVGs, a Tao-style ColabFold RMSD/pLDDT joint plot for the current single mask
-policy, a ChimeraX mask-context script, WT ESMC model-constraint audit
-SVGs, exact-dictionary Biohub ESMC SAE review plots, interactive
-py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
-organized by progressive analysis sections. The notebook presents constraint
-evidence for the design mask, ProteinMPNN designs with fold triage, ESMC
-feature review, and a planned feasibility/handoff gate. The expanded
-selection-readiness tables are materialized separately under
-`outputs/thread/design_classes/selection/`; the foundation notebook still needs
-a compact selection-readiness lane before it should be used as the panel-review
-surface. WT ESMC
-masked-marginal scoring is shown with the constraint evidence as a review-only
-model-constraint audit, not as a mask input.
+Mestre-derived clade 9 scaffold/mask-evidence panel, baseline ProteinMPNN
+SVGs, a baseline sequence-difference map, a ChimeraX mask-context script,
+WT ESMC model-check SVGs, exact-dictionary Biohub ESMC SAE review
+plots, interactive py3Dmol-backed structure-browser manifests, and a scoped
+marimo notebook organized by progressive analysis sections. The notebook
+presents constraint evidence for the design mask, baseline ProteinMPNN review,
+expanded-pool panel-selection evidence, and ESMC/SAE checks when those
+manifests exist. The expanded panel-selection tables are materialized separately under
+`outputs/thread/design_classes/selection/`; the review notebook links the
+compact gate-count, panel-axis, and selected-sequence-difference SVGs from
+that manifest. WT ESMC masked-marginal scoring is shown with the constraint
+evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same
 section/visual controls. The scaffold/mask browser highlights one mask or motif
 category at a time on the off-white ec86kit/7V9U reference using a single
@@ -235,8 +234,8 @@ and mutation burden. It does not rewrite or duplicate the raw ColabFold PDB
 files; ChimeraX remains the still-render and pose-capture path. The command
 does not launch ChimeraX unless an operator passes the explicit render flag. It
 does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
-Feature-window heatmaps and feasibility/triage/selection matrices are planned
-follow-ons, not part of the materialized foundation bundle.
+The review notebook does not compute selection; it reads the selection manifest
+and pre-rendered SVGs.
 
 `atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
 operator explicitly opts into on-demand folding. Use `--selection-manifest` for
@@ -275,8 +274,8 @@ Use `--sequence-limit all --resume-existing` only after deciding to spend the
 remaining hosted requests. These rows are semantic annotation, not fold
 validation or processivity evidence.
 
-`biohub_esmc_wt_mutation_scoring` is a WT-only masked-marginal model-constraint
-audit. A final uncapped run must use all 320 WT positions; short position
+`biohub_esmc_wt_mutation_scoring` is a WT-only masked-marginal model check.
+A final uncapped run must use all 320 WT positions; short position
 ranges are smoke tests only and must be capped with `--max-new-requests`. The
 default 300M run writes to `biohub_esmc/mutation_scoring/`. Non-default models
 write under a model-specific subdirectory, so a 6B rescore does not overwrite
@@ -308,7 +307,7 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 That command writes to
 `biohub_esmc/mutation_scoring/esmc_6b_2024_12/`. The review-deliverables
 materializer derives a separate 6B additive candidate-LLR table and plot when
-that directory exists, then renders a 300M-versus-6B rank-stability plot. These
+that directory exists, then renders a 300M-versus-6B score-comparison plot. These
 scores remain WT-context masked-marginal additive LLR values, not whole-protein
 likelihoods.
 
