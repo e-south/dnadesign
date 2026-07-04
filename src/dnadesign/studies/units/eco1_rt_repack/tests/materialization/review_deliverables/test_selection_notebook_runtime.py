@@ -80,3 +80,21 @@ def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: P
     assert "candidate_handoff.yaml is absent" in readiness_text
     assert "construct_subject_created" in readiness_text
     assert "false" in readiness_text.lower()
+
+
+def test_non_image_artifact_fallback_uses_manifest_relative_path(tmp_path: Path) -> None:
+    tmp_path.joinpath("review_deliverables").mkdir()
+    tmp_path.joinpath("review_deliverables", "notes.txt").write_text("fixture\n", encoding="utf-8")
+
+    rendered = notebook_runtime.render_deliverable_artifact(
+        {
+            "artifact_kind": "text",
+            "path": "notes.txt",
+            "status": "materialized",
+        },
+        mo=FakeMo(),
+        manifest_root=tmp_path / "review_deliverables",
+    )
+
+    assert rendered == "Artifact file: `notes.txt`"
+    assert str(tmp_path) not in rendered

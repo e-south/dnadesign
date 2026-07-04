@@ -183,11 +183,12 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
         return _render_handoff_boundary(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return _render_image(row, mo=mo, media_path=media_path)
+    artifact_path = str(row.get("path") or "")
     if media_path.exists():
-        return mo.md(f"Artifact file: `{media_path}`")
+        return mo.md(f"Artifact file: `{artifact_path}`")
     skip_reason = str(row.get("skip_reason") or "artifact path does not exist")
     return mo.md(
-        f"Artifact unavailable: `{media_path}`\n\nArtifact state: `{row.get('status')}`. Reason: {skip_reason}"
+        f"Artifact unavailable: `{artifact_path}`\n\nArtifact state: `{row.get('status')}`. Reason: {skip_reason}"
     )
 
 

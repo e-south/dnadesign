@@ -89,8 +89,9 @@ def write_sae_delta_umap_panel(
         return _missing_row(panel_root, [protein_features_path], reason="SAE UMAP requires at least three sequences")
     embedding, embedding_backend = _embed_delta_matrix(model_points.delta_matrix)
     plot_path = panel_root / FILE_NAME
-    _render_sae_delta_umap(plot_path, rows=model_points.rows, embedding=embedding)
+    _render_sae_delta_umap(plot_path, rows=model_points.rows, embedding=embedding, embedding_backend=embedding_backend)
     evidence_summary = _evidence_summary(model_points=model_points, embedding_backend=embedding_backend)
+    projection_label = _projection_label(embedding_backend)
     return make_deliverable_row(
         deliverable_id=DELIVERABLE_ID,
         section=SECTION_ESMC_FEATURE_REVIEW,
@@ -107,13 +108,14 @@ def write_sae_delta_umap_panel(
             }
         ),
         alt_text=(
-            "UMAP scatter plot of Biohub ESMC SAE activation-sum deltas relative to WT. Points are "
+            f"{projection_label} scatter plot of Biohub ESMC SAE activation-sum deltas relative to WT. Points are "
             "colored by additive ESMC LLR versus WT and WT is shown as a zero-delta control."
         ),
         description=(
             "Shows whether the synthetic variants separate in SAE activation space after subtracting the "
             "WT activation vector. Color uses the existing additive WT-context ESMC LLR so the view can be "
-            "read beside the candidate-preference ranking without calling the values whole-protein likelihood."
+            "read beside the candidate-preference ranking without calling the values whole-protein likelihood. "
+            f"The two-dimensional view uses {projection_label.lower()}."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,
         title=TITLE,
@@ -212,8 +214,10 @@ def _candidate_order(*, vectors: dict[str, dict[int, float]], llr_rows: dict[str
 
 
 def _embed_delta_matrix(matrix: np.ndarray) -> tuple[np.ndarray, str]:
-    if matrix.shape[0] < 3 or not np.any(matrix):
-        return _linear_embedding(matrix), "linear_small_or_zero_delta"
+    if matrix.shape[0] <= 3:
+        return _linear_embedding(matrix), "linear_small_candidate_set"
+    if not np.any(matrix):
+        return _linear_embedding(matrix), "linear_zero_delta"
     from umap import UMAP
 
     n_neighbors = min(15, max(2, matrix.shape[0] - 1))
@@ -239,7 +243,13 @@ def _linear_embedding(matrix: np.ndarray) -> np.ndarray:
     return np.column_stack([first, second]).astype(np.float64)
 
 
-def _render_sae_delta_umap(path: Path, *, rows: list[dict[str, Any]], embedding: np.ndarray) -> None:
+def _render_sae_delta_umap(
+    path: Path,
+    *,
+    rows: list[dict[str, Any]],
+    embedding: np.ndarray,
+    embedding_backend: str,
+) -> None:
     llr_values = [float(row["llr_total"]) for row in rows if row.get("llr_total") is not None]
     lower = min(min(llr_values), -0.1)
     upper = max(max(llr_values), 0.1)
@@ -281,8 +291,9 @@ def _render_sae_delta_umap(path: Path, *, rows: list[dict[str, Any]], embedding:
         color="#24292f",
     )
     ax.set_title(TITLE, fontsize=TITLE_SIZE, pad=12)
-    ax.set_xlabel("UMAP 1", fontsize=LABEL_SIZE)
-    ax.set_ylabel("UMAP 2", fontsize=LABEL_SIZE)
+    axis_prefix = "UMAP" if embedding_backend == "umap-learn" else "Linear projection"
+    ax.set_xlabel(f"{axis_prefix} 1", fontsize=LABEL_SIZE)
+    ax.set_ylabel(f"{axis_prefix} 2", fontsize=LABEL_SIZE)
     style_open_axes(ax, grid=True)
     ax.legend(loc="upper right", frameon=False, fontsize=LEGEND_SIZE)
     colorbar = fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.035)
@@ -294,10 +305,14 @@ def _render_sae_delta_umap(path: Path, *, rows: list[dict[str, Any]], embedding:
         path,
         title=TITLE,
         description=(
-            "UMAP plot of SAE activation-sum deltas relative to wild type. WT is a black star at the "
-            "zero-delta control point; synthetic variants are circles colored by additive ESMC LLR."
+            f"{axis_prefix} plot of SAE activation-sum deltas relative to wild type. WT is a black star at "
+            "the zero-delta control point; synthetic variants are circles colored by additive ESMC LLR."
         ),
     )
+
+
+def _projection_label(embedding_backend: str) -> str:
+    return "UMAP" if embedding_backend == "umap-learn" else "Linear projection"
 
 
 def _evidence_summary(*, model_points: _ModelPoints, embedding_backend: str) -> dict[str, Any]:

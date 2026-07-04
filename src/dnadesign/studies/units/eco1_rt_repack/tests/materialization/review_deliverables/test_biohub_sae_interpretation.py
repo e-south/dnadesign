@@ -98,6 +98,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
 
     assert "biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet" in sae_delta_umap["source_tables"]
     assert sae_delta_umap["evidence_summary"]["embedding_method_id"] == "umap_delta_activation_sum_cosine_v1"
+    assert sae_delta_umap["evidence_summary"]["embedding_backend"] == "linear_small_candidate_set"
     assert sae_delta_umap["evidence_summary"]["candidate_count"] == 3
     assert sae_delta_umap["evidence_summary"]["variant_llr_joined_candidate_count"] == 2
     assert sae_delta_umap["evidence_summary"]["wt_control_llr_total"] == 0.0
@@ -106,7 +107,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
         encoding="utf-8"
     )
     assert "SAE activation deltas place Eco1 variants near WT in model-feature space" in sae_delta_umap_text
-    assert "UMAP 1" in sae_delta_umap_text
+    assert "Linear projection 1" in sae_delta_umap_text
     assert "WT control" in sae_delta_umap_text
 
     loaded_heatmap = notebook_sae_features.load_sae_feature_heatmap_manifest(
