@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/pipeline.py
 
-Materialize Eco1 selection-readiness artifacts.
+Materialize Eco1 panel-selection artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     DEFAULT_SOURCE_OUTPUT_ROOT,
     FEASIBILITY_REPORT_FILE_NAME,
     MANIFEST_FILE_NAME,
+    PLOTS_DIR_NAME,
     SELECTION_POLICY_ID,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.feasibility import (
@@ -39,6 +40,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
     build_selection_panel_rows,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
+    write_selection_readiness_plots,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.review_axes import (
+    build_review_axis_by_candidate,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.triage import (
     build_triage_rows,
@@ -66,6 +73,10 @@ def materialize_selection_readiness(
         paths["foldcheck_report"],
         paths["foldcheck_review"],
         paths["mask_set"],
+        paths["conservation_profile"],
+        paths["clade9_alignment"],
+        paths["subtype_alignment"],
+        paths["contact_geometry_profile"],
     ]
     for required in required_paths:
         if not required.exists():
@@ -76,9 +87,14 @@ def materialize_selection_readiness(
     llr_300m_rows = read_rows(paths["llr_300m"], required=False)
     llr_6b_rows = read_rows(paths["llr_6b"], required=False)
     sae_window_rows = read_rows(paths["sae_window"], required=False)
+    conservation_profile_rows = read_rows(paths["conservation_profile"])
+    contact_geometry_rows = read_rows(paths["contact_geometry_profile"])
+    mask_payload = yaml.safe_load(paths["mask_set"].read_text(encoding="utf-8"))
+    mask_residues = list(mask_payload.get("residues") or [])
     feasibility_path = selected_root / FEASIBILITY_REPORT_FILE_NAME
     triage_path = selected_root / CANDIDATE_TRIAGE_TABLE_FILE_NAME
     panel_path = selected_root / CANDIDATE_SELECTION_PANEL_FILE_NAME
+    plots_root = selected_root / PLOTS_DIR_NAME
     feasibility_rows = build_feasibility_rows(
         candidate_rows=candidate_rows,
         foldcheck_report_rows=foldcheck_report_rows,
@@ -93,7 +109,19 @@ def materialize_selection_readiness(
         "foldcheck_review": sha256_uri(paths["foldcheck_review"]),
         "feasibility_report": sha256_uri(feasibility_path),
         "sae_window_summary": sha256_uri(paths["sae_window"]) if paths["sae_window"].exists() else None,
+        "conservation_profile": sha256_uri(paths["conservation_profile"]),
+        "clade9_alignment": sha256_uri(paths["clade9_alignment"]),
+        "subtype_alignment": sha256_uri(paths["subtype_alignment"]),
+        "contact_geometry_profile": sha256_uri(paths["contact_geometry_profile"]),
     }
+    review_axis_by_candidate = build_review_axis_by_candidate(
+        candidate_rows=candidate_rows,
+        conservation_profile_rows=conservation_profile_rows,
+        clade9_alignment_path=paths["clade9_alignment"],
+        subtype_alignment_path=paths["subtype_alignment"],
+        contact_geometry_rows=contact_geometry_rows,
+        mask_residues=mask_residues,
+    )
     triage_rows = build_triage_rows(
         candidate_rows=candidate_rows,
         fold_review_rows=fold_review_rows,
@@ -101,6 +129,7 @@ def materialize_selection_readiness(
         llr_300m_rows=llr_300m_rows,
         llr_6b_rows=llr_6b_rows,
         sae_window_rows=sae_window_rows,
+        review_axis_by_candidate=review_axis_by_candidate,
         input_hashes=input_hashes,
     )
     write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
@@ -112,6 +141,16 @@ def materialize_selection_readiness(
         input_hashes=panel_hashes,
     )
     write_rows(panel_path, panel_rows, schema_id="eco1_rt.candidate_selection_panel")
+    plot_hashes = dict(panel_hashes)
+    plot_hashes["candidate_selection_panel"] = sha256_uri(panel_path)
+    plot_rows = write_selection_readiness_plots(
+        plot_root=plots_root,
+        triage_rows=triage_rows,
+        panel_rows=panel_rows,
+        candidate_rows=candidate_rows,
+        mask_residues=mask_residues,
+        input_hashes=plot_hashes,
+    )
     manifest_path = selected_root / MANIFEST_FILE_NAME
     _write_manifest(
         manifest_path,
@@ -119,6 +158,7 @@ def materialize_selection_readiness(
         feasibility_path=feasibility_path,
         triage_path=triage_path,
         panel_path=panel_path,
+        plot_rows=plot_rows,
         feasibility_rows=feasibility_rows,
         triage_rows=triage_rows,
         panel_rows=panel_rows,
@@ -128,6 +168,7 @@ def materialize_selection_readiness(
         feasibility_report_path=feasibility_path,
         candidate_triage_table_path=triage_path,
         candidate_selection_panel_path=panel_path,
+        plots_root=plots_root,
         manifest_path=manifest_path,
     )
 
@@ -139,6 +180,11 @@ def _input_paths(*, class_root: Path, source_root: Path) -> dict[str, Path]:
         "foldcheck_report": class_root / "foldcheck_report.parquet",
         "foldcheck_review": class_root / "foldcheck_review/foldcheck_candidate_ranking.parquet",
         "mask_set": source_root / "mask_set.yaml",
+        "conservation_profile": source_root / "conservation_profile.parquet",
+        "clade9_alignment": source_root / "conservation_alignments/ec86_clade9_conservation_v1.aligned.fasta",
+        "subtype_alignment": source_root
+        / "conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta",
+        "contact_geometry_profile": source_root / "contact_geometry_profile.parquet",
         "llr_300m": scoring_root / "biohub_esmc_variant_llr_scores.parquet",
         "llr_6b": scoring_root / "esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet",
         "sae_window": class_root / "biohub_esmc/sae_feature_window_summary.parquet",
@@ -152,6 +198,7 @@ def _write_manifest(
     feasibility_path: Path,
     triage_path: Path,
     panel_path: Path,
+    plot_rows: list[dict[str, object]],
     feasibility_rows: list[dict[str, object]],
     triage_rows: list[dict[str, object]],
     panel_rows: list[dict[str, object]],
@@ -165,17 +212,25 @@ def _write_manifest(
         "created_by": CREATED_BY,
         "created_at": created_at,
         "selection_policy_id": SELECTION_POLICY_ID,
-        "governing_rule": "Select one feasible fold-preserved nonredundant representative from each design class.",
+        "governing_rule": (
+            "Select one feasible fold-preserved representative from each design class, then prefer natural "
+            "sequence support, nucleic-acid-facing mutation geography, simple local chemistry, and sequence "
+            "nonredundancy. Do not use ESMC or SAE as positive selection evidence."
+        ),
         "sae_window_policy": (
             "SAE windows are retained as review evidence but not used for selection because the current pool "
             "does not meaningfully stratify in SAE-window space."
         ),
+        "esmc_policy": "ESMC additive LLR rows are retained for review and are not used as panel-selection tie-breaks.",
         "source_tables": {key: str(value) for key, value in paths.items() if value.exists()},
         "artifacts": {
             "feasibility_report": str(feasibility_path),
             "candidate_triage_table": str(triage_path),
             "candidate_selection_panel": str(panel_path),
+            "plots_root": str(path.parent / PLOTS_DIR_NAME),
         },
+        "path_policy": "manifest_relative_for_plots",
+        "plots": [_plot_manifest_row(row, manifest_root=path.parent) for row in plot_rows],
         "artifact_hashes": {
             key: sha256_uri(value)
             for key, value in {
@@ -183,6 +238,7 @@ def _write_manifest(
                 "feasibility_report": feasibility_path,
                 "candidate_triage_table": triage_path,
                 "candidate_selection_panel": panel_path,
+                **{str(row["plot_id"]): Path(str(row["path"])) for row in plot_rows},
             }.items()
         },
         "row_counts": {
@@ -192,6 +248,18 @@ def _write_manifest(
         },
         "hard_gate_allowed_fold_classes": ["strong_fold_preserved", "good_fold_preserved"],
         "default_excluded_fold_classes": ["low_confidence", "review_band"],
+        "panel_tie_break_order": [
+            "fold review class",
+            "selection-support MSA observed fraction",
+            "selection-support MSA mean alternate-residue frequency",
+            "selection-support unobserved mutation count",
+            "nucleic-acid-facing mutation count",
+            "nucleic-acid-facing chemistry warning count",
+            "nearest selected sequence distance",
+            "fold metrics",
+            "mutation count",
+            "sequence hash",
+        ],
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
@@ -199,3 +267,9 @@ def _write_manifest(
 def _resolve(repo_root: Path, path: Path) -> Path:
     expanded = path.expanduser()
     return expanded if expanded.is_absolute() else (repo_root / expanded).resolve()
+
+
+def _plot_manifest_row(row: dict[str, object], *, manifest_root: Path) -> dict[str, object]:
+    normalized = dict(row)
+    normalized["path"] = str(Path(str(row["path"])).relative_to(manifest_root))
+    return normalized

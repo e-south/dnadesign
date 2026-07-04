@@ -60,11 +60,15 @@ def _choose_representative(
         nearest_distance = _nearest_distance(sequence_by_id[str(row["candidate_id"])], selected_sequences)
         return (
             _fold_rank(str(row["fold_review_class"])),
+            -_float_value(row.get("selection_support_alt_observed_fraction")),
+            -_float_value(row.get("selection_support_alt_frequency_mean")),
+            _int_value(row.get("selection_support_unobserved_mutation_count"), default=9999),
+            -_int_value(row.get("nucleic_acid_facing_mutation_count")),
+            _int_value(row.get("nucleic_acid_facing_chemistry_warning_count"), default=9999),
             -(nearest_distance if nearest_distance is not None else 0),
             -float(row.get("mean_plddt") or 0.0),
             float(row.get("wt_runtime_ca_rmsd") or 9999.0),
             float(row.get("cryoem_mapped_ca_rmsd") or 9999.0),
-            -float(row.get("esmc_6b_additive_llr_total") or -9999.0),
             int(row.get("mutation_count_total") or 0),
             str(row["sequence_hash"]),
         )
@@ -81,17 +85,28 @@ def _panel_row(
 ) -> dict[str, object]:
     reason = (
         f"Selected as the {row['design_class_id']} representative after feasibility and fold gates. "
-        "SAE windows were WT-like and not used for selection."
+        "The tie-breaks use MSA support, nucleic-acid-facing mutation geography, simple local chemistry, "
+        "and sequence nonredundancy. ESMC and SAE rows were retained for review but not used for selection."
     )
     trace = {
         "selection_policy_id": SELECTION_POLICY_ID,
         "design_class_id": row["design_class_id"],
+        "selection_support_profile_id": row["selection_support_profile_id"],
+        "selection_support_alt_observed_fraction": row["selection_support_alt_observed_fraction"],
+        "selection_support_alt_frequency_mean": row["selection_support_alt_frequency_mean"],
+        "selection_support_unobserved_mutation_count": row["selection_support_unobserved_mutation_count"],
+        "mutation_count_total": row["mutation_count_total"],
+        "nucleic_acid_facing_mutation_count": row["nucleic_acid_facing_mutation_count"],
+        "nucleic_acid_facing_chemistry_warning_count": row["nucleic_acid_facing_chemistry_warning_count"],
+        "nucleic_acid_facing_charge_delta": row["nucleic_acid_facing_charge_delta"],
+        "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
+        "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
+        "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
         "nearest_selected_distance_aa": nearest_distance,
         "fold_review_class": row["fold_review_class"],
         "mean_plddt": row["mean_plddt"],
         "wt_runtime_ca_rmsd": row["wt_runtime_ca_rmsd"],
         "cryoem_mapped_ca_rmsd": row["cryoem_mapped_ca_rmsd"],
-        "esmc_6b_additive_llr_total": row["esmc_6b_additive_llr_total"],
         "sae_window_status": row["sae_window_status"],
     }
     return {
@@ -107,8 +122,6 @@ def _panel_row(
         "nearest_selected_distance_aa": nearest_distance,
         "fold_review_class": row["fold_review_class"],
         "feasibility_status": row["feasibility_status"],
-        "esmc_penalty_rank": None,
-        "sae_window_contrast_rank": None,
         "hard_gate_status": row["hard_gate_status"],
         "input_candidate_triage_table_hash": input_hashes["candidate_triage_table"],
         "input_foldcheck_review_hash": input_hashes["foldcheck_review"],
@@ -133,3 +146,11 @@ def _fold_rank(review_class: str) -> int:
     if review_class == "good_fold_preserved":
         return 1
     return 2
+
+
+def _float_value(value: object, *, default: float = -1.0) -> float:
+    return default if value is None else float(value)
+
+
+def _int_value(value: object, *, default: int = 0) -> int:
+    return default if value is None else int(value)

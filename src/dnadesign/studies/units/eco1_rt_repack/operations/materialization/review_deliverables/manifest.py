@@ -88,9 +88,8 @@ def write_manifest(
             "input_manifest": path.name,
             "scope": "eco1_rt_repack review deliverables",
             "description": (
-                "Manifest-backed marimo surface for mask-constraint evidence, "
-                "ProteinMPNN variant and fold-triage evidence, and Biohub ESMC "
-                "SAE feature-review deliverables."
+                "Marimo notebook for Eco1 mask evidence, ProteinMPNN sequence proposals, "
+                "fold checks, panel selection, and supporting ESMC/SAE model checks."
             ),
         },
         "visual_policy": {

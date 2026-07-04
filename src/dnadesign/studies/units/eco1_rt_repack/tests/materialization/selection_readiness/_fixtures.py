@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/selection_readiness/_fixtures.py
 
-Selection-readiness test fixtures for Eco1 RT repack.
+Panel-selection test fixtures for Eco1 RT repack.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -19,9 +19,12 @@ import pyarrow.parquet as pq
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._source_fixtures import (
+    write_selection_source_inputs,
+)
 
 
-def write_inputs(class_root: Path) -> dict[str, list[dict[str, object]]]:
+def write_inputs(class_root: Path, source_root: Path) -> dict[str, list[dict[str, object]]]:
     class_root.mkdir(parents=True)
     candidates = candidate_rows()
     _write_parquet(class_root / "candidate_pool.parquet", candidates)
@@ -37,6 +40,7 @@ def write_inputs(class_root: Path) -> dict[str, list[dict[str, object]]]:
         _llr_rows(candidates, model="esmc-6b-2024-12", offset=-10.0),
     )
     _write_parquet(class_root / "biohub_esmc/sae_feature_window_summary.parquet", _sae_rows(candidates))
+    write_selection_source_inputs(source_root)
     return {"candidate_pool": candidates}
 
 

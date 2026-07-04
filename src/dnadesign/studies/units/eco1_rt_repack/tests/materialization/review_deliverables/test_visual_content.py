@@ -85,7 +85,7 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
 
 def _assert_proteinmpnn_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
     diversity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_score_mutation_burden")
-    assert "ProteinMPNN proposal scores and mutation burden" in diversity_text
+    assert "Baseline ProteinMPNN proposal scores and mutation burden" in diversity_text
     assert "Sequence identity to Ec86 WT (%)" in diversity_text
     assert "Accepted designs retain a minority of WT residues." not in diversity_text
     assert "Sampling temperature" in diversity_text
@@ -93,13 +93,13 @@ def _assert_proteinmpnn_content(manifest_path: Path, deliverables: dict[str, dic
     assert "Global score" in diversity_text
 
     mutation_density_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_mutation_density")
-    assert "ProteinMPNN mutation density across allowed residues" in mutation_density_text
+    assert "Baseline ProteinMPNN mutation density across allowed residues" in mutation_density_text
     assert "RT1-RT7 annotation intervals" in mutation_density_text
     assert "Retained DNA/RNA &lt;=5 A" in mutation_density_text
     assert "Motif anchors: NAxxH/YADD/VTG" in mutation_density_text
 
     similarity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_variant_similarity_heatmap")
-    assert "ProteinMPNN variants are mapped against the Ec86 WT sequence" in similarity_text
+    assert "Baseline ProteinMPNN variants are mapped against the Ec86 WT sequence" in similarity_text
     assert "Same as WT" in similarity_text
     assert "Different from WT" in similarity_text
     assert "Missing backbone context" in similarity_text
@@ -109,10 +109,10 @@ def _assert_proteinmpnn_content(manifest_path: Path, deliverables: dict[str, dic
     )
 
     tao_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_tao_style_fold_validation")
-    assert "ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text
+    assert "Baseline ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text
     assert "WT-runtime C-alpha RMSD" in tao_text
     assert "Mean pLDDT" in tao_text
-    assert "Tao-style" in str(deliverables["proteinmpnn_tao_style_fold_validation"]["description"])
+    assert "baseline" in str(deliverables["proteinmpnn_tao_style_fold_validation"]["description"]).lower()
     assert "single active mask policy" in str(
         deliverables["proteinmpnn_tao_style_fold_validation"]["interpretation_limit"]
     )
@@ -155,7 +155,9 @@ def _assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict
     assert "R2 =" in esmc_scatter_text
     assert "Linear fit" in esmc_scatter_text
     assert "25% plurality threshold" not in esmc_scatter_text
-    assert "model-derived audit" in str(deliverables["msa_plurality_vs_esmc_entropy"]["interpretation_limit"])
+    assert "model check of the WT sequence context" in str(
+        deliverables["msa_plurality_vs_esmc_entropy"]["interpretation_limit"]
+    )
 
 
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:

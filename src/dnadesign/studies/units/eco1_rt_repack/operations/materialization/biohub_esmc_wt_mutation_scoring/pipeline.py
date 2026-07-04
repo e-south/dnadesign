@@ -355,7 +355,7 @@ def _request_manifest(
                 "role": "primary literature context for ESMC and model-derived protein representations",
             },
         ],
-        "evidence_role": "model_constraint_audit_v1",
+        "evidence_role": "model_check_v1",
         "changes_current_mask": False,
         "key_label": key_label,
         "authorization": "<redacted>",

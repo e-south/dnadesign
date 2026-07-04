@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/models.py
 
-Data models for Eco1 selection-readiness materialization.
+Data models for Eco1 panel-selection materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,9 +17,10 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class MaterializedSelectionReadiness:
-    """Paths emitted by selection-readiness materialization."""
+    """Paths emitted by panel-selection materialization."""
 
     feasibility_report_path: Path
     candidate_triage_table_path: Path
     candidate_selection_panel_path: Path
+    plots_root: Path
     manifest_path: Path

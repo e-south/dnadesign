@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +28,7 @@ from .biohub_esmc_sequence_preference import (
     VARIANT_LLR_FILE_NAME,
     write_biohub_esmc_sequence_preference_deliverables,
 )
-from .biohub_esmc_sequence_preference_model_stability import write_biohub_esmc_model_stability_deliverables
+from .biohub_esmc_sequence_preference_model_agreement import write_biohub_esmc_model_agreement_deliverables
 from .constants import (
     ALIGNED_FASTA_RELATIVE_PATH,
     BIOHUB_ESMC_6B_MUTATION_SCORING_RELATIVE_PATH,
@@ -60,13 +61,12 @@ from .constants import (
     REFERENCE_BACKBONE_RELATIVE_PATH,
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
     SECTION_ESMC_FEATURE_REVIEW,
-    SECTION_FEASIBILITY_AND_HANDOFF,
     STRUCTURE_BROWSER_DIR_NAME,
     SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH,
     SUBTYPE_CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH,
-    WT_MODEL_CONSTRAINT_DIR_NAME,
+    WT_MODEL_CHECK_DIR_NAME,
 )
-from .esmc_model_constraint import write_esmc_model_constraint_audit_panels
+from .esmc_model_check import write_esmc_model_check_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
 from .mask_structure_browser import write_mask_structure_browser_manifest
@@ -76,7 +76,11 @@ from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, source_manifest_acce
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
 from .sae_structure_browser import write_sae_structure_browser_manifest
-from .structure_browser import write_interactive_structure_browser_manifest
+from .selection_readiness import linked_selection_readiness_rows
+from .structure_browser import (
+    write_interactive_structure_browser_manifest,
+    write_selected_panel_structure_browser_manifest,
+)
 from .structure_browser_common import REFERENCE_STRUCTURE_RELATIVE_PATH, stage_browser_reference_structure
 
 
@@ -92,6 +96,7 @@ def materialize_review_deliverables(
     out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
     deliverable_root = out_root / DELIVERABLE_DIR_NAME
     deliverable_root.mkdir(parents=True, exist_ok=True)
+    _remove_retired_deliverable_dirs(deliverable_root)
 
     aligned_fasta_path = out_root / ALIGNED_FASTA_RELATIVE_PATH
     subtype_aligned_fasta_path = out_root / SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH
@@ -214,7 +219,7 @@ def materialize_review_deliverables(
         )
         deliverables.extend(six_b_sequence_preference_deliverables)
         deliverables.extend(
-            write_biohub_esmc_model_stability_deliverables(
+            write_biohub_esmc_model_agreement_deliverables(
                 panel_root=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME,
                 left_table_path=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME / VARIANT_LLR_FILE_NAME,
                 right_table_path=six_b_sequence_scoring_root / VARIANT_LLR_FILE_NAME,
@@ -237,9 +242,34 @@ def materialize_review_deliverables(
             candidate_preference_table_path=candidate_preference_table_path,
         )
     )
+    design_class_foldcheck_root = out_root / "design_classes" / "foldcheck_review"
+    selected_panel_table_path = out_root / "design_classes" / "selection" / "candidate_selection_panel.parquet"
+    candidate_triage_table_path = out_root / "design_classes" / "selection" / "candidate_triage_table.parquet"
+    candidate_pool_path = out_root / "design_classes" / "candidate_pool.parquet"
+    selected_alignment_reference_path = design_class_foldcheck_root / REFERENCE_STRUCTURE_RELATIVE_PATH
+    if selected_panel_table_path.exists() and candidate_pool_path.exists():
+        deliverables.append(
+            write_selected_panel_structure_browser_manifest(
+                panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
+                full_structure_set_path=design_class_foldcheck_root / "foldcheck_full_structure_set.yaml",
+                foldcheck_ranking_path=design_class_foldcheck_root / "foldcheck_candidate_ranking.parquet",
+                reference_structure_path=browser_reference.local_path,
+                reference_structure_format=browser_reference.structure_format,
+                alignment_reference_path=selected_alignment_reference_path,
+                candidate_table_path=candidate_pool_path,
+                selection_panel_table_path=selected_panel_table_path,
+                triage_table_path=candidate_triage_table_path,
+                candidate_preference_table_path=out_root
+                / "design_classes"
+                / "review_deliverables"
+                / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME
+                / "esmc_6b_2024_12"
+                / VARIANT_LLR_FILE_NAME,
+            )
+        )
     deliverables.extend(
-        write_esmc_model_constraint_audit_panels(
-            panel_root=deliverable_root / WT_MODEL_CONSTRAINT_DIR_NAME,
+        write_esmc_model_check_panels(
+            panel_root=deliverable_root / WT_MODEL_CHECK_DIR_NAME,
             mutation_scoring_root=out_root / BIOHUB_ESMC_MUTATION_SCORING_RELATIVE_PATH,
         )
     )
@@ -270,7 +300,7 @@ def materialize_review_deliverables(
             alignment_reference_path=foldcheck_reference_backbone_path,
         )
     )
-    deliverables.append(_planned_feasibility_handoff_row(deliverable_root))
+    deliverables.extend(linked_selection_readiness_rows(out_root))
 
     notebook_path = deliverable_root / NOTEBOOKS_DIR_NAME / NOTEBOOK_FILE_NAME
     write_review_deliverables_notebook(notebook_path)
@@ -281,6 +311,15 @@ def materialize_review_deliverables(
         notebook_path=notebook_path,
         deliverable_count=len(deliverables),
     )
+
+
+def _remove_retired_deliverable_dirs(deliverable_root: Path) -> None:
+    """Remove generated directories retired by renamed review deliverables."""
+
+    for dirname in ("wt_model_constraint_audit",):
+        retired = deliverable_root / dirname
+        if retired.is_dir():
+            shutil.rmtree(retired)
 
 
 def _validate_subtype_source_subset(*, clade_source_manifest_path: Path, subtype_source_manifest_path: Path) -> None:
@@ -352,50 +391,6 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
             )
         )
     return rows
-
-
-def _planned_feasibility_handoff_row(deliverable_root: Path) -> dict[str, Any]:
-    planned_root = deliverable_root / "feasibility_and_handoff"
-    planned_root.mkdir(parents=True, exist_ok=True)
-    path = planned_root / "planned.md"
-    path.write_text(
-        "\n".join(
-            [
-                "# Feasibility and RT-only handoff remain planned",
-                "",
-                "The review bundle stops before synthesis feasibility and downstream handoff.",
-                "A candidate will need a feasible synthesis row, structure review, and upstream hash closure "
-                "before RT-only handoff.",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return make_deliverable_row(
-        deliverable_id="feasibility_and_handoff_planned",
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
-        artifact_kind="planned_section",
-        status="planned",
-        path=path,
-        source_tables=[
-            "operations/contract/readiness/checks/assembly_feasibility.yaml",
-            "operations/contract/readiness/checks/candidate_handoff.yaml",
-            "operations/contract/readiness/checks/downstream_rt_lnrna_handoff.yaml",
-        ],
-        input_hashes=file_hashes({"planned_note": path}),
-        alt_text="Planned feasibility and RT-only handoff section.",
-        description=(
-            "Feasibility, candidate selection, and RT-only downstream handoff are not materialized in this slice. "
-            "They remain explicit downstream gates after fold review and model-derived ESMC review."
-        ),
-        interpretation_limit=(
-            "No candidate is handoff-ready from this section. Downstream structured-template assays "
-            "remain the only evidence for activity, strand displacement, or hairpin readthrough."
-        ),
-        title="Feasibility and RT-only handoff remain downstream gates",
-        role="manuscript_facing",
-        render_mode="planned_section",
-    )
 
 
 def _resolve_linked_manifest_path(manifest_path: Path, value: str) -> Path:

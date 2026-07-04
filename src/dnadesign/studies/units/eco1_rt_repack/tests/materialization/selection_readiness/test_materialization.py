@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/selection_readiness/test_materialization.py
 
-Selection-readiness materialization tests for Eco1 RT repack.
+Panel-selection materialization tests for Eco1 RT repack.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
@@ -35,10 +36,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     class_root = repo_root / "outputs/thread/design_classes"
     selection_root = class_root / "selection"
     source_root = repo_root / "outputs/thread"
-    mask_set = source_root / "mask_set.yaml"
-    mask_set.parent.mkdir(parents=True)
-    mask_set.write_text("mask_policy_id: test_mask\n", encoding="utf-8")
-    inputs = write_inputs(class_root)
+    inputs = write_inputs(class_root, source_root)
 
     result = materialize_selection_readiness(
         repo_root=repo_root,
@@ -51,6 +49,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert result.feasibility_report_path == selection_root / "feasibility_report.parquet"
     assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
+    assert result.plots_root == selection_root / "plots"
     assert result.manifest_path == selection_root / "selection_readiness_manifest.yaml"
 
     feasibility = pq.read_table(result.feasibility_report_path).to_pylist()
@@ -67,6 +66,9 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     )
     assert {row["sae_window_status"] for row in triage} == {"wt_like_not_used_for_selection"}
     assert all(row["sae_mechanistic_contrast_window_id"] is None for row in triage)
+    assert all(row["selection_support_alt_observed_fraction"] is not None for row in triage)
+    assert all(row["nucleic_acid_facing_mutation_count"] is not None for row in triage)
+    assert all(row["nucleic_acid_facing_chemistry_warning_count"] is not None for row in triage)
 
     panel = pq.read_table(result.candidate_selection_panel_path).to_pylist()
     assert len(panel) == len(ALL_SPECS)
@@ -75,7 +77,28 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert {row["fold_review_class"] for row in panel} == {"strong_fold_preserved"}
     assert all(row["selected_for_panel"] for row in panel)
     assert all(row["eligible_for_handoff"] for row in panel)
-    assert "SAE windows were WT-like" in panel[0]["selection_reason"]
+    assert "esmc_penalty_rank" not in panel[0]
+    assert "sae_window_contrast_rank" not in panel[0]
+    assert "MSA support" in panel[0]["selection_reason"]
+    assert "not used for selection" in panel[0]["selection_reason"]
+    assert "esmc_6b_additive_llr_total" not in panel[0]["tie_break_trace_json"]
+    assert "selection_support_alt_observed_fraction" in panel[0]["tie_break_trace_json"]
+    assert "mutation_count_total" in panel[0]["tie_break_trace_json"]
+    assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
+
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    assert [plot["plot_id"] for plot in manifest["plots"]] == [
+        "selection_design_class_gate_counts",
+        "selection_panel_review_axes",
+        "selection_panel_sequence_differences",
+        "selection_panel_mutation_geography_chemistry",
+    ]
+    for plot in manifest["plots"]:
+        plot_path = result.manifest_path.parent / plot["path"]
+        assert plot_path.exists()
+        assert "<title" in plot_path.read_text(encoding="utf-8")
+        assert plot["alt_text"].strip()
+        assert plot["interpretation_limit"].strip()
 
 
 def test_feasibility_preserves_positions_from_serialized_mutation_lists() -> None:

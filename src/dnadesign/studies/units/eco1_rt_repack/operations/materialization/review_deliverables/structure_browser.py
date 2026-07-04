@@ -20,6 +20,7 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
+    SECTION_FEASIBILITY_AND_HANDOFF,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
@@ -40,6 +41,7 @@ from .structure_browser_common import (
 )
 
 STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "interactive_structure_browser_manifest.yaml"
+SELECTED_PANEL_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "selected_panel_structure_browser_manifest.yaml"
 _MUTATION_PATTERN = re.compile(r"^[A-Z](?P<position>\d+)[A-Z]$")
 
 
@@ -53,19 +55,41 @@ def write_interactive_structure_browser_manifest(
     alignment_reference_path: Path,
     candidate_table_path: Path | None = None,
     candidate_preference_table_path: Path | None = None,
+    selection_panel_table_path: Path | None = None,
+    triage_table_path: Path | None = None,
+    manifest_file_name: str = STRUCTURE_BROWSER_MANIFEST_FILE_NAME,
+    deliverable_id: str = "interactive_structure_browser_manifest",
+    section: str = SECTION_DESIGNS_AND_FOLD_TRIAGE,
+    title: str = "Reference-fitted ColabFold structures can be inspected one at a time",
+    alt_text: str = "Manifest for interactive browser review of reference-fitted local ColabFold structure models.",
+    description: str = (
+        "Lists the local reference and fold-check PDB paths used by the browser-native "
+        "structure view. Query coordinates are aligned in memory "
+        "over mapped C-alpha atoms before rendering; the local raw PDB files "
+        "remain unchanged."
+    ),
+    source_table_prefix: str = "foldcheck_review",
 ) -> dict[str, Any]:
     """Write a compact manifest that lets marimo browse local fold structures."""
 
     panel_root.mkdir(parents=True, exist_ok=True)
-    manifest_path = panel_root / STRUCTURE_BROWSER_MANIFEST_FILE_NAME
+    manifest_path = panel_root / manifest_file_name
     if not full_structure_set_path.exists():
-        return _missing_row(manifest_path, full_structure_set_path)
+        return _missing_row(
+            manifest_path,
+            full_structure_set_path,
+            deliverable_id=deliverable_id,
+            section=section,
+            source_table_prefix=source_table_prefix,
+        )
 
     source = yaml.safe_load(full_structure_set_path.read_text(encoding="utf-8"))
     if not isinstance(source, dict) or source.get("schema_id") != "eco1_rt.foldcheck_full_structure_set":
         raise ValueError(f"Expected eco1_rt.foldcheck_full_structure_set at {full_structure_set_path}")
 
     ranking = _ranking_by_candidate(foldcheck_ranking_path)
+    selection = _selection_by_candidate(selection_panel_table_path)
+    triage = _triage_by_candidate(triage_table_path)
     if not reference_structure_path.exists():
         raise ValueError(f"interactive structure browser reference path is missing: {reference_structure_path}")
     if not alignment_reference_path.exists():
@@ -79,12 +103,15 @@ def write_interactive_structure_browser_manifest(
         source_root=full_structure_set_path.parent,
         manifest_root=manifest_path.parent,
         ranking=ranking,
+        selection=selection,
+        triage=triage,
         mutations_by_candidate=_mutation_rows_by_candidate(
             candidate_table_path,
             query_start_residue=query_start_residue,
             reference_start_residue=reference_start_residue,
         ),
         esmc_scores_by_candidate=_esmc_scores_by_candidate(candidate_preference_table_path),
+        selected_candidate_ids=set(selection),
     )
     source_tables = [
         repo_relative_hint(full_structure_set_path),
@@ -102,6 +129,12 @@ def write_interactive_structure_browser_manifest(
     if candidate_preference_table_path is not None and candidate_preference_table_path.exists():
         source_tables.append(repo_relative_hint(candidate_preference_table_path))
         input_hash_paths["candidate_preference_table"] = candidate_preference_table_path
+    if selection_panel_table_path is not None and selection_panel_table_path.exists():
+        source_tables.append(repo_relative_hint(selection_panel_table_path))
+        input_hash_paths["selection_panel_table"] = selection_panel_table_path
+    if triage_table_path is not None and triage_table_path.exists():
+        source_tables.append(repo_relative_hint(triage_table_path))
+        input_hash_paths["candidate_triage_table"] = triage_table_path
     payload = {
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
         "schema_version": 1,
@@ -136,27 +169,61 @@ def write_interactive_structure_browser_manifest(
     }
     manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return make_deliverable_row(
-        deliverable_id="interactive_structure_browser_manifest",
-        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
+        deliverable_id=deliverable_id,
+        section=section,
         artifact_kind="structure_browser_manifest",
         status="rendered",
         path=manifest_path,
-        source_tables=[
-            "foldcheck_review/foldcheck_full_structure_set.yaml",
-            "foldcheck_review/foldcheck_candidate_ranking.parquet",
-            repo_relative_hint(reference_structure_path),
-        ],
+        source_tables=source_tables,
         input_hashes=file_hashes(input_hash_paths),
-        alt_text="Manifest for interactive browser review of reference-fitted local ColabFold structure models.",
-        description=(
-            "Lists the local reference and fold-check PDB paths used by the browser-native "
-            "structure view. Query coordinates are aligned in memory "
-            "over mapped C-alpha atoms before rendering; the local raw PDB files "
-            "remain unchanged."
-        ),
+        alt_text=alt_text,
+        description=description,
         interpretation_limit=payload["interpretation_limit"],
-        title="Reference-fitted ColabFold structures can be inspected one at a time",
+        title=title,
         role="interactive_review",
+    )
+
+
+def write_selected_panel_structure_browser_manifest(
+    *,
+    panel_root: Path,
+    full_structure_set_path: Path,
+    foldcheck_ranking_path: Path,
+    reference_structure_path: Path,
+    reference_structure_format: str,
+    alignment_reference_path: Path,
+    candidate_table_path: Path,
+    selection_panel_table_path: Path,
+    triage_table_path: Path,
+    candidate_preference_table_path: Path | None = None,
+) -> dict[str, Any]:
+    """Write the selected-six structure-browser manifest from expanded fold-check outputs."""
+
+    return write_interactive_structure_browser_manifest(
+        panel_root=panel_root,
+        full_structure_set_path=full_structure_set_path,
+        foldcheck_ranking_path=foldcheck_ranking_path,
+        reference_structure_path=reference_structure_path,
+        reference_structure_format=reference_structure_format,
+        alignment_reference_path=alignment_reference_path,
+        candidate_table_path=candidate_table_path,
+        candidate_preference_table_path=candidate_preference_table_path,
+        selection_panel_table_path=selection_panel_table_path,
+        triage_table_path=triage_table_path,
+        manifest_file_name=SELECTED_PANEL_STRUCTURE_BROWSER_MANIFEST_FILE_NAME,
+        deliverable_id="selected_panel_structure_browser_manifest",
+        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        title="Selected Eco1 panel structures can be inspected one at a time",
+        alt_text=(
+            "Manifest for interactive browser review of WT and the six selected expanded-panel Eco1 "
+            "ColabFold structure models."
+        ),
+        description=(
+            "Lists WT and the six selected design-class representatives from the expanded fold-check structure set. "
+            "The dashboard shows fold metrics, mutation count, MSA support, nucleic-acid-facing chemistry, and "
+            "selection context beside the py3Dmol viewer."
+        ),
+        source_table_prefix="design_classes/foldcheck_review",
     )
 
 
@@ -166,14 +233,21 @@ def _reference_display_label(reference_structure_path: Path, reference_structure
     return "ec86kit/7V9U reference"
 
 
-def _missing_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]:
+def _missing_row(
+    manifest_path: Path,
+    missing_path: Path,
+    *,
+    deliverable_id: str,
+    section: str,
+    source_table_prefix: str,
+) -> dict[str, Any]:
     return make_deliverable_row(
-        deliverable_id="interactive_structure_browser_manifest",
-        section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
+        deliverable_id=deliverable_id,
+        section=section,
         artifact_kind="structure_browser_manifest",
         status="skipped_missing_input",
         path=manifest_path,
-        source_tables=["foldcheck_review/foldcheck_full_structure_set.yaml"],
+        source_tables=[f"{source_table_prefix}/foldcheck_full_structure_set.yaml"],
         input_hashes={},
         alt_text="Interactive structure browser manifest was not generated.",
         description="Interactive structure browsing is skipped until the local fold structure set exists.",
@@ -237,8 +311,11 @@ def _structure_rows(
     source_root: Path,
     manifest_root: Path,
     ranking: dict[str, dict[str, Any]],
+    selection: dict[str, dict[str, Any]],
+    triage: dict[str, dict[str, Any]],
     mutations_by_candidate: dict[str, dict[str, Any]],
     esmc_scores_by_candidate: dict[str, dict[str, Any]],
+    selected_candidate_ids: set[str],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for row_index, row in enumerate(source_rows):
@@ -253,14 +330,18 @@ def _structure_rows(
             raise ValueError(f"full structure-set row {row_index} is missing local_model_artifact_path")
         if not local_path.exists():
             raise ValueError(f"declared structure path is missing for {candidate_id}: {local_path}")
+        if selected_candidate_ids and candidate_id != "wild_type" and candidate_id not in selected_candidate_ids:
+            continue
         rank_row = ranking.get(candidate_id, {})
+        selection_row = selection.get(candidate_id, {})
+        triage_row = triage.get(candidate_id, {})
         mutation_payload = mutations_by_candidate.get(candidate_id, {})
         esmc_payload = esmc_scores_by_candidate.get(candidate_id, {})
         rows.append(
             {
                 "candidate_id": candidate_id,
                 "display_label": display_label(candidate_id, row),
-                "group": _structure_group(candidate_id, rank_row),
+                "group": _structure_group(candidate_id, rank_row, selection_row),
                 "local_path": relative_path(local_path, manifest_root),
                 "structure_format": "pdb",
                 "color": _structure_color(candidate_id, rank_row),
@@ -276,6 +357,7 @@ def _structure_rows(
                 or len(mutation_payload.get("canonical_positions") or []),
                 "canonical_mutations": mutation_payload.get("canonical_mutations", []),
                 "mutation_residue_numbers": mutation_payload.get("query_residue_numbers", []),
+                **_selection_payload(selection_row, triage_row),
                 "esmc_llr_total": nullable_float(esmc_payload.get("llr_total")),
                 "esmc_llr_per_mutation": nullable_float(esmc_payload.get("llr_per_mutation")),
                 "esmc_mutations_scored_count": nullable_int(esmc_payload.get("mutations_scored_count")),
@@ -303,9 +385,52 @@ def _esmc_scores_by_candidate(path: Path | None) -> dict[str, dict[str, Any]]:
     return {str(row["candidate_id"]): row for row in table.to_pylist()}
 
 
-def _structure_group(candidate_id: str, rank_row: dict[str, Any]) -> str:
+def _selection_by_candidate(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    table = pq.read_table(path)
+    return {str(row["candidate_id"]): row for row in table.to_pylist()}
+
+
+def _triage_by_candidate(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    table = pq.read_table(path)
+    return {str(row["candidate_id"]): row for row in table.to_pylist()}
+
+
+def _selection_payload(selection_row: dict[str, Any], triage_row: dict[str, Any]) -> dict[str, Any]:
+    if not selection_row and not triage_row:
+        return {}
+    return {
+        "selection_slot": str(selection_row.get("selection_slot") or ""),
+        "selection_reason": str(selection_row.get("selection_reason") or ""),
+        "nearest_selected_distance_aa": nullable_int(selection_row.get("nearest_selected_distance_aa")),
+        "selection_support_alt_observed_fraction": nullable_float(
+            triage_row.get("selection_support_alt_observed_fraction")
+        ),
+        "selection_support_unobserved_mutation_count": nullable_int(
+            triage_row.get("selection_support_unobserved_mutation_count")
+        ),
+        "nucleic_acid_facing_mutation_count": nullable_int(triage_row.get("nucleic_acid_facing_mutation_count")),
+        "nucleic_acid_facing_charge_delta": nullable_int(triage_row.get("nucleic_acid_facing_charge_delta")),
+        "nucleic_acid_facing_chemistry_warning_count": nullable_int(
+            triage_row.get("nucleic_acid_facing_chemistry_warning_count")
+        ),
+        "catalytic_or_direct_contact_mutation_count": nullable_int(
+            triage_row.get("catalytic_or_direct_contact_mutation_count")
+        ),
+        "thumb_contact_track_mutation_count": nullable_int(triage_row.get("thumb_contact_track_mutation_count")),
+        "distal_scaffold_mutation_count": nullable_int(triage_row.get("distal_scaffold_mutation_count")),
+    }
+
+
+def _structure_group(candidate_id: str, rank_row: dict[str, Any], selection_row: dict[str, Any]) -> str:
     if candidate_id == "wild_type":
         return "0 WT ColabFold baseline"
+    selection_slot = str(selection_row.get("selection_slot") or "")
+    if selection_slot:
+        return f"1 Selected panel: {selection_slot}"
     review_class = str(rank_row.get("review_class") or "")
     if review_class in {"strong_fold_preserved", "good_fold_preserved"}:
         return "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)"

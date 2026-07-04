@@ -124,7 +124,7 @@ def write_feature_heatmap_manifest(
             sae_provenance_audit=sae_provenance_audit,
         )
         | {"sequence_rows": len(candidate_order), "sequence_length": len(wt_sequence)},
-        role="manuscript_facing",
+        role="review_only",
     )
 
 

@@ -119,7 +119,7 @@ def write_sae_delta_umap_panel(
         title=TITLE,
         method_summary=METHOD_SUMMARY,
         evidence_summary=evidence_summary,
-        role="manuscript_facing",
+        role="review_only",
     )
 
 

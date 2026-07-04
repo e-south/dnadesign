@@ -53,7 +53,7 @@ def write_tao_style_fold_validation(
 ) -> dict[str, Any]:
     """Render a joint fold-metric plot analogous to Tao-style AF2 filtering."""
 
-    title = "ProteinMPNN designs cluster by ColabFold RMSD and pLDDT"
+    title = "Baseline ProteinMPNN designs cluster by ColabFold RMSD and pLDDT"
     source_tables = ["candidate_table.parquet", "foldcheck_review/foldcheck_candidate_ranking.parquet"]
     if not foldcheck_ranking_path.exists():
         return _skipped_fold_validation_row(
@@ -112,7 +112,7 @@ def write_tao_style_fold_validation(
 
     path = panel_root / "proteinmpnn_tao_style_fold_validation.svg"
     alt = (
-        f"Tao-style joint plot for {len(joined_rows)} accepted ProteinMPNN designs, "
+        f"Baseline joint plot for {len(joined_rows)} accepted ProteinMPNN designs, "
         "showing WT-runtime C-alpha RMSD against mean pLDDT with marginal histograms."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
@@ -131,8 +131,8 @@ def write_tao_style_fold_validation(
         ),
         alt_text=alt,
         description=(
-            "Shows a Tao-style structural filtering view: ColabFold confidence and "
-            "WT-runtime RMSD for ProteinMPNN designs under the current Eco1 mask."
+            "Shows ColabFold confidence and WT-runtime RMSD for baseline ProteinMPNN designs under the "
+            "current Eco1 mask. Expanded design-class fold selection is shown in the panel selection section."
         ),
         interpretation_limit=(
             "The plot uses one single active mask policy, not multiple distance-threshold "
@@ -140,6 +140,7 @@ def write_tao_style_fold_validation(
             "displacement, or hairpin readthrough."
         ),
         title=title,
+        role="review_only",
     )
 
 

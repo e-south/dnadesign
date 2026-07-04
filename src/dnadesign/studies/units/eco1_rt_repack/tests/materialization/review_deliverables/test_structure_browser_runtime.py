@@ -19,21 +19,25 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
+    notebook_selection_panel,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    structure_browser_common as browser_colors,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
+    SECTION_FEASIBILITY_AND_HANDOFF,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     FakeMo,
+)
+
+from .structure_browser_assertions import (
+    assert_candidate_structure_browser_render,
+    assert_mutation_overlay_render,
 )
 
 
@@ -80,63 +84,7 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
 
-    assert "<iframe" in rendered_text
-    assert "3Dmol" in rendered_text
-    assert "Ec86/7V9U all-atom reference" in rendered_text
-    assert "ProteinMPNN variant rank 1" in rendered_text
-    assert "Variant dashboard" in rendered_text
-    assert "ESMC additive LLR total" in rendered_text
-    assert "<sae-highlight-dropdown>" in rendered_text
-    assert "<side-chain-toggle>" in rendered_text
-    assert "<protein-color-toggle>" in rendered_text
-    assert "<dna-color-toggle>" in rendered_text
-    assert "<rna-color-toggle>" in rendered_text
-    assert "Selected SAE feature" in rendered_text
-    assert "F101" in rendered_text
-    assert "SAE activation region" in rendered_text
-    assert "Mean pLDDT" in rendered_text
-    assert "Sequence identity" in rendered_text
-    assert "WT-runtime CA RMSD" in rendered_text
-    assert "0.82 A" in rendered_text
-    assert "Browser alignment:" not in rendered_text
-    assert "Side-chain display:" not in rendered_text
-    assert "Candidate side-chain atoms are present and rendered as sticks" in rendered_text
-    assert "The reference background includes protein side-chain atoms rendered as sticks" in rendered_text
-    assert "browser_alignment_status" in rendered_text
-    assert "aligned_in_memory_to_reference_ca" in rendered_text
-    assert "browser_mapped_ca_rmsd" in rendered_text
-    assert "reference_atom_scope" in rendered_text
-    assert "sidechain_atoms_present" in rendered_text
-    assert "query_atom_scope" in rendered_text
-    assert "sidechain_atoms_present" in rendered_text
-    assert "Raw local ColabFold PDB files are not rewritten" in rendered_text
-    assert "What this structure view shows" not in rendered_text
-    assert "Query coordinates are aligned in memory" in rendered_text
-    assert "Interpretation limit:" not in rendered_text
-    assert "ChimeraX remains the publication-still and pose-capture path" in rendered_text
-    assert "eco1-rt-repack:interactive_structure_browser_manifest" in rendered_text
-    assert "localStorage" in rendered_text
-    assert "twoFingerPan" in rendered_text
-    assert '","pdb");' in unescaped_rendered
-    assert '","cif");' not in unescaped_rendered
-    assert '","mmcif");' not in unescaped_rendered
-    assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_rendered
-    assert (
-        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.REFERENCE_COLOR}",'
-        f'"colorfunc":function(atom){{return"{browser_colors.REFERENCE_COLOR}";}}}}' in unescaped_rendered
-    )
-    assert f'"color":"{browser_colors.DNA_CLASS_COLOR}"' not in unescaped_rendered
-    assert f'"color":"{browser_colors.RNA_CLASS_COLOR}"' not in unescaped_rendered
-    assert f'"stick":{{"color":"{browser_colors.REFERENCE_COLOR}","radius":0.16}}' in unescaped_rendered
-    assert f'"stick":{{"color":"{browser_colors.CANDIDATE_PASS_COLOR}","radius":0.16}}' not in unescaped_rendered
-    assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
-        unescaped_rendered
-    )
-    assert unescaped_rendered.index(
-        f'"stick":{{"color":"{browser_colors.REFERENCE_COLOR}","radius":0.16}}'
-    ) < unescaped_rendered.index(
-        f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}'
-    )
+    assert_candidate_structure_browser_render(rendered_text, unescaped_rendered)
 
 
 def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp_path: Path) -> None:
@@ -171,18 +119,73 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
 
-    assert "<reference-background-toggle>" in rendered_text
-    assert "<mutation-toggle>" in rendered_text
-    assert "<side-chain-toggle>" in rendered_text
-    assert "Candidate differences" in rendered_text
-    assert "canonical_mutations" in rendered_text
-    assert "A1G, A2G" in rendered_text
-    assert "Ec86/7V9U all-atom reference" not in rendered_text
-    assert '"model":0,"resi":[3,4]' in unescaped_rendered
-    assert f'"stick":{{"color":"{browser_colors.CANDIDATE_PASS_COLOR}","radius":0.16}}' not in unescaped_rendered
-    assert "data-selection-id=&quot;candidate_differences&quot;" in rendered_text or (
-        'data-selection-id="candidate_differences"' in rendered_text
+    assert_mutation_overlay_render(rendered_text, unescaped_rendered)
+
+
+def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    rows = structure_browser.load_structure_browser_rows(
+        manifest_root=result.manifest_path.parent,
+        deliverables=manifest["deliverables"],
     )
+    selected_rows = [row for row in rows if row.get("_deliverable_id") == "selected_panel_structure_browser_manifest"]
+    assert {row["candidate_id"] for row in selected_rows} == {
+        "wild_type",
+        "thread_candidate_alpha",
+        "thread_candidate_beta",
+    }
+    group_lookup = structure_browser.structure_group_lookup(
+        selected_rows,
+        selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
+        selected_deliverable_id="selected_panel_structure_browser_manifest",
+    )
+    assert "1 Selected panel: clade9_p25_contact5a" in group_lookup
+    lookup = structure_browser.structure_browser_lookup(
+        selected_rows,
+        selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
+        selected_deliverable_id="selected_panel_structure_browser_manifest",
+        selected_group=group_lookup["1 Selected panel: clade9_p25_contact5a"],
+    )
+    selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
+
+    rendered = structure_browser.render_structure_browser(
+        mo=FakeMo(),
+        selected_row=selected,
+        structure_ui="<structure-dropdown>",
+        structure_group_ui="<structure-group-dropdown>",
+        show_sidechains=True,
+    )
+    rendered_text = str(rendered)
+
+    assert "Variant dashboard" in rendered_text
+    assert "Selection slot" in rendered_text
+    assert "clade9_p25_contact5a" in rendered_text
+    assert "MSA observed fraction" in rendered_text
+    assert "NA-facing charge change" in rendered_text
+    assert "Distal scaffold changes" in rendered_text
+
+
+def test_selection_panel_table_reads_metrics_from_trace_json(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    table_row = next(row for row in manifest["deliverables"] if row["deliverable_id"] == "selection_panel_table")
+    rendered = notebook_selection_panel.render_selection_panel_table(
+        table_row,
+        mo=FakeMo(),
+        table_path=result.manifest_path.parent / table_row["path"],
+    )
+    rows = rendered["items"][1]["rows"]
+
+    assert rows[0]["mutations"] == 2
+    assert rows[0]["pLDDT"] == 92.4
+    assert rows[0]["WT RMSD A"] == 0.82
+    assert rows[0]["cryoEM RMSD A"] == 1.23
+    assert rows[0]["unobserved MSA changes"] == 1
+    assert rows[0]["NA-facing charge change"] == 1
 
 
 def test_structure_browser_manifest_rejects_missing_declared_pdb(tmp_path: Path) -> None:

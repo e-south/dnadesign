@@ -50,7 +50,7 @@ def write_variant_similarity_heatmap(
     """Render a categorical WT/variant sequence-similarity heatmap."""
 
     panel_root.mkdir(parents=True, exist_ok=True)
-    title = "ProteinMPNN variants are mapped against the Ec86 WT sequence"
+    title = "Baseline ProteinMPNN variants are mapped against the Ec86 WT sequence"
     fasta_sequences = (
         _read_fasta(foldcheck_fasta_path) if foldcheck_fasta_path and foldcheck_fasta_path.exists() else {}
     )
@@ -80,7 +80,7 @@ def write_variant_similarity_heatmap(
     _add_similarity_legend(fig)
     path = panel_root / "proteinmpnn_variant_similarity_heatmap.svg"
     alt = (
-        f"Categorical heatmap comparing WT Ec86 and {len(candidate_sequences)} accepted ProteinMPNN variants "
+        f"Categorical heatmap comparing WT Ec86 and {len(candidate_sequences)} baseline ProteinMPNN variants "
         f"over {sequence_length} canonical positions. Cells show whether each residue matches WT, differs "
         "from WT, or lacks mapped backbone context."
     )
@@ -101,14 +101,16 @@ def write_variant_similarity_heatmap(
         input_hashes=file_hashes(input_paths),
         alt_text=alt,
         description=(
-            "Maps WT and accepted ProteinMPNN variants against Ec86 canonical positions using the fold-check "
-            "FASTA when present. The plot separates residue identity differences from missing backbone context."
+            "Maps WT and baseline accepted ProteinMPNN variants against Ec86 canonical positions using the "
+            "fold-check FASTA when present. The plot separates residue identity differences from missing "
+            "backbone context; expanded design-class selection is shown in the selection panel."
         ),
         interpretation_limit=(
             "This is a descriptive sequence-similarity view. It does not measure fold quality, ESMC likelihood, "
             "or RT activity."
         ),
         title=title,
+        role="review_only",
         evidence_summary={
             "sequence_count": row_count,
             "variant_count": len(candidate_sequences),

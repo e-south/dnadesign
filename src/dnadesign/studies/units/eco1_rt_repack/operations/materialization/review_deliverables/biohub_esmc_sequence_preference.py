@@ -148,16 +148,16 @@ def write_biohub_esmc_sequence_preference_deliverables(
             path=lane_manifest_path,
             source_tables=source_tables,
             input_hashes=input_hashes | file_hashes({"variant_llr_scores": table_path, "preference_plot": plot_path}),
-            alt_text="YAML provenance manifest for the Biohub ESMC candidate-preference review lane.",
+            alt_text="YAML method record for the Biohub ESMC candidate-preference table and plot.",
             description=(
                 "Records the source WT ESMC masked-marginal run, derived scoring method, model/API "
                 "metadata, request counts, and interpretation limits for the candidate-preference table and plot."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="Biohub ESMC candidate-preference scoring manifest",
+            title="Biohub ESMC candidate-preference method record",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
-            role="audit",
+            role="operator_review",
             render_mode="manifest",
         ),
         make_deliverable_row(
@@ -201,7 +201,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
             title=title,
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
-            role="manuscript_facing",
+            role="review_only",
             render_mode="wide_visual" if len(score_rows) > 42 else "standard_visual",
         ),
     ]

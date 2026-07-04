@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/cli.py
 
-CLI for Eco1 selection-readiness materialization.
+CLI for Eco1 panel-selection materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,9 +26,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the selection-readiness materialization CLI parser."""
+    """Build the panel-selection materialization CLI parser."""
 
-    parser = argparse.ArgumentParser(description="Materialize Eco1 RT selection-readiness artifacts.")
+    parser = argparse.ArgumentParser(description="Materialize Eco1 RT panel-selection artifacts.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--source-output-root", type=Path, default=DEFAULT_SOURCE_OUTPUT_ROOT)
@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run selection-readiness materialization and print emitted paths."""
+    """Run panel-selection materialization and print emitted paths."""
 
     args = build_parser().parse_args(argv)
     try:

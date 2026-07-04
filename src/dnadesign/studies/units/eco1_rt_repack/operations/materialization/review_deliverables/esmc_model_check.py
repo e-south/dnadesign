@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/esmc_model_constraint.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/esmc_model_check.py
 
-WT ESMC masked-marginal model-constraint review panels.
+WT ESMC masked-marginal model-check panels.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,12 +33,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     style_open_axes,
 )
 
-from .esmc_model_constraint_metadata import (
+from .esmc_model_check_metadata import (
     INTERPRETATION_LIMIT,
     METHOD_SUMMARY,
     SECTION,
     SOURCE_TABLES,
-    missing_model_constraint_row,
+    missing_model_check_row,
     mutation_scoring_evidence_summary,
 )
 
@@ -55,7 +55,7 @@ _CLASS_COLORS = {
 }
 
 
-def write_esmc_model_constraint_audit_panels(
+def write_esmc_model_check_panels(
     *,
     panel_root: Path,
     mutation_scoring_root: Path,
@@ -64,7 +64,7 @@ def write_esmc_model_constraint_audit_panels(
 
     mask_join_path = mutation_scoring_root / "wt_mutation_scoring_mask_join.parquet"
     if not mask_join_path.exists():
-        return [missing_model_constraint_row(panel_root, mutation_scoring_root)]
+        return [missing_model_check_row(panel_root, mutation_scoring_root)]
 
     rows = pq.read_table(mask_join_path).to_pylist()
     accepted_rows = sorted(

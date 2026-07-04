@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/__init__.py
 
-Eco1 selection-readiness materialization.
+Eco1 panel-selection materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

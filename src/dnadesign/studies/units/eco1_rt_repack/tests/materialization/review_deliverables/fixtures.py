@@ -23,6 +23,7 @@ from .biohub_sae_fixtures import write_biohub_esmc_sae_outputs
 from .conservation_fixtures import write_conservation_inputs
 from .esmc_fixtures import write_wt_mutation_scoring_outputs
 from .foldcheck_fixtures import write_foldcheck_review_manifest
+from .selection_fixtures import write_selection_readiness_manifest
 
 
 def write_deliverable_inputs(output_root: Path) -> None:
@@ -32,10 +33,13 @@ def write_deliverable_inputs(output_root: Path) -> None:
     write_conservation_inputs(output_root)
     _write_mask_set(output_root / "mask_set.yaml")
     _write_candidate_table(output_root / "candidate_table.parquet")
+    _write_candidate_table(output_root / "design_classes" / "candidate_pool.parquet")
     _write_reference_pdb(output_root / "proteinmpnn_request" / "chain_a_backbone.pdb")
     write_foldcheck_review_manifest(output_root / "foldcheck_review")
+    write_foldcheck_review_manifest(output_root / "design_classes" / "foldcheck_review")
     write_wt_mutation_scoring_outputs(output_root)
     write_biohub_esmc_sae_outputs(output_root)
+    write_selection_readiness_manifest(output_root / "design_classes" / "selection")
 
 
 def _write_mask_set(path: Path) -> None:
@@ -82,6 +86,7 @@ def _write_mask_set(path: Path) -> None:
 
 
 def _write_candidate_table(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     rows = []
     for rank, (candidate_id, score, global_score, seq_recovery, temperature, mutation_count) in enumerate(
         [

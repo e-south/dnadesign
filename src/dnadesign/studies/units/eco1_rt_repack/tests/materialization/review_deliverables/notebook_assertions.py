@@ -53,7 +53,7 @@ def assert_manifest_visual_contract(
 
 
 def assert_review_notebook_contract(notebook_text: str) -> None:
-    """Assert the generated marimo notebook stays manifest-backed and plain."""
+    """Assert the generated marimo notebook stays plain and manifest-driven."""
 
     runtime_path = repo_root() / (
         "src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_runtime.py"
@@ -64,6 +64,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
         for path in (
             runtime_path,
             runtime_dir / "notebook_sae_features.py",
+            runtime_dir / "notebook_selection_panel.py",
             runtime_dir / "notebook_structure_browser.py",
         )
     )
@@ -77,7 +78,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "deliverable_section_ui = mo.ui.dropdown" in notebook_text
     assert "deliverable_id_ui = mo.ui.dropdown" in notebook_text
     assert "review_lane_ui = mo.ui.dropdown" in notebook_text
-    assert 'label="Deliverable lane"' in notebook_text
+    assert 'label="Evidence set"' in notebook_text
     assert "selected_deliverable(" in notebook_text
     assert "sections: list[str] = []" in runtime_text
     assert 'sorted({str(row["section"])' not in notebook_text
@@ -87,7 +88,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "Mestre-derived clade 9" in combined_text
     assert "active mask uses" in combined_text
     assert "WT ESMC" in combined_text
-    assert "review-only model-constraint audit" in combined_text
+    assert "model check, not as a mask input" in combined_text
     assert "Biohub ESMC SAE features annotate WT" in combined_text
     assert "alignments and ESMC" not in combined_text
     assert "ProteinMPNN proposes variants" in combined_text
@@ -104,7 +105,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "Status:" not in combined_text
     assert "status_summary_text" not in combined_text
     assert "Analysis section" in notebook_text
-    assert 'label="Figure / browser"' in notebook_text
+    assert 'label="Figure or structure view"' in notebook_text
     assert "mo.hstack(" in notebook_text
     assert "[review_lane_ui, deliverable_section_ui, deliverable_id_ui]" in notebook_text.replace("\n", "")
     assert "section_deliverables" in combined_text
@@ -112,11 +113,12 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "format_section_label(" in combined_text
     assert "format_deliverable_label(" in combined_text
     assert 'str(row.get("title") or "")' in runtime_text
-    assert "Constraint evidence for the design mask" in combined_text
-    assert "ProteinMPNN designs and fold triage" in combined_text
-    assert "ESMC feature review" in combined_text
-    assert "Feasibility and handoff" in combined_text
-    assert "Planned downstream gate" in combined_text
+    assert "Mask basis" in combined_text
+    assert "Sequence proposals and fold checks" in combined_text
+    assert "ESMC and SAE checks" in combined_text
+    assert "Panel selection" in combined_text
+    assert "selection_panel_table" in combined_text
+    assert "Six Eco1 variants selected for assay review" in combined_text
     assert "sae_feature_heatmap_manifest" in combined_text
     assert "is_sae_feature_heatmap_deliverable" in combined_text
     assert "render_sae_feature_heatmap" in combined_text
@@ -137,6 +139,8 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'label="Show RNA"' in notebook_text
     assert "WT Ec86 control" not in combined_text
     assert "SAE feature" in notebook_text
+    assert "if not is_sae_feature_heatmap_deliverable(selected_visual):" in notebook_text
+    assert "sae_heatmap_feature_ui = None" in notebook_text
     assert "is_interactive_structure_deliverable(" in combined_text
     assert "render_deliverable_details(" in combined_text
     assert 'if selected_section == "fold_review":' not in notebook_text
@@ -149,6 +153,8 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "label=structure_label" in notebook_text
     assert "structure_group_ui = mo.ui.dropdown" in notebook_text
     assert 'label="Structure group"' in notebook_text
+    assert "if not is_interactive_structure_deliverable(selected_visual):" in notebook_text
+    assert "structure_group_ui = None" in notebook_text
     assert "structure_background_ui = mo.ui.checkbox" in notebook_text
     assert 'label="Reference background"' in notebook_text
     assert "structure_mutation_ui = mo.ui.checkbox" in notebook_text

@@ -79,7 +79,7 @@ def render_candidate_preference_plot(path: Path, rows: list[dict[str, object]], 
     )
 
 
-def render_model_stability_plot(
+def render_model_agreement_plot(
     path: Path,
     rows: list[dict[str, object]],
     *,
@@ -87,7 +87,7 @@ def render_model_stability_plot(
     left_label: str,
     right_label: str,
 ) -> None:
-    """Render a two-model additive LLR comparison plot."""
+    """Render a two-model additive LLR agreement plot."""
 
     x_values = [float(row["left_llr_total"]) for row in rows]
     y_values = [float(row["right_llr_total"]) for row in rows]

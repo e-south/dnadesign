@@ -167,7 +167,7 @@ def write_sae_structure_browser_manifest(
         ),
         interpretation_limit=payload["interpretation_limit"],
         title="Biohub ESMC SAE activation regions can be inspected on structure",
-        role="interactive_review",
+        role="review_only",
     )
 
 
@@ -200,7 +200,7 @@ def _missing_sae_structure_row(
         description="SAE activation structure browsing is skipped until feature rows and local structures exist.",
         interpretation_limit="Missing structure or activation inputs cannot support SAE structure review.",
         title="Biohub ESMC SAE activation structure browser is skipped until inputs are available",
-        role="interactive_review",
+        role="review_only",
         skip_reason=message,
     )
 

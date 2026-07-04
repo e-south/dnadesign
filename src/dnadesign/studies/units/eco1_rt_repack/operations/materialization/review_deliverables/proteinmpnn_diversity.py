@@ -144,7 +144,7 @@ def _write_score_mutation_burden(
     rows: list[dict[str, Any]],
     candidate_table_path: Path,
 ) -> dict[str, Any]:
-    title = "ProteinMPNN proposal scores and mutation burden"
+    title = "Baseline ProteinMPNN proposal scores and mutation burden"
     fig, axes = plt.subplots(1, 2, figsize=(10.0, 4.55))
     temperatures = [float(row["temperature"]) for row in rows]
     colors = [_temperature_color(temperature) for temperature in temperatures]
@@ -200,7 +200,7 @@ def _write_score_mutation_burden(
 
     path = panel_root / "proteinmpnn_score_mutation_burden.svg"
     alt = (
-        f"ProteinMPNN diversity panel for {len(rows)} candidate-table rows with status=accepted, showing "
+        f"Baseline ProteinMPNN diversity panel for {len(rows)} candidate-table rows with status=accepted, showing "
         "mutation count versus score and WT sequence recovery versus global score."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
@@ -214,14 +214,16 @@ def _write_score_mutation_burden(
         input_hashes=file_hashes({"candidate_table": candidate_table_path}),
         alt_text=alt,
         description=(
-            "Summarizes ProteinMPNN proposal scores, global scores, mutation burden, "
-            "and sequence identity for candidate-table rows with status=accepted."
+            "Summarizes ProteinMPNN proposal scores, global scores, mutation burden, and sequence identity "
+            "for the baseline accepted candidate table. The expanded six-class panel is shown in the panel "
+            "selection section."
         ),
         interpretation_limit=(
             "Sequence recovery and ProteinMPNN scores are descriptive proposal metrics. "
             "They are not fold, synthesis, or activity acceptance criteria."
         ),
         title=title,
+        role="review_only",
     )
 
 
@@ -239,7 +241,7 @@ def _write_mutation_density(
             if match:
                 counts[int(match.group("position"))] += 1
     positions = sorted(counts)
-    title = "ProteinMPNN mutation density across allowed residues"
+    title = "Baseline ProteinMPNN mutation density across allowed residues"
     fig, ax = plt.subplots(figsize=(12.8, 4.8))
     _draw_residue_context_spans(ax, mask_residues)
     ax.bar(
@@ -260,7 +262,8 @@ def _write_mutation_density(
 
     path = panel_root / "proteinmpnn_mutation_density.svg"
     alt = (
-        f"Bar chart of mutation density across Ec86 residue positions for {len(rows)} accepted ProteinMPNN candidates."
+        "Bar chart of baseline mutation density across Ec86 residue positions for "
+        f"{len(rows)} accepted ProteinMPNN candidates."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return make_deliverable_row(
@@ -272,12 +275,16 @@ def _write_mutation_density(
         source_tables=["candidate_table.parquet"],
         input_hashes=file_hashes({"candidate_table": candidate_table_path}),
         alt_text=alt,
-        description="Shows where ProteinMPNN sampled mutations under the current mask.",
+        description=(
+            "Shows where the baseline ProteinMPNN run sampled mutations under the current mask. Expanded "
+            "design-class selection is summarized separately in the panel selection plots."
+        ),
         interpretation_limit=(
             "Mutation density describes sampled sequence variation under the current mask. "
             "It does not imply residue importance or biochemical effect."
         ),
         title=title,
+        role="review_only",
     )
 
 

@@ -26,12 +26,12 @@ _ROOT_FILES = {
     "biohub_esmc_sae_tables.py",
     "biohub_esmc_sae_umap.py",
     "biohub_esmc_sequence_preference.py",
-    "biohub_esmc_sequence_preference_model_stability.py",
+    "biohub_esmc_sequence_preference_model_agreement.py",
     "biohub_esmc_sequence_preference_plot.py",
     "cli.py",
     "constants.py",
-    "esmc_model_constraint.py",
-    "esmc_model_constraint_metadata.py",
+    "esmc_model_check.py",
+    "esmc_model_check_metadata.py",
     "manifest.py",
     "mask_rows.py",
     "mask_tracks.py",
@@ -41,6 +41,7 @@ _ROOT_FILES = {
     "notebook.py",
     "notebook_runtime.py",
     "notebook_sae_features.py",
+    "notebook_selection_panel.py",
     "notebook_structure_browser.py",
     "notebook_structure_dashboard.py",
     "pipeline.py",
@@ -49,6 +50,7 @@ _ROOT_FILES = {
     "proteinmpnn_variant_similarity.py",
     "rendering.py",
     "sae_structure_browser.py",
+    "selection_readiness.py",
     "structure_browser.py",
     "structure_browser_common.py",
 }
@@ -65,7 +67,8 @@ def test_review_deliverables_materializer_uses_semantic_modules() -> None:
     assert "write_msa_plurality_mask_panel" in pipeline_text
     assert "write_linear_mask_tracks" in pipeline_text
     assert "write_proteinmpnn_diversity_panels" in pipeline_text
-    assert "write_esmc_model_constraint_audit_panels" in pipeline_text
+    assert "write_esmc_model_check_panels" in pipeline_text
     assert "write_biohub_esmc_sae_interpretation_panels" in pipeline_text
     assert "write_interactive_structure_browser_manifest" in pipeline_text
+    assert "linked_selection_readiness_rows" in pipeline_text
     assert "read_mask_residues" in pipeline_text

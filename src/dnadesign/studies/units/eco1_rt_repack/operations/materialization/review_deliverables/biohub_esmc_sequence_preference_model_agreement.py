@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/biohub_esmc_sequence_preference_model_stability.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/biohub_esmc_sequence_preference_model_agreement.py
 
-Biohub ESMC candidate-preference model-stability deliverables.
+Biohub ESMC candidate-score comparison deliverables.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -23,18 +23,23 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
-from .biohub_esmc_sequence_preference_plot import render_model_stability_plot
+from .biohub_esmc_sequence_preference_plot import render_model_agreement_plot
 from .constants import SECTION_ESMC_FEATURE_REVIEW
 
 SECTION = SECTION_ESMC_FEATURE_REVIEW
-MODEL_STABILITY_TITLE = "300M and 6B ESMC additive LLR comparison"
-MODEL_STABILITY_TABLE_FILE_NAME = "esmc_candidate_preference_model_stability.parquet"
-MODEL_STABILITY_PLOT_FILE_NAME = "esmc_candidate_preference_model_stability.svg"
-MODEL_STABILITY_TABLE_DELIVERABLE_ID = "biohub_esmc_candidate_preference_model_stability_table"
-MODEL_STABILITY_PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_model_stability"
+MODEL_AGREEMENT_TITLE = "300M and 6B ESMC additive LLR scores disagree"
+MODEL_AGREEMENT_TABLE_FILE_NAME = "esmc_candidate_preference_model_agreement.parquet"
+MODEL_AGREEMENT_PLOT_FILE_NAME = "esmc_candidate_preference_model_agreement.svg"
+STALE_MODEL_STABILITY_FILE_NAMES = (
+    "esmc_candidate_preference_model_stability.parquet",
+    "esmc_candidate_preference_model_stability.svg",
+)
+MODEL_AGREEMENT_TABLE_DELIVERABLE_ID = "biohub_esmc_candidate_preference_model_agreement_table"
+MODEL_AGREEMENT_PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_model_agreement"
 INTERPRETATION_LIMIT = (
     "This plot sums WT-context masked-marginal single-substitution LLR values for each candidate. "
-    "It is not a whole-protein pseudo-likelihood, not a joint likelihood, and not an activity measurement."
+    "It is not a whole-protein pseudo-likelihood, not a joint likelihood, not a selection rule, and not "
+    "an activity measurement."
 )
 METHOD_SUMMARY = (
     "Each ProteinMPNN candidate is reduced to its canonical substitutions. For each substitution, the "
@@ -43,7 +48,7 @@ METHOD_SUMMARY = (
     "the total and per-mutation additive LLR so this model-derived preference signal can be reviewed "
     "separately from SAE feature activations and ColabFold metrics."
 )
-_MODEL_STABILITY_SCHEMA = pa.schema(
+_MODEL_AGREEMENT_SCHEMA = pa.schema(
     [
         ("candidate_id", pa.string()),
         ("left_model", pa.string()),
@@ -60,7 +65,7 @@ _MODEL_STABILITY_SCHEMA = pa.schema(
 )
 
 
-def write_biohub_esmc_model_stability_deliverables(
+def write_biohub_esmc_model_agreement_deliverables(
     *,
     panel_root: Path,
     left_table_path: Path,
@@ -68,32 +73,33 @@ def write_biohub_esmc_model_stability_deliverables(
     left_label: str = "300M",
     right_label: str = "6B",
 ) -> list[dict[str, Any]]:
-    """Write a two-model candidate-preference stability table and plot."""
+    """Write a two-model candidate-preference agreement table and plot."""
 
+    _remove_stale_model_stability_artifacts(panel_root)
     missing = [path for path in (left_table_path, right_table_path) if not path.exists()]
     if missing:
-        return [_missing_model_stability_row(panel_root, missing)]
-    rows = build_model_stability_rows(left_table_path=left_table_path, right_table_path=right_table_path)
+        return [_missing_model_agreement_row(panel_root, missing)]
+    rows = build_model_agreement_rows(left_table_path=left_table_path, right_table_path=right_table_path)
     if not rows:
         return [
-            _missing_model_stability_row(
+            _missing_model_agreement_row(
                 panel_root,
                 [left_table_path, right_table_path],
                 reason="No shared candidates",
             )
         ]
     panel_root.mkdir(parents=True, exist_ok=True)
-    table_path = panel_root / MODEL_STABILITY_TABLE_FILE_NAME
-    plot_path = panel_root / MODEL_STABILITY_PLOT_FILE_NAME
-    write_model_stability_table(table_path, rows=rows)
-    render_model_stability_plot(
+    table_path = panel_root / MODEL_AGREEMENT_TABLE_FILE_NAME
+    plot_path = panel_root / MODEL_AGREEMENT_PLOT_FILE_NAME
+    write_model_agreement_table(table_path, rows=rows)
+    render_model_agreement_plot(
         plot_path,
         rows,
-        title=MODEL_STABILITY_TITLE,
+        title=MODEL_AGREEMENT_TITLE,
         left_label=left_label,
         right_label=right_label,
     )
-    evidence = _model_stability_evidence(rows)
+    evidence = _model_agreement_evidence(rows)
     source_tables = [
         "review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet",
         "review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet",
@@ -101,7 +107,7 @@ def write_biohub_esmc_model_stability_deliverables(
     input_hashes = file_hashes({"left_candidate_llr": left_table_path, "right_candidate_llr": right_table_path})
     return [
         make_deliverable_row(
-            deliverable_id=MODEL_STABILITY_TABLE_DELIVERABLE_ID,
+            deliverable_id=MODEL_AGREEMENT_TABLE_DELIVERABLE_ID,
             section=SECTION,
             artifact_kind="parquet",
             status="materialized",
@@ -114,37 +120,44 @@ def write_biohub_esmc_model_stability_deliverables(
                 "between the 300M and 6B ESMC scoring lanes."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="Biohub ESMC candidate-preference model-stability table",
+            title="300M and 6B ESMC candidate-score comparison table",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="review_only",
             render_mode="table",
         ),
         make_deliverable_row(
-            deliverable_id=MODEL_STABILITY_PLOT_DELIVERABLE_ID,
+            deliverable_id=MODEL_AGREEMENT_PLOT_DELIVERABLE_ID,
             section=SECTION,
             artifact_kind="svg",
             status="rendered",
             path=plot_path,
             source_tables=source_tables,
-            input_hashes=input_hashes | file_hashes({"model_stability_table": table_path}),
+            input_hashes=input_hashes | file_hashes({"model_agreement_table": table_path}),
             alt_text="Scatter plot comparing 300M and 6B additive ESMC LLR totals for shared candidates.",
             description=(
-                "Compares whether candidate additive LLR rankings are stable after rescoring the same WT "
+                "Shows that candidate additive LLR rankings change after rescoring the same WT "
                 "single-substitution contexts with the 6B ESMC model."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title=MODEL_STABILITY_TITLE,
+            title=MODEL_AGREEMENT_TITLE,
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
-            role="manuscript_facing",
+            role="review_only",
             render_mode="standard_visual",
         ),
     ]
 
 
-def build_model_stability_rows(*, left_table_path: Path, right_table_path: Path) -> list[dict[str, object]]:
-    """Join two candidate-preference tables and compute rank-stability fields."""
+def _remove_stale_model_stability_artifacts(panel_root: Path) -> None:
+    """Remove old model-stability filenames after the comparison rename."""
+
+    for file_name in STALE_MODEL_STABILITY_FILE_NAMES:
+        (panel_root / file_name).unlink(missing_ok=True)
+
+
+def build_model_agreement_rows(*, left_table_path: Path, right_table_path: Path) -> list[dict[str, object]]:
+    """Join two candidate-preference tables and compute rank-agreement fields."""
 
     left_rows = _candidate_llr_rows(left_table_path)
     right_rows = _candidate_llr_rows(right_table_path)
@@ -177,13 +190,13 @@ def build_model_stability_rows(*, left_table_path: Path, right_table_path: Path)
     return sorted(rows, key=lambda row: (int(row["right_rank"]), str(row["candidate_id"])))
 
 
-def write_model_stability_table(path: Path, *, rows: list[dict[str, object]]) -> None:
-    """Write model-stability rows with a schema marker."""
+def write_model_agreement_table(path: Path, *, rows: list[dict[str, object]]) -> None:
+    """Write two-model comparison rows with a schema marker."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.Table.from_pylist(rows, schema=_MODEL_STABILITY_SCHEMA)
+    table = pa.Table.from_pylist(rows, schema=_MODEL_AGREEMENT_SCHEMA)
     metadata = dict(table.schema.metadata or {})
-    metadata[b"schema_id"] = b"eco1_rt.biohub_esmc.candidate_preference_model_stability"
+    metadata[b"schema_id"] = b"eco1_rt.biohub_esmc.candidate_preference_model_agreement"
     metadata[b"schema_version"] = b"1"
     pq.write_table(table.replace_schema_metadata(metadata), path)
 
@@ -198,7 +211,7 @@ def _rank_by_llr(rows: dict[str, dict[str, object]]) -> dict[str, int]:
     return {str(row["candidate_id"]): index for index, row in enumerate(ordered, start=1)}
 
 
-def _model_stability_evidence(rows: list[dict[str, object]]) -> dict[str, object]:
+def _model_agreement_evidence(rows: list[dict[str, object]]) -> dict[str, object]:
     left_ranks = [float(row["left_rank"]) for row in rows]
     right_ranks = [float(row["right_rank"]) for row in rows]
     top_n = min(10, len(rows))
@@ -228,30 +241,30 @@ def _pearson(xs: list[float], ys: list[float]) -> float | None:
     return numerator / (x_denom * y_denom)
 
 
-def _missing_model_stability_row(
+def _missing_model_agreement_row(
     panel_root: Path,
     missing: list[Path],
     *,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    message = reason or "Missing Biohub ESMC model-stability input: " + ", ".join(str(path) for path in missing)
+    message = reason or "Missing Biohub ESMC comparison input: " + ", ".join(str(path) for path in missing)
     return make_deliverable_row(
-        deliverable_id=MODEL_STABILITY_PLOT_DELIVERABLE_ID,
+        deliverable_id=MODEL_AGREEMENT_PLOT_DELIVERABLE_ID,
         section=SECTION,
         artifact_kind="svg",
         status="skipped_missing_input",
-        path=panel_root / "missing_biohub_esmc_model_stability.txt",
+        path=panel_root / "missing_biohub_esmc_model_comparison.txt",
         source_tables=[
             "review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet",
             "review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet",
         ],
         input_hashes=file_hashes({f"input_{index}": path for index, path in enumerate(missing)}),
-        alt_text="Biohub ESMC model-stability plot was skipped because required inputs were missing.",
+        alt_text="Biohub ESMC model-comparison plot was skipped because required inputs were missing.",
         description="The plot requires both the default and 6B additive candidate LLR tables.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title=MODEL_STABILITY_TITLE,
+        title=MODEL_AGREEMENT_TITLE,
         method_summary=METHOD_SUMMARY,
-        evidence_summary={"scoring_method_id": "candidate_preference_model_stability_v1"},
+        evidence_summary={"scoring_method_id": "candidate_preference_model_agreement_v1"},
         role="review_only",
         skip_reason=message,
     )

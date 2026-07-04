@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/io.py
 
-Input/output helpers for Eco1 selection-readiness materialization.
+Input/output helpers for Eco1 panel-selection materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

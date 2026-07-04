@@ -34,8 +34,8 @@ from ..review_deliverables.biohub_esmc_sequence_preference import (
     VARIANT_LLR_FILE_NAME,
     write_biohub_esmc_sequence_preference_deliverables,
 )
-from ..review_deliverables.biohub_esmc_sequence_preference_model_stability import (
-    write_biohub_esmc_model_stability_deliverables,
+from ..review_deliverables.biohub_esmc_sequence_preference_model_agreement import (
+    write_biohub_esmc_model_agreement_deliverables,
 )
 
 MANIFEST_FILE_NAME = "design_class_esmc_sequence_preference_manifest.yaml"
@@ -99,7 +99,7 @@ def materialize_design_class_esmc_sequence_preference(
         )
     )
     deliverables.extend(
-        write_biohub_esmc_model_stability_deliverables(
+        write_biohub_esmc_model_agreement_deliverables(
             panel_root=class_root / DELIVERABLE_ROOT,
             left_table_path=class_root / DELIVERABLE_ROOT / VARIANT_LLR_FILE_NAME,
             right_table_path=six_b_panel_root / VARIANT_LLR_FILE_NAME,

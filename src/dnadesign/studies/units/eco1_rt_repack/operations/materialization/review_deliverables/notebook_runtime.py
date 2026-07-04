@@ -26,6 +26,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     SECTION_FEASIBILITY_AND_HANDOFF,
 )
 
+from .notebook_selection_panel import render_selection_panel_table
+
 _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
     "foldcheck_review_structure_overlay_panel",
     "foldcheck_review_structure_overlay_skipped",
@@ -36,8 +38,8 @@ _NOTEBOOK_LANE_ROLES = {
     "audit_supplement": {"review_only", "operator_review", "optional_heavy"},
 }
 _NOTEBOOK_LANE_LABELS = {
-    "main_review": "Main review",
-    "audit_supplement": "Audit / supplement",
+    "main_review": "Core evidence",
+    "audit_supplement": "Model and method checks",
 }
 
 
@@ -60,11 +62,11 @@ def render_intro(mo: Any) -> Any:
         "substrate contacts, and homolog conservation, then repack the remaining designable residues."
     )
     intro_flow = (
-        "Evidence is ordered as scaffold, constraint evidence, sequence proposal, structure-model review, "
-        "and model-derived annotation. "
+        "The notebook follows the evidence in order: scaffold, mask evidence, sequence proposals, fold checks, "
+        "panel selection, and model checks. "
         "The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, retained-substrate "
         "proximity, and Mestre-derived clade 9 plurality at the 25% threshold. WT ESMC masked-marginal "
-        "scoring appears beside those inputs as a review-only model-constraint audit. "
+        "scoring appears beside those inputs as a model check, not as a mask input. "
         "ProteinMPNN proposes variants at unprotected residues, ColabFold checks fold-model compatibility, and "
         "Biohub ESMC SAE features annotate WT and candidate sequences. Activity, strand displacement, "
         "and structured-template readthrough remain assay questions."
@@ -155,7 +157,7 @@ def selected_deliverable(
     lookup: dict[str, dict[str, Any]],
     options: list[str],
 ) -> dict[str, Any] | None:
-    """Resolve a selected deliverable row with a stable fallback."""
+    """Resolve a selected deliverable row, defaulting to the first visible option."""
 
     if selected_label not in lookup and options:
         selected_label = str(options[0])
@@ -167,8 +169,10 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
 
     media_path = resolve_manifest_path(manifest_root, str(row["path"]))
     suffix = media_path.suffix.lower()
-    if str(row.get("artifact_kind") or "") == "planned_section":
-        return _render_planned_section(row, mo=mo)
+    if str(row.get("artifact_kind") or "") == "selection_panel_table":
+        return render_selection_panel_table(row, mo=mo, table_path=media_path)
+    if str(row.get("artifact_kind") or "") == "handoff_boundary":
+        return _render_handoff_boundary(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return _render_image(row, mo=mo, media_path=media_path)
     if media_path.exists():
@@ -191,18 +195,15 @@ def render_deliverable_details(row: dict[str, Any], *, mo: Any) -> Any:
 
     evidence_rows = [
         {"field": "title", "value": str(row.get("title") or "")},
-        {"field": "status", "value": str(row.get("status") or "")},
         {"field": "path", "value": str(row.get("path") or "")},
-        {"field": "role", "value": str(row.get("role") or "")},
-        {"field": "render_mode", "value": str(row.get("render_mode") or "")},
-        {"field": "sources", "value": ", ".join(row.get("source_tables", []))},
+        {"field": "input sources", "value": ", ".join(row.get("source_tables", []))},
         {"field": "alt_text", "value": str(row.get("alt_text") or "")},
         {"field": "skip_reason", "value": str(row.get("skip_reason") or "")},
     ]
     detail_panels = {
-        "What this visual shows": mo.md(str(row.get("description") or "")),
+        "Premise": mo.md(str(row.get("description") or "")),
         "Interpretation limit": mo.md(str(row.get("interpretation_limit") or "")),
-        "Evidence": mo.ui.table(evidence_rows, page_size=8),
+        "Sources": mo.ui.table(evidence_rows, page_size=8),
     }
     method_summary = str(row.get("method_summary") or "")
     evidence_summary = row.get("evidence_summary") or {}
@@ -228,10 +229,10 @@ def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
 
 def format_section_label(section: str) -> str:
     labels = {
-        SECTION_CONSTRAINT_EVIDENCE: "Constraint evidence for the design mask",
-        SECTION_DESIGNS_AND_FOLD_TRIAGE: "ProteinMPNN designs and fold triage",
-        SECTION_ESMC_FEATURE_REVIEW: "ESMC feature review",
-        SECTION_FEASIBILITY_AND_HANDOFF: "Feasibility and handoff",
+        SECTION_CONSTRAINT_EVIDENCE: "Mask basis",
+        SECTION_DESIGNS_AND_FOLD_TRIAGE: "Sequence proposals and fold checks",
+        SECTION_ESMC_FEATURE_REVIEW: "ESMC and SAE checks",
+        SECTION_FEASIBILITY_AND_HANDOFF: "Panel selection",
     }
     return labels.get(str(section), str(section).replace("_", " ").title())
 
@@ -247,8 +248,10 @@ def format_deliverable_label(row: dict[str, Any] | str) -> str:
 def _is_publication_visual(row: dict[str, Any]) -> bool:
     if str(row.get("deliverable_id") or "") in _NOTEBOOK_HIDDEN_DELIVERABLE_IDS:
         return False
-    if str(row.get("artifact_kind") or "") == "planned_section":
-        return True
+    if str(row.get("artifact_kind") or "") == "selection_panel_table":
+        return str(row.get("status") or "") == "linked_existing"
+    if str(row.get("artifact_kind") or "") == "handoff_boundary":
+        return str(row.get("status") or "") == "linked_existing"
     if str(row.get("artifact_kind") or "") == "sae_feature_heatmap_manifest":
         return str(row.get("status") or "") == "rendered"
     if is_interactive_structure_deliverable(row):
@@ -299,6 +302,20 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
             caption_html,
         ],
         gap=0.15,
+    )
+
+
+def _render_handoff_boundary(row: dict[str, Any], *, mo: Any) -> Any:
+    title = html.escape(str(row.get("title") or "Panel status"))
+    description = html.escape(str(row.get("description") or ""))
+    return mo.Html(
+        f"""
+        <section style="border:1px solid #d8dee4; border-radius:6px; padding:0.8rem 0.9rem;
+                        background:#ffffff;">
+          <h3 style="margin:0 0 0.35rem 0; font-size:1.06rem;">{title}</h3>
+          <p style="margin:0; line-height:1.45; color:#57606a;">{description}</p>
+        </section>
+        """
     )
 
 
@@ -432,26 +449,6 @@ def visual_zoom_script(*, container_id: str, image_id: str) -> str:
           }})();
           </script>
     """
-
-
-def _render_planned_section(row: dict[str, Any], *, mo: Any) -> Any:
-    title = html.escape(format_deliverable_label(row))
-    description = html.escape(str(row.get("description") or ""))
-    limit = html.escape(str(row.get("interpretation_limit") or ""))
-    return mo.Html(
-        f"""
-        <section style="border:1px solid #d8dee4; border-radius:6px; background:#ffffff;
-                        padding:0.85rem 0.95rem; max-width:780px;">
-          <div style="font-size:0.78rem; color:#6e7781; text-transform:uppercase;
-                      letter-spacing:0.04em; margin-bottom:0.3rem;">Planned downstream gate</div>
-          <h2 style="font-size:1.25rem; line-height:1.2; margin:0 0 0.45rem 0;">{title}</h2>
-          <p style="margin:0; line-height:1.45; color:#24292f;">{description}</p>
-          <p style="margin:0.55rem 0 0 0; line-height:1.45; color:#57606a;">
-            <strong>Boundary:</strong> {limit}
-          </p>
-        </section>
-        """
-    )
 
 
 def is_wide_visual(row: dict[str, Any]) -> bool:

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/esmc_model_constraint_metadata.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/esmc_model_check_metadata.py
 
-Manifest metadata for WT ESMC masked-marginal model-constraint panels.
+Manifest metadata for WT ESMC masked-marginal model-check panels.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -30,7 +30,7 @@ SOURCE_TABLES = [
     "biohub_esmc/mutation_scoring/wt_substitution_llr.parquet",
 ]
 INTERPRETATION_LIMIT = (
-    "ESMC masked-marginal scores are a model-derived audit of the WT sequence context. "
+    "ESMC masked-marginal scores are a model check of the WT sequence context. "
     "They are not experimental DMS, processivity evidence, or a current mask update."
 )
 METHOD_SUMMARY = (
@@ -39,21 +39,21 @@ METHOD_SUMMARY = (
 )
 
 
-def missing_model_constraint_row(panel_root: Path, mutation_scoring_root: Path) -> dict[str, object]:
+def missing_model_check_row(panel_root: Path, mutation_scoring_root: Path) -> dict[str, object]:
     """Return the manifest row used when WT mutation-scoring inputs are absent."""
 
     return make_deliverable_row(
-        deliverable_id="wt_model_constraint_audit",
+        deliverable_id="wt_model_check",
         section=SECTION,
         artifact_kind="manifest",
         status="skipped_missing_input",
-        path=panel_root / "missing_wt_model_constraint_audit.txt",
+        path=panel_root / "missing_wt_model_check.txt",
         source_tables=SOURCE_TABLES,
         input_hashes=file_hashes({"mutation_scoring_root": mutation_scoring_root}),
-        alt_text="WT ESMC model-constraint audit was skipped because mutation-scoring inputs were missing.",
+        alt_text="WT ESMC model check was skipped because mutation-scoring inputs were missing.",
         description="The WT ESMC masked-marginal review section requires the joined mask-context table.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title="WT ESMC model-constraint audit",
+        title="WT ESMC model check",
         method_summary=METHOD_SUMMARY,
         role="review_only",
         skip_reason=f"Missing input table: {mutation_scoring_root / 'wt_mutation_scoring_mask_join.parquet'}",

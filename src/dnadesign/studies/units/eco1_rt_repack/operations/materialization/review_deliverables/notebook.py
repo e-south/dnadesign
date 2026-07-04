@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def write_review_deliverables_notebook(path: Path) -> None:
-    """Write a compact manifest-backed marimo notebook for Eco1 review deliverables."""
+    """Write a compact marimo notebook for Eco1 review deliverables."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_NOTEBOOK_SOURCE, encoding="utf-8")
@@ -31,18 +31,9 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
-        deliverable_lookup,
-        format_deliverable_label,
-        is_interactive_structure_deliverable,
-        load_review_manifest,
-        render_deliverable_panel,
-        render_deliverable_details,
-        render_intro,
-        review_lane_lookup,
-        section_deliverables,
-        section_label_lookup,
-        selected_deliverable,
-        visual_deliverables,
+        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable, load_review_manifest,
+        render_deliverable_details, render_deliverable_panel, render_intro, review_lane_lookup, section_deliverables,
+        section_label_lookup, selected_deliverable, visual_deliverables,
     )
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
         notebook_sae_features as sae_runtime,
@@ -60,28 +51,12 @@ def _():
     structure_highlight_lookup = structure_runtime.structure_highlight_lookup
 
     return (
-        deliverable_lookup,
-        format_deliverable_label,
-        is_interactive_structure_deliverable,
-        is_sae_feature_heatmap_deliverable,
-        load_review_manifest,
-        load_sae_feature_heatmap_manifest,
-        load_structure_browser_rows,
-        mo,
-        render_deliverable_details,
-        render_deliverable_panel,
-        render_intro,
-        render_sae_feature_heatmap,
-        render_structure_browser,
-        review_lane_lookup,
-        sae_heatmap_feature_lookup,
-        section_deliverables,
-        section_label_lookup,
-        selected_deliverable,
-        structure_browser_lookup,
-        structure_group_lookup,
-        structure_highlight_lookup,
-        visual_deliverables,
+        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable,
+        is_sae_feature_heatmap_deliverable, load_review_manifest, load_sae_feature_heatmap_manifest,
+        load_structure_browser_rows, mo, render_deliverable_details, render_deliverable_panel, render_intro,
+        render_sae_feature_heatmap, render_structure_browser, review_lane_lookup, sae_heatmap_feature_lookup,
+        section_deliverables, section_label_lookup, selected_deliverable, structure_browser_lookup,
+        structure_group_lookup, structure_highlight_lookup, visual_deliverables,
     )
 
 
@@ -108,7 +83,7 @@ def _(lane_options, mo):
     review_lane_ui = mo.ui.dropdown(
         lane_options,
         value=lane_options[0] if lane_options else None,
-        label="Deliverable lane",
+        label="Evidence set",
         full_width=True,
     )
     return review_lane_ui
@@ -162,7 +137,7 @@ def _(deliverable_options, mo):
     deliverable_id_ui = mo.ui.dropdown(
         deliverable_options,
         value=deliverable_options[0] if deliverable_options else None,
-        label="Figure / browser",
+        label="Figure or structure view",
         full_width=True,
     )
     return deliverable_id_ui
@@ -189,20 +164,31 @@ def _(deliverables, load_structure_browser_rows, manifest_root):
 
 
 @app.cell
-def _(mo, selected_section, selected_visual, structure_browser_rows, structure_group_lookup):
+def _(
+    is_interactive_structure_deliverable,
+    mo,
+    selected_section,
+    selected_visual,
+    structure_browser_rows,
+    structure_group_lookup,
+):
     selected_visual_id = str(selected_visual.get("deliverable_id") or "") if selected_visual else ""
-    structure_group_map = structure_group_lookup(
-        structure_browser_rows,
-        selected_section=selected_section,
-        selected_deliverable_id=selected_visual_id,
-    )
-    structure_group_options = list(structure_group_map)
-    structure_group_ui = mo.ui.dropdown(
-        structure_group_options,
-        value=structure_group_options[0] if structure_group_options else None,
-        label="Structure group",
-        full_width=True,
-    )
+    if not is_interactive_structure_deliverable(selected_visual):
+        structure_group_map = {}
+        structure_group_ui = None
+    else:
+        structure_group_map = structure_group_lookup(
+            structure_browser_rows,
+            selected_section=selected_section,
+            selected_deliverable_id=selected_visual_id,
+        )
+        structure_group_options = list(structure_group_map)
+        structure_group_ui = mo.ui.dropdown(
+            structure_group_options,
+            value=structure_group_options[0] if structure_group_options else None,
+            label="Structure group",
+            full_width=True,
+        )
     return selected_visual_id, structure_group_map, structure_group_ui
 
 
@@ -216,29 +202,35 @@ def _(structure_group_map, structure_group_ui):
 
 @app.cell
 def _(
+    is_interactive_structure_deliverable,
     mo,
     selected_section,
     selected_structure_group,
+    selected_visual,
     selected_visual_id,
     structure_browser_lookup,
     structure_browser_rows,
 ):
-    structure_map = structure_browser_lookup(
-        structure_browser_rows,
-        selected_section=selected_section,
-        selected_deliverable_id=selected_visual_id,
-        selected_group=selected_structure_group,
-    )
-    structure_options = list(structure_map)
-    structure_label = "Structure view"
-    if structure_map:
-        structure_label = str(next(iter(structure_map.values())).get("_control_label") or structure_label)
-    structure_ui = mo.ui.dropdown(
-        structure_options,
-        value=structure_options[0] if structure_options else None,
-        label=structure_label,
-        full_width=True,
-    )
+    if not is_interactive_structure_deliverable(selected_visual):
+        structure_map = {}
+        structure_ui = None
+    else:
+        structure_map = structure_browser_lookup(
+            structure_browser_rows,
+            selected_section=selected_section,
+            selected_deliverable_id=selected_visual_id,
+            selected_group=selected_structure_group,
+        )
+        structure_options = list(structure_map)
+        structure_label = "Structure view"
+        if structure_map:
+            structure_label = str(next(iter(structure_map.values())).get("_control_label") or structure_label)
+        structure_ui = mo.ui.dropdown(
+            structure_options,
+            value=structure_options[0] if structure_options else None,
+            label=structure_label,
+            full_width=True,
+        )
     return structure_map, structure_ui
 
 
@@ -252,17 +244,21 @@ def _(structure_map, structure_ui):
 
 @app.cell
 def _(mo, selected_structure_row, structure_browser_rows, structure_highlight_lookup):
-    structure_highlight_map = structure_highlight_lookup(
-        structure_browser_rows,
-        selected_row=selected_structure_row,
-    )
-    structure_highlight_options = list(structure_highlight_map)
-    structure_highlight_ui = mo.ui.dropdown(
-        structure_highlight_options,
-        value=structure_highlight_options[0] if structure_highlight_options else None,
-        label="SAE highlight",
-        full_width=True,
-    )
+    if selected_structure_row is not None:
+        structure_highlight_map = structure_highlight_lookup(
+            structure_browser_rows,
+            selected_row=selected_structure_row,
+        )
+        structure_highlight_options = list(structure_highlight_map)
+        structure_highlight_ui = mo.ui.dropdown(
+            structure_highlight_options,
+            value=structure_highlight_options[0] if structure_highlight_options else None,
+            label="Residue highlight",
+            full_width=True,
+        )
+    else:
+        structure_highlight_map = {}
+        structure_highlight_ui = None
     return structure_highlight_map, structure_highlight_ui
 
 
@@ -275,15 +271,25 @@ def _(structure_highlight_map, structure_highlight_ui):
 
 
 @app.cell
-def _(mo):
-    structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
-    structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
-    structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
-    structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
-    structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
-    structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
-    structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
-    structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
+def _(is_interactive_structure_deliverable, mo, selected_visual):
+    if not is_interactive_structure_deliverable(selected_visual):
+        structure_background_ui = None
+        structure_mutation_ui = None
+        structure_sidechain_ui = None
+        structure_protein_ui = None
+        structure_dna_visible_ui = None
+        structure_dna_ui = None
+        structure_rna_visible_ui = None
+        structure_rna_ui = None
+    else:
+        structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
+        structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
+        structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
+        structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
+        structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
+        structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
+        structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
+        structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
     return (
         structure_background_ui,
         structure_dna_ui,
@@ -353,15 +359,25 @@ def _(load_sae_feature_heatmap_manifest, manifest_root, selected_visual):
 
 
 @app.cell
-def _(mo, sae_heatmap_feature_lookup, sae_heatmap_manifest):
-    sae_heatmap_feature_map = sae_heatmap_feature_lookup(sae_heatmap_manifest)
-    sae_heatmap_feature_options = list(sae_heatmap_feature_map)
-    sae_heatmap_feature_ui = mo.ui.dropdown(
-        sae_heatmap_feature_options,
-        value=sae_heatmap_feature_options[0] if sae_heatmap_feature_options else None,
-        label="SAE feature",
-        full_width=True,
-    )
+def _(
+    is_sae_feature_heatmap_deliverable,
+    mo,
+    sae_heatmap_feature_lookup,
+    sae_heatmap_manifest,
+    selected_visual,
+):
+    if not is_sae_feature_heatmap_deliverable(selected_visual):
+        sae_heatmap_feature_map = {}
+        sae_heatmap_feature_ui = None
+    else:
+        sae_heatmap_feature_map = sae_heatmap_feature_lookup(sae_heatmap_manifest)
+        sae_heatmap_feature_options = list(sae_heatmap_feature_map)
+        sae_heatmap_feature_ui = mo.ui.dropdown(
+            sae_heatmap_feature_options,
+            value=sae_heatmap_feature_options[0] if sae_heatmap_feature_options else None,
+            label="SAE feature",
+            full_width=True,
+        )
     return sae_heatmap_feature_map, sae_heatmap_feature_ui
 
 
