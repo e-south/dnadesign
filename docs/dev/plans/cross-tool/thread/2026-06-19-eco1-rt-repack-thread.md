@@ -1229,6 +1229,17 @@ Those claims require downstream experimental evidence.
 
 ### Source Roles
 
+| Source | Identifier | Role in this study |
+| --- | --- | --- |
+| Tao et al. 2026 | DOI `10.1038/s41587-026-03149-6` | Fixed-backbone RT redesign method prior. |
+| Mestre et al. 2020 | DOI `10.1093/nar/gkaa1149` | Retron RT roster and Ec86 clade context. |
+| Simon et al. 2019 | DOI `10.1093/nar/gkz865` | RT motif grammar and annotation prior. |
+| Wang et al. 2022 | DOI `10.1038/s41564-022-01197-7`; PDB `7V9U` | Ec86 RT-msDNA/msrRNA scaffold and substrate-contact context. |
+| ProteinMPNN | `dauparas/ProteinMPNN`; DOI `10.1126/science.add2187` | Public fixed-backbone inverse-folding CLI and helper-file workflow. |
+| ColabFold | DOI `10.1038/s41592-022-01488-1` | Public `colabfold_batch` fold-check command path. |
+| Candido et al. 2026 | DOI `10.64898/2026.06.03.729735` | ESMC, ESMFold2, Atlas, and SAE representation context. |
+| Biohub ESMC docs and notebooks | `/api/v1/encode`, `/api/v1/logits`, ESMC SAE and mutation-scoring notebooks | Public intended API and notebook patterns for query-time SAE and masked-marginal LLR review evidence. |
+
 - Tao et al. supplies the fixed-backbone RT redesign method pattern:
   protect functional/conserved residues, generate RT sequence proposals, and
   structurally filter candidates. It does not define Eco1's biological objective.

@@ -48,6 +48,7 @@ def validate_sampling_artifacts(
     candidate_table = structure_root / "candidate_table.parquet"
     foldcheck_request = structure_root / "foldcheck_request/foldcheck_request_manifest.yaml"
     foldcheck_report = structure_root / "foldcheck_report.parquet"
+    candidate_handoff = structure_root / "candidate_handoff.yaml"
     if not thread_plan.exists():
         issues.append(
             ContractIssue(
@@ -117,4 +118,12 @@ def validate_sampling_artifacts(
             )
         else:
             issues.extend(validate_foldcheck_report_content(foldcheck_report, output_root=structure_root))
+    if _phase_rank(phase) >= _phase_rank("phase4_downstream_promotion") and not candidate_handoff.exists():
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.handoff.candidate_handoff_not_materialized",
+                message="Phase 4 downstream promotion requires materialized RT-only candidate_handoff.yaml",
+                path=str(candidate_handoff),
+            )
+        )
     return issues

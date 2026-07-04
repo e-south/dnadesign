@@ -11,13 +11,14 @@ status_surface: record-only
 
 ### Current Phase
 
-Phase 3 fold-check report validation passes locally for the baseline WT plus
-96-candidate ColabFold report and for the expanded design-class review bundle
-used for assay-panel preparation. The study has the required structure, source,
-alignment, conservation evidence, manual mask authority, mask set, explicit
-thread plan, ProteinMPNN request, backend run manifests, sample/candidate
-tables, fold-check requests, compact fold-check reports, and expanded review
-evidence under
+Selection readiness is materialized for the expanded design-class pool, and
+RT-only `candidate_handoff.yaml` is not materialized. Phase 3 fold-check report
+validation still passes locally for the baseline WT plus 96-candidate ColabFold
+report and for the expanded design-class review bundle used for assay-panel
+preparation. The study has the required structure, source, alignment,
+conservation evidence, manual mask authority, mask set, explicit thread plan,
+ProteinMPNN request, backend run manifests, sample/candidate tables, fold-check
+requests, compact fold-check reports, and expanded review evidence under
 `src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/`.
 This is full fold-check and model-annotation coverage for candidate review, not
 downstream candidate-handoff readiness.

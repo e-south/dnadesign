@@ -28,6 +28,14 @@ def test_phase0_checked_in_contracts_pass_as_scaffold() -> None:
     assert report.issue_count == 0
 
 
+def test_phase4_requires_materialized_rt_only_candidate_handoff() -> None:
+    report = validate_checked_in_contracts(repo_root=repo_root(), phase="phase4_downstream_promotion")
+
+    assert report.passed is False
+    check_ids = {issue.check_id for issue in report.issues}
+    assert "eco1_rt.handoff.candidate_handoff_not_materialized" in check_ids
+
+
 def test_phase1_contracts_fail_on_missing_materialized_structure_artifacts(tmp_path: Path) -> None:
     report = validate_checked_in_contracts(
         repo_root=repo_root(),
