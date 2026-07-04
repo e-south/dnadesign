@@ -53,6 +53,8 @@ checks:
           - source_artifacts
           - selection_policy
           - candidates
+        required_source_artifacts:
+          - candidate_handoff_sequences
         required_upstream_hashes:
           - eco1_rt_v1_profile
           - planned_backbone_bundle
@@ -68,6 +70,7 @@ checks:
           - biohub_esmc_sae_feature_window_summary
           - candidate_triage_table
           - candidate_selection_panel
+          - candidate_handoff_sequences
         required_handoff_kind: rt_only_candidate_handoff
         required_subject_kind: reverse_transcriptase_protein_only
         requires_construct_subject_created_false: true

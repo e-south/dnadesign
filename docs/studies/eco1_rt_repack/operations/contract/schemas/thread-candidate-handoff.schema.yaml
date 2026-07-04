@@ -45,6 +45,7 @@ field_contract:
       - feasibility_report
       - candidate_triage_table
       - candidate_selection_panel
+      - candidate_handoff_sequences
       - upstream_artifact_hashes
   selection_policy:
     required:
@@ -56,6 +57,7 @@ field_contract:
     required_fields:
       - candidate_id
       - sequence_hash
+      - candidate_handoff_sequence_csv_hash
       - eligible_for_handoff
       - foldcheck_status
       - feasibility_status
@@ -142,12 +144,29 @@ field_contract:
       - eligible_for_handoff
       - selection_reason
       - input_candidate_triage_table_hash
+  candidate_handoff_sequences:
+    required_columns:
+      - candidate_id
+      - selection_slot
+      - design_class_id
+      - protein_sequence
+      - sequence_hash
+      - amino_acid_length
+      - fold_review_class
+      - feasibility_status
+      - eligible_for_handoff
+      - codon_policy_id
+      - dna_design_status
+      - restriction_site_screen_status
 invariants:
   - candidates_must_exist_in_candidate_table
   - candidates_must_have_zero_mask_violations
   - candidates_must_have_nonfixture_foldcheck_acceptance
   - candidates_must_have_feasible_rows
   - candidates_must_exist_in_candidate_selection_panel
+  - candidates_must_exist_in_candidate_handoff_sequences
+  - candidate_handoff_sequences_must_match_candidate_sequence_hashes
+  - candidate_handoff_sequences_must_be_protein_only_until_downstream_acceptance
   - upstream_artifact_hashes_must_cover_profile_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_feasibility_triage_selection
   - handoff_kind_must_be_rt_only_candidate_handoff
   - construct_subject_created_must_be_false_before_downstream_acceptance

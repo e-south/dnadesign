@@ -64,8 +64,9 @@ The validator owns only study-local scaffold and runtime-artifact checks. It
 does not hide MPNN or fold execution behind a run-all command. The current
 `dnadesign.thread` surface covers generic ProteinMPNN request, sample-ingest,
 candidate-table, fold-check report, and ColabFold output-normalization
-mechanics. Fold-model execution, feasibility, and handoff mechanics remain
-separate contract promotions.
+mechanics. Fold-model execution and handoff mechanics remain separate contract
+promotions; feasibility and selection readiness are study-owned materialized
+surfaces for the current expanded pool.
 
 ### Implemented Slice: Structure Authority v1a
 
@@ -588,11 +589,13 @@ checks and HTML export. The deliverable sequence is:
    review metrics, with a declared feature/window subset instead of all features.
 8. Feasibility and handoff matrix after feasibility and selection tables exist.
 
-After the review-deliverable foundation, materialize
+After the review-deliverable foundation, keep
 `feasibility_report.parquet`, `selection/candidate_triage_table.parquet`,
-`selection/candidate_selection_panel.parquet`, and the RT-only
-`candidate_handoff.yaml`. The three-window SAE summary is already materialized
-and should feed the triage table as local review evidence.
+`selection/candidate_selection_panel.parquet`, and
+`selection/candidate_handoff_sequences.csv` linked into the review notebook,
+then materialize the RT-only `candidate_handoff.yaml` after selected-row review.
+The three-window SAE summary is already materialized and feeds the triage table
+as local review evidence.
 
 ### Implemented Slice: ESM Atlas Semantic Audit v1
 
@@ -719,11 +722,12 @@ interpreted in the study record.
   A full WT plus 96-candidate ColabFold `foldcheck_report.parquet` is
   materialized and validates. Fold-check review, the local full-fold PDB set,
   selected-panel Atlas lookup, and all-97 Biohub ESMC query-time SAE profile
-  are materialized. Feasibility report and candidate handoff are not
-  materialized.
+  are materialized. Feasibility, candidate triage, six-row panel selection, and
+  the selected protein-sequence CSV are materialized. RT-only
+  `candidate_handoff.yaml` is not materialized.
 - Phase 1 now has content validators for the local structure, contact,
   conservation, mask, thread-plan, ProteinMPNN request, and fold-check request
   artifacts. Phase 2 backend ingest passes locally through the candidate table,
-  and Phase 3 fold-check report validation passes for the full report. Optional
-  Atlas semantic annotation, feasibility review, and downstream selection are
-  the next gates.
+  and Phase 3 fold-check report validation passes for the full report. The next
+  gate is RT-only candidate handoff materialization and downstream accept/reject
+  review.

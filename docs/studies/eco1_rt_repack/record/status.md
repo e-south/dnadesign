@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-02
+last_verified: 2026-07-04
 status_surface: record-only
 ---
 
@@ -161,12 +161,18 @@ handled separately.
   materialized for the 576-candidate expanded pool. Current review classes are
   `strong_fold_preserved: 280`, `good_fold_preserved: 188`,
   `low_confidence: 105`, and `review_band: 3`.
+- `design_classes/selection/candidate_handoff_sequences.csv` is the flat
+  reviewer-facing protein-sequence export for the selected six rows. It carries
+  candidate ids, selection slots, protein sequences, sequence hashes, codon
+  policy id, DNA-design status, and restriction-screen status. It is not an
+  E. coli codon-optimized DNA design and has not passed restriction-site
+  screening.
 - `review_deliverables/` is materialized as the study visual bundle. It writes
   `review_deliverable_manifest.yaml`, the clade 9 and subtype MSA panels,
   linear mask tracks, a ChimeraX mask-context script, baseline ProteinMPNN
   audit plots, WT ESMC model-check plots, ESMC/SAE check plots, three
-  interactive structure-browser manifests, expanded panel-selection plots, and
-  a marimo notebook. The notebook is organized by
+  interactive structure-browser manifests, expanded panel-selection plots, the
+  selected-protein sequence CSV link, and a marimo notebook. The notebook is organized by
   scientific question: mask basis, sequence proposals and fold checks, panel
   selection, and ESMC/SAE checks. WT ESMC masked-marginal scoring appears with
   the mask evidence as a model check, not as a mask input. ESMC scores disagree
@@ -179,7 +185,9 @@ handled separately.
   reference into a browser-native 3D view. The panel-selection browser uses the
   expanded fold-check structure set and shows WT plus the six selected variants
   with fold metrics, mutation counts, MSA support, and nucleic-acid-facing
-  chemistry fields. Query coordinates are aligned to the reference in memory
+  chemistry fields. The structure dashboard also exposes protein sequence fields
+  for each selected candidate when the structure-browser manifest is regenerated
+  from the current materializer. Query coordinates are aligned to the reference in memory
   over mapped C-alpha atoms, and local raw ColabFold PDB files are unchanged.
   ChimeraX remains the explicit opt-in still-render and pose-capture path.
   Manifest paths are relative to the manifest location, so the visual bundle can
@@ -344,24 +352,28 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    review-band rows marked as manual reserve only. The regenerated table now
    adds MSA support, mutation-geography, nucleic-acid-facing chemistry, and
    source-artifact hashes for those review axes.
-4. Use the four panel-selection SVGs under `selection/plots/` for notebook
-   review. They show gate counts by design class, the six selected rows across
-   MSA support, nucleic-acid-facing mutation geography and local-chemistry
-   warnings, the selected-row sequence-difference map, and the selected-row
-   mutation chemistry/geography map.
-5. Use `candidate_selection_panel.parquet` as the current six-row assay-panel
-   proposal. It selects one feasible, fold-preserved representative from each
-   design class by MSA support, nucleic-acid-facing mutation geography, local
-   chemistry warnings, sequence nonredundancy, and fold metrics. The selected
-   rows are all `strong_fold_preserved`: `thread_candidate_f8de74828ad8`,
+4. Use the five panel-selection SVGs under `selection/plots/` for notebook
+   review. They show gate counts by design class, selected rows in the full
+   candidate population, the six selected rows across MSA support,
+   nucleic-acid-facing mutation geography and local-chemistry warnings, the
+   selected-row sequence-difference map, and the selected-row mutation
+   chemistry/geography map.
+5. Use `candidate_selection_panel.parquet` and
+   `candidate_handoff_sequences.csv` as the current six-row RT-only protein
+   review surface. The panel selects one feasible, fold-preserved
+   representative from each design class by MSA support, nucleic-acid-facing
+   mutation geography, local chemistry warnings, sequence nonredundancy, and
+   fold metrics. The selected rows are all `strong_fold_preserved`:
+   `thread_candidate_f8de74828ad8`,
    `thread_candidate_3b8ec09dffa4`, `thread_candidate_8145a7ffbfd6`,
    `thread_candidate_9545e08c9ab9`, `thread_candidate_b134f9a1f060`, and
    `thread_candidate_7d5861f87291`.
 6. Keep SAE windowing as review evidence only. The current table records
    `wt_like_not_used_for_selection` for every synthetic row, so SAE does not
    nominate a mechanistic slot.
-7. Emit `candidate_handoff.yaml` only after the selected rows are reviewed,
-   hash-linked, and accepted by the RT-only handoff contract.
+7. Emit `candidate_handoff.yaml` only after the selected rows, sequence hashes,
+   and upstream artifact hashes are reviewed and accepted by the RT-only
+   handoff contract.
 
 ### Blockers
 
@@ -380,10 +392,11 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 - RT-only `candidate_handoff.yaml` is not materialized.
 - Downstream RT-lnRNA acceptance or rejection is not materialized.
 - The review-deliverables marimo notebook includes the expanded panel-selection
-  table and plots: gate counts, selected-row review axes, a selected
-  sequence-difference map, a selected mutation chemistry/geography map, the
-  selected-panel structure browser, the handoff-boundary note, and the compact
-  selected-panel table.
+  table and plots: gate counts, full-population stratification with the selected
+  six highlighted, selected-row review axes, a selected sequence-difference
+  map, a selected mutation chemistry/geography map, the selected protein
+  sequence CSV, the selected-panel structure browser, the handoff-boundary note,
+  and the compact selected-panel table.
 
 ### Non-Goals
 

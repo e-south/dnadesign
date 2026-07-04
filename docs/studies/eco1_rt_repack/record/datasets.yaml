@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-07-01
+last_verified: 2026-07-04
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -698,6 +698,16 @@ datasets:
       Compact review visual showing eligible, manual-reserve, excluded, and
       missing-input candidate counts for each design class. It supports panel
       review but does not measure RT activity or handoff acceptance.
+  - id: eco1_rt_selection_population_stratification
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_population_stratification.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual placing the selected six rows in the full expanded
+      candidate population by MSA-observed designed-substitution fraction and
+      nucleic-acid-facing mutation count. It supports review context and does
+      not create a combined score or activity claim.
   - id: eco1_rt_selection_panel_review_axes
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -777,6 +787,16 @@ datasets:
       rather than descending by a combined score. MSA support, mutation
       geography, local chemistry, and sequence nonredundancy explain the panel
       choices. ESMC and SAE are recorded but not used for selection.
+  - id: eco1_rt_candidate_handoff_sequences
+    owner: eco1_rt_repack
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_handoff_sequences.csv
+    status: materialized_six_row_sequence_export
+    description: >-
+      Flat reviewer-facing RT protein sequence table for the selected six
+      rows. It records sequence hashes plus explicit not-materialized
+      DNA-design and restriction-screen status. Codon optimization and
+      restriction-site screening remain downstream work.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

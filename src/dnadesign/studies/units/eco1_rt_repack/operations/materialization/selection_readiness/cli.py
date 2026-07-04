@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
                 "feasibility_report_path": str(result.feasibility_report_path),
                 "candidate_triage_table_path": str(result.candidate_triage_table_path),
                 "candidate_selection_panel_path": str(result.candidate_selection_panel_path),
+                "candidate_handoff_sequence_csv_path": str(result.candidate_handoff_sequence_csv_path),
                 "selection_readiness_manifest_path": str(result.manifest_path),
             },
             indent=2,

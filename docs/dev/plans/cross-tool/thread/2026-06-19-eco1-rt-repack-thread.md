@@ -39,13 +39,15 @@ accepted candidate row
 The panel-selection deliverables are materialized under
 `outputs/thread/design_classes/selection/`:
 `feasibility_report.parquet`, `candidate_triage_table.parquet`, and
-`candidate_selection_panel.parquet`. The panel has six rows, one per design
-class. Feasibility can exclude candidates. Fold class is the first review
-filter. The panel tie-breaks use MSA support, mutation geography,
-nucleic-acid-facing chemistry, and sequence nonredundancy inside the eligible
-set. ESMC LLR and SAE windows are retained as review evidence, but they are
-not used for selection because they do not meaningfully stratify the current
-pool.
+`candidate_selection_panel.parquet`, plus the flat
+`candidate_handoff_sequences.csv` protein sequence export. The panel has six
+rows, one per design class. Feasibility can exclude candidates. Fold class is
+the first review filter. The panel tie-breaks use MSA support, mutation
+geography, nucleic-acid-facing chemistry, and sequence nonredundancy inside
+the eligible set. The review plots include full-population stratification with
+the selected six highlighted before selected-row detail views. ESMC LLR and
+SAE windows are retained as review evidence, but they are not used for
+selection because they do not meaningfully stratify the current pool.
 
 Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings, Tranception,
 Evo2, computational stability prediction, whole-protein ESMC
@@ -1010,15 +1012,20 @@ Main outputs:
 - `feasibility_report.parquet`
 - `candidate_triage_table.parquet`
 - `candidate_selection_panel.parquet`
+- `candidate_handoff_sequences.csv`
 - `plots/selection_design_class_gate_counts.svg`
+- `plots/selection_population_stratification.svg`
 - `plots/selection_panel_review_axes.svg`
+- `plots/selection_panel_sequence_differences.svg`
+- `plots/selection_panel_mutation_geography_chemistry.svg`
 
 Purpose:
 
 ```text
 Show which candidates pass feasibility and fold gates, then explain the six
-class-balanced panel rows with MSA support, mutation geography, local chemistry,
-and sequence nonredundancy.
+class-balanced panel rows in full-population context with MSA support, mutation
+geography, local chemistry, sequence nonredundancy, and flat protein-sequence
+export.
 ```
 
 Inputs:
@@ -1026,6 +1033,7 @@ Inputs:
 - `feasibility_report.parquet`;
 - `candidate_triage_table.parquet`;
 - `candidate_selection_panel.parquet`;
+- `candidate_handoff_sequences.csv`;
 - `candidate_handoff.yaml` when present.
 
 These plots render only after feasibility, triage, and the selection panel are
@@ -1041,7 +1049,8 @@ The marimo notebook should read the manifest and expose dropdowns for:
 - fold-review structure panels;
 - WT SAE feature frames;
 - variant SAE heatmap;
-- panel-selection plots and the RT-only handoff boundary.
+- panel-selection plots, selected protein sequences, py3Dmol structure views,
+  and the RT-only handoff boundary.
 
 The notebook must read manifests and pre-rendered artifacts. It must not
 hard-code plot paths, rerun Biohub requests, rerender all ChimeraX structures,
@@ -1195,6 +1204,7 @@ sae_feature_window_summary.parquet exists and validates
 feasibility_report.parquet exists and validates
 candidate_triage_table.parquet exists and validates
 candidate_selection_panel.parquet exists and validates
+candidate_handoff_sequences.csv exists and validates
 candidate_handoff.yaml exists and validates
 review_deliverable_manifest.yaml exists and validates
 MSA plurality/mask context visual renders from declared alignment inputs
@@ -1205,6 +1215,7 @@ WT Biohub ESMC SAE feature frames render for a declared feature subset
 Biohub ESMC feature-window heatmap renders from sae_feature_window_summary.parquet
 candidate triage table exposes feasibility, SAE-window, ESMC, fold-review, and sequence-diversity fields without a combined rank
 selection visuals render from materialized feasibility/selection inputs
+selected protein sequence CSV is visible in the review notebook and referenced by handoff contracts
 all visual manifests include alt text and interpretation limits
 status.md, datasets.yaml, routes, and command groups name the new state
 phase wording separates fold-check validation from downstream promotion

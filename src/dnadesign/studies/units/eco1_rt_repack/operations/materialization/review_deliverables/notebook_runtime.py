@@ -62,18 +62,23 @@ def render_intro(mo: Any) -> Any:
 
     intro_lead = (
         "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported RNA/DNA-bound scaffold. "
-        "The current Tao-style fixed-backbone workflow builds a conservative redesign set for downstream "
-        "structured-template assays: protect residues supported by motifs, "
-        "substrate contacts, and homolog conservation, then repack the remaining designable residues."
+        "The study asks whether fold-preserved RT sequence variants can support downstream assays for "
+        "processivity and strand displacement. The computational deliverable is a bounded set of protein "
+        "sequence candidates for review, not an activity claim."
     )
     intro_flow = (
-        "Evidence order: scaffold, mask evidence, sequence proposals, fold checks, panel selection, and model checks. "
-        "The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, retained-substrate "
-        "proximity, and Mestre-derived clade 9 plurality at the 25% threshold. WT ESMC masked-marginal "
-        "scoring appears beside those inputs as a model check, not as a mask input. "
-        "ProteinMPNN proposes variants at unprotected residues, ColabFold checks fold-model compatibility, and "
-        "Biohub ESMC SAE features annotate WT and candidate sequences. Activity, strand displacement, "
-        "and structured-template readthrough remain assay questions."
+        "Evidence order: cryoEM scaffold, Tao-style mask evidence, ProteinMPNN sequence proposals, "
+        "ColabFold fold checks, localized triage, panel selection, and sequence export. "
+        "The active design classes vary homolog-conservation "
+        "and retained-DNA/RNA proximity thresholds while always protecting catalytic anchors and Wang/Ec86 "
+        "direct-contact priors. The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, "
+        "retained-substrate proximity, and Mestre-derived clade 9 plurality at the 25% threshold. "
+        "ProteinMPNN proposes variants at unprotected residues to repack the remaining designable residues, "
+        "ColabFold removes poor "
+        "fold predictions, and the remaining pool is stratified by MSA support, local mutation geography, "
+        "nucleic-acid-facing chemistry, and selected model checks. WT ESMC masked-marginal scores and Biohub ESMC "
+        "SAE features annotate the review set; they are not mask inputs or acceptance gates. The selected protein "
+        "sequences are exported as a flat CSV for RT-only handoff planning."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "

@@ -56,6 +56,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
     )
     plots = {
         "selection_design_class_gate_counts": "Eco1 design classes retain fold-preserved candidates",
+        "selection_population_stratification": "Selected candidates in the full Eco1 candidate population",
         "selection_panel_review_axes": "The six selected candidates balance MSA support with mutation geography",
         "selection_panel_sequence_differences": "Selected Eco1 candidates vary only at designable protein positions",
         "selection_panel_mutation_geography_chemistry": "Selected candidates change distal scaffold chemistry",
@@ -117,13 +118,22 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 input_hash_tail="a",
             ),
             plot_row(
+                plot_id="selection_population_stratification",
+                title=plots["selection_population_stratification"],
+                path="plots/selection_population_stratification.svg",
+                alt_text="Fixture full candidate population stratification plot with selected rows highlighted.",
+                description="Shows the six selected candidates relative to the full candidate population.",
+                interpretation_limit="Population stratification is not an activity measurement.",
+                input_hash_tail="b",
+            ),
+            plot_row(
                 plot_id="selection_panel_review_axes",
                 title=plots["selection_panel_review_axes"],
                 path="plots/selection_panel_review_axes.svg",
                 alt_text="Fixture panel review-axis plot.",
                 description="Shows panel review axes.",
                 interpretation_limit="Review axes do not measure strand displacement.",
-                input_hash_tail="b",
+                input_hash_tail="c",
             ),
             plot_row(
                 plot_id="selection_panel_sequence_differences",
@@ -132,7 +142,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 alt_text="Fixture selected-panel sequence-difference heatmap.",
                 description="Shows WT-match and designed-difference positions for selected panel rows.",
                 interpretation_limit="Sequence differences do not measure activity.",
-                input_hash_tail="c",
+                input_hash_tail="d",
             ),
             plot_row(
                 plot_id="selection_panel_mutation_geography_chemistry",
@@ -141,7 +151,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 alt_text="Fixture selected-panel mutation-chemistry heatmap.",
                 description="Shows chemistry classes for selected panel substitutions.",
                 interpretation_limit="Mutation chemistry categories do not measure activity.",
-                input_hash_tail="d",
+                input_hash_tail="e",
             ),
         ],
     }

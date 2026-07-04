@@ -44,6 +44,7 @@ _EXPECTED_ARTIFACT_ORDER = (
     "feasibility_report",
     "candidate_triage_table",
     "candidate_selection_panel",
+    "candidate_handoff_sequences",
     "candidate_handoff",
 )
 _SHARED_ARTIFACT_FIELDS = {
@@ -65,7 +66,7 @@ _REQUIRED_ARTIFACT_INVARIANTS = {
     "no_candidate_handoff_without_foldcheck_and_feasibility_reports": (
         "thread.artifact_chain.missing_handoff_gate_invariant"
     ),
-    "no_candidate_handoff_without_foldcheck_feasibility_triage_and_selection_reports": (
+    "no_candidate_handoff_without_foldcheck_feasibility_triage_selection_and_sequence_reports": (
         "thread.artifact_chain.missing_selection_handoff_gate_invariant"
     ),
 }

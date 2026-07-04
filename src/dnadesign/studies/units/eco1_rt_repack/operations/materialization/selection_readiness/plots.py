@@ -44,6 +44,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     tie_break_trace,
 )
 
+from .population_stratification import write_population_stratification_plot
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -76,6 +78,7 @@ def write_selection_readiness_plots(
     plot_root.mkdir(parents=True, exist_ok=True)
     return [
         _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
+        write_population_stratification_plot(plot_root, triage_rows, panel_rows, input_hashes),
         _write_panel_review_axes(plot_root, panel_rows, input_hashes),
         _write_panel_sequence_differences(
             plot_root,

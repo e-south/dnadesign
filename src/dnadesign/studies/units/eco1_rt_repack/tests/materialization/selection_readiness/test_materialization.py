@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -19,6 +20,9 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
+    cli as selection_readiness_cli,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     materialize_selection_readiness,
@@ -117,16 +121,49 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     assert [plot["plot_id"] for plot in manifest["plots"]] == [
         "selection_design_class_gate_counts",
+        "selection_population_stratification",
         "selection_panel_review_axes",
         "selection_panel_sequence_differences",
         "selection_panel_mutation_geography_chemistry",
     ]
+    population_plot = next(
+        plot for plot in manifest["plots"] if plot["plot_id"] == "selection_population_stratification"
+    )
+    assert "full candidate population" in population_plot["alt_text"]
+    assert "six selected" in population_plot["description"]
     for plot in manifest["plots"]:
         plot_path = result.manifest_path.parent / plot["path"]
         assert plot_path.exists()
         assert "<title" in plot_path.read_text(encoding="utf-8")
         assert plot["alt_text"].strip()
         assert plot["interpretation_limit"].strip()
+
+
+def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Path, capsys) -> None:
+    repo_root = tmp_path
+    class_root = repo_root / "outputs/thread/design_classes"
+    selection_root = class_root / "selection"
+    source_root = repo_root / "outputs/thread"
+    write_inputs(class_root, source_root)
+
+    exit_code = selection_readiness_cli.main(
+        [
+            "--repo-root",
+            str(repo_root),
+            "--output-root",
+            str(class_root),
+            "--source-output-root",
+            str(source_root),
+            "--selection-root",
+            str(selection_root),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
+    assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
 
 
 def test_feasibility_preserves_positions_from_serialized_mutation_lists() -> None:

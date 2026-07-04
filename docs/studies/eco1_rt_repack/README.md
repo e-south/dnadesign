@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-02
+last_verified: 2026-07-04
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -21,6 +21,34 @@ Use `routes/README.md` first. Current state is in `record/status.md`; source and
 artifact posture are in `record/datasets.yaml`; machine-readable planning
 surfaces are under `operations/`; durable rationale and policy live in
 `contexts/`; design-set meaning and provenance live in `workbench/`.
+
+### Motivation And Funnel
+
+Eco1/Ec86 has a cryoEM-supported RT/RNA/DNA structure that anchors this
+fixed-backbone repacking study. The biological motivation is to prepare
+fold-preserved reverse-transcriptase protein variants for downstream assays
+that can test processivity, strand displacement, and structured-template
+readthrough. The computational funnel does not claim those functions; it
+selects a bounded protein sequence panel for review and handoff.
+
+The method starts from the selected Ec86 cryoEM scaffold. The study defines
+fixed and mutable positions using catalytic motifs, Wang/Ec86 direct-contact
+priors, retained DNA/RNA proximity, and Tao-style homolog-conservation masks
+from Mestre-derived MSA profiles. Different conservation and proximity
+thresholds define design classes. ProteinMPNN samples protein sequences at the
+unprotected positions for each design class. ColabFold predictions then remove
+poor fold-model candidates. The remaining pool is triaged by MSA support,
+localized mutation geography, nucleic-acid-facing chemistry, sequence
+nonredundancy, and model-check annotations that are kept out of the acceptance
+gate.
+
+The current reviewer-facing endpoint is a six-row panel with one feasible,
+fold-preserved representative per design class. The review notebook should let
+a user inspect the full population, the selected six, py3Dmol structure views,
+and the selected protein sequences. The flat
+`candidate_handoff_sequences.csv` is the protein-sequence export for RT-only
+handoff planning; codon optimization, restriction-site screening, and construct
+subject creation remain downstream work.
 
 This study intentionally separates three layers:
 

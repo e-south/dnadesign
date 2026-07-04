@@ -74,13 +74,17 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "sections: list[str] = []" in runtime_text
     assert 'sorted({str(row["section"])' not in notebook_text
     assert "Repacking Eco1 reverse transcriptase for structured-template assays" in combined_text
-    assert "Tao-style fixed-backbone" in combined_text
+    assert "Tao-style mask evidence" in combined_text
     assert "repack the remaining designable residues" in combined_text
     assert "Mestre-derived clade 9" in combined_text
     assert "active mask uses" in combined_text
+    assert "sequence export" in combined_text
+    assert "flat CSV" in combined_text
     assert "WT ESMC" in combined_text
-    assert "model check, not as a mask input" in combined_text
-    assert "Biohub ESMC SAE features annotate WT" in combined_text
+    assert "not mask inputs or acceptance gates" in combined_text
+    assert "Biohub ESMC" in combined_text
+    assert "SAE features annotate" in combined_text
+    assert "review set" in combined_text
     assert "alignments and ESMC" not in combined_text
     assert "ProteinMPNN proposes variants" in combined_text
     assert "unprotected" in combined_text
@@ -142,7 +146,6 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "No source-backed description is available for this exact SAE dictionary" not in combined_text
     assert "Reference sequence, alignment, and mask" not in combined_text
     assert "Reference scaffold and mask evidence" not in combined_text
-    assert "ProteinMPNN sequence proposals" not in combined_text
     assert "ColabFold structure triage" not in combined_text
     assert 'structure_label = "Structure view"' in notebook_text
     assert "label=structure_label" in notebook_text
