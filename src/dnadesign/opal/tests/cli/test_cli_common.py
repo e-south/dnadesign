@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.cli.commands import _common
 from dnadesign.opal.src.core.utils import OpalError
 
@@ -32,3 +33,16 @@ def test_opal_error_default_mode_writes_only_stderr(monkeypatch) -> None:
 
     assert stderr_messages == ["bad config"]
     assert stdout_messages == []
+
+
+def test_building_cli_app_is_idempotent() -> None:
+    app = _build()
+    command_names = [info.name for info in app.registered_commands]
+    group_names = [info.name for info in app.registered_groups]
+
+    _build()
+
+    assert [info.name for info in app.registered_commands] == command_names
+    assert [info.name for info in app.registered_groups] == group_names
+    assert len(command_names) == len(set(command_names))
+    assert len(group_names) == len(set(group_names))
