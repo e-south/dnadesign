@@ -1,7 +1,7 @@
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-07-04
 
 
 Single technical reference for operators and integrators.
