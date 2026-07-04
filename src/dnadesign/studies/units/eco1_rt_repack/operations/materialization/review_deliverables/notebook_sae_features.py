@@ -21,9 +21,11 @@ import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
+    resolve_manifest_path,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_visuals import (
     render_visual_zoom_controls,
     render_zoom_frame,
-    resolve_manifest_path,
     visual_zoom_script,
     zoom_frame_html,
 )

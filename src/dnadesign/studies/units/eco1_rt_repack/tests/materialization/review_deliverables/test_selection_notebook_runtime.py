@@ -20,6 +20,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     notebook_runtime,
     notebook_selection_panel,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
+    SECTION_FEASIBILITY_AND_HANDOFF,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
@@ -87,10 +90,31 @@ def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: P
         mo=FakeMo(),
         manifest_root=result.manifest_path.parent,
     )
-    sequence_rows = sequences["items"][1]["rows"]
+    sequence_list_html = sequences["items"][1]
+    assert "eco1-handoff-sequence-list" in sequence_list_html
+    assert "thread_candidate_alpha" in sequence_list_html
+    assert "MKSAGG" in sequence_list_html
+    sequence_rows = sequences["items"][2]["rows"]
     assert sequence_rows[0]["candidate_id"] == "thread_candidate_alpha"
     assert sequence_rows[0]["protein_sequence"] == "MKSAGG"
     assert sequence_rows[0]["dna_design_status"] == "not_materialized"
+
+
+def test_panel_selection_deliverables_follow_review_sequence(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+
+    panel_rows = notebook_runtime.section_deliverables(
+        manifest["deliverables"],
+        SECTION_FEASIBILITY_AND_HANDOFF,
+    )
+    panel_ids = [str(row["deliverable_id"]) for row in panel_rows]
+
+    assert panel_ids[0] == "selection_funnel_summary"
+    assert panel_ids.index("selection_population_stratification") < panel_ids.index("selection_panel_table")
+    assert panel_ids.index("selection_panel_table") < panel_ids.index("selection_handoff_sequences")
+    assert panel_ids.index("selection_handoff_sequences") < panel_ids.index("selected_panel_structure_browser_manifest")
 
 
 def test_non_image_artifact_fallback_uses_manifest_relative_path(tmp_path: Path) -> None:

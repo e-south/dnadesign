@@ -11,9 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import base64
 import csv
-import hashlib
 import html
 from pathlib import Path
 from typing import Any
@@ -32,6 +30,8 @@ from .notebook_selection_summary import (
     render_handoff_readiness,
     render_selection_funnel_summary,
 )
+from .notebook_sequences import handoff_sequence_list_html
+from .notebook_visuals import render_image
 
 _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
     "foldcheck_review_structure_overlay_panel",
@@ -45,6 +45,21 @@ _NOTEBOOK_LANE_ROLES = {
 _NOTEBOOK_LANE_LABELS = {
     "main_review": "Core evidence",
     "audit_supplement": "Model and method checks",
+}
+_SECTION_DELIVERABLE_ORDER = {
+    SECTION_FEASIBILITY_AND_HANDOFF: (
+        "selection_funnel_summary",
+        "selection_design_class_gate_counts",
+        "selection_population_stratification",
+        "selection_panel_review_axes",
+        "selection_panel_table",
+        "selection_handoff_sequences",
+        "selected_panel_structure_browser_manifest",
+        "selection_panel_sequence_differences",
+        "selection_panel_mutation_geography_chemistry",
+        "selection_handoff_readiness",
+        "selection_handoff_boundary",
+    )
 }
 
 
@@ -151,7 +166,15 @@ def section_label_lookup(rows: list[dict[str, Any]]) -> dict[str, str]:
 def section_deliverables(rows: list[dict[str, Any]], selected_section: str) -> list[dict[str, Any]]:
     """Filter visual deliverables to the selected section."""
 
-    return [row for row in rows if str(row.get("section") or "") == selected_section]
+    section_rows = [row for row in rows if str(row.get("section") or "") == selected_section]
+    order = _SECTION_DELIVERABLE_ORDER.get(selected_section)
+    if order is None:
+        return section_rows
+    order_lookup = {deliverable_id: index for index, deliverable_id in enumerate(order)}
+    return sorted(
+        section_rows,
+        key=lambda row: (order_lookup.get(str(row.get("deliverable_id") or ""), len(order_lookup)),),
+    )
 
 
 def deliverable_lookup(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -190,7 +213,7 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
     if artifact_kind == "handoff_boundary":
         return _render_handoff_boundary(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
-        return _render_image(row, mo=mo, media_path=media_path)
+        return render_image(row, mo=mo, media_path=media_path)
     artifact_path = str(row.get("path") or "")
     if media_path.exists():
         return mo.md(f"Artifact file: `{artifact_path}`")
@@ -282,51 +305,6 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
     return suffix in {".svg", ".png"} and str(row.get("status") or "") in {"rendered", "linked_existing"}
 
 
-def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
-    mime_type = "image/svg+xml" if media_path.suffix.lower() == ".svg" else "image/png"
-    encoded = base64.b64encode(media_path.read_bytes()).decode("ascii")
-    alt_text = html.escape(str(row["alt_text"]), quote=True)
-    caption = html.escape(format_deliverable_label(row), quote=True)
-    is_wide = is_wide_visual(row)
-    render_mode = html.escape(str(row.get("render_mode") or "standard_visual"), quote=True)
-    container_id = f"zoomable-visual-{hashlib.sha256(str(media_path).encode()).hexdigest()[:12]}"
-    image_id = f"{container_id}-image"
-    container_max_height = "86vh" if is_wide else "82vh"
-    image_style = "display:block; width:100%; max-width:none; max-height:none; height:auto; transform-origin:top left;"
-    zoom_controls = render_visual_zoom_controls(container_id)
-    zoom_script = visual_zoom_script(container_id=container_id, image_id=image_id)
-    frame_html = zoom_frame_html(
-        body_html=f"""
-          {zoom_controls}
-          <div id="{container_id}" data-render-mode="{render_mode}"
-               style="overflow:auto; width:100%; height:calc(100vh - 2.6rem);
-                      border:1px solid #d8dee4; border-radius:6px; background:#ffffff; padding:0.25rem;
-                      box-sizing:border-box;">
-            <img id="{image_id}" src="data:{mime_type};base64,{encoded}" alt="{alt_text}"
-                 style="{image_style}" />
-          </div>
-          {zoom_script}
-        """
-    )
-    caption_html = mo.Html(
-        f"""
-        <figcaption style="font-size:0.92rem; color:#57606a; margin-top:0.2rem;">{caption}</figcaption>
-        """
-    )
-    return mo.vstack(
-        [
-            render_zoom_frame(
-                mo=mo,
-                frame_html=frame_html,
-                title=f"Zoomable visual: {caption}",
-                height_css=container_max_height,
-            ),
-            caption_html,
-        ],
-        gap=0.15,
-    )
-
-
 def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Path) -> Any:
     if not table_path.exists():
         return mo.md(f"Selected sequence CSV unavailable: `{row.get('path')}`")
@@ -335,6 +313,7 @@ def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Pa
     return mo.vstack(
         [
             mo.Html("<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>Selected RT protein sequences</h3>"),
+            mo.Html(handoff_sequence_list_html(rows)),
             mo.ui.table(rows, page_size=10),
         ],
         gap=0.25,
@@ -353,141 +332,3 @@ def _render_handoff_boundary(row: dict[str, Any], *, mo: Any) -> Any:
         </section>
         """
     )
-
-
-def render_zoom_frame(*, mo: Any, frame_html: str, title: str, height_css: str) -> Any:
-    safe_srcdoc = html.escape(frame_html, quote=True)
-    safe_title = html.escape(title, quote=True)
-    safe_height = html.escape(height_css, quote=True)
-    return mo.Html(
-        f"""
-        <iframe title="{safe_title}" srcdoc="{safe_srcdoc}"
-                style="display:block; width:100%; height:{safe_height}; min-height:520px;
-                       border:0; margin:0; padding:0; background:#ffffff;"
-                loading="lazy"></iframe>
-        """
-    )
-
-
-def zoom_frame_html(*, body_html: str) -> str:
-    return f"""
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          html, body {{
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #ffffff;
-            color: #24292f;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          }}
-          * {{ box-sizing: border-box; }}
-        </style>
-      </head>
-      <body>
-        {body_html}
-      </body>
-    </html>
-    """
-
-
-def render_visual_zoom_controls(container_id: str) -> str:
-    safe_container_id = html.escape(container_id, quote=True)
-    return f"""
-          <div style="display:flex; gap:0.35rem; align-items:center; justify-content:flex-end;
-                      margin:0 0 0.25rem 0;">
-            <button type="button" data-zoom-target="{safe_container_id}" data-zoom-action="out"
-                    aria-label="Zoom out"
-                    style="border:1px solid #d8dee4; background:#ffffff; border-radius:4px;
-                           padding:0.12rem 0.45rem; line-height:1.25; cursor:pointer;">-</button>
-            <button type="button" data-zoom-target="{safe_container_id}" data-zoom-action="fit"
-                    aria-label="Fit image to panel"
-                    style="border:1px solid #d8dee4; background:#ffffff; border-radius:4px;
-                           padding:0.12rem 0.45rem; line-height:1.25; cursor:pointer;">Fit</button>
-            <button type="button" data-zoom-target="{safe_container_id}" data-zoom-action="in"
-                    aria-label="Zoom in"
-                    style="border:1px solid #d8dee4; background:#ffffff; border-radius:4px;
-                           padding:0.12rem 0.45rem; line-height:1.25; cursor:pointer;">+</button>
-          </div>
-    """
-
-
-def visual_zoom_script(*, container_id: str, image_id: str) -> str:
-    safe_container_id = html.escape(container_id, quote=True)
-    safe_image_id = html.escape(image_id, quote=True)
-    return f"""
-          <script>
-          (function() {{
-            const container = document.getElementById("{safe_container_id}");
-            const image = document.getElementById("{safe_image_id}");
-            if (!container || !image || container.dataset.zoomReady === "true") {{
-              return;
-            }}
-            container.dataset.zoomReady = "true";
-            const minScale = 0.2;
-            const maxScale = 24.0;
-            let scale = 1.0;
-            let baseWidth = 0;
-            const setBaseWidth = function() {{
-              const rect = image.getBoundingClientRect();
-              const computedStyle = window.getComputedStyle(container);
-              const horizontalPadding = parseFloat(computedStyle.paddingLeft || "0") +
-                parseFloat(computedStyle.paddingRight || "0");
-              baseWidth = Math.max(320, container.clientWidth - horizontalPadding, rect.width || 0);
-              image.style.width = baseWidth + "px";
-            }};
-            const applyScale = function(nextScale) {{
-              if (!baseWidth) {{
-                setBaseWidth();
-              }}
-              scale = Math.max(minScale, Math.min(maxScale, nextScale));
-              image.dataset.zoomScale = String(scale);
-              image.style.width = (baseWidth * scale) + "px";
-            }};
-            const fitImage = function() {{
-              scale = 1.0;
-              setBaseWidth();
-              image.dataset.zoomScale = String(scale);
-              container.scrollLeft = 0;
-              container.scrollTop = 0;
-            }};
-            window.requestAnimationFrame(fitImage);
-            container.addEventListener("wheel", function(event) {{
-              if (!event.ctrlKey && !event.metaKey) {{
-                return;
-              }}
-              event.preventDefault();
-              const factor = event.deltaY < 0 ? 1.14 : 0.88;
-              applyScale(scale * factor);
-            }}, {{ passive: false }});
-            document.querySelectorAll('[data-zoom-target="{safe_container_id}"]').forEach(function(button) {{
-              button.addEventListener("click", function() {{
-                const action = button.getAttribute("data-zoom-action");
-                if (action === "fit") {{
-                  fitImage();
-                }} else if (action === "in") {{
-                  applyScale(scale * 1.25);
-                }} else if (action === "out") {{
-                  applyScale(scale * 0.8);
-                }}
-              }});
-            }});
-            window.addEventListener("resize", function() {{
-              if (scale === 1.0) {{
-                fitImage();
-              }}
-            }}, {{ passive: true }});
-          }})();
-          </script>
-    """
-
-
-def is_wide_visual(row: dict[str, Any]) -> bool:
-    """Return whether a visual should preserve horizontal detail instead of squeezing to fit."""
-
-    return str(row.get("render_mode") or "") == "wide_visual"

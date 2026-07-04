@@ -162,6 +162,8 @@ def structure_browser_panel_html(
     dashboard_rows: list[dict[str, str]],
     row: dict[str, Any],
 ) -> str:
+    dashboard_html = _dashboard_table_html(row, dashboard_rows)
+    sequence_html = _protein_sequence_panel_html(row)
     return (
         '<section class="eco1-structure-browser-panel">'
         "<style>"
@@ -177,13 +179,16 @@ def structure_browser_panel_html(
         ".eco1-structure-browser-dashboard td{border-top:1px solid #d8dee4;padding:0.34rem 0.25rem;"
         "vertical-align:top;overflow-wrap:anywhere;}"
         ".eco1-structure-browser-dashboard td:first-child{width:38%;color:#57606a;font-weight:600;}"
-        ".eco1-protein-sequence{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"
-        "font-size:0.76rem;line-height:1.25;white-space:normal;overflow-wrap:anywhere;}"
+        ".eco1-protein-sequence-panel{border-top:1px solid #d8dee4;margin-top:0.55rem;padding-top:0.45rem;}"
+        ".eco1-protein-sequence-panel h4{margin:0 0 0.28rem 0;font-size:0.78rem;text-transform:uppercase;"
+        "letter-spacing:0.04em;color:#6e7781;}"
+        ".eco1-protein-sequence{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"
+        "font-size:0.76rem;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word;}"
         "@media (max-width: 860px){.eco1-structure-browser-grid{grid-template-columns:1fr;}}"
         "</style>"
         '<div class="eco1-structure-browser-grid">'
         f'<div class="eco1-structure-browser-view">{structure_html}</div>'
-        f'<aside class="eco1-structure-browser-dashboard">{_dashboard_table_html(row, dashboard_rows)}</aside>'
+        f'<aside class="eco1-structure-browser-dashboard">{dashboard_html}{sequence_html}</aside>'
         "</div>"
         "</section>"
     )
@@ -228,7 +233,6 @@ def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
             "value": format_float(row.get("sequence_identity_percent"), decimals=1, suffix="%"),
         },
         {"metric": "Protein sequence length", "value": format_int(row.get("protein_sequence_length"))},
-        {"metric": "Protein sequence", "value": str(row.get("protein_sequence") or "")},
         {"metric": "Mutation count", "value": format_int(row.get("mutation_count"))},
         {"metric": "Selection slot", "value": str(row.get("selection_slot") or "")},
         {"metric": "Nearest selected distance", "value": format_int(row.get("nearest_selected_distance_aa"))},
@@ -353,11 +357,23 @@ def _dashboard_table_html(row: dict[str, Any], dashboard_rows: list[dict[str, st
 def _dashboard_row_html(entry: dict[str, str]) -> str:
     metric = str(entry.get("metric") or "")
     value = str(entry.get("value") or "")
-    if metric == "Protein sequence":
-        value_html = f'<code class="eco1-protein-sequence">{html.escape(value)}</code>'
-    else:
-        value_html = html.escape(value)
+    value_html = html.escape(value)
     return f"<tr><td>{html.escape(metric)}</td><td>{value_html}</td></tr>"
+
+
+def _protein_sequence_panel_html(row: dict[str, Any]) -> str:
+    sequence = str(row.get("protein_sequence") or "").strip()
+    if not sequence:
+        return ""
+    label = "Protein sequence"
+    if str(row.get("structure_view_mode") or "") == "reference_selection":
+        label = "Reference protein sequence"
+    return (
+        '<section class="eco1-protein-sequence-panel">'
+        f"<h4>{html.escape(label)}</h4>"
+        f'<code class="eco1-protein-sequence">{html.escape(sequence)}</code>'
+        "</section>"
+    )
 
 
 def _atom_content_dashboard_value(content: StructureAtomContent) -> str:

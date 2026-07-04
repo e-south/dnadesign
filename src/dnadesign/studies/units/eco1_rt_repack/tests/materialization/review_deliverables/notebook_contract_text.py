@@ -24,9 +24,11 @@ def notebook_contract_text(notebook_text: str) -> tuple[str, str]:
         for path in (
             runtime_path,
             runtime_dir / "notebook_sae_features.py",
+            runtime_dir / "notebook_sequences.py",
             runtime_dir / "notebook_selection_panel.py",
             runtime_dir / "notebook_selection_summary.py",
             runtime_dir / "notebook_structure_browser.py",
+            runtime_dir / "notebook_visuals.py",
         )
     )
     return runtime_text, notebook_text + "\n" + runtime_text

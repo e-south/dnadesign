@@ -46,6 +46,8 @@ _STATUS_LABELS = {
     "ineligible": "Excluded",
     "missing_inputs": "Missing input",
 }
+_SELECTED_LABEL_X = 1.075
+_SELECTED_LABEL_MIN_GAP = 3.9
 
 
 def write_population_stratification_plot(
@@ -87,6 +89,7 @@ def write_population_stratification_plot(
     selected_rows = [row for row in plot_rows if str(row.get("candidate_id") or "") in selected_by_id]
     if not selected_rows:
         raise ValueError("population stratification plot requires selected candidates in triage rows")
+    y_max = max(int(row["nucleic_acid_facing_mutation_count"]) for row in plot_rows)
     selected_x = [float(row["selection_support_alt_observed_fraction"]) for row in selected_rows]
     selected_y = [int(row["nucleic_acid_facing_mutation_count"]) for row in selected_rows]
     ax.scatter(
@@ -100,22 +103,31 @@ def write_population_stratification_plot(
         label="Selected panel",
         zorder=4,
     )
+    label_positions = selected_label_positions(selected_rows, y_max=y_max)
     for row, x_value, y_value in zip(selected_rows, selected_x, selected_y, strict=True):
         panel_row = selected_by_id[str(row["candidate_id"])]
         label = f"{class_label(str(panel_row['design_class_id']))}: {short_candidate(str(row['candidate_id']))}"
-        ax.text(
-            min(x_value + 0.016, 1.01),
-            y_value + 0.08,
+        label_x, label_y = label_positions[str(row["candidate_id"])]
+        ax.annotate(
             label,
-            fontsize=9.3,
+            xy=(x_value, y_value),
+            xytext=(label_x, label_y),
+            textcoords="data",
+            fontsize=8.6,
             color="#24292f",
             ha="left",
-            va="bottom",
+            va="center",
+            arrowprops={
+                "arrowstyle": "-",
+                "color": "#57606a",
+                "lw": 0.65,
+                "shrinkA": 2,
+                "shrinkB": 4,
+            },
             zorder=5,
         )
 
-    ax.set_xlim(-0.02, 1.06)
-    y_max = max(int(row["nucleic_acid_facing_mutation_count"]) for row in plot_rows)
+    ax.set_xlim(-0.02, 1.19)
     ax.set_ylim(-0.7, y_max + 2.0)
     ax.set_xlabel("Designed substitutions observed in the selected MSA denominator", fontsize=LABEL_SIZE)
     ax.set_ylabel("Nucleic-acid-facing designed substitutions", fontsize=LABEL_SIZE)
@@ -126,13 +138,13 @@ def write_population_stratification_plot(
     ax.legend(
         handles=handles,
         labels=labels,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.23),
-        ncol=3,
+        loc="lower left",
+        bbox_to_anchor=(0.16, 0.03),
+        ncol=2,
         frameon=False,
         fontsize=LEGEND_SIZE,
     )
-    fig.subplots_adjust(left=0.12, right=0.98, top=0.9, bottom=0.25)
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.9, bottom=0.16)
     path = plot_root / "selection_population_stratification.svg"
     alt = (
         "Scatter plot of the full candidate population. X position is MSA-observed designed-substitution "
@@ -156,3 +168,30 @@ def write_population_stratification_plot(
         ),
         render_mode="wide_visual",
     )
+
+
+def selected_label_positions(
+    selected_rows: list[dict[str, object]],
+    *,
+    y_max: int,
+) -> dict[str, tuple[float, float]]:
+    """Return right-side label positions separated enough for selected-row clusters."""
+
+    sorted_rows = sorted(
+        selected_rows,
+        key=lambda row: (
+            -int(row.get("nucleic_acid_facing_mutation_count") or 0),
+            str(row.get("candidate_id") or ""),
+        ),
+    )
+    positions: dict[str, tuple[float, float]] = {}
+    previous_y = float(y_max) + 2.0
+    for row in sorted_rows:
+        candidate_id = str(row.get("candidate_id") or "")
+        observed_y = float(row.get("nucleic_acid_facing_mutation_count") or 0)
+        desired_y = observed_y + 0.35
+        label_y = min(desired_y, previous_y - _SELECTED_LABEL_MIN_GAP)
+        label_y = max(0.15, label_y)
+        positions[candidate_id] = (_SELECTED_LABEL_X, label_y)
+        previous_y = label_y
+    return positions
