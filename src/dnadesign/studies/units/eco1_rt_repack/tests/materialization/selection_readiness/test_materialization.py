@@ -87,6 +87,16 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["gate_counts"]["hard_gate_status"] == {"eligible": len(panel), "ineligible": 2}
+    assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
+    assert manifest["selected_candidate_ids"] == [row["candidate_id"] for row in panel]
+    assert manifest["handoff_readiness"] == {
+        "handoff_kind": "rt_only_candidate_handoff",
+        "panel_selected": True,
+        "candidate_handoff_path": "candidate_handoff.yaml",
+        "candidate_handoff_materialized": False,
+        "construct_subject_created": False,
+    }
     assert [plot["plot_id"] for plot in manifest["plots"]] == [
         "selection_design_class_gate_counts",
         "selection_panel_review_axes",

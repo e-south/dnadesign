@@ -17,6 +17,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from .selection_plot_fixtures import plot_row, write_svg
+
 
 def write_selection_readiness_manifest(selection_root: Path) -> None:
     plot_root = selection_root / "plots"
@@ -60,15 +62,49 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         "selection_panel_mutation_geography_chemistry": "Selected candidates change distal scaffold chemistry",
     }
     for plot_id, title in plots.items():
-        _write_svg(plot_root / f"{plot_id}.svg", plot_id=plot_id, title=title)
+        write_svg(plot_root / f"{plot_id}.svg", plot_id=plot_id, title=title)
     payload = {
         "schema_id": "eco1_rt.selection_readiness_manifest",
         "schema_version": 1,
         "status": "materialized",
+        "selection_policy_id": "eco1_rt_structure_evolution_class_representative_panel_v1",
+        "governing_rule": (
+            "Select one feasible fold-preserved representative from each design class. Do not use ESMC or SAE "
+            "as positive selection evidence."
+        ),
+        "sae_window_policy": "SAE windows are retained for review evidence and are not panel-selection inputs.",
+        "esmc_policy": "ESMC additive LLR rows are retained for review and are not panel-selection tie-breaks.",
         "path_policy": "manifest_relative_for_plots",
-        "artifacts": {"candidate_selection_panel": "candidate_selection_panel.parquet"},
+        "artifacts": {
+            "candidate_triage_table": "candidate_triage_table.parquet",
+            "candidate_selection_panel": "candidate_selection_panel.parquet",
+        },
+        "row_counts": {
+            "candidate_triage_table": 2,
+            "candidate_selection_panel": 2,
+        },
+        "gate_counts": {
+            "hard_gate_status": {"eligible": 2},
+            "sae_window_status": {"wt_like_not_used_for_selection": 2},
+        },
+        "selected_candidate_ids": ["thread_candidate_alpha", "thread_candidate_beta"],
+        "panel_tie_break_order": [
+            "fold review class",
+            "selection-support MSA observed fraction",
+            "selection-support unobserved mutation count",
+            "nucleic-acid-facing mutation count",
+            "nucleic-acid-facing chemistry warning count",
+            "nearest selected sequence distance",
+        ],
+        "handoff_readiness": {
+            "handoff_kind": "rt_only_candidate_handoff",
+            "panel_selected": True,
+            "candidate_handoff_path": "candidate_handoff.yaml",
+            "candidate_handoff_materialized": False,
+            "construct_subject_created": False,
+        },
         "plots": [
-            _plot_row(
+            plot_row(
                 plot_id="selection_design_class_gate_counts",
                 title=plots["selection_design_class_gate_counts"],
                 path="plots/selection_design_class_gate_counts.svg",
@@ -77,7 +113,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 interpretation_limit="Gate counts do not measure activity.",
                 input_hash_tail="a",
             ),
-            _plot_row(
+            plot_row(
                 plot_id="selection_panel_review_axes",
                 title=plots["selection_panel_review_axes"],
                 path="plots/selection_panel_review_axes.svg",
@@ -86,7 +122,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 interpretation_limit="Review axes do not measure strand displacement.",
                 input_hash_tail="b",
             ),
-            _plot_row(
+            plot_row(
                 plot_id="selection_panel_sequence_differences",
                 title=plots["selection_panel_sequence_differences"],
                 path="plots/selection_panel_sequence_differences.svg",
@@ -95,7 +131,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 interpretation_limit="Sequence differences do not measure activity.",
                 input_hash_tail="c",
             ),
-            _plot_row(
+            plot_row(
                 plot_id="selection_panel_mutation_geography_chemistry",
                 title=plots["selection_panel_mutation_geography_chemistry"],
                 path="plots/selection_panel_mutation_geography_chemistry.svg",
@@ -158,42 +194,6 @@ def _triage_row(*, candidate_id: str, msa_fraction: float, charge_delta: int) ->
         "catalytic_or_direct_contact_mutation_count": 0,
         "thumb_contact_track_mutation_count": 0,
         "distal_scaffold_mutation_count": 2,
+        "hard_gate_status": "eligible",
+        "sae_window_status": "wt_like_not_used_for_selection",
     }
-
-
-def _plot_row(
-    *,
-    plot_id: str,
-    title: str,
-    path: str,
-    alt_text: str,
-    description: str,
-    interpretation_limit: str,
-    input_hash_tail: str,
-) -> dict[str, object]:
-    return {
-        "plot_id": plot_id,
-        "title": title,
-        "artifact_kind": "svg",
-        "status": "rendered",
-        "path": path,
-        "data_sources": ["selection/candidate_selection_panel.parquet"],
-        "input_hashes": {"candidate_selection_panel": "sha256:" + input_hash_tail * 64},
-        "alt_text": alt_text,
-        "description": description,
-        "interpretation_limit": interpretation_limit,
-        "role": "manuscript_facing",
-        "render_mode": "wide_visual",
-    }
-
-
-def _write_svg(path: Path, *, plot_id: str, title: str) -> None:
-    path.write_text(
-        f"""<svg xmlns="http://www.w3.org/2000/svg" role="img" width="320" height="180">
-<title>{title}</title>
-<desc>Fixture panel-selection visual for review-deliverable linking.</desc>
-<text x="20" y="90">{plot_id}</text>
-</svg>
-""",
-        encoding="utf-8",
-    )

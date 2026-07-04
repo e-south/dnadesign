@@ -15,10 +15,12 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     resolve_manifest_path,
 )
+
+from .notebook_contract_text import notebook_contract_text
+from .notebook_selection_assertions import assert_selection_notebook_contract
 
 
 def assert_manifest_visual_contract(
@@ -55,20 +57,7 @@ def assert_manifest_visual_contract(
 def assert_review_notebook_contract(notebook_text: str) -> None:
     """Assert the generated marimo notebook stays plain and manifest-driven."""
 
-    runtime_path = repo_root() / (
-        "src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_runtime.py"
-    )
-    runtime_dir = runtime_path.parent
-    runtime_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (
-            runtime_path,
-            runtime_dir / "notebook_sae_features.py",
-            runtime_dir / "notebook_selection_panel.py",
-            runtime_dir / "notebook_structure_browser.py",
-        )
-    )
-    combined_text = notebook_text + "\n" + runtime_text
+    runtime_text, combined_text = notebook_contract_text(notebook_text)
     assert 'marimo.App(width="medium")' in notebook_text
     assert "notebook_runtime import" in notebook_text
     assert "review_deliverable_manifest.yaml" in combined_text
@@ -94,6 +83,8 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "ProteinMPNN proposes variants" in combined_text
     assert "unprotected" in combined_text
     assert "review surface follows" not in combined_text
+    assert "The notebook follows" not in combined_text
+    assert "Generated non-image artifact" not in combined_text
     assert "does not rerun ProteinMPNN" not in combined_text
     assert "This study asks" not in combined_text
     assert "review surface" not in combined_text
@@ -117,8 +108,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "Sequence proposals and fold checks" in combined_text
     assert "ESMC and SAE checks" in combined_text
     assert "Panel selection" in combined_text
-    assert "selection_panel_table" in combined_text
-    assert "Six Eco1 variants selected for assay review" in combined_text
+    assert_selection_notebook_contract(combined_text)
     assert "sae_feature_heatmap_manifest" in combined_text
     assert "is_sae_feature_heatmap_deliverable" in combined_text
     assert "render_sae_feature_heatmap" in combined_text

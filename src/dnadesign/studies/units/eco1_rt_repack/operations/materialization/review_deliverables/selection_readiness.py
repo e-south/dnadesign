@@ -21,7 +21,9 @@ from .manifest import file_hashes, make_deliverable_row
 
 _SELECTION_MANIFEST_RELATIVE_PATH = Path("design_classes/selection/selection_readiness_manifest.yaml")
 _PANEL_TABLE_ARTIFACT_KEY = "candidate_selection_panel"
+_FUNNEL_SUMMARY_DELIVERABLE_ID = "selection_funnel_summary"
 _PANEL_TABLE_DELIVERABLE_ID = "selection_panel_table"
+_HANDOFF_READINESS_DELIVERABLE_ID = "selection_handoff_readiness"
 
 
 def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
@@ -34,7 +36,9 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {manifest_path}")
     rows: list[dict[str, Any]] = []
+    rows.append(_funnel_summary_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_panel_table_row(manifest_path=manifest_path, loaded=loaded))
+    rows.append(_handoff_readiness_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_handoff_boundary_row(manifest_path=manifest_path))
     for plot in loaded.get("plots", []):
         if not isinstance(plot, dict):
@@ -71,6 +75,47 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
             )
         )
     return rows
+
+
+def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+    artifacts = loaded.get("artifacts") or {}
+    if not isinstance(artifacts, dict):
+        raise ValueError(f"Expected artifacts mapping in {manifest_path}")
+    input_paths = {"selection_readiness_manifest": manifest_path}
+    triage_value = str(artifacts.get("candidate_triage_table") or "")
+    if triage_value:
+        input_paths["candidate_triage_table"] = _resolve_manifest_path(manifest_path, triage_value)
+    panel_value = str(artifacts.get(_PANEL_TABLE_ARTIFACT_KEY) or "")
+    if panel_value:
+        input_paths["candidate_selection_panel"] = _resolve_manifest_path(manifest_path, panel_value)
+    return make_deliverable_row(
+        deliverable_id=_FUNNEL_SUMMARY_DELIVERABLE_ID,
+        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        artifact_kind="selection_funnel_summary",
+        status="linked_existing",
+        path=manifest_path,
+        source_tables=[
+            "design_classes/selection/selection_readiness_manifest.yaml",
+            "design_classes/selection/candidate_triage_table.parquet",
+            "design_classes/selection/candidate_selection_panel.parquet",
+        ],
+        input_hashes=file_hashes(input_paths),
+        alt_text="Selection-funnel summary table with row counts, gate counts, selected IDs, and policy notes.",
+        description=(
+            "Shows row counts, gate counts, selected IDs, and selection policy from selection_readiness_manifest.yaml."
+        ),
+        interpretation_limit=(
+            "ESMC and SAE are review annotations, not panel-selection evidence. The summary does not establish "
+            "activity, strand displacement, or structured-template readthrough."
+        ),
+        title="Eco1 panel-selection funnel summary",
+        role="manuscript_facing",
+        render_mode="table",
+        evidence_summary={
+            "selection_policy_id": str(loaded.get("selection_policy_id") or ""),
+            "selected_candidate_count": len(list(loaded.get("selected_candidate_ids") or [])),
+        },
+    )
 
 
 def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
@@ -114,6 +159,33 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
     )
 
 
+def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+    readiness = _normalized_handoff_readiness(manifest_path=manifest_path, loaded=loaded)
+    handoff_path = _resolve_manifest_path(manifest_path, str(readiness["candidate_handoff_path"]))
+    handoff_state = "present" if handoff_path.exists() else "absent"
+    return make_deliverable_row(
+        deliverable_id=_HANDOFF_READINESS_DELIVERABLE_ID,
+        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        artifact_kind="handoff_readiness",
+        status="linked_existing",
+        path=manifest_path,
+        source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
+        input_hashes=file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff": handoff_path}),
+        alt_text="Checklist for the RT-only candidate handoff boundary.",
+        description=(
+            f"candidate_handoff.yaml is {handoff_state}; panel selection remains separate from construct subject "
+            "creation."
+        ),
+        interpretation_limit=(
+            "The readiness state has no assay acceptance gate and does not create an RT-lnRNA construct subject."
+        ),
+        title="RT-only handoff readiness",
+        role="manuscript_facing",
+        render_mode="text",
+        evidence_summary={str(key): value for key, value in readiness.items()},
+    )
+
+
 def _handoff_boundary_row(*, manifest_path: Path) -> dict[str, Any]:
     return make_deliverable_row(
         deliverable_id="selection_handoff_boundary",
@@ -123,22 +195,34 @@ def _handoff_boundary_row(*, manifest_path: Path) -> dict[str, Any]:
         path=manifest_path,
         source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
         input_hashes=file_hashes({"selection_readiness_manifest": manifest_path}),
-        alt_text=(
-            "Text note stating that the computational Eco1 panel is selected but RT-only handoff is not materialized."
-        ),
+        alt_text="Text note stating that the Eco1 panel is selected but RT-only handoff remains separate.",
         description=(
-            "The current artifacts identify six computational panel candidates for assay review. The RT-only "
-            "candidate_handoff.yaml record is intentionally absent until the downstream handoff contract is "
-            "reviewed and accepted."
+            "Six RT-only candidates are selected for review. Create no construct subject until the downstream "
+            "RT-lnRNA handoff record is accepted."
         ),
         interpretation_limit=(
             "Panel selection is not construct creation and does not assert improved RT activity, strand "
             "displacement, or structured-template readthrough."
         ),
-        title="Computational panel selection is complete; RT-only handoff remains separate",
+        title="Panel selected; RT-only handoff remains separate",
         role="manuscript_facing",
         render_mode="text",
     )
+
+
+def _normalized_handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, object]:
+    raw = loaded.get("handoff_readiness") or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"Expected handoff_readiness mapping in {manifest_path}")
+    handoff_path = str(raw.get("candidate_handoff_path") or "candidate_handoff.yaml")
+    resolved = _resolve_manifest_path(manifest_path, handoff_path)
+    return {
+        "handoff_kind": str(raw.get("handoff_kind") or "rt_only_candidate_handoff"),
+        "panel_selected": bool(raw.get("panel_selected")),
+        "candidate_handoff_path": handoff_path,
+        "candidate_handoff_materialized": resolved.exists(),
+        "construct_subject_created": bool(raw.get("construct_subject_created")),
+    }
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:

@@ -42,6 +42,7 @@ def test_review_deliverable_visual_content_is_plain_and_linked(tmp_path: Path) -
     _assert_mask_and_msa_content(result.manifest_path, deliverables)
     _assert_proteinmpnn_content(result.manifest_path, deliverables)
     _assert_linked_fold_and_esmc_content(result.manifest_path, deliverables)
+    _assert_selection_content(deliverables)
     assert_chimerax_context_scripts(
         manifest_path=result.manifest_path,
         deliverables=deliverables,
@@ -158,6 +159,22 @@ def _assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict
     assert "model check of the WT sequence context" in str(
         deliverables["msa_plurality_vs_esmc_entropy"]["interpretation_limit"]
     )
+
+
+def _assert_selection_content(deliverables: dict[str, dict[str, object]]) -> None:
+    funnel = deliverables["selection_funnel_summary"]
+    assert funnel["path"].endswith("design_classes/selection/selection_readiness_manifest.yaml")
+    assert "row counts, gate counts, selected IDs, and selection policy" in str(funnel["description"])
+    assert "ESMC and SAE are review annotations, not panel-selection evidence" in str(funnel["interpretation_limit"])
+    assert "backend" not in str(funnel).lower()
+    assert "generated" not in str(funnel).lower()
+
+    readiness = deliverables["selection_handoff_readiness"]
+    assert "candidate_handoff.yaml is absent" in str(readiness["description"])
+    assert "construct subject" in str(readiness["description"])
+    assert "no assay acceptance gate" in str(readiness["interpretation_limit"])
+    assert "backend" not in str(readiness).lower()
+    assert "generated" not in str(readiness).lower()
 
 
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:

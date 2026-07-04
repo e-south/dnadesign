@@ -42,6 +42,7 @@ _ROOT_FILES = {
     "notebook_runtime.py",
     "notebook_sae_features.py",
     "notebook_selection_panel.py",
+    "notebook_selection_summary.py",
     "notebook_structure_browser.py",
     "notebook_structure_dashboard.py",
     "pipeline.py",

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 import yaml
@@ -246,6 +247,14 @@ def _write_manifest(
             "candidate_triage_table": len(triage_rows),
             "candidate_selection_panel": len(panel_rows),
         },
+        "gate_counts": {
+            "feasibility_status": _count_by(feasibility_rows, "feasibility_status"),
+            "hard_gate_status": _count_by(triage_rows, "hard_gate_status"),
+            "fold_review_class": _count_by(triage_rows, "fold_review_class"),
+            "sae_window_status": _count_by(triage_rows, "sae_window_status"),
+        },
+        "selected_candidate_ids": [str(row["candidate_id"]) for row in panel_rows],
+        "handoff_readiness": _handoff_readiness(path=path, panel_rows=panel_rows),
         "hard_gate_allowed_fold_classes": ["strong_fold_preserved", "good_fold_preserved"],
         "default_excluded_fold_classes": ["low_confidence", "review_band"],
         "panel_tie_break_order": [
@@ -262,6 +271,22 @@ def _write_manifest(
         ],
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _count_by(rows: list[dict[str, object]], key: str) -> dict[str, int]:
+    counts = Counter(str(row.get(key) or "missing") for row in rows)
+    return {value: counts[value] for value in sorted(counts)}
+
+
+def _handoff_readiness(*, path: Path, panel_rows: list[dict[str, object]]) -> dict[str, object]:
+    candidate_handoff_path = path.parent / "candidate_handoff.yaml"
+    return {
+        "handoff_kind": "rt_only_candidate_handoff",
+        "panel_selected": bool(panel_rows),
+        "candidate_handoff_path": candidate_handoff_path.name,
+        "candidate_handoff_materialized": candidate_handoff_path.exists(),
+        "construct_subject_created": False,
+    }
 
 
 def _resolve(repo_root: Path, path: Path) -> Path:

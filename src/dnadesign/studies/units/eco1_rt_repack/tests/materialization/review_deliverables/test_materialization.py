@@ -67,7 +67,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "selection_panel_review_axes",
         "selection_panel_sequence_differences",
         "selection_panel_mutation_geography_chemistry",
+        "selection_funnel_summary",
         "selection_panel_table",
+        "selection_handoff_readiness",
         "selection_handoff_boundary",
         "selected_panel_structure_browser_manifest",
     }
@@ -110,7 +112,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "selection_panel_review_axes" in visual_ids
     assert "selection_panel_sequence_differences" in visual_ids
     assert "selection_panel_mutation_geography_chemistry" in visual_ids
+    assert "selection_funnel_summary" in visual_ids
     assert "selection_panel_table" in visual_ids
+    assert "selection_handoff_readiness" in visual_ids
     assert "selection_handoff_boundary" in visual_ids
     assert "selected_panel_structure_browser_manifest" in visual_ids
     assert "feasibility_and_handoff_planned" not in visual_ids
@@ -141,8 +145,12 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
+    assert deliverables["selection_funnel_summary"]["artifact_kind"] == "selection_funnel_summary"
+    assert deliverables["selection_funnel_summary"]["status"] == "linked_existing"
     assert deliverables["selection_panel_table"]["artifact_kind"] == "selection_panel_table"
     assert deliverables["selection_panel_table"]["status"] == "linked_existing"
+    assert deliverables["selection_handoff_readiness"]["artifact_kind"] == "handoff_readiness"
+    assert deliverables["selection_handoff_readiness"]["status"] == "linked_existing"
     assert deliverables["selection_handoff_boundary"]["artifact_kind"] == "handoff_boundary"
     assert deliverables["selection_handoff_boundary"]["status"] == "linked_existing"
 

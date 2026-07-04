@@ -27,6 +27,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .notebook_selection_panel import render_selection_panel_table
+from .notebook_selection_summary import (
+    render_handoff_readiness,
+    render_selection_funnel_summary,
+)
 
 _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
     "foldcheck_review_structure_overlay_panel",
@@ -62,8 +66,7 @@ def render_intro(mo: Any) -> Any:
         "substrate contacts, and homolog conservation, then repack the remaining designable residues."
     )
     intro_flow = (
-        "The notebook follows the evidence in order: scaffold, mask evidence, sequence proposals, fold checks, "
-        "panel selection, and model checks. "
+        "Evidence order: scaffold, mask evidence, sequence proposals, fold checks, panel selection, and model checks. "
         "The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, retained-substrate "
         "proximity, and Mestre-derived clade 9 plurality at the 25% threshold. WT ESMC masked-marginal "
         "scoring appears beside those inputs as a model check, not as a mask input. "
@@ -168,15 +171,20 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
     """Render one visual artifact at notebook-column width."""
 
     media_path = resolve_manifest_path(manifest_root, str(row["path"]))
+    artifact_kind = str(row.get("artifact_kind") or "")
     suffix = media_path.suffix.lower()
-    if str(row.get("artifact_kind") or "") == "selection_panel_table":
+    if artifact_kind == "selection_funnel_summary":
+        return render_selection_funnel_summary(row, mo=mo, manifest_path=media_path)
+    if artifact_kind == "selection_panel_table":
         return render_selection_panel_table(row, mo=mo, table_path=media_path)
-    if str(row.get("artifact_kind") or "") == "handoff_boundary":
+    if artifact_kind == "handoff_readiness":
+        return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
+    if artifact_kind == "handoff_boundary":
         return _render_handoff_boundary(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return _render_image(row, mo=mo, media_path=media_path)
     if media_path.exists():
-        return mo.md(f"Generated non-image artifact: `{media_path}`")
+        return mo.md(f"Artifact file: `{media_path}`")
     skip_reason = str(row.get("skip_reason") or "artifact path does not exist")
     return mo.md(
         f"Artifact unavailable: `{media_path}`\n\nArtifact state: `{row.get('status')}`. Reason: {skip_reason}"
@@ -248,7 +256,11 @@ def format_deliverable_label(row: dict[str, Any] | str) -> str:
 def _is_publication_visual(row: dict[str, Any]) -> bool:
     if str(row.get("deliverable_id") or "") in _NOTEBOOK_HIDDEN_DELIVERABLE_IDS:
         return False
-    if str(row.get("artifact_kind") or "") == "selection_panel_table":
+    if str(row.get("artifact_kind") or "") in {
+        "selection_funnel_summary",
+        "selection_panel_table",
+        "handoff_readiness",
+    }:
         return str(row.get("status") or "") == "linked_existing"
     if str(row.get("artifact_kind") or "") == "handoff_boundary":
         return str(row.get("status") or "") == "linked_existing"

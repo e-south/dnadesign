@@ -19,7 +19,6 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
-    notebook_selection_panel,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
@@ -166,26 +165,6 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
     assert "MSA observed fraction" in rendered_text
     assert "NA-facing charge change" in rendered_text
     assert "Distal scaffold changes" in rendered_text
-
-
-def test_selection_panel_table_reads_metrics_from_trace_json(tmp_path: Path) -> None:
-    write_deliverable_inputs(tmp_path)
-    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
-    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
-    table_row = next(row for row in manifest["deliverables"] if row["deliverable_id"] == "selection_panel_table")
-    rendered = notebook_selection_panel.render_selection_panel_table(
-        table_row,
-        mo=FakeMo(),
-        table_path=result.manifest_path.parent / table_row["path"],
-    )
-    rows = rendered["items"][1]["rows"]
-
-    assert rows[0]["mutations"] == 2
-    assert rows[0]["pLDDT"] == 92.4
-    assert rows[0]["WT RMSD A"] == 0.82
-    assert rows[0]["cryoEM RMSD A"] == 1.23
-    assert rows[0]["unobserved MSA changes"] == 1
-    assert rows[0]["NA-facing charge change"] == 1
 
 
 def test_structure_browser_manifest_rejects_missing_declared_pdb(tmp_path: Path) -> None:
