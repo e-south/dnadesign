@@ -54,3 +54,9 @@ def test_feature_description_client_rejects_out_of_dictionary_index_before_reque
             sae_model=FEATURE_DESCRIPTION_SAE_MODEL,
             feature_index=FEATURE_DESCRIPTION_CODEBOOK_SIZE,
         )
+
+
+def test_feature_description_client_uses_public_biohub_base_url() -> None:
+    assert BiohubSaeFeatureDescriptionClient(base_url="https://www.biohub.ai/").base_url == "https://www.biohub.ai"
+    with pytest.raises(ValueError, match="Biohub API base URL"):
+        BiohubSaeFeatureDescriptionClient(base_url="https://example.org")

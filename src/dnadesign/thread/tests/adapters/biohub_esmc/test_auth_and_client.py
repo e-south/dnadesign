@@ -23,7 +23,9 @@ from dnadesign.thread.adapters.biohub_esmc import (
     BiohubEsmcClient,
     BiohubEsmcRequestError,
     load_biohub_credential,
+    validate_biohub_api_base_url,
 )
+from dnadesign.thread.adapters.biohub_esmc import client as biohub_client_module
 from dnadesign.thread.adapters.biohub_esmc.client import _read_response_body, extract_sequence_tokens
 
 
@@ -49,6 +51,40 @@ def test_load_biohub_credential_rejects_unexpected_label(tmp_path: Path) -> None
 
 def test_extract_sequence_tokens_accepts_documented_encode_shape() -> None:
     assert extract_sequence_tokens({"outputs": {"sequence": [0, 4, 5, 2]}}) == [0, 4, 5, 2]
+
+
+def test_validate_biohub_api_base_url_accepts_public_hosts() -> None:
+    assert validate_biohub_api_base_url("https://biohub.ai/") == "https://biohub.ai"
+    assert validate_biohub_api_base_url("https://www.biohub.ai") == "https://www.biohub.ai"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://biohub.ai",
+        "https://biohub.ai.example.org",
+        "https://biohub.ai:8443",
+        "https://biohub.ai/api",
+        "https://token@biohub.ai",
+        "https://biohub.ai?redirect=https://example.org",
+    ],
+)
+def test_validate_biohub_api_base_url_rejects_untrusted_or_ambiguous_urls(base_url: str) -> None:
+    with pytest.raises(ValueError, match="Biohub API base URL"):
+        validate_biohub_api_base_url(base_url)
+
+
+def test_authenticated_client_rejects_untrusted_base_url_before_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_urlopen(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("Biohub client should reject the base URL before opening a request")
+
+    monkeypatch.setattr(biohub_client_module, "urlopen", fail_urlopen)
+
+    with pytest.raises(ValueError, match="Biohub API base URL"):
+        BiohubEsmcClient(
+            credential=BiohubCredential(key_label="bu-dunlop-lab", token="fixture-secret"),
+            base_url="https://example.org",
+        )
 
 
 def test_client_uses_encode_then_logits_request_shape() -> None:

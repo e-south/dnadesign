@@ -16,6 +16,7 @@ from dnadesign.thread.adapters.biohub_esmc.client import (
     DEFAULT_ESMC_SAE_MODEL,
     BiohubEsmcClient,
     BiohubEsmcRequestError,
+    validate_biohub_api_base_url,
 )
 from dnadesign.thread.adapters.biohub_esmc.feature_descriptions import (
     FEATURE_DESCRIPTION_CODEBOOK_SIZE,
@@ -60,6 +61,7 @@ __all__ = [
     "raw_response_hash",
     "supports_feature_description_endpoint",
     "validate_biohub_esmc_artifacts",
+    "validate_biohub_api_base_url",
     "write_biohub_esmc_artifacts",
     "write_biohub_esmc_feature_catalog",
 ]

@@ -17,6 +17,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from dnadesign.thread.adapters.biohub_esmc.client import validate_biohub_api_base_url
 from dnadesign.thread.adapters.biohub_esmc.hashes import raw_response_hash
 
 FEATURE_DESCRIPTION_SAE_MODEL = "esmc-6b-2024-12-sae-layer60-k64-codebook16384"
@@ -81,6 +82,9 @@ class BiohubSaeFeatureDescriptionClient:
     base_url: str = "https://biohub.ai"
     timeout_seconds: float = 30.0
     user_agent: str = DEFAULT_FEATURE_DESCRIPTION_USER_AGENT
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "base_url", validate_biohub_api_base_url(self.base_url))
 
     def fetch(self, *, sae_model: str, feature_index: int) -> BiohubSaeFeatureDescription:
         """Fetch one source-backed feature description when the SAE dictionary is compatible."""
