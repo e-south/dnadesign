@@ -78,8 +78,19 @@ def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: P
     )
     readiness_text = str(readiness)
     assert "candidate_handoff.yaml is absent" in readiness_text
+    assert "candidate_handoff_sequence_csv_materialized" in readiness_text
     assert "construct_subject_created" in readiness_text
     assert "false" in readiness_text.lower()
+
+    sequences = notebook_runtime.render_deliverable_artifact(
+        deliverables["selection_handoff_sequences"],
+        mo=FakeMo(),
+        manifest_root=result.manifest_path.parent,
+    )
+    sequence_rows = sequences["items"][1]["rows"]
+    assert sequence_rows[0]["candidate_id"] == "thread_candidate_alpha"
+    assert sequence_rows[0]["protein_sequence"] == "MKSAGG"
+    assert sequence_rows[0]["dna_design_status"] == "not_materialized"
 
 
 def test_non_image_artifact_fallback_uses_manifest_relative_path(tmp_path: Path) -> None:

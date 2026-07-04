@@ -239,6 +239,7 @@ def materialize_review_deliverables(
             reference_structure_format=browser_reference.structure_format,
             alignment_reference_path=foldcheck_reference_backbone_path,
             candidate_table_path=candidate_table_path,
+            foldcheck_fasta_path=out_root / FOLDCHECK_REQUEST_INPUT_FASTA_RELATIVE_PATH,
             candidate_preference_table_path=candidate_preference_table_path,
         )
     )
@@ -259,6 +260,7 @@ def materialize_review_deliverables(
                 candidate_table_path=candidate_pool_path,
                 selection_panel_table_path=selected_panel_table_path,
                 triage_table_path=candidate_triage_table_path,
+                foldcheck_fasta_path=out_root / "design_classes" / "foldcheck_request" / "input_sequences.fasta",
                 candidate_preference_table_path=out_root
                 / "design_classes"
                 / "review_deliverables"

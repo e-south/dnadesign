@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
 import html
 from pathlib import Path
@@ -177,6 +178,8 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
         return render_selection_funnel_summary(row, mo=mo, manifest_path=media_path)
     if artifact_kind == "selection_panel_table":
         return render_selection_panel_table(row, mo=mo, table_path=media_path)
+    if artifact_kind == "candidate_handoff_sequence_csv":
+        return _render_handoff_sequence_csv(row, mo=mo, table_path=media_path)
     if artifact_kind == "handoff_readiness":
         return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
     if artifact_kind == "handoff_boundary":
@@ -260,6 +263,7 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
     if str(row.get("artifact_kind") or "") in {
         "selection_funnel_summary",
         "selection_panel_table",
+        "candidate_handoff_sequence_csv",
         "handoff_readiness",
     }:
         return str(row.get("status") or "") == "linked_existing"
@@ -315,6 +319,20 @@ def _render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
             caption_html,
         ],
         gap=0.15,
+    )
+
+
+def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Path) -> Any:
+    if not table_path.exists():
+        return mo.md(f"Selected sequence CSV unavailable: `{row.get('path')}`")
+    with table_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    return mo.vstack(
+        [
+            mo.Html("<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>Selected RT protein sequences</h3>"),
+            mo.ui.table(rows, page_size=10),
+        ],
+        gap=0.25,
     )
 
 

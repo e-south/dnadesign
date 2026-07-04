@@ -136,6 +136,9 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
         "thread_candidate_alpha",
         "thread_candidate_beta",
     }
+    alpha_row = next(row for row in selected_rows if row["candidate_id"] == "thread_candidate_alpha")
+    assert alpha_row["protein_sequence"] == "MKSAGG"
+    assert alpha_row["protein_sequence_length"] == 6
     group_lookup = structure_browser.structure_group_lookup(
         selected_rows,
         selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
@@ -160,6 +163,8 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
     rendered_text = str(rendered)
 
     assert "Variant dashboard" in rendered_text
+    assert "Protein sequence" in rendered_text
+    assert "MKSAGG" in rendered_text
     assert "Selection slot" in rendered_text
     assert "clade9_p25_contact5a" in rendered_text
     assert "MSA observed fraction" in rendered_text

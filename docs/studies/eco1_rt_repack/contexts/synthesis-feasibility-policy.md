@@ -89,3 +89,10 @@ placement/window feasibility belong to Construct when they become reusable.
 The first RT-lnRNA downstream handoff should carry RT-only candidate sequences
 and their provenance. It should not imply that a construct subject exists until
 the downstream study explicitly binds the RT to an lnRNA/TF-sponging context.
+
+The reviewer-facing sequence handoff should stay flat: selected candidate id,
+selection slot, protein sequence, sequence hash, feasibility state, and explicit
+DNA-design status belong in `candidate_handoff_sequences.csv`. The CSV is a
+protein-sequence table. E. coli codon design, DNA restriction-site screening,
+and any hosted sequence-optimization workflow are separate downstream steps and
+must not be implied by the protein-only handoff.

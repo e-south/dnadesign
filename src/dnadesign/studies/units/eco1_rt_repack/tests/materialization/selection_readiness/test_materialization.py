@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -49,6 +50,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert result.feasibility_report_path == selection_root / "feasibility_report.parquet"
     assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
+    assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
     assert result.plots_root == selection_root / "plots"
     assert result.manifest_path == selection_root / "selection_readiness_manifest.yaml"
 
@@ -86,6 +88,18 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "mutation_count_total" in panel[0]["tie_break_trace_json"]
     assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
 
+    with result.candidate_handoff_sequence_csv_path.open(encoding="utf-8", newline="") as handle:
+        handoff_sequence_rows = list(csv.DictReader(handle))
+    assert len(handoff_sequence_rows) == len(panel)
+    assert {row["candidate_id"] for row in handoff_sequence_rows} == {row["candidate_id"] for row in panel}
+    assert all(
+        row["protein_sequence"] == sequence(int(row["candidate_id"].split("_")[-1])) for row in handoff_sequence_rows
+    )
+    assert {row["dna_design_status"] for row in handoff_sequence_rows} == {"not_materialized"}
+    assert {row["restriction_site_screen_status"] for row in handoff_sequence_rows} == {
+        "not_applicable_until_dna_sequence_materialized"
+    }
+
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["gate_counts"]["hard_gate_status"] == {"eligible": len(panel), "ineligible": 2}
     assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
@@ -94,9 +108,13 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "handoff_kind": "rt_only_candidate_handoff",
         "panel_selected": True,
         "candidate_handoff_path": "candidate_handoff.yaml",
+        "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
+        "candidate_handoff_sequence_csv_materialized": True,
         "candidate_handoff_materialized": False,
         "construct_subject_created": False,
     }
+    assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
+    assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     assert [plot["plot_id"] for plot in manifest["plots"]] == [
         "selection_design_class_gate_counts",
         "selection_panel_review_axes",

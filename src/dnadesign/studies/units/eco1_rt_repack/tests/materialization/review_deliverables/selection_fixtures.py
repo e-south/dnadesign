@@ -18,39 +18,38 @@ import pyarrow.parquet as pq
 import yaml
 
 from .selection_plot_fixtures import plot_row, write_svg
+from .selection_sequence_fixtures import write_handoff_sequence_csv
+from .selection_table_fixtures import panel_row, triage_row
 
 
 def write_selection_readiness_manifest(selection_root: Path) -> None:
     plot_root = selection_root / "plots"
     plot_root.mkdir(parents=True, exist_ok=True)
-    pq.write_table(
-        pa.Table.from_pylist(
-            [
-                _panel_row(
-                    slot="clade9_p25_contact5a",
-                    candidate_id="thread_candidate_alpha",
-                    mutation_count=2,
-                    msa_fraction=0.75,
-                    na_facing=1,
-                    chemistry_warnings=0,
-                ),
-                _panel_row(
-                    slot="clade9_p25_contact6a",
-                    candidate_id="thread_candidate_beta",
-                    mutation_count=3,
-                    msa_fraction=0.6,
-                    na_facing=2,
-                    chemistry_warnings=1,
-                ),
-            ]
+    panel_rows = [
+        panel_row(
+            slot="clade9_p25_contact5a",
+            candidate_id="thread_candidate_alpha",
+            mutation_count=2,
+            msa_fraction=0.75,
+            na_facing=1,
+            chemistry_warnings=0,
         ),
-        selection_root / "candidate_selection_panel.parquet",
-    )
+        panel_row(
+            slot="clade9_p25_contact6a",
+            candidate_id="thread_candidate_beta",
+            mutation_count=3,
+            msa_fraction=0.6,
+            na_facing=2,
+            chemistry_warnings=1,
+        ),
+    ]
+    pq.write_table(pa.Table.from_pylist(panel_rows), selection_root / "candidate_selection_panel.parquet")
+    write_handoff_sequence_csv(selection_root / "candidate_handoff_sequences.csv", panel_rows)
     pq.write_table(
         pa.Table.from_pylist(
             [
-                _triage_row(candidate_id="thread_candidate_alpha", msa_fraction=0.75, charge_delta=1),
-                _triage_row(candidate_id="thread_candidate_beta", msa_fraction=0.6, charge_delta=-1),
+                triage_row(candidate_id="thread_candidate_alpha", msa_fraction=0.75, charge_delta=1),
+                triage_row(candidate_id="thread_candidate_beta", msa_fraction=0.6, charge_delta=-1),
             ]
         ),
         selection_root / "candidate_triage_table.parquet",
@@ -78,10 +77,12 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         "artifacts": {
             "candidate_triage_table": "candidate_triage_table.parquet",
             "candidate_selection_panel": "candidate_selection_panel.parquet",
+            "candidate_handoff_sequences": "candidate_handoff_sequences.csv",
         },
         "row_counts": {
             "candidate_triage_table": 2,
             "candidate_selection_panel": 2,
+            "candidate_handoff_sequences": 2,
         },
         "gate_counts": {
             "hard_gate_status": {"eligible": 2},
@@ -100,6 +101,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             "handoff_kind": "rt_only_candidate_handoff",
             "panel_selected": True,
             "candidate_handoff_path": "candidate_handoff.yaml",
+            "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
+            "candidate_handoff_sequence_csv_materialized": True,
             "candidate_handoff_materialized": False,
             "construct_subject_created": False,
         },
@@ -146,54 +149,3 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         yaml.safe_dump(payload, sort_keys=False),
         encoding="utf-8",
     )
-
-
-def _panel_row(
-    *,
-    slot: str,
-    candidate_id: str,
-    mutation_count: int,
-    msa_fraction: float,
-    na_facing: int,
-    chemistry_warnings: int,
-) -> dict[str, object]:
-    trace_json = (
-        f'{{"selection_support_alt_observed_fraction": {msa_fraction}, '
-        f'"selection_support_unobserved_mutation_count": 1, '
-        f'"mutation_count_total": {mutation_count}, '
-        f'"mean_plddt": 92.4, '
-        f'"wt_runtime_ca_rmsd": 0.82, '
-        f'"cryoem_mapped_ca_rmsd": 1.23, '
-        f'"nucleic_acid_facing_mutation_count": {na_facing}, '
-        f'"nucleic_acid_facing_charge_delta": 1, '
-        f'"nucleic_acid_facing_chemistry_warning_count": {chemistry_warnings}, '
-        f'"catalytic_or_direct_contact_mutation_count": 0, '
-        f'"thumb_contact_track_mutation_count": 0, '
-        f'"distal_scaffold_mutation_count": {mutation_count}}}'
-    )
-    return {
-        "selection_slot": slot,
-        "candidate_id": candidate_id,
-        "design_class_id": slot,
-        "fold_review_class": "strong_fold_preserved",
-        "feasibility_status": "pass",
-        "nearest_selected_distance_aa": 4,
-        "selection_reason": "fixture selected panel row",
-        "tie_break_trace_json": trace_json,
-    }
-
-
-def _triage_row(*, candidate_id: str, msa_fraction: float, charge_delta: int) -> dict[str, object]:
-    return {
-        "candidate_id": candidate_id,
-        "selection_support_alt_observed_fraction": msa_fraction,
-        "selection_support_unobserved_mutation_count": 1,
-        "nucleic_acid_facing_mutation_count": 2,
-        "nucleic_acid_facing_charge_delta": charge_delta,
-        "nucleic_acid_facing_chemistry_warning_count": 1,
-        "catalytic_or_direct_contact_mutation_count": 0,
-        "thumb_contact_track_mutation_count": 0,
-        "distal_scaffold_mutation_count": 2,
-        "hard_gate_status": "eligible",
-        "sae_window_status": "wt_like_not_used_for_selection",
-    }

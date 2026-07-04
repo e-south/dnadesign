@@ -21,8 +21,10 @@ from .manifest import file_hashes, make_deliverable_row
 
 _SELECTION_MANIFEST_RELATIVE_PATH = Path("design_classes/selection/selection_readiness_manifest.yaml")
 _PANEL_TABLE_ARTIFACT_KEY = "candidate_selection_panel"
+_HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY = "candidate_handoff_sequences"
 _FUNNEL_SUMMARY_DELIVERABLE_ID = "selection_funnel_summary"
 _PANEL_TABLE_DELIVERABLE_ID = "selection_panel_table"
+_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID = "selection_handoff_sequences"
 _HANDOFF_READINESS_DELIVERABLE_ID = "selection_handoff_readiness"
 
 
@@ -38,6 +40,7 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     rows.append(_funnel_summary_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_panel_table_row(manifest_path=manifest_path, loaded=loaded))
+    rows.append(_handoff_sequence_csv_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_handoff_readiness_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_handoff_boundary_row(manifest_path=manifest_path))
     for plot in loaded.get("plots", []):
@@ -159,6 +162,65 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
     )
 
 
+def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+    artifacts = loaded.get("artifacts") or {}
+    if not isinstance(artifacts, dict):
+        raise ValueError(f"Expected artifacts mapping in {manifest_path}")
+    table_value = str(artifacts.get(_HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY) or "")
+    if not table_value:
+        return make_deliverable_row(
+            deliverable_id=_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID,
+            section=SECTION_FEASIBILITY_AND_HANDOFF,
+            artifact_kind="candidate_handoff_sequence_csv",
+            status="skipped_missing_input",
+            path=manifest_path.parent / "candidate_handoff_sequences.csv",
+            source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
+            input_hashes=file_hashes({"selection_readiness_manifest": manifest_path}),
+            alt_text="Selected RT protein sequence CSV was not declared by the panel-selection manifest.",
+            description="Selected protein-sequence CSV is unavailable until selection readiness is regenerated.",
+            interpretation_limit="Missing sequence CSV cannot support handoff review.",
+            title="Selected RT protein sequences for handoff review",
+            role="manuscript_facing",
+            render_mode="table",
+            skip_reason="selection_readiness_manifest.yaml has no candidate_handoff_sequences artifact",
+        )
+    table_path = _resolve_manifest_path(manifest_path, table_value)
+    linked_status = "linked_existing" if table_path.exists() else "skipped_missing_input"
+    manifest_hashes = {
+        str(key): str(value)
+        for key, value in dict(loaded.get("artifact_hashes") or {}).items()
+        if str(key) == _HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY
+    }
+    return make_deliverable_row(
+        deliverable_id=_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID,
+        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        artifact_kind="candidate_handoff_sequence_csv",
+        status=linked_status,
+        path=table_path,
+        source_tables=[
+            "design_classes/selection/candidate_handoff_sequences.csv",
+            "design_classes/selection/candidate_selection_panel.parquet",
+        ],
+        input_hashes={
+            **manifest_hashes,
+            **file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff_sequences": table_path}),
+        },
+        alt_text="Flat CSV table of selected RT protein sequences and sequence-design status fields.",
+        description=(
+            "Lists selected RT protein sequences with sequence hashes, selection slots, feasibility state, "
+            "and explicit not-materialized DNA-design status."
+        ),
+        interpretation_limit=(
+            "This CSV is a protein-sequence handoff table. It is not an E. coli codon-optimized DNA design and it has "
+            "not passed DNA restriction-site screening."
+        ),
+        title="Selected RT protein sequences for handoff review",
+        role="manuscript_facing",
+        render_mode="table",
+        skip_reason="" if linked_status != "skipped_missing_input" else f"Missing handoff sequence CSV: {table_path}",
+    )
+
+
 def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     readiness = _normalized_handoff_readiness(manifest_path=manifest_path, loaded=loaded)
     handoff_path = _resolve_manifest_path(manifest_path, str(readiness["candidate_handoff_path"]))
@@ -216,10 +278,14 @@ def _normalized_handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]
         raise ValueError(f"Expected handoff_readiness mapping in {manifest_path}")
     handoff_path = str(raw.get("candidate_handoff_path") or "candidate_handoff.yaml")
     resolved = _resolve_manifest_path(manifest_path, handoff_path)
+    sequence_csv_path = str(raw.get("candidate_handoff_sequence_csv_path") or "candidate_handoff_sequences.csv")
+    sequence_csv_resolved = _resolve_manifest_path(manifest_path, sequence_csv_path)
     return {
         "handoff_kind": str(raw.get("handoff_kind") or "rt_only_candidate_handoff"),
         "panel_selected": bool(raw.get("panel_selected")),
         "candidate_handoff_path": handoff_path,
+        "candidate_handoff_sequence_csv_path": sequence_csv_path,
+        "candidate_handoff_sequence_csv_materialized": sequence_csv_resolved.exists(),
         "candidate_handoff_materialized": resolved.exists(),
         "construct_subject_created": bool(raw.get("construct_subject_created")),
     }

@@ -39,6 +39,7 @@ from .structure_browser_common import (
     relative_path,
     repo_relative_hint,
 )
+from .structure_sequences import sequence_by_candidate
 
 STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "interactive_structure_browser_manifest.yaml"
 SELECTED_PANEL_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "selected_panel_structure_browser_manifest.yaml"
@@ -54,6 +55,7 @@ def write_interactive_structure_browser_manifest(
     reference_structure_format: str,
     alignment_reference_path: Path,
     candidate_table_path: Path | None = None,
+    foldcheck_fasta_path: Path | None = None,
     candidate_preference_table_path: Path | None = None,
     selection_panel_table_path: Path | None = None,
     triage_table_path: Path | None = None,
@@ -88,6 +90,7 @@ def write_interactive_structure_browser_manifest(
         raise ValueError(f"Expected eco1_rt.foldcheck_full_structure_set at {full_structure_set_path}")
 
     ranking = _ranking_by_candidate(foldcheck_ranking_path)
+    sequences = sequence_by_candidate(candidate_table_path, foldcheck_fasta_path=foldcheck_fasta_path)
     selection = _selection_by_candidate(selection_panel_table_path)
     triage = _triage_by_candidate(triage_table_path)
     if not reference_structure_path.exists():
@@ -103,6 +106,7 @@ def write_interactive_structure_browser_manifest(
         source_root=full_structure_set_path.parent,
         manifest_root=manifest_path.parent,
         ranking=ranking,
+        sequences=sequences,
         selection=selection,
         triage=triage,
         mutations_by_candidate=_mutation_rows_by_candidate(
@@ -126,6 +130,9 @@ def write_interactive_structure_browser_manifest(
     if candidate_table_path is not None:
         source_tables.append(repo_relative_hint(candidate_table_path))
         input_hash_paths["candidate_table"] = candidate_table_path
+    if foldcheck_fasta_path is not None and foldcheck_fasta_path.exists():
+        source_tables.append(repo_relative_hint(foldcheck_fasta_path))
+        input_hash_paths["foldcheck_fasta"] = foldcheck_fasta_path
     if candidate_preference_table_path is not None and candidate_preference_table_path.exists():
         source_tables.append(repo_relative_hint(candidate_preference_table_path))
         input_hash_paths["candidate_preference_table"] = candidate_preference_table_path
@@ -195,6 +202,7 @@ def write_selected_panel_structure_browser_manifest(
     candidate_table_path: Path,
     selection_panel_table_path: Path,
     triage_table_path: Path,
+    foldcheck_fasta_path: Path | None = None,
     candidate_preference_table_path: Path | None = None,
 ) -> dict[str, Any]:
     """Write the selected-six structure-browser manifest from expanded fold-check outputs."""
@@ -207,6 +215,7 @@ def write_selected_panel_structure_browser_manifest(
         reference_structure_format=reference_structure_format,
         alignment_reference_path=alignment_reference_path,
         candidate_table_path=candidate_table_path,
+        foldcheck_fasta_path=foldcheck_fasta_path,
         candidate_preference_table_path=candidate_preference_table_path,
         selection_panel_table_path=selection_panel_table_path,
         triage_table_path=triage_table_path,
@@ -311,6 +320,7 @@ def _structure_rows(
     source_root: Path,
     manifest_root: Path,
     ranking: dict[str, dict[str, Any]],
+    sequences: dict[str, dict[str, Any]],
     selection: dict[str, dict[str, Any]],
     triage: dict[str, dict[str, Any]],
     mutations_by_candidate: dict[str, dict[str, Any]],
@@ -333,6 +343,7 @@ def _structure_rows(
         if selected_candidate_ids and candidate_id != "wild_type" and candidate_id not in selected_candidate_ids:
             continue
         rank_row = ranking.get(candidate_id, {})
+        sequence_row = sequences.get(candidate_id, {})
         selection_row = selection.get(candidate_id, {})
         triage_row = triage.get(candidate_id, {})
         mutation_payload = mutations_by_candidate.get(candidate_id, {})
@@ -353,6 +364,10 @@ def _structure_rows(
                 ),
                 "cryoem_mapped_ca_rmsd": nullable_float(rank_row.get("cryoem_mapped_ca_rmsd")),
                 "sequence_identity_percent": nullable_float(row.get("sequence_identity_percent")),
+                "protein_sequence": str(sequence_row.get("protein_sequence") or ""),
+                "protein_sequence_hash": str(sequence_row.get("sequence_hash") or ""),
+                "protein_sequence_length": nullable_int(sequence_row.get("amino_acid_length")),
+                "protein_sequence_source": str(sequence_row.get("sequence_source") or ""),
                 "mutation_count": nullable_int(rank_row.get("mutation_count"))
                 or len(mutation_payload.get("canonical_positions") or []),
                 "canonical_mutations": mutation_payload.get("canonical_mutations", []),

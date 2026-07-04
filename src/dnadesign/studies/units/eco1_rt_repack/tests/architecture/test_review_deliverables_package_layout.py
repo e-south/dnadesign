@@ -54,6 +54,7 @@ _ROOT_FILES = {
     "selection_readiness.py",
     "structure_browser.py",
     "structure_browser_common.py",
+    "structure_sequences.py",
 }
 
 

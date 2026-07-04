@@ -95,10 +95,13 @@ def _count_rows(*, row_counts: dict[str, Any], gate_counts: dict[str, Any]) -> l
 def _handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, object]:
     raw = _dict_or_empty(loaded.get("handoff_readiness"))
     handoff_path = str(raw.get("candidate_handoff_path") or "candidate_handoff.yaml")
+    sequence_csv_path = str(raw.get("candidate_handoff_sequence_csv_path") or "candidate_handoff_sequences.csv")
     return {
         "handoff_kind": str(raw.get("handoff_kind") or "rt_only_candidate_handoff"),
         "panel_selected": bool(raw.get("panel_selected")),
         "candidate_handoff_path": handoff_path,
+        "candidate_handoff_sequence_csv_path": sequence_csv_path,
+        "candidate_handoff_sequence_csv_materialized": (manifest_path.parent / sequence_csv_path).exists(),
         "candidate_handoff_materialized": (manifest_path.parent / handoff_path).exists(),
         "construct_subject_created": bool(raw.get("construct_subject_created")),
     }

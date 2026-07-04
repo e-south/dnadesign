@@ -11,14 +11,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import csv
 from collections import Counter
 from pathlib import Path
 
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
+    CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME,
     CANDIDATE_SELECTION_PANEL_FILE_NAME,
     CANDIDATE_TRIAGE_TABLE_FILE_NAME,
+    CODON_POLICY_ID,
     CREATED_BY,
     DEFAULT_CREATED_AT,
     DEFAULT_OUTPUT_ROOT,
@@ -95,6 +98,7 @@ def materialize_selection_readiness(
     feasibility_path = selected_root / FEASIBILITY_REPORT_FILE_NAME
     triage_path = selected_root / CANDIDATE_TRIAGE_TABLE_FILE_NAME
     panel_path = selected_root / CANDIDATE_SELECTION_PANEL_FILE_NAME
+    handoff_sequence_csv_path = selected_root / CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
     plots_root = selected_root / PLOTS_DIR_NAME
     feasibility_rows = build_feasibility_rows(
         candidate_rows=candidate_rows,
@@ -142,6 +146,11 @@ def materialize_selection_readiness(
         input_hashes=panel_hashes,
     )
     write_rows(panel_path, panel_rows, schema_id="eco1_rt.candidate_selection_panel")
+    handoff_sequence_rows = _write_candidate_handoff_sequence_csv(
+        handoff_sequence_csv_path,
+        panel_rows=panel_rows,
+        candidate_rows=candidate_rows,
+    )
     plot_hashes = dict(panel_hashes)
     plot_hashes["candidate_selection_panel"] = sha256_uri(panel_path)
     plot_rows = write_selection_readiness_plots(
@@ -159,16 +168,19 @@ def materialize_selection_readiness(
         feasibility_path=feasibility_path,
         triage_path=triage_path,
         panel_path=panel_path,
+        handoff_sequence_csv_path=handoff_sequence_csv_path,
         plot_rows=plot_rows,
         feasibility_rows=feasibility_rows,
         triage_rows=triage_rows,
         panel_rows=panel_rows,
+        handoff_sequence_rows=handoff_sequence_rows,
         created_at=created_at,
     )
     return MaterializedSelectionReadiness(
         feasibility_report_path=feasibility_path,
         candidate_triage_table_path=triage_path,
         candidate_selection_panel_path=panel_path,
+        candidate_handoff_sequence_csv_path=handoff_sequence_csv_path,
         plots_root=plots_root,
         manifest_path=manifest_path,
     )
@@ -199,10 +211,12 @@ def _write_manifest(
     feasibility_path: Path,
     triage_path: Path,
     panel_path: Path,
+    handoff_sequence_csv_path: Path,
     plot_rows: list[dict[str, object]],
     feasibility_rows: list[dict[str, object]],
     triage_rows: list[dict[str, object]],
     panel_rows: list[dict[str, object]],
+    handoff_sequence_rows: list[dict[str, object]],
     created_at: str,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -228,6 +242,7 @@ def _write_manifest(
             "feasibility_report": str(feasibility_path),
             "candidate_triage_table": str(triage_path),
             "candidate_selection_panel": str(panel_path),
+            "candidate_handoff_sequences": str(handoff_sequence_csv_path),
             "plots_root": str(path.parent / PLOTS_DIR_NAME),
         },
         "path_policy": "manifest_relative_for_plots",
@@ -239,6 +254,7 @@ def _write_manifest(
                 "feasibility_report": feasibility_path,
                 "candidate_triage_table": triage_path,
                 "candidate_selection_panel": panel_path,
+                "candidate_handoff_sequences": handoff_sequence_csv_path,
                 **{str(row["plot_id"]): Path(str(row["path"])) for row in plot_rows},
             }.items()
         },
@@ -246,6 +262,7 @@ def _write_manifest(
             "feasibility_report": len(feasibility_rows),
             "candidate_triage_table": len(triage_rows),
             "candidate_selection_panel": len(panel_rows),
+            "candidate_handoff_sequences": len(handoff_sequence_rows),
         },
         "gate_counts": {
             "feasibility_status": _count_by(feasibility_rows, "feasibility_status"),
@@ -280,13 +297,81 @@ def _count_by(rows: list[dict[str, object]], key: str) -> dict[str, int]:
 
 def _handoff_readiness(*, path: Path, panel_rows: list[dict[str, object]]) -> dict[str, object]:
     candidate_handoff_path = path.parent / "candidate_handoff.yaml"
+    handoff_sequence_csv_path = path.parent / CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
     return {
         "handoff_kind": "rt_only_candidate_handoff",
         "panel_selected": bool(panel_rows),
         "candidate_handoff_path": candidate_handoff_path.name,
+        "candidate_handoff_sequence_csv_path": handoff_sequence_csv_path.name,
+        "candidate_handoff_sequence_csv_materialized": handoff_sequence_csv_path.exists(),
         "candidate_handoff_materialized": candidate_handoff_path.exists(),
         "construct_subject_created": False,
     }
+
+
+_HANDOFF_SEQUENCE_CSV_FIELDS = [
+    "candidate_id",
+    "selection_slot",
+    "design_class_id",
+    "protein_sequence",
+    "sequence_hash",
+    "amino_acid_length",
+    "fold_review_class",
+    "feasibility_status",
+    "eligible_for_handoff",
+    "codon_policy_id",
+    "dna_design_status",
+    "restriction_site_screen_status",
+]
+
+
+def _write_candidate_handoff_sequence_csv(
+    path: Path,
+    *,
+    panel_rows: list[dict[str, object]],
+    candidate_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Write a flat selected-protein sequence table for review and handoff planning."""
+
+    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows}
+    output_rows: list[dict[str, object]] = []
+    for panel_row in panel_rows:
+        candidate_id = str(panel_row["candidate_id"])
+        candidate_row = candidate_by_id.get(candidate_id)
+        if candidate_row is None:
+            raise ValueError(f"Selected panel candidate is absent from candidate pool: {candidate_id}")
+        sequence = str(candidate_row.get("sequence") or "").strip().upper()
+        if not sequence:
+            raise ValueError(f"Selected panel candidate has no protein sequence: {candidate_id}")
+        candidate_hash = str(candidate_row.get("sequence_hash") or "")
+        panel_hash = str(panel_row.get("sequence_hash") or "")
+        if candidate_hash != panel_hash:
+            raise ValueError(
+                "Selected panel sequence hash does not match candidate pool for "
+                f"{candidate_id}: panel={panel_hash!r} candidate_pool={candidate_hash!r}"
+            )
+        output_rows.append(
+            {
+                "candidate_id": candidate_id,
+                "selection_slot": str(panel_row.get("selection_slot") or ""),
+                "design_class_id": str(panel_row.get("design_class_id") or ""),
+                "protein_sequence": sequence,
+                "sequence_hash": candidate_hash,
+                "amino_acid_length": len(sequence),
+                "fold_review_class": str(panel_row.get("fold_review_class") or ""),
+                "feasibility_status": str(panel_row.get("feasibility_status") or ""),
+                "eligible_for_handoff": str(bool(panel_row.get("eligible_for_handoff"))).lower(),
+                "codon_policy_id": CODON_POLICY_ID,
+                "dna_design_status": "not_materialized",
+                "restriction_site_screen_status": "not_applicable_until_dna_sequence_materialized",
+            }
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_HANDOFF_SEQUENCE_CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(output_rows)
+    return output_rows
 
 
 def _resolve(repo_root: Path, path: Path) -> Path:
