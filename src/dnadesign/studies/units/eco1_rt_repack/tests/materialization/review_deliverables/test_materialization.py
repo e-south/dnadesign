@@ -52,10 +52,12 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "msa_plurality_mask_panel",
         "msa_subtype_plurality_panel",
         "linear_mask_tracks",
+        "design_class_mask_overview",
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_mutation_density",
         "proteinmpnn_variant_similarity_heatmap",
         "proteinmpnn_tao_style_fold_validation",
+        "expanded_proteinmpnn_fold_validation",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
         "mask_structure_browser_manifest",
@@ -105,6 +107,8 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "proteinmpnn_mutation_density" not in visual_ids
     assert "proteinmpnn_tao_style_fold_validation" not in visual_ids
     assert "proteinmpnn_variant_similarity_heatmap" not in visual_ids
+    assert "design_class_mask_overview" in visual_ids
+    assert "expanded_proteinmpnn_fold_validation" in visual_ids
     assert "biohub_esmc_candidate_preference_vs_wt" not in visual_ids
     assert "biohub_esmc_sae_feature_activation_heatmap" not in visual_ids
     assert "biohub_esmc_sae_umap" not in visual_ids
@@ -145,6 +149,11 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "baseline" in deliverables["proteinmpnn_variant_similarity_heatmap"]["title"].lower()
     assert deliverables["proteinmpnn_tao_style_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["proteinmpnn_tao_style_fold_validation"]["role"] == "review_only"
+    assert deliverables["design_class_mask_overview"]["section"] == SECTION_CONSTRAINT_EVIDENCE
+    assert deliverables["design_class_mask_overview"]["role"] == "manuscript_facing"
+    assert deliverables["design_class_mask_overview"]["render_mode"] == "compact_wide_visual"
+    assert deliverables["expanded_proteinmpnn_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
+    assert deliverables["expanded_proteinmpnn_fold_validation"]["role"] == "manuscript_facing"
     assert deliverables["interactive_structure_browser_manifest"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF

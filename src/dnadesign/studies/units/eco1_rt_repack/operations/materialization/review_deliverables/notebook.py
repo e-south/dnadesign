@@ -183,11 +183,16 @@ def _(
             selected_section=selected_section,
             selected_deliverable_id=selected_visual_id,
         )
+        structure_group_label = "Structure group"
+        if selected_visual_id == "mask_structure_browser_manifest":
+            structure_group_label = "Mask evidence category"
+        elif selected_visual_id == "selected_panel_structure_browser_manifest":
+            structure_group_label = "Design class"
         structure_group_options = list(structure_group_map)
         structure_group_ui = mo.ui.dropdown(
             structure_group_options,
             value=structure_group_options[0] if structure_group_options else None,
-            label="Structure group",
+            label=structure_group_label,
             full_width=True,
         )
     return selected_visual_id, structure_group_map, structure_group_ui
@@ -272,25 +277,15 @@ def _(structure_highlight_map, structure_highlight_ui):
 
 
 @app.cell
-def _(is_interactive_structure_deliverable, mo, selected_visual):
-    if not is_interactive_structure_deliverable(selected_visual):
-        structure_background_ui = None
-        structure_mutation_ui = None
-        structure_sidechain_ui = None
-        structure_protein_ui = None
-        structure_dna_visible_ui = None
-        structure_dna_ui = None
-        structure_rna_visible_ui = None
-        structure_rna_ui = None
-    else:
-        structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
-        structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
-        structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
-        structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
-        structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
-        structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
-        structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
-        structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
+def _(mo):
+    structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
+    structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
+    structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
+    structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
+    structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
+    structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
+    structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
+    structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
     return (
         structure_background_ui,
         structure_dna_ui,

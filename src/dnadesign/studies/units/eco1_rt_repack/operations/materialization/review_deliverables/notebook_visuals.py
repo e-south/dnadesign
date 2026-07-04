@@ -23,11 +23,11 @@ def render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     encoded = base64.b64encode(media_path.read_bytes()).decode("ascii")
     alt_text = html.escape(str(row["alt_text"]), quote=True)
     caption = html.escape(_format_deliverable_label(row), quote=True)
-    is_wide = is_wide_visual(row)
     render_mode = html.escape(str(row.get("render_mode") or "standard_visual"), quote=True)
     container_id = f"zoomable-visual-{hashlib.sha256(str(media_path).encode()).hexdigest()[:12]}"
     image_id = f"{container_id}-image"
-    container_max_height = "86vh" if is_wide else "82vh"
+    container_max_height = _container_height(row)
+    container_min_height = _container_min_height(row)
     image_style = "display:block; width:100%; max-width:none; max-height:none; height:auto; transform-origin:top left;"
     zoom_controls = render_visual_zoom_controls(container_id)
     zoom_script = visual_zoom_script(container_id=container_id, image_id=image_id)
@@ -56,6 +56,7 @@ def render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
                 frame_html=frame_html,
                 title=f"Zoomable visual: {caption}",
                 height_css=container_max_height,
+                min_height_css=container_min_height,
             ),
             caption_html,
         ],
@@ -63,14 +64,15 @@ def render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     )
 
 
-def render_zoom_frame(*, mo: Any, frame_html: str, title: str, height_css: str) -> Any:
+def render_zoom_frame(*, mo: Any, frame_html: str, title: str, height_css: str, min_height_css: str = "520px") -> Any:
     safe_srcdoc = html.escape(frame_html, quote=True)
     safe_title = html.escape(title, quote=True)
     safe_height = html.escape(height_css, quote=True)
+    safe_min_height = html.escape(min_height_css, quote=True)
     return mo.Html(
         f"""
         <iframe title="{safe_title}" srcdoc="{safe_srcdoc}"
-                style="display:block; width:100%; height:{safe_height}; min-height:520px;
+                style="display:block; width:100%; height:{safe_height}; min-height:{safe_min_height};
                        border:0; margin:0; padding:0; background:#ffffff;"
                 loading="lazy"></iframe>
         """
@@ -198,7 +200,21 @@ def visual_zoom_script(*, container_id: str, image_id: str) -> str:
 def is_wide_visual(row: dict[str, Any]) -> bool:
     """Return whether a visual should preserve horizontal detail instead of squeezing to fit."""
 
-    return str(row.get("render_mode") or "") == "wide_visual"
+    return str(row.get("render_mode") or "") in {"wide_visual", "compact_wide_visual"}
+
+
+def _container_height(row: dict[str, Any]) -> str:
+    render_mode = str(row.get("render_mode") or "")
+    if render_mode == "compact_wide_visual":
+        return "42vh"
+    return "86vh" if is_wide_visual(row) else "82vh"
+
+
+def _container_min_height(row: dict[str, Any]) -> str:
+    render_mode = str(row.get("render_mode") or "")
+    if render_mode == "compact_wide_visual":
+        return "340px"
+    return "520px"
 
 
 def _format_deliverable_label(row: dict[str, Any]) -> str:

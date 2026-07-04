@@ -31,6 +31,8 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
     resolve_manifest_path,
 )
 
+from .proteinmpnn_visual_assertions import assert_proteinmpnn_visual_content
+
 
 def test_review_deliverable_visual_content_is_plain_and_linked(tmp_path: Path) -> None:
     write_deliverable_inputs(tmp_path)
@@ -40,7 +42,7 @@ def test_review_deliverable_visual_content_is_plain_and_linked(tmp_path: Path) -
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
     _assert_mask_and_msa_content(result.manifest_path, deliverables)
-    _assert_proteinmpnn_content(result.manifest_path, deliverables)
+    assert_proteinmpnn_visual_content(result.manifest_path, deliverables)
     _assert_linked_fold_and_esmc_content(result.manifest_path, deliverables)
     _assert_selection_content(deliverables)
     assert_chimerax_context_scripts(
@@ -61,6 +63,8 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert deliverables["msa_plurality_mask_panel"]["evidence_summary"]["current_mask_denominator"] is True
     assert "ec86_clade9_conservation_v1__" not in msa_text
     assert "WT plurality &gt;=25% (clade 9)" in msa_text
+    assert "WT plurality &gt;=50% (design-class threshold)" in msa_text
+    assert "Subtype II-A3/42_1 rows" in msa_text
     assert "C9 001 fig|fixture.1.peg.1" in msa_text
     assert "Mask-protected" in msa_text
 
@@ -73,6 +77,7 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert deliverables["msa_subtype_plurality_panel"]["evidence_summary"]["current_mask_denominator"] is False
     assert "II-A3 002 fig|fixture.2.peg.1" in subtype_text
     assert "WT plurality &gt;=25% (Eco1 subtype II-A3/42_1)" in subtype_text
+    assert "WT plurality &gt;=50% (design-class threshold)" in subtype_text
 
     mask_text = _read_deliverable(manifest_path, deliverables, "linear_mask_tracks")
     assert "Residue mask evidence across Ec86 RT" in mask_text
@@ -83,40 +88,15 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "M" in mask_text
     assert "K" in mask_text
 
-
-def _assert_proteinmpnn_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
-    diversity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_score_mutation_burden")
-    assert "Baseline ProteinMPNN proposal scores and mutation burden" in diversity_text
-    assert "Sequence identity to Ec86 WT (%)" in diversity_text
-    assert "Accepted designs retain a minority of WT residues." not in diversity_text
-    assert "Sampling temperature" in diversity_text
-    assert "ProteinMPNN score" in diversity_text
-    assert "Global score" in diversity_text
-
-    mutation_density_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_mutation_density")
-    assert "Baseline ProteinMPNN mutation density across allowed residues" in mutation_density_text
-    assert "RT1-RT7 annotation intervals" in mutation_density_text
-    assert "Retained DNA/RNA &lt;=5 A" in mutation_density_text
-    assert "Motif anchors: NAxxH/YADD/VTG" in mutation_density_text
-
-    similarity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_variant_similarity_heatmap")
-    assert "Baseline ProteinMPNN variants are mapped against the Ec86 WT sequence" in similarity_text
-    assert "Same as WT" in similarity_text
-    assert "Different from WT" in similarity_text
-    assert "Missing backbone context" in similarity_text
-    assert "canonical positions" in str(deliverables["proteinmpnn_variant_similarity_heatmap"]["description"])
-    assert "descriptive sequence-similarity view" in str(
-        deliverables["proteinmpnn_variant_similarity_heatmap"]["interpretation_limit"]
-    )
-
-    tao_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_tao_style_fold_validation")
-    assert "Baseline ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text
-    assert "WT-runtime C-alpha RMSD" in tao_text
-    assert "Mean pLDDT" in tao_text
-    assert "baseline" in str(deliverables["proteinmpnn_tao_style_fold_validation"]["description"]).lower()
-    assert "single active mask policy" in str(
-        deliverables["proteinmpnn_tao_style_fold_validation"]["interpretation_limit"]
-    )
+    design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
+    assert "Design-class mask rules show which residues were fixed or designable" in design_class_mask_text
+    assert "clade 9 p25, 5 A" in design_class_mask_text
+    assert "clade 9 p50, 5 A" in design_class_mask_text
+    assert "subtype p50, 5 A" in design_class_mask_text
+    assert "25% WT plurality" in design_class_mask_text
+    assert "50% WT plurality" in design_class_mask_text
+    assert "ProteinMPNN-designable residues" in design_class_mask_text
+    assert "current baseline only" not in design_class_mask_text.lower()
 
 
 def _assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:

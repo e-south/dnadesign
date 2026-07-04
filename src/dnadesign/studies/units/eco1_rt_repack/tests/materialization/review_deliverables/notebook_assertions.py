@@ -23,6 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
 
 from .notebook_contract_text import notebook_contract_text
 from .notebook_selection_assertions import assert_selection_notebook_contract
+from .notebook_structure_assertions import assert_structure_notebook_contract
 
 
 def assert_manifest_visual_contract(
@@ -122,50 +123,11 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "is_sae_feature_heatmap_deliverable" in combined_text
     assert "render_sae_feature_heatmap" in combined_text
     assert "sae_heatmap_feature_lookup" in combined_text
-    assert "structure_sidechain_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Side-chain sticks"' in notebook_text
-    assert "structure_protein_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Protein color"' in notebook_text
-    assert "structure_dna_ui = mo.ui.checkbox" in notebook_text
-    assert 'structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")' in notebook_text
-    assert 'label="DNA color"' in notebook_text
-    assert "structure_dna_visible_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Show DNA"' in notebook_text
-    assert "structure_rna_ui = mo.ui.checkbox" in notebook_text
-    assert 'structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")' in notebook_text
-    assert 'label="RNA color"' in notebook_text
-    assert "structure_rna_visible_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Show RNA"' in notebook_text
-    assert "WT Ec86 control" not in combined_text
     assert "SAE feature" in notebook_text
     assert "if not is_sae_feature_heatmap_deliverable(selected_visual):" in notebook_text
     assert "sae_heatmap_feature_ui = None" in notebook_text
-    assert "is_interactive_structure_deliverable(" in combined_text
-    assert "render_deliverable_details(" in combined_text
-    assert 'if selected_section == "fold_review":' not in notebook_text
     assert "No source-backed description is available for this exact SAE dictionary" not in combined_text
-    assert "Reference sequence, alignment, and mask" not in combined_text
-    assert "Reference scaffold and mask evidence" not in combined_text
-    assert "ColabFold structure triage" not in combined_text
-    assert 'structure_label = "Structure view"' in notebook_text
-    assert "label=structure_label" in notebook_text
-    assert "structure_group_ui = mo.ui.dropdown" in notebook_text
-    assert 'label="Structure group"' in notebook_text
-    assert "if not is_interactive_structure_deliverable(selected_visual):" in notebook_text
-    assert "structure_group_ui = None" in notebook_text
-    assert "structure_background_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Reference background"' in notebook_text
-    assert "structure_mutation_ui = mo.ui.checkbox" in notebook_text
-    assert 'label="Mutation differences"' in notebook_text
-    assert "show_sidechains" in notebook_text
-    assert "highlight_dna" in notebook_text
-    assert "highlight_rna" in notebook_text
-    assert "highlight_protein" in notebook_text
-    assert "show_dna" in notebook_text
-    assert "show_rna" in notebook_text
-    assert "selected_deliverable_id=selected_visual_id" in notebook_text
-    assert "selected_group=selected_structure_group" in notebook_text
-    assert "structure_group_lookup" in combined_text
+    assert_structure_notebook_contract(notebook_text=notebook_text, combined_text=combined_text)
     assert "_NOTEBOOK_HIDDEN_DELIVERABLE_IDS" in combined_text
     assert "LLR = log P(alternate) - log P(WT)" in combined_text
     assert "Method and row counts" in combined_text

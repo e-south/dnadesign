@@ -66,15 +66,18 @@ from .constants import (
     SUBTYPE_CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH,
     WT_MODEL_CHECK_DIR_NAME,
 )
+from .design_class_masks import write_design_class_mask_overview
 from .esmc_model_check import write_esmc_model_check_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
 from .mask_structure_browser import write_mask_structure_browser_manifest
 from .mask_tracks import write_linear_mask_tracks, write_mask_structure_context
 from .models import MaterializedReviewDeliverables
-from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, source_manifest_accessions, write_msa_plurality_mask_panel
+from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, write_msa_plurality_mask_panel
+from .msa_panel_data import source_manifest_accessions
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
+from .proteinmpnn_fold_validation import write_expanded_design_class_fold_validation
 from .sae_structure_browser import write_sae_structure_browser_manifest
 from .selection_readiness import linked_selection_readiness_rows
 from .structure_browser import (
@@ -139,6 +142,7 @@ def materialize_review_deliverables(
             conservation_profile_path=conservation_profile_path,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
+            subtype_source_manifest_path=subtype_conservation_source_manifest_path,
         ),
         write_msa_plurality_mask_panel(
             panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
@@ -153,6 +157,11 @@ def materialize_review_deliverables(
             panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
+        ),
+        write_design_class_mask_overview(
+            panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
+            baseline_mask_set_path=mask_set_path,
+            design_classes_root=out_root / "design_classes",
         ),
     ]
     deliverables.extend(
@@ -181,6 +190,17 @@ def materialize_review_deliverables(
             foldcheck_fasta_path=out_root / FOLDCHECK_REQUEST_INPUT_FASTA_RELATIVE_PATH,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
+        )
+    )
+    deliverables.append(
+        write_expanded_design_class_fold_validation(
+            panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
+            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
+            foldcheck_ranking_path=out_root
+            / "design_classes"
+            / "foldcheck_review"
+            / "foldcheck_candidate_ranking.parquet",
+            selection_panel_table_path=out_root / "design_classes" / "selection" / "candidate_selection_panel.parquet",
         )
     )
     deliverables.extend(_linked_foldcheck_review_rows(out_root / FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH))
