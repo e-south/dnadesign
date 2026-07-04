@@ -18,8 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
+    load_yaml,
+    write_yaml,
+)
 from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
 _DOCS_ROOT = Path("docs/studies/eco1_rt_repack")
@@ -79,7 +81,7 @@ def materialize_thread_plan(
         artifact_id=artifact_id,
     )
     thread_plan_path = out_root / "thread_plan.yaml"
-    thread_plan_path.write_text(yaml.safe_dump(thread_plan, sort_keys=False), encoding="utf-8")
+    write_yaml(thread_plan_path, thread_plan)
     return MaterializedThreadPlanArtifacts(thread_plan_path=thread_plan_path)
 
 
@@ -257,10 +259,7 @@ def _sha256(path: Path) -> str:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Expected YAML mapping at {path}")
-    return loaded
+    return load_yaml(path)
 
 
 def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:

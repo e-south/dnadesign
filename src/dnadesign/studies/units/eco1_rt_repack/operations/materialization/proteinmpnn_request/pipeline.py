@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
     find_repo_root,
     load_yaml,
@@ -23,6 +21,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
     require_text,
     resolve_output_root,
     resolve_source_ref,
+    write_yaml,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.structure_io import (
     load_first_model,
@@ -165,7 +164,7 @@ def materialize_proteinmpnn_request(
     )
     manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
     manifest_path = request_root / "request_manifest.yaml"
-    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    write_yaml(manifest_path, manifest)
     return MaterializedProteinMpnnRequestArtifacts(
         chain_a_backbone_pdb_path=chain_pdb_path,
         parsed_pdbs_path=parsed_pdbs_path,

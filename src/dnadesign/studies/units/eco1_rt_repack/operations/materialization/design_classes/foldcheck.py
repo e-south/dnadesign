@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
+    load_yaml,
+    write_yaml,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     CANDIDATE_POOL_FILE_NAME,
     DEFAULT_DESIGN_CLASSES_ROOT,
@@ -93,7 +95,7 @@ def materialize_design_class_foldcheck_request(
         storage_policy=STORAGE_POLICY,
     )
     request_manifest_path = request_root / "foldcheck_request_manifest.yaml"
-    request_manifest_path.write_text(yaml.safe_dump(request_manifest, sort_keys=False), encoding="utf-8")
+    write_yaml(request_manifest_path, request_manifest)
     return MaterializedDesignClassFoldCheckRequest(
         input_fasta_path=fasta_path,
         request_manifest_path=request_manifest_path,
@@ -106,7 +108,4 @@ def _resolve(repo_root: Path, path: Path) -> Path:
 
 
 def _load_yaml(path: Path) -> dict[str, object]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Expected YAML mapping at {path}")
-    return loaded
+    return load_yaml(path)

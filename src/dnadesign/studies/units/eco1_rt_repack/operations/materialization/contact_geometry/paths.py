@@ -22,6 +22,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
     _DEFAULT_OUTPUT_ROOT,
 )
 
+try:
+    from yaml import CSafeDumper as _SafeDumper
+    from yaml import CSafeLoader as _SafeLoader
+except ImportError:  # pragma: no cover - depends on optional LibYAML bindings
+    from yaml import SafeDumper as _SafeDumper
+    from yaml import SafeLoader as _SafeLoader
+
 
 def resolve_output_root(repo_root: Path, output_root: Path | None) -> Path:
     """Resolve the runtime output root against the repository root."""
@@ -68,10 +75,22 @@ def sha256(path: Path) -> str:
 def load_yaml(path: Path) -> dict[str, Any]:
     """Load a YAML mapping from disk."""
 
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    loaded = yaml.load(path.read_text(encoding="utf-8"), Loader=_SafeLoader)
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {path}")
     return loaded
+
+
+def dump_yaml(payload: object) -> str:
+    """Dump YAML with safe representers while preserving insertion order."""
+
+    return yaml.dump(payload, Dumper=_SafeDumper, sort_keys=False)
+
+
+def write_yaml(path: Path, payload: object) -> None:
+    """Write a safe YAML payload to disk."""
+
+    path.write_text(dump_yaml(payload), encoding="utf-8")
 
 
 def require_mapping(value: Any, name: str) -> Mapping[str, Any]:

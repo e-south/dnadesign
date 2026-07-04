@@ -17,8 +17,11 @@ from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
+    load_yaml,
+    write_yaml,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     BASELINE_CLASS_ID,
     CANDIDATE_POOL_FILE_NAME,
@@ -86,7 +89,7 @@ def materialize_design_class_candidate_pool(
             path: sha256_uri(Path(path)) for path in sorted({record["source_candidate_table"] for record in records})
         },
     }
-    pool_manifest_path.write_text(yaml.safe_dump(pool_manifest, sort_keys=False), encoding="utf-8")
+    write_yaml(pool_manifest_path, pool_manifest)
     return MaterializedDesignClassCandidatePool(candidate_pool_path=pool_path, manifest_path=pool_manifest_path)
 
 
@@ -159,7 +162,4 @@ def _resolve(repo_root: Path, path: Path) -> Path:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Expected YAML mapping at {path}")
-    return loaded
+    return load_yaml(path)

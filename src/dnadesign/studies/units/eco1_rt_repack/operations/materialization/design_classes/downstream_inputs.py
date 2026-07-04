@@ -16,8 +16,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import yaml
-
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import write_yaml
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     CANDIDATE_POOL_FILE_NAME,
     DEFAULT_DESIGN_CLASSES_ROOT,
@@ -105,7 +104,7 @@ def materialize_design_class_downstream_inputs(
             "mask_policy_id values, so mask-specific review must read the per-class mask_set.yaml files."
         ),
     }
-    manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    write_yaml(manifest_path, payload)
     return MaterializedDesignClassDownstreamInputs(
         candidate_table_path=candidate_table_path,
         manifest_path=manifest_path,

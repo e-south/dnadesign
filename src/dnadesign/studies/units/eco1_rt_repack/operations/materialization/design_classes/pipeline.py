@@ -16,8 +16,11 @@ from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
-import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
+    load_yaml,
+    write_yaml,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     CONSERVATION_SOURCES_PATH,
     CREATED_BY,
@@ -100,7 +103,7 @@ def materialize_design_class_requests(
         "design_classes": manifest_rows,
     }
     manifest_path = class_root / DESIGN_CLASS_MANIFEST_FILE_NAME
-    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    write_yaml(manifest_path, manifest)
     return MaterializedDesignClassRequests(
         manifest_path=manifest_path,
         class_artifacts=tuple(class_artifacts),
@@ -140,7 +143,7 @@ def _materialize_one_class(
         created_at=created_at,
     )
     mask_set_path = one_root / "mask_set.yaml"
-    mask_set_path.write_text(yaml.safe_dump(mask_set, sort_keys=False), encoding="utf-8")
+    write_yaml(mask_set_path, mask_set)
     thread_plan = materialize_thread_plan(
         repo_root=root,
         output_root=one_root,
@@ -275,7 +278,4 @@ def _resolve(repo_root: Path, path: Path) -> Path:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Expected YAML mapping at {path}")
-    return loaded
+    return load_yaml(path)
