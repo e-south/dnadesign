@@ -17,8 +17,6 @@ from typing import Any
 
 import yaml
 
-_SELECTION_HANDOFF_READINESS_DELIVERABLE_ID = "selection_handoff_readiness"
-
 
 def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_path: Path) -> Any:
     """Render selection-readiness counts and policy from the selection manifest."""

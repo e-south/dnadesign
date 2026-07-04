@@ -15,6 +15,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+import marimo
+
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     resolve_manifest_path,
 )
@@ -85,6 +87,9 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "review surface follows" not in combined_text
     assert "The notebook follows" not in combined_text
     assert "Generated non-image artifact" not in combined_text
+    assert f'__generated_with = "{marimo.__version__}"' in notebook_text
+    assert 'dnadesign.eco1_rt_repack.review_deliverables"' not in notebook_text
+    assert "For this section" not in combined_text
     assert "does not rerun ProteinMPNN" not in combined_text
     assert "This study asks" not in combined_text
     assert "review surface" not in combined_text

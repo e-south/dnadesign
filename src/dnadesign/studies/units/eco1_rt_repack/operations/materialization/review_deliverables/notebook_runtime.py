@@ -216,7 +216,7 @@ def render_deliverable_details(row: dict[str, Any], *, mo: Any) -> Any:
     method_summary = str(row.get("method_summary") or "")
     evidence_summary = row.get("evidence_summary") or {}
     if method_summary or evidence_summary:
-        method_text = method_summary or "For this section, LLR = log P(alternate) - log P(WT)."
+        method_text = method_summary or "LLR = log P(alternate) - log P(WT)."
         method_rows = [{"field": str(key), "value": str(value)} for key, value in dict(evidence_summary).items()]
         detail_panels["Method and row counts"] = mo.vstack(
             [mo.md(method_text), mo.ui.table(method_rows, page_size=8)],

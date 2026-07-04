@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from importlib.metadata import version
 from pathlib import Path
 
 
@@ -18,12 +19,12 @@ def write_review_deliverables_notebook(path: Path) -> None:
     """Write a compact marimo notebook for Eco1 review deliverables."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_NOTEBOOK_SOURCE, encoding="utf-8")
+    path.write_text(_NOTEBOOK_SOURCE.replace("__MARIMO_VERSION__", version("marimo")), encoding="utf-8")
 
 
 _NOTEBOOK_SOURCE = """import marimo
 
-__generated_with = "dnadesign.eco1_rt_repack.review_deliverables"
+__generated_with = "__MARIMO_VERSION__"
 app = marimo.App(width="medium")
 
 
