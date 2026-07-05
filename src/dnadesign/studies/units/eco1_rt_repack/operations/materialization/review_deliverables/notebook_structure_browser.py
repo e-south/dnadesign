@@ -162,8 +162,6 @@ def render_structure_browser(
     structure_mutation_ui: Any | None = None,
     structure_sidechain_ui: Any | None = None,
     structure_protein_ui: Any | None = None,
-    structure_dna_ui: Any | None = None,
-    structure_rna_ui: Any | None = None,
     structure_dna_visible_ui: Any | None = None,
     structure_rna_visible_ui: Any | None = None,
     show_reference_background: bool = True,
@@ -320,9 +318,7 @@ def render_structure_browser(
                         structure_sidechain_ui,
                         structure_protein_ui,
                         structure_dna_visible_ui,
-                        structure_dna_ui,
                         structure_rna_visible_ui,
-                        structure_rna_ui,
                     )
                     if item is not None
                 ],

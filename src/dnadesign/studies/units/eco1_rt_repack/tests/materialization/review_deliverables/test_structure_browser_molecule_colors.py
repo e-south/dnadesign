@@ -59,13 +59,11 @@ def test_structure_browser_runtime_can_toggle_molecule_class_colors(tmp_path: Pa
         structure_ui="<structure-dropdown>",
         structure_group_ui="<structure-group-dropdown>",
         structure_dna_visible_ui="<show-dna-toggle>",
-        structure_dna_ui="<dna-color-toggle>",
         structure_rna_visible_ui="<show-rna-toggle>",
-        structure_rna_ui="<rna-color-toggle>",
         show_dna=True,
         show_rna=True,
-        highlight_dna=False,
-        highlight_rna=False,
+        highlight_dna=True,
+        highlight_rna=True,
     )
     default_text = str(default_rendered)
     default_unescaped = html_lib.unescape(default_text).replace(" ", "")
@@ -76,8 +74,14 @@ def test_structure_browser_runtime_can_toggle_molecule_class_colors(tmp_path: Pa
         f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.REFERENCE_COLOR}",'
         f'"colorfunc":function(atom){{return"{browser_colors.REFERENCE_COLOR}";}}}}' in default_unescaped
     )
-    assert f'"color":"{browser_colors.DNA_CLASS_COLOR}"' not in default_unescaped
-    assert f'"color":"{browser_colors.RNA_CLASS_COLOR}"' not in default_unescaped
+    assert (
+        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.DNA_CLASS_COLOR}",'
+        f'"colorfunc":function(atom){{return"{browser_colors.DNA_CLASS_COLOR}";}}}}' in default_unescaped
+    )
+    assert (
+        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.RNA_CLASS_COLOR}",'
+        f'"colorfunc":function(atom){{return"{browser_colors.RNA_CLASS_COLOR}";}}}}' in default_unescaped
+    )
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
@@ -86,9 +90,7 @@ def test_structure_browser_runtime_can_toggle_molecule_class_colors(tmp_path: Pa
         structure_group_ui="<structure-group-dropdown>",
         structure_protein_ui="<protein-color-toggle>",
         structure_dna_visible_ui="<show-dna-toggle>",
-        structure_dna_ui="<dna-color-toggle>",
         structure_rna_visible_ui="<show-rna-toggle>",
-        structure_rna_ui="<rna-color-toggle>",
         highlight_protein=True,
         highlight_dna=True,
         highlight_rna=True,
@@ -98,9 +100,9 @@ def test_structure_browser_runtime_can_toggle_molecule_class_colors(tmp_path: Pa
 
     assert "<protein-color-toggle>" in rendered_text
     assert "<show-dna-toggle>" in rendered_text
-    assert "<dna-color-toggle>" in rendered_text
     assert "<show-rna-toggle>" in rendered_text
-    assert "<rna-color-toggle>" in rendered_text
+    assert "<dna-color-toggle>" not in rendered_text
+    assert "<rna-color-toggle>" not in rendered_text
     assert "Protein" in rendered_text
     assert "DNA" in rendered_text
     assert "RNA" in rendered_text
@@ -127,9 +129,7 @@ def test_structure_browser_runtime_can_toggle_molecule_class_colors(tmp_path: Pa
         structure_ui="<structure-dropdown>",
         structure_group_ui="<structure-group-dropdown>",
         structure_dna_visible_ui="<show-dna-toggle>",
-        structure_dna_ui="<dna-color-toggle>",
         structure_rna_visible_ui="<show-rna-toggle>",
-        structure_rna_ui="<rna-color-toggle>",
         show_dna=False,
         show_rna=True,
         highlight_dna=True,

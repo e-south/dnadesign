@@ -73,8 +73,8 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         selected_row=selected,
         structure_ui="<mask-highlight-dropdown>",
         structure_sidechain_ui="<side-chain-toggle>",
-        structure_dna_ui="<dna-color-toggle>",
-        structure_rna_ui="<rna-color-toggle>",
+        structure_dna_visible_ui="<show-dna-toggle>",
+        structure_rna_visible_ui="<show-rna-toggle>",
     )
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
@@ -88,8 +88,10 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert "Side-chain display:" not in rendered_text
     assert "Reference side-chain atoms are present and rendered as sticks" in rendered_text
     assert "<side-chain-toggle>" in rendered_text
-    assert "<dna-color-toggle>" in rendered_text
-    assert "<rna-color-toggle>" in rendered_text
+    assert "<show-dna-toggle>" in rendered_text
+    assert "<show-rna-toggle>" in rendered_text
+    assert "<dna-color-toggle>" not in rendered_text
+    assert "<rna-color-toggle>" not in rendered_text
     assert "What this structure view shows" not in rendered_text
     assert "All residues fixed by the baseline clade 9 p25 conservation" in rendered_text
     assert "Interpretation limit:" not in rendered_text
@@ -121,7 +123,7 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
         manual_mask_authority_source_path=manual_authority_path,
     )
 
-    mask_structure_browser.write_mask_structure_browser_manifest(
+    deliverable = mask_structure_browser.write_mask_structure_browser_manifest(
         panel_root=tmp_path / "review_deliverables" / "structure_browser",
         mask_set_path=tmp_path / "mask_set.yaml",
         reference_structure_path=tmp_path / "proteinmpnn_request" / "chain_a_backbone.pdb",
@@ -149,6 +151,23 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     assert "display-only rt annotation" in rt1["description"].lower()
     assert region_x["selection_styles"][0]["canonical_residue_numbers"] == [2, 3, 4]
     assert "rt_annotation_tracks" in manifest["source_hashes"]
+
+    rows = structure_browser.load_structure_browser_rows(
+        manifest_root=tmp_path,
+        deliverables=[deliverable],
+    )
+    highlight_lookup = structure_browser.structure_browser_lookup(
+        rows,
+        selected_section=SECTION_CONSTRAINT_EVIDENCE,
+        selected_deliverable_id="mask_structure_browser_manifest",
+        selected_group="Reference mask evidence",
+    )
+    assert "RT1 | 2 residues" in highlight_lookup
+    assert "RT2 | 2 residues" in highlight_lookup
+    assert "Region X context | 3 residues" in highlight_lookup
+    assert "Catalytic context | 3 residues" in highlight_lookup
+    assert "NAxxH | 1 residues" in highlight_lookup
+    assert "YADD | 1 residues" in highlight_lookup
 
 
 def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path: Path) -> None:

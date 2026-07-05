@@ -283,16 +283,12 @@ def _(mo):
     structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
     structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
     structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
-    structure_dna_ui = mo.ui.checkbox(value=False, label="DNA color")
     structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
-    structure_rna_ui = mo.ui.checkbox(value=False, label="RNA color")
     return (
         structure_background_ui,
-        structure_dna_ui,
         structure_dna_visible_ui,
         structure_mutation_ui,
         structure_protein_ui,
-        structure_rna_ui,
         structure_rna_visible_ui,
         structure_sidechain_ui,
     )
@@ -301,11 +297,9 @@ def _(mo):
 @app.cell
 def _(
     structure_background_ui,
-    structure_dna_ui,
     structure_dna_visible_ui,
     structure_mutation_ui,
     structure_protein_ui,
-    structure_rna_ui,
     structure_rna_visible_ui,
     structure_sidechain_ui,
 ):
@@ -329,10 +323,8 @@ def _(
         show_rna = bool(structure_rna_visible_ui.value)
     if structure_protein_ui is not None:
         highlight_protein = bool(structure_protein_ui.value)
-    if structure_dna_ui is not None:
-        highlight_dna = bool(structure_dna_ui.value)
-    if structure_rna_ui is not None:
-        highlight_rna = bool(structure_rna_ui.value)
+    highlight_dna = show_dna
+    highlight_rna = show_rna
     return (
         highlight_dna,
         highlight_protein,
@@ -410,7 +402,6 @@ def _(
     show_rna,
     show_sidechains,
     structure_background_ui,
-    structure_dna_ui,
     structure_dna_visible_ui,
     structure_highlight_ui,
     selected_structure_row,
@@ -418,7 +409,6 @@ def _(
     structure_group_ui,
     structure_mutation_ui,
     structure_protein_ui,
-    structure_rna_ui,
     structure_rna_visible_ui,
     structure_sidechain_ui,
     structure_ui,
@@ -440,8 +430,6 @@ def _(
                     structure_mutation_ui=structure_mutation_ui,
                     structure_sidechain_ui=structure_sidechain_ui,
                     structure_protein_ui=structure_protein_ui,
-                    structure_dna_ui=structure_dna_ui,
-                    structure_rna_ui=structure_rna_ui,
                     structure_dna_visible_ui=structure_dna_visible_ui,
                     structure_rna_visible_ui=structure_rna_visible_ui,
                     show_reference_background=show_reference_background,

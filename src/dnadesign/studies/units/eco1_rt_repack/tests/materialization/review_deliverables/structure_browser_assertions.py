@@ -26,8 +26,10 @@ def assert_candidate_structure_browser_render(rendered_text: str, unescaped_rend
     assert "<sae-highlight-dropdown>" in rendered_text
     assert "<side-chain-toggle>" in rendered_text
     assert "<protein-color-toggle>" in rendered_text
-    assert "<dna-color-toggle>" in rendered_text
-    assert "<rna-color-toggle>" in rendered_text
+    assert "<show-dna-toggle>" in rendered_text
+    assert "<show-rna-toggle>" in rendered_text
+    assert "<dna-color-toggle>" not in rendered_text
+    assert "<rna-color-toggle>" not in rendered_text
     assert "Selected SAE feature" in rendered_text
     assert "F101" in rendered_text
     assert "SAE activation region" in rendered_text
@@ -61,8 +63,14 @@ def assert_candidate_structure_browser_render(rendered_text: str, unescaped_rend
         f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.REFERENCE_COLOR}",'
         f'"colorfunc":function(atom){{return"{browser_colors.REFERENCE_COLOR}";}}}}' in unescaped_rendered
     )
-    assert f'"color":"{browser_colors.DNA_CLASS_COLOR}"' not in unescaped_rendered
-    assert f'"color":"{browser_colors.RNA_CLASS_COLOR}"' not in unescaped_rendered
+    assert (
+        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.DNA_CLASS_COLOR}",'
+        f'"colorfunc":function(atom){{return"{browser_colors.DNA_CLASS_COLOR}";}}}}' in unescaped_rendered
+    )
+    assert (
+        f'"cartoon":{{"style":"rectangle","ribbon":true,"color":"{browser_colors.RNA_CLASS_COLOR}",'
+        f'"colorfunc":function(atom){{return"{browser_colors.RNA_CLASS_COLOR}";}}}}' in unescaped_rendered
+    )
     assert f'"stick":{{"color":"{browser_colors.REFERENCE_COLOR}","radius":0.16}}' in unescaped_rendered
     assert f'"stick":{{"color":"{browser_colors.CANDIDATE_PASS_COLOR}","radius":0.16}}' not in unescaped_rendered
     assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (

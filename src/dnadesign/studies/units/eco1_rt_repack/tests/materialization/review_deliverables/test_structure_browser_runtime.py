@@ -76,9 +76,11 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         selected_highlight_row=selected_highlight,
         structure_sidechain_ui="<side-chain-toggle>",
         structure_protein_ui="<protein-color-toggle>",
-        structure_dna_ui="<dna-color-toggle>",
-        structure_rna_ui="<rna-color-toggle>",
+        structure_dna_visible_ui="<show-dna-toggle>",
+        structure_rna_visible_ui="<show-rna-toggle>",
         show_sidechains=True,
+        highlight_dna=True,
+        highlight_rna=True,
     )
     rendered_text = str(rendered)
     unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
