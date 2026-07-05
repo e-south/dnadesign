@@ -57,7 +57,7 @@ def write_tao_style_fold_validation(
 ) -> dict[str, Any]:
     """Render a joint fold-metric plot analogous to Tao-style AF2 filtering."""
 
-    title = "Baseline ProteinMPNN designs cluster by ColabFold RMSD and pLDDT"
+    title = "The original fixed-mask run has measurable ColabFold RMSD and pLDDT spread"
     source_tables = ["candidate_table.parquet", "foldcheck_review/foldcheck_candidate_ranking.parquet"]
     if not foldcheck_ranking_path.exists():
         return _skipped_fold_validation_row(
@@ -152,7 +152,7 @@ def write_expanded_design_class_fold_validation(
 ) -> dict[str, Any]:
     """Render the expanded design-class ProteinMPNN fold-validation panel."""
 
-    title = "Expanded ProteinMPNN design classes cluster by ColabFold RMSD and pLDDT"
+    title = "Expanded fixed-mask design classes preserve folds across RMSD and pLDDT checks"
     source_tables = [
         "design_classes/candidate_pool.parquet",
         "design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet",

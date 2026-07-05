@@ -137,7 +137,7 @@ def write_mask_structure_browser_manifest(
             "set is visually separable."
         ),
         interpretation_limit=payload["interpretation_limit"],
-        title="Ec86 reference structure maps fixed masks and RT annotations interactively",
+        title="The Ec86 structure shows which residues each fixed-mask rule protects",
         role="interactive_review",
     )
 
@@ -160,7 +160,7 @@ def _missing_mask_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]
         alt_text="Interactive mask structure browser was not generated.",
         description="Interactive mask highlighting is skipped until the reference backbone PDB exists.",
         interpretation_limit="Missing structure paths cannot support interactive mask review.",
-        title="Ec86 reference mask browser is skipped until the backbone PDB is available",
+        title="The Ec86 mask browser waits for the reference backbone PDB",
         role="interactive_review",
         skip_reason=f"Missing input reference structure: {missing_path}",
     )

@@ -95,7 +95,7 @@ def write_mask_structure_context(
                 "The script visualizes mask context only. It does not show candidate fold quality or activity."
             ),
             role="review_only",
-            title="ChimeraX recipe for the Ec86 mask-context view",
+            title="A ChimeraX recipe reproduces the active Ec86 mask-context view",
         ),
         make_deliverable_row(
             deliverable_id="mask_structure_context_orientation_template",
@@ -118,7 +118,7 @@ def write_mask_structure_context(
                 "mask, fold, or candidate evidence."
             ),
             role="operator_review",
-            title="Manual ChimeraX orientation template for the Ec86 reference",
+            title="A manual ChimeraX template preserves the Ec86 mask colors while tuning the camera",
         ),
     ]
     if not render_png:
@@ -153,7 +153,7 @@ def write_mask_structure_context(
             interpretation_limit="This render is a mask-context view, not a fold-check result.",
             role="optional_heavy",
             skip_reason=skip_reason,
-            title="Ec86 reference structure maps the fixed-residue mask",
+            title="The Ec86 reference structure shows the fixed residues protected by the active mask",
         )
     )
     return rows

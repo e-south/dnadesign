@@ -48,7 +48,7 @@ def write_feature_heatmap_manifest(
     mask_residues: list[dict[str, Any]],
     sae_provenance_audit: dict[str, Any],
 ) -> dict[str, Any]:
-    title = "Selected SAE feature activation across Eco1 RT variants"
+    title = "Selected SAE features activate across WT and ProteinMPNN RT variants"
     heatmap_root.mkdir(parents=True, exist_ok=True)
     path = heatmap_root / "sae_feature_heatmap_manifest.yaml"
     candidate_order = _candidate_order(protein_features_path, foldcheck_ranking_path)

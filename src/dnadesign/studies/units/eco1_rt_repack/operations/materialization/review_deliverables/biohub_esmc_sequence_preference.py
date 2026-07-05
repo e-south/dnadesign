@@ -41,7 +41,7 @@ MODEL_6B_CANDIDATE_SCORING_METHOD_ID = "esmc_6b_2024_12_additive_wt_single_subst
 PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_vs_wt"
 TABLE_DELIVERABLE_ID = "biohub_esmc_variant_llr_scores"
 MANIFEST_DELIVERABLE_ID = "biohub_esmc_sequence_scoring_manifest"
-TITLE = "Candidate ESMC additive LLR versus wild type"
+TITLE = "Candidate substitutions shift additive ESMC LLR relative to wild type"
 TITLE_6B = "6B ESMC WT-context additive LLR ranks Eco1 ProteinMPNN candidates relative to wild type"
 INTERPRETATION_LIMIT = (
     "This plot sums WT-context masked-marginal single-substitution LLR values for each candidate. "
@@ -154,7 +154,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
                 "metadata, request counts, and interpretation limits for the candidate-preference table and plot."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="Biohub ESMC candidate-preference method record",
+            title="The ESMC candidate-preference method records the WT-context scoring inputs",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="operator_review",
@@ -174,7 +174,7 @@ def write_biohub_esmc_sequence_preference_deliverables(
                 "single-substitution ESMC LLR and the same score normalized by mutation count."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="Biohub ESMC additive candidate LLR table",
+            title="The ESMC table records additive LLR scores for each ProteinMPNN candidate",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="review_only",

@@ -23,31 +23,24 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     """Assert baseline and expanded ProteinMPNN visuals stay plain and scoped."""
 
     diversity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_score_mutation_burden")
-    assert "Baseline ProteinMPNN proposal scores and mutation burden" in diversity_text
+    assert "ProteinMPNN proposal scores describe sampling variation before fold filtering" in diversity_text
     assert "Sequence identity to Ec86 WT (%)" in diversity_text
     assert "Accepted designs retain a minority of WT residues." not in diversity_text
     assert "Sampling temperature" in diversity_text
     assert "ProteinMPNN score" in diversity_text
     assert "Global score" in diversity_text
 
-    mutation_density_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_mutation_density")
-    assert "Baseline ProteinMPNN mutation density across allowed residues" in mutation_density_text
-    assert "RT1-RT7 annotation intervals" in mutation_density_text
-    assert "Retained DNA/RNA &lt;=5 A" in mutation_density_text
-    assert "Motif anchors: NAxxH/YADD/VTG" in mutation_density_text
-
-    similarity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_variant_similarity_heatmap")
-    assert "Baseline ProteinMPNN variants are mapped against the Ec86 WT sequence" in similarity_text
-    assert "Same as WT" in similarity_text
-    assert "Different from WT" in similarity_text
-    assert "Missing backbone context" in similarity_text
-    assert "canonical positions" in str(deliverables["proteinmpnn_variant_similarity_heatmap"]["description"])
-    assert "descriptive sequence-similarity view" in str(
-        deliverables["proteinmpnn_variant_similarity_heatmap"]["interpretation_limit"]
-    )
+    assert "proteinmpnn_variant_similarity_heatmap" not in deliverables
+    residue_frequency_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_residue_frequency_heatmap")
+    assert "ProteinMPNN samples alternate amino acids within each fixed-mask design class" in residue_frequency_text
+    assert "WT residue mark" in residue_frequency_text
+    assert "Changed residue count" in residue_frequency_text
+    assert "Clade 9 25% + 5 A" in residue_frequency_text
+    assert "II-A3/42_1 50% + 5 A" in residue_frequency_text
+    assert "Baseline ProteinMPNN mutation density across allowed residues" not in residue_frequency_text
 
     tao_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_tao_style_fold_validation")
-    assert "Baseline ProteinMPNN designs cluster by ColabFold RMSD and pLDDT" in tao_text
+    assert "The original fixed-mask run has measurable ColabFold RMSD and pLDDT spread" in tao_text
     assert "WT-runtime C-alpha RMSD" in tao_text
     assert "Mean pLDDT" in tao_text
     assert "baseline" in str(deliverables["proteinmpnn_tao_style_fold_validation"]["description"]).lower()
@@ -56,7 +49,7 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     )
 
     expanded_text = _read_deliverable(manifest_path, deliverables, "expanded_proteinmpnn_fold_validation")
-    assert "Expanded ProteinMPNN design classes cluster by ColabFold RMSD and pLDDT" in expanded_text
+    assert "Expanded fixed-mask design classes preserve folds across RMSD and pLDDT checks" in expanded_text
     assert "Design class" in expanded_text
     assert "Sampling temperature" in expanded_text
     assert "Temperature 0.1" in expanded_text

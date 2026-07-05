@@ -111,7 +111,7 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
             "ESMC and SAE are review annotations, not panel-selection evidence. The summary does not establish "
             "activity, strand displacement, or structured-template readthrough."
         ),
-        title="Eco1 panel-selection funnel summary",
+        title="Panel selection keeps fold checks separate from activity claims",
         role="manuscript_facing",
         render_mode="table",
         evidence_summary={
@@ -155,7 +155,7 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
             "The table records the proposed computational panel. It does not establish activity, strand "
             "displacement, or structured-template readthrough."
         ),
-        title="Six Eco1 variants selected for assay review",
+        title="Six Eco1 RT variants are selected for assay review",
         role="manuscript_facing",
         render_mode="table",
         skip_reason="" if linked_status != "skipped_missing_input" else f"Missing selection panel table: {table_path}",
@@ -179,7 +179,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
             alt_text="Selected RT protein sequence CSV was not declared by the panel-selection manifest.",
             description="Selected protein-sequence CSV is unavailable until selection readiness is regenerated.",
             interpretation_limit="Missing sequence CSV cannot support handoff review.",
-            title="Selected RT protein sequences for handoff review",
+            title="Selected RT protein sequences are exported as a flat handoff table",
             role="manuscript_facing",
             render_mode="table",
             skip_reason="selection_readiness_manifest.yaml has no candidate_handoff_sequences artifact",
@@ -214,7 +214,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
             "This CSV is a protein-sequence handoff table. It is not an E. coli codon-optimized DNA design and it has "
             "not passed DNA restriction-site screening."
         ),
-        title="Selected RT protein sequences for handoff review",
+        title="Selected RT protein sequences are exported as a flat handoff table",
         role="manuscript_facing",
         render_mode="table",
         skip_reason="" if linked_status != "skipped_missing_input" else f"Missing handoff sequence CSV: {table_path}",
@@ -241,7 +241,7 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         interpretation_limit=(
             "The readiness state has no assay acceptance gate and does not create an RT-lnRNA construct subject."
         ),
-        title="RT-only handoff readiness",
+        title="RT-only handoff remains blocked until candidate_handoff.yaml is materialized",
         role="manuscript_facing",
         render_mode="text",
         evidence_summary={str(key): value for key, value in readiness.items()},

@@ -53,7 +53,7 @@ def missing_model_check_row(panel_root: Path, mutation_scoring_root: Path) -> di
         alt_text="WT ESMC model check was skipped because mutation-scoring inputs were missing.",
         description="The WT ESMC masked-marginal review section requires the joined mask-context table.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title="WT ESMC model check",
+        title="WT ESMC masked-marginal checks wait for mutation-scoring inputs",
         method_summary=METHOD_SUMMARY,
         role="review_only",
         skip_reason=f"Missing input table: {mutation_scoring_root / 'wt_mutation_scoring_mask_join.parquet'}",

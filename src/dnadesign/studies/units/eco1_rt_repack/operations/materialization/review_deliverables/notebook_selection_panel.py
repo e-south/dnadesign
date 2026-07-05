@@ -37,7 +37,7 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
     table = pq.read_table(table_path)
     available_columns = [column for column in selected_columns if column in table.column_names]
     rows = table.select(available_columns).to_pylist()
-    title = html.escape(str(row.get("title") or "Six Eco1 variants selected for assay review"))
+    title = html.escape(str(row.get("title") or "Six Eco1 RT variants are selected for assay review"))
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),

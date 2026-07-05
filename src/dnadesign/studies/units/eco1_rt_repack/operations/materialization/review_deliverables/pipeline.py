@@ -195,10 +195,10 @@ def materialize_review_deliverables(
         write_proteinmpnn_diversity_panels(
             panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
             candidate_table_path=candidate_table_path,
+            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
+            design_classes_root=out_root / "design_classes",
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
-            foldcheck_fasta_path=out_root / FOLDCHECK_REQUEST_INPUT_FASTA_RELATIVE_PATH,
             mask_set_path=mask_set_path,
-            mask_residues=mask_residues,
         )
     )
     deliverables.append(
@@ -351,7 +351,11 @@ def _remove_retired_deliverables(deliverable_root: Path) -> None:
         retired = deliverable_root / dirname
         if retired.is_dir():
             shutil.rmtree(retired)
-    for relative_path in (Path(MASK_CONTEXT_DIR_NAME) / "linear_mask_tracks.svg",):
+    for relative_path in (
+        Path(MASK_CONTEXT_DIR_NAME) / "linear_mask_tracks.svg",
+        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_mutation_density.svg",
+        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_variant_similarity_heatmap.svg",
+    ):
         retired_file = deliverable_root / relative_path
         if retired_file.is_file():
             retired_file.unlink()
@@ -419,7 +423,7 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
                 description=str(plot.get("description") or ""),
                 interpretation_limit=str(plot.get("interpretation_limit") or ""),
                 title=str(plot.get("title") or ""),
-                role="review_only",
+                role="manuscript_facing" if plot_id == "review_class_counts" else "review_only",
                 skip_reason=str(plot.get("skip_reason") or "")
                 if linked_status != "skipped_missing_input"
                 else f"Missing linked fold-review visual: {plot_path}",

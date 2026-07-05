@@ -74,13 +74,14 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
     counts = Counter(str(row.get("review_class") or "metric_missing") for row in rows)
     labels = [label for label in _CLASS_ORDER if counts.get(label)]
     values = [counts[label] for label in labels]
-    fig, ax = plt.subplots(figsize=(6.8, 6.8))
+    title = "Fold-review thresholds separate preserved folds from review-band candidates"
+    fig, ax = plt.subplots(figsize=(5.8, 5.8))
     y_positions = list(range(len(labels)))
     ax.barh(y_positions, values, color=[_CLASS_COLORS[label] for label in labels])
     ax.set_yticks(y_positions, [_review_class_tick_label(label) for label in labels], fontsize=10.5)
     ax.invert_yaxis()
     ax.set_xlabel("Candidate count", fontsize=_LABEL_SIZE)
-    ax.set_title("Fold-review bins are threshold summaries", fontsize=_TITLE_SIZE, pad=10)
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     ax.grid(axis="x", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
     ax.tick_params(axis="x", labelsize=_TICK_SIZE)
@@ -94,13 +95,13 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
     _save_accessible_svg(
         fig,
         path,
-        title="Fold-review bins are threshold summaries",
+        title=title,
         description=alt,
     )
     return _plot_row(
         plot_id="review_class_counts",
         path=path,
-        title="Fold-review bins are threshold summaries",
+        title=title,
         alt_text=alt,
         description=(
             "Counts candidates in the fold-review bins used for structural inspection. "

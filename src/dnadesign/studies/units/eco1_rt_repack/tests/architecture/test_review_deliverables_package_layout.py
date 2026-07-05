@@ -57,7 +57,7 @@ _ROOT_FILES = {
     "proteinmpnn_diversity.py",
     "proteinmpnn_fold_validation.py",
     "proteinmpnn_fold_validation_support.py",
-    "proteinmpnn_variant_similarity.py",
+    "proteinmpnn_residue_frequency.py",
     "rendering.py",
     "rt_annotation_context.py",
     "sae_structure_browser.py",

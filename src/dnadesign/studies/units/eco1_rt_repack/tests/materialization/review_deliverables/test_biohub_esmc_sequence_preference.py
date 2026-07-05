@@ -85,7 +85,7 @@ def test_biohub_esmc_sequence_preference_deliverables_are_rendered(tmp_path: Pat
     assert score_rows[0]["scoring_method_id"] == "esmc_additive_wt_single_substitution_llr_v1"
 
     plot_text = _resolve_manifest_path(result.manifest_path, plot_row["path"]).read_text(encoding="utf-8")
-    assert "Candidate ESMC additive LLR versus wild type" in plot_text
+    assert "Candidate substitutions shift additive ESMC LLR relative to wild type" in plot_text
     assert "WT-context single-substitution LLR sum" in plot_text
     assert "thread_candidate_alpha" not in plot_text
     assert "Activity" not in plot_text

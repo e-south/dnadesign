@@ -34,7 +34,7 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
     ]
     count_rows = _count_rows(row_counts=row_counts, gate_counts=gate_counts)
     selected_rows = [{"candidate_id": candidate_id} for candidate_id in selected_ids]
-    title = html.escape(str(row.get("title") or "Eco1 panel-selection funnel summary"))
+    title = html.escape(str(row.get("title") or "Panel selection keeps fold checks separate from activity claims"))
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),
@@ -58,7 +58,9 @@ def render_handoff_readiness(row: dict[str, Any], *, mo: Any, manifest_path: Pat
         if handoff_path.exists()
         else "candidate_handoff.yaml is absent; panel selection remains separate from construct subjects."
     )
-    title = html.escape(str(row.get("title") or "RT-only handoff readiness"))
+    title = html.escape(
+        str(row.get("title") or "RT-only handoff remains blocked until candidate_handoff.yaml is materialized")
+    )
     checklist_rows = [{"field": str(key), "value": _display_value(value)} for key, value in readiness.items()]
     return mo.vstack(
         [

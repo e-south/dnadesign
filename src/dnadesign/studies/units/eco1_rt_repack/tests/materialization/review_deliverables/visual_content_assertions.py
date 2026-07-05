@@ -48,7 +48,10 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
     assert "linear_mask_tracks" not in deliverables
 
     design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
-    assert "Design-class residue mask evidence across EC86 RT" in design_class_mask_text
+    assert (
+        "Fixed residues combine catalytic, conservation, and substrate-proximity constraints across Ec86 RT"
+        in design_class_mask_text
+    )
     assert "WT amino acid" not in design_class_mask_text
     assert "Residue position" in design_class_mask_text
     assert "EC86 canonical residue position" not in design_class_mask_text
@@ -75,6 +78,8 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
     assert "Fixed-residue union" not in design_class_mask_text
     assert "Protected union" not in design_class_mask_text
     assert "current baseline only" not in design_class_mask_text.lower()
+
+    _assert_premise_titles(deliverables)
 
 
 def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
@@ -138,3 +143,18 @@ def assert_selection_content(deliverables: dict[str, dict[str, object]]) -> None
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:
     path = resolve_manifest_path(manifest_path, str(deliverables[deliverable_id]["path"]))
     return path.read_text(encoding="utf-8")
+
+
+def _assert_premise_titles(deliverables: dict[str, dict[str, object]]) -> None:
+    stale_titles = {
+        "Baseline ProteinMPNN variants are mapped against the Ec86 WT sequence",
+        "Baseline ProteinMPNN mutation density across allowed residues",
+        "Design-class residue mask evidence across EC86 RT",
+        "Eco1 panel-selection funnel summary",
+        "RT-only handoff readiness",
+    }
+    for deliverable_id, row in deliverables.items():
+        title = str(row.get("title") or "")
+        assert title, f"{deliverable_id} must carry a title"
+        assert not title.endswith("."), f"{deliverable_id} title must omit terminal periods"
+        assert title not in stale_titles, f"{deliverable_id} title still uses stale noun-label wording"
