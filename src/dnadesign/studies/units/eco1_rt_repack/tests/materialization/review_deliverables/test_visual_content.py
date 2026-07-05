@@ -84,12 +84,12 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
 
     design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
     assert "Design-class residue mask evidence across EC86 RT" in design_class_mask_text
-    assert "WT amino acid" in design_class_mask_text
+    assert "WT amino acid" not in design_class_mask_text
     assert "Residue position" in design_class_mask_text
     assert "EC86 canonical residue position" not in design_class_mask_text
     assert "EC86 per-residue ruler" not in design_class_mask_text
     assert "Mask evidence and design-class policy" not in design_class_mask_text
-    assert "Clade 9 25% + 5 A | 2 editable / 4 fixed" in design_class_mask_text
+    assert "Clade 9 25% + 5 A | 4 fixed" in design_class_mask_text
     assert "Clade 9 25% + 6 A" in design_class_mask_text
     assert "Clade 9 25% + 8 A" in design_class_mask_text
     assert "Clade 9 25% + 10 A" in design_class_mask_text
@@ -105,6 +105,7 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "DNA/RNA contact threshold" not in design_class_mask_text
     assert "Fixed by design-class policy" not in design_class_mask_text
     assert "Designable by design-class policy" not in design_class_mask_text
+    assert "editable" not in design_class_mask_text
     assert "#009e73" not in design_class_mask_text.lower()
     assert "Fixed-residue union" not in design_class_mask_text
     assert "Protected union" not in design_class_mask_text

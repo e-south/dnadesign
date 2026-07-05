@@ -50,12 +50,11 @@ _STATE_WANG = 2
 _STATE_CONSERVATION = 3
 _STATE_CONTACT = 4
 _STATE_FIXED = 5
-_STATE_DESIGNABLE = 6
-_STATE_MISSING_BACKBONE = 7
 _MASK_AXIS_FONT_SIZE = 11.0
+_TOP_AMINO_ACID_FONT_SIZE = 3.2
 _POSITION_MINOR_TICK_STEP = 1
 _BOTTOM_POSITION_LABEL_STEP = 20
-_TOP_AMINO_ACID_LABEL_STEP = 5
+_TOP_AMINO_ACID_LABEL_STEP = 1
 _STATE_COLORS = (
     "#f8f7f2",
     OKABE_ITO["vermillion"],
@@ -63,8 +62,6 @@ _STATE_COLORS = (
     OKABE_ITO["blue"],
     OKABE_ITO["orange"],
     "#222222",
-    OKABE_ITO["sky"],
-    "#b8b8b8",
 )
 
 
@@ -127,7 +124,7 @@ def write_design_class_mask_overview(
     alt = (
         "Matrix comparing Eco1 RT mask evidence and the six ProteinMPNN design-class masks. Evidence rows "
         "separate motif anchors, Wang/EC86 priors, WT-plurality cutoffs, and retained DNA/RNA proximity rows. "
-        "Class rows show which residues are fixed or editable."
+        "Class rows show which residues are fixed."
     )
     save_accessible_svg(fig, path, title=title, description=alt, dpi=300)
     return make_deliverable_row(
@@ -141,8 +138,8 @@ def write_design_class_mask_overview(
         alt_text=alt,
         description=(
             "Provides one residue-coordinate source of truth for mask review. Evidence rows show motif, "
-            "prior, conservation, and retained DNA/RNA proximity rules; class rows show fixed and editable "
-            "residues for the six design classes."
+            "prior, conservation, and retained DNA/RNA proximity rules; class rows show fixed residues for "
+            "the six design classes."
         ),
         interpretation_limit=(
             "Mask membership explains the ProteinMPNN design surface. It does not rank sequences, "
@@ -300,12 +297,11 @@ def _conservation_axis_label(*, profile_id: str, threshold: int) -> str:
 
 
 def _class_axis_label(row: dict[str, Any]) -> str:
-    designable = int(row["designable_count"])
     protected = int(row["protected_count"])
     threshold = int(round(float(row["conservation_threshold"]) * 100))
     contact = int(round(float(row["contact_threshold_angstrom"])))
     class_basis = f"{_profile_label(str(row['conservation_profile_id']))} {threshold}% + {contact} A"
-    return f"{class_basis} | {designable} editable / {protected} fixed"
+    return f"{class_basis} | {protected} fixed"
 
 
 def _matrix_state(row: dict[str, Any], position: int) -> int:
@@ -317,10 +313,6 @@ def _matrix_state(row: dict[str, Any], position: int) -> int:
 def _policy_state_value(residue: dict[str, Any] | None) -> int:
     if residue is None:
         return _STATE_EMPTY
-    if bool(residue.get("non_fixed_missing_backbone")):
-        return _STATE_MISSING_BACKBONE
-    if bool(residue.get("non_fixed")):
-        return _STATE_DESIGNABLE
     if bool(residue.get("protected")):
         return _STATE_FIXED
     return _STATE_EMPTY
@@ -357,12 +349,11 @@ def _add_top_amino_acid_axis(ax: Any, positions: list[int], *, wt_aa_by_position
     top_ax.set_xticks(
         top_tick_indexes,
         [wt_aa_by_position[positions[index]] for index in top_tick_indexes],
-        fontsize=_MASK_AXIS_FONT_SIZE,
+        fontsize=_TOP_AMINO_ACID_FONT_SIZE,
     )
-    top_ax.set_xticks(_minor_position_tick_indexes(positions), minor=True)
-    top_ax.set_xlabel("WT amino acid", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
-    top_ax.tick_params(axis="x", which="major", length=3.2, labelsize=_MASK_AXIS_FONT_SIZE, pad=3)
-    top_ax.tick_params(axis="x", which="minor", length=1.3, color="#737373")
+    for tick_label in top_ax.get_xticklabels():
+        tick_label.set_fontfamily("DejaVu Sans Mono")
+    top_ax.tick_params(axis="x", which="major", length=1.2, labelsize=_TOP_AMINO_ACID_FONT_SIZE, pad=2)
     top_ax.tick_params(axis="y", which="both", left=False, labelleft=False)
     top_ax.spines[["right", "left", "bottom"]].set_visible(False)
     top_ax.spines["top"].set_color("#737373")
