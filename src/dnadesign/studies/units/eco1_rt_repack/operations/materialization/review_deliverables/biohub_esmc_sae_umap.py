@@ -44,7 +44,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 DELIVERABLE_ID = "biohub_esmc_sae_delta_umap"
 FILE_NAME = "sae_delta_umap_vs_wt_llr.svg"
 EMBEDDING_METHOD_ID = "umap_delta_activation_sum_cosine_v1"
-TITLE = "SAE activation deltas place Eco1 variants near WT in model-feature space"
+TITLE = "SAE deltas keep variants near WT"
 INTERPRETATION_LIMIT = (
     "This plot embeds Biohub ESMC SAE activation-sum deltas relative to WT. It is not evidence of "
     "discrete biological clusters, protein activity, or whole-protein likelihood."

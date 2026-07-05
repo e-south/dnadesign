@@ -90,7 +90,7 @@ def write_design_class_mask_overview(
 
     matrix_rows = _mask_matrix_rows(class_rows)
     matrix = [[_matrix_state(row, position) for position in positions] for row in matrix_rows]
-    title = "Fixed residues combine catalytic, conservation, and substrate-proximity constraints across Ec86 RT"
+    title = "Fixed residues combine motif, conservation, and substrate rules"
     fig_width = max(13.8, min(20.0, len(positions) * 0.06))
     fig_height = max(7.6, len(matrix_rows) * 0.35 + 2.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))

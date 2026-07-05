@@ -85,7 +85,7 @@ def test_biohub_esmc_sequence_preference_deliverables_are_rendered(tmp_path: Pat
     assert score_rows[0]["scoring_method_id"] == "esmc_additive_wt_single_substitution_llr_v1"
 
     plot_text = _resolve_manifest_path(result.manifest_path, plot_row["path"]).read_text(encoding="utf-8")
-    assert "Candidate substitutions shift additive ESMC LLR relative to wild type" in plot_text
+    assert "Candidate substitutions shift ESMC LLR" in plot_text
     assert "WT-context single-substitution LLR sum" in plot_text
     assert "thread_candidate_alpha" not in plot_text
     assert "Activity" not in plot_text
@@ -136,7 +136,7 @@ def test_biohub_esmc_sequence_preference_adds_6b_lane_and_model_agreement(tmp_pa
     agreement_plot_text = _resolve_manifest_path(result.manifest_path, agreement_row["path"]).read_text(
         encoding="utf-8"
     )
-    assert "300M and 6B ESMC additive LLR scores disagree" in agreement_plot_text
+    assert "300M and 6B ESMC scores differ by candidate" in agreement_plot_text
     assert "stability" not in agreement_row["title"].lower()
     assert not stale_plot_path.exists()
 

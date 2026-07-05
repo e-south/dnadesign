@@ -71,7 +71,7 @@ def test_msa_plurality_panel_renders_all_source_rows_without_arbitrary_cutoff(tm
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
     msa_text = _read_deliverable(result.manifest_path, deliverables, "msa_plurality_mask_panel")
-    assert "The 52-record clade 9 MSA shows the active 25% WT-plurality mask denominator" in msa_text
+    assert "Clade 9 conservation defines the baseline mask" in msa_text
     assert "all 52 accepted alignment rows" in str(deliverables["msa_plurality_mask_panel"]["alt_text"])
     assert "C9 051 fig|fixture.51.peg.1" in msa_text
     assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text

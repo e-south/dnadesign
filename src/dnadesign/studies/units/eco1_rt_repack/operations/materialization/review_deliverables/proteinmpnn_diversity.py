@@ -90,7 +90,7 @@ def _write_score_mutation_burden(
     rows: list[dict[str, Any]],
     candidate_table_path: Path,
 ) -> dict[str, Any]:
-    title = "ProteinMPNN proposal scores describe sampling variation before fold filtering"
+    title = "ProteinMPNN scores describe proposal spread"
     fig, axes = plt.subplots(1, 2, figsize=(10.0, 4.55))
     temperatures = [float(row["temperature"]) for row in rows]
     colors = [_temperature_color(temperature) for temperature in temperatures]

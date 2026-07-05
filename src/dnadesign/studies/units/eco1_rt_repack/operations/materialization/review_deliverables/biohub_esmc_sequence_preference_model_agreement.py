@@ -27,7 +27,7 @@ from .biohub_esmc_sequence_preference_plot import render_model_agreement_plot
 from .constants import SECTION_ESMC_FEATURE_REVIEW
 
 SECTION = SECTION_ESMC_FEATURE_REVIEW
-MODEL_AGREEMENT_TITLE = "300M and 6B ESMC additive LLR scores disagree"
+MODEL_AGREEMENT_TITLE = "300M and 6B ESMC scores differ by candidate"
 MODEL_AGREEMENT_TABLE_FILE_NAME = "esmc_candidate_preference_model_agreement.parquet"
 MODEL_AGREEMENT_PLOT_FILE_NAME = "esmc_candidate_preference_model_agreement.svg"
 STALE_MODEL_STABILITY_FILE_NAMES = (

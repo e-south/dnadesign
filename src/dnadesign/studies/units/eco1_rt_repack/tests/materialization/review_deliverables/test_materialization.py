@@ -60,6 +60,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_residue_frequency_heatmap",
         "expanded_proteinmpnn_fold_validation",
+        "foldcheck_review_review_class_counts",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
         "mask_structure_browser_manifest",
@@ -94,11 +95,15 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
     assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
-    assert "fixed-mask rule protects" in deliverables["mask_structure_browser_manifest"]["title"].lower()
+    assert deliverables["mask_structure_browser_manifest"]["title"] == "The EC86 structure maps each fixed-mask rule"
     assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
-    assert "reference-fitted colabfold" in deliverables["interactive_structure_browser_manifest"]["title"].lower()
+    assert deliverables["interactive_structure_browser_manifest"]["title"] == (
+        "Folded candidates can be inspected one at a time"
+    )
     assert deliverables["selected_panel_structure_browser_manifest"]["status"] == "rendered"
-    assert "selected eco1 panel" in deliverables["selected_panel_structure_browser_manifest"]["title"].lower()
+    assert deliverables["selected_panel_structure_browser_manifest"]["title"] == (
+        "Selected structures can be inspected one at a time"
+    )
     visual_ids = {entry["deliverable_id"] for entry in visual_deliverables(manifest["deliverables"])}
     audit_visual_ids = {
         entry["deliverable_id"]
@@ -155,6 +160,16 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["design_class_mask_overview"]["render_mode"] == "compact_wide_visual"
     assert deliverables["expanded_proteinmpnn_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["expanded_proteinmpnn_fold_validation"]["role"] == "manuscript_facing"
+    assert deliverables["foldcheck_review_review_class_counts"]["status"] == "rendered"
+    assert deliverables["foldcheck_review_review_class_counts"]["role"] == "manuscript_facing"
+    assert deliverables["foldcheck_review_review_class_counts"]["title"] == (
+        "Each fixed mask keeps foldable candidates"
+    )
+    assert deliverables["foldcheck_review_review_class_counts"]["source_tables"] == [
+        "design_classes/candidate_pool.parquet",
+        "design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet",
+    ]
+    assert deliverables["foldcheck_review_review_class_counts"]["evidence_summary"]["design_class_count"] == 6
     assert deliverables["interactive_structure_browser_manifest"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF

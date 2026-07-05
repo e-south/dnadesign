@@ -23,7 +23,7 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     """Assert baseline and expanded ProteinMPNN visuals stay plain and scoped."""
 
     diversity_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_score_mutation_burden")
-    assert "ProteinMPNN proposal scores describe sampling variation before fold filtering" in diversity_text
+    assert "ProteinMPNN scores describe proposal spread" in diversity_text
     assert "Sequence identity to Ec86 WT (%)" in diversity_text
     assert "Accepted designs retain a minority of WT residues." not in diversity_text
     assert "Sampling temperature" in diversity_text
@@ -59,6 +59,16 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     _assert_top_marginal_matches_square_panel(expanded_text)
     assert "576" not in expanded_text or "Baseline" not in expanded_text
     assert "design class as color" in str(deliverables["expanded_proteinmpnn_fold_validation"]["description"])
+
+    fold_bin_text = _read_deliverable(manifest_path, deliverables, "foldcheck_review_review_class_counts")
+    assert "Each fixed mask keeps foldable candidates" in fold_bin_text
+    assert "clade 9 p25, 5 A" in fold_bin_text
+    assert "clade 9 p25, 10 A" in fold_bin_text
+    assert "subtype p50, 5 A" in fold_bin_text
+    assert "Strong fold" in fold_bin_text
+    assert "Review band" in fold_bin_text
+    assert "Fold-review thresholds separate preserved folds" not in fold_bin_text
+    assert "class-specific failures" in str(deliverables["foldcheck_review_review_class_counts"]["description"])
 
 
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:

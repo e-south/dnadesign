@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.plain_titles import (
+    PLAIN_DELIVERABLE_TITLES,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     resolve_manifest_path,
 )
@@ -20,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
 
 def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
     msa_text = _read_deliverable(manifest_path, deliverables, "msa_plurality_mask_panel")
-    assert "The 4-record clade 9 MSA shows the active 25% WT-plurality mask denominator" in msa_text
+    assert "Clade 9 conservation defines the baseline mask" in msa_text
     assert "all accepted clade 9 alignment rows" in str(deliverables["msa_plurality_mask_panel"]["description"])
     assert "current conservation mask uses this clade 9 denominator" in str(
         deliverables["msa_plurality_mask_panel"]["description"]
@@ -35,7 +38,7 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
     assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text
 
     subtype_text = _read_deliverable(manifest_path, deliverables, "msa_subtype_plurality_panel")
-    assert "The 3-record Eco1 subtype II-A3/42_1 MSA shows the narrower subtype conservation context" in subtype_text
+    assert "The Eco1 subtype MSA gives a closer conservation view" in subtype_text
     assert "all accepted II-A3/42_1 subtype alignment rows" in str(
         deliverables["msa_subtype_plurality_panel"]["description"]
     )
@@ -48,10 +51,7 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
     assert "linear_mask_tracks" not in deliverables
 
     design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
-    assert (
-        "Fixed residues combine catalytic, conservation, and substrate-proximity constraints across Ec86 RT"
-        in design_class_mask_text
-    )
+    assert "Fixed residues combine motif, conservation, and substrate rules" in design_class_mask_text
     assert "WT amino acid" not in design_class_mask_text
     assert "Residue position" in design_class_mask_text
     assert "EC86 canonical residue position" not in design_class_mask_text
@@ -100,9 +100,7 @@ def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[
     linked_esmc_text = linked_esmc_plot.read_text(encoding="utf-8")
     assert "<title" in linked_esmc_text
     assert "<desc" in linked_esmc_text
-    assert deliverables["wt_esmc_substitution_llr_heatmap"]["title"] == (
-        "ESMC masked-marginal scores form a WT substitution matrix"
-    )
+    assert deliverables["wt_esmc_substitution_llr_heatmap"]["title"] == "ESMC scores WT-context substitutions"
     assert deliverables["wt_esmc_substitution_llr_heatmap"]["render_mode"] == "wide_visual"
     assert "LLR = log P(alternate) - log P(WT)" in str(
         deliverables["wt_esmc_substitution_llr_heatmap"]["method_summary"]
@@ -110,7 +108,7 @@ def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[
     assert deliverables["wt_esmc_substitution_llr_heatmap"]["evidence_summary"]["substitution_llr_rows"] == 114
 
     esmc_scatter_text = _read_deliverable(manifest_path, deliverables, "msa_plurality_vs_esmc_entropy")
-    assert "Clade 9 plurality is inversely related to ESMC entropy" in esmc_scatter_text
+    assert "Clade 9 plurality tracks lower ESMC entropy" in esmc_scatter_text
     assert "Pearson r =" in esmc_scatter_text
     assert "R2 =" in esmc_scatter_text
     assert "Linear fit" in esmc_scatter_text
@@ -148,9 +146,19 @@ def _assert_premise_titles(deliverables: dict[str, dict[str, object]]) -> None:
         "Design-class residue mask evidence across EC86 RT",
         "Eco1 panel-selection funnel summary",
         "RT-only handoff readiness",
+        "Fold-review thresholds separate preserved folds from review-band candidates",
+        "ColabFold metrics show continuous review signals",
     }
+    banned_fragments = ("review surface", "current baseline only", "thresholds separate")
     for deliverable_id, row in deliverables.items():
         title = str(row.get("title") or "")
         assert title, f"{deliverable_id} must carry a title"
         assert not title.endswith("."), f"{deliverable_id} title must omit terminal periods"
+        assert len(title) <= 72, f"{deliverable_id} title is too long: {title!r}"
         assert title not in stale_titles, f"{deliverable_id} title still uses stale noun-label wording"
+        assert not any(fragment in title.lower() for fragment in banned_fragments), (
+            f"{deliverable_id} title still has slop wording: {title!r}"
+        )
+        expected_title = PLAIN_DELIVERABLE_TITLES.get(deliverable_id)
+        if expected_title is not None:
+            assert title == expected_title

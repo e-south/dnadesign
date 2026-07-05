@@ -54,6 +54,7 @@ _ROOT_FILES = {
     "notebook_structure_dashboard.py",
     "notebook_visuals.py",
     "pipeline.py",
+    "plain_titles.py",
     "proteinmpnn_diversity.py",
     "proteinmpnn_fold_validation.py",
     "proteinmpnn_fold_validation_support.py",

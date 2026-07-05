@@ -24,7 +24,7 @@ _STRUCTURE_PANEL_SOURCE = [
     "foldcheck_review/foldcheck_structure_panel.yaml",
     "foldcheck_review/foldcheck_candidate_ranking.parquet",
 ]
-_REVIEW_CLASS_COUNTS_TITLE = "Fold-review thresholds separate preserved folds from review-band candidates"
+_REVIEW_CLASS_COUNTS_TITLE = "Fold bins summarize structural triage"
 
 
 def write_foldcheck_review_manifest(review_root: Path) -> None:

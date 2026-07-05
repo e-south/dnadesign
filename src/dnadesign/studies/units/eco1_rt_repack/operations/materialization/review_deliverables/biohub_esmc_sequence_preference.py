@@ -41,8 +41,8 @@ MODEL_6B_CANDIDATE_SCORING_METHOD_ID = "esmc_6b_2024_12_additive_wt_single_subst
 PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_vs_wt"
 TABLE_DELIVERABLE_ID = "biohub_esmc_variant_llr_scores"
 MANIFEST_DELIVERABLE_ID = "biohub_esmc_sequence_scoring_manifest"
-TITLE = "Candidate substitutions shift additive ESMC LLR relative to wild type"
-TITLE_6B = "6B ESMC WT-context additive LLR ranks Eco1 ProteinMPNN candidates relative to wild type"
+TITLE = "Candidate substitutions shift ESMC LLR"
+TITLE_6B = "6B ESMC LLR scores rank candidates"
 INTERPRETATION_LIMIT = (
     "This plot sums WT-context masked-marginal single-substitution LLR values for each candidate. "
     "It is not a whole-protein pseudo-likelihood, not a joint likelihood, and not an activity measurement."

@@ -165,7 +165,7 @@ def write_msa_plurality_mask_panel(
     target_id, _target_sequence = records[0]
     matrix = alignment_matrix(selected_records, profile_rows)
 
-    title = _panel_title(record_count=len(records), panel_profile=panel_profile)
+    title = _panel_title(panel_profile=panel_profile)
     fig_width, fig_height = _figure_size(len(selected_records))
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     margins = _figure_margins(len(selected_records), fig_height=fig_height)
@@ -358,10 +358,10 @@ def write_msa_plurality_mask_panel(
     )
 
 
-def _panel_title(*, record_count: int, panel_profile: MsaPanelProfile) -> str:
+def _panel_title(*, panel_profile: MsaPanelProfile) -> str:
     if panel_profile.current_mask_denominator:
-        return f"The {record_count}-record clade 9 MSA shows the active 25% WT-plurality mask denominator"
-    return f"The {record_count}-record Eco1 subtype II-A3/42_1 MSA shows the narrower subtype conservation context"
+        return "Clade 9 conservation defines the baseline mask"
+    return "The Eco1 subtype MSA gives a closer conservation view"
 
 
 def _panel_description(panel_profile: MsaPanelProfile) -> str:

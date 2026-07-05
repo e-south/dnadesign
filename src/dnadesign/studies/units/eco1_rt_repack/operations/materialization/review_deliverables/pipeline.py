@@ -76,8 +76,12 @@ from .models import MaterializedReviewDeliverables
 from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, write_msa_plurality_mask_panel
 from .msa_panel_data import source_manifest_accessions
 from .notebook import write_review_deliverables_notebook
+from .plain_titles import apply_plain_titles
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
-from .proteinmpnn_fold_validation import write_expanded_design_class_fold_validation
+from .proteinmpnn_fold_validation import (
+    write_design_class_fold_bin_counts,
+    write_expanded_design_class_fold_validation,
+)
 from .rt_annotation_context import (
     MANUAL_MASK_AUTHORITY_SOURCE_LABEL,
     RT_ANNOTATION_TRACKS_SOURCE_LABEL,
@@ -211,6 +215,16 @@ def materialize_review_deliverables(
             selection_panel_table_path=out_root / "design_classes" / "selection" / "candidate_selection_panel.parquet",
         )
     )
+    deliverables.append(
+        write_design_class_fold_bin_counts(
+            panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
+            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
+            foldcheck_ranking_path=out_root
+            / "design_classes"
+            / "foldcheck_review"
+            / "foldcheck_candidate_ranking.parquet",
+        )
+    )
     deliverables.extend(_linked_foldcheck_review_rows(out_root / FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH))
     sequence_preference_deliverables = write_biohub_esmc_sequence_preference_deliverables(
         panel_root=deliverable_root / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME,
@@ -335,6 +349,7 @@ def materialize_review_deliverables(
     notebook_path = deliverable_root / NOTEBOOKS_DIR_NAME / NOTEBOOK_FILE_NAME
     write_review_deliverables_notebook(notebook_path)
     manifest_path = deliverable_root / MANIFEST_FILE_NAME
+    deliverables = apply_plain_titles(deliverables)
     write_manifest(manifest_path, deliverables=deliverables, notebook_path=notebook_path)
     return MaterializedReviewDeliverables(
         manifest_path=manifest_path,
@@ -398,7 +413,7 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {manifest_path}")
     rows: list[dict[str, Any]] = []
-    retired_plot_ids = {"fold_metric_scatter", "cryoem_vs_runtime_rmsd"}
+    retired_plot_ids = {"review_class_counts", "fold_metric_scatter", "cryoem_vs_runtime_rmsd"}
     for plot in loaded.get("plots", []):
         if not isinstance(plot, dict):
             continue

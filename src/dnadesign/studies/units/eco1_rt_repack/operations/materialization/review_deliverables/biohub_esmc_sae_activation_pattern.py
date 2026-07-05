@@ -59,7 +59,7 @@ def write_wt_activation_pattern_panel(
     feature_rows: list[dict[str, Any]],
     sae_provenance_audit: dict[str, Any],
 ) -> dict[str, Any]:
-    title = "WT-active SAE features have distinct residue activation patterns"
+    title = "WT-active SAE features localize by residue"
     selected_features = [int(row["feature_index"]) for row in feature_rows]
     residue_rows = pq.read_table(
         residue_features_path,

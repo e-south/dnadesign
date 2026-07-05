@@ -74,7 +74,7 @@ def _write_review_class_counts(plot_root: Path, rows: list[dict[str, Any]]) -> d
     counts = Counter(str(row.get("review_class") or "metric_missing") for row in rows)
     labels = [label for label in _CLASS_ORDER if counts.get(label)]
     values = [counts[label] for label in labels]
-    title = "Fold-review thresholds separate preserved folds from review-band candidates"
+    title = "Fold bins summarize structural triage"
     fig, ax = plt.subplots(figsize=(5.8, 5.8))
     y_positions = list(range(len(labels)))
     ax.barh(y_positions, values, color=[_CLASS_COLORS[label] for label in labels])
@@ -135,7 +135,8 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
     )
     ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
     ax.set_ylabel("Mean pLDDT", fontsize=_LABEL_SIZE)
-    ax.set_title("ColabFold metrics show continuous review signals", fontsize=_TITLE_SIZE, pad=10)
+    title = "RMSD and pLDDT show fold quality"
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     _style_scatter_axis(ax)
     colorbar = fig.colorbar(scatter, ax=ax, orientation="horizontal", fraction=0.055, pad=0.13)
     colorbar.set_label("Sequence identity to Ec86 WT (%)", fontsize=_LEGEND_SIZE)
@@ -147,11 +148,11 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
         f"ProteinMPNN candidates. The plot contains {len(rows)} candidate points "
         "colored by sequence identity to the Ec86 WT reference."
     )
-    _save_accessible_svg(fig, path, title="ColabFold metrics show continuous review signals", description=alt)
+    _save_accessible_svg(fig, path, title=title, description=alt)
     return _plot_row(
         plot_id="fold_metric_scatter",
         path=path,
-        title="ColabFold metrics show continuous review signals",
+        title=title,
         alt_text=alt,
         description=(
             "Shows confidence and within-run structural drift as quantitative axes, "
@@ -177,7 +178,8 @@ def _write_cryoem_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) ->
             )
     ax.set_xlabel("WT-runtime C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
     ax.set_ylabel("cryoEM-reference mapped C-alpha RMSD (A)", fontsize=_LABEL_SIZE)
-    ax.set_title("WT-model similarity and cryoEM similarity are checked separately", fontsize=_TITLE_SIZE, pad=10)
+    title = "Runtime and cryoEM RMSD use different references"
+    ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     _style_scatter_axis(ax)
     if not available:
         ax.text(0.5, 0.5, "CryoEM-reference RMSD unavailable", transform=ax.transAxes, ha="center", va="center")
@@ -192,13 +194,13 @@ def _write_cryoem_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) ->
     _save_accessible_svg(
         fig,
         path,
-        title="WT-model similarity and cryoEM similarity are checked separately",
+        title=title,
         description=alt,
     )
     return _plot_row(
         plot_id="cryoem_vs_runtime_rmsd",
         path=path,
-        title="Runtime RMSD and cryoEM-reference RMSD are separate checks",
+        title=title,
         alt_text=alt,
         description=(
             "Makes the two RMSD reference frames visible so within-run ColabFold similarity "
@@ -226,7 +228,7 @@ def _write_biohub_profile_summary(plot_root: Path, profile_path: Path) -> dict[s
     )
     ax.set_xlabel("Protein-level nonzero SAE features", fontsize=_LABEL_SIZE)
     ax.set_ylabel("Encoded SAE payload size (KiB)", fontsize=_LABEL_SIZE)
-    title = "Biohub ESMC coverage is available for accepted query rows"
+    title = "Biohub ESMC returns SAE coverage for accepted rows"
     ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     _style_scatter_axis(ax)
     fig.tight_layout()

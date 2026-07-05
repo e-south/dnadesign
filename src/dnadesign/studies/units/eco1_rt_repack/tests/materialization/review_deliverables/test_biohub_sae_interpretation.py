@@ -55,7 +55,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
         "thread_candidate_beta",
     }
     assert {row["selection_reason"] for row in top_feature_rows}
-    assert "peak activation and thresholded prevalence" in top_features["title"]
+    assert top_features["title"] == "Top SAE features are ranked by activation"
     assert (
         top_features["evidence_summary"]["prevalence_activation_threshold"]
         == biohub_esmc_sae_tables.FEATURE_PREVALENCE_THRESHOLD
@@ -67,7 +67,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     activation_pattern_text = _resolve_manifest_path(result.manifest_path, activation_pattern["path"]).read_text(
         encoding="utf-8"
     )
-    assert "WT-active SAE features have distinct residue activation patterns" in activation_pattern_text
+    assert "WT-active SAE features localize by residue" in activation_pattern_text
     assert "F101" in activation_pattern_text
     assert "activation_max" in activation_pattern["evidence_summary"]["feature_selection_rule"]
     assert "exact SAE model" not in activation_pattern["title"]
@@ -106,7 +106,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     sae_delta_umap_text = _resolve_manifest_path(result.manifest_path, sae_delta_umap["path"]).read_text(
         encoding="utf-8"
     )
-    assert "SAE activation deltas place Eco1 variants near WT in model-feature space" in sae_delta_umap_text
+    assert "SAE deltas keep variants near WT" in sae_delta_umap_text
     assert "Linear projection 1" in sae_delta_umap_text
     assert "WT control" in sae_delta_umap_text
 

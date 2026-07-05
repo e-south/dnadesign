@@ -100,7 +100,7 @@ def test_foldcheck_review_materializes_ranking_panel_and_atlas_subset(tmp_path: 
         encoding="utf-8"
     )
     assert "Sequence identity to Ec86 WT" in fold_metric_text
-    assert "continuous review signals" in fold_metric_text
+    assert "RMSD and pLDDT show fold quality" in fold_metric_text
 
     overlay_index_text = _resolve_manifest_path(result.visual_manifest_path, overlay_row["path"]).with_suffix(".cxc")
     structure_overlay_index = result.visual_manifest_path.parent / "chimerax" / "ec86_structure_overlay_panel.cxc"

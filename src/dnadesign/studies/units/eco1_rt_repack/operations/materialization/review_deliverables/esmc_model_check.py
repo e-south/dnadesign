@@ -151,7 +151,7 @@ def _write_plurality_entropy_scatter(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "Clade 9 plurality is inversely related to ESMC entropy"
+    title = "Clade 9 plurality tracks lower ESMC entropy"
     plurality_values = [float(row["wt_plurality_frequency"]) for row in rows]
     entropy_values = [float(row["canonical_entropy_bits"]) for row in rows]
     pearson_r = _pearson_r(plurality_values, entropy_values)
@@ -232,7 +232,7 @@ def _write_plurality_best_alt_scatter(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "Best alternate LLR highlights where model and MSA disagree"
+    title = "Best alternate LLR marks MSA-model disagreement"
     fig, ax = plt.subplots(figsize=(6.9, 7.3))
     for label in _CLASS_COLORS:
         class_rows = [row for row in rows if _constraint_class(row) == label]
@@ -297,7 +297,7 @@ def _write_constraint_tracks(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "Plurality, ESMC scores, and mask classes align along Ec86"
+    title = "MSA and ESMC signals align with mask classes"
     positions = [int(row["canonical_position"]) for row in rows]
     fig, axes = plt.subplots(
         4,
