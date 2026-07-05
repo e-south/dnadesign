@@ -58,8 +58,9 @@ def test_msa_plurality_panel_renders_all_source_rows_without_arbitrary_cutoff(tm
     assert "The 52-record clade 9 MSA shows the active 25% WT-plurality mask denominator" in msa_text
     assert "all 52 accepted alignment rows" in str(deliverables["msa_plurality_mask_panel"]["alt_text"])
     assert "C9 051 fig|fixture.51.peg.1" in msa_text
-    assert "Subtype II-A3/42_1 rows" in msa_text
-    assert "WT plurality &gt;=50% (design-class threshold)" in msa_text
+    assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text
+    assert "Subtype II-A3/42_1 rows" not in msa_text
+    assert "50% WT plurality threshold" in msa_text
     assert "display subset" not in str(deliverables["msa_plurality_mask_panel"]["description"])
 
 

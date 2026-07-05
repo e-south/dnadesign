@@ -62,10 +62,11 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     )
     assert deliverables["msa_plurality_mask_panel"]["evidence_summary"]["current_mask_denominator"] is True
     assert "ec86_clade9_conservation_v1__" not in msa_text
-    assert "WT plurality &gt;=25% (clade 9)" in msa_text
-    assert "WT plurality &gt;=50% (design-class threshold)" in msa_text
-    assert "Subtype II-A3/42_1 rows" in msa_text
-    assert "C9 001 fig|fixture.1.peg.1" in msa_text
+    assert "25% WT plurality threshold" in msa_text
+    assert "50% WT plurality threshold" in msa_text
+    assert "Mask-protected positions" in msa_text
+    assert "Subtype II-A3/42_1 rows" not in msa_text
+    assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text
     assert "Mask-protected" in msa_text
 
     subtype_text = _read_deliverable(manifest_path, deliverables, "msa_subtype_plurality_panel")
@@ -76,8 +77,9 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "does not replace the clade 9 denominator" in str(deliverables["msa_subtype_plurality_panel"]["description"])
     assert deliverables["msa_subtype_plurality_panel"]["evidence_summary"]["current_mask_denominator"] is False
     assert "II-A3 002 fig|fixture.2.peg.1" in subtype_text
-    assert "WT plurality &gt;=25% (Eco1 subtype II-A3/42_1)" in subtype_text
-    assert "WT plurality &gt;=50% (design-class threshold)" in subtype_text
+    assert "25% WT plurality threshold" in subtype_text
+    assert "50% WT plurality threshold" in subtype_text
+    assert "Mask-protected positions" in subtype_text
 
     mask_text = _read_deliverable(manifest_path, deliverables, "linear_mask_tracks")
     assert "Residue mask evidence across Ec86 RT" in mask_text
