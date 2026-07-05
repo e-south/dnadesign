@@ -184,6 +184,7 @@ def materialize_review_deliverables(
         write_mask_structure_browser_manifest(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
             mask_set_path=mask_set_path,
+            design_classes_root=out_root / "design_classes",
             reference_structure_path=browser_reference.local_path,
             reference_structure_format=browser_reference.structure_format,
             mask_residues=mask_residues,

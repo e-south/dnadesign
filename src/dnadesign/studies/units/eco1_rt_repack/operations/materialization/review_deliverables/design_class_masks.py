@@ -16,8 +16,6 @@ from typing import Any
 
 import matplotlib
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import FancyBboxPatch
-from matplotlib.transforms import ScaledTranslation
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     BASELINE_CLASS_ID,
@@ -43,7 +41,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
-from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
+from .design_class_mask_annotations import add_rt_annotation_context
+from .rt_annotation_context import RTAnnotationContext
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -60,7 +59,6 @@ _POSITION_MINOR_TICK_STEP = 1
 _BOTTOM_POSITION_LABEL_STEP = 20
 _TOP_AMINO_ACID_LABEL_STEP = 1
 _MASK_EMPTY_STATE_ALPHA = 0.0
-_MASK_ANNOTATION_SPAN_ZORDER = 0.5
 _MASK_MATRIX_ZORDER = 2.0
 _STATE_COLORS = (
     (248 / 255.0, 247 / 255.0, 242 / 255.0, _MASK_EMPTY_STATE_ALPHA),
@@ -70,22 +68,6 @@ _STATE_COLORS = (
     OKABE_ITO["orange"],
     "#222222",
 )
-_TRACK_CONTEXT = "retron_rt_context_spans"
-_TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
-_TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
-_CONTEXT_FILL = "#e7d4ee"
-_CORE_INTERVAL_FILL = "#d7ecf5"
-_MOTIF_FILL = "#f4d7bd"
-_CONTEXT_TEXT = "#6f4c7d"
-_CORE_INTERVAL_TEXT = "#28566a"
-_MOTIF_TEXT = "#8a4a11"
-_RT_SPAN_LABEL_SIZE = 7.0
-_CONTEXT_SPAN_ALPHA = 0.30
-_CORE_INTERVAL_SPAN_ALPHA = 0.30
-_MOTIF_SPAN_ALPHA = 0.42
-_CONTEXT_LABEL_OFFSET_POINTS = 32.0
-_CORE_INTERVAL_LABEL_OFFSET_POINTS = 22.0
-_MOTIF_LABEL_OFFSET_POINTS = 12.0
 
 
 def write_design_class_mask_overview(
@@ -122,7 +104,7 @@ def write_design_class_mask_overview(
         vmax=len(_STATE_COLORS) - 1,
         zorder=_MASK_MATRIX_ZORDER,
     )
-    _add_rt_annotation_context(ax, positions, row_count=len(matrix_rows), context=rt_annotation_context)
+    add_rt_annotation_context(ax, positions, row_count=len(matrix_rows), context=rt_annotation_context)
     ax.set_yticks(
         range(len(matrix_rows)),
         [str(row["label"]) for row in matrix_rows],
@@ -348,108 +330,6 @@ def _policy_state_value(residue: dict[str, Any] | None) -> int:
     if bool(residue.get("protected")):
         return _STATE_FIXED
     return _STATE_EMPTY
-
-
-def _add_rt_annotation_context(
-    ax: Any,
-    positions: list[int],
-    *,
-    row_count: int,
-    context: RTAnnotationContext,
-) -> None:
-    position_to_index = {position: index for index, position in enumerate(positions)}
-    for feature in context.features_for_track(_TRACK_CONTEXT):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            row_count=row_count,
-            fill_color=_CONTEXT_FILL,
-            text_color=_CONTEXT_TEXT,
-            alpha=_CONTEXT_SPAN_ALPHA,
-            label_offset_points=_CONTEXT_LABEL_OFFSET_POINTS,
-        )
-    for feature in context.features_for_track(_TRACK_CORE_INTERVALS):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            row_count=row_count,
-            fill_color=_CORE_INTERVAL_FILL,
-            text_color=_CORE_INTERVAL_TEXT,
-            alpha=_CORE_INTERVAL_SPAN_ALPHA,
-            label_offset_points=_CORE_INTERVAL_LABEL_OFFSET_POINTS,
-        )
-    for feature in context.features_for_track(_TRACK_MOTIF_ANCHORS):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            row_count=row_count,
-            fill_color=_MOTIF_FILL,
-            text_color=_MOTIF_TEXT,
-            alpha=_MOTIF_SPAN_ALPHA,
-            label_offset_points=_MOTIF_LABEL_OFFSET_POINTS,
-        )
-
-
-def _add_context_span(
-    ax: Any,
-    feature: RTAnnotationFeature,
-    *,
-    position_to_index: dict[int, int],
-    row_count: int,
-    fill_color: str,
-    text_color: str,
-    alpha: float,
-    label_offset_points: float,
-) -> None:
-    bounds = _feature_bounds(feature, position_to_index)
-    if bounds is None:
-        return
-    x, width = bounds
-    patch = FancyBboxPatch(
-        (x, -0.5),
-        width,
-        row_count,
-        boxstyle="round,pad=0,rounding_size=0.15",
-        facecolor=fill_color,
-        edgecolor="none",
-        linewidth=0,
-        alpha=alpha,
-        clip_on=False,
-        zorder=_MASK_ANNOTATION_SPAN_ZORDER,
-    )
-    ax.add_patch(patch)
-    ax.text(
-        x + width / 2.0,
-        1.0,
-        feature.label,
-        ha="center",
-        va="bottom",
-        fontsize=_RT_SPAN_LABEL_SIZE,
-        color=text_color,
-        transform=_top_axis_offset_transform(ax, label_offset_points),
-        clip_on=False,
-        zorder=6,
-    )
-
-
-def _top_axis_offset_transform(ax: Any, offset_points: float) -> Any:
-    return ax.get_xaxis_transform() + ScaledTranslation(
-        0,
-        offset_points / 72.0,
-        ax.figure.dpi_scale_trans,
-    )
-
-
-def _feature_bounds(feature: RTAnnotationFeature, position_to_index: dict[int, int]) -> tuple[float, float] | None:
-    indexes = [index for position, index in position_to_index.items() if feature.start <= position <= feature.end]
-    if not indexes:
-        return None
-    start_index = min(indexes)
-    end_index = max(indexes)
-    return start_index - 0.5, float(end_index - start_index + 1)
 
 
 def _position_tick_indexes(positions: list[int]) -> list[int]:

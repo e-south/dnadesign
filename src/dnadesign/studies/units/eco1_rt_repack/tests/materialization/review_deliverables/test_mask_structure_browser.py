@@ -17,6 +17,9 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
+    ALL_SPECS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     mask_structure_browser,
     materialize_review_deliverables,
@@ -59,14 +62,32 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
     )
-    assert group_lookup == {"Reference mask evidence": "Reference mask evidence"}
+    assert group_lookup["Design-class fixed masks"] == "Design-class fixed masks"
+    assert group_lookup["Mask input evidence"] == "Mask input evidence"
+    assert "Reference mask evidence" not in group_lookup
     lookup = structure_browser.structure_browser_lookup(
         rows,
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
-        selected_group="Reference mask evidence",
+        selected_group="Design-class fixed masks",
     )
-    selected = lookup["Baseline fixed residues (clade 9 p25 + 5 A) | 4 residues"]
+    stale_labels = (
+        "Catalytic motif anchors",
+        "Baseline fixed residues (clade 9 p25 + 5 A)",
+        "ProteinMPNN-designable residues",
+    )
+    combined_labels = "\n".join(
+        structure_browser.structure_browser_lookup(
+            rows,
+            selected_section=SECTION_CONSTRAINT_EVIDENCE,
+            selected_deliverable_id="mask_structure_browser_manifest",
+        )
+    )
+    for stale_label in stale_labels:
+        assert stale_label not in combined_labels
+    design_class_labels = [label for label in lookup if label.startswith("Fixed mask: ")]
+    assert len(design_class_labels) == len(ALL_SPECS)
+    selected = lookup["Fixed mask: Clade 9 p25 + 5 A | 4 residues"]
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
@@ -81,8 +102,8 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
 
     assert "<iframe" in rendered_text
     assert "3Dmol" in rendered_text
-    assert "Baseline fixed residues (clade 9 p25 + 5 A)" in rendered_text
-    assert "Reference mask evidence" in rendered_text
+    assert "Fixed mask: Clade 9 p25 + 5 A" in rendered_text
+    assert "Design-class fixed masks" in rendered_text
     assert "Reference selection:" not in rendered_text
     assert "No candidate structure is shown" in rendered_text
     assert "Side-chain display:" not in rendered_text
@@ -93,23 +114,23 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert "<dna-color-toggle>" not in rendered_text
     assert "<rna-color-toggle>" not in rendered_text
     assert "What this structure view shows" not in rendered_text
-    assert "All residues fixed by the baseline clade 9 p25 conservation" in rendered_text
+    assert "Residues fixed under the Clade 9 p25 + 5 A design-class mask." in rendered_text
     assert "Interpretation limit:" not in rendered_text
     assert "does not evaluate candidate fold quality or RT activity" in rendered_text
     assert "eco1-rt-repack:mask_structure_browser_manifest" in rendered_text
     assert "localStorage" in rendered_text
     assert (
-        "data-selection-id=&quot;protected&quot;" in rendered_text or 'data-selection-id="protected"' in rendered_text
+        "data-selection-id=&quot;eco1_rt_clade9_plurality25_contact5a_v1&quot;" in rendered_text
+        or 'data-selection-id="eco1_rt_clade9_plurality25_contact5a_v1"' in rendered_text
     )
     assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
         unescaped_rendered
     )
-    mask_selection_ids = {selection[0] for selection in mask_structure_browser._MASK_SELECTIONS}
     selection_colors = {
         str(style["color"])
         for row in rows
         if str(row.get("structure_view_mode") or "") == "reference_selection"
-        and str(row.get("candidate_id") or "") in mask_selection_ids
+        and str(row.get("group") or "") == "Design-class fixed masks"
         for style in row.get("selection_styles", [])
     }
     assert selection_colors == {browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}
@@ -126,6 +147,7 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     deliverable = mask_structure_browser.write_mask_structure_browser_manifest(
         panel_root=tmp_path / "review_deliverables" / "structure_browser",
         mask_set_path=tmp_path / "mask_set.yaml",
+        design_classes_root=tmp_path / "design_classes",
         reference_structure_path=tmp_path / "proteinmpnn_request" / "chain_a_backbone.pdb",
         reference_structure_format="pdb",
         mask_residues=[mask_row(position, protected=True) for position in range(1, 7)],
@@ -142,7 +164,7 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     region_x = rows_by_id["retron_x_context"]
 
     assert rt1["display_label"] == "RT1"
-    assert rt1["group"] == "Reference mask evidence"
+    assert rt1["group"] == "RT annotation spans"
     assert rt1["structure_view_mode"] == "reference_selection"
     assert rt1["selection_residue_count"] == 2
     assert rt1["selection_styles"][0]["canonical_residue_numbers"] == [2, 3]
@@ -160,7 +182,7 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
         rows,
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
-        selected_group="Reference mask evidence",
+        selected_group="RT annotation spans",
     )
     assert "RT1 | 2 residues" in highlight_lookup
     assert "RT2 | 2 residues" in highlight_lookup
@@ -168,50 +190,3 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     assert "Catalytic YADD local context | 3 residues" in highlight_lookup
     assert "NAxxH | 1 residues" in highlight_lookup
     assert "YADD | 1 residues" in highlight_lookup
-
-
-def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path: Path) -> None:
-    mask_set_path = tmp_path / "mask_set.yaml"
-    mask_set_path.write_text("schema_id: thread.mask_set\nresidues: []\n", encoding="utf-8")
-    reference_path = tmp_path / "proteinmpnn_request" / "chain_a_backbone.pdb"
-    reference_path.parent.mkdir(parents=True)
-    reference_path.write_text(
-        "ATOM      1  CA  SER A   1       1.000   0.000   0.000  1.00  0.00           C\n"
-        "ATOM      2  CA  ALA A   2       2.000   0.000   0.000  1.00  0.00           C\n"
-        "ATOM      3  CA  GLU A   3       3.000   0.000   0.000  1.00  0.00           C\n"
-        "END\n",
-        encoding="utf-8",
-    )
-    mask_residues = [
-        mask_row(1, mapped=False),
-        mask_row(2, mapped=False),
-        mask_row(3, motif=True),
-        mask_row(4, motif=True),
-        mask_row(5, protected=True),
-    ]
-    annotation_tracks_path, manual_authority_path = write_rt_annotation_context_sources(tmp_path)
-    rt_annotation_context = load_rt_annotation_context(
-        annotation_tracks_path=annotation_tracks_path,
-        manual_mask_authority_source_path=manual_authority_path,
-    )
-
-    mask_structure_browser.write_mask_structure_browser_manifest(
-        panel_root=tmp_path / "review_deliverables" / "structure_browser",
-        mask_set_path=mask_set_path,
-        reference_structure_path=reference_path,
-        reference_structure_format="pdb",
-        mask_residues=mask_residues,
-        rt_annotation_context=rt_annotation_context,
-    )
-
-    manifest = yaml.safe_load(
-        (tmp_path / "review_deliverables" / "structure_browser" / "mask_structure_browser_manifest.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
-    motif = next(row for row in manifest["structures"] if row["candidate_id"] == "motif_protected")
-    style = motif["selection_styles"][0]
-    assert style["source_coordinate_basis"] == "canonical_position"
-    assert style["selection_coordinate_basis"] == "proteinmpnn_export_residue_number"
-    assert style["canonical_residue_numbers"] == [3, 4]
-    assert style["residue_numbers"] == [1, 2]

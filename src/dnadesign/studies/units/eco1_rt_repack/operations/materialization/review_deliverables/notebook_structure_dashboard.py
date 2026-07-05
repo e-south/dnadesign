@@ -60,7 +60,8 @@ def structure_metric_rows(
     ]
     rows = [{"field": field, "value": format_metric_value(row.get(field))} for field in fields]
     if selected_highlight_row is not None:
-        for field in ("feature_index", "activation_max", "activation_sum", "nonzero_residue_count"):
+        rows.extend(_selected_highlight_metric_rows(selected_highlight_row))
+        for field in _selected_sae_metric_fields(selected_highlight_row):
             rows.append(
                 {
                     "field": f"selected_sae_{field}",
@@ -138,7 +139,7 @@ def structure_dashboard_rows(
     else:
         dashboard.extend(_candidate_dashboard_rows(row))
     if selected_highlight_row is not None:
-        dashboard.extend(_selected_sae_dashboard_rows(selected_highlight_row))
+        dashboard.extend(_selected_highlight_dashboard_rows(selected_highlight_row))
     dashboard.extend(
         _browser_dashboard_rows(
             row,
@@ -274,9 +275,35 @@ def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
 def _reference_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {"metric": "Highlighted residues", "value": format_int(row.get("selection_residue_count"))},
-        {"metric": "Evidence view", "value": str(row.get("group") or "Reference mask evidence")},
+        {"metric": "Evidence view", "value": str(row.get("group") or "Reference evidence")},
         {"metric": "Base model", "value": "Ec86/7V9U"},
         {"metric": "Candidate structure", "value": "No candidate structure is shown in this view."},
+    ]
+
+
+def _selected_highlight_metric_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+    label = str(row.get("display_label") or row.get("candidate_id") or "")
+    return [
+        {"field": "selected_residue_highlight", "value": label},
+        {"field": "selected_residue_highlight_group", "value": str(row.get("group") or "")},
+        {"field": "selected_residue_highlight_count", "value": format_metric_value(row.get("selection_residue_count"))},
+    ]
+
+
+def _selected_sae_metric_fields(row: dict[str, Any]) -> tuple[str, ...]:
+    if row.get("feature_index") is None:
+        return ()
+    return ("feature_index", "activation_max", "activation_sum", "nonzero_residue_count")
+
+
+def _selected_highlight_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+    if row.get("feature_index") is not None:
+        return _selected_sae_dashboard_rows(row)
+    label = str(row.get("display_label") or row.get("candidate_id") or "")
+    return [
+        {"metric": "Selected residue highlight", "value": label},
+        {"metric": "Highlight category", "value": str(row.get("group") or "")},
+        {"metric": "Highlighted residues", "value": format_int(row.get("selection_residue_count"))},
     ]
 
 

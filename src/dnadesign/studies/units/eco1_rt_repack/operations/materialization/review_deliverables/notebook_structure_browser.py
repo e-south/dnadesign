@@ -131,14 +131,20 @@ def structure_highlight_lookup(
     *,
     selected_row: dict[str, Any] | None,
 ) -> dict[str, dict[str, Any] | None]:
-    """Build SAE-highlight options for the currently selected structure."""
+    """Build residue-highlight options for the currently selected structure."""
 
     if selected_row is None or str(selected_row.get("structure_view_mode") or "") == "reference_selection":
         return {}
     candidate_id = str(selected_row.get("source_candidate_id") or selected_row.get("candidate_id") or "")
     if not candidate_id:
         return {}
-    options: dict[str, dict[str, Any] | None] = {"No SAE feature highlight": None}
+    options: dict[str, dict[str, Any] | None] = {"No residue highlight": None}
+    for row in rows:
+        if str(row.get("_deliverable_id") or "") != "mask_structure_browser_manifest":
+            continue
+        if str(row.get("structure_view_mode") or "") != "reference_selection":
+            continue
+        options[_structure_browser_label(row)] = row
     for row in rows:
         if str(row.get("_deliverable_id") or "") != "biohub_esmc_sae_structure_browser_manifest":
             continue

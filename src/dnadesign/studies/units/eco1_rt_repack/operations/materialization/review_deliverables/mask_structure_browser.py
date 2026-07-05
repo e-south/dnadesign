@@ -24,6 +24,15 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
+from .mask_structure_highlights import (
+    GROUP_RT_ANNOTATION_SPANS,
+    design_class_fixed_mask_views,
+    design_class_source_paths,
+    design_class_source_table_labels,
+    load_design_class_mask_rows,
+    mask_input_evidence_views,
+    reference_selection_view,
+)
 from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 from .structure_browser_common import (
     REFERENCE_COLOR,
@@ -35,58 +44,19 @@ from .structure_browser_common import (
 )
 
 MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "mask_structure_browser_manifest.yaml"
-_MASK_HIGHLIGHT_COLOR = RESIDUE_CATEGORY_HIGHLIGHT_COLOR
 _RT_CONTEXT_HIGHLIGHT_COLOR = "#6f4c7d"
 _RT_CORE_INTERVAL_HIGHLIGHT_COLOR = "#28566a"
 _RT_MOTIF_HIGHLIGHT_COLOR = "#8a4a11"
 _TRACK_CONTEXT = "retron_rt_context_spans"
 _TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
 _TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
-_MASK_SELECTIONS = (
-    (
-        "motif_protected",
-        "Catalytic motif anchors",
-        "motif_protected",
-        "NAxxH, YADD, and VTG motif residues fixed before ProteinMPNN design.",
-    ),
-    (
-        "wang_ec86_direct_contact_prior",
-        "Wang/Ec86 substrate-contact priors",
-        "wang_ec86_direct_contact_prior",
-        "Residues from the Ec86 structural prior that directly contact substrate.",
-    ),
-    (
-        "direct_retained_dna_rna_contact_5a",
-        "Retained DNA/RNA-contact residues within 5 A",
-        "direct_retained_dna_rna_contact_5a",
-        "Residues near retained nucleic-acid atoms in the reference structure.",
-    ),
-    (
-        "evolutionarily_conserved_clade9_25pct_plurality",
-        "Clade 9 p25 WT-plurality residues",
-        "evolutionarily_conserved_clade9_25pct_plurality",
-        "Residues fixed by the clade 9 25% WT-plurality rule.",
-    ),
-    (
-        "protected",
-        "Baseline fixed residues (clade 9 p25 + 5 A)",
-        "protected",
-        "All residues fixed by the baseline clade 9 p25 conservation, 5 A retained DNA/RNA contact, "
-        "motif, or Wang/Ec86 prior rules.",
-    ),
-    (
-        "non_fixed",
-        "ProteinMPNN-designable residues",
-        "non_fixed",
-        "Residues exposed to ProteinMPNN redesign in the current campaign.",
-    ),
-)
 
 
 def write_mask_structure_browser_manifest(
     *,
     panel_root: Path,
     mask_set_path: Path,
+    design_classes_root: Path,
     reference_structure_path: Path,
     reference_structure_format: str,
     mask_residues: list[dict[str, Any]],
@@ -98,17 +68,23 @@ def write_mask_structure_browser_manifest(
     manifest_path = panel_root / MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME
     if not reference_structure_path.exists():
         return _missing_mask_row(manifest_path, reference_structure_path)
+    design_class_rows = load_design_class_mask_rows(
+        baseline_mask_set_path=mask_set_path,
+        design_classes_root=design_classes_root,
+    )
     views = _mask_structure_views(
         mask_residues=mask_residues,
         reference_path=reference_structure_path,
         reference_structure_format=reference_structure_format,
         manifest_root=manifest_path.parent,
+        design_class_rows=design_class_rows,
         rt_annotation_context=rt_annotation_context,
     )
     source_paths = {
         "mask_set": mask_set_path,
         "reference_structure": reference_structure_path,
     }
+    source_paths.update(design_class_source_paths(design_class_rows))
     source_paths.update(rt_annotation_context.source_paths)
     payload = {
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
@@ -119,7 +95,7 @@ def write_mask_structure_browser_manifest(
         "default_backend": "py3dmol",
         "path_policy": "paths_relative_to_this_manifest",
         "source_tables": [
-            repo_relative_hint(mask_set_path),
+            *design_class_source_table_labels(design_class_rows),
             repo_relative_hint(reference_structure_path),
             *rt_annotation_context.source_table_labels,
         ],
@@ -136,8 +112,8 @@ def write_mask_structure_browser_manifest(
         "structures": views,
         "structure_count": len(views),
         "interpretation_limit": (
-            "This browser view maps mask evidence onto the reference structure. It does "
-            "not evaluate candidate fold quality or RT activity."
+            "This browser view maps fixed-mask choices, mask inputs, and RT annotations onto the "
+            "reference structure. It does not evaluate candidate fold quality or RT activity."
         ),
     }
     manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -147,16 +123,21 @@ def write_mask_structure_browser_manifest(
         artifact_kind="structure_browser_manifest",
         status="rendered",
         path=manifest_path,
-        source_tables=["mask_set.yaml", repo_relative_hint(reference_structure_path)]
+        source_tables=design_class_source_table_labels(design_class_rows)
+        + [repo_relative_hint(reference_structure_path)]
         + rt_annotation_context.source_table_labels,
         input_hashes=file_hashes(source_paths),
-        alt_text="Interactive Ec86 reference structure viewer with selectable fixed-residue mask highlights.",
+        alt_text=(
+            "Interactive Ec86 reference structure viewer with selectable design-class fixed masks, "
+            "mask inputs, and RT annotation spans."
+        ),
         description=(
-            "Shows the Ec86/7V9U reference structure with one mask or motif category highlighted at a time. "
-            "The base structure remains off-white so the selected evidence category is visually separable."
+            "Shows the Ec86/7V9U reference structure with one fixed-mask, mask-input, or RT annotation "
+            "choice highlighted at a time. The base structure remains off-white so the selected residue "
+            "set is visually separable."
         ),
         interpretation_limit=payload["interpretation_limit"],
-        title="Ec86 reference structure maps fixed-residue evidence interactively",
+        title="Ec86 reference structure maps fixed masks and RT annotations interactively",
         role="interactive_review",
     )
 
@@ -191,6 +172,7 @@ def _mask_structure_views(
     reference_path: Path,
     reference_structure_format: str,
     manifest_root: Path,
+    design_class_rows: list[dict[str, Any]],
     rt_annotation_context: RTAnnotationContext,
 ) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
@@ -201,43 +183,26 @@ def _mask_structure_views(
     selection_coordinate_basis = reference_selection_coordinate_basis(
         reference_structure_format=reference_structure_format,
     )
-    for view_id, label, field, description in _MASK_SELECTIONS:
-        canonical_residue_numbers = sorted(
-            int(row["canonical_position"]) for row in mask_residues if bool(row.get(field))
+    views.extend(
+        design_class_fixed_mask_views(
+            design_class_rows=design_class_rows,
+            reference_path=reference_path,
+            reference_structure_format=reference_structure_format,
+            manifest_root=manifest_root,
+            reference_number_by_canonical=reference_number_by_canonical,
+            selection_coordinate_basis=selection_coordinate_basis,
         )
-        residue_numbers = [
-            reference_number_by_canonical[position]
-            for position in canonical_residue_numbers
-            if position in reference_number_by_canonical
-        ]
-        if not residue_numbers:
-            continue
-        views.append(
-            {
-                "candidate_id": view_id,
-                "display_label": label,
-                "group": "Reference mask evidence",
-                "local_path": relative_path(reference_path, manifest_root),
-                "structure_format": reference_structure_format,
-                "color": _MASK_HIGHLIGHT_COLOR,
-                "structure_view_mode": "reference_selection",
-                "description": description,
-                "selection_styles": [
-                    {
-                        "selection_id": view_id,
-                        "model_id": "ec86kit_7v9u_reference",
-                        "label": label,
-                        "source_coordinate_basis": "canonical_position",
-                        "selection_coordinate_basis": selection_coordinate_basis,
-                        "canonical_residue_numbers": canonical_residue_numbers,
-                        "residue_numbers": residue_numbers,
-                        "residue_scope": "protein",
-                        "color": _MASK_HIGHLIGHT_COLOR,
-                    }
-                ],
-                "selection_residue_count": len(residue_numbers),
-            }
+    )
+    views.extend(
+        mask_input_evidence_views(
+            design_class_rows=design_class_rows,
+            reference_path=reference_path,
+            reference_structure_format=reference_structure_format,
+            manifest_root=manifest_root,
+            reference_number_by_canonical=reference_number_by_canonical,
+            selection_coordinate_basis=selection_coordinate_basis,
         )
+    )
     views.extend(
         _rt_annotation_structure_views(
             rt_annotation_context=rt_annotation_context,
@@ -269,34 +234,23 @@ def _rt_annotation_structure_views(
         if not residue_numbers:
             continue
         color = _rt_annotation_color(feature)
-        views.append(
-            {
-                "candidate_id": feature.feature_id,
-                "display_label": feature.label,
-                "group": "Reference mask evidence",
-                "local_path": relative_path(reference_path, manifest_root),
-                "structure_format": reference_structure_format,
-                "color": color,
-                "structure_view_mode": "reference_selection",
-                "description": (
+        views.extend(
+            reference_selection_view(
+                view_id=feature.feature_id,
+                label=feature.label,
+                group=GROUP_RT_ANNOTATION_SPANS,
+                description=(
                     f"Display-only RT annotation span from {feature.start}-{feature.end}; "
                     "included for structural orientation, not as a mask rule."
                 ),
-                "selection_styles": [
-                    {
-                        "selection_id": feature.feature_id,
-                        "model_id": "ec86kit_7v9u_reference",
-                        "label": feature.label,
-                        "source_coordinate_basis": "canonical_position",
-                        "selection_coordinate_basis": selection_coordinate_basis,
-                        "canonical_residue_numbers": canonical_residue_numbers,
-                        "residue_numbers": residue_numbers,
-                        "residue_scope": "protein",
-                        "color": color,
-                    }
-                ],
-                "selection_residue_count": len(residue_numbers),
-            }
+                canonical_residue_numbers=canonical_residue_numbers,
+                reference_path=reference_path,
+                reference_structure_format=reference_structure_format,
+                manifest_root=manifest_root,
+                reference_number_by_canonical=reference_number_by_canonical,
+                selection_coordinate_basis=selection_coordinate_basis,
+                color=color,
+            )
         )
     return views
 

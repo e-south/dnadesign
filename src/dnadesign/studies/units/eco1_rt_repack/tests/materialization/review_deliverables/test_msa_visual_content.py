@@ -20,13 +20,12 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
+    msa_panel_annotations,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.msa_panel import (
-    _MSA_ANNOTATION_SPAN_ZORDER,
     _MSA_MATRIX_ZORDER,
     CLADE9_MSA_PANEL,
     _msa_y_tick_size,
-    _rt_annotation_span_band,
     _subtype_fill_left_extension,
     write_msa_plurality_mask_panel,
 )
@@ -138,9 +137,9 @@ def test_msa_panel_renders_rt_context_spans_from_ontology(tmp_path: Path) -> Non
 
 
 def test_msa_rt_context_spans_stay_behind_header_and_reference_band() -> None:
-    y, height = _rt_annotation_span_band()
+    y, height = msa_panel_annotations._rt_annotation_span_band()
 
-    assert _MSA_ANNOTATION_SPAN_ZORDER < _MSA_MATRIX_ZORDER
+    assert msa_panel_annotations._MSA_ANNOTATION_SPAN_ZORDER < _MSA_MATRIX_ZORDER
     assert y < 0
     assert y + height == pytest.approx(0.5)
 

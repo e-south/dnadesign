@@ -18,8 +18,7 @@ from typing import Any
 import matplotlib
 import pyarrow.parquet as pq
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import FancyBboxPatch, Patch, Rectangle
-from matplotlib.transforms import ScaledTranslation
+from matplotlib.patches import Patch, Rectangle
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     CONSERVATION_CLADE9_PROFILE_ID,
@@ -69,28 +68,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
-from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
+from .msa_panel_annotations import add_rt_annotation_context
+from .rt_annotation_context import RTAnnotationContext
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-_TRACK_CONTEXT = "retron_rt_context_spans"
-_TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
-_TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
-_CONTEXT_FILL = "#e7d4ee"
-_CORE_INTERVAL_FILL = "#d7ecf5"
-_MOTIF_FILL = "#f4d7bd"
-_CONTEXT_TEXT = "#6f4c7d"
-_CORE_INTERVAL_TEXT = "#28566a"
-_MOTIF_TEXT = "#8a4a11"
-_RT_SPAN_LABEL_SIZE = 7.0
-_CONTEXT_SPAN_ALPHA = 0.46
-_CORE_INTERVAL_SPAN_ALPHA = 0.46
-_MOTIF_SPAN_ALPHA = 0.56
-_CONTEXT_LABEL_OFFSET_POINTS = 32.0
-_CORE_INTERVAL_LABEL_OFFSET_POINTS = 22.0
-_MOTIF_LABEL_OFFSET_POINTS = 12.0
-_MSA_ANNOTATION_SPAN_ZORDER = 0.5
 _MSA_MATRIX_ZORDER = 2.0
 _MSA_TRACK_ZORDER = 3.0
 
@@ -193,7 +176,7 @@ def write_msa_plurality_mask_panel(
         cmap=ListedColormap(["#fffdf7", "#c9c9c9", OKABE_ITO["green"]]),
         zorder=_MSA_MATRIX_ZORDER,
     )
-    _add_rt_annotation_context(
+    add_rt_annotation_context(
         ax,
         positions,
         context=rt_annotation_context,
@@ -407,121 +390,10 @@ def _panel_interpretation_limit(panel_profile: MsaPanelProfile) -> str:
     )
 
 
-def _add_rt_annotation_context(
-    ax: Any,
-    positions: list[int],
-    *,
-    context: RTAnnotationContext,
-) -> None:
-    position_to_index = {position: index for index, position in enumerate(positions)}
-    y, height = _rt_annotation_span_band()
-    for feature in context.features_for_track(_TRACK_CONTEXT):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            y=y,
-            height=height,
-            fill_color=_CONTEXT_FILL,
-            text_color=_CONTEXT_TEXT,
-            alpha=_CONTEXT_SPAN_ALPHA,
-            label_offset_points=_CONTEXT_LABEL_OFFSET_POINTS,
-        )
-    for feature in context.features_for_track(_TRACK_CORE_INTERVALS):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            y=y,
-            height=height,
-            fill_color=_CORE_INTERVAL_FILL,
-            text_color=_CORE_INTERVAL_TEXT,
-            alpha=_CORE_INTERVAL_SPAN_ALPHA,
-            label_offset_points=_CORE_INTERVAL_LABEL_OFFSET_POINTS,
-        )
-    for feature in context.features_for_track(_TRACK_MOTIF_ANCHORS):
-        _add_context_span(
-            ax,
-            feature,
-            position_to_index=position_to_index,
-            y=y,
-            height=height,
-            fill_color=_MOTIF_FILL,
-            text_color=_MOTIF_TEXT,
-            alpha=_MOTIF_SPAN_ALPHA,
-            label_offset_points=_MOTIF_LABEL_OFFSET_POINTS,
-        )
-
-
-def _add_context_span(
-    ax: Any,
-    feature: RTAnnotationFeature,
-    *,
-    position_to_index: dict[int, int],
-    y: float,
-    height: float,
-    fill_color: str,
-    text_color: str,
-    alpha: float,
-    label_offset_points: float,
-) -> None:
-    bounds = _feature_bounds(feature, position_to_index)
-    if bounds is None:
-        return
-    x, width = bounds
-    patch = FancyBboxPatch(
-        (x, y),
-        width,
-        height,
-        boxstyle="round,pad=0,rounding_size=0.15",
-        facecolor=fill_color,
-        edgecolor="none",
-        linewidth=0,
-        alpha=alpha,
-        clip_on=False,
-        zorder=_MSA_ANNOTATION_SPAN_ZORDER,
-    )
-    ax.add_patch(patch)
-    ax.text(
-        x + width / 2.0,
-        1.0,
-        feature.label,
-        ha="center",
-        va="bottom",
-        fontsize=_RT_SPAN_LABEL_SIZE,
-        color=text_color,
-        transform=_top_axis_offset_transform(ax, label_offset_points),
-        clip_on=False,
-        zorder=6,
-    )
-
-
-def _top_axis_offset_transform(ax: Any, offset_points: float) -> Any:
-    return ax.get_xaxis_transform() + ScaledTranslation(
-        0,
-        offset_points / 72.0,
-        ax.figure.dpi_scale_trans,
-    )
-
-
 def _legend_y(*, selected_row_count: int, margins: dict[str, float]) -> float:
     if selected_row_count > 140:
         return max(0.046, float(margins["bottom"]) - 0.034)
     return 0.016
-
-
-def _rt_annotation_span_band() -> tuple[float, float]:
-    reference_row_bottom = 0.5
-    return _TRACK_TOP_Y_LIMIT, reference_row_bottom - _TRACK_TOP_Y_LIMIT
-
-
-def _feature_bounds(feature: RTAnnotationFeature, position_to_index: dict[int, int]) -> tuple[float, float] | None:
-    indexes = [index for position, index in position_to_index.items() if feature.start <= position <= feature.end]
-    if not indexes:
-        return None
-    start_index = min(indexes)
-    end_index = max(indexes)
-    return start_index - 0.5, float(end_index - start_index + 1)
 
 
 def _read_profile_rows(path: Path, *, profile_id: str) -> list[dict[str, Any]]:
