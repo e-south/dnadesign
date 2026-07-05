@@ -48,12 +48,14 @@ def test_selection_panel_table_reads_metrics_from_trace_json(tmp_path: Path) -> 
     assert rows[0]["WT RMSD A"] == 0.82
     assert rows[0]["cryoEM RMSD A"] == 1.23
     assert rows[0]["unobserved MSA changes"] == 1
-    assert rows[0]["NA-facing charge change"] == 1
+    assert rows[0]["near DNA/RNA or thumb charge change"] == 1
     why = rendered["items"][2]
     assert why["kind"] == "accordion"
     assert "Why this row: thread_candidate_alpha" in why["items"]
     assert "MSA observed fraction: 0.75" in str(why["items"]["Why this row: thread_candidate_alpha"])
-    assert "Nucleic-acid-facing mutations: 1" in str(why["items"]["Why this row: thread_candidate_alpha"])
+    assert "Near retained DNA/RNA or thumb-track mutations: 1" in str(
+        why["items"]["Why this row: thread_candidate_alpha"]
+    )
 
 
 def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: Path) -> None:
@@ -105,16 +107,33 @@ def test_panel_selection_deliverables_follow_review_sequence(tmp_path: Path) -> 
     result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
 
-    panel_rows = notebook_runtime.section_deliverables(
+    visible_panel_rows = notebook_runtime.section_deliverables(
+        notebook_runtime.visual_deliverables(manifest["deliverables"]),
+        SECTION_FEASIBILITY_AND_HANDOFF,
+    )
+    visible_panel_ids = [str(row["deliverable_id"]) for row in visible_panel_rows]
+    all_panel_rows = notebook_runtime.section_deliverables(
         manifest["deliverables"],
         SECTION_FEASIBILITY_AND_HANDOFF,
     )
-    panel_ids = [str(row["deliverable_id"]) for row in panel_rows]
+    all_panel_ids = [str(row["deliverable_id"]) for row in all_panel_rows]
 
-    assert panel_ids[0] == "selection_funnel_summary"
-    assert panel_ids.index("selection_population_stratification") < panel_ids.index("selection_panel_table")
-    assert panel_ids.index("selection_panel_table") < panel_ids.index("selection_handoff_sequences")
-    assert panel_ids.index("selection_handoff_sequences") < panel_ids.index("selected_panel_structure_browser_manifest")
+    assert visible_panel_ids == [
+        "selection_design_class_gate_counts",
+        "selection_population_stratification",
+        "selection_class_local_percentiles",
+        "selection_six_sequence_distance",
+        "selection_selected_substitutions_across_rt",
+        "selection_regional_mutation_burden",
+        "selected_panel_structure_browser_manifest",
+    ]
+    assert "selection_funnel_summary" not in visible_panel_ids
+    assert "selection_panel_table" not in visible_panel_ids
+    assert "selection_handoff_sequences" not in visible_panel_ids
+    assert all_panel_ids.index("selected_panel_structure_browser_manifest") < all_panel_ids.index(
+        "selection_panel_table"
+    )
+    assert all_panel_ids.index("selection_panel_table") < all_panel_ids.index("selection_handoff_sequences")
 
 
 def test_non_image_artifact_fallback_uses_manifest_relative_path(tmp_path: Path) -> None:

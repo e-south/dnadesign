@@ -37,7 +37,7 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
     table = pq.read_table(table_path)
     available_columns = [column for column in selected_columns if column in table.column_names]
     rows = table.select(available_columns).to_pylist()
-    title = html.escape(str(row.get("title") or "Six Eco1 RT variants are selected for assay review"))
+    title = html.escape(str(row.get("title") or "Six Eco1 RT variants form a protein review panel"))
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),
@@ -62,8 +62,8 @@ def _display_row(row: dict[str, Any]) -> dict[str, object]:
         "nearest selected distance": row.get("nearest_selected_distance_aa"),
         "MSA observed fraction": _round_or_none(trace.get("selection_support_alt_observed_fraction")),
         "unobserved MSA changes": _int_or_none(trace.get("selection_support_unobserved_mutation_count")),
-        "NA-facing mutations": trace.get("nucleic_acid_facing_mutation_count"),
-        "NA-facing charge change": trace.get("nucleic_acid_facing_charge_delta"),
+        "near DNA/RNA or thumb mutations": trace.get("nucleic_acid_facing_mutation_count"),
+        "near DNA/RNA or thumb charge change": trace.get("nucleic_acid_facing_charge_delta"),
         "chemistry warnings": trace.get("nucleic_acid_facing_chemistry_warning_count"),
         "reason": str(row.get("selection_reason") or ""),
     }
@@ -95,8 +95,10 @@ def _candidate_reason_text(*, row: dict[str, Any], trace: dict[str, object]) -> 
         str(row.get("selection_reason") or "").strip(),
         f"MSA observed fraction: {_display_metric(trace.get('selection_support_alt_observed_fraction'))}",
         f"Unobserved MSA changes: {_display_metric(trace.get('selection_support_unobserved_mutation_count'))}",
-        f"Nucleic-acid-facing mutations: {_display_metric(trace.get('nucleic_acid_facing_mutation_count'))}",
-        f"Nucleic-acid-facing charge change: {_display_metric(trace.get('nucleic_acid_facing_charge_delta'))}",
+        f"Near retained DNA/RNA or thumb-track mutations: "
+        f"{_display_metric(trace.get('nucleic_acid_facing_mutation_count'))}",
+        f"Near retained DNA/RNA or thumb-track charge change: "
+        f"{_display_metric(trace.get('nucleic_acid_facing_charge_delta'))}",
         f"Chemistry warnings: {_display_metric(trace.get('nucleic_acid_facing_chemistry_warning_count'))}",
         f"Distal scaffold changes: {_display_metric(trace.get('distal_scaffold_mutation_count'))}",
         f"Nearest selected distance: {_display_metric(trace.get('nearest_selected_distance_aa'))}",

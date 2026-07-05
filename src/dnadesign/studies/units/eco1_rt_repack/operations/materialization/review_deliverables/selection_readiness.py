@@ -155,7 +155,7 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
             "The table records the proposed computational panel. It does not establish activity, strand "
             "displacement, or structured-template readthrough."
         ),
-        title="Six Eco1 RT variants are selected for assay review",
+        title="Six Eco1 RT variants form a protein review panel",
         role="manuscript_facing",
         render_mode="table",
         skip_reason="" if linked_status != "skipped_missing_input" else f"Missing selection panel table: {table_path}",
@@ -179,7 +179,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
             alt_text="Selected RT protein sequence CSV was not declared by the panel-selection manifest.",
             description="Selected protein-sequence CSV is unavailable until selection readiness is regenerated.",
             interpretation_limit="Missing sequence CSV cannot support handoff review.",
-            title="Selected RT protein sequences are exported as a flat handoff table",
+            title="Selected protein sequences keep handoff scope explicit",
             role="manuscript_facing",
             render_mode="table",
             skip_reason="selection_readiness_manifest.yaml has no candidate_handoff_sequences artifact",
@@ -205,16 +205,16 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
             **manifest_hashes,
             **file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff_sequences": table_path}),
         },
-        alt_text="Flat CSV table of selected RT protein sequences and sequence-design status fields.",
+        alt_text="Flat CSV table of selected mapped RT-chain protein sequences and explicit non-DNA status fields.",
         description=(
-            "Lists selected RT protein sequences with sequence hashes, selection slots, feasibility state, "
-            "and explicit not-materialized DNA-design status."
+            "Lists selected mapped_rt_chain_protein sequences with sequence hashes, selection slots, feasibility "
+            "state, and explicit non-DNA, non-codon-optimized, and not-screened status fields."
         ),
         interpretation_limit=(
             "This CSV is a protein-sequence handoff table. It is not an E. coli codon-optimized DNA design and it has "
             "not passed DNA restriction-site screening."
         ),
-        title="Selected RT protein sequences are exported as a flat handoff table",
+        title="Selected protein sequences keep handoff scope explicit",
         role="manuscript_facing",
         render_mode="table",
         skip_reason="" if linked_status != "skipped_missing_input" else f"Missing handoff sequence CSV: {table_path}",

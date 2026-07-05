@@ -12,11 +12,15 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import hashlib
 from collections import Counter
 from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
+    ALL_SPECS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME,
     CANDIDATE_SELECTION_PANEL_FILE_NAME,
@@ -44,6 +48,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
     build_selection_panel_rows,
+    panel_coverage_summary,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
     write_selection_readiness_plots,
@@ -55,6 +60,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     build_triage_rows,
 )
 from dnadesign.thread.adapters.proteinmpnn.hashing import sha256_uri
+
+from ..review_deliverables.rt_annotation_context import RTAnnotationContext, load_rt_annotation_context
 
 
 def materialize_selection_readiness(
@@ -140,6 +147,7 @@ def materialize_selection_readiness(
     write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
     panel_hashes = dict(input_hashes)
     panel_hashes["candidate_triage_table"] = sha256_uri(triage_path)
+    rt_annotation_context = _load_rt_annotation_context_if_available(root)
     panel_rows = build_selection_panel_rows(
         triage_rows=triage_rows,
         candidate_rows=candidate_rows,
@@ -150,9 +158,16 @@ def materialize_selection_readiness(
         handoff_sequence_csv_path,
         panel_rows=panel_rows,
         candidate_rows=candidate_rows,
+        source_candidate_pool_sha256=sha256_uri(paths["candidate_pool"]),
+        source_panel_sha256=sha256_uri(panel_path),
     )
     plot_hashes = dict(panel_hashes)
     plot_hashes["candidate_selection_panel"] = sha256_uri(panel_path)
+    if rt_annotation_context is not None:
+        plot_hashes["rt_annotation_tracks"] = sha256_uri(rt_annotation_context.annotation_tracks_path)
+        plot_hashes["manual_mask_authority_source"] = sha256_uri(
+            rt_annotation_context.manual_mask_authority_source_path
+        )
     plot_rows = write_selection_readiness_plots(
         plot_root=plots_root,
         triage_rows=triage_rows,
@@ -160,6 +175,7 @@ def materialize_selection_readiness(
         candidate_rows=candidate_rows,
         mask_residues=mask_residues,
         input_hashes=plot_hashes,
+        rt_annotation_context=rt_annotation_context,
     )
     manifest_path = selected_root / MANIFEST_FILE_NAME
     _write_manifest(
@@ -183,6 +199,19 @@ def materialize_selection_readiness(
         candidate_handoff_sequence_csv_path=handoff_sequence_csv_path,
         plots_root=plots_root,
         manifest_path=manifest_path,
+    )
+
+
+def _load_rt_annotation_context_if_available(repo_root: Path) -> RTAnnotationContext | None:
+    annotation_tracks_path = repo_root / "docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml"
+    manual_mask_authority_source_path = (
+        repo_root / "docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml"
+    )
+    if not annotation_tracks_path.exists() or not manual_mask_authority_source_path.exists():
+        return None
+    return load_rt_annotation_context(
+        annotation_tracks_path=annotation_tracks_path,
+        manual_mask_authority_source_path=manual_mask_authority_source_path,
     )
 
 
@@ -229,8 +258,8 @@ def _write_manifest(
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
             "Select one feasible fold-preserved representative from each design class, then prefer natural "
-            "sequence support, nucleic-acid-facing mutation geography, simple local chemistry, and sequence "
-            "nonredundancy. Do not use ESMC or SAE as positive selection evidence."
+            "sequence support, mutation geography near retained DNA/RNA or thumb-track, simple local chemistry, "
+            "and sequence nonredundancy. Do not use ESMC or SAE as positive selection evidence."
         ),
         "sae_window_policy": (
             "SAE windows are retained as review evidence but not used for selection because the current pool "
@@ -271,6 +300,10 @@ def _write_manifest(
             "sae_window_status": _count_by(triage_rows, "sae_window_status"),
         },
         "selected_candidate_ids": [str(row["candidate_id"]) for row in panel_rows],
+        "panel_coverage": panel_coverage_summary(
+            panel_rows,
+            expected_design_classes=[spec.design_class_id for spec in ALL_SPECS],
+        ),
         "handoff_readiness": _handoff_readiness(path=path, panel_rows=panel_rows),
         "hard_gate_allowed_fold_classes": ["strong_fold_preserved", "good_fold_preserved"],
         "default_excluded_fold_classes": ["low_confidence", "review_band"],
@@ -279,8 +312,8 @@ def _write_manifest(
             "selection-support MSA observed fraction",
             "selection-support MSA mean alternate-residue frequency",
             "selection-support unobserved mutation count",
-            "nucleic-acid-facing mutation count",
-            "nucleic-acid-facing chemistry warning count",
+            "near retained DNA/RNA or thumb-track mutation count",
+            "near retained DNA/RNA or thumb-track chemistry warning count",
             "nearest selected sequence distance",
             "fold metrics",
             "mutation count",
@@ -313,15 +346,26 @@ _HANDOFF_SEQUENCE_CSV_FIELDS = [
     "candidate_id",
     "selection_slot",
     "design_class_id",
+    "sequence_scope",
     "protein_sequence",
     "sequence_hash",
-    "amino_acid_length",
+    "protein_sequence_length",
+    "protein_sequence_sha256",
+    "mapped_rt_chain_length",
+    "canonical_rt_length",
+    "canonical_sequence_status",
+    "canonical_sequence_sha256",
     "fold_review_class",
     "feasibility_status",
     "eligible_for_handoff",
     "codon_policy_id",
     "dna_design_status",
-    "restriction_site_screen_status",
+    "dna_sequence_status",
+    "codon_optimization_status",
+    "restriction_screen_status",
+    "handoff_scope_note",
+    "source_candidate_pool_sha256",
+    "source_panel_sha256",
 ]
 
 
@@ -330,6 +374,8 @@ def _write_candidate_handoff_sequence_csv(
     *,
     panel_rows: list[dict[str, object]],
     candidate_rows: list[dict[str, object]],
+    source_candidate_pool_sha256: str,
+    source_panel_sha256: str,
 ) -> list[dict[str, object]]:
     """Write a flat selected-protein sequence table for review and handoff planning."""
 
@@ -355,15 +401,28 @@ def _write_candidate_handoff_sequence_csv(
                 "candidate_id": candidate_id,
                 "selection_slot": str(panel_row.get("selection_slot") or ""),
                 "design_class_id": str(panel_row.get("design_class_id") or ""),
+                "sequence_scope": "mapped_rt_chain_protein",
                 "protein_sequence": sequence,
                 "sequence_hash": candidate_hash,
-                "amino_acid_length": len(sequence),
+                "protein_sequence_length": len(sequence),
+                "protein_sequence_sha256": _sequence_sha256(sequence),
+                "mapped_rt_chain_length": len(sequence),
+                "canonical_rt_length": 320,
+                "canonical_sequence_status": "not_exported_in_this_slice",
+                "canonical_sequence_sha256": "",
                 "fold_review_class": str(panel_row.get("fold_review_class") or ""),
                 "feasibility_status": str(panel_row.get("feasibility_status") or ""),
                 "eligible_for_handoff": str(bool(panel_row.get("eligible_for_handoff"))).lower(),
                 "codon_policy_id": CODON_POLICY_ID,
                 "dna_design_status": "not_materialized",
-                "restriction_site_screen_status": "not_applicable_until_dna_sequence_materialized",
+                "dna_sequence_status": "not_dna",
+                "codon_optimization_status": "not_codon_optimized",
+                "restriction_screen_status": "not_screened",
+                "handoff_scope_note": (
+                    "RT protein sequence only; not DNA, codon optimized, restriction screened, or construct ready."
+                ),
+                "source_candidate_pool_sha256": source_candidate_pool_sha256,
+                "source_panel_sha256": source_panel_sha256,
             }
         )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -372,6 +431,10 @@ def _write_candidate_handoff_sequence_csv(
         writer.writeheader()
         writer.writerows(output_rows)
     return output_rows
+
+
+def _sequence_sha256(sequence: str) -> str:
+    return "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest()
 
 
 def _resolve(repo_root: Path, path: Path) -> Path:

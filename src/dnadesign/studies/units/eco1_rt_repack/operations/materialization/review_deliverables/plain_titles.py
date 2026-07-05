@@ -49,15 +49,16 @@ PLAIN_DELIVERABLE_TITLES = {
     "biohub_esmc_sae_feature_activation_heatmap": "Selected SAE features activate across RT variants",
     "biohub_esmc_sae_structure_browser_manifest": "SAE activation regions can be inspected on structure",
     "selection_funnel_summary": "Panel selection keeps activity claims separate",
-    "selection_panel_table": "Six Eco1 RT variants are ready for assay review",
-    "selection_handoff_sequences": "Selected protein sequences export as a flat table",
+    "selection_panel_table": "Six Eco1 RT variants form a protein review panel",
+    "selection_handoff_sequences": "Selected protein sequences keep handoff scope explicit",
     "selection_handoff_readiness": "RT-only handoff still needs candidate_handoff.yaml",
     "selection_handoff_boundary": "Panel selection and RT-only handoff stay separate",
-    "selection_design_class_gate_counts": "Each mask class has candidates for panel review",
+    "selection_design_class_gate_counts": "Each mask class contributes fold-preserved candidates",
     "selection_population_stratification": "Selected candidates sit within the full design pool",
-    "selection_panel_review_axes": "Selected candidates balance MSA support and mutation spread",
-    "selection_panel_sequence_differences": "Selected candidates vary only at designable positions",
-    "selection_panel_mutation_geography_chemistry": "Selected mutations stay distal with small chemistry shifts",
+    "selection_class_local_percentiles": "Each selected row is reviewed within its own mask class",
+    "selection_six_sequence_distance": "The selected six sample distinct sequence neighborhoods",
+    "selection_selected_substitutions_across_rt": "Selected substitutions map to RT regions",
+    "selection_regional_mutation_burden": "Selected candidates differ in which RT regions carry mutations",
 }
 
 

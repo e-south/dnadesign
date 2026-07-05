@@ -48,15 +48,16 @@ _NOTEBOOK_LANE_LABELS = {
 }
 _SECTION_DELIVERABLE_ORDER = {
     SECTION_FEASIBILITY_AND_HANDOFF: (
-        "selection_funnel_summary",
         "selection_design_class_gate_counts",
         "selection_population_stratification",
-        "selection_panel_review_axes",
+        "selection_class_local_percentiles",
+        "selection_six_sequence_distance",
+        "selection_selected_substitutions_across_rt",
+        "selection_regional_mutation_burden",
+        "selected_panel_structure_browser_manifest",
+        "selection_funnel_summary",
         "selection_panel_table",
         "selection_handoff_sequences",
-        "selected_panel_structure_browser_manifest",
-        "selection_panel_sequence_differences",
-        "selection_panel_mutation_geography_chemistry",
         "selection_handoff_readiness",
         "selection_handoff_boundary",
     )
@@ -91,7 +92,8 @@ def render_intro(mo: Any) -> Any:
         "ProteinMPNN proposes variants at unprotected residues to repack the remaining designable residues, "
         "ColabFold removes poor "
         "fold predictions, and the remaining pool is stratified by MSA support, local mutation geography, "
-        "nucleic-acid-facing chemistry, and selected model checks. WT ESMC masked-marginal scores and Biohub ESMC "
+        "chemistry near retained DNA/RNA or thumb-track, and selected model checks. WT ESMC masked-marginal scores "
+        "and Biohub ESMC "
         "SAE features annotate the review set; they are not mask inputs or acceptance gates. The selected protein "
         "sequences are exported as a flat CSV for RT-only handoff planning."
     )
@@ -295,10 +297,9 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
         "selection_panel_table",
         "candidate_handoff_sequence_csv",
         "handoff_readiness",
+        "handoff_boundary",
     }:
-        return str(row.get("status") or "") == "linked_existing"
-    if str(row.get("artifact_kind") or "") == "handoff_boundary":
-        return str(row.get("status") or "") == "linked_existing"
+        return False
     if str(row.get("artifact_kind") or "") == "sae_feature_heatmap_manifest":
         return str(row.get("status") or "") == "rendered"
     if is_interactive_structure_deliverable(row):

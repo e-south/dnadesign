@@ -246,11 +246,11 @@ def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
             "value": format_int(row.get("selection_support_unobserved_mutation_count")),
         },
         {
-            "metric": "NA-facing mutations",
+            "metric": "Near DNA/RNA or thumb mutations",
             "value": format_int(row.get("nucleic_acid_facing_mutation_count")),
         },
         {
-            "metric": "NA-facing charge change",
+            "metric": "Near DNA/RNA or thumb charge change",
             "value": format_int(row.get("nucleic_acid_facing_charge_delta")),
         },
         {

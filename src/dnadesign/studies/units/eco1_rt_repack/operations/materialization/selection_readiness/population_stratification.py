@@ -58,7 +58,7 @@ def write_population_stratification_plot(
 ) -> dict[str, Any]:
     """Write the full-candidate-population plot with selected panel rows highlighted."""
 
-    title = "Selected Eco1 candidates are shown in the context of the full candidate population"
+    title = "Selected candidates sit within the full design pool"
     selected_by_id = {str(row["candidate_id"]): row for row in panel_rows}
     plot_rows = [
         row
@@ -129,8 +129,8 @@ def write_population_stratification_plot(
 
     ax.set_xlim(-0.02, 1.19)
     ax.set_ylim(-0.7, y_max + 2.0)
-    ax.set_xlabel("Designed substitutions observed in the selected MSA denominator", fontsize=LABEL_SIZE)
-    ax.set_ylabel("Nucleic-acid-facing designed substitutions", fontsize=LABEL_SIZE)
+    ax.set_xlabel("Designed substitutions seen in the matching natural-sequence set", fontsize=LABEL_SIZE)
+    ax.set_ylabel("Mutations near retained DNA/RNA or thumb-track", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
     style_open_axes(ax)
     ax.grid(color="#d0d7de", alpha=0.45, linewidth=0.7)
@@ -147,8 +147,9 @@ def write_population_stratification_plot(
     fig.subplots_adjust(left=0.12, right=0.98, top=0.9, bottom=0.16)
     path = plot_root / "selection_population_stratification.svg"
     alt = (
-        "Scatter plot of the full candidate population. X position is MSA-observed designed-substitution "
-        "fraction, y position is nucleic-acid-facing mutation count, point color marks hard-gate status, "
+        "Scatter plot of the full candidate population. X position is the fraction of designed substitutions "
+        "seen in the matching natural-sequence set, y position is mutation count near retained DNA/RNA or "
+        "thumb-track, point color marks hard-gate status, "
         "and outlined markers identify the six selected Eco1 candidates."
     )
     save_accessible_svg(fig, path, title=title, description=alt)

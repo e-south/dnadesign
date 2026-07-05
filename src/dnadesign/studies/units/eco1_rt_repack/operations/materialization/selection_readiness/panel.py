@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
@@ -45,7 +46,62 @@ def build_selection_panel_rows(
         )
         selected.append(chosen)
         panel_rows.append(_panel_row(chosen, nearest_distance=nearest_distance, input_hashes=input_hashes))
+    validate_exact_panel_coverage(
+        panel_rows,
+        expected_design_classes=[spec.design_class_id for spec in ALL_SPECS],
+    )
     return panel_rows
+
+
+def validate_exact_panel_coverage(
+    panel_rows: Sequence[dict[str, object]],
+    *,
+    expected_design_classes: Sequence[str],
+) -> None:
+    """Fail unless the panel has exactly one row per declared design class."""
+
+    expected = [str(design_class_id) for design_class_id in expected_design_classes]
+    observed = [str(row.get("design_class_id") or "") for row in panel_rows]
+    counts = Counter(observed)
+    missing = [design_class_id for design_class_id in expected if counts[design_class_id] == 0]
+    duplicate = [design_class_id for design_class_id in expected if counts[design_class_id] > 1]
+    unexpected = sorted(design_class_id for design_class_id in counts if design_class_id not in set(expected))
+    if len(panel_rows) == len(expected) and not missing and not duplicate and not unexpected:
+        return
+    raise ValueError(
+        "Panel coverage failed: expected exactly one selected row for each of "
+        f"{len(expected)} design classes. Missing classes: {_format_class_list(missing)}. "
+        f"Duplicate classes: {_format_class_list(duplicate)}. "
+        f"Unexpected classes: {_format_class_list(unexpected)}. Selected rows: {len(panel_rows)}."
+    )
+
+
+def panel_coverage_summary(
+    panel_rows: Sequence[dict[str, object]],
+    *,
+    expected_design_classes: Sequence[str],
+) -> dict[str, object]:
+    """Return manifest-ready exact panel coverage fields."""
+
+    expected = [str(design_class_id) for design_class_id in expected_design_classes]
+    observed = [str(row.get("design_class_id") or "") for row in panel_rows]
+    counts = Counter(observed)
+    missing = [design_class_id for design_class_id in expected if counts[design_class_id] == 0]
+    duplicate = [design_class_id for design_class_id in expected if counts[design_class_id] > 1]
+    unexpected = sorted(design_class_id for design_class_id in counts if design_class_id not in set(expected))
+    return {
+        "expected_design_class_count": len(expected),
+        "selected_row_count": len(panel_rows),
+        "required_rows_per_class": 1,
+        "missing_design_classes": missing,
+        "duplicate_design_classes": duplicate,
+        "unexpected_design_classes": unexpected,
+        "valid": len(panel_rows) == len(expected) and not missing and not duplicate and not unexpected,
+    }
+
+
+def _format_class_list(values: Sequence[str]) -> str:
+    return ", ".join(values) if values else "none"
 
 
 def _choose_representative(
@@ -85,7 +141,8 @@ def _panel_row(
 ) -> dict[str, object]:
     reason = (
         f"Selected as the {row['design_class_id']} representative after feasibility and fold gates. "
-        "The tie-breaks use MSA support, nucleic-acid-facing mutation geography, simple local chemistry, "
+        "The tie-breaks use MSA support, mutation geography near retained DNA/RNA or thumb-track, "
+        "simple local chemistry, "
         "and sequence nonredundancy. ESMC and SAE rows were retained for review but not used for selection."
     )
     trace = {

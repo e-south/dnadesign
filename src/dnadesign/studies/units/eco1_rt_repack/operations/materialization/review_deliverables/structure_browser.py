@@ -229,7 +229,8 @@ def write_selected_panel_structure_browser_manifest(
         ),
         description=(
             "Lists WT and the six selected design-class representatives from the expanded fold-check structure set. "
-            "The dashboard shows fold metrics, mutation count, MSA support, nucleic-acid-facing chemistry, and "
+            "The dashboard shows fold metrics, mutation count, MSA support, chemistry near retained DNA/RNA or "
+            "thumb-track, and "
             "selection context beside the py3Dmol viewer."
         ),
         source_table_prefix="design_classes/foldcheck_review",

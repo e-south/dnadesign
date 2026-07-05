@@ -70,9 +70,10 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "msa_esmc_constraint_tracks",
         "selection_design_class_gate_counts",
         "selection_population_stratification",
-        "selection_panel_review_axes",
-        "selection_panel_sequence_differences",
-        "selection_panel_mutation_geography_chemistry",
+        "selection_class_local_percentiles",
+        "selection_six_sequence_distance",
+        "selection_selected_substitutions_across_rt",
+        "selection_regional_mutation_burden",
         "selection_funnel_summary",
         "selection_panel_table",
         "selection_handoff_sequences",
@@ -125,14 +126,18 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "biohub_esmc_sae_fold_llr_comparison" not in visual_ids
     assert "selection_design_class_gate_counts" in visual_ids
     assert "selection_population_stratification" in visual_ids
-    assert "selection_panel_review_axes" in visual_ids
-    assert "selection_panel_sequence_differences" in visual_ids
-    assert "selection_panel_mutation_geography_chemistry" in visual_ids
-    assert "selection_funnel_summary" in visual_ids
-    assert "selection_panel_table" in visual_ids
-    assert "selection_handoff_sequences" in visual_ids
-    assert "selection_handoff_readiness" in visual_ids
-    assert "selection_handoff_boundary" in visual_ids
+    assert "selection_class_local_percentiles" in visual_ids
+    assert "selection_six_sequence_distance" in visual_ids
+    assert "selection_selected_substitutions_across_rt" in visual_ids
+    assert "selection_regional_mutation_burden" in visual_ids
+    assert "selection_panel_review_axes" not in visual_ids
+    assert "selection_panel_sequence_differences" not in visual_ids
+    assert "selection_panel_mutation_geography_chemistry" not in visual_ids
+    assert "selection_funnel_summary" not in visual_ids
+    assert "selection_panel_table" not in visual_ids
+    assert "selection_handoff_sequences" not in visual_ids
+    assert "selection_handoff_readiness" not in visual_ids
+    assert "selection_handoff_boundary" not in visual_ids
     assert "selected_panel_structure_browser_manifest" in visual_ids
     assert "feasibility_and_handoff_planned" not in visual_ids
     assert "wt_esmc_entropy_by_position" in audit_visual_ids
@@ -176,6 +181,14 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
     assert deliverables["selection_population_stratification"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_population_stratification"]["status"] == "linked_existing"
+    assert deliverables["selection_class_local_percentiles"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_class_local_percentiles"]["status"] == "linked_existing"
+    assert deliverables["selection_six_sequence_distance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_six_sequence_distance"]["status"] == "linked_existing"
+    assert deliverables["selection_selected_substitutions_across_rt"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_selected_substitutions_across_rt"]["status"] == "linked_existing"
+    assert deliverables["selection_regional_mutation_burden"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_regional_mutation_burden"]["status"] == "linked_existing"
     assert deliverables["selection_funnel_summary"]["artifact_kind"] == "selection_funnel_summary"
     assert deliverables["selection_funnel_summary"]["status"] == "linked_existing"
     assert deliverables["selection_panel_table"]["artifact_kind"] == "selection_panel_table"
