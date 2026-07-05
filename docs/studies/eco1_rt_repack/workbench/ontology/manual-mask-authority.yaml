@@ -260,21 +260,27 @@ candidate_authority_sets:
           - ec86kit_7v9u_protomer1_distance_profile
 context_only_spans:
   - id: retron_x_context
-    label: Region X context
+    label: Region X local context
     start: 99
     end: 115
     status: display_context_only_not_mask_authoritative
-    source_locator: Wang et al. 2022 and Simon et al. 2019 Region X annotation context.
+    span_role: local_context_window_not_region_boundary
+    windowing_policy: not_a_subsequence_window_authority
+    source_locator: Wang et al. 2022 and Simon et al. 2019 Region X annotation context; short EC86 display window around the NAxxH anchor, not the full Region X extent.
   - id: catalytic_context
-    label: Catalytic context
+    label: Catalytic YADD local context
     start: 189
     end: 204
     status: display_context_only_not_mask_authoritative
-    source_locator: Wang et al. 2022 and Tao et al. 2026 catalytic-context preservation prior.
+    span_role: local_context_window_not_region_boundary
+    windowing_policy: not_a_subsequence_window_authority
+    source_locator: Wang et al. 2022 and Tao et al. 2026 catalytic-context preservation prior; short EC86 display window around the YADD anchor, not a complete catalytic-domain boundary.
   - id: retron_y_context
-    label: Region Y context
+    label: Region Y local context
     start: 237
     end: 251
     status: display_context_only_not_mask_authoritative
-    source_locator: Wang et al. 2022 and Simon et al. 2019 Region Y annotation context.
+    span_role: local_context_window_not_region_boundary
+    windowing_policy: not_a_subsequence_window_authority
+    source_locator: Wang et al. 2022 and Simon et al. 2019 Region Y annotation context; short EC86 display window around the VTG anchor, not the full Region Y extent.
 deferred_authority: []

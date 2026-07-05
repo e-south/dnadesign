@@ -53,9 +53,21 @@ def test_manual_mask_authority_materializer_writes_protected_motifs_and_rt_revie
     assert "wang_et_al_2022_ec86_cryoem_structure_priors" in source_basis_ids
 
     feature_positions = {feature["feature_id"]: feature["canonical_positions"] for feature in authority["features"]}
+    feature_sequences = {
+        feature["feature_id"]: "".join(
+            _row_by_position(authority["residues"], position)["wt_aa"] for position in feature["canonical_positions"]
+        )
+        for feature in authority["features"]
+        if feature["policy"] == "fixed"
+    }
     assert feature_positions["retron_x_naxxh"] == [105, 106, 107, 108, 109]
     assert feature_positions["catalytic_yadd"] == [195, 196, 197, 198]
     assert feature_positions["retron_y_vtg"] == [243, 244, 245]
+    assert feature_sequences["retron_x_naxxh"] == "NATPH"
+    assert feature_sequences["retron_x_naxxh"].startswith("NA")
+    assert feature_sequences["retron_x_naxxh"].endswith("H")
+    assert feature_sequences["catalytic_yadd"] == "YADD"
+    assert feature_sequences["retron_y_vtg"] == "VTG"
     assert feature_positions["rt1_interval"] == list(range(33, 65))
     assert feature_positions["rt2_interval"] == list(range(65, 100))
     assert feature_positions["rt3_interval"] == list(range(111, 152))
@@ -91,3 +103,10 @@ def _load_yaml(path: Path) -> dict[str, object]:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(loaded, dict)
     return loaded
+
+
+def _row_by_position(rows: list[object], position: int) -> dict[str, object]:
+    for row in rows:
+        if isinstance(row, dict) and row.get("canonical_position") == position:
+            return row
+    raise AssertionError(f"missing manual residue row for position {position}")

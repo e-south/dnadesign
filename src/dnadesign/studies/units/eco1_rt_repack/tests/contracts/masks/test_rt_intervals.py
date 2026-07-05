@@ -37,3 +37,16 @@ def test_manual_mask_source_declares_exact_rt_interval_review_spans() -> None:
         "rt7_interval": (231, 245),
     }
     assert {feature.policy for feature in intervals.values()} == {"review_label"}
+
+
+def test_manual_mask_source_marks_context_spans_as_local_display_windows() -> None:
+    authority_source = load_manual_mask_authority_source(repo_root())
+    spans = {span["id"]: span for span in authority_source["context_only_spans"]}
+
+    assert {span_id: (span["label"], span["start"], span["end"]) for span_id, span in spans.items()} == {
+        "retron_x_context": ("Region X local context", 99, 115),
+        "catalytic_context": ("Catalytic YADD local context", 189, 204),
+        "retron_y_context": ("Region Y local context", 237, 251),
+    }
+    assert {span["span_role"] for span in spans.values()} == {"local_context_window_not_region_boundary"}
+    assert {span["windowing_policy"] for span in spans.values()} == {"not_a_subsequence_window_authority"}

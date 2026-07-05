@@ -85,8 +85,8 @@ def test_design_class_mask_overview_renders_rt_context_spans_from_ontology(tmp_p
     svg_text = svg_path.read_text(encoding="utf-8")
     assert "RT1" in svg_text
     assert "RT2" in svg_text
-    assert "Region X context" in svg_text
-    assert "Catalytic context" in svg_text
+    assert "Region X local context" in svg_text
+    assert "Catalytic YADD local context" in svg_text
     assert "NAxxH" in svg_text
     assert "YADD" in svg_text
     assert "rt_annotation_tracks" in deliverable["input_hashes"]

@@ -21,7 +21,7 @@ tracks:
     color: "#d73027"
     features:
       - id: retron_x_context
-        label: Region X context
+        label: Region X local context
         start: 99
         end: 115
         color: "#d73027"
@@ -32,7 +32,7 @@ tracks:
         label_position: above
         mask_relevance: manual_mask_anchor_context_display_only
       - id: catalytic_context
-        label: Catalytic context
+        label: Catalytic YADD local context
         start: 189
         end: 204
         color: "#7b3294"
@@ -43,7 +43,7 @@ tracks:
         label_position: above
         mask_relevance: manual_mask_anchor_context_display_only
       - id: retron_y_context
-        label: Region Y context
+        label: Region Y local context
         start: 237
         end: 251
         color: "#d73027"

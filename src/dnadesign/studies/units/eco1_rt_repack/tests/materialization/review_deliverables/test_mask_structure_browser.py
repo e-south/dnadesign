@@ -164,8 +164,8 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     )
     assert "RT1 | 2 residues" in highlight_lookup
     assert "RT2 | 2 residues" in highlight_lookup
-    assert "Region X context | 3 residues" in highlight_lookup
-    assert "Catalytic context | 3 residues" in highlight_lookup
+    assert "Region X local context | 3 residues" in highlight_lookup
+    assert "Catalytic YADD local context | 3 residues" in highlight_lookup
     assert "NAxxH | 1 residues" in highlight_lookup
     assert "YADD | 1 residues" in highlight_lookup
 

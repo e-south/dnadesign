@@ -131,6 +131,12 @@ def _materialize_features(
                     raise ValueError(
                         f"manual mask feature {feature.get('id')!r} references unknown position {position}"
                     )
+            _validate_feature_sequence(
+                feature_id=_require_text(feature, "id"),
+                authority_type=_require_text(authority_set, "authority_type"),
+                canonical_positions=canonical_positions,
+                residue_by_position=residue_by_position,
+            )
             source_locator = _require_text(feature, "source_locator")
             features.append(
                 {
@@ -154,6 +160,26 @@ def _materialize_features(
     if not features:
         raise ValueError("manual mask authority source must declare at least one feature")
     return features
+
+
+def _validate_feature_sequence(
+    *,
+    feature_id: str,
+    authority_type: str,
+    canonical_positions: Sequence[int],
+    residue_by_position: Mapping[int, Mapping[str, Any]],
+) -> None:
+    sequence = "".join(str(residue_by_position[position]["wt_aa"]) for position in canonical_positions)
+    if authority_type == "retron_x_motif_anchor" and not (
+        len(sequence) == 5 and sequence.startswith("NA") and sequence.endswith("H")
+    ):
+        raise ValueError(
+            f"manual mask feature {feature_id!r} must resolve to an EC86 NAxxH motif, observed {sequence!r}"
+        )
+    if authority_type == "catalytic_core_motif_anchor" and sequence != "YADD":
+        raise ValueError(f"manual mask feature {feature_id!r} must resolve to EC86 YADD, observed {sequence!r}")
+    if authority_type == "retron_y_motif_anchor" and sequence != "VTG":
+        raise ValueError(f"manual mask feature {feature_id!r} must resolve to EC86 VTG, observed {sequence!r}")
 
 
 def _residue_authority_rows(

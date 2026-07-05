@@ -73,13 +73,13 @@ def write_rt_annotation_context_sources(output_root: Path) -> tuple[Path, Path]:
                         "features": [
                             {
                                 "id": "retron_x_context",
-                                "label": "Region X context",
+                                "label": "Region X local context",
                                 "start": 2,
                                 "end": 4,
                             },
                             {
                                 "id": "catalytic_context",
-                                "label": "Catalytic context",
+                                "label": "Catalytic YADD local context",
                                 "start": 3,
                                 "end": 5,
                             },
@@ -168,13 +168,13 @@ def write_rt_annotation_context_sources(output_root: Path) -> tuple[Path, Path]:
                 "context_only_spans": [
                     {
                         "id": "retron_x_context",
-                        "label": "Region X context",
+                        "label": "Region X local context",
                         "start": 2,
                         "end": 4,
                     },
                     {
                         "id": "catalytic_context",
-                        "label": "Catalytic context",
+                        "label": "Catalytic YADD local context",
                         "start": 3,
                         "end": 5,
                     },
