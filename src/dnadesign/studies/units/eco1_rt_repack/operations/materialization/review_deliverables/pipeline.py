@@ -197,7 +197,6 @@ def materialize_review_deliverables(
             candidate_table_path=candidate_table_path,
             candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
             design_classes_root=out_root / "design_classes",
-            foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
             mask_set_path=mask_set_path,
         )
     )
@@ -354,6 +353,7 @@ def _remove_retired_deliverables(deliverable_root: Path) -> None:
     for relative_path in (
         Path(MASK_CONTEXT_DIR_NAME) / "linear_mask_tracks.svg",
         Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_mutation_density.svg",
+        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_tao_style_fold_validation.svg",
         Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_variant_similarity_heatmap.svg",
     ):
         retired_file = deliverable_root / relative_path
@@ -398,10 +398,13 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {manifest_path}")
     rows: list[dict[str, Any]] = []
+    retired_plot_ids = {"fold_metric_scatter", "cryoem_vs_runtime_rmsd"}
     for plot in loaded.get("plots", []):
         if not isinstance(plot, dict):
             continue
         plot_id = str(plot.get("plot_id") or "plot")
+        if plot_id in retired_plot_ids:
+            continue
         plot_path = _resolve_linked_manifest_path(manifest_path, str(plot.get("path") or ""))
         plot_status = str(plot.get("status") or "rendered")
         linked_status = "linked_existing" if plot_status == "rendered" and plot_path.exists() else plot_status

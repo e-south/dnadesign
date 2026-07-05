@@ -31,25 +31,24 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     assert "Global score" in diversity_text
 
     assert "proteinmpnn_variant_similarity_heatmap" not in deliverables
+    assert "proteinmpnn_tao_style_fold_validation" not in deliverables
+    assert "foldcheck_review_fold_metric_scatter" not in deliverables
+    assert "foldcheck_review_cryoem_vs_runtime_rmsd" not in deliverables
     residue_frequency_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_residue_frequency_heatmap")
-    assert "ProteinMPNN samples alternate amino acids within each fixed-mask design class" in residue_frequency_text
-    assert "WT residue mark" in residue_frequency_text
-    assert "Changed residue count" in residue_frequency_text
+    assert "ProteinMPNN samples amino acids within each fixed mask" in residue_frequency_text
+    assert "WT residue" in residue_frequency_text
+    assert "Variants with this amino acid" in residue_frequency_text
     assert "Clade 9 25% + 5 A" in residue_frequency_text
-    assert "II-A3/42_1 50% + 5 A" in residue_frequency_text
     assert "Baseline ProteinMPNN mutation density across allowed residues" not in residue_frequency_text
-
-    tao_text = _read_deliverable(manifest_path, deliverables, "proteinmpnn_tao_style_fold_validation")
-    assert "The original fixed-mask run has measurable ColabFold RMSD and pLDDT spread" in tao_text
-    assert "WT-runtime C-alpha RMSD" in tao_text
-    assert "Mean pLDDT" in tao_text
-    assert "baseline" in str(deliverables["proteinmpnn_tao_style_fold_validation"]["description"]).lower()
-    assert "single active mask policy" in str(
-        deliverables["proteinmpnn_tao_style_fold_validation"]["interpretation_limit"]
-    )
+    class_views = deliverables["proteinmpnn_residue_frequency_heatmap"]["evidence_summary"]["design_class_views"]
+    assert len(class_views) == 6
+    assert {view["label"] for view in class_views} >= {
+        "Clade 9 25% + 5 A",
+        "II-A3/42_1 50% + 5 A",
+    }
 
     expanded_text = _read_deliverable(manifest_path, deliverables, "expanded_proteinmpnn_fold_validation")
-    assert "Expanded fixed-mask design classes preserve folds across RMSD and pLDDT checks" in expanded_text
+    assert "Expanded designs preserve the RT fold" in expanded_text
     assert "Design class" in expanded_text
     assert "Sampling temperature" in expanded_text
     assert "Temperature 0.1" in expanded_text

@@ -59,7 +59,6 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "design_class_mask_overview",
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_residue_frequency_heatmap",
-        "proteinmpnn_tao_style_fold_validation",
         "expanded_proteinmpnn_fold_validation",
         "mask_structure_context_script",
         "mask_structure_context_orientation_template",
@@ -89,7 +88,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "linear_mask_tracks" not in deliverables
     assert expected_linked_model_check.issubset(deliverables)
     assert deliverables["mask_structure_context_png"]["status"] == "skipped_optional_render_disabled"
-    assert deliverables["foldcheck_review_fold_metric_scatter"]["status"] == "linked_existing"
+    assert "proteinmpnn_tao_style_fold_validation" not in deliverables
+    assert "foldcheck_review_fold_metric_scatter" not in deliverables
+    assert "foldcheck_review_cryoem_vs_runtime_rmsd" not in deliverables
     assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
     assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
@@ -108,8 +109,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "biohub_esmc_sae_structure_browser_manifest" not in visual_ids
     assert "wt_esmc_entropy_by_position" not in visual_ids
     assert "proteinmpnn_score_mutation_burden" not in visual_ids
-    assert "proteinmpnn_residue_frequency_heatmap" not in visual_ids
-    assert "proteinmpnn_tao_style_fold_validation" not in visual_ids
+    assert "proteinmpnn_residue_frequency_heatmap" in visual_ids
     assert "design_class_mask_overview" in visual_ids
     assert "linear_mask_tracks" not in visual_ids
     assert "expanded_proteinmpnn_fold_validation" in visual_ids
@@ -133,12 +133,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "wt_esmc_entropy_by_position" in audit_visual_ids
     assert "foldcheck_review_review_class_counts" in visual_ids
     assert "proteinmpnn_score_mutation_burden" in audit_visual_ids
-    assert "proteinmpnn_residue_frequency_heatmap" in audit_visual_ids
-    assert "proteinmpnn_tao_style_fold_validation" in audit_visual_ids
     assert "biohub_esmc_candidate_preference_vs_wt" in audit_visual_ids
     assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
     assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids
-    assert "foldcheck_review_fold_metric_scatter" in audit_visual_ids
     assert "mask_structure_context_png" not in visual_ids
     assert "foldcheck_review_structure_overlay_panel" not in visual_ids
     assert "foldcheck_review_structure_overlay_skipped" not in visual_ids
@@ -147,10 +144,12 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
     assert deliverables["proteinmpnn_score_mutation_burden"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["proteinmpnn_score_mutation_burden"]["role"] == "review_only"
-    assert deliverables["proteinmpnn_residue_frequency_heatmap"]["role"] == "review_only"
+    assert deliverables["proteinmpnn_residue_frequency_heatmap"]["role"] == "manuscript_facing"
+    assert deliverables["proteinmpnn_residue_frequency_heatmap"]["artifact_kind"] == (
+        "proteinmpnn_residue_frequency_bundle"
+    )
+    assert len(deliverables["proteinmpnn_residue_frequency_heatmap"]["evidence_summary"]["design_class_views"]) == 6
     assert "proteinmpnn_variant_similarity_heatmap" not in deliverables
-    assert deliverables["proteinmpnn_tao_style_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
-    assert deliverables["proteinmpnn_tao_style_fold_validation"]["role"] == "review_only"
     assert deliverables["design_class_mask_overview"]["section"] == SECTION_CONSTRAINT_EVIDENCE
     assert deliverables["design_class_mask_overview"]["role"] == "manuscript_facing"
     assert deliverables["design_class_mask_overview"]["render_mode"] == "compact_wide_visual"

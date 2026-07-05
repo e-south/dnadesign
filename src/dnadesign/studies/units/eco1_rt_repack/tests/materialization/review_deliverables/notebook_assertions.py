@@ -141,6 +141,8 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "mask_structure_context_orientation_template" not in notebook_text
     assert "structure_overlay_skipped" not in notebook_text
     assert "render_deliverable_artifact(" in runtime_text
+    assert "proteinmpnn_residue_frequency_bundle" in runtime_text
+    assert 'label="Fixed-mask design class"' in runtime_text
     assert "render_interpretation_note(" not in combined_text
     assert "<strong>Interpretation limit:</strong>" not in combined_text
     assert "overflow-x:auto" not in combined_text

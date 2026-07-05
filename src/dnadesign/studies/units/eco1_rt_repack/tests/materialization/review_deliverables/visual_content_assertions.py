@@ -83,12 +83,8 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
 
 
 def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:
-    linked_fold_plot = resolve_manifest_path(
-        manifest_path,
-        str(deliverables["foldcheck_review_fold_metric_scatter"]["path"]),
-    )
-    assert linked_fold_plot.exists()
-    assert linked_fold_plot.parent.name == "plots"
+    assert "foldcheck_review_fold_metric_scatter" not in deliverables
+    assert "foldcheck_review_cryoem_vs_runtime_rmsd" not in deliverables
     linked_structure_overlay = resolve_manifest_path(
         manifest_path,
         str(deliverables["foldcheck_review_structure_overlay_panel"]["path"]),

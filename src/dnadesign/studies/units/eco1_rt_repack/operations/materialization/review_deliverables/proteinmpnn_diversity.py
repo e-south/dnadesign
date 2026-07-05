@@ -23,7 +23,6 @@ from .manifest import (
     file_hashes,
     make_deliverable_row,
 )
-from .proteinmpnn_fold_validation import write_tao_style_fold_validation
 from .proteinmpnn_residue_frequency import write_residue_frequency_heatmap
 from .rendering import (
     LABEL_SIZE,
@@ -49,7 +48,6 @@ def write_proteinmpnn_diversity_panels(
     candidate_table_path: Path,
     candidate_pool_path: Path,
     design_classes_root: Path,
-    foldcheck_ranking_path: Path | None = None,
     mask_set_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Render compact ProteinMPNN diversity panels."""
@@ -84,15 +82,6 @@ def write_proteinmpnn_diversity_panels(
             design_classes_root=design_classes_root,
         ),
     ]
-    if foldcheck_ranking_path is not None:
-        deliverables.append(
-            write_tao_style_fold_validation(
-                panel_root,
-                accepted_rows,
-                candidate_table_path,
-                foldcheck_ranking_path,
-            )
-        )
     return deliverables
 
 

@@ -208,6 +208,8 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
         return render_selection_panel_table(row, mo=mo, table_path=media_path)
     if artifact_kind == "candidate_handoff_sequence_csv":
         return _render_handoff_sequence_csv(row, mo=mo, table_path=media_path)
+    if artifact_kind == "proteinmpnn_residue_frequency_bundle":
+        return _render_residue_frequency_bundle(row, mo=mo, manifest_root=manifest_root)
     if artifact_kind == "handoff_readiness":
         return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
     if artifact_kind == "handoff_boundary":
@@ -316,6 +318,37 @@ def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Pa
             mo.Html(handoff_sequence_list_html(rows)),
             mo.ui.table(rows, page_size=10),
         ],
+        gap=0.25,
+    )
+
+
+def _render_residue_frequency_bundle(row: dict[str, Any], *, mo: Any, manifest_root: Path) -> Any:
+    evidence_summary = row.get("evidence_summary") or {}
+    view_rows = list(dict(evidence_summary).get("design_class_views") or [])
+    if not view_rows:
+        media_path = resolve_manifest_path(manifest_root, str(row["path"]))
+        return render_image(row, mo=mo, media_path=media_path)
+    view_lookup = {str(view.get("label") or ""): dict(view) for view in view_rows if view.get("label")}
+    options = list(view_lookup)
+    design_class_ui = mo.ui.dropdown(
+        options,
+        value=options[0] if options else None,
+        label="Fixed-mask design class",
+        full_width=True,
+    )
+    selected_label = str(design_class_ui.value or options[0]) if options else ""
+    selected_view = view_lookup.get(selected_label) or (dict(view_rows[0]) if view_rows else {})
+    selected_path = resolve_manifest_path(manifest_root, str(selected_view.get("path") or row["path"]))
+    selected_row = dict(row)
+    selected_row["path"] = str(selected_path)
+    selected_row["title"] = f"{row.get('title')} | {selected_label}" if selected_label else str(row.get("title") or "")
+    selected_row["alt_text"] = (
+        f"{row.get('alt_text')} Selected design class: {selected_label}."
+        if selected_label
+        else str(row.get("alt_text") or "")
+    )
+    return mo.vstack(
+        [design_class_ui, render_image(selected_row, mo=mo, media_path=selected_path)],
         gap=0.25,
     )
 
