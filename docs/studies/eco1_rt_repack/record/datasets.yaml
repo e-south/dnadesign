@@ -626,8 +626,8 @@ datasets:
     status: materialized_script_png
     description: >-
       Design-class mask context deliverable. The SVG matrix compares the six
-      conservation and retained-substrate proximity policies against motif,
-      Wang/EC86 prior, WT-plurality, and DNA/RNA contact evidence rows. The
+      design-class masks against motif, Wang/EC86 prior, WT-plurality, and
+      DNA/RNA proximity evidence rows. The
       ChimeraX `.cxc` script is written for an off-white EC86 RT structure with
       categorical overlays for baseline fixed residues and mutable ProteinMPNN
       positions. The PNG render is opt-in; normal materialization records a

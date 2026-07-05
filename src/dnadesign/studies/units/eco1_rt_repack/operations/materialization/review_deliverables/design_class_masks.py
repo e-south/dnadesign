@@ -16,7 +16,6 @@ from typing import Any
 
 import matplotlib
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     BASELINE_CLASS_ID,
@@ -41,9 +40,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     TITLE_SIZE,
     save_accessible_svg,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
-    class_label,
-)
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -59,7 +55,7 @@ _STATE_MISSING_BACKBONE = 7
 _MASK_AXIS_FONT_SIZE = 11.0
 _POSITION_MINOR_TICK_STEP = 1
 _BOTTOM_POSITION_LABEL_STEP = 20
-_TOP_POSITION_LABEL_STEP = 10
+_TOP_AMINO_ACID_LABEL_STEP = 5
 _STATE_COLORS = (
     "#f8f7f2",
     OKABE_ITO["vermillion"],
@@ -87,12 +83,13 @@ def write_design_class_mask_overview(
     positions = sorted({position for row in class_rows for position in row["residues_by_position"]})
     if not positions:
         raise ValueError("No canonical positions found in design-class mask sets")
+    wt_aa_by_position = _wt_aa_by_position(class_rows)
 
     matrix_rows = _mask_matrix_rows(class_rows)
     matrix = [[_matrix_state(row, position) for position in positions] for row in matrix_rows]
     title = "Design-class residue mask evidence across EC86 RT"
     fig_width = max(13.8, min(20.0, len(positions) * 0.06))
-    fig_height = max(9.0, len(matrix_rows) * 0.35 + 3.8)
+    fig_height = max(7.6, len(matrix_rows) * 0.35 + 2.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
     ax.imshow(
         matrix,
@@ -110,8 +107,7 @@ def write_design_class_mask_overview(
     tick_indexes = _position_tick_indexes(positions)
     ax.set_xticks(tick_indexes, [str(positions[index]) for index in tick_indexes], fontsize=_MASK_AXIS_FONT_SIZE)
     ax.set_xticks(_minor_position_tick_indexes(positions), minor=True)
-    ax.set_xlabel("EC86 canonical residue position", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
-    ax.set_ylabel("Mask evidence and design-class policy", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
+    ax.set_xlabel("Residue position", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=18)
     ax.tick_params(axis="x", which="major", length=3.2, labelsize=_MASK_AXIS_FONT_SIZE, pad=3)
     ax.tick_params(axis="x", which="minor", length=1.3, color="#737373")
@@ -119,27 +115,9 @@ def write_design_class_mask_overview(
     ax.spines[["top", "right", "left"]].set_visible(False)
     ax.spines["bottom"].set_color("#737373")
     ax.spines["bottom"].set_linewidth(0.55)
-    _add_top_position_ruler(ax, positions)
-    legend_handles = [
-        Patch(facecolor=OKABE_ITO["vermillion"], label="Catalytic motif anchor"),
-        Patch(facecolor=OKABE_ITO["purple"], label="Wang/EC86 prior"),
-        Patch(facecolor=OKABE_ITO["blue"], label="Conservation threshold"),
-        Patch(facecolor=OKABE_ITO["orange"], label="DNA/RNA contact threshold"),
-        Patch(facecolor="#222222", label="Fixed by design-class policy"),
-        Patch(facecolor=OKABE_ITO["sky"], label="Designable by design-class policy"),
-        Patch(facecolor="#b8b8b8", label="Missing backbone context"),
-    ]
-    fig.legend(
-        handles=legend_handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.018),
-        ncol=3,
-        frameon=False,
-        fontsize=_MASK_AXIS_FONT_SIZE - 0.5,
-        columnspacing=1.0,
-        handletextpad=0.5,
-    )
-    fig.subplots_adjust(left=0.22, right=0.995, bottom=0.29, top=0.78)
+    _add_row_group_separator(ax, matrix_rows)
+    _add_top_amino_acid_axis(ax, positions, wt_aa_by_position=wt_aa_by_position)
+    fig.subplots_adjust(left=0.23, right=0.995, bottom=0.115, top=0.76)
 
     path = panel_root / "design_class_mask_overview.svg"
     source_paths = _source_paths_by_label(
@@ -147,9 +125,9 @@ def write_design_class_mask_overview(
         design_classes_root=design_classes_root,
     )
     alt = (
-        "Matrix comparing Eco1 RT mask evidence and the six ProteinMPNN design-class policies. Evidence rows "
-        "separate motif anchors, Wang/EC86 priors, WT-plurality thresholds, and retained DNA/RNA contact "
-        "thresholds. Policy rows show which residues each design class fixed or left designable."
+        "Matrix comparing Eco1 RT mask evidence and the six ProteinMPNN design-class masks. Evidence rows "
+        "separate motif anchors, Wang/EC86 priors, WT-plurality cutoffs, and retained DNA/RNA proximity rows. "
+        "Class rows show which residues are fixed or editable."
     )
     save_accessible_svg(fig, path, title=title, description=alt, dpi=300)
     return make_deliverable_row(
@@ -163,8 +141,8 @@ def write_design_class_mask_overview(
         alt_text=alt,
         description=(
             "Provides one residue-coordinate source of truth for mask review. Evidence rows show motif, "
-            "prior, conservation, and retained DNA/RNA proximity rules; policy rows show the resulting "
-            "fixed and designable residues for the six design classes."
+            "prior, conservation, and retained DNA/RNA proximity rules; class rows show fixed and editable "
+            "residues for the six design classes."
         ),
         interpretation_limit=(
             "Mask membership explains the ProteinMPNN design surface. It does not rank sequences, "
@@ -205,7 +183,6 @@ def _load_design_class_rows(*, baseline_mask_set_path: Path, design_classes_root
         rows.append(
             {
                 "design_class_id": spec.design_class_id,
-                "label": class_label(spec.design_class_id),
                 "conservation_profile_id": spec.conservation_profile_id,
                 "conservation_threshold": spec.conservation_threshold,
                 "contact_threshold_angstrom": spec.contact_threshold_angstrom,
@@ -261,7 +238,7 @@ def _conservation_rows(class_rows: list[dict[str, Any]]) -> list[dict[str, Any]]
             )
         rows.append(
             _binary_row(
-                f"{_profile_label(profile_id)} p{threshold} conservation",
+                _conservation_axis_label(profile_id=profile_id, threshold=threshold),
                 _STATE_CONSERVATION,
                 positions,
             )
@@ -297,7 +274,7 @@ def _contact_rows(class_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 for position, residue in row["residues_by_position"].items()
                 if bool(residue.get("selected_retained_dna_rna_contact"))
             )
-        rows.append(_binary_row(f"DNA/RNA <={threshold} A contact", _STATE_CONTACT, positions))
+        rows.append(_binary_row(f"DNA/RNA within {threshold} A", _STATE_CONTACT, positions))
     return rows
 
 
@@ -312,16 +289,23 @@ def _positions_with_field(class_rows: list[dict[str, Any]], field: str) -> set[i
 
 def _profile_label(profile_id: str) -> str:
     if profile_id == CONSERVATION_CLADE9_PROFILE_ID:
-        return "clade 9"
+        return "Clade 9"
     if profile_id == CONSERVATION_SUBTYPE_PROFILE_ID:
         return "II-A3/42_1"
     return profile_id
 
 
+def _conservation_axis_label(*, profile_id: str, threshold: int) -> str:
+    return f"{_profile_label(profile_id)}: >={threshold}% WT plurality"
+
+
 def _class_axis_label(row: dict[str, Any]) -> str:
     designable = int(row["designable_count"])
     protected = int(row["protected_count"])
-    return f"{row['label']} policy | {designable} designable, {protected} fixed"
+    threshold = int(round(float(row["conservation_threshold"]) * 100))
+    contact = int(round(float(row["contact_threshold_angstrom"])))
+    class_basis = f"{_profile_label(str(row['conservation_profile_id']))} {threshold}% + {contact} A"
+    return f"{class_basis} | {designable} editable / {protected} fixed"
 
 
 def _matrix_state(row: dict[str, Any], position: int) -> int:
@@ -346,8 +330,8 @@ def _position_tick_indexes(positions: list[int]) -> list[int]:
     return _labeled_position_tick_indexes(positions, step=_BOTTOM_POSITION_LABEL_STEP)
 
 
-def _top_position_tick_indexes(positions: list[int]) -> list[int]:
-    return _labeled_position_tick_indexes(positions, step=_TOP_POSITION_LABEL_STEP)
+def _top_amino_acid_tick_indexes(positions: list[int]) -> list[int]:
+    return _labeled_position_tick_indexes(positions, step=_TOP_AMINO_ACID_LABEL_STEP)
 
 
 def _labeled_position_tick_indexes(positions: list[int], *, step: int) -> list[int]:
@@ -366,23 +350,43 @@ def _minor_position_tick_indexes(positions: list[int]) -> list[int]:
     return list(range(0, len(positions), _POSITION_MINOR_TICK_STEP))
 
 
-def _add_top_position_ruler(ax: Any, positions: list[int]) -> None:
+def _add_top_amino_acid_axis(ax: Any, positions: list[int], *, wt_aa_by_position: dict[int, str]) -> None:
     top_ax = ax.twiny()
     top_ax.set_xlim(ax.get_xlim())
-    top_tick_indexes = _top_position_tick_indexes(positions)
+    top_tick_indexes = _top_amino_acid_tick_indexes(positions)
     top_ax.set_xticks(
         top_tick_indexes,
-        [str(positions[index]) for index in top_tick_indexes],
+        [wt_aa_by_position[positions[index]] for index in top_tick_indexes],
         fontsize=_MASK_AXIS_FONT_SIZE,
     )
     top_ax.set_xticks(_minor_position_tick_indexes(positions), minor=True)
-    top_ax.set_xlabel("EC86 per-residue ruler", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
+    top_ax.set_xlabel("WT amino acid", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
     top_ax.tick_params(axis="x", which="major", length=3.2, labelsize=_MASK_AXIS_FONT_SIZE, pad=3)
     top_ax.tick_params(axis="x", which="minor", length=1.3, color="#737373")
     top_ax.tick_params(axis="y", which="both", left=False, labelleft=False)
     top_ax.spines[["right", "left", "bottom"]].set_visible(False)
     top_ax.spines["top"].set_color("#737373")
     top_ax.spines["top"].set_linewidth(0.55)
+
+
+def _add_row_group_separator(ax: Any, matrix_rows: list[dict[str, Any]]) -> None:
+    evidence_row_count = sum(1 for row in matrix_rows if row["kind"] == "binary")
+    if evidence_row_count <= 0 or evidence_row_count >= len(matrix_rows):
+        return
+    ax.axhline(evidence_row_count - 0.5, color="#5f6368", linewidth=0.7)
+
+
+def _wt_aa_by_position(class_rows: list[dict[str, Any]]) -> dict[int, str]:
+    wt_by_position: dict[int, str] = {}
+    for class_row in class_rows:
+        for position, residue in class_row["residues_by_position"].items():
+            wt_aa = str(residue.get("wt_aa") or "").strip().upper()
+            if len(wt_aa) != 1:
+                raise ValueError(f"mask_set row {position} must include one-letter wt_aa for the EC86 sequence axis")
+            existing = wt_by_position.setdefault(position, wt_aa)
+            if existing != wt_aa:
+                raise ValueError(f"mask_set rows disagree on wt_aa for canonical position {position}")
+    return wt_by_position
 
 
 def _source_paths_by_label(*, baseline_mask_set_path: Path, design_classes_root: Path) -> dict[str, Path]:
