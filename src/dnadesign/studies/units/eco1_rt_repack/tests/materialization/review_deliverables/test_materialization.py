@@ -36,8 +36,13 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
 
 def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path: Path) -> None:
     write_deliverable_inputs(tmp_path)
+    stale_linear_mask_track = tmp_path / "review_deliverables" / "mask_structure_context" / "linear_mask_tracks.svg"
+    stale_linear_mask_track.parent.mkdir(parents=True, exist_ok=True)
+    stale_linear_mask_track.write_text("<svg>retired baseline-only mask track</svg>\n", encoding="utf-8")
 
     result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+
+    assert not stale_linear_mask_track.exists()
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_id"] == "eco1_rt.review_deliverables"
@@ -51,7 +56,6 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     expected_rendered = {
         "msa_plurality_mask_panel",
         "msa_subtype_plurality_panel",
-        "linear_mask_tracks",
         "design_class_mask_overview",
         "proteinmpnn_score_mutation_burden",
         "proteinmpnn_mutation_density",
@@ -83,6 +87,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "wt_esmc_substitution_llr_heatmap",
     }
     assert expected_rendered.issubset(deliverables)
+    assert "linear_mask_tracks" not in deliverables
     assert expected_linked_model_check.issubset(deliverables)
     assert deliverables["mask_structure_context_png"]["status"] == "skipped_optional_render_disabled"
     assert deliverables["foldcheck_review_fold_metric_scatter"]["status"] == "linked_existing"
@@ -108,6 +113,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert "proteinmpnn_tao_style_fold_validation" not in visual_ids
     assert "proteinmpnn_variant_similarity_heatmap" not in visual_ids
     assert "design_class_mask_overview" in visual_ids
+    assert "linear_mask_tracks" not in visual_ids
     assert "expanded_proteinmpnn_fold_validation" in visual_ids
     assert "biohub_esmc_candidate_preference_vs_wt" not in visual_ids
     assert "biohub_esmc_sae_feature_activation_heatmap" not in visual_ids

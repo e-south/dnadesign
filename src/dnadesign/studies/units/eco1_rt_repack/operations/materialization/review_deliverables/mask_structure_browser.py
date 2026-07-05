@@ -56,15 +56,16 @@ _MASK_SELECTIONS = (
     ),
     (
         "evolutionarily_conserved_clade9_25pct_plurality",
-        "Clade 9 plurality-protected residues",
+        "Clade 9 p25 WT-plurality residues",
         "evolutionarily_conserved_clade9_25pct_plurality",
-        "Residues fixed by the clade 9 WT-plurality rule.",
+        "Residues fixed by the clade 9 25% WT-plurality rule.",
     ),
     (
         "protected",
-        "Protected union",
+        "Baseline fixed residues (clade 9 p25 + 5 A)",
         "protected",
-        "All residues fixed by at least one active mask rule.",
+        "All residues fixed by the baseline clade 9 p25 conservation, 5 A retained DNA/RNA contact, "
+        "motif, or Wang/Ec86 prior rules.",
     ),
     (
         "non_fixed",

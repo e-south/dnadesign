@@ -62,12 +62,12 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     )
     assert deliverables["msa_plurality_mask_panel"]["evidence_summary"]["current_mask_denominator"] is True
     assert "ec86_clade9_conservation_v1__" not in msa_text
-    assert "25% WT plurality threshold" in msa_text
-    assert "50% WT plurality threshold" in msa_text
-    assert "Mask-protected positions" in msa_text
+    assert "clade 9 25% WT plurality" in msa_text
+    assert "clade 9 50% WT plurality" in msa_text
+    assert "Baseline fixed residues (clade 9 p25 + 5 A)" in msa_text
+    assert "Mask-protected" not in msa_text
     assert "Subtype II-A3/42_1 rows" not in msa_text
     assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text
-    assert "Mask-protected" in msa_text
 
     subtype_text = _read_deliverable(manifest_path, deliverables, "msa_subtype_plurality_panel")
     assert "The 3-record Eco1 subtype II-A3/42_1 MSA shows the narrower subtype conservation context" in subtype_text
@@ -77,27 +77,27 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "does not replace the clade 9 denominator" in str(deliverables["msa_subtype_plurality_panel"]["description"])
     assert deliverables["msa_subtype_plurality_panel"]["evidence_summary"]["current_mask_denominator"] is False
     assert "II-A3 002 fig|fixture.2.peg.1" in subtype_text
-    assert "25% WT plurality threshold" in subtype_text
-    assert "50% WT plurality threshold" in subtype_text
-    assert "Mask-protected positions" in subtype_text
-
-    mask_text = _read_deliverable(manifest_path, deliverables, "linear_mask_tracks")
-    assert "Residue mask evidence across Ec86 RT" in mask_text
-    assert "ProteinMPNN-designable residues" in mask_text
-    assert "WT residue" not in mask_text
-    assert "Ec86 positions 1-6" not in mask_text
-    assert "Mask evidence track" not in mask_text
-    assert "M" in mask_text
-    assert "K" in mask_text
+    assert "II-A3/42_1 25% WT plurality" in subtype_text
+    assert "II-A3/42_1 50% WT plurality" in subtype_text
+    assert "Baseline fixed residues (clade 9 p25 + 5 A)" in subtype_text
+    assert "linear_mask_tracks" not in deliverables
 
     design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
-    assert "Design-class mask rules show which residues were fixed or designable" in design_class_mask_text
+    assert "Design-class residue mask evidence across Ec86 RT" in design_class_mask_text
     assert "clade 9 p25, 5 A" in design_class_mask_text
+    assert "clade 9 p25, 6 A" in design_class_mask_text
+    assert "clade 9 p25, 8 A" in design_class_mask_text
+    assert "clade 9 p25, 10 A" in design_class_mask_text
     assert "clade 9 p50, 5 A" in design_class_mask_text
     assert "subtype p50, 5 A" in design_class_mask_text
-    assert "25% WT plurality" in design_class_mask_text
-    assert "50% WT plurality" in design_class_mask_text
-    assert "ProteinMPNN-designable residues" in design_class_mask_text
+    assert "clade 9 p25 conservation" in design_class_mask_text
+    assert "clade 9 p50 conservation" in design_class_mask_text
+    assert "II-A3/42_1 p50 conservation" in design_class_mask_text
+    assert "DNA/RNA &lt;=10 A contact" in design_class_mask_text
+    assert "Fixed by row mask policy" in design_class_mask_text
+    assert "Designable by row mask policy" in design_class_mask_text
+    assert "Fixed-residue union" not in design_class_mask_text
+    assert "Protected union" not in design_class_mask_text
     assert "current baseline only" not in design_class_mask_text.lower()
 
 

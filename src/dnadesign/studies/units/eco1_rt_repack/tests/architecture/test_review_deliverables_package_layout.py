@@ -40,6 +40,7 @@ _ROOT_FILES = {
     "models.py",
     "msa_panel.py",
     "msa_panel_data.py",
+    "msa_panel_layout.py",
     "notebook.py",
     "notebook_runtime.py",
     "notebook_sae_features.py",
@@ -72,7 +73,8 @@ def test_review_deliverables_materializer_uses_semantic_modules() -> None:
     assert "matplotlib" not in pipeline_text
     assert "pyarrow" not in pipeline_text
     assert "write_msa_plurality_mask_panel" in pipeline_text
-    assert "write_linear_mask_tracks" in pipeline_text
+    assert "write_linear_mask_tracks" not in pipeline_text
+    assert "write_design_class_mask_overview" in pipeline_text
     assert "write_proteinmpnn_diversity_panels" in pipeline_text
     assert "write_esmc_model_check_panels" in pipeline_text
     assert "write_biohub_esmc_sae_interpretation_panels" in pipeline_text

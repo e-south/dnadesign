@@ -625,15 +625,14 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
     status: materialized_script_png
     description: >-
-      Linear-plus-3D mask context deliverable. The linear SVG is rendered and
-      the ChimeraX `.cxc` script is written for an off-white Ec86 RT structure
-      with categorical overlays for catalytic anchors, Wang/Ec86 direct-contact
-      priors, retained DNA/RNA 5 A contact residues, clade 9 plurality-protected
-      positions, and mutable ProteinMPNN positions. The same directory now also
-      contains a design-class mask overview comparing the six conservation and
-      retained-substrate proximity policies. The PNG render is opt-in; normal
-      materialization records a skipped optional-render status unless an existing
-      render is being retained.
+      Design-class mask context deliverable. The SVG matrix compares the six
+      conservation and retained-substrate proximity policies against motif,
+      Wang/Ec86 prior, WT-plurality, and DNA/RNA contact evidence rows. The
+      ChimeraX `.cxc` script is written for an off-white Ec86 RT structure with
+      categorical overlays for baseline fixed residues and mutable ProteinMPNN
+      positions. The PNG render is opt-in; normal materialization records a
+      skipped optional-render status unless an existing render is being
+      retained.
   - id: eco1_rt_mask_structure_browser_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -644,7 +643,7 @@ datasets:
       the review-deliverables marimo notebook. It points to the off-white
       ec86kit/7V9U reference backbone and exposes dropdown views for catalytic
       motif anchors, Wang/Ec86 substrate-contact priors, retained DNA/RNA 5 A
-      contacts, clade 9 plurality-protected residues, the protected union, and
+      contacts, clade 9 p25 WT-plurality residues, baseline fixed residues, and
       mutable ProteinMPNN positions. It uses the generic
       `dnadesign.thread.structure_views` residue-selection contract and is
       review context only.

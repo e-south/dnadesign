@@ -43,6 +43,22 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     source_record_labels,
     subtype_row_segments,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.msa_panel_layout import (
+    _TRACK_25_Y,
+    _TRACK_50_Y,
+    _TRACK_HEIGHT,
+    _TRACK_PROTECTED_Y,
+    _TRACK_TOP_Y_LIMIT,
+    _axes_center_x,
+    _figure_margins,
+    _figure_size,
+    _msa_y_tick_size,
+    _position_tick_indexes,
+    _residue_label_size,
+    _style_y_tick_labels,
+    _subtype_fill_left_extension,
+    _track_tick_labels,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
@@ -89,17 +105,6 @@ SUBTYPE_MSA_PANEL = MsaPanelProfile(
     aligned_fasta_source_table=f"conservation_alignments/{CONSERVATION_SUBTYPE_PROFILE_ID}.aligned.fasta",
     source_manifest_table=f"conservation_sources/{CONSERVATION_SUBTYPE_PROFILE_ID}.source_manifest.yaml",
     current_mask_denominator=False,
-)
-
-_TRACK_50_Y = -5.25
-_TRACK_25_Y = -3.65
-_TRACK_PROTECTED_Y = -2.05
-_TRACK_HEIGHT = 0.8
-_TRACK_TOP_Y_LIMIT = -5.75
-_TRACK_TICK_LABELS = (
-    (-4.85, "50% WT plurality threshold"),
-    (-3.25, "25% WT plurality threshold"),
-    (-1.65, "Mask-protected positions"),
 )
 
 
@@ -156,6 +161,7 @@ def write_msa_plurality_mask_panel(
     title = _panel_title(record_count=len(records), panel_profile=panel_profile)
     fig_width, fig_height = _figure_size(len(selected_records))
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    margins = _figure_margins(len(selected_records), fig_height=fig_height)
     ax.imshow(
         matrix,
         aspect="auto",
@@ -196,7 +202,24 @@ def write_msa_plurality_mask_panel(
                     clip_on=False,
                 )
             )
-    subtype_fill_left_extension = _subtype_fill_left_extension(len(positions))
+    row_labels = [
+        _msa_axis_row_label(
+            record_id,
+            source_labels=source_labels,
+            profile_id=panel_profile.profile_id,
+            row_label_prefix=panel_profile.row_label_prefix,
+            is_subtype_record=record_id in subtype_record_ids,
+        )
+        for record_id, _seq in selected_records
+    ]
+    row_label_size = _msa_y_tick_size(len(selected_records))
+    subtype_fill_left_extension = _subtype_fill_left_extension(
+        row_labels=row_labels,
+        row_label_size=row_label_size,
+        position_count=len(positions),
+        fig_width=fig_width,
+        axes_width_fraction=float(margins["right"]) - float(margins["left"]),
+    )
     for start, count in subtype_row_segments(
         selected_records,
         source_accessions=source_accessions,
@@ -214,21 +237,18 @@ def write_msa_plurality_mask_panel(
                 clip_on=False,
             )
         )
-    row_labels = [
-        _msa_axis_row_label(
-            record_id,
-            source_labels=source_labels,
-            profile_id=panel_profile.profile_id,
-            row_label_prefix=panel_profile.row_label_prefix,
-            is_subtype_record=record_id in subtype_record_ids,
-        )
-        for record_id, _seq in selected_records
-    ]
+    track_tick_labels = _track_tick_labels(panel_profile)
     ax.set_yticks(
-        [tick for tick, _label in _TRACK_TICK_LABELS] + list(range(len(selected_records))),
-        [label for _tick, label in _TRACK_TICK_LABELS] + row_labels,
+        [tick for tick, _label in track_tick_labels] + list(range(len(selected_records))),
+        [label for _tick, label in track_tick_labels] + row_labels,
     )
-    _style_y_tick_labels(ax, selected_records=selected_records, subtype_record_ids=subtype_record_ids)
+    _style_y_tick_labels(
+        ax,
+        selected_records=selected_records,
+        subtype_record_ids=subtype_record_ids,
+        row_label_size=row_label_size,
+        track_label_count=len(track_tick_labels),
+    )
     ax.tick_params(axis="y", pad=2)
     tick_indexes = _position_tick_indexes(positions)
     ax.set_xticks(tick_indexes, [str(positions[index]) for index in tick_indexes], fontsize=TICK_SIZE)
@@ -244,7 +264,6 @@ def write_msa_plurality_mask_panel(
     ax.set_ylim(len(selected_records) - 0.5, _TRACK_TOP_Y_LIMIT)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=24)
     ax.spines[["top", "right"]].set_visible(False)
-    margins = _figure_margins(len(selected_records), fig_height=fig_height)
     legend_center_x = _axes_center_x(margins)
     fig.legend(
         handles=[
@@ -385,79 +404,3 @@ def _msa_axis_row_label(
     if is_subtype_record:
         return f"II-A3 subset | {label}"
     return label
-
-
-def _style_y_tick_labels(ax: Any, *, selected_records: list[tuple[str, str]], subtype_record_ids: set[str]) -> None:
-    row_label_size = _row_label_size(len(selected_records))
-    for index, label in enumerate(ax.get_yticklabels()):
-        if index < len(_TRACK_TICK_LABELS):
-            label.set_fontsize(LEGEND_SIZE - 0.9)
-            label.set_color("#333333")
-            continue
-        record_index = index - len(_TRACK_TICK_LABELS)
-        label.set_fontsize(row_label_size)
-        if selected_records[record_index][0] in subtype_record_ids:
-            label.set_bbox(
-                {
-                    "facecolor": OKABE_ITO["sky"],
-                    "edgecolor": "none",
-                    "alpha": 0.18,
-                    "pad": 1.1,
-                }
-            )
-
-
-def _figure_size(row_count: int) -> tuple[float, float]:
-    return _figure_width(row_count), _figure_height(row_count)
-
-
-def _figure_width(row_count: int) -> float:
-    if row_count <= 80:
-        return 18.4
-    return 22.4
-
-
-def _figure_height(row_count: int) -> float:
-    if row_count <= 60:
-        return max(5.8, row_count * 0.22 + 1.75)
-    if row_count <= 140:
-        return row_count * 0.14 + 2.15
-    return row_count * 0.096 + 2.35
-
-
-def _figure_margins(row_count: int, *, fig_height: float) -> dict[str, float]:
-    bottom = max(0.09, min(0.18, 1.08 / fig_height))
-    top = 1.0 - max(0.036, min(0.12, 0.78 / fig_height))
-    left = 0.205 if row_count <= 80 else 0.112
-    return {
-        "left": left,
-        "right": 0.995,
-        "bottom": bottom,
-        "top": top,
-    }
-
-
-def _axes_center_x(margins: dict[str, float]) -> float:
-    return (float(margins["left"]) + float(margins["right"])) / 2.0
-
-
-def _subtype_fill_left_extension(position_count: int) -> float:
-    return max(8.0, min(42.0, position_count * 0.13))
-
-
-def _row_label_size(row_count: int) -> float:
-    if row_count <= 60:
-        return float(TICK_SIZE)
-    if row_count <= 140:
-        return 5.2
-    return 3.4
-
-
-def _position_tick_indexes(positions: list[int]) -> list[int]:
-    return [index for index, position in enumerate(positions) if position == 1 or position % 40 == 0]
-
-
-def _residue_label_size(position_count: int, row_count: int) -> float:
-    if row_count <= 80:
-        return 7.4 if position_count <= 180 else 6.4
-    return 6.0

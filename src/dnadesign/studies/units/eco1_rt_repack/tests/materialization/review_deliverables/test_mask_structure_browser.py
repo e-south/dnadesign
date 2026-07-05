@@ -59,7 +59,7 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         selected_deliverable_id="mask_structure_browser_manifest",
         selected_group="Reference mask evidence",
     )
-    selected = lookup["Protected union | 4 residues"]
+    selected = lookup["Baseline fixed residues (clade 9 p25 + 5 A) | 4 residues"]
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
@@ -74,7 +74,7 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
 
     assert "<iframe" in rendered_text
     assert "3Dmol" in rendered_text
-    assert "Protected union" in rendered_text
+    assert "Baseline fixed residues (clade 9 p25 + 5 A)" in rendered_text
     assert "Reference mask evidence" in rendered_text
     assert "Reference selection:" not in rendered_text
     assert "No candidate structure is shown" in rendered_text
@@ -84,7 +84,7 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert "<dna-color-toggle>" in rendered_text
     assert "<rna-color-toggle>" in rendered_text
     assert "What this structure view shows" not in rendered_text
-    assert "All residues fixed by at least one active mask rule" in rendered_text
+    assert "All residues fixed by the baseline clade 9 p25 conservation" in rendered_text
     assert "Interpretation limit:" not in rendered_text
     assert "does not evaluate candidate fold quality or RT activity" in rendered_text
     assert "eco1-rt-repack:mask_structure_browser_manifest" in rendered_text

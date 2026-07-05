@@ -71,7 +71,7 @@ from .esmc_model_check import write_esmc_model_check_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
 from .mask_structure_browser import write_mask_structure_browser_manifest
-from .mask_tracks import write_linear_mask_tracks, write_mask_structure_context
+from .mask_tracks import write_mask_structure_context
 from .models import MaterializedReviewDeliverables
 from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, write_msa_plurality_mask_panel
 from .msa_panel_data import source_manifest_accessions
@@ -99,7 +99,7 @@ def materialize_review_deliverables(
     out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
     deliverable_root = out_root / DELIVERABLE_DIR_NAME
     deliverable_root.mkdir(parents=True, exist_ok=True)
-    _remove_retired_deliverable_dirs(deliverable_root)
+    _remove_retired_deliverables(deliverable_root)
 
     aligned_fasta_path = out_root / ALIGNED_FASTA_RELATIVE_PATH
     subtype_aligned_fasta_path = out_root / SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH
@@ -150,11 +150,6 @@ def materialize_review_deliverables(
             aligned_fasta_path=subtype_aligned_fasta_path,
             source_manifest_path=subtype_conservation_source_manifest_path,
             conservation_profile_path=conservation_profile_path,
-            mask_set_path=mask_set_path,
-            mask_residues=mask_residues,
-        ),
-        write_linear_mask_tracks(
-            panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
         ),
@@ -335,13 +330,17 @@ def materialize_review_deliverables(
     )
 
 
-def _remove_retired_deliverable_dirs(deliverable_root: Path) -> None:
-    """Remove generated directories retired by renamed review deliverables."""
+def _remove_retired_deliverables(deliverable_root: Path) -> None:
+    """Remove generated artifacts retired by renamed review deliverables."""
 
     for dirname in ("wt_model_constraint_audit",):
         retired = deliverable_root / dirname
         if retired.is_dir():
             shutil.rmtree(retired)
+    for relative_path in (Path(MASK_CONTEXT_DIR_NAME) / "linear_mask_tracks.svg",):
+        retired_file = deliverable_root / relative_path
+        if retired_file.is_file():
+            retired_file.unlink()
 
 
 def _validate_subtype_source_subset(*, clade_source_manifest_path: Path, subtype_source_manifest_path: Path) -> None:

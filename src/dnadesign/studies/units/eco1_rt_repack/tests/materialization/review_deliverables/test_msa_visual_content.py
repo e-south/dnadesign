@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,10 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     materialize_review_deliverables,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.msa_panel import (
+    _msa_y_tick_size,
+    _subtype_fill_left_extension,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -60,8 +65,31 @@ def test_msa_plurality_panel_renders_all_source_rows_without_arbitrary_cutoff(tm
     assert "C9 051 fig|fixture.51.peg.1" in msa_text
     assert "II-A3 subset | C9 001 fig|fixture.1.peg.1" in msa_text
     assert "Subtype II-A3/42_1 rows" not in msa_text
-    assert "50% WT plurality threshold" in msa_text
+    assert "clade 9 50% WT plurality" in msa_text
+    assert _svg_font_size(msa_text, "clade 9 50% WT plurality") == _svg_font_size(
+        msa_text,
+        "II-A3 subset | C9 001 fig|fixture.1.peg.1",
+    )
     assert "display subset" not in str(deliverables["msa_plurality_mask_panel"]["description"])
+
+
+def test_msa_subtype_fill_width_tracks_label_width_not_position_count() -> None:
+    short_width = _subtype_fill_left_extension(
+        row_labels=["II-A3 subset | C9 001"],
+        row_label_size=_msa_y_tick_size(303),
+        position_count=320,
+        fig_width=22.4,
+        axes_width_fraction=0.883,
+    )
+    long_width = _subtype_fill_left_extension(
+        row_labels=["II-A3 subset | C9 001 fig|1428.517.peg.2380"],
+        row_label_size=_msa_y_tick_size(303),
+        position_count=320,
+        fig_width=22.4,
+        axes_width_fraction=0.883,
+    )
+
+    assert 4.0 < short_width < long_width < 30.0
 
 
 def test_msa_subtype_panel_requires_clade_source_superset(tmp_path: Path) -> None:
@@ -80,3 +108,9 @@ def test_msa_subtype_panel_requires_clade_source_superset(tmp_path: Path) -> Non
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:
     path = resolve_manifest_path(manifest_path, str(deliverables[deliverable_id]["path"]))
     return path.read_text(encoding="utf-8")
+
+
+def _svg_font_size(svg_text: str, label: str) -> str:
+    match = re.search(rf'<text style="font-size: ([0-9.]+)px;[^>]*>{re.escape(label)}</text>', svg_text)
+    assert match is not None, label
+    return match.group(1)
