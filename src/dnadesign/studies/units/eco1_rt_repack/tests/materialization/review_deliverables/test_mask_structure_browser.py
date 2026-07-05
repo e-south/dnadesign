@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import html as html_lib
+from importlib import import_module
 from pathlib import Path
 
 import yaml
@@ -31,11 +32,17 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+    write_rt_annotation_context_sources,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     FakeMo,
     mask_row,
 )
+
+_RT_CONTEXT_MODULE = (
+    "dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rt_annotation_context"
+)
+load_rt_annotation_context = import_module(_RT_CONTEXT_MODULE).load_rt_annotation_context
 
 
 def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -> None:
@@ -95,13 +102,53 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
         unescaped_rendered
     )
+    mask_selection_ids = {selection[0] for selection in mask_structure_browser._MASK_SELECTIONS}
     selection_colors = {
         str(style["color"])
         for row in rows
         if str(row.get("structure_view_mode") or "") == "reference_selection"
+        and str(row.get("candidate_id") or "") in mask_selection_ids
         for style in row.get("selection_styles", [])
     }
     assert selection_colors == {browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}
+
+
+def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlights(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    annotation_tracks_path, manual_authority_path = write_rt_annotation_context_sources(tmp_path)
+    rt_annotation_context = load_rt_annotation_context(
+        annotation_tracks_path=annotation_tracks_path,
+        manual_mask_authority_source_path=manual_authority_path,
+    )
+
+    mask_structure_browser.write_mask_structure_browser_manifest(
+        panel_root=tmp_path / "review_deliverables" / "structure_browser",
+        mask_set_path=tmp_path / "mask_set.yaml",
+        reference_structure_path=tmp_path / "proteinmpnn_request" / "chain_a_backbone.pdb",
+        reference_structure_format="pdb",
+        mask_residues=[mask_row(position, protected=True) for position in range(1, 7)],
+        rt_annotation_context=rt_annotation_context,
+    )
+
+    manifest = yaml.safe_load(
+        (tmp_path / "review_deliverables" / "structure_browser" / "mask_structure_browser_manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rows_by_id = {row["candidate_id"]: row for row in manifest["structures"]}
+    rt1 = rows_by_id["rt1_interval"]
+    region_x = rows_by_id["retron_x_context"]
+
+    assert rt1["display_label"] == "RT1"
+    assert rt1["group"] == "Reference mask evidence"
+    assert rt1["structure_view_mode"] == "reference_selection"
+    assert rt1["selection_residue_count"] == 2
+    assert rt1["selection_styles"][0]["canonical_residue_numbers"] == [2, 3]
+    assert rt1["selection_styles"][0]["residue_numbers"] == [2, 3]
+    assert rt1["selection_styles"][0]["selection_id"] == "rt1_interval"
+    assert "display-only rt annotation" in rt1["description"].lower()
+    assert region_x["selection_styles"][0]["canonical_residue_numbers"] == [2, 3, 4]
+    assert "rt_annotation_tracks" in manifest["source_hashes"]
 
 
 def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path: Path) -> None:
@@ -123,6 +170,11 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
         mask_row(4, motif=True),
         mask_row(5, protected=True),
     ]
+    annotation_tracks_path, manual_authority_path = write_rt_annotation_context_sources(tmp_path)
+    rt_annotation_context = load_rt_annotation_context(
+        annotation_tracks_path=annotation_tracks_path,
+        manual_mask_authority_source_path=manual_authority_path,
+    )
 
     mask_structure_browser.write_mask_structure_browser_manifest(
         panel_root=tmp_path / "review_deliverables" / "structure_browser",
@@ -130,6 +182,7 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
         reference_structure_path=reference_path,
         reference_structure_format="pdb",
         mask_residues=mask_residues,
+        rt_annotation_context=rt_annotation_context,
     )
 
     manifest = yaml.safe_load(

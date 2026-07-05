@@ -20,6 +20,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.design_class_masks import (
+    _MASK_ANNOTATION_SPAN_ZORDER,
+    _MASK_EMPTY_STATE_ALPHA,
+    _MASK_MATRIX_ZORDER,
     write_design_class_mask_overview,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.chimerax_assertions import (
@@ -90,6 +93,11 @@ def test_design_class_mask_overview_renders_rt_context_spans_from_ontology(tmp_p
     assert "manual_mask_authority_source" in deliverable["input_hashes"]
     assert "docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml" in deliverable["source_tables"]
     assert "docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml" in deliverable["source_tables"]
+
+
+def test_design_class_rt_context_spans_stay_behind_mask_features() -> None:
+    assert _MASK_ANNOTATION_SPAN_ZORDER < _MASK_MATRIX_ZORDER
+    assert _MASK_EMPTY_STATE_ALPHA == 0.0
 
 
 def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dict[str, object]]) -> None:

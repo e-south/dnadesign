@@ -24,6 +24,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
+from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 from .structure_browser_common import (
     REFERENCE_COLOR,
     RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
@@ -35,6 +36,12 @@ from .structure_browser_common import (
 
 MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "mask_structure_browser_manifest.yaml"
 _MASK_HIGHLIGHT_COLOR = RESIDUE_CATEGORY_HIGHLIGHT_COLOR
+_RT_CONTEXT_HIGHLIGHT_COLOR = "#6f4c7d"
+_RT_CORE_INTERVAL_HIGHLIGHT_COLOR = "#28566a"
+_RT_MOTIF_HIGHLIGHT_COLOR = "#8a4a11"
+_TRACK_CONTEXT = "retron_rt_context_spans"
+_TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
+_TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
 _MASK_SELECTIONS = (
     (
         "motif_protected",
@@ -83,6 +90,7 @@ def write_mask_structure_browser_manifest(
     reference_structure_path: Path,
     reference_structure_format: str,
     mask_residues: list[dict[str, Any]],
+    rt_annotation_context: RTAnnotationContext,
 ) -> dict[str, Any]:
     """Write a manifest for interactive mask-category highlighting on the reference backbone."""
 
@@ -95,7 +103,13 @@ def write_mask_structure_browser_manifest(
         reference_path=reference_structure_path,
         reference_structure_format=reference_structure_format,
         manifest_root=manifest_path.parent,
+        rt_annotation_context=rt_annotation_context,
     )
+    source_paths = {
+        "mask_set": mask_set_path,
+        "reference_structure": reference_structure_path,
+    }
+    source_paths.update(rt_annotation_context.source_paths)
     payload = {
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
         "schema_version": 1,
@@ -107,7 +121,9 @@ def write_mask_structure_browser_manifest(
         "source_tables": [
             repo_relative_hint(mask_set_path),
             repo_relative_hint(reference_structure_path),
+            *rt_annotation_context.source_table_labels,
         ],
+        "source_hashes": file_hashes(source_paths),
         "reference": {
             "model_id": "ec86kit_7v9u_reference",
             "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
@@ -131,8 +147,9 @@ def write_mask_structure_browser_manifest(
         artifact_kind="structure_browser_manifest",
         status="rendered",
         path=manifest_path,
-        source_tables=["mask_set.yaml", repo_relative_hint(reference_structure_path)],
-        input_hashes=file_hashes({"mask_set": mask_set_path, "reference_structure": reference_structure_path}),
+        source_tables=["mask_set.yaml", repo_relative_hint(reference_structure_path)]
+        + rt_annotation_context.source_table_labels,
+        input_hashes=file_hashes(source_paths),
         alt_text="Interactive Ec86 reference structure viewer with selectable fixed-residue mask highlights.",
         description=(
             "Shows the Ec86/7V9U reference structure with one mask or motif category highlighted at a time. "
@@ -174,6 +191,7 @@ def _mask_structure_views(
     reference_path: Path,
     reference_structure_format: str,
     manifest_root: Path,
+    rt_annotation_context: RTAnnotationContext,
 ) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
     reference_number_by_canonical = reference_residue_number_by_canonical(
@@ -220,4 +238,74 @@ def _mask_structure_views(
                 "selection_residue_count": len(residue_numbers),
             }
         )
+    views.extend(
+        _rt_annotation_structure_views(
+            rt_annotation_context=rt_annotation_context,
+            reference_path=reference_path,
+            reference_structure_format=reference_structure_format,
+            manifest_root=manifest_root,
+            reference_number_by_canonical=reference_number_by_canonical,
+            selection_coordinate_basis=selection_coordinate_basis,
+        )
+    )
     return views
+
+
+def _rt_annotation_structure_views(
+    *,
+    rt_annotation_context: RTAnnotationContext,
+    reference_path: Path,
+    reference_structure_format: str,
+    manifest_root: Path,
+    reference_number_by_canonical: dict[int, int],
+    selection_coordinate_basis: str,
+) -> list[dict[str, Any]]:
+    views: list[dict[str, Any]] = []
+    for feature in rt_annotation_context.features:
+        canonical_residue_numbers = [
+            position for position in range(feature.start, feature.end + 1) if position in reference_number_by_canonical
+        ]
+        residue_numbers = [reference_number_by_canonical[position] for position in canonical_residue_numbers]
+        if not residue_numbers:
+            continue
+        color = _rt_annotation_color(feature)
+        views.append(
+            {
+                "candidate_id": feature.feature_id,
+                "display_label": feature.label,
+                "group": "Reference mask evidence",
+                "local_path": relative_path(reference_path, manifest_root),
+                "structure_format": reference_structure_format,
+                "color": color,
+                "structure_view_mode": "reference_selection",
+                "description": (
+                    f"Display-only RT annotation span from {feature.start}-{feature.end}; "
+                    "included for structural orientation, not as a mask rule."
+                ),
+                "selection_styles": [
+                    {
+                        "selection_id": feature.feature_id,
+                        "model_id": "ec86kit_7v9u_reference",
+                        "label": feature.label,
+                        "source_coordinate_basis": "canonical_position",
+                        "selection_coordinate_basis": selection_coordinate_basis,
+                        "canonical_residue_numbers": canonical_residue_numbers,
+                        "residue_numbers": residue_numbers,
+                        "residue_scope": "protein",
+                        "color": color,
+                    }
+                ],
+                "selection_residue_count": len(residue_numbers),
+            }
+        )
+    return views
+
+
+def _rt_annotation_color(feature: RTAnnotationFeature) -> str:
+    if feature.track_id == _TRACK_CONTEXT:
+        return _RT_CONTEXT_HIGHLIGHT_COLOR
+    if feature.track_id == _TRACK_CORE_INTERVALS:
+        return _RT_CORE_INTERVAL_HIGHLIGHT_COLOR
+    if feature.track_id == _TRACK_MOTIF_ANCHORS:
+        return _RT_MOTIF_HIGHLIGHT_COLOR
+    return RESIDUE_CATEGORY_HIGHLIGHT_COLOR

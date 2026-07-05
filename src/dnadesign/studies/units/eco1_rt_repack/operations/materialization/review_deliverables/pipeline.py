@@ -187,6 +187,7 @@ def materialize_review_deliverables(
             reference_structure_path=browser_reference.local_path,
             reference_structure_format=browser_reference.structure_format,
             mask_residues=mask_residues,
+            rt_annotation_context=rt_annotation_context,
         )
     )
     deliverables.extend(

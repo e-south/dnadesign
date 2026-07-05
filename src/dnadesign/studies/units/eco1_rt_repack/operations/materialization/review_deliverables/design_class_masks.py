@@ -59,8 +59,11 @@ _TOP_AMINO_ACID_FONT_SIZE = 3.2
 _POSITION_MINOR_TICK_STEP = 1
 _BOTTOM_POSITION_LABEL_STEP = 20
 _TOP_AMINO_ACID_LABEL_STEP = 1
+_MASK_EMPTY_STATE_ALPHA = 0.0
+_MASK_ANNOTATION_SPAN_ZORDER = 0.5
+_MASK_MATRIX_ZORDER = 2.0
 _STATE_COLORS = (
-    "#f8f7f2",
+    (248 / 255.0, 247 / 255.0, 242 / 255.0, _MASK_EMPTY_STATE_ALPHA),
     OKABE_ITO["vermillion"],
     OKABE_ITO["purple"],
     OKABE_ITO["blue"],
@@ -109,6 +112,7 @@ def write_design_class_mask_overview(
     fig_width = max(13.8, min(20.0, len(positions) * 0.06))
     fig_height = max(7.6, len(matrix_rows) * 0.35 + 2.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+    ax.set_facecolor("#f8f7f2")
     ax.imshow(
         matrix,
         aspect="auto",
@@ -116,7 +120,7 @@ def write_design_class_mask_overview(
         cmap=ListedColormap(_STATE_COLORS),
         vmin=0,
         vmax=len(_STATE_COLORS) - 1,
-        zorder=1,
+        zorder=_MASK_MATRIX_ZORDER,
     )
     _add_rt_annotation_context(ax, positions, row_count=len(matrix_rows), context=rt_annotation_context)
     ax.set_yticks(
@@ -414,7 +418,7 @@ def _add_context_span(
         linewidth=0,
         alpha=alpha,
         clip_on=False,
-        zorder=2,
+        zorder=_MASK_ANNOTATION_SPAN_ZORDER,
     )
     ax.add_patch(patch)
     ax.text(
