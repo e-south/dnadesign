@@ -78,6 +78,11 @@ from .msa_panel_data import source_manifest_accessions
 from .notebook import write_review_deliverables_notebook
 from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
 from .proteinmpnn_fold_validation import write_expanded_design_class_fold_validation
+from .rt_annotation_context import (
+    MANUAL_MASK_AUTHORITY_SOURCE_LABEL,
+    RT_ANNOTATION_TRACKS_SOURCE_LABEL,
+    load_rt_annotation_context,
+)
 from .sae_structure_browser import write_sae_structure_browser_manifest
 from .selection_readiness import linked_selection_readiness_rows
 from .structure_browser import (
@@ -127,6 +132,10 @@ def materialize_review_deliverables(
     )
 
     mask_residues = read_mask_residues(mask_set_path)
+    rt_annotation_context = load_rt_annotation_context(
+        annotation_tracks_path=root / RT_ANNOTATION_TRACKS_SOURCE_LABEL,
+        manual_mask_authority_source_path=root / MANUAL_MASK_AUTHORITY_SOURCE_LABEL,
+    )
     foldcheck_review_root = out_root / Path(FOLDCHECK_FULL_STRUCTURE_SET_RELATIVE_PATH).parent
     foldcheck_reference_backbone_path = foldcheck_review_root / REFERENCE_STRUCTURE_RELATIVE_PATH
     browser_reference = stage_browser_reference_structure(
@@ -143,6 +152,7 @@ def materialize_review_deliverables(
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
             subtype_source_manifest_path=subtype_conservation_source_manifest_path,
+            rt_annotation_context=rt_annotation_context,
         ),
         write_msa_plurality_mask_panel(
             panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
@@ -152,11 +162,13 @@ def materialize_review_deliverables(
             conservation_profile_path=conservation_profile_path,
             mask_set_path=mask_set_path,
             mask_residues=mask_residues,
+            rt_annotation_context=rt_annotation_context,
         ),
         write_design_class_mask_overview(
             panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
             baseline_mask_set_path=mask_set_path,
             design_classes_root=out_root / "design_classes",
+            rt_annotation_context=rt_annotation_context,
         ),
     ]
     deliverables.extend(

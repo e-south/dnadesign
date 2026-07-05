@@ -18,7 +18,8 @@ from typing import Any
 import matplotlib
 import pyarrow.parquet as pq
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch, Rectangle
+from matplotlib.patches import FancyBboxPatch, Patch, Rectangle
+from matplotlib.transforms import ScaledTranslation
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     CONSERVATION_CLADE9_PROFILE_ID,
@@ -68,8 +69,30 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
+from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+
+_TRACK_CONTEXT = "retron_rt_context_spans"
+_TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
+_TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
+_CONTEXT_FILL = "#e7d4ee"
+_CORE_INTERVAL_FILL = "#d7ecf5"
+_MOTIF_FILL = "#f4d7bd"
+_CONTEXT_TEXT = "#6f4c7d"
+_CORE_INTERVAL_TEXT = "#28566a"
+_MOTIF_TEXT = "#8a4a11"
+_RT_SPAN_LABEL_SIZE = 7.0
+_CONTEXT_SPAN_ALPHA = 0.46
+_CORE_INTERVAL_SPAN_ALPHA = 0.46
+_MOTIF_SPAN_ALPHA = 0.56
+_CONTEXT_LABEL_OFFSET_POINTS = 32.0
+_CORE_INTERVAL_LABEL_OFFSET_POINTS = 22.0
+_MOTIF_LABEL_OFFSET_POINTS = 12.0
+_MSA_ANNOTATION_SPAN_ZORDER = 0.5
+_MSA_MATRIX_ZORDER = 2.0
+_MSA_TRACK_ZORDER = 3.0
 
 
 @dataclass(frozen=True)
@@ -119,6 +142,7 @@ def write_msa_plurality_mask_panel(
     mask_residues: list[dict[str, Any]] | None = None,
     max_display_rows: int | None = None,
     subtype_source_manifest_path: Path | None = None,
+    rt_annotation_context: RTAnnotationContext,
 ) -> dict[str, Any]:
     """Render a canonical-coordinate MSA plurality panel."""
 
@@ -167,6 +191,12 @@ def write_msa_plurality_mask_panel(
         aspect="auto",
         interpolation="none",
         cmap=ListedColormap(["#fffdf7", "#c9c9c9", OKABE_ITO["green"]]),
+        zorder=_MSA_MATRIX_ZORDER,
+    )
+    _add_rt_annotation_context(
+        ax,
+        positions,
+        context=rt_annotation_context,
     )
     for index, position in enumerate(positions):
         if position in conserved_50:
@@ -178,6 +208,7 @@ def write_msa_plurality_mask_panel(
                     facecolor=OKABE_ITO["purple"],
                     edgecolor="none",
                     clip_on=False,
+                    zorder=_MSA_TRACK_ZORDER,
                 )
             )
         if position in conserved_25:
@@ -189,6 +220,7 @@ def write_msa_plurality_mask_panel(
                     facecolor=OKABE_ITO["orange"],
                     edgecolor="none",
                     clip_on=False,
+                    zorder=_MSA_TRACK_ZORDER,
                 )
             )
         if position in protected:
@@ -200,6 +232,7 @@ def write_msa_plurality_mask_panel(
                     facecolor=OKABE_ITO["blue"],
                     edgecolor="none",
                     clip_on=False,
+                    zorder=_MSA_TRACK_ZORDER,
                 )
             )
     row_labels = [
@@ -258,13 +291,14 @@ def write_msa_plurality_mask_panel(
         [str(row["wt_aa"]) for row in profile_rows],
         fontsize=_residue_label_size(len(positions), len(selected_records)),
     )
-    top_axis.tick_params(length=0, pad=2)
+    top_axis.tick_params(length=0, pad=1)
     ax.set_xlabel("Ec86 canonical residue position", fontsize=LABEL_SIZE)
     ax.set_ylabel("Accepted alignment rows", fontsize=LABEL_SIZE)
     ax.set_ylim(len(selected_records) - 0.5, _TRACK_TOP_Y_LIMIT)
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=24)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=58)
     ax.spines[["top", "right"]].set_visible(False)
     legend_center_x = _axes_center_x(margins)
+    legend_y = _legend_y(selected_row_count=len(selected_records), margins=margins)
     fig.legend(
         handles=[
             Patch(facecolor=OKABE_ITO["green"], label="Matches Ec86"),
@@ -272,7 +306,7 @@ def write_msa_plurality_mask_panel(
             Patch(facecolor="#fbfaf7", edgecolor="#888888", label="Gap"),
         ],
         loc="lower center",
-        bbox_to_anchor=(legend_center_x, 0.016),
+        bbox_to_anchor=(legend_center_x, legend_y),
         ncol=3,
         frameon=False,
         fontsize=LEGEND_SIZE - 0.8,
@@ -289,8 +323,9 @@ def write_msa_plurality_mask_panel(
         "the remaining rows use source-manifest labels with clade row or node identifiers and provider "
         f"accessions. Vertical markings show columns passing the 25 percent WT-plurality rule in the "
         f"{panel_profile.scope_label} profile, the 50 percent design-class threshold cue, and current "
-        "protected mask positions. The clade 9 view also marks rows that belong to the narrower "
-        "II-A3/42_1 subtype set when that source set is available."
+        "protected mask positions. Display-only background bands mark audited RT context spans, RT intervals, "
+        "and motif anchors. The clade 9 view also marks rows that belong to the narrower II-A3/42_1 subtype "
+        "set when that source set is available."
     )
     source_tables = [
         panel_profile.aligned_fasta_source_table,
@@ -298,12 +333,14 @@ def write_msa_plurality_mask_panel(
         "conservation_profile.parquet",
         "mask_set.yaml",
     ]
+    source_tables.extend(rt_annotation_context.source_table_labels)
     input_paths = {
         "aligned_fasta": aligned_fasta_path,
         "source_manifest": source_manifest_path,
         "conservation_profile": conservation_profile_path,
         "mask_set": mask_set_path,
     }
+    input_paths.update(rt_annotation_context.source_paths)
     if subtype_source_manifest_path is not None:
         source_tables.append(f"conservation_sources/{CONSERVATION_SUBTYPE_PROFILE_ID}.source_manifest.yaml")
         input_paths["subtype_source_manifest"] = subtype_source_manifest_path
@@ -332,6 +369,8 @@ def write_msa_plurality_mask_panel(
                     if source_accessions.get(record_id) in subtype_accessions
                 ]
             ),
+            "rt_annotation_feature_count": len(rt_annotation_context.features),
+            "rt_annotation_target_sequence_hash": rt_annotation_context.target_sequence_hash,
         },
     )
 
@@ -366,6 +405,123 @@ def _panel_interpretation_limit(panel_profile: MsaPanelProfile) -> str:
         "This subtype panel is a narrower family context view. It is not the active conservation mask "
         "denominator unless the mask policy is explicitly changed."
     )
+
+
+def _add_rt_annotation_context(
+    ax: Any,
+    positions: list[int],
+    *,
+    context: RTAnnotationContext,
+) -> None:
+    position_to_index = {position: index for index, position in enumerate(positions)}
+    y, height = _rt_annotation_span_band()
+    for feature in context.features_for_track(_TRACK_CONTEXT):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            y=y,
+            height=height,
+            fill_color=_CONTEXT_FILL,
+            text_color=_CONTEXT_TEXT,
+            alpha=_CONTEXT_SPAN_ALPHA,
+            label_offset_points=_CONTEXT_LABEL_OFFSET_POINTS,
+        )
+    for feature in context.features_for_track(_TRACK_CORE_INTERVALS):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            y=y,
+            height=height,
+            fill_color=_CORE_INTERVAL_FILL,
+            text_color=_CORE_INTERVAL_TEXT,
+            alpha=_CORE_INTERVAL_SPAN_ALPHA,
+            label_offset_points=_CORE_INTERVAL_LABEL_OFFSET_POINTS,
+        )
+    for feature in context.features_for_track(_TRACK_MOTIF_ANCHORS):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            y=y,
+            height=height,
+            fill_color=_MOTIF_FILL,
+            text_color=_MOTIF_TEXT,
+            alpha=_MOTIF_SPAN_ALPHA,
+            label_offset_points=_MOTIF_LABEL_OFFSET_POINTS,
+        )
+
+
+def _add_context_span(
+    ax: Any,
+    feature: RTAnnotationFeature,
+    *,
+    position_to_index: dict[int, int],
+    y: float,
+    height: float,
+    fill_color: str,
+    text_color: str,
+    alpha: float,
+    label_offset_points: float,
+) -> None:
+    bounds = _feature_bounds(feature, position_to_index)
+    if bounds is None:
+        return
+    x, width = bounds
+    patch = FancyBboxPatch(
+        (x, y),
+        width,
+        height,
+        boxstyle="round,pad=0,rounding_size=0.15",
+        facecolor=fill_color,
+        edgecolor="none",
+        linewidth=0,
+        alpha=alpha,
+        clip_on=False,
+        zorder=_MSA_ANNOTATION_SPAN_ZORDER,
+    )
+    ax.add_patch(patch)
+    ax.text(
+        x + width / 2.0,
+        1.0,
+        feature.label,
+        ha="center",
+        va="bottom",
+        fontsize=_RT_SPAN_LABEL_SIZE,
+        color=text_color,
+        transform=_top_axis_offset_transform(ax, label_offset_points),
+        clip_on=False,
+        zorder=6,
+    )
+
+
+def _top_axis_offset_transform(ax: Any, offset_points: float) -> Any:
+    return ax.get_xaxis_transform() + ScaledTranslation(
+        0,
+        offset_points / 72.0,
+        ax.figure.dpi_scale_trans,
+    )
+
+
+def _legend_y(*, selected_row_count: int, margins: dict[str, float]) -> float:
+    if selected_row_count > 140:
+        return max(0.046, float(margins["bottom"]) - 0.034)
+    return 0.016
+
+
+def _rt_annotation_span_band() -> tuple[float, float]:
+    reference_row_bottom = 0.5
+    return _TRACK_TOP_Y_LIMIT, reference_row_bottom - _TRACK_TOP_Y_LIMIT
+
+
+def _feature_bounds(feature: RTAnnotationFeature, position_to_index: dict[int, int]) -> tuple[float, float] | None:
+    indexes = [index for position, index in position_to_index.items() if feature.start <= position <= feature.end]
+    if not indexes:
+        return None
+    start_index = min(indexes)
+    end_index = max(indexes)
+    return start_index - 0.5, float(end_index - start_index + 1)
 
 
 def _read_profile_rows(path: Path, *, profile_id: str) -> list[dict[str, Any]]:

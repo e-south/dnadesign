@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -21,15 +22,26 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.msa_panel import (
+    _MSA_ANNOTATION_SPAN_ZORDER,
+    _MSA_MATRIX_ZORDER,
+    CLADE9_MSA_PANEL,
     _msa_y_tick_size,
+    _rt_annotation_span_band,
     _subtype_fill_left_extension,
+    write_msa_plurality_mask_panel,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+    write_rt_annotation_context_sources,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
     resolve_manifest_path,
 )
+
+_RT_CONTEXT_MODULE = (
+    "dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rt_annotation_context"
+)
+load_rt_annotation_context = import_module(_RT_CONTEXT_MODULE).load_rt_annotation_context
 
 
 def test_msa_plurality_panel_renders_all_source_rows_without_arbitrary_cutoff(tmp_path: Path) -> None:
@@ -90,6 +102,60 @@ def test_msa_subtype_fill_width_tracks_label_width_not_position_count() -> None:
     )
 
     assert 4.0 < short_width < long_width < 30.0
+
+
+def test_msa_panel_renders_rt_context_spans_from_ontology(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    annotation_tracks_path, manual_authority_path = write_rt_annotation_context_sources(tmp_path)
+    rt_annotation_context = load_rt_annotation_context(
+        annotation_tracks_path=annotation_tracks_path,
+        manual_mask_authority_source_path=manual_authority_path,
+    )
+
+    deliverable = write_msa_plurality_mask_panel(
+        panel_root=tmp_path / "review_deliverables" / "msa_plurality_mask_panel",
+        panel_profile=CLADE9_MSA_PANEL,
+        aligned_fasta_path=tmp_path / "conservation_alignments" / "ec86_clade9_conservation_v1.aligned.fasta",
+        source_manifest_path=tmp_path / "conservation_sources" / "ec86_clade9_conservation_v1.source_manifest.yaml",
+        conservation_profile_path=tmp_path / "conservation_profile.parquet",
+        mask_set_path=tmp_path / "mask_set.yaml",
+        rt_annotation_context=rt_annotation_context,
+        subtype_source_manifest_path=(
+            tmp_path / "conservation_sources" / "ec86_iia3_cluster42_1_conservation_v1.source_manifest.yaml"
+        ),
+    )
+
+    svg_text = (
+        tmp_path / "review_deliverables" / "msa_plurality_mask_panel" / "msa_plurality_mask_panel.svg"
+    ).read_text(encoding="utf-8")
+    assert "RT1" in svg_text
+    assert "RT2" in svg_text
+    assert "Region X context" in svg_text
+    assert "NAxxH" in svg_text
+    assert "YADD" in svg_text
+    assert "rt_annotation_tracks" in deliverable["input_hashes"]
+    assert "manual_mask_authority_source" in deliverable["input_hashes"]
+
+
+def test_msa_rt_context_spans_stay_behind_header_and_reference_band() -> None:
+    y, height = _rt_annotation_span_band()
+
+    assert _MSA_ANNOTATION_SPAN_ZORDER < _MSA_MATRIX_ZORDER
+    assert y < 0
+    assert y + height == pytest.approx(0.5)
+
+
+def test_rt_annotation_context_rejects_manual_authority_drift(tmp_path: Path) -> None:
+    annotation_tracks_path, manual_authority_path = write_rt_annotation_context_sources(tmp_path)
+    manual_authority = yaml.safe_load(manual_authority_path.read_text(encoding="utf-8"))
+    manual_authority["authority_sets"][0]["features"][0]["end"] = 4
+    manual_authority_path.write_text(yaml.safe_dump(manual_authority, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="RT annotation feature rt1_interval does not match manual authority"):
+        load_rt_annotation_context(
+            annotation_tracks_path=annotation_tracks_path,
+            manual_mask_authority_source_path=manual_authority_path,
+        )
 
 
 def test_msa_subtype_panel_requires_clade_source_superset(tmp_path: Path) -> None:

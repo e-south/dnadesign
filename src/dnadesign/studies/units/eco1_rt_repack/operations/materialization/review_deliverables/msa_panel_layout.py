@@ -94,7 +94,8 @@ def _figure_height(row_count: int) -> float:
 
 def _figure_margins(row_count: int, *, fig_height: float) -> dict[str, float]:
     bottom = max(0.09, min(0.18, 1.08 / fig_height))
-    top = 1.0 - max(0.036, min(0.12, 0.78 / fig_height))
+    top_margin_floor = 0.052 if row_count > 140 else 0.036
+    top = 1.0 - max(top_margin_floor, min(0.12, 0.78 / fig_height))
     left = 0.205 if row_count <= 80 else 0.112
     return {
         "left": left,

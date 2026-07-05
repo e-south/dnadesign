@@ -16,6 +16,8 @@ from typing import Any
 
 import matplotlib
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import FancyBboxPatch
+from matplotlib.transforms import ScaledTranslation
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.constants import (
     BASELINE_CLASS_ID,
@@ -41,6 +43,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
+from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -63,6 +67,22 @@ _STATE_COLORS = (
     OKABE_ITO["orange"],
     "#222222",
 )
+_TRACK_CONTEXT = "retron_rt_context_spans"
+_TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
+_TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
+_CONTEXT_FILL = "#e7d4ee"
+_CORE_INTERVAL_FILL = "#d7ecf5"
+_MOTIF_FILL = "#f4d7bd"
+_CONTEXT_TEXT = "#6f4c7d"
+_CORE_INTERVAL_TEXT = "#28566a"
+_MOTIF_TEXT = "#8a4a11"
+_RT_SPAN_LABEL_SIZE = 7.0
+_CONTEXT_SPAN_ALPHA = 0.30
+_CORE_INTERVAL_SPAN_ALPHA = 0.30
+_MOTIF_SPAN_ALPHA = 0.42
+_CONTEXT_LABEL_OFFSET_POINTS = 32.0
+_CORE_INTERVAL_LABEL_OFFSET_POINTS = 22.0
+_MOTIF_LABEL_OFFSET_POINTS = 12.0
 
 
 def write_design_class_mask_overview(
@@ -70,6 +90,7 @@ def write_design_class_mask_overview(
     panel_root: Path,
     baseline_mask_set_path: Path,
     design_classes_root: Path,
+    rt_annotation_context: RTAnnotationContext,
 ) -> dict[str, Any]:
     """Render a design-class-aware mask matrix over canonical positions."""
 
@@ -95,7 +116,9 @@ def write_design_class_mask_overview(
         cmap=ListedColormap(_STATE_COLORS),
         vmin=0,
         vmax=len(_STATE_COLORS) - 1,
+        zorder=1,
     )
+    _add_rt_annotation_context(ax, positions, row_count=len(matrix_rows), context=rt_annotation_context)
     ax.set_yticks(
         range(len(matrix_rows)),
         [str(row["label"]) for row in matrix_rows],
@@ -105,7 +128,7 @@ def write_design_class_mask_overview(
     ax.set_xticks(tick_indexes, [str(positions[index]) for index in tick_indexes], fontsize=_MASK_AXIS_FONT_SIZE)
     ax.set_xticks(_minor_position_tick_indexes(positions), minor=True)
     ax.set_xlabel("Residue position", fontsize=_MASK_AXIS_FONT_SIZE, labelpad=7)
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=18)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=58)
     ax.tick_params(axis="x", which="major", length=3.2, labelsize=_MASK_AXIS_FONT_SIZE, pad=3)
     ax.tick_params(axis="x", which="minor", length=1.3, color="#737373")
     ax.tick_params(axis="y", which="both", length=0, labelsize=_MASK_AXIS_FONT_SIZE)
@@ -114,17 +137,19 @@ def write_design_class_mask_overview(
     ax.spines["bottom"].set_linewidth(0.55)
     _add_row_group_separator(ax, matrix_rows)
     _add_top_amino_acid_axis(ax, positions, wt_aa_by_position=wt_aa_by_position)
-    fig.subplots_adjust(left=0.23, right=0.995, bottom=0.115, top=0.76)
+    fig.subplots_adjust(left=0.23, right=0.995, bottom=0.115, top=0.72)
 
     path = panel_root / "design_class_mask_overview.svg"
     source_paths = _source_paths_by_label(
         baseline_mask_set_path=baseline_mask_set_path,
         design_classes_root=design_classes_root,
     )
+    source_paths.update(rt_annotation_context.source_paths)
     alt = (
         "Matrix comparing Eco1 RT mask evidence and the six ProteinMPNN design-class masks. Evidence rows "
         "separate motif anchors, Wang/EC86 priors, WT-plurality cutoffs, and retained DNA/RNA proximity rows. "
-        "Class rows show which residues are fixed."
+        "Class rows show which residues are fixed. Display bands mark audited RT context spans, "
+        "RT1-RT7 intervals, and motif-anchor neighborhoods."
     )
     save_accessible_svg(fig, path, title=title, description=alt, dpi=300)
     return make_deliverable_row(
@@ -133,13 +158,14 @@ def write_design_class_mask_overview(
         artifact_kind="svg",
         status="rendered",
         path=path,
-        source_tables=_source_table_labels(),
+        source_tables=_source_table_labels() + rt_annotation_context.source_table_labels,
         input_hashes=file_hashes(source_paths),
         alt_text=alt,
         description=(
             "Provides one residue-coordinate source of truth for mask review. Evidence rows show motif, "
             "prior, conservation, and retained DNA/RNA proximity rules; class rows show fixed residues for "
-            "the six design classes."
+            "the six design classes. Display-only RT spans provide motif and domain context without changing "
+            "mask membership."
         ),
         interpretation_limit=(
             "Mask membership explains the ProteinMPNN design surface. It does not rank sequences, "
@@ -160,6 +186,8 @@ def write_design_class_mask_overview(
                 }
                 for row in class_rows
             ],
+            "rt_annotation_feature_count": len(rt_annotation_context.features),
+            "rt_annotation_target_sequence_hash": rt_annotation_context.target_sequence_hash,
         },
     )
 
@@ -318,6 +346,108 @@ def _policy_state_value(residue: dict[str, Any] | None) -> int:
     return _STATE_EMPTY
 
 
+def _add_rt_annotation_context(
+    ax: Any,
+    positions: list[int],
+    *,
+    row_count: int,
+    context: RTAnnotationContext,
+) -> None:
+    position_to_index = {position: index for index, position in enumerate(positions)}
+    for feature in context.features_for_track(_TRACK_CONTEXT):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            row_count=row_count,
+            fill_color=_CONTEXT_FILL,
+            text_color=_CONTEXT_TEXT,
+            alpha=_CONTEXT_SPAN_ALPHA,
+            label_offset_points=_CONTEXT_LABEL_OFFSET_POINTS,
+        )
+    for feature in context.features_for_track(_TRACK_CORE_INTERVALS):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            row_count=row_count,
+            fill_color=_CORE_INTERVAL_FILL,
+            text_color=_CORE_INTERVAL_TEXT,
+            alpha=_CORE_INTERVAL_SPAN_ALPHA,
+            label_offset_points=_CORE_INTERVAL_LABEL_OFFSET_POINTS,
+        )
+    for feature in context.features_for_track(_TRACK_MOTIF_ANCHORS):
+        _add_context_span(
+            ax,
+            feature,
+            position_to_index=position_to_index,
+            row_count=row_count,
+            fill_color=_MOTIF_FILL,
+            text_color=_MOTIF_TEXT,
+            alpha=_MOTIF_SPAN_ALPHA,
+            label_offset_points=_MOTIF_LABEL_OFFSET_POINTS,
+        )
+
+
+def _add_context_span(
+    ax: Any,
+    feature: RTAnnotationFeature,
+    *,
+    position_to_index: dict[int, int],
+    row_count: int,
+    fill_color: str,
+    text_color: str,
+    alpha: float,
+    label_offset_points: float,
+) -> None:
+    bounds = _feature_bounds(feature, position_to_index)
+    if bounds is None:
+        return
+    x, width = bounds
+    patch = FancyBboxPatch(
+        (x, -0.5),
+        width,
+        row_count,
+        boxstyle="round,pad=0,rounding_size=0.15",
+        facecolor=fill_color,
+        edgecolor="none",
+        linewidth=0,
+        alpha=alpha,
+        clip_on=False,
+        zorder=2,
+    )
+    ax.add_patch(patch)
+    ax.text(
+        x + width / 2.0,
+        1.0,
+        feature.label,
+        ha="center",
+        va="bottom",
+        fontsize=_RT_SPAN_LABEL_SIZE,
+        color=text_color,
+        transform=_top_axis_offset_transform(ax, label_offset_points),
+        clip_on=False,
+        zorder=6,
+    )
+
+
+def _top_axis_offset_transform(ax: Any, offset_points: float) -> Any:
+    return ax.get_xaxis_transform() + ScaledTranslation(
+        0,
+        offset_points / 72.0,
+        ax.figure.dpi_scale_trans,
+    )
+
+
+def _feature_bounds(feature: RTAnnotationFeature, position_to_index: dict[int, int]) -> tuple[float, float] | None:
+    indexes = [index for position, index in position_to_index.items() if feature.start <= position <= feature.end]
+    if not indexes:
+        return None
+    start_index = min(indexes)
+    end_index = max(indexes)
+    return start_index - 0.5, float(end_index - start_index + 1)
+
+
 def _position_tick_indexes(positions: list[int]) -> list[int]:
     return _labeled_position_tick_indexes(positions, step=_BOTTOM_POSITION_LABEL_STEP)
 
@@ -353,7 +483,7 @@ def _add_top_amino_acid_axis(ax: Any, positions: list[int], *, wt_aa_by_position
     )
     for tick_label in top_ax.get_xticklabels():
         tick_label.set_fontfamily("DejaVu Sans Mono")
-    top_ax.tick_params(axis="x", which="major", length=1.2, labelsize=_TOP_AMINO_ACID_FONT_SIZE, pad=2)
+    top_ax.tick_params(axis="x", which="major", length=1.2, labelsize=_TOP_AMINO_ACID_FONT_SIZE, pad=1)
     top_ax.tick_params(axis="y", which="both", left=False, labelleft=False)
     top_ax.spines[["right", "left", "bottom"]].set_visible(False)
     top_ax.spines["top"].set_color("#737373")
