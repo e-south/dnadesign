@@ -83,7 +83,8 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "linear_mask_tracks" not in deliverables
 
     design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
-    assert "Design-class residue mask evidence across Ec86 RT" in design_class_mask_text
+    assert "Design-class residue mask evidence across EC86 RT" in design_class_mask_text
+    assert "EC86 per-residue ruler" in design_class_mask_text
     assert "clade 9 p25, 5 A" in design_class_mask_text
     assert "clade 9 p25, 6 A" in design_class_mask_text
     assert "clade 9 p25, 8 A" in design_class_mask_text
@@ -93,9 +94,13 @@ def _assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, di
     assert "clade 9 p25 conservation" in design_class_mask_text
     assert "clade 9 p50 conservation" in design_class_mask_text
     assert "II-A3/42_1 p50 conservation" in design_class_mask_text
+    assert "Wang/EC86 substrate-contact priors" in design_class_mask_text
+    assert "Wang/Ec86" not in design_class_mask_text
     assert "DNA/RNA &lt;=10 A contact" in design_class_mask_text
-    assert "Fixed by row mask policy" in design_class_mask_text
-    assert "Designable by row mask policy" in design_class_mask_text
+    assert "Fixed by design-class policy" in design_class_mask_text
+    assert "Designable by design-class policy" in design_class_mask_text
+    assert "#56b4e9" in design_class_mask_text.lower()
+    assert "#009e73" not in design_class_mask_text.lower()
     assert "Fixed-residue union" not in design_class_mask_text
     assert "Protected union" not in design_class_mask_text
     assert "current baseline only" not in design_class_mask_text.lower()

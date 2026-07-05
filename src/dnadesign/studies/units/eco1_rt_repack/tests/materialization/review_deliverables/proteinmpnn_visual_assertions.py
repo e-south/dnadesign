@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
@@ -63,6 +64,7 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     assert "Selected panel" in expanded_text
     assert "WT-runtime C-alpha RMSD" in expanded_text
     assert "Mean pLDDT" in expanded_text
+    _assert_top_marginal_matches_square_panel(expanded_text)
     assert "576" not in expanded_text or "Baseline" not in expanded_text
     assert "design class as color" in str(deliverables["expanded_proteinmpnn_fold_validation"]["description"])
 
@@ -70,3 +72,21 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:
     path = resolve_manifest_path(manifest_path, str(deliverables[deliverable_id]["path"]))
     return path.read_text(encoding="utf-8")
+
+
+def _assert_top_marginal_matches_square_panel(svg_text: str) -> None:
+    rects = [
+        tuple(float(value) for value in match)
+        for match in re.findall(
+            r'<clipPath id="[^"]+">\s*<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"',
+            svg_text,
+        )
+    ]
+    square_panels = [rect for rect in rects if abs(rect[2] - rect[3]) <= 0.5 and rect[2] > 100.0]
+    assert square_panels, "expanded fold SVG should include a square main panel"
+    main_panel = square_panels[0]
+    top_marginals = [rect for rect in rects if rect[1] < main_panel[1] and rect[2] > 100.0 and rect[3] < main_panel[3]]
+    assert top_marginals, "expanded fold SVG should include a top marginal histogram"
+    top_marginal = top_marginals[0]
+    assert abs(top_marginal[0] - main_panel[0]) <= 0.5
+    assert abs(top_marginal[2] - main_panel[2]) <= 0.5

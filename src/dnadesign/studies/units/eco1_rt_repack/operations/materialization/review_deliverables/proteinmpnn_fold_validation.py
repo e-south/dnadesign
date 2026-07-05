@@ -17,7 +17,6 @@ from typing import Any
 import matplotlib
 import numpy as np
 import pyarrow.parquet as pq
-from matplotlib import gridspec
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
@@ -72,11 +71,8 @@ def write_tao_style_fold_validation(
     if not joined_rows:
         raise ValueError("No candidate rows could be joined to fold-review ranking rows")
 
-    fig = plt.figure(figsize=(7.1, 7.4))
-    grid = gridspec.GridSpec(2, 2, width_ratios=[4.0, 1.02], height_ratios=[1.0, 4.0], hspace=0.06, wspace=0.06)
-    ax_hist_x = fig.add_subplot(grid[0, 0])
-    ax = fig.add_subplot(grid[1, 0], sharex=ax_hist_x)
-    ax_hist_y = fig.add_subplot(grid[1, 1], sharey=ax)
+    fig = plt.figure(figsize=(7.6, 7.6))
+    ax, ax_hist_x, ax_hist_y = _add_joint_fold_axes(fig)
 
     rmsd_values = np.array([row["wt_runtime_ca_rmsd"] for row in joined_rows], dtype=float)
     plddt_values = np.array([row["plddt"] for row in joined_rows], dtype=float)
@@ -111,9 +107,7 @@ def write_tao_style_fold_validation(
         style_open_axes(plot_ax)
     ax_hist_x.spines["bottom"].set_visible(True)
     ax_hist_y.spines["left"].set_visible(True)
-    ax.set_box_aspect(1)
     fig.suptitle(title, fontsize=TITLE_SIZE, y=0.965)
-    fig.subplots_adjust(left=0.115, right=0.985, bottom=0.16, top=0.89)
 
     path = panel_root / "proteinmpnn_tao_style_fold_validation.svg"
     alt = (
@@ -206,11 +200,8 @@ def write_expanded_design_class_fold_validation(
     class_order = design_class_order(joined_rows)
     temperatures = sorted({row["temperature"] for row in joined_rows})
 
-    fig = plt.figure(figsize=(8.2, 8.4))
-    grid = gridspec.GridSpec(2, 2, width_ratios=[4.0, 1.0], height_ratios=[1.0, 4.0], hspace=0.06, wspace=0.06)
-    ax_hist_x = fig.add_subplot(grid[0, 0])
-    ax = fig.add_subplot(grid[1, 0], sharex=ax_hist_x)
-    ax_hist_y = fig.add_subplot(grid[1, 1], sharey=ax)
+    fig = plt.figure(figsize=(8.6, 8.6))
+    ax, ax_hist_x, ax_hist_y = _add_joint_fold_axes(fig)
 
     for class_id in class_order:
         color = design_class_color(class_id)
@@ -273,10 +264,8 @@ def write_expanded_design_class_fold_validation(
         style_open_axes(plot_ax)
     ax_hist_x.spines["bottom"].set_visible(True)
     ax_hist_y.spines["left"].set_visible(True)
-    ax.set_box_aspect(1)
     fig.suptitle(title, fontsize=TITLE_SIZE, y=0.972)
     add_expanded_fold_legend(fig, class_order=class_order, temperatures=temperatures)
-    fig.subplots_adjust(left=0.105, right=0.985, bottom=0.23, top=0.89)
 
     path = panel_root / "expanded_proteinmpnn_fold_validation.svg"
     alt = (
@@ -340,6 +329,25 @@ def _skipped_fold_validation_row(
         role="review_only",
         skip_reason=f"Missing input table: {foldcheck_ranking_path}",
     )
+
+
+def _add_joint_fold_axes(fig: Any) -> tuple[Any, Any, Any]:
+    main_left = 0.145
+    main_bottom = 0.285
+    main_size = 0.51
+    gap = 0.025
+    marginal_height = 0.135
+    side_width = 0.17
+    ax = fig.add_axes([main_left, main_bottom, main_size, main_size])
+    ax_hist_x = fig.add_axes(
+        [main_left, main_bottom + main_size + gap, main_size, marginal_height],
+        sharex=ax,
+    )
+    ax_hist_y = fig.add_axes(
+        [main_left + main_size + gap, main_bottom, side_width, main_size],
+        sharey=ax,
+    )
+    return ax, ax_hist_x, ax_hist_y
 
 
 def _join_candidate_fold_rows(
