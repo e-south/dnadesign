@@ -24,6 +24,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     SECTION_ESMC_FEATURE_REVIEW,
     SECTION_FEASIBILITY_AND_HANDOFF,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    CURRENT_SELECTION_PLOT_IDS,
+)
 
 from .notebook_selection_panel import render_selection_panel_table
 from .notebook_selection_summary import (
@@ -48,12 +51,7 @@ _NOTEBOOK_LANE_LABELS = {
 }
 _SECTION_DELIVERABLE_ORDER = {
     SECTION_FEASIBILITY_AND_HANDOFF: (
-        "selection_design_class_gate_counts",
-        "selection_population_stratification",
-        "selection_class_local_percentiles",
-        "selection_six_sequence_distance",
-        "selection_selected_substitutions_across_rt",
-        "selection_regional_mutation_burden",
+        *CURRENT_SELECTION_PLOT_IDS,
         "selected_panel_structure_browser_manifest",
         "selection_funnel_summary",
         "selection_panel_table",

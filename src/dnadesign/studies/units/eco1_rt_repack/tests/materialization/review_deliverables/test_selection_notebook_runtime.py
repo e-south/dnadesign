@@ -23,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_FEASIBILITY_AND_HANDOFF,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    CURRENT_SELECTION_PLOT_IDS,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
@@ -119,12 +122,7 @@ def test_panel_selection_deliverables_follow_review_sequence(tmp_path: Path) -> 
     all_panel_ids = [str(row["deliverable_id"]) for row in all_panel_rows]
 
     assert visible_panel_ids == [
-        "selection_design_class_gate_counts",
-        "selection_population_stratification",
-        "selection_class_local_percentiles",
-        "selection_six_sequence_distance",
-        "selection_selected_substitutions_across_rt",
-        "selection_regional_mutation_burden",
+        *CURRENT_SELECTION_PLOT_IDS,
         "selected_panel_structure_browser_manifest",
     ]
     assert "selection_funnel_summary" not in visible_panel_ids

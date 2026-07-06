@@ -271,11 +271,10 @@ language is:
 
 > SAE features will not be interpreted as direct measurements of processivity,
 > strand displacement, or hairpin unwinding. They will be used to annotate
-> fold-report-accepted Ec86 RT variants and to select a stratified experimental panel
-> designed to test whether preservation or perturbation of RT-relevant semantic
-> features correlates with measured biochemical phenotypes.
+> fold-report-accepted Ec86 RT variants and to plan a stratified downstream
+> review panel for later biochemical testing.
 
-A first assay panel should be a designed contrast, not a top-N SAE ranking. Use
+A first protein review panel should be a designed contrast, not a top-N SAE ranking. Use
 fold-report-accepted variants to fill strata such as:
 
 - WT Ec86 baseline.

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -266,15 +267,17 @@ def _write_manifest(
             "does not meaningfully stratify in SAE-window space."
         ),
         "esmc_policy": "ESMC additive LLR rows are retained for review and are not used as panel-selection tie-breaks.",
-        "source_tables": {key: str(value) for key, value in paths.items() if value.exists()},
-        "artifacts": {
-            "feasibility_report": str(feasibility_path),
-            "candidate_triage_table": str(triage_path),
-            "candidate_selection_panel": str(panel_path),
-            "candidate_handoff_sequences": str(handoff_sequence_csv_path),
-            "plots_root": str(path.parent / PLOTS_DIR_NAME),
+        "source_tables": {
+            key: _manifest_relative_path(path.parent, value) for key, value in paths.items() if value.exists()
         },
-        "path_policy": "manifest_relative_for_plots",
+        "artifacts": {
+            "feasibility_report": _manifest_relative_path(path.parent, feasibility_path),
+            "candidate_triage_table": _manifest_relative_path(path.parent, triage_path),
+            "candidate_selection_panel": _manifest_relative_path(path.parent, panel_path),
+            "candidate_handoff_sequences": _manifest_relative_path(path.parent, handoff_sequence_csv_path),
+            "plots_root": PLOTS_DIR_NAME,
+        },
+        "path_policy": "paths_relative_to_selection_manifest",
         "plots": [_plot_manifest_row(row, manifest_root=path.parent) for row in plot_rows],
         "artifact_hashes": {
             key: sha256_uri(value)
@@ -321,6 +324,10 @@ def _write_manifest(
         ],
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _manifest_relative_path(manifest_root: Path, target: Path) -> str:
+    return os.path.relpath(target, start=manifest_root)
 
 
 def _count_by(rows: list[dict[str, object]], key: str) -> dict[str, int]:

@@ -11,12 +11,22 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
+    NA_FACING_CHEMISTRY_METRICS,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.chemistry_balance import (
+    build_na_facing_chemistry_balance_matrix,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
-    build_regional_mutation_burden_matrix,
     build_selected_sequence_distance_matrix,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.regional_plots import (
+    build_regional_mutation_burden_matrix,
 )
 
 
@@ -81,3 +91,51 @@ def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
     assert len(row_labels) == len(ALL_SPECS)
     assert len(matrix) == len(ALL_SPECS)
     assert all(len(row) == len(region_labels) for row in matrix)
+
+
+def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
+    row_labels, charge_delta, metric_labels, matrix = build_na_facing_chemistry_balance_matrix(
+        panel_rows=_panel_rows(),
+        triage_rows=[
+            {
+                "candidate_id": f"candidate_{index}",
+                "design_class_id": spec.design_class_id,
+                "nucleic_acid_facing_charge_delta": index - 3,
+                "nucleic_acid_facing_basic_gain_count": index,
+                "nucleic_acid_facing_basic_loss_count": 6 - index,
+                "nucleic_acid_facing_acidic_gain_count": index % 2,
+                "nucleic_acid_facing_proline_glycine_gain_count": index % 3,
+            }
+            for index, spec in enumerate(ALL_SPECS, start=1)
+        ],
+    )
+
+    assert len(row_labels) == len(ALL_SPECS)
+    assert charge_delta == [-2, -1, 0, 1, 2, 3]
+    assert metric_labels == [metric.label for metric in NA_FACING_CHEMISTRY_METRICS]
+    assert len(matrix) == len(ALL_SPECS)
+    assert matrix[0] == [1, 5, 1, 1]
+
+
+def test_na_facing_chemistry_balance_matrix_fails_on_missing_selected_field() -> None:
+    triage_rows = [
+        {
+            "candidate_id": f"candidate_{index}",
+            "design_class_id": spec.design_class_id,
+            "nucleic_acid_facing_charge_delta": index - 3,
+            "nucleic_acid_facing_basic_gain_count": index,
+            "nucleic_acid_facing_basic_loss_count": 6 - index,
+            "nucleic_acid_facing_acidic_gain_count": index % 2,
+            "nucleic_acid_facing_proline_glycine_gain_count": index % 3,
+        }
+        for index, spec in enumerate(ALL_SPECS, start=1)
+    ]
+    triage_rows[0].pop("nucleic_acid_facing_basic_loss_count")
+    triage_rows[1]["nucleic_acid_facing_charge_delta"] = None
+
+    with pytest.raises(ValueError) as error:
+        build_na_facing_chemistry_balance_matrix(panel_rows=_panel_rows(), triage_rows=triage_rows)
+
+    message = str(error.value)
+    assert "candidate_1" in message
+    assert "nucleic_acid_facing_basic_loss_count" in message

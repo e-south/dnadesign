@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-07-04
+last_verified: 2026-07-05
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -337,7 +337,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_report.parquet
     status: materialized_expanded_577_rows
-    description: Local generated expanded fold-validation report for WT plus 576 nonredundant design-class candidates. The normalized report has all rows accepted and is the fold evidence source for assay-panel preparation.
+    description: Local generated expanded fold-validation report for WT plus 576 nonredundant design-class candidates. The normalized report has all rows accepted and is the fold evidence source for protein review panel planning.
   - id: eco1_rt_design_class_foldcheck_candidate_ranking
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -574,7 +574,7 @@ datasets:
       per-residue mean pseudo-log-likelihood, pseudo-perplexity, and delta
       versus WT. This is a masked-language-model plausibility review field, not
       a calibrated probability of natural occurrence or a candidate acceptance
-      gate. It is not required for the first assay panel.
+      gate. It is not required for the first protein review panel.
   - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_manifest
     owner: eco1_rt_repack
     method_contract_owner: permuter
@@ -710,18 +710,56 @@ datasets:
     description: >-
       Compact review visual placing the selected six rows in the full expanded
       candidate population by MSA-observed designed-substitution fraction and
-      nucleic-acid-facing mutation count. It supports review context and does
-      not create a combined score or activity claim.
-  - id: eco1_rt_selection_panel_review_axes
+      mutation count near retained DNA/RNA or thumb-track positions. It supports
+      review context and does not create a combined score or activity claim.
+  - id: eco1_rt_selection_class_local_percentiles
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_panel_review_axes.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_class_local_percentiles.svg
     status: materialized_selection_readiness_visual
     description: >-
-      Compact review visual for the six selected panel rows. It shows
-      selected-denominator MSA support, nucleic-acid-facing mutation geography,
-      and local-chemistry warning burden. It explains the current panel
-      rationale without creating a combined score.
+      Compact review visual comparing each selected row against candidates from
+      its own design class across MSA support, unsupported substitutions,
+      substrate-proximal mutation burden, chemistry warnings, and fold metrics.
+      It explains panel review context without creating a combined score.
+  - id: eco1_rt_selection_six_sequence_distance
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_six_sequence_distance.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing pairwise amino-acid Hamming distances among
+      the selected six protein candidates. It supports sequence-diversity review
+      and does not measure RT activity.
+  - id: eco1_rt_selection_selected_substitutions_across_rt
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_selected_substitutions_across_rt.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing where selected substitutions fall across
+      Eco1 RT positions, with substitution chemistry and display-only RT region
+      context. It is descriptive review context, not activity evidence.
+  - id: eco1_rt_selection_regional_mutation_burden
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regional_mutation_burden.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual summarizing selected substitutions by catalytic or
+      direct-contact, near retained DNA/RNA annulus, thumb-contact-track, and
+      distal scaffold regions. It is regional review context, not a functional
+      predictor.
+  - id: eco1_rt_selection_na_facing_chemistry_balance
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_na_facing_chemistry_balance.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual separating chemistry changes near retained DNA/RNA
+      or thumb-track positions into charge change, basic gain, basic loss, acidic
+      gain, and proline/glycine gain. It treats chemistry as review risk and
+      context, not as a positive activity predictor.
   - id: eco1_rt_wt_model_check_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -777,7 +815,7 @@ datasets:
     description: >-
       Study-owned table for the expanded nonredundant candidate pool. It joins
       fold-review classes, MSA support, mutation geography,
-      nucleic-acid-facing chemistry, sequence-diversity fields, ESMC additive
+      near-DNA/RNA or thumb-track chemistry, sequence-diversity fields, ESMC additive
       LLR fields, three-window SAE WT-delta fields, and feasibility status. It
       is a triage surface, not a combined-score table.
   - id: eco1_rt_candidate_selection_panel

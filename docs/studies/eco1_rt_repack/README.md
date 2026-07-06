@@ -38,7 +38,7 @@ from Mestre-derived MSA profiles. Different conservation and proximity
 thresholds define design classes. ProteinMPNN samples protein sequences at the
 unprotected positions for each design class. ColabFold predictions then remove
 poor fold-model candidates. The remaining pool is triaged by MSA support,
-localized mutation geography, nucleic-acid-facing chemistry, sequence
+localized mutation geography, near retained DNA/RNA or thumb-track chemistry, sequence
 nonredundancy, and model-check annotations that are kept out of the acceptance
 gate.
 
@@ -135,14 +135,14 @@ the same positions under a WT masked-marginal context; it is not a whole-protein
 pseudo-likelihood and not an activity measurement. Whole-protein ESMC
 pseudo-likelihood is not part of the v1 six-variant panel.
 
-The assay-panel layer is now materialized for the expanded pool under
+The protein review panel layer is now materialized for the expanded pool under
 `outputs/thread/design_classes/selection/`. It contains a computational
 full-gene feasibility report, a candidate triage table, and a six-row panel
 with one feasible fold-preserved representative from each design class. The
 triage table now records MSA support for designed residues, mutation geography,
-nucleic-acid-facing chemistry, and sequence nonredundancy. ESMC and SAE remain
-review evidence only. The review fields explain the panel; they are not a
-single combined score.
+near retained DNA/RNA or thumb-track chemistry, and sequence nonredundancy. ESMC
+and SAE remain review evidence only. The review fields explain the panel; they
+are not a single combined score.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic

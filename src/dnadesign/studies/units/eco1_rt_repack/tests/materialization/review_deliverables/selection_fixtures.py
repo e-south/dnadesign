@@ -17,6 +17,10 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    SELECTION_PLOT_PLAIN_TITLES,
+)
+
 from .selection_plot_fixtures import plot_row, write_svg
 from .selection_sequence_fixtures import write_handoff_sequence_csv
 from .selection_table_fixtures import panel_row, triage_row
@@ -54,14 +58,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         ),
         selection_root / "candidate_triage_table.parquet",
     )
-    plots = {
-        "selection_design_class_gate_counts": "Each mask class contributes fold-preserved candidates",
-        "selection_population_stratification": "Selected candidates sit within the full design pool",
-        "selection_class_local_percentiles": "Each selected row is reviewed within its own mask class",
-        "selection_six_sequence_distance": "The selected six sample distinct sequence neighborhoods",
-        "selection_selected_substitutions_across_rt": "Selected substitutions map to RT regions",
-        "selection_regional_mutation_burden": "Selected candidates differ in which RT regions carry mutations",
-    }
+    plots = SELECTION_PLOT_PLAIN_TITLES
     for plot_id, title in plots.items():
         write_svg(plot_root / f"{plot_id}.svg", plot_id=plot_id, title=title)
     payload = {
@@ -75,7 +72,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         ),
         "sae_window_policy": "SAE windows are retained for review evidence and are not panel-selection inputs.",
         "esmc_policy": "ESMC additive LLR rows are retained for review and are not panel-selection tie-breaks.",
-        "path_policy": "manifest_relative_for_plots",
+        "path_policy": "paths_relative_to_selection_manifest",
         "artifacts": {
             "candidate_triage_table": "candidate_triage_table.parquet",
             "candidate_selection_panel": "candidate_selection_panel.parquet",
@@ -162,6 +159,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 description="Shows mutation burden by RT region.",
                 interpretation_limit="Regional mutation burden does not measure activity.",
                 input_hash_tail="f",
+            ),
+            plot_row(
+                plot_id="selection_na_facing_chemistry_balance",
+                title=plots["selection_na_facing_chemistry_balance"],
+                path="plots/selection_na_facing_chemistry_balance.svg",
+                alt_text="Fixture near-DNA/RNA chemistry-balance heatmap.",
+                description="Shows chemistry changes near retained DNA/RNA or thumb-track.",
+                interpretation_limit="Chemistry balance does not measure activity.",
+                input_hash_tail="g",
             ),
         ],
     }

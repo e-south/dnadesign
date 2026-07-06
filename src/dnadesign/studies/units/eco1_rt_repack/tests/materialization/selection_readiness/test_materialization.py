@@ -11,8 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import csv
-import hashlib
 import json
 from pathlib import Path
 
@@ -30,6 +28,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.feasibility import (
     build_feasibility_rows,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    CURRENT_SELECTION_PLOT_IDS,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
     sequence,
@@ -96,32 +97,10 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "mutation_count_total" in panel[0]["tie_break_trace_json"]
     assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
 
-    with result.candidate_handoff_sequence_csv_path.open(encoding="utf-8", newline="") as handle:
-        handoff_sequence_rows = list(csv.DictReader(handle))
-    assert len(handoff_sequence_rows) == len(panel)
-    assert {row["candidate_id"] for row in handoff_sequence_rows} == {row["candidate_id"] for row in panel}
-    assert all(
-        row["protein_sequence"] == sequence(int(row["candidate_id"].split("_")[-1])) for row in handoff_sequence_rows
-    )
-    assert {row["dna_design_status"] for row in handoff_sequence_rows} == {"not_materialized"}
-    assert {row["sequence_scope"] for row in handoff_sequence_rows} == {"mapped_rt_chain_protein"}
-    assert {row["mapped_rt_chain_length"] for row in handoff_sequence_rows} == {"64"}
-    assert {row["canonical_rt_length"] for row in handoff_sequence_rows} == {"320"}
-    assert {row["canonical_sequence_status"] for row in handoff_sequence_rows} == {"not_exported_in_this_slice"}
-    assert {row["dna_sequence_status"] for row in handoff_sequence_rows} == {"not_dna"}
-    assert {row["codon_optimization_status"] for row in handoff_sequence_rows} == {"not_codon_optimized"}
-    assert {row["restriction_screen_status"] for row in handoff_sequence_rows} == {"not_screened"}
-    assert all(row["handoff_scope_note"].startswith("RT protein sequence only") for row in handoff_sequence_rows)
-    assert all(int(row["protein_sequence_length"]) == len(row["protein_sequence"]) for row in handoff_sequence_rows)
-    assert all(
-        row["protein_sequence_sha256"]
-        == "sha256:" + hashlib.sha256(row["protein_sequence"].encode("utf-8")).hexdigest()
-        for row in handoff_sequence_rows
-    )
-    assert all(row["source_candidate_pool_sha256"].startswith("sha256:") for row in handoff_sequence_rows)
-    assert all(row["source_panel_sha256"].startswith("sha256:") for row in handoff_sequence_rows)
-
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["path_policy"] == "paths_relative_to_selection_manifest"
+    assert all(not Path(value).is_absolute() for value in manifest["source_tables"].values())
+    assert all(not Path(value).is_absolute() for value in manifest["artifacts"].values())
     assert manifest["gate_counts"]["hard_gate_status"] == {"eligible": len(panel), "ineligible": 2}
     assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
     assert manifest["selected_candidate_ids"] == [row["candidate_id"] for row in panel]
@@ -145,14 +124,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     }
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
-    assert [plot["plot_id"] for plot in manifest["plots"]] == [
-        "selection_design_class_gate_counts",
-        "selection_population_stratification",
-        "selection_class_local_percentiles",
-        "selection_six_sequence_distance",
-        "selection_selected_substitutions_across_rt",
-        "selection_regional_mutation_burden",
-    ]
+    assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
     population_plot = next(
         plot for plot in manifest["plots"] if plot["plot_id"] == "selection_population_stratification"
     )

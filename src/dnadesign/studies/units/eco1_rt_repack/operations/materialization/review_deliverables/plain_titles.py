@@ -13,6 +13,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    SELECTION_PLOT_PLAIN_TITLES,
+)
+
 PLAIN_DELIVERABLE_TITLES = {
     "msa_plurality_mask_panel": "Clade 9 conservation defines the baseline mask",
     "msa_subtype_plurality_panel": "The Eco1 subtype MSA gives a closer conservation view",
@@ -53,12 +57,7 @@ PLAIN_DELIVERABLE_TITLES = {
     "selection_handoff_sequences": "Selected protein sequences keep handoff scope explicit",
     "selection_handoff_readiness": "RT-only handoff still needs candidate_handoff.yaml",
     "selection_handoff_boundary": "Panel selection and RT-only handoff stay separate",
-    "selection_design_class_gate_counts": "Each mask class contributes fold-preserved candidates",
-    "selection_population_stratification": "Selected candidates sit within the full design pool",
-    "selection_class_local_percentiles": "Each selected row is reviewed within its own mask class",
-    "selection_six_sequence_distance": "The selected six sample distinct sequence neighborhoods",
-    "selection_selected_substitutions_across_rt": "Selected substitutions map to RT regions",
-    "selection_regional_mutation_burden": "Selected candidates differ in which RT regions carry mutations",
+    **SELECTION_PLOT_PLAIN_TITLES,
 }
 
 

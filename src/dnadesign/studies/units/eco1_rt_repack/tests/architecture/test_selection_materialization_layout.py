@@ -28,6 +28,7 @@ _SAE_WINDOW_SUMMARY_ROOT_FILES = {
 _SELECTION_READINESS_ROOT_FILES = {
     "__init__.py",
     "__main__.py",
+    "chemistry_balance.py",
     "cli.py",
     "constants.py",
     "feasibility.py",
@@ -38,8 +39,11 @@ _SELECTION_READINESS_ROOT_FILES = {
     "plot_support.py",
     "plots.py",
     "population_stratification.py",
+    "review_axis_contracts.py",
     "review_axes.py",
+    "regional_plots.py",
     "triage.py",
+    "visual_inventory.py",
 }
 
 

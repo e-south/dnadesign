@@ -144,10 +144,15 @@ def short_candidate(candidate_id: str) -> str:
     return candidate_id.replace(prefix, "") if candidate_id.startswith(prefix) else candidate_id
 
 
+def matrix_text_color(value: float, *, max_value: float) -> str:
+    return "#ffffff" if max_value > 0 and value >= max_value * 0.55 else "#24292f"
+
+
 __all__ = [
     "canonical_mutations",
     "class_label",
     "legend_sizes",
+    "matrix_text_color",
     "mutation_category",
     "ordered_panel_rows",
     "parse_mutation",

@@ -23,8 +23,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
     SECTION_FEASIBILITY_AND_HANDOFF,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
-    visual_deliverables,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    CURRENT_SELECTION_PLOT_IDS,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -68,12 +68,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "msa_plurality_vs_esmc_entropy",
         "msa_plurality_vs_best_alt_llr",
         "msa_esmc_constraint_tracks",
-        "selection_design_class_gate_counts",
-        "selection_population_stratification",
-        "selection_class_local_percentiles",
-        "selection_six_sequence_distance",
-        "selection_selected_substitutions_across_rt",
-        "selection_regional_mutation_burden",
+        *CURRENT_SELECTION_PLOT_IDS,
         "selection_funnel_summary",
         "selection_panel_table",
         "selection_handoff_sequences",
@@ -105,50 +100,6 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selected_panel_structure_browser_manifest"]["title"] == (
         "Selected structures can be inspected one at a time"
     )
-    visual_ids = {entry["deliverable_id"] for entry in visual_deliverables(manifest["deliverables"])}
-    audit_visual_ids = {
-        entry["deliverable_id"]
-        for entry in visual_deliverables(manifest["deliverables"], selected_lane="audit_supplement")
-    }
-    assert "mask_structure_browser_manifest" in visual_ids
-    assert "interactive_structure_browser_manifest" in visual_ids
-    assert "biohub_esmc_sae_structure_browser_manifest" not in visual_ids
-    assert "wt_esmc_entropy_by_position" not in visual_ids
-    assert "proteinmpnn_score_mutation_burden" not in visual_ids
-    assert "proteinmpnn_residue_frequency_heatmap" in visual_ids
-    assert "design_class_mask_overview" in visual_ids
-    assert "linear_mask_tracks" not in visual_ids
-    assert "expanded_proteinmpnn_fold_validation" in visual_ids
-    assert "biohub_esmc_candidate_preference_vs_wt" not in visual_ids
-    assert "biohub_esmc_sae_feature_activation_heatmap" not in visual_ids
-    assert "biohub_esmc_sae_umap" not in visual_ids
-    assert "biohub_esmc_candidate_top_sae_feature_activation_ratio" not in visual_ids
-    assert "biohub_esmc_sae_fold_llr_comparison" not in visual_ids
-    assert "selection_design_class_gate_counts" in visual_ids
-    assert "selection_population_stratification" in visual_ids
-    assert "selection_class_local_percentiles" in visual_ids
-    assert "selection_six_sequence_distance" in visual_ids
-    assert "selection_selected_substitutions_across_rt" in visual_ids
-    assert "selection_regional_mutation_burden" in visual_ids
-    assert "selection_panel_review_axes" not in visual_ids
-    assert "selection_panel_sequence_differences" not in visual_ids
-    assert "selection_panel_mutation_geography_chemistry" not in visual_ids
-    assert "selection_funnel_summary" not in visual_ids
-    assert "selection_panel_table" not in visual_ids
-    assert "selection_handoff_sequences" not in visual_ids
-    assert "selection_handoff_readiness" not in visual_ids
-    assert "selection_handoff_boundary" not in visual_ids
-    assert "selected_panel_structure_browser_manifest" in visual_ids
-    assert "feasibility_and_handoff_planned" not in visual_ids
-    assert "wt_esmc_entropy_by_position" in audit_visual_ids
-    assert "foldcheck_review_review_class_counts" in visual_ids
-    assert "proteinmpnn_score_mutation_burden" in audit_visual_ids
-    assert "biohub_esmc_candidate_preference_vs_wt" in audit_visual_ids
-    assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
-    assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids
-    assert "mask_structure_context_png" not in visual_ids
-    assert "foldcheck_review_structure_overlay_panel" not in visual_ids
-    assert "foldcheck_review_structure_overlay_skipped" not in visual_ids
     assert deliverables["wt_esmc_entropy_by_position"]["status"] == "linked_existing"
     assert deliverables["wt_esmc_entropy_by_position"]["section"] == SECTION_CONSTRAINT_EVIDENCE
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
@@ -189,6 +140,8 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selection_selected_substitutions_across_rt"]["status"] == "linked_existing"
     assert deliverables["selection_regional_mutation_burden"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_regional_mutation_burden"]["status"] == "linked_existing"
+    assert deliverables["selection_na_facing_chemistry_balance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_na_facing_chemistry_balance"]["status"] == "linked_existing"
     assert deliverables["selection_funnel_summary"]["artifact_kind"] == "selection_funnel_summary"
     assert deliverables["selection_funnel_summary"]["status"] == "linked_existing"
     assert deliverables["selection_panel_table"]["artifact_kind"] == "selection_panel_table"
