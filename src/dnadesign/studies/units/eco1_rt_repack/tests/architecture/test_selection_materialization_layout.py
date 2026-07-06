@@ -40,6 +40,7 @@ _SELECTION_READINESS_ROOT_FILES = {
     "io.py",
     "local_structure.py",
     "local_structure_plot.py",
+    "local_structure_regions.py",
     "models.py",
     "panel.py",
     "pipeline.py",
