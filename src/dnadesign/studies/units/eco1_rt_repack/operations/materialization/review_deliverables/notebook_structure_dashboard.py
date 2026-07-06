@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_structure_dashboard.py
 
-Dashboard helpers for Eco1 review-notebook structure views.
+Structure summary helpers for Eco1 review-notebook structure views.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -115,7 +115,7 @@ def structure_metric_rows(
     return rows
 
 
-def structure_dashboard_rows(
+def structure_summary_rows(
     row: dict[str, Any],
     *,
     selected_highlight_row: dict[str, Any] | None,
@@ -130,18 +130,18 @@ def structure_dashboard_rows(
     highlight_dna: bool,
     highlight_rna: bool,
 ) -> list[dict[str, str]]:
-    dashboard: list[dict[str, str]] = [
+    summary: list[dict[str, str]] = [
         {"metric": "Structure", "value": str(row.get("display_label") or row.get("candidate_id") or "")},
         {"metric": "Fold-review bin", "value": str(row.get("group") or "")},
     ]
     if str(row.get("structure_view_mode") or "") == "reference_selection":
-        dashboard.extend(_reference_dashboard_rows(row))
+        summary.extend(_reference_summary_rows(row))
     else:
-        dashboard.extend(_candidate_dashboard_rows(row))
+        summary.extend(_candidate_summary_rows(row))
     if selected_highlight_row is not None:
-        dashboard.extend(_selected_highlight_dashboard_rows(selected_highlight_row))
-    dashboard.extend(
-        _browser_dashboard_rows(
+        summary.extend(_selected_highlight_summary_rows(selected_highlight_row))
+    summary.extend(
+        _browser_summary_rows(
             row,
             alignment_status=alignment_status,
             browser_mapped_ca_rmsd=browser_mapped_ca_rmsd,
@@ -155,15 +155,15 @@ def structure_dashboard_rows(
             highlight_rna=highlight_rna,
         )
     )
-    return [entry for entry in dashboard if str(entry.get("value") or "")]
+    return [entry for entry in summary if str(entry.get("value") or "")]
 
 
 def structure_browser_panel_html(
     structure_html: str,
-    dashboard_rows: list[dict[str, str]],
+    summary_rows: list[dict[str, str]],
     row: dict[str, Any],
 ) -> str:
-    dashboard_html = _dashboard_table_html(row, dashboard_rows)
+    summary_html = _summary_table_html(row, summary_rows)
     sequence_html = _protein_sequence_panel_html(row)
     return (
         '<section class="eco1-structure-browser-panel">'
@@ -172,14 +172,14 @@ def structure_browser_panel_html(
         ".eco1-structure-browser-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(14rem,0.82fr);"
         "gap:0.75rem;align-items:start;width:100%;max-width:100%;min-width:0;box-sizing:border-box;}"
         ".eco1-structure-browser-view{min-width:0;max-width:100%;overflow:hidden;}"
-        ".eco1-structure-browser-dashboard{min-width:0;max-width:100%;overflow:hidden;}"
-        ".eco1-structure-browser-dashboard table{width:100%;border-collapse:collapse;table-layout:fixed;"
+        ".eco1-structure-browser-summary{min-width:0;max-width:100%;overflow:hidden;}"
+        ".eco1-structure-browser-summary table{width:100%;border-collapse:collapse;table-layout:fixed;"
         "font-size:0.86rem;line-height:1.25;}"
-        ".eco1-structure-browser-dashboard th{font-size:0.78rem;text-transform:uppercase;"
+        ".eco1-structure-browser-summary th{font-size:0.78rem;text-transform:uppercase;"
         "letter-spacing:0.04em;color:#6e7781;text-align:left;padding:0 0 0.28rem 0;}"
-        ".eco1-structure-browser-dashboard td{border-top:1px solid #d8dee4;padding:0.34rem 0.25rem;"
+        ".eco1-structure-browser-summary td{border-top:1px solid #d8dee4;padding:0.34rem 0.25rem;"
         "vertical-align:top;overflow-wrap:anywhere;}"
-        ".eco1-structure-browser-dashboard td:first-child{width:38%;color:#57606a;font-weight:600;}"
+        ".eco1-structure-browser-summary td:first-child{width:38%;color:#57606a;font-weight:600;}"
         ".eco1-protein-sequence-panel{border-top:1px solid #d8dee4;margin-top:0.55rem;padding-top:0.45rem;}"
         ".eco1-protein-sequence-panel h4{margin:0 0 0.28rem 0;font-size:0.78rem;text-transform:uppercase;"
         "letter-spacing:0.04em;color:#6e7781;}"
@@ -189,7 +189,7 @@ def structure_browser_panel_html(
         "</style>"
         '<div class="eco1-structure-browser-grid">'
         f'<div class="eco1-structure-browser-view">{structure_html}</div>'
-        f'<aside class="eco1-structure-browser-dashboard">{dashboard_html}{sequence_html}</aside>'
+        f'<aside class="eco1-structure-browser-summary">{summary_html}{sequence_html}</aside>'
         "</div>"
         "</section>"
     )
@@ -221,7 +221,7 @@ def format_metric_value(value: Any) -> str:
     return str(value)
 
 
-def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {"metric": "Mean pLDDT", "value": format_float(row.get("plddt"), decimals=1)},
         {"metric": "WT-runtime CA RMSD", "value": format_float(row.get("wt_runtime_ca_rmsd"), decimals=2, suffix=" A")},
@@ -235,7 +235,7 @@ def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
         },
         {"metric": "Protein sequence length", "value": format_int(row.get("protein_sequence_length"))},
         {"metric": "Mutation count", "value": format_int(row.get("mutation_count"))},
-        {"metric": "Selection slot", "value": str(row.get("selection_slot") or "")},
+        {"metric": "Design class", "value": str(row.get("selection_slot") or "")},
         {"metric": "Nearest selected distance", "value": format_int(row.get("nearest_selected_distance_aa"))},
         {
             "metric": "MSA observed fraction",
@@ -272,7 +272,7 @@ def _candidate_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def _reference_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+def _reference_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     return [
         {"metric": "Highlighted residues", "value": format_int(row.get("selection_residue_count"))},
         {"metric": "Evidence view", "value": str(row.get("group") or "Reference evidence")},
@@ -296,9 +296,9 @@ def _selected_sae_metric_fields(row: dict[str, Any]) -> tuple[str, ...]:
     return ("feature_index", "activation_max", "activation_sum", "nonzero_residue_count")
 
 
-def _selected_highlight_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+def _selected_highlight_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     if row.get("feature_index") is not None:
-        return _selected_sae_dashboard_rows(row)
+        return _selected_sae_summary_rows(row)
     label = str(row.get("display_label") or row.get("candidate_id") or "")
     return [
         {"metric": "Selected residue highlight", "value": label},
@@ -307,7 +307,7 @@ def _selected_highlight_dashboard_rows(row: dict[str, Any]) -> list[dict[str, st
     ]
 
 
-def _selected_sae_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
+def _selected_sae_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     feature_value = f"F{int(row['feature_index'])}" if row.get("feature_index") is not None else ""
     return [
         {"metric": "Selected SAE feature", "value": feature_value},
@@ -317,7 +317,7 @@ def _selected_sae_dashboard_rows(row: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def _browser_dashboard_rows(
+def _browser_summary_rows(
     row: dict[str, Any],
     *,
     alignment_status: str,
@@ -337,10 +337,10 @@ def _browser_dashboard_rows(
             "metric": "Browser mapped CA RMSD",
             "value": "" if browser_mapped_ca_rmsd is None else f"{browser_mapped_ca_rmsd:.3f} A",
         },
-        {"metric": "Reference atoms", "value": _atom_content_dashboard_value(reference_atom_content)},
+        {"metric": "Reference atoms", "value": _atom_content_summary_value(reference_atom_content)},
         {
             "metric": "Query atoms",
-            "value": "" if query_atom_content is None else _atom_content_dashboard_value(query_atom_content),
+            "value": "" if query_atom_content is None else _atom_content_summary_value(query_atom_content),
         },
         {
             "metric": "Side chains",
@@ -353,11 +353,11 @@ def _browser_dashboard_rows(
         },
         {
             "metric": "Molecule visibility",
-            "value": molecule_visibility_dashboard_value(show_dna=show_dna, show_rna=show_rna),
+            "value": molecule_visibility_summary_value(show_dna=show_dna, show_rna=show_rna),
         },
         {
             "metric": "Molecule colors",
-            "value": molecule_color_dashboard_value(
+            "value": molecule_color_summary_value(
                 highlight_protein=highlight_protein,
                 highlight_dna=highlight_dna,
                 highlight_rna=highlight_rna,
@@ -366,13 +366,11 @@ def _browser_dashboard_rows(
     ]
 
 
-def _dashboard_table_html(row: dict[str, Any], dashboard_rows: list[dict[str, str]]) -> str:
+def _summary_table_html(row: dict[str, Any], summary_rows: list[dict[str, str]]) -> str:
     label = (
-        "Reference dashboard"
-        if str(row.get("structure_view_mode") or "") == "reference_selection"
-        else "Variant dashboard"
+        "Reference summary" if str(row.get("structure_view_mode") or "") == "reference_selection" else "Variant summary"
     )
-    body = "".join(_dashboard_row_html(entry) for entry in dashboard_rows)
+    body = "".join(_summary_row_html(entry) for entry in summary_rows)
     return (
         f'<table aria-label="{html.escape(label)}">'
         f'<thead><tr><th colspan="2">{html.escape(label)}</th></tr></thead>'
@@ -381,7 +379,7 @@ def _dashboard_table_html(row: dict[str, Any], dashboard_rows: list[dict[str, st
     )
 
 
-def _dashboard_row_html(entry: dict[str, str]) -> str:
+def _summary_row_html(entry: dict[str, str]) -> str:
     metric = str(entry.get("metric") or "")
     value = str(entry.get("value") or "")
     value_html = html.escape(value)
@@ -403,7 +401,7 @@ def _protein_sequence_panel_html(row: dict[str, Any]) -> str:
     )
 
 
-def _atom_content_dashboard_value(content: StructureAtomContent) -> str:
+def _atom_content_summary_value(content: StructureAtomContent) -> str:
     if content.has_sidechain_atoms:
         return f"{content.atom_count} protein atoms; {content.sidechain_residue_count} residues with side-chain atoms"
     return f"{content.atom_count} protein atoms; no side-chain atoms detected"
@@ -449,7 +447,7 @@ def browser_alignment_note(
     return f"{alignment_status}.{rmsd_text} Raw local ColabFold PDB files are not rewritten."
 
 
-def molecule_color_dashboard_value(
+def molecule_color_summary_value(
     *,
     highlight_protein: bool,
     highlight_dna: bool,
@@ -469,7 +467,7 @@ def molecule_color_dashboard_value(
     return "On for " + ", ".join(enabled) + "."
 
 
-def molecule_visibility_dashboard_value(*, show_dna: bool, show_rna: bool) -> str:
+def molecule_visibility_summary_value(*, show_dna: bool, show_rna: bool) -> str:
     visible = ["Protein"]
     if show_dna:
         visible.append("DNA")

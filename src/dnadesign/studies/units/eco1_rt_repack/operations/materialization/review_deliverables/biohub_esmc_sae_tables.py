@@ -109,7 +109,7 @@ def make_protein_top_feature_table_row(
             "when the exact SAE dictionary supplies source-backed labels."
         ),
         interpretation_limit=interpretation_limit,
-        title="Per-protein top SAE features are ordered by peak activation and thresholded prevalence",
+        title="Strongest per-protein SAE features are ordered by peak activation and thresholded prevalence",
         method_summary=method_summary,
         evidence_summary={
             "source_notebook": source_notebook,

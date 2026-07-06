@@ -120,7 +120,7 @@ def write_biohub_esmc_model_agreement_deliverables(
                 "between the 300M and 6B ESMC scoring lanes."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="The 300M and 6B ESMC table records candidate-score order changes",
+            title="300M and 6B ESMC score-order changes are recorded",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="review_only",

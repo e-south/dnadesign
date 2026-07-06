@@ -61,6 +61,9 @@ def test_current_study_docs_do_not_reintroduce_removed_selection_surfaces() -> N
         "handoff boundary",
         "selection readiness and handoff boundary",
         "semantic stratification",
+        "semantic review context",
+        "semantic review evidence",
+        "assay-panel stratification",
         "6b esmc llr scores rank candidates",
         "orders variants by sae",
     )

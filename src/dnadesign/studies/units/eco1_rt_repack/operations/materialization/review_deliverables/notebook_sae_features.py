@@ -74,7 +74,7 @@ def sae_heatmap_feature_lookup(payload: dict[str, Any]) -> dict[str, int]:
             continue
         feature_index = int(row["feature_index"])
         label = str(row.get("label") or "").strip() or f"F{feature_index}"
-        options[f"{label} | WT peak rank {rank}"] = feature_index
+        options[f"{label} | WT peak order {rank}"] = feature_index
     return options
 
 

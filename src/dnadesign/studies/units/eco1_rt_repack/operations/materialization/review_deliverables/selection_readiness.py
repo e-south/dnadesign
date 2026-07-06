@@ -227,7 +227,17 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
 def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     readiness = _normalized_handoff_readiness(manifest_path=manifest_path, loaded=loaded)
     handoff_path = _resolve_manifest_path(manifest_path, str(readiness["candidate_handoff_path"]))
-    handoff_state = "present" if handoff_path.exists() else "absent"
+    handoff_file_present = bool(readiness["candidate_handoff_file_present"])
+    handoff_materialized = bool(readiness["candidate_handoff_materialized"])
+    if handoff_materialized:
+        title = "RT-only candidate handoff is materialized"
+        handoff_state = "materialized and valid"
+    elif handoff_file_present:
+        title = "RT-only candidate handoff needs a valid candidate_handoff.yaml"
+        handoff_state = "present but not valid"
+    else:
+        title = "RT-only candidate handoff still needs candidate_handoff.yaml"
+        handoff_state = "absent"
     return make_deliverable_row(
         deliverable_id=_HANDOFF_READINESS_DELIVERABLE_ID,
         section=SECTION_FEASIBILITY_AND_HANDOFF,
@@ -244,7 +254,7 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         interpretation_limit=(
             "The readiness state has no assay acceptance gate and does not create an RT-lnRNA construct subject."
         ),
-        title="Candidate handoff remains blocked until candidate_handoff.yaml exists",
+        title=title,
         role="manuscript_facing",
         render_mode="text",
         evidence_summary={str(key): value for key, value in readiness.items()},

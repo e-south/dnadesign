@@ -108,7 +108,7 @@ ColabFold is the structural-fidelity gate. It compares full-length WT and
 candidate sequences against the selected Ec86 cryoEM-backed RT scaffold. The
 claim at this stage is fold preservation, not improved RT activity.
 
-Biohub ESMC SAE is the query-time semantic annotation layer for WT and synthetic
+Biohub ESMC SAE is the query-time model-annotation layer for WT and synthetic
 candidates after fold checking. It can show whether model-derived feature
 regions are retained or shifted. ESM Atlas remains public-protein neighborhood
 context where a sequence or related public protein is present. WT ESMC
@@ -227,7 +227,7 @@ a candidate has improved function. The right study wording is:
 > results, when available, are public-protein neighborhood context. Neither
 > source measures processivity, strand displacement, or hairpin unwinding.
 
-The first Eco1 use case is a semantic context check: ask whether
+The first Eco1 use case is a model-feature context check: ask whether
 ProteinMPNN variants that passed the fold-report validator preserve or shift
 polymerase-related model-feature activation patterns in controlled ways.
 For structured RNA templates, the feature panel should be described as
@@ -252,8 +252,8 @@ The Biohub ESMC SAE and Atlas context layers may be used for:
   public-neighborhood space.
 - Annotation: expose thumb/palm, primer-grip, fingers/palm, catalytic, and
   gating feature shifts.
-- Stratification: choose a balanced protein review panel with semantic-retained and
-  semantic-shifted variants.
+- Panel planning: choose a balanced protein review panel with model-feature-retained and
+  model-feature-shifted variants.
 - Learning: provide model-derived input fields for supervised models after biochemical data
   exist.
 
@@ -265,7 +265,7 @@ It may not be used for:
 - hiding a composite SAE score as an empirical fitness score.
 
 Before biochemical data are inspected, freeze the feature panel, residue
-windows, normalization rule, fold-gate thresholds, semantic flag definitions,
+windows, normalization rule, fold-gate thresholds, model-feature flag definitions,
 selection strata, assay endpoints, and primary analysis plan. The pre-assay
 language is:
 
@@ -278,8 +278,8 @@ A first protein review panel should be a designed contrast, not a top-N SAE rank
 fold-report-accepted variants to fill strata such as:
 
 - WT Ec86 baseline.
-- Fold-best / semantic-retained candidates.
-- Fold-best / semantic-shifted candidates.
+- Fold-best / model-feature-retained candidates.
+- Fold-best / model-feature-shifted candidates.
 - Thumb-retained / fingers-shifted candidates.
 - Primer-grip-shifted candidates with intact catalytic and fold gates.
 - Random fold-report-accepted controls.
@@ -333,18 +333,18 @@ writes compact study-local artifacts:
 
 The current all-97 Atlas probe uses hash lookup with an explicit
 `--allow-fold-on-miss --prediction-set-id ...` cap and resume by per-sequence
-Atlas query hash. WT is accepted and has rich sparse Atlas rows plus one
+Atlas query hash. WT is accepted and has sparse Atlas rows plus one
 Atlas/ESMFold-derived structure registry row. The first synthetic ProteinMPNN
 candidates still return explicit 404 rows on this endpoint, and the remaining
 synthetic candidates are capped as unattempted. Do not keep retrying this
-hash-lookup path expecting rich query-level synthetic SAE rows unless the API
+hash-lookup path expecting candidate-level synthetic SAE rows unless the API
 behavior changes. If no-auth Atlas context is needed for synthetic candidates,
-use the sequence-similarity endpoint as a separate semantic-neighborhood
+use the sequence-similarity endpoint as a separate model-neighborhood
 artifact. Do not merge Atlas/ESMFold structures with SCC ColabFold fold-check
 structures, and do not route Atlas rows through fold validation or candidate
 acceptance until a later policy explicitly says how that evidence is used.
 
-Synthetic ProteinMPNN sequences should use Biohub ESMC/logits when rich
+Synthetic ProteinMPNN sequences should use Biohub ESMC/logits when
 query-time SAE activations are needed. The implemented path is:
 
 ```text
@@ -359,7 +359,7 @@ The current run uses `esmc-6b-2024-12` with
 `normalize_features=true`. It materialized WT plus all 96 fold-report
 candidate rows accepted by the validator. All 97 selected sequences returned sparse query-time
 SAE outputs with 64 active features per residue.
-Store these rows as semantic annotation only.
+Store these rows as model annotation only.
 Do not use them as a hidden processivity score or as a replacement for
 ColabFold/AlphaFold-family structural checks.
 

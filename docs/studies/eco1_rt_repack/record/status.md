@@ -189,7 +189,7 @@ handled separately.
   reference into a browser-native 3D view. The panel-selection browser uses the
   expanded fold-check structure set and shows WT plus the six selected variants
   with fold metrics, mutation counts, MSA support, and near retained DNA/RNA or
-  thumb-track chemistry fields. The structure dashboard also exposes protein sequence fields
+  thumb-track chemistry fields. The structure side summary also exposes protein sequence fields
   for each selected candidate when the structure-browser manifest is regenerated
   from the current materializer. Query coordinates are aligned to the reference in memory
   over mapped C-alpha atoms, and local raw ColabFold PDB files are unchanged.
@@ -216,15 +216,15 @@ handled separately.
   `structure_predictions/structure_prediction_registry.parquet`. A bounded
   `--allow-fold-on-miss --prediction-set-id atlas_esmfold_on_miss_all97_20260626`
   run selected WT plus all 96 candidates and allowed 5 new requests. WT was
-  accepted with rich sparse Atlas data and one Atlas/ESMFold-derived structure
+  accepted with sparse Atlas data and one Atlas/ESMFold-derived structure
   registry row. The first four synthetic ProteinMPNN candidates still returned
   explicit Atlas HTTP 404 rows, and the remaining 92 candidates are marked
   `atlas_request_not_attempted_due_to_max_new_requests`. The sparse tables
   therefore still contain only the WT-derived 2,095 protein-level nonzero
   activations, 20,480 per-residue activations, and 100 feature-catalog rows.
-  This is model-derived semantic context only. The no-auth Atlas hash-lookup
-  path has not produced rich query-level SAE rows for synthetic candidates; use
-  the sequence-similarity endpoint as a separate semantic-neighborhood artifact
+  This is model-derived feature context only. The no-auth Atlas hash-lookup
+  path has not produced candidate-level SAE rows for synthetic candidates; use
+  the sequence-similarity endpoint as a separate model-neighborhood artifact
   if synthetic-candidate Atlas context is needed without the authenticated
   Biohub ESMC/logits API.
 - A Biohub ESMC/logits SAE profile is materialized separately through
@@ -243,7 +243,7 @@ handled separately.
   observed feature-catalog rows. The request manifest stores the key label and
   redacted authorization only; it does not store the Biohub token. It now also
   records non-secret method references for the Biohub ESMC SAE feature
-  interpretation notebook and the Biohub logits API. This is rich
+  interpretation notebook and the Biohub logits API. This is
   query-time SAE context for synthetic sequences, not fold validation,
   processivity evidence, or an acceptance gate.
   The sparse residue-feature tables are residue-only after BOS/EOS trimming:
@@ -256,15 +256,15 @@ handled separately.
 - The expanded design-class Biohub ESMC/logits SAE profile is also materialized
   under `design_classes/`. It covers WT plus all 576 nonredundant synthetic
   candidates with 577 accepted profiles, 1,216,696 protein-feature rows, and
-  11,816,960 residue-feature rows. This supports windowed semantic review and
+  11,816,960 residue-feature rows. This supports windowed model review and
   candidate triage; it is not a hard acceptance gate.
 - The three-window SAE summary is materialized under
   `design_classes/biohub_esmc/sae_feature_window_summary.parquet`. It has 1,731
   rows: 577 sequences across the 23-position catalytic-palm control,
   120-position nucleic-acid contact surface, and 107-position mutable
   substrate-proximal annulus/basic-surface windows. It reports WT-delta
-  activation summaries, top signed feature deltas, and window-space redundancy;
-  it is local semantic review evidence, not a selection gate.
+  activation summaries, signed feature deltas, and window-space redundancy;
+  it is local model review evidence, not a selection gate.
 - A WT-only Biohub ESMC masked-marginal mutation-scoring materializer is
   implemented at
   `operations/materialization/biohub_esmc_wt_mutation_scoring/`. It uses the
@@ -399,8 +399,8 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
 - Atlas hash-lookup/on-demand coverage has been probed for the baseline all-97 request.
   WT is accepted; the first synthetic candidate requests still return explicit
   404 rows even with `fold_on_miss=true`, and the remaining synthetic rows are
-  intentionally unattempted. Atlas remains optional post-fold semantic context
-  and review context, not a candidate acceptance gate.
+  intentionally unattempted. Atlas remains optional post-fold model-feature
+  review context, not a candidate acceptance gate.
 - RT-only `candidate_handoff.yaml` is not materialized.
 - Downstream RT-lnRNA acceptance or rejection is not materialized.
 - The review-deliverables marimo notebook includes the expanded panel-selection

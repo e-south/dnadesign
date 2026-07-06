@@ -148,13 +148,13 @@ def write_biohub_esmc_sequence_preference_deliverables(
             path=lane_manifest_path,
             source_tables=source_tables,
             input_hashes=input_hashes | file_hashes({"variant_llr_scores": table_path, "preference_plot": plot_path}),
-            alt_text="YAML method record for the Biohub ESMC candidate-preference table and plot.",
+            alt_text="Method record for Biohub ESMC WT-context candidate scoring.",
             description=(
                 "Records the source WT ESMC masked-marginal run, derived scoring method, model/API "
-                "metadata, request counts, and interpretation limits for the candidate-preference table and plot."
+                "metadata, request counts, and interpretation limits for WT-context candidate scoring."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="The ESMC candidate-preference method records the WT-context scoring inputs",
+            title="ESMC WT-context scoring inputs are recorded",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="operator_review",
@@ -453,7 +453,7 @@ def _missing_row(
             "biohub_esmc/mutation_scoring/wt_mutation_scoring_manifest.yaml",
         ],
         input_hashes=file_hashes({f"input_{index}": path for index, path in enumerate(missing)}),
-        alt_text="Biohub ESMC candidate-preference plot was skipped because required inputs were missing.",
+        alt_text="Biohub ESMC LLR review plot is unavailable because required inputs are missing.",
         description="The plot requires candidate mutations and the WT ESMC masked-marginal substitution table.",
         interpretation_limit=INTERPRETATION_LIMIT,
         title=title,

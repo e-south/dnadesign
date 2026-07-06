@@ -187,7 +187,7 @@ def _write_atlas_subset_manifest(
         "atlas_policy": {
             "candidate_acceptance_gate": False,
             "default_fold_on_miss": False,
-            "allowed_use": "semantic audit and assay-panel stratification only",
+            "allowed_use": "model audit and assay-panel review only",
             "forbidden_use": "processivity, strand-displacement, or hairpin-readthrough acceptance",
         },
     }

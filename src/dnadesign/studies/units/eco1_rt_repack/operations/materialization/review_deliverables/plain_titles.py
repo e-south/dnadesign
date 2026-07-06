@@ -45,16 +45,15 @@ PLAIN_DELIVERABLE_TITLES = {
     "wt_esmc_fraction_negative_alternate_llr": "ESMC disfavors different alternates by residue",
     "wt_esmc_substitution_llr_heatmap": "ESMC scores WT-context substitutions",
     "msa_plurality_vs_esmc_entropy": "Clade 9 plurality tracks lower ESMC entropy",
-    "msa_plurality_vs_best_alt_llr": "Best alternate LLR marks MSA-model disagreement",
+    "msa_plurality_vs_best_alt_llr": "Highest alternate LLR marks MSA-model disagreement",
     "msa_esmc_constraint_tracks": "MSA and ESMC signals align with mask classes",
-    "biohub_esmc_protein_top_sae_features": "Top SAE features are ranked by activation",
+    "biohub_esmc_protein_top_sae_features": "Strongest SAE features are ordered by activation",
     "biohub_esmc_wt_top_sae_feature_activation_pattern": "WT-active SAE features localize by residue",
     "biohub_esmc_sae_feature_activation_heatmap": "Selected SAE features activate across RT variants",
     "biohub_esmc_sae_structure_browser_manifest": "SAE activation regions can be inspected on structure",
     "selection_funnel_summary": "Panel selection keeps activity claims separate",
     "selection_panel_table": "Six Eco1 RT variants form a protein review panel",
     "selection_handoff_sequences": "Selected protein sequences keep handoff scope explicit",
-    "selection_handoff_readiness": "RT-only handoff still needs candidate_handoff.yaml",
     **SELECTION_PLOT_PLAIN_TITLES,
 }
 

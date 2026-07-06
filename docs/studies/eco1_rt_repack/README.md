@@ -154,7 +154,7 @@ owns generic ColabFold output normalization, and
 activation normalization. `dnadesign.thread.adapters.biohub_esmc` owns
 authenticated Biohub ESMC `/api/v1/encode` -> `/api/v1/logits` query-time SAE
 normalization for synthetic sequences that are not present in Atlas. These
-Biohub ESMC rows are semantic annotation only; they are not fold validation,
+Biohub ESMC rows are model annotation only; they are not fold validation,
 processivity evidence, or candidate acceptance. Whole-protein ESMC
 pseudo-likelihood is deferred and is not required for the v1 six-variant panel.
 `dnadesign.thread.structure_predictions` owns the generic registry for

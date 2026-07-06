@@ -135,7 +135,7 @@ def write_sae_structure_browser_manifest(
         "structure_count": len(activation_rows),
         "interpretation_limit": (
             "This browser maps Biohub ESMC SAE activation regions onto available structures. It supports "
-            "semantic review, not activity, processivity, strand-displacement, or acceptance claims."
+            "model review context, not activity, processivity, strand-displacement, or acceptance claims."
         ),
     }
     manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -161,7 +161,7 @@ def write_sae_structure_browser_manifest(
         ),
         alt_text="Interactive structure browser for Biohub ESMC SAE feature activation regions.",
         description=(
-            "Maps the highest peak-ranked per-protein SAE activation regions onto the Ec86 reference or fitted "
+            "Maps the highest per-protein SAE activation regions onto the Ec86 reference or fitted "
             "ProteinMPNN candidate structures. The viewer keeps activation highlights separate from "
             "fold-quality and activity interpretation."
         ),
@@ -196,7 +196,7 @@ def _missing_sae_structure_row(
             "foldcheck_review/foldcheck_full_structure_set.yaml",
         ],
         input_hashes=file_hashes({f"input_{index}": path for index, path in enumerate(missing)}),
-        alt_text="Interactive SAE activation structure browser was not generated.",
+        alt_text="SAE activation structure browsing is unavailable because required inputs are missing.",
         description="SAE activation structure browsing is skipped until feature rows and local structures exist.",
         interpretation_limit="Missing structure or activation inputs cannot support SAE structure review.",
         title="Biohub ESMC SAE activation structure browser is skipped until inputs are available",
@@ -343,7 +343,7 @@ def _sae_structure_label(row: dict[str, Any]) -> str:
     prefix = "WT Ec86" if candidate_id == "wild_type" else display_label(candidate_id, {})
     feature_index = int(row["feature_index"])
     rank = row.get("rank_by_max_activation") or "-"
-    return f"{prefix} F{feature_index} | peak rank {rank}"
+    return f"{prefix} F{feature_index} | peak order {rank}"
 
 
 def _sae_structure_description(row: dict[str, Any]) -> str:

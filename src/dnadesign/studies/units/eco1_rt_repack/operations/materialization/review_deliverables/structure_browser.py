@@ -229,7 +229,7 @@ def write_selected_panel_structure_browser_manifest(
         ),
         description=(
             "Lists WT and the six selected design-class representatives from the expanded fold-check structure set. "
-            "The dashboard shows fold metrics, mutation count, MSA support, chemistry near retained DNA/RNA or "
+            "The side summary shows fold metrics, mutation count, MSA support, chemistry near retained DNA/RNA or "
             "thumb-track, and "
             "selection context beside the py3Dmol viewer."
         ),
@@ -259,7 +259,7 @@ def _missing_row(
         path=manifest_path,
         source_tables=[f"{source_table_prefix}/foldcheck_full_structure_set.yaml"],
         input_hashes={},
-        alt_text="Interactive structure browser manifest was not generated.",
+        alt_text="Structure browsing is unavailable because the local fold structure set is missing.",
         description="Interactive structure browsing is skipped until the local fold structure set exists.",
         interpretation_limit="Missing structure paths cannot support interactive structure review.",
         title="Interactive structure browser is skipped until local PDBs are available",

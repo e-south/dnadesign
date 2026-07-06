@@ -232,7 +232,7 @@ def _write_plurality_best_alt_scatter(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "Best alternate LLR marks MSA-model disagreement"
+    title = "Highest alternate LLR marks MSA-model disagreement"
     fig, ax = plt.subplots(figsize=(6.9, 7.3))
     for label in _CLASS_COLORS:
         class_rows = [row for row in rows if _constraint_class(row) == label]
@@ -253,13 +253,13 @@ def _write_plurality_best_alt_scatter(
     ax.text(
         0.02,
         0.05,
-        "Best alternate equals WT at LLR = 0",
+        "Highest alternate equals WT at LLR = 0",
         transform=ax.transAxes,
         fontsize=TICK_SIZE,
         bbox=annotation_box,
     )
     ax.set_xlabel("Clade 9 WT plurality frequency", fontsize=LABEL_SIZE)
-    ax.set_ylabel("Best alternate ESMC LLR vs WT", fontsize=LABEL_SIZE)
+    ax.set_ylabel("Highest alternate ESMC LLR vs WT", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
     _style_scatter_axes(ax)
     _add_class_legend_below(fig, ax, ncol=3)
@@ -267,7 +267,7 @@ def _write_plurality_best_alt_scatter(
 
     path = panel_root / "msa_plurality_vs_best_alt_llr.svg"
     alt = (
-        "Scatter plot comparing clade 9 WT plurality frequency against the best ESMC alternate-residue "
+        "Scatter plot comparing clade 9 WT plurality frequency against the highest ESMC alternate-residue "
         f"LLR for {len(rows)} WT Ec86 positions."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
@@ -281,7 +281,7 @@ def _write_plurality_best_alt_scatter(
         input_hashes=file_hashes({"mask_join": mask_join_path}),
         alt_text=alt,
         description=(
-            "Highlights positions where natural plurality and the model's most favorable single alternate "
+            "Highlights positions where natural plurality and the model's highest-scoring single alternate "
             "tell different stories."
         ),
         interpretation_limit=INTERPRETATION_LIMIT,

@@ -34,8 +34,8 @@ from dnadesign.thread.structure_views import (
 from .notebook_structure_dashboard import (
     format_float,
     structure_browser_panel_html,
-    structure_dashboard_rows,
     structure_metric_rows,
+    structure_summary_rows,
 )
 from .structure_browser_common import (
     DNA_CLASS_COLOR,
@@ -296,7 +296,7 @@ def render_structure_browser(
         query_atom_content=query_atom_content,
         show_sidechains=show_sidechains,
     )
-    dashboard_rows = structure_dashboard_rows(
+    summary_rows = structure_summary_rows(
         selected_row,
         selected_highlight_row=selected_highlight_row,
         alignment_status=alignment_status,
@@ -334,7 +334,7 @@ def render_structure_browser(
                 gap=1.0,
                 widths="equal",
             ),
-            mo.Html(structure_browser_panel_html(html_panel, dashboard_rows, selected_row)),
+            mo.Html(structure_browser_panel_html(html_panel, summary_rows, selected_row)),
             mo.accordion(
                 {"Selected structure evidence": mo.ui.table(metric_rows, page_size=8)},
                 multiple=False,
@@ -461,12 +461,12 @@ def _structure_highlight_label(row: dict[str, Any]) -> str:
     feature_index = int(row["feature_index"])
     rank_text = ""
     display_label = str(row.get("display_label") or "")
-    if "peak rank " in display_label:
-        rank_text = display_label.split("peak rank ", 1)[1].split("|", 1)[0].strip()
+    if "peak order " in display_label:
+        rank_text = display_label.split("peak order ", 1)[1].split("|", 1)[0].strip()
     activation_max = format_float(row.get("activation_max"), decimals=3)
     suffix = f" | max {activation_max}" if activation_max else ""
     if rank_text:
-        return f"SAE F{feature_index} | peak rank {rank_text}{suffix}"
+        return f"SAE F{feature_index} | peak order {rank_text}{suffix}"
     return f"SAE F{feature_index}{suffix}"
 
 

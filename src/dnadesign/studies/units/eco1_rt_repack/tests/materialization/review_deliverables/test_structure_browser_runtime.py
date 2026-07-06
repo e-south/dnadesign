@@ -164,11 +164,11 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
     )
     rendered_text = str(rendered)
 
-    assert "Variant dashboard" in rendered_text
+    assert "Variant summary" in rendered_text
     assert "eco1-protein-sequence-panel" in rendered_text
     assert "Protein sequence" in rendered_text
     assert "MKSAGG" in rendered_text
-    assert "Selection slot" in rendered_text
+    assert "Design class" in rendered_text
     assert "clade9_p25_contact5a" in rendered_text
     assert "MSA observed fraction" in rendered_text
     assert "Near DNA/RNA or thumb charge change" in rendered_text

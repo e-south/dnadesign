@@ -349,7 +349,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_structure_panel.yaml
     status: materialized_local_review
-    description: Local generated structure-review panel manifest. It records the ec86kit/7V9U reference, WT runtime model, best-folded candidates, high-RMSD outliers, low-pLDDT rows, intermediate rows, deterministic controls, exact SCC source paths, and local staged PDB paths.
+    description: Local generated structure-review panel manifest. It records the ec86kit/7V9U reference, WT runtime model, fold-preserved examples, high-RMSD outliers, low-pLDDT rows, intermediate rows, deterministic controls, exact SCC source paths, and local staged PDB paths.
   - id: eco1_rt_foldcheck_full_structure_set
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -391,7 +391,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/atlas_subset_manifest.yaml
     status: materialized_local_review
-    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later semantic annotation. Atlas remains post-fold semantic context, not a candidate acceptance gate.
+    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later model annotation. Atlas remains post-fold model-feature context, not a candidate acceptance gate.
   - id: eco1_rt_atlas_semantic_profile
     owner: thread
     kind: generated_artifact
@@ -436,7 +436,7 @@ datasets:
     description: >-
       Authenticated Biohub ESMC/logits query-time SAE profile for WT plus all
       96 fold-report candidate rows accepted by the validator. The
-      materialization accepted all 97 query rows. This is a semantic annotation artifact, not fold
+      materialization accepted all 97 query rows. This is a model annotation artifact, not fold
       validation or candidate acceptance.
   - id: eco1_rt_biohub_esmc_protein_features
     owner: thread
@@ -483,7 +483,7 @@ datasets:
       `protein_top_sae_features.parquet`, a compact per-protein table ranked by
       peak activation and prevalence. Feature names and descriptions come from
       the exact 6B layer-60 16k feature-description source when available.
-      These visuals are semantic review aids, not fold validation, processivity
+      These visuals are model review aids, not fold validation, processivity
       evidence, or candidate acceptance gates.
   - id: eco1_rt_biohub_esmc_wt_position_entropy
     owner: eco1_rt_repack
@@ -596,7 +596,7 @@ datasets:
       Model-compatible summary of sparse Biohub ESMC SAE activations over three
       declared Eco1 windows: catalytic-palm negative control, thumb/palm
       nucleic-acid-binding surface, and mutable substrate-proximal
-      annulus/basic-surface region. This is local semantic review evidence, not
+      annulus/basic-surface region. This is local model review evidence, not
       a processivity score and not a candidate acceptance gate.
   - id: eco1_rt_review_deliverable_manifest
     owner: eco1_rt_repack
@@ -785,7 +785,7 @@ datasets:
       marimo notebook. The notebook renders one WT-active feature at a time
       with WT plus candidate variants as rows, Ec86 canonical residue positions
       as columns, WT residue letters on the top axis, and per-residue SAE
-      activation as color. It is semantic review context, not a processivity
+      activation as color. It is model review context, not a processivity
       ranking or candidate acceptance gate.
   - id: eco1_rt_feasibility_report
     owner: eco1_rt_repack

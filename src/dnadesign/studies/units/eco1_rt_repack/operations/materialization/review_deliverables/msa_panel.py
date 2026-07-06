@@ -303,7 +303,7 @@ def write_msa_plurality_mask_panel(
     alt = (
         f"Canonical-coordinate MSA panel for all {len(selected_records)} accepted alignment rows from the "
         f"{len(records)}-record {panel_profile.profile_id} alignment. The first row is {target_id}; "
-        "the remaining rows use source-manifest labels with clade row or node identifiers and provider "
+        "the remaining rows use source record labels with clade row or node identifiers and provider "
         f"accessions. Vertical markings show columns passing the 25 percent WT-plurality rule in the "
         f"{panel_profile.scope_label} profile, the 50 percent design-class threshold cue, and current "
         "protected mask positions. Display-only background bands mark audited RT context spans, RT intervals, "
@@ -367,13 +367,13 @@ def _panel_title(*, panel_profile: MsaPanelProfile) -> str:
 def _panel_description(panel_profile: MsaPanelProfile) -> str:
     if panel_profile.current_mask_denominator:
         return (
-            "Shows the Eco1/Ec86 anchor row against all accepted clade 9 alignment rows with source-manifest "
+            "Shows the Eco1/Ec86 anchor row against all accepted clade 9 alignment rows with source record "
             "row labels. The current conservation mask uses this clade 9 denominator; subtype rows are marked "
             "when they are present in the clade 9 source set."
         )
     return (
         "Shows the Eco1/Ec86 anchor row against all accepted II-A3/42_1 subtype alignment rows with "
-        "source-manifest row labels. This is an independent subtype-context plot; it does not replace the "
+        "source record row labels. This is an independent subtype-context plot; it does not replace the "
         "clade 9 denominator used by the current mask policy."
     )
 

@@ -47,11 +47,11 @@ SOURCE_NOTEBOOK = (
     "esmc_sae_feature_interpretation.ipynb"
 )
 INTERPRETATION_LIMIT = (
-    "These are exact-dictionary Biohub ESMC SAE activations. They support semantic review, "
+    "These are exact-dictionary Biohub ESMC SAE activations. They support model review context, "
     "not activity, processivity, strand-displacement, or candidate acceptance claims."
 )
 METHOD_SUMMARY = (
-    "Rank top SAE features from Biohub ESMC sparse activations by peak activation and by the Biohub "
+    "Order the strongest SAE features from Biohub ESMC sparse activations by peak activation and by the Biohub "
     "tutorial's activation-thresholded prevalence, inspect where those features activate over WT residues, "
     "and render one selected feature at a time across WT plus candidate sequences in the marimo notebook. "
     "Feature names remain blank unless a source-backed interpretation exists for the exact SAE model, "
@@ -79,7 +79,7 @@ def missing_row(panel_root: Path, missing: list[Path], *, reason: str | None = N
         alt_text="Biohub ESMC SAE feature-review visuals were skipped because sparse SAE inputs were missing.",
         description="The SAE feature-review section requires profile, protein-feature, and residue-feature tables.",
         interpretation_limit=INTERPRETATION_LIMIT,
-        title="Biohub ESMC SAE features support semantic review without acting as gates",
+        title="Biohub ESMC SAE features provide model context without acting as gates",
         method_summary=METHOD_SUMMARY,
         evidence_summary={"source_notebook": SOURCE_NOTEBOOK},
         role="review_only",

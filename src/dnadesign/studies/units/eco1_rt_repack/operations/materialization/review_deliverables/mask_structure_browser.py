@@ -157,7 +157,7 @@ def _missing_mask_row(manifest_path: Path, missing_path: Path) -> dict[str, Any]
         path=manifest_path,
         source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
         input_hashes={},
-        alt_text="Interactive mask structure browser was not generated.",
+        alt_text="Mask structure browsing is unavailable because the reference backbone PDB is missing.",
         description="Interactive mask highlighting is skipped until the reference backbone PDB exists.",
         interpretation_limit="Missing structure paths cannot support interactive mask review.",
         title="The Ec86 mask browser waits for the reference backbone PDB",

@@ -57,7 +57,7 @@ Evo2, computational stability prediction, whole-protein ESMC
 pseudo-likelihood, and global SAE clustering unless a later v1.1/v2 task opens
 one of those lanes explicitly. For the first panel, stability is handled by
 fold plausibility, build feasibility, and later empirical expression or
-thermal-screen data when those data exist. Biohub ESMC/SAE data remain semantic
+thermal-screen data when those data exist. Biohub ESMC/SAE data remain model
 review evidence. They are not fold validation, processivity evidence, or
 candidate acceptance gates. A biochemical assay remains the only evidence for
 processivity, strand displacement, or hairpin readthrough.
@@ -214,8 +214,8 @@ Biohub ESMC/SAE:
 > Biohub ESMC/logits was used to collect query-time SAE activations for WT plus
 > the fold-accepted candidate sequences. Baseline coverage is WT plus 96
 > candidates; the expanded design-class coverage is WT plus 576 candidates.
-> These rows are model-derived semantic annotation. They can support review and
-> assay-panel stratification, but they cannot by themselves establish
+> These rows are model-derived feature context. They can support review and
+> assay-panel planning, but they cannot by themselves establish
 > processivity, strand displacement, or structured-template readthrough.
 
 Biohub ESMC masked-marginal mutation scoring:
@@ -246,7 +246,7 @@ Biohub ESMC candidate preference:
 > table and plot. For each ProteinMPNN candidate, it sums the already
 > materialized WT-context single-substitution LLR values over that candidate's
 > canonical mutations and also reports the per-mutation mean. This is useful for
-> ranking whether the proposed substitutions are more or less model-preferred
+> checking whether the proposed substitutions are more or less model-preferred
 > than the WT residue at the same positions under the WT masked context. It is
 > not a joint protein likelihood, not leave-one-out whole-protein
 > pseudo-likelihood, and not an activity measurement.
@@ -264,7 +264,7 @@ Stability/developability boundary:
 ESM Atlas:
 
 > ESM Atlas lookup/on-demand probing remains separate from Biohub ESMC/logits.
-> In the current all-97 probe, WT returned rich Atlas rows while synthetic
+> In the current all-97 probe, WT returned Atlas rows while synthetic
 > ProteinMPNN candidates returned explicit hash-lookup failures or were left
 > unattempted by the request cap. Do not treat the Atlas hash-lookup path as
 > synthetic-candidate SAE coverage.
@@ -725,7 +725,7 @@ persisted figure, frame, or notebook input must record:
 - interpretation limit;
 - whether the panel is manuscript-facing, review-only, or optional/heavy.
 
-Current foundation status: `review-deliverable-foundation-v1` is materialized.
+Current review-bundle status: `review-deliverable-foundation-v1` is materialized.
 It writes the visual manifest, canonical-coordinate MSA plurality/mask SVG,
 linear mask-track SVG, ChimeraX mask-context script/render, baseline
 ProteinMPNN audit SVGs, and a
@@ -882,8 +882,8 @@ colabfold_structure_review/
 
 Main outputs:
 
-- `structure_panel_best_worst.png`
-- `structure_panel_best_worst_manifest.yaml`
+- `structure_panel_fold_review_examples.png`
+- `structure_panel_fold_review_examples_manifest.yaml`
 - optional `structure_contact_sheet_all97.png`
 - optional `structure_contact_sheet_all97_manifest.yaml`
 
@@ -896,7 +896,7 @@ visually inspectable without loading every model manually.
 
 Rendering contract:
 
-- Always render a small panel first: WT, top preserved candidates, high-RMSD
+- Always render a small panel first: WT, fold-preserved examples, high-RMSD
   outliers, low-pLDDT rows, and one or more deterministic controls.
 - Render the all-97 contact sheet only as an optional/heavy artifact.
 - Cache per-structure thumbnails by structure hash and view preset so reruns do
@@ -992,7 +992,7 @@ Rendering contract:
 - Do not show all feature indices.
 - Values should be WT-normalized activation ratios or z-scores, with missing
   values explicit.
-- Use this heatmap as semantic review context after fold review, not as a hidden
+- Use this heatmap as model review context after fold review, not as a hidden
   candidate selector.
 
 Interpretation limit:
@@ -1278,7 +1278,7 @@ Those claims require downstream experimental evidence.
   substrate-contact context.
 - ColabFold supplies the `colabfold_batch` structural-fidelity path used on
   BU SCC. LocalColabFold supplies the install/environment path for that CLI.
-- Candido et al., Biohub ESMC, and ESM Atlas supply model-derived semantic
+- Candido et al., Biohub ESMC, and ESM Atlas supply model-derived feature
   representation context. They do not supply biochemical processivity evidence.
 - The Biohub ESMC mutation-scoring notebook supplies the masked-marginal
   sequence-logit pattern: mask one residue, compute per-position entropy, and

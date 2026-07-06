@@ -514,16 +514,16 @@ accepted fold row for ChimeraX and direct structure review.
 
 The current review classes are `strong_fold_preserved: 17`,
 `good_fold_preserved: 53`, `low_confidence: 9`, `review_band: 14`, and
-`structural_outlier: 3`. The structure-panel manifest selects WT, best-folded
-candidates, high-RMSD outliers, low-pLDDT rows, intermediate rows, and
+`structural_outlier: 3`. The structure-panel manifest selects WT, fold-preserved
+examples, high-RMSD outliers, low-pLDDT rows, intermediate rows, and
 deterministic controls. The Atlas subset manifest records a contrastive panel
-for later semantic annotation; it is not a candidate acceptance gate.
+for later model annotation; it is not a candidate acceptance gate.
 
 ### Next Slice: SAE Window Summary, Feasibility, Selection, And RT-Only Handoff v1
 
 Inspect the selected and full ChimeraX review scripts before candidate
 selection. The Atlas hash-lookup/on-demand probe selected WT plus all 96
-candidates and allowed five new requests. WT was accepted with rich sparse Atlas
+candidates and allowed five new requests. WT was accepted with sparse Atlas
 data and one Atlas/ESMFold-derived structure registry row; the first four
 synthetic candidates still returned explicit 404 rows, and the remaining 92
 synthetic candidates were left unattempted. Do not continue retrying that hash
@@ -645,7 +645,7 @@ plain claim is:
 ```text
 ProteinMPNN = fold-compatible sequence proposal
 ColabFold = structural fidelity gate
-Biohub ESMC/SAE = query-time semantic annotation
+Biohub ESMC/SAE = query-time model annotation
 ESM Atlas = public-protein neighborhood context where available
 Assay = functional truth
 ```
@@ -663,8 +663,8 @@ hypothesis panel around polymerase mechanics, not a measured processivity score:
 Do not rank candidates by a hidden composite "processivity" score. Use Atlas
 features to stratify a small experimental panel after fold acceptance:
 
-- semantic-retained candidates;
-- semantic-shifted candidates;
+- model-feature-retained candidates;
+- model-feature-shifted candidates;
 - thumb-retained / fingers-shifted candidates;
 - primer-grip-shifted candidates;
 - random fold-report-accepted controls.

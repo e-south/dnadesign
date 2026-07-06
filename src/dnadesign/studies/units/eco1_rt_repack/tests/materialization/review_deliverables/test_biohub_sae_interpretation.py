@@ -53,7 +53,7 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
         "thread_candidate_beta",
     }
     assert {row["selection_reason"] for row in top_feature_rows}
-    assert top_features["title"] == "Top SAE features are ranked by activation"
+    assert top_features["title"] == "Strongest SAE features are ordered by activation"
     assert (
         top_features["evidence_summary"]["prevalence_activation_threshold"]
         == biohub_esmc_sae_tables.FEATURE_PREVALENCE_THRESHOLD

@@ -275,7 +275,7 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 ```
 
 Use `--sequence-limit all --resume-existing` only after deciding to spend the
-remaining hosted requests. These rows are semantic annotation, not fold
+remaining hosted requests. These rows are model annotation, not fold
 validation or processivity evidence.
 
 `biohub_esmc_wt_mutation_scoring` is a WT-only masked-marginal model check.
