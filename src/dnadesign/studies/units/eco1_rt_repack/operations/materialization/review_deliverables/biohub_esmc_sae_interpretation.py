@@ -32,7 +32,6 @@ from .biohub_esmc_sae_tables import (
     make_protein_top_feature_table_row,
     write_protein_top_feature_table,
 )
-from .biohub_esmc_sae_umap import write_sae_delta_umap_panel
 
 _SOURCE_TABLES = SOURCE_TABLES
 
@@ -47,7 +46,6 @@ def write_biohub_esmc_sae_interpretation_panels(
     feature_catalog_path: Path,
     request_manifest_path: Path,
     foldcheck_ranking_path: Path,
-    candidate_preference_table_path: Path,
     mask_residues: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Render lightweight SAE interpretation panels from existing sparse Biohub rows."""
@@ -104,13 +102,6 @@ def write_biohub_esmc_sae_interpretation_panels(
             request_manifest_path=request_manifest_path,
             feature_rows=feature_rows,
             sae_provenance_audit=provenance_audit,
-        ),
-        write_sae_delta_umap_panel(
-            panel_root=panel_root,
-            profile_path=profile_path,
-            protein_features_path=protein_features_path,
-            request_manifest_path=request_manifest_path,
-            candidate_preference_table_path=candidate_preference_table_path,
         ),
         write_feature_heatmap_manifest(
             heatmap_root=heatmap_root,

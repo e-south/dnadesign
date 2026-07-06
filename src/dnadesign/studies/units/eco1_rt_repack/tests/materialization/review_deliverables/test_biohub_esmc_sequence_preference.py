@@ -19,11 +19,10 @@ import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    biohub_esmc_sae_umap,
-    materialize_review_deliverables,
+    biohub_esmc_sequence_preference as sequence_preference,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    biohub_esmc_sequence_preference as sequence_preference,
+    materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.esmc_fixtures import (
     write_wt_mutation_scoring_outputs,
@@ -31,16 +30,6 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
 )
-
-
-@pytest.fixture(autouse=True)
-def _fast_sae_embedding_for_sequence_preference_tests(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep these ESMC tests focused; SAE-specific tests cover real UMAP embedding."""
-
-    def _linear_embedding_for_test(matrix):
-        return biohub_esmc_sae_umap._linear_embedding(matrix), "linear_test_embedding"
-
-    monkeypatch.setattr(biohub_esmc_sae_umap, "_embed_delta_matrix", _linear_embedding_for_test)
 
 
 def test_biohub_esmc_sequence_preference_deliverables_are_rendered(tmp_path: Path) -> None:

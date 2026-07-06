@@ -130,11 +130,6 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
-    population_plot = next(
-        plot for plot in manifest["plots"] if plot["plot_id"] == "selection_population_stratification"
-    )
-    assert "full candidate population" in population_plot["alt_text"]
-    assert "six selected" in population_plot["description"]
     for plot in manifest["plots"]:
         plot_path = result.manifest_path.parent / plot["path"]
         assert plot_path.exists()

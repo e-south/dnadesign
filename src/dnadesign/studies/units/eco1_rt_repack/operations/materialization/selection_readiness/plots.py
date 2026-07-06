@@ -38,7 +38,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 from ..review_deliverables.rt_annotation_context import RTAnnotationContext
 from .chemistry_balance import write_na_facing_chemistry_balance_plot
-from .population_stratification import write_population_stratification_plot
 from .regional_plots import (
     write_regional_mutation_burden_plot,
     write_selected_substitutions_across_rt_plot,
@@ -79,7 +78,6 @@ def write_selection_readiness_plots(
     _remove_retired_selection_plots(plot_root)
     return [
         _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
-        write_population_stratification_plot(plot_root, triage_rows, panel_rows, input_hashes),
         _write_class_local_percentiles(plot_root, triage_rows, panel_rows, input_hashes),
         _write_selected_sequence_distance(
             plot_root,

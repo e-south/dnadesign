@@ -1014,7 +1014,6 @@ Main outputs:
 - `candidate_selection_panel.parquet`
 - `candidate_handoff_sequences.csv`
 - `plots/selection_design_class_gate_counts.svg`
-- `plots/selection_population_stratification.svg`
 - `plots/selection_class_local_percentiles.svg`
 - `plots/selection_six_sequence_distance.svg`
 - `plots/selection_selected_substitutions_across_rt.svg`
@@ -1025,9 +1024,9 @@ Purpose:
 
 ```text
 Show which candidates pass feasibility and fold gates, then explain the six
-class-balanced panel rows in full-population context with MSA support, mutation
-geography, local chemistry, sequence nonredundancy, and flat protein-sequence
-export.
+class-balanced panel rows with within-class percentiles, sequence distance,
+regional substitutions, mutation burden, local chemistry, and flat
+protein-sequence export.
 ```
 
 Inputs:

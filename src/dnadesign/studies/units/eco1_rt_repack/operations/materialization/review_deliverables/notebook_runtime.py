@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
-import html
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +56,6 @@ _SECTION_DELIVERABLE_ORDER = {
         "selection_panel_table",
         "selection_handoff_sequences",
         "selection_handoff_readiness",
-        "selection_handoff_boundary",
     )
 }
 
@@ -212,8 +210,6 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
         return _render_residue_frequency_bundle(row, mo=mo, manifest_root=manifest_root)
     if artifact_kind == "handoff_readiness":
         return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
-    if artifact_kind == "handoff_boundary":
-        return _render_handoff_boundary(row, mo=mo)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return render_image(row, mo=mo, media_path=media_path)
     artifact_path = str(row.get("path") or "")
@@ -295,7 +291,6 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
         "selection_panel_table",
         "candidate_handoff_sequence_csv",
         "handoff_readiness",
-        "handoff_boundary",
     }:
         return False
     if str(row.get("artifact_kind") or "") == "sae_feature_heatmap_manifest":
@@ -349,18 +344,4 @@ def _render_residue_frequency_bundle(row: dict[str, Any], *, mo: Any, manifest_r
     return mo.vstack(
         [design_class_ui, render_image(selected_row, mo=mo, media_path=selected_path)],
         gap=0.25,
-    )
-
-
-def _render_handoff_boundary(row: dict[str, Any], *, mo: Any) -> Any:
-    title = html.escape(str(row.get("title") or "Panel status"))
-    description = html.escape(str(row.get("description") or ""))
-    return mo.Html(
-        f"""
-        <section style="border:1px solid #d8dee4; border-radius:6px; padding:0.8rem 0.9rem;
-                        background:#ffffff;">
-          <h3 style="margin:0 0 0.35rem 0; font-size:1.06rem;">{title}</h3>
-          <p style="margin:0; line-height:1.45; color:#57606a;">{description}</p>
-        </section>
-        """
     )

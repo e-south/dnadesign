@@ -327,7 +327,6 @@ def materialize_review_deliverables(
             feature_catalog_path=out_root / BIOHUB_ESMC_FEATURE_CATALOG_FILE_NAME,
             request_manifest_path=out_root / BIOHUB_ESMC_REQUEST_MANIFEST_FILE_NAME,
             foldcheck_ranking_path=out_root / FOLDCHECK_REVIEW_RANKING_RELATIVE_PATH,
-            candidate_preference_table_path=candidate_preference_table_path,
             mask_residues=mask_residues,
         )
     )

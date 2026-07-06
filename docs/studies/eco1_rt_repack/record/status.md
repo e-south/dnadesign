@@ -360,17 +360,15 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    review-band rows marked as manual reserve only. The regenerated table now
    adds MSA support, mutation geography near retained DNA/RNA or thumb-track,
    local chemistry, and source-artifact hashes for those review axes.
-4. Use the seven panel-selection SVGs under `selection/plots/` for notebook
+4. Use the six panel-selection SVGs under `selection/plots/` for notebook
    review: `selection_design_class_gate_counts`,
-   `selection_population_stratification`,
    `selection_class_local_percentiles`, `selection_six_sequence_distance`,
    `selection_selected_substitutions_across_rt`,
    `selection_regional_mutation_burden`, and
    `selection_na_facing_chemistry_balance`. They show gate counts by design
-   class, selected rows in the full candidate population, within-class review
-   percentiles, selected-row sequence distance, selected substitutions across
-   RT regions, regional mutation burden, and chemistry changes near retained
-   DNA/RNA or thumb-track positions.
+   class, within-class review percentiles, selected-row sequence distance,
+   selected substitutions across RT regions, regional mutation burden, and
+   chemistry changes near retained DNA/RNA or thumb-track positions.
 5. Use `candidate_selection_panel.parquet` and
    `candidate_handoff_sequences.csv` as the current six-row RT-only protein
    review surface. The panel selects one feasible, fold-preserved

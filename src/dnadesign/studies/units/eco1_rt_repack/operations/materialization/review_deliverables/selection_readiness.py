@@ -46,7 +46,6 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
     rows.append(_panel_table_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_handoff_sequence_csv_row(manifest_path=manifest_path, loaded=loaded))
     rows.append(_handoff_readiness_row(manifest_path=manifest_path, loaded=loaded))
-    rows.append(_handoff_boundary_row(manifest_path=manifest_path))
     for plot in loaded.get("plots", []):
         if not isinstance(plot, dict):
             raise ValueError(f"Expected panel-selection plot row mappings in {manifest_path}")
@@ -249,30 +248,6 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         role="manuscript_facing",
         render_mode="text",
         evidence_summary={str(key): value for key, value in readiness.items()},
-    )
-
-
-def _handoff_boundary_row(*, manifest_path: Path) -> dict[str, Any]:
-    return make_deliverable_row(
-        deliverable_id="selection_handoff_boundary",
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
-        artifact_kind="handoff_boundary",
-        status="linked_existing",
-        path=manifest_path,
-        source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
-        input_hashes=file_hashes({"selection_readiness_manifest": manifest_path}),
-        alt_text="Text note stating that the Eco1 panel is selected but RT-only handoff remains separate.",
-        description=(
-            "Six RT-only candidates are selected for review. Create no construct subject until the downstream "
-            "RT-lnRNA handoff record is accepted."
-        ),
-        interpretation_limit=(
-            "Panel selection is not construct creation and does not assert improved RT activity, strand "
-            "displacement, or structured-template readthrough."
-        ),
-        title="Panel selected; RT-only handoff remains separate",
-        role="manuscript_facing",
-        render_mode="text",
     )
 
 

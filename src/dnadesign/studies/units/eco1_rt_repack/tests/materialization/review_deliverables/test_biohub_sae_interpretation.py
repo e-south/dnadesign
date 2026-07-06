@@ -41,12 +41,10 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     activation_pattern = deliverables["biohub_esmc_wt_top_sae_feature_activation_pattern"]
     feature_heatmap = deliverables["biohub_esmc_sae_feature_activation_heatmap"]
     top_features = deliverables["biohub_esmc_protein_top_sae_features"]
-    sae_delta_umap = deliverables["biohub_esmc_sae_delta_umap"]
+    assert "biohub_esmc_sae_delta_umap" not in deliverables
     assert top_features["status"] == "materialized"
     assert activation_pattern["status"] == "rendered"
     assert feature_heatmap["status"] == "rendered"
-    assert sae_delta_umap["status"] == "rendered"
-    assert sae_delta_umap["artifact_kind"] == "svg"
     assert feature_heatmap["artifact_kind"] == "sae_feature_heatmap_manifest"
     top_feature_rows = pq.read_table(_resolve_manifest_path(result.manifest_path, top_features["path"])).to_pylist()
     assert {row["candidate_id"] for row in top_feature_rows} == {
@@ -95,20 +93,6 @@ def test_biohub_esmc_sae_interpretation_deliverables_are_rendered(tmp_path: Path
     assert heatmap_manifest["sae_provenance_audit"]["profile_row_count"] == 3
     assert "top tick labels are WT residue letters" in feature_heatmap["description"]
     assert "acceptance claims" in feature_heatmap["interpretation_limit"]
-
-    assert "biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet" in sae_delta_umap["source_tables"]
-    assert sae_delta_umap["evidence_summary"]["embedding_method_id"] == "umap_delta_activation_sum_cosine_v1"
-    assert sae_delta_umap["evidence_summary"]["embedding_backend"] == "linear_small_candidate_set"
-    assert sae_delta_umap["evidence_summary"]["candidate_count"] == 3
-    assert sae_delta_umap["evidence_summary"]["variant_llr_joined_candidate_count"] == 2
-    assert sae_delta_umap["evidence_summary"]["wt_control_llr_total"] == 0.0
-    assert "not evidence of discrete biological clusters" in sae_delta_umap["interpretation_limit"]
-    sae_delta_umap_text = _resolve_manifest_path(result.manifest_path, sae_delta_umap["path"]).read_text(
-        encoding="utf-8"
-    )
-    assert "SAE deltas keep variants near WT" in sae_delta_umap_text
-    assert "Linear projection 1" in sae_delta_umap_text
-    assert "WT control" in sae_delta_umap_text
 
     loaded_heatmap = notebook_sae_features.load_sae_feature_heatmap_manifest(
         manifest_root=result.manifest_path.parent,

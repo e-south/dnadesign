@@ -28,7 +28,6 @@ _ROOT_FILES = {
     "biohub_esmc_sae_interpretation.py",
     "biohub_esmc_sae_interpretation_shared.py",
     "biohub_esmc_sae_tables.py",
-    "biohub_esmc_sae_umap.py",
     "biohub_esmc_sequence_preference.py",
     "biohub_esmc_sequence_preference_model_agreement.py",
     "biohub_esmc_sequence_preference_plot.py",

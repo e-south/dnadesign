@@ -73,7 +73,6 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         "selection_panel_table",
         "selection_handoff_sequences",
         "selection_handoff_readiness",
-        "selection_handoff_boundary",
         "selected_panel_structure_browser_manifest",
     }
     expected_linked_model_check = {
@@ -130,8 +129,6 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
-    assert deliverables["selection_population_stratification"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
-    assert deliverables["selection_population_stratification"]["status"] == "linked_existing"
     assert deliverables["selection_class_local_percentiles"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_class_local_percentiles"]["status"] == "linked_existing"
     assert deliverables["selection_six_sequence_distance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
@@ -150,8 +147,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selection_handoff_sequences"]["status"] == "linked_existing"
     assert deliverables["selection_handoff_readiness"]["artifact_kind"] == "handoff_readiness"
     assert deliverables["selection_handoff_readiness"]["status"] == "linked_existing"
-    assert deliverables["selection_handoff_boundary"]["artifact_kind"] == "handoff_boundary"
-    assert deliverables["selection_handoff_boundary"]["status"] == "linked_existing"
+    assert "selection_handoff_boundary" not in deliverables
 
     assert_manifest_visual_contract(
         manifest_path=result.manifest_path,

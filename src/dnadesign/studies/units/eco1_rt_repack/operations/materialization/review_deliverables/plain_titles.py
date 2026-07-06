@@ -49,14 +49,12 @@ PLAIN_DELIVERABLE_TITLES = {
     "msa_esmc_constraint_tracks": "MSA and ESMC signals align with mask classes",
     "biohub_esmc_protein_top_sae_features": "Top SAE features are ranked by activation",
     "biohub_esmc_wt_top_sae_feature_activation_pattern": "WT-active SAE features localize by residue",
-    "biohub_esmc_sae_delta_umap": "SAE deltas keep variants near WT",
     "biohub_esmc_sae_feature_activation_heatmap": "Selected SAE features activate across RT variants",
     "biohub_esmc_sae_structure_browser_manifest": "SAE activation regions can be inspected on structure",
     "selection_funnel_summary": "Panel selection keeps activity claims separate",
     "selection_panel_table": "Six Eco1 RT variants form a protein review panel",
     "selection_handoff_sequences": "Selected protein sequences keep handoff scope explicit",
     "selection_handoff_readiness": "RT-only handoff still needs candidate_handoff.yaml",
-    "selection_handoff_boundary": "Panel selection and RT-only handoff stay separate",
     **SELECTION_PLOT_PLAIN_TITLES,
 }
 

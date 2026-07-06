@@ -117,15 +117,6 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 input_hash_tail="a",
             ),
             plot_row(
-                plot_id="selection_population_stratification",
-                title=plots["selection_population_stratification"],
-                path="plots/selection_population_stratification.svg",
-                alt_text="Fixture full candidate population stratification plot with selected rows highlighted.",
-                description="Shows the six selected candidates relative to the full candidate population.",
-                interpretation_limit="Population stratification is not an activity measurement.",
-                input_hash_tail="b",
-            ),
-            plot_row(
                 plot_id="selection_class_local_percentiles",
                 title=plots["selection_class_local_percentiles"],
                 path="plots/selection_class_local_percentiles.svg",

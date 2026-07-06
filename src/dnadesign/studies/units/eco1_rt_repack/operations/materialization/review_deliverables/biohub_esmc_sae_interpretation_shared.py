@@ -39,6 +39,7 @@ TOP_FEATURE_COUNT = 12
 RETIRED_OUTPUT_NAMES = (
     "candidate_top_sae_feature_activation_ratio.svg",
     "sae_fold_llr_comparison.svg",
+    "sae_delta_umap_vs_wt_llr.svg",
     "missing_sae_fold_llr_comparison.txt",
 )
 SOURCE_NOTEBOOK = (

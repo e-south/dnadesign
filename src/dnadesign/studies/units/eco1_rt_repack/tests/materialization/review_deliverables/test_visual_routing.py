@@ -74,4 +74,5 @@ def test_review_notebook_routes_only_visual_artifacts_to_figure_selectors(tmp_pa
     assert "proteinmpnn_score_mutation_burden" in audit_visual_ids
     assert "biohub_esmc_candidate_preference_vs_wt" in audit_visual_ids
     assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
+    assert "biohub_esmc_sae_delta_umap" not in audit_visual_ids
     assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids

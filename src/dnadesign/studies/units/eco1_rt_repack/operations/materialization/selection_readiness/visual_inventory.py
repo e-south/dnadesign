@@ -30,11 +30,6 @@ CURRENT_SELECTION_PLOTS = (
         plain_title="Each mask class contributes fold-preserved candidates",
     ),
     SelectionPlot(
-        plot_id="selection_population_stratification",
-        file_name="selection_population_stratification.svg",
-        plain_title="Selected candidates sit within the full design pool",
-    ),
-    SelectionPlot(
         plot_id="selection_class_local_percentiles",
         file_name="selection_class_local_percentiles.svg",
         plain_title="Each selected row is reviewed within its own mask class",
@@ -69,5 +64,6 @@ RETIRED_SELECTION_PLOT_IDS = (
     "selection_panel_review_axes",
     "selection_panel_sequence_differences",
     "selection_panel_mutation_geography_chemistry",
+    "selection_population_stratification",
 )
 RETIRED_SELECTION_PLOT_FILE_NAMES = tuple(f"{plot_id}.svg" for plot_id in RETIRED_SELECTION_PLOT_IDS)
