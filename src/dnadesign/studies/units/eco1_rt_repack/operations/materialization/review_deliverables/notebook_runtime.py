@@ -207,7 +207,7 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
     if artifact_kind == "candidate_handoff_sequence_csv":
         return _render_handoff_sequence_csv(row, mo=mo, table_path=media_path)
     if artifact_kind == "proteinmpnn_residue_frequency_bundle":
-        return _render_residue_frequency_bundle(row, mo=mo, manifest_root=manifest_root)
+        return render_residue_frequency_bundle(row, mo=mo, manifest_root=manifest_root)
     if artifact_kind == "handoff_readiness":
         return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
     if media_path.exists() and suffix in {".svg", ".png"}:
@@ -265,6 +265,37 @@ def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
     return artifact_kind == "structure_browser_manifest" and status == "rendered"
 
 
+def is_residue_frequency_bundle_deliverable(row: dict[str, Any] | None) -> bool:
+    """Return whether a manifest row owns a ProteinMPNN residue-frequency bundle."""
+
+    if row is None:
+        return False
+    return str(row.get("artifact_kind") or "") == "proteinmpnn_residue_frequency_bundle"
+
+
+def residue_frequency_view_lookup(row: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Map residue-frequency view labels to design-class view rows."""
+
+    if not is_residue_frequency_bundle_deliverable(row):
+        return {}
+    evidence_summary = row.get("evidence_summary") or {}
+    view_rows = list(dict(evidence_summary).get("design_class_views") or [])
+    return {str(view.get("label") or ""): dict(view) for view in view_rows if view.get("label")}
+
+
+def select_residue_frequency_view(
+    *,
+    selected_label: str,
+    lookup: dict[str, dict[str, Any]],
+    options: list[str],
+) -> dict[str, Any] | None:
+    """Resolve the selected ProteinMPNN design-class view."""
+
+    if selected_label not in lookup and options:
+        selected_label = str(options[0])
+    return lookup.get(selected_label) if selected_label else None
+
+
 def format_section_label(section: str) -> str:
     labels = {
         SECTION_CONSTRAINT_EVIDENCE: "Mask basis",
@@ -316,22 +347,28 @@ def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Pa
     )
 
 
-def _render_residue_frequency_bundle(row: dict[str, Any], *, mo: Any, manifest_root: Path) -> Any:
-    evidence_summary = row.get("evidence_summary") or {}
-    view_rows = list(dict(evidence_summary).get("design_class_views") or [])
-    if not view_rows:
+def render_residue_frequency_bundle(
+    row: dict[str, Any],
+    *,
+    mo: Any,
+    manifest_root: Path,
+    selected_view: dict[str, Any] | None = None,
+    design_class_ui: Any | None = None,
+) -> Any:
+    """Render a residue-frequency design-class view with notebook-owned controls."""
+
+    view_lookup = residue_frequency_view_lookup(row)
+    if not view_lookup:
         media_path = resolve_manifest_path(manifest_root, str(row["path"]))
         return render_image(row, mo=mo, media_path=media_path)
-    view_lookup = {str(view.get("label") or ""): dict(view) for view in view_rows if view.get("label")}
     options = list(view_lookup)
-    design_class_ui = mo.ui.dropdown(
-        options,
-        value=options[0] if options else None,
-        label="Fixed-mask design class",
-        full_width=True,
+    selected_view = selected_view or select_residue_frequency_view(
+        selected_label=options[0] if options else "",
+        lookup=view_lookup,
+        options=options,
     )
-    selected_label = str(design_class_ui.value or options[0]) if options else ""
-    selected_view = view_lookup.get(selected_label) or (dict(view_rows[0]) if view_rows else {})
+    selected_view = selected_view or {}
+    selected_label = str(selected_view.get("label") or "")
     selected_path = resolve_manifest_path(manifest_root, str(selected_view.get("path") or row["path"]))
     selected_row = dict(row)
     selected_row["path"] = str(selected_path)
@@ -341,7 +378,10 @@ def _render_residue_frequency_bundle(row: dict[str, Any], *, mo: Any, manifest_r
         if selected_label
         else str(row.get("alt_text") or "")
     )
+    rendered_items = [render_image(selected_row, mo=mo, media_path=selected_path)]
+    if design_class_ui is not None:
+        rendered_items.insert(0, design_class_ui)
     return mo.vstack(
-        [design_class_ui, render_image(selected_row, mo=mo, media_path=selected_path)],
+        rendered_items,
         gap=0.25,
     )

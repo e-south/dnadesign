@@ -32,9 +32,11 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
-        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable, load_review_manifest,
-        render_deliverable_details, render_deliverable_panel, render_intro, review_lane_lookup, section_deliverables,
-        section_label_lookup, selected_deliverable, visual_deliverables,
+        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable,
+        is_residue_frequency_bundle_deliverable, load_review_manifest, render_deliverable_details,
+        render_deliverable_panel, render_intro, render_residue_frequency_bundle, residue_frequency_view_lookup,
+        review_lane_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
+        selected_deliverable, visual_deliverables,
     )
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
         notebook_sae_features as sae_runtime,
@@ -51,13 +53,30 @@ def _():
     structure_group_lookup = structure_runtime.structure_group_lookup
     structure_highlight_lookup = structure_runtime.structure_highlight_lookup
 
+    def review_dropdown(options, *, value=None, label="", searchable=False):
+        clean_options = [str(option) for option in (options or [])]
+        if not clean_options:
+            return None
+        selected_value = str(value) if value is not None else clean_options[0]
+        if selected_value not in clean_options:
+            selected_value = clean_options[0]
+        return mo.ui.dropdown(
+            clean_options,
+            value=selected_value,
+            label=label,
+            searchable=searchable,
+            full_width=True,
+        )
+
     return (
         deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable,
-        is_sae_feature_heatmap_deliverable, load_review_manifest, load_sae_feature_heatmap_manifest,
-        load_structure_browser_rows, mo, render_deliverable_details, render_deliverable_panel, render_intro,
-        render_sae_feature_heatmap, render_structure_browser, review_lane_lookup, sae_heatmap_feature_lookup,
-        section_deliverables, section_label_lookup, selected_deliverable, structure_browser_lookup,
-        structure_group_lookup, structure_highlight_lookup, visual_deliverables,
+        is_residue_frequency_bundle_deliverable, is_sae_feature_heatmap_deliverable, load_review_manifest,
+        load_sae_feature_heatmap_manifest, load_structure_browser_rows, mo, render_deliverable_details,
+        render_deliverable_panel, render_intro, render_residue_frequency_bundle, render_sae_feature_heatmap,
+        render_structure_browser, residue_frequency_view_lookup, review_dropdown, review_lane_lookup,
+        sae_heatmap_feature_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
+        selected_deliverable, structure_browser_lookup, structure_group_lookup, structure_highlight_lookup,
+        visual_deliverables,
     )
 
 
@@ -80,12 +99,11 @@ def _(deliverables, review_lane_lookup):
 
 
 @app.cell
-def _(lane_options, mo):
-    review_lane_ui = mo.ui.dropdown(
+def _(lane_options, review_dropdown):
+    review_lane_ui = review_dropdown(
         lane_options,
         value=lane_options[0] if lane_options else None,
         label="Evidence set",
-        full_width=True,
     )
     return review_lane_ui
 
@@ -107,12 +125,11 @@ def _(deliverables, section_label_lookup, selected_lane, visual_deliverables):
 
 
 @app.cell
-def _(mo, section_options):
-    deliverable_section_ui = mo.ui.dropdown(
+def _(review_dropdown, section_options):
+    deliverable_section_ui = review_dropdown(
         section_options,
         value=section_options[0] if section_options else None,
         label="Analysis section",
-        full_width=True,
     )
     return deliverable_section_ui
 
@@ -134,12 +151,12 @@ def _(deliverable_lookup, format_deliverable_label, section_deliverables, select
 
 
 @app.cell
-def _(deliverable_options, mo):
-    deliverable_id_ui = mo.ui.dropdown(
+def _(deliverable_options, review_dropdown):
+    deliverable_id_ui = review_dropdown(
         deliverable_options,
         value=deliverable_options[0] if deliverable_options else None,
         label="Figure or structure view",
-        full_width=True,
+        searchable=True,
     )
     return deliverable_id_ui
 
@@ -156,6 +173,45 @@ def _(deliverable_id_ui, deliverable_map, deliverable_options, selected_delivera
 
 
 @app.cell
+def _(is_residue_frequency_bundle_deliverable, residue_frequency_view_lookup, selected_visual):
+    if not is_residue_frequency_bundle_deliverable(selected_visual):
+        residue_frequency_view_map = {}
+        residue_frequency_view_options = []
+    else:
+        residue_frequency_view_map = residue_frequency_view_lookup(selected_visual)
+        residue_frequency_view_options = list(residue_frequency_view_map)
+    return residue_frequency_view_map, residue_frequency_view_options
+
+
+@app.cell
+def _(residue_frequency_view_options, review_dropdown):
+    residue_frequency_class_ui = review_dropdown(
+        residue_frequency_view_options,
+        value=residue_frequency_view_options[0] if residue_frequency_view_options else None,
+        label="Fixed-mask design class",
+        searchable=True,
+    )
+    return residue_frequency_class_ui
+
+
+@app.cell
+def _(
+    residue_frequency_class_ui,
+    residue_frequency_view_map,
+    residue_frequency_view_options,
+    select_residue_frequency_view,
+):
+    selected_residue_frequency_view = None
+    if residue_frequency_class_ui is not None and residue_frequency_class_ui.value:
+        selected_residue_frequency_view = select_residue_frequency_view(
+            selected_label=str(residue_frequency_class_ui.value),
+            lookup=residue_frequency_view_map,
+            options=residue_frequency_view_options,
+        )
+    return selected_residue_frequency_view
+
+
+@app.cell
 def _(deliverables, load_structure_browser_rows, manifest_root):
     structure_browser_rows = load_structure_browser_rows(
         manifest_root=manifest_root,
@@ -167,7 +223,7 @@ def _(deliverables, load_structure_browser_rows, manifest_root):
 @app.cell
 def _(
     is_interactive_structure_deliverable,
-    mo,
+    review_dropdown,
     selected_section,
     selected_visual,
     structure_browser_rows,
@@ -189,11 +245,11 @@ def _(
         elif selected_visual_id == "selected_panel_structure_browser_manifest":
             structure_group_label = "Design class"
         structure_group_options = list(structure_group_map)
-        structure_group_ui = mo.ui.dropdown(
+        structure_group_ui = review_dropdown(
             structure_group_options,
             value=structure_group_options[0] if structure_group_options else None,
             label=structure_group_label,
-            full_width=True,
+            searchable=True,
         )
     return selected_visual_id, structure_group_map, structure_group_ui
 
@@ -209,7 +265,7 @@ def _(structure_group_map, structure_group_ui):
 @app.cell
 def _(
     is_interactive_structure_deliverable,
-    mo,
+    review_dropdown,
     selected_section,
     selected_structure_group,
     selected_visual,
@@ -231,11 +287,11 @@ def _(
         structure_label = "Structure view"
         if structure_map:
             structure_label = str(next(iter(structure_map.values())).get("_control_label") or structure_label)
-        structure_ui = mo.ui.dropdown(
+        structure_ui = review_dropdown(
             structure_options,
             value=structure_options[0] if structure_options else None,
             label=structure_label,
-            full_width=True,
+            searchable=True,
         )
     return structure_map, structure_ui
 
@@ -249,18 +305,18 @@ def _(structure_map, structure_ui):
 
 
 @app.cell
-def _(mo, selected_structure_row, structure_browser_rows, structure_highlight_lookup):
+def _(review_dropdown, selected_structure_row, structure_browser_rows, structure_highlight_lookup):
     if selected_structure_row is not None:
         structure_highlight_map = structure_highlight_lookup(
             structure_browser_rows,
             selected_row=selected_structure_row,
         )
         structure_highlight_options = list(structure_highlight_map)
-        structure_highlight_ui = mo.ui.dropdown(
+        structure_highlight_ui = review_dropdown(
             structure_highlight_options,
             value=structure_highlight_options[0] if structure_highlight_options else None,
             label="Residue highlight",
-            full_width=True,
+            searchable=True,
         )
     else:
         structure_highlight_map = {}
@@ -349,7 +405,7 @@ def _(load_sae_feature_heatmap_manifest, manifest_root, selected_visual):
 @app.cell
 def _(
     is_sae_feature_heatmap_deliverable,
-    mo,
+    review_dropdown,
     sae_heatmap_feature_lookup,
     sae_heatmap_manifest,
     selected_visual,
@@ -360,11 +416,11 @@ def _(
     else:
         sae_heatmap_feature_map = sae_heatmap_feature_lookup(sae_heatmap_manifest)
         sae_heatmap_feature_options = list(sae_heatmap_feature_map)
-        sae_heatmap_feature_ui = mo.ui.dropdown(
+        sae_heatmap_feature_ui = review_dropdown(
             sae_heatmap_feature_options,
             value=sae_heatmap_feature_options[0] if sae_heatmap_feature_options else None,
             label="SAE feature",
-            full_width=True,
+            searchable=True,
         )
     return sae_heatmap_feature_map, sae_heatmap_feature_ui
 
@@ -382,15 +438,19 @@ def _(
     deliverable_id_ui,
     deliverable_section_ui,
     is_interactive_structure_deliverable,
+    is_residue_frequency_bundle_deliverable,
     is_sae_feature_heatmap_deliverable,
     manifest_root,
     mo,
     render_deliverable_details,
     render_deliverable_panel,
+    render_residue_frequency_bundle,
     render_sae_feature_heatmap,
     render_structure_browser,
+    residue_frequency_class_ui,
     sae_heatmap_feature_ui,
     sae_heatmap_manifest,
+    selected_residue_frequency_view,
     selected_sae_heatmap_feature,
     selected_structure_highlight,
     highlight_dna,
@@ -453,12 +513,26 @@ def _(
                 ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
+        elif is_residue_frequency_bundle_deliverable(selected_visual):
+            rendered = [
+                render_residue_frequency_bundle(
+                    selected_visual,
+                    mo=mo,
+                    manifest_root=manifest_root,
+                    selected_view=selected_residue_frequency_view,
+                    design_class_ui=residue_frequency_class_ui,
+                ),
+                render_deliverable_details(selected_visual, mo=mo),
+            ]
         else:
             rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
+        navigation_controls = [
+            control for control in (review_lane_ui, deliverable_section_ui, deliverable_id_ui) if control is not None
+        ]
         panel = mo.vstack(
             [
                 mo.hstack(
-                    [review_lane_ui, deliverable_section_ui, deliverable_id_ui],
+                    navigation_controls,
                     justify="start",
                     align="stretch",
                     wrap=True,

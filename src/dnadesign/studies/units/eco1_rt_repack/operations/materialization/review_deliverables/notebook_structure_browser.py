@@ -310,30 +310,41 @@ def render_structure_browser(
         highlight_dna=highlight_dna,
         highlight_rna=highlight_rna,
     )
-    return mo.vstack(
-        [
+    selector_controls = [
+        item
+        for item in (
+            structure_group_ui,
+            structure_ui,
+            structure_highlight_ui if view_mode != "reference_selection" else None,
+        )
+        if item is not None
+    ]
+    display_controls = [
+        item
+        for item in (
+            structure_background_ui if view_mode != "reference_selection" else None,
+            structure_mutation_ui if view_mode != "reference_selection" else None,
+            structure_sidechain_ui,
+            structure_protein_ui,
+            structure_dna_visible_ui,
+            structure_rna_visible_ui,
+        )
+        if item is not None
+    ]
+    control_rows = [*selector_controls]
+    if display_controls:
+        control_rows.append(
             mo.hstack(
-                [
-                    item
-                    for item in (
-                        structure_group_ui,
-                        structure_ui,
-                        structure_highlight_ui if view_mode != "reference_selection" else None,
-                        structure_background_ui if view_mode != "reference_selection" else None,
-                        structure_mutation_ui if view_mode != "reference_selection" else None,
-                        structure_sidechain_ui,
-                        structure_protein_ui,
-                        structure_dna_visible_ui,
-                        structure_rna_visible_ui,
-                    )
-                    if item is not None
-                ],
-                justify="center",
-                align="stretch",
+                display_controls,
+                justify="start",
+                align="start",
                 wrap=True,
                 gap=1.0,
-                widths="equal",
-            ),
+            )
+        )
+    return mo.vstack(
+        [
+            mo.vstack(control_rows, gap=0.3),
             mo.Html(structure_browser_panel_html(html_panel, summary_rows, selected_row)),
             mo.accordion(
                 {"Selected structure evidence": mo.ui.table(metric_rows, page_size=8)},

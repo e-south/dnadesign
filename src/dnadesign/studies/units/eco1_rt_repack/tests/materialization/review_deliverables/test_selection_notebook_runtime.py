@@ -134,6 +134,35 @@ def test_panel_selection_deliverables_follow_review_sequence(tmp_path: Path) -> 
     assert all_panel_ids.index("selection_panel_table") < all_panel_ids.index("selection_handoff_sequences")
 
 
+def test_residue_frequency_bundle_uses_notebook_owned_selector(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    deliverables = {row["deliverable_id"]: row for row in manifest["deliverables"]}
+    bundle_row = deliverables["proteinmpnn_residue_frequency_heatmap"]
+
+    view_lookup = notebook_runtime.residue_frequency_view_lookup(bundle_row)
+    view_options = list(view_lookup)
+    selected_view = notebook_runtime.select_residue_frequency_view(
+        selected_label=view_options[-1],
+        lookup=view_lookup,
+        options=view_options,
+    )
+    rendered = notebook_runtime.render_residue_frequency_bundle(
+        bundle_row,
+        mo=FakeMo(),
+        manifest_root=result.manifest_path.parent,
+        selected_view=selected_view,
+        design_class_ui="<fixed-mask-design-class-dropdown>",
+    )
+
+    assert notebook_runtime.is_residue_frequency_bundle_deliverable(bundle_row)
+    assert len(view_options) == 6
+    assert rendered["items"][0] == "<fixed-mask-design-class-dropdown>"
+    assert "data:image/svg+xml" in str(rendered)
+    assert str(selected_view["label"]) in str(rendered)
+
+
 def test_non_image_artifact_fallback_uses_manifest_relative_path(tmp_path: Path) -> None:
     tmp_path.joinpath("review_deliverables").mkdir()
     tmp_path.joinpath("review_deliverables", "notes.txt").write_text("fixture\n", encoding="utf-8")

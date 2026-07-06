@@ -36,7 +36,7 @@ def assert_structure_notebook_contract(*, notebook_text: str, combined_text: str
     assert "ColabFold structure triage" not in combined_text
     assert 'structure_label = "Structure view"' in notebook_text
     assert "label=structure_label" in notebook_text
-    assert "structure_group_ui = mo.ui.dropdown" in notebook_text
+    assert "structure_group_ui = review_dropdown" in notebook_text
     assert 'structure_group_label = "Structure group"' in notebook_text
     assert 'structure_group_label = "Mask evidence category"' in notebook_text
     assert 'structure_group_label = "Design class"' in notebook_text
