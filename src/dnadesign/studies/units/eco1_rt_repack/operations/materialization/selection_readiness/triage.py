@@ -109,12 +109,16 @@ def _hard_gate_status(
     elif str(feasibility.get("feasibility_status")) != "feasible":
         reasons.append("feasibility_not_feasible")
     review_class = str((fold or {}).get("review_class") or "")
+    if any(reason.startswith("missing_") for reason in reasons):
+        return "missing_inputs", sorted(reasons)
+    if reasons:
+        if review_class in REVIEW_ONLY_FOLD_CLASSES:
+            reasons.append("fold_review_class_requires_manual_review")
+        return "ineligible", sorted(reasons)
     if review_class in REVIEW_ONLY_FOLD_CLASSES:
         return "needs_review", ["fold_review_class_requires_manual_review"]
     if review_class and review_class not in ALLOWED_FOLD_CLASSES:
         reasons.append("fold_review_class_not_allowed")
-    if any(reason.startswith("missing_") for reason in reasons):
-        return "missing_inputs", sorted(reasons)
     return ("ineligible", sorted(reasons)) if reasons else ("eligible", [])
 
 

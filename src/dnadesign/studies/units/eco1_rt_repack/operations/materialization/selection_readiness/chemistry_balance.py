@@ -73,7 +73,7 @@ def write_na_facing_chemistry_balance_plot(
     )
     if not matrix:
         raise ValueError("near-DNA/RNA chemistry-balance plot requires selected candidates")
-    fig = plt.figure(figsize=(10.8, max(3.8, 0.55 * len(matrix) + 1.8)))
+    fig = plt.figure(figsize=(7.8, 7.2))
     grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 4.2], wspace=0.1)
     ax_charge = fig.add_subplot(grid[0, 0])
     ax_counts = fig.add_subplot(grid[0, 1], sharey=ax_charge)
@@ -81,7 +81,7 @@ def write_na_facing_chemistry_balance_plot(
     max_abs_charge = max(max((abs(value) for value in charge_delta), default=0), 1)
     ax_charge.imshow(
         [[value] for value in charge_delta],
-        aspect="auto",
+        aspect="equal",
         interpolation="nearest",
         cmap="coolwarm",
         norm=TwoSlopeNorm(vmin=-max_abs_charge, vcenter=0, vmax=max_abs_charge),
@@ -89,7 +89,7 @@ def write_na_facing_chemistry_balance_plot(
     count_max = max((max(values) for values in matrix), default=0)
     count_image = ax_counts.imshow(
         matrix,
-        aspect="auto",
+        aspect="equal",
         interpolation="nearest",
         cmap="YlGnBu",
         vmin=0,

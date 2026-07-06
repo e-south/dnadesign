@@ -149,8 +149,11 @@ def write_selected_substitutions_across_rt_plot(
     ax.set_xticklabels([str(positions[index]) for index in tick_positions], fontsize=9.6)
     ax.set_xlabel("Residue position", fontsize=LABEL_SIZE, labelpad=8)
     top_axis = ax.secondary_xaxis("top")
-    top_axis.set_xticks(tick_positions)
-    top_axis.set_xticklabels([residue_letters[index] for index in tick_positions], fontsize=9.4)
+    letter_tick_positions = list(range(len(positions)))
+    top_axis.set_xticks(letter_tick_positions)
+    top_axis.set_xticklabels([residue_letters[index] for index in letter_tick_positions], fontsize=2.8)
+    for tick_label in top_axis.get_xticklabels():
+        tick_label.set_fontfamily("DejaVu Sans Mono")
     top_axis.tick_params(length=0, pad=4)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=58)
     ax.tick_params(axis="both", length=0)
@@ -216,8 +219,8 @@ def write_regional_mutation_burden_plot(
         candidate_rows=candidate_rows,
         mask_residues=mask_residues,
     )
-    fig, ax = plt.subplots(figsize=(9.6, max(3.8, 0.55 * len(matrix) + 1.8)))
-    image = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap="YlOrBr")
+    fig, ax = plt.subplots(figsize=(7.8, 7.2))
+    image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlOrBr")
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(region_labels))))

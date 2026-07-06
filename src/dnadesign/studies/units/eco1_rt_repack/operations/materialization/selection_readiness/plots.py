@@ -42,7 +42,7 @@ from .regional_plots import (
     write_regional_mutation_burden_plot,
     write_selected_substitutions_across_rt_plot,
 )
-from .visual_inventory import RETIRED_SELECTION_PLOT_FILE_NAMES
+from .visual_inventory import RETIRED_SELECTION_PLOT_FILE_NAMES, SELECTION_PLOT_PLAIN_TITLES
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -55,10 +55,10 @@ _STATUS_COLORS = {
     "missing_inputs": OKABE_ITO["vermillion"],
 }
 _STATUS_LABELS = {
-    "eligible": "Eligible",
-    "needs_review": "Manual reserve",
-    "ineligible": "Excluded",
-    "missing_inputs": "Missing input",
+    "eligible": "Passes protein gate",
+    "needs_review": "Fold-review reserve",
+    "ineligible": "Blocked by gate",
+    "missing_inputs": "Missing fold or feasibility input",
 }
 
 
@@ -155,6 +155,17 @@ def _class_percentile(
         return 100.0 * sum(value >= selected_value for value in values) / len(values)
     if direction == "higher":
         return 100.0 * sum(value <= selected_value for value in values) / len(values)
+    if direction == "moderate":
+        sorted_values = sorted(values)
+        midpoint = len(sorted_values) // 2
+        if len(sorted_values) % 2:
+            median = sorted_values[midpoint]
+        else:
+            median = (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
+        max_distance = max(abs(value - median) for value in sorted_values)
+        if max_distance == 0.0:
+            return 100.0
+        return max(0.0, 100.0 * (1.0 - abs(selected_value - median) / max_distance))
     raise ValueError(f"Unknown class-local percentile direction: {direction}")
 
 
@@ -172,7 +183,7 @@ def _write_design_class_gate_counts(
     panel_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
-    title = "Each Eco1 design class retains fold-preserved candidates for panel selection"
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_design_class_gate_counts"]
     counts_by_class: dict[str, Counter[str]] = {spec.design_class_id: Counter() for spec in ALL_SPECS}
     for row in triage_rows:
         class_id = str(row["design_class_id"])
@@ -182,7 +193,7 @@ def _write_design_class_gate_counts(
     selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
     labels = [class_label(spec.design_class_id) for spec in ALL_SPECS]
     y_positions = list(range(len(ALL_SPECS)))
-    fig, ax = plt.subplots(figsize=(11.2, 5.6))
+    fig, ax = plt.subplots(figsize=(7.8, 7.8))
     left = [0] * len(ALL_SPECS)
     for status in _STATUS_ORDER:
         widths = [counts_by_class[spec.design_class_id][status] for spec in ALL_SPECS]
@@ -214,21 +225,25 @@ def _write_design_class_gate_counts(
     ax.invert_yaxis()
     ax.set_xlabel("Candidate count", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    ax.set_box_aspect(1)
     style_open_axes(ax, grid=False)
     ax.grid(axis="x", color="#d0d7de", alpha=0.42, linewidth=0.7)
     ax.set_xlim(0, max(left) + 16)
     ax.legend(
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.18),
-        ncol=len(_STATUS_ORDER),
+        bbox_to_anchor=(0.5, -0.22),
+        ncol=2,
         frameon=False,
         fontsize=LEGEND_SIZE,
+        columnspacing=1.2,
+        handletextpad=0.45,
     )
-    fig.subplots_adjust(left=0.27, right=0.98, top=0.9, bottom=0.22)
+    fig.subplots_adjust(left=0.27, right=0.97, top=0.87, bottom=0.28)
     path = plot_root / "selection_design_class_gate_counts.svg"
     alt = (
-        "Stacked horizontal bars show eligible, manual-reserve, excluded, and missing-input candidates "
-        "for each Eco1 design class. Each class has one selected candidate label."
+        "Stacked horizontal bars show candidates that pass the protein gate, fold-review reserve candidates, "
+        "blocked candidates, and candidates missing fold or feasibility input for each Eco1 design class. "
+        "Each class has one selected candidate label."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -238,8 +253,7 @@ def _write_design_class_gate_counts(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Counts candidates that pass feasibility and fold checks in each design class before choosing "
-            "one representative."
+            "Counts candidates by protein-level gate outcome in each design class before choosing one representative."
         ),
         interpretation_limit=(
             "Counts show panel preparation only. They do not measure RT activity, processivity, strand "
@@ -261,8 +275,8 @@ def _write_class_local_percentiles(
     metrics = [
         ("selection_support_alt_observed_fraction", "MSA support", "higher"),
         ("selection_support_unobserved_mutation_count", "Unsupported changes", "lower"),
-        ("nucleic_acid_facing_mutation_count", "Near DNA/RNA or thumb", "higher"),
         ("nucleic_acid_facing_chemistry_warning_count", "Chemistry warnings", "lower"),
+        ("nucleic_acid_facing_mutation_count", "Regional burden", "moderate"),
         ("mean_plddt", "pLDDT", "higher"),
         ("wt_runtime_ca_rmsd", "WT RMSD", "lower"),
     ]
@@ -289,8 +303,8 @@ def _write_class_local_percentiles(
         row_labels.append(f"{class_label(spec.design_class_id)}  {short_candidate(candidate_id)}")
     if not matrix:
         raise ValueError("class-local percentile plot requires selected rows")
-    fig, ax = plt.subplots(figsize=(10.8, 5.2))
-    image = ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap="YlGnBu", vmin=0, vmax=100)
+    fig, ax = plt.subplots(figsize=(7.6, 7.2))
+    image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlGnBu", vmin=0, vmax=100)
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(metrics))))
@@ -320,7 +334,7 @@ def _write_class_local_percentiles(
     path = plot_root / "selection_class_local_percentiles.svg"
     alt = (
         "Heatmap showing each selected candidate as a within-class percentile for MSA support, unsupported "
-        "substitutions, near-DNA/RNA or thumb-track mutation count, chemistry warnings, pLDDT, and WT RMSD."
+        "substitutions, near-DNA/RNA chemistry warnings, regional mutation burden, pLDDT, and WT RMSD."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(

@@ -22,6 +22,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     SELECTION_POLICY_ID,
 )
 
+NA_FACING_BURDEN_TARGET_RATIO = 0.40
+NA_FACING_LOW_BURDEN_RATIO = 0.05
+NA_FACING_HIGH_BURDEN_RATIO = 0.75
+
 
 def build_selection_panel_rows(
     *,
@@ -119,8 +123,8 @@ def _choose_representative(
             -_float_value(row.get("selection_support_alt_observed_fraction")),
             -_float_value(row.get("selection_support_alt_frequency_mean")),
             _int_value(row.get("selection_support_unobserved_mutation_count"), default=9999),
-            -_int_value(row.get("nucleic_acid_facing_mutation_count")),
             _int_value(row.get("nucleic_acid_facing_chemistry_warning_count"), default=9999),
+            _na_facing_burden_sort_values(row),
             -(nearest_distance if nearest_distance is not None else 0),
             -float(row.get("mean_plddt") or 0.0),
             float(row.get("wt_runtime_ca_rmsd") or 9999.0),
@@ -141,10 +145,11 @@ def _panel_row(
 ) -> dict[str, object]:
     reason = (
         f"Selected as the {row['design_class_id']} representative after feasibility and fold gates. "
-        "The tie-breaks use MSA support, mutation geography near retained DNA/RNA or thumb-track, "
-        "simple local chemistry, "
-        "and sequence nonredundancy. ESMC and SAE rows were retained for review but not used for selection."
+        "The tie-breaks use MSA support, near-DNA/RNA chemistry warnings, moderate regional mutation burden, "
+        "fold metrics, and sequence nonredundancy. ESMC and SAE rows were retained for review but not used "
+        "for selection."
     )
+    na_facing_count, na_facing_ratio = _na_facing_count_and_ratio(row)
     trace = {
         "selection_policy_id": SELECTION_POLICY_ID,
         "design_class_id": row["design_class_id"],
@@ -154,6 +159,8 @@ def _panel_row(
         "selection_support_unobserved_mutation_count": row["selection_support_unobserved_mutation_count"],
         "mutation_count_total": row["mutation_count_total"],
         "nucleic_acid_facing_mutation_count": row["nucleic_acid_facing_mutation_count"],
+        "nucleic_acid_facing_burden_ratio": na_facing_ratio,
+        "nucleic_acid_facing_burden_band": _na_facing_burden_band(na_facing_count, na_facing_ratio),
         "nucleic_acid_facing_chemistry_warning_count": row["nucleic_acid_facing_chemistry_warning_count"],
         "nucleic_acid_facing_charge_delta": row["nucleic_acid_facing_charge_delta"],
         "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
@@ -203,6 +210,35 @@ def _fold_rank(review_class: str) -> int:
     if review_class == "good_fold_preserved":
         return 1
     return 2
+
+
+def _na_facing_burden_sort_values(row: dict[str, object]) -> tuple[int, float, int]:
+    """Prefer controlled substrate-proximal burden instead of maximizing it."""
+
+    count, ratio = _na_facing_count_and_ratio(row)
+    band_rank = {
+        "moderate": 0,
+        "low": 1,
+        "none": 2,
+        "broad": 3,
+    }[_na_facing_burden_band(count, ratio)]
+    return (band_rank, abs(ratio - NA_FACING_BURDEN_TARGET_RATIO), count)
+
+
+def _na_facing_count_and_ratio(row: dict[str, object]) -> tuple[int, float]:
+    count = _int_value(row.get("nucleic_acid_facing_mutation_count"))
+    total = max(_int_value(row.get("mutation_count_total")), 0)
+    return count, count / total if total else 0.0
+
+
+def _na_facing_burden_band(count: int, ratio: float) -> str:
+    if count == 0:
+        return "none"
+    if ratio < NA_FACING_LOW_BURDEN_RATIO:
+        return "low"
+    if ratio <= NA_FACING_HIGH_BURDEN_RATIO:
+        return "moderate"
+    return "broad"
 
 
 def _float_value(value: object, *, default: float = -1.0) -> float:

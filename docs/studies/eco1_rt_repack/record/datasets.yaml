@@ -699,9 +699,10 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_gate_counts.svg
     status: materialized_selection_readiness_visual
     description: >-
-      Compact review visual showing eligible, manual-reserve, excluded, and
-      missing-input candidate counts for each design class. It supports panel
-      review but does not measure RT activity or handoff acceptance.
+      Compact review visual showing candidates that pass the protein gate,
+      fold-review reserve candidates, blocked candidates, and rows missing fold
+      or feasibility inputs for each design class. It supports panel review but
+      does not measure RT activity or handoff acceptance.
   - id: eco1_rt_selection_class_local_percentiles
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -710,8 +711,9 @@ datasets:
     description: >-
       Compact review visual comparing each selected row against candidates from
       its own design class across MSA support, unsupported substitutions,
-      substrate-proximal mutation burden, chemistry warnings, and fold metrics.
-      It explains panel review context without creating a combined score.
+      near-DNA/RNA chemistry warnings, moderated regional mutation burden, and
+      fold metrics. It explains panel review context without creating a
+      combined score.
   - id: eco1_rt_selection_six_sequence_distance
     owner: eco1_rt_repack
     kind: generated_artifact

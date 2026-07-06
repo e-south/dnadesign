@@ -271,8 +271,8 @@ def _write_manifest(
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
             "Select one feasible fold-preserved representative from each design class, then prefer natural "
-            "sequence support, mutation geography near retained DNA/RNA or thumb-track, simple local chemistry, "
-            "and sequence nonredundancy. Do not use ESMC or SAE as positive selection evidence."
+            "sequence support, fewer near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
+            "fold metrics, and sequence nonredundancy. Do not use ESMC or SAE as positive selection evidence."
         ),
         "sae_window_policy": (
             "SAE windows are retained as review evidence but not used for selection because the current pool "
@@ -333,8 +333,8 @@ def _write_manifest(
             "selection-support MSA observed fraction",
             "selection-support MSA mean alternate-residue frequency",
             "selection-support unobserved mutation count",
-            "near retained DNA/RNA or thumb-track mutation count",
             "near retained DNA/RNA or thumb-track chemistry warning count",
+            "moderate near retained DNA/RNA or thumb-track mutation burden",
             "nearest selected sequence distance",
             "fold metrics",
             "mutation count",

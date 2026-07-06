@@ -23,6 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     build_na_facing_chemistry_balance_matrix,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
+    _class_percentile,
     build_selected_sequence_distance_matrix,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.regional_plots import (
@@ -62,6 +63,11 @@ def test_selected_six_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     assert all(len(row) == len(ALL_SPECS) for row in matrix)
     assert all(matrix[index][index] == 0 for index in range(len(matrix)))
     assert matrix == [list(row) for row in zip(*matrix, strict=True)]
+
+
+def test_class_local_moderate_percentile_prefers_class_median() -> None:
+    assert _class_percentile(selected_value=40.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 100.0
+    assert _class_percentile(selected_value=90.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 0.0
 
 
 def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:

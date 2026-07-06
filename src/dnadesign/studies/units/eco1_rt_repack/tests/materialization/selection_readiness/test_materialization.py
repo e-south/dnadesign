@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -130,12 +131,33 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
+    plot_text_by_id: dict[str, str] = {}
     for plot in manifest["plots"]:
         plot_path = result.manifest_path.parent / plot["path"]
         assert plot_path.exists()
-        assert "<title" in plot_path.read_text(encoding="utf-8")
+        plot_text = plot_path.read_text(encoding="utf-8")
+        plot_text_by_id[str(plot["plot_id"])] = plot_text
+        assert "<title" in plot_text
         assert plot["alt_text"].strip()
         assert plot["interpretation_limit"].strip()
+    gate_count_text = plot_text_by_id["selection_design_class_gate_counts"]
+    assert "Passes protein gate" in gate_count_text
+    assert "Fold-review reserve" in gate_count_text
+    assert "Blocked by gate" in gate_count_text
+    assert "Missing fold or feasibility input" in gate_count_text
+    assert "Manual reserve" not in gate_count_text
+    assert "Excluded" not in gate_count_text
+    _assert_svg_has_square_panel(gate_count_text)
+    _assert_heatmap_cells_are_square(
+        plot_text_by_id["selection_class_local_percentiles"],
+        row_count=len(ALL_SPECS),
+        column_count=6,
+    )
+    _assert_heatmap_cells_are_square(
+        plot_text_by_id["selection_regional_mutation_burden"],
+        row_count=len(ALL_SPECS),
+        column_count=4,
+    )
     assert not retired_plot.exists()
 
 
@@ -164,3 +186,28 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
     payload = json.loads(captured.out)
     assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
     assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
+
+
+def _svg_clip_rects(svg_text: str) -> list[tuple[float, float, float, float]]:
+    return [
+        tuple(float(value) for value in match)
+        for match in re.findall(
+            r'<clipPath id="[^"]+">\s*<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"',
+            svg_text,
+        )
+    ]
+
+
+def _assert_svg_has_square_panel(svg_text: str) -> None:
+    assert any(
+        width > 100.0 and height > 100.0 and abs(width - height) <= 1.0
+        for _x, _y, width, height in _svg_clip_rects(svg_text)
+    )
+
+
+def _assert_heatmap_cells_are_square(svg_text: str, *, row_count: int, column_count: int) -> None:
+    expected_ratio = column_count / row_count
+    assert any(
+        width > 80.0 and height > 80.0 and abs((width / height) - expected_ratio) <= 0.03
+        for _x, _y, width, height in _svg_clip_rects(svg_text)
+    )
