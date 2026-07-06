@@ -400,16 +400,15 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
   WT is accepted; the first synthetic candidate requests still return explicit
   404 rows even with `fold_on_miss=true`, and the remaining synthetic rows are
   intentionally unattempted. Atlas remains optional post-fold semantic context
-  and stratification layer, not a candidate acceptance gate.
+  and review context, not a candidate acceptance gate.
 - RT-only `candidate_handoff.yaml` is not materialized.
 - Downstream RT-lnRNA acceptance or rejection is not materialized.
 - The review-deliverables marimo notebook includes the expanded panel-selection
-  table and plots: gate counts, full-population stratification with the selected
-  six highlighted, class-local percentiles, selected-row sequence distance,
+  table and plots: gate counts, class-local percentiles, selected-row sequence distance,
   selected substitutions across RT regions, regional mutation burden, chemistry
   changes near retained DNA/RNA or thumb-track positions, the selected protein
-  sequence CSV, the selected-panel structure browser, the handoff-boundary note,
-  and the compact selected-panel table.
+  sequence CSV, the selected-panel structure browser, the candidate-handoff
+  readiness checklist, and the compact selected-panel table.
 
 ### Non-Goals
 

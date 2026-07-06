@@ -65,7 +65,7 @@ study.
 
 | Need | First owner surface | State |
 | --- | --- | --- |
-| Generic fixed-backbone IA and candidate-review dev spec | `../../../dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md` | active next-slice spec for protein review panel planning: feasibility, three-window SAE summary, candidate triage, six-slot selection, and RT-only handoff |
+| Generic fixed-backbone IA and candidate-review dev spec | `../../../dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md` | materialized selection-readiness spec plus active RT-only candidate-handoff slice: feasibility, three-window SAE summary, candidate triage, six-slot selection, and downstream handoff |
 | Implementation sequence | `../contexts/implementation-roadmap.md` | active study roadmap |
 | Eco1 study profile | `../operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml` | scaffolded |
 | Phase 0/1 contract validation | CLI: `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py`; shared validators: `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/`; domain validators: `operations/contracts/conservation/`, `operations/contracts/masks/`, and `operations/contracts/structure/` | implemented |

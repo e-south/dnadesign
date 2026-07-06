@@ -236,7 +236,7 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         path=manifest_path,
         source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
         input_hashes=file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff": handoff_path}),
-        alt_text="Checklist for the RT-only candidate handoff boundary.",
+        alt_text="Checklist for RT-only candidate-handoff readiness.",
         description=(
             f"candidate_handoff.yaml is {handoff_state}; panel selection remains separate from construct subject "
             "creation."
@@ -244,7 +244,7 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         interpretation_limit=(
             "The readiness state has no assay acceptance gate and does not create an RT-lnRNA construct subject."
         ),
-        title="RT-only handoff remains blocked until candidate_handoff.yaml is materialized",
+        title="Candidate handoff remains blocked until candidate_handoff.yaml exists",
         role="manuscript_facing",
         render_mode="text",
         evidence_summary={str(key): value for key, value in readiness.items()},

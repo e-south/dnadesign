@@ -28,7 +28,7 @@ def build_handoff_readiness(
     panel_rows: Sequence[Mapping[str, object]],
     candidate_handoff_path: Path,
 ) -> dict[str, object]:
-    """Return manifest fields for the RT-only handoff boundary."""
+    """Return manifest fields for RT-only candidate-handoff readiness."""
 
     return normalize_handoff_readiness(
         selection_root=selection_root,

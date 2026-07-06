@@ -16,7 +16,7 @@ sponging workflows. The method is computational and contract-first:
 3. Compose conservative fixed/mutable masks from structure contacts,
    conservation, catalytic policy, and explicit missing-backbone handling.
 4. Generate fixed-backbone sequence samples with a declared MPNN backend.
-5. Deduplicate and rank candidates.
+5. Deduplicate candidates and triage them with explicit review axes.
 6. Validate structural fidelity with declared fold-check metrics.
 7. Emit a candidate handoff only when every upstream artifact is present and
    hash-linked.

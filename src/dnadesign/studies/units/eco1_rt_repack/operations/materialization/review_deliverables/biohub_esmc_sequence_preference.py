@@ -42,7 +42,7 @@ PLOT_DELIVERABLE_ID = "biohub_esmc_candidate_preference_vs_wt"
 TABLE_DELIVERABLE_ID = "biohub_esmc_variant_llr_scores"
 MANIFEST_DELIVERABLE_ID = "biohub_esmc_sequence_scoring_manifest"
 TITLE = "Candidate substitutions shift ESMC LLR"
-TITLE_6B = "6B ESMC LLR scores rank candidates"
+TITLE_6B = "6B ESMC LLR scores provide review-only context"
 INTERPRETATION_LIMIT = (
     "This plot sums WT-context masked-marginal single-substitution LLR values for each candidate. "
     "It is not a whole-protein pseudo-likelihood, not a joint likelihood, and not an activity measurement."
@@ -189,13 +189,13 @@ def write_biohub_esmc_sequence_preference_deliverables(
             source_tables=source_tables,
             input_hashes=input_hashes | file_hashes({"variant_llr_scores": table_path}),
             alt_text=(
-                "Ranked bar plot of additive WT-context ESMC single-substitution LLR sums for "
+                "Ordered bar plot of additive WT-context ESMC single-substitution LLR sums for "
                 "ProteinMPNN candidates, with WT at zero."
             ),
             description=(
                 "Shows whether each candidate's substitutions are assigned a higher or lower summed ESMC "
                 "masked-marginal score than the WT residues at those positions. Bars are ordered by total "
-                "additive LLR; colors show fold-review class when available."
+                "additive LLR for inspection; colors show fold-review class when available."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
             title=title,

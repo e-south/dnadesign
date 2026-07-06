@@ -223,7 +223,7 @@ presents constraint evidence for the design mask, baseline ProteinMPNN audit
 views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when those
 manifests exist. The expanded panel-selection tables are materialized separately under
 `outputs/thread/design_classes/selection/`; the review notebook links the
-the seven selection-readiness SVGs from that manifest. WT ESMC
+six selection-readiness SVGs from that manifest. WT ESMC
 masked-marginal scoring is shown with the constraint
 evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same
@@ -326,9 +326,9 @@ does not call Biohub again. It follows the
 [Biohub ESMC SAE feature interpretation notebook](https://colab.research.google.com/github/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb)
 at a small scale: rank WT-active features, inspect residue-localized
 activations, compare candidate retention of the same exact-dictionary
-features, and render a joint review panel that orders variants by SAE
-similarity to WT while showing ColabFold pLDDT and summed WT masked-marginal
-single-substitution LLR side markers. Feature labels and descriptions are
+features, and render a joint review panel that arranges rows by SAE
+similarity to WT for inspection while showing ColabFold pLDDT and summed WT
+masked-marginal single-substitution LLR side markers. Feature labels and descriptions are
 joined only from the exact 6B layer-60 16k dictionary; the LLR side marker is
 not a joint protein likelihood.
 

@@ -149,9 +149,19 @@ def _assert_premise_titles(deliverables: dict[str, dict[str, object]]) -> None:
         "Fold-review thresholds separate preserved folds from review-band candidates",
         "ColabFold metrics show continuous review signals",
     }
-    banned_fragments = ("review surface", "current baseline only", "thresholds separate")
+    banned_fragments = (
+        "review surface",
+        "current baseline only",
+        "thresholds separate",
+        "rank candidates",
+        "best variants",
+        "top six",
+        "processivity improvement",
+        "strand-displacement improvement",
+    )
     for deliverable_id, row in deliverables.items():
         title = str(row.get("title") or "")
+        display_text = " ".join(str(row.get(field) or "") for field in ("title", "alt_text", "description")).lower()
         assert title, f"{deliverable_id} must carry a title"
         assert not title.endswith("."), f"{deliverable_id} title must omit terminal periods"
         assert len(title) <= 72, f"{deliverable_id} title is too long: {title!r}"
@@ -159,6 +169,9 @@ def _assert_premise_titles(deliverables: dict[str, dict[str, object]]) -> None:
         assert not any(fragment in title.lower() for fragment in banned_fragments), (
             f"{deliverable_id} title still has slop wording: {title!r}"
         )
+        assert "ranked bar plot" not in display_text
+        assert "candidate-score rank changes" not in display_text
+        assert "candidate additive llr rankings" not in display_text
         expected_title = PLAIN_DELIVERABLE_TITLES.get(deliverable_id)
         if expected_title is not None:
             assert title == expected_title

@@ -114,13 +114,13 @@ def write_biohub_esmc_model_agreement_deliverables(
             path=table_path,
             source_tables=source_tables,
             input_hashes=input_hashes,
-            alt_text="Table comparing 300M and 6B additive ESMC LLR ranks for each shared candidate.",
+            alt_text="Table comparing 300M and 6B additive ESMC LLR order for each shared candidate.",
             description=(
-                "One row per shared ProteinMPNN candidate with additive WT-context LLR totals and rank deltas "
+                "One row per shared ProteinMPNN candidate with additive WT-context LLR totals and order deltas "
                 "between the 300M and 6B ESMC scoring lanes."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,
-            title="The 300M and 6B ESMC table records candidate-score rank changes",
+            title="The 300M and 6B ESMC table records candidate-score order changes",
             method_summary=METHOD_SUMMARY,
             evidence_summary=evidence,
             role="review_only",
@@ -136,7 +136,7 @@ def write_biohub_esmc_model_agreement_deliverables(
             input_hashes=input_hashes | file_hashes({"model_agreement_table": table_path}),
             alt_text="Scatter plot comparing 300M and 6B additive ESMC LLR totals for shared candidates.",
             description=(
-                "Shows that candidate additive LLR rankings change after rescoring the same WT "
+                "Shows that candidate additive LLR order changes after rescoring the same WT "
                 "single-substitution contexts with the 6B ESMC model."
             ),
             interpretation_limit=INTERPRETATION_LIMIT,

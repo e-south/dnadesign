@@ -785,7 +785,7 @@ datasets:
       marimo notebook. The notebook renders one WT-active feature at a time
       with WT plus candidate variants as rows, Ec86 canonical residue positions
       as columns, WT residue letters on the top axis, and per-residue SAE
-      activation as color. It is semantic stratification, not a processivity
+      activation as color. It is semantic review context, not a processivity
       ranking or candidate acceptance gate.
   - id: eco1_rt_feasibility_report
     owner: eco1_rt_repack

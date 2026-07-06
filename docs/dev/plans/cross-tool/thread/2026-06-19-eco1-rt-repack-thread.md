@@ -4,23 +4,25 @@ surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
 last_verified: 2026-07-06
-status: active_next_slice
-primary_slice: protein-review-panel-preparation-v1
+status: active_handoff_slice
+primary_slice: rt-only-candidate-handoff-v1
 ---
 
 ## Eco1 RT Repack Candidate Review, Feasibility, And RT-Only Handoff
 
-This spec is the current cross-tool development surface for the next Eco1 RT
-repack slice. The study has already moved past the original tracer bullet:
+This spec is the current cross-tool development surface for the Eco1 RT
+repack review and RT-only handoff slice. The study has already moved past the original tracer bullet:
 ProteinMPNN sampling, candidate normalization, ColabFold fold checking,
 fold-check review, local PDB staging, Biohub ESMC query-time SAE collection, and
 the expanded design-class candidate pool are materialized locally.
 
-The current task is to prepare a small protein review panel from the 576 synthetic
-candidates. The current panel path checks computational buildability, removes
-fold-risk candidates, records that SAE windows remain WT-like, and selects one
-fold-preserved representative from each design class. These steps prepare the
-protein review set; they do not predict improved strand displacement.
+Selection readiness is now materialized for a six-row protein review panel from
+the 576 synthetic candidates. The active task is to review those rows and emit
+the RT-only `candidate_handoff.yaml` through the handoff contract. The panel
+path checks computational buildability, removes fold-risk candidates, records
+that SAE windows remain WT-like, and selects one fold-preserved representative
+from each design class. These steps prepare the protein review set; they do not
+predict improved strand displacement.
 
 ### Scientific Flow
 
@@ -44,8 +46,9 @@ The panel-selection deliverables are materialized under
 rows, one per design class. Feasibility can exclude candidates. Fold class is
 the first review filter. The panel tie-breaks use MSA support, mutation
 geography, nucleic-acid-facing chemistry, and sequence nonredundancy inside
-the eligible set. The review plots include full-population stratification with
-the selected six highlighted before selected-row detail views. ESMC LLR and
+the eligible set. The review plots include design-class gate counts,
+class-local percentiles, sequence-distance context, and selected-row regional
+detail views. ESMC LLR and
 SAE windows are retained as review evidence, but they are not used for
 selection because they do not meaningfully stratify the current pool.
 
@@ -989,7 +992,7 @@ Rendering contract:
 - Do not show all feature indices.
 - Values should be WT-normalized activation ratios or z-scores, with missing
   values explicit.
-- Use this heatmap as semantic stratification after fold review, not as a hidden
+- Use this heatmap as semantic review context after fold review, not as a hidden
   candidate selector.
 
 Interpretation limit:
@@ -999,7 +1002,7 @@ The heatmap shows which model-derived feature activations are retained, shifted,
 or depleted across candidates. It does not rank processivity.
 ```
 
-#### Deliverable 7: Selection Readiness And Handoff Boundary
+#### Deliverable 7: Selection Readiness And RT-Only Sequence Export
 
 Artifact group:
 
@@ -1035,7 +1038,6 @@ Inputs:
 - `candidate_triage_table.parquet`;
 - `candidate_selection_panel.parquet`;
 - `candidate_handoff_sequences.csv`;
-- `candidate_handoff.yaml` when present.
 
 These plots render only after feasibility, triage, and the selection panel are
 materialized. They do not create handoff eligibility by themselves.
@@ -1051,7 +1053,7 @@ The marimo notebook should read the manifest and expose dropdowns for:
 - WT SAE feature frames;
 - variant SAE heatmap;
 - panel-selection plots, selected protein sequences, py3Dmol structure views,
-  and the RT-only handoff boundary.
+  and the candidate-handoff readiness checklist.
 
 The notebook must read manifests and pre-rendered artifacts. It must not
 hard-code plot paths, rerun Biohub requests, rerender all ChimeraX structures,
@@ -1212,7 +1214,6 @@ MSA plurality/mask context visual renders from declared alignment inputs
 linear-plus-3D mask context visual renders from declared mask/structure inputs
 ProteinMPNN sequence-diversity visuals render from candidate_table.parquet
 cached ColabFold structure-review panel renders from local staged PDBs
-WT Biohub ESMC SAE feature frames render for a declared feature subset
 Biohub ESMC feature-window heatmap renders from sae_feature_window_summary.parquet
 candidate triage table exposes feasibility, SAE-window, ESMC, fold-review, and sequence-diversity fields without a combined rank
 selection visuals render from materialized feasibility/selection inputs

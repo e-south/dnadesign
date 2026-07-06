@@ -32,7 +32,7 @@ from matplotlib.patches import Patch  # noqa: E402
 
 
 def render_candidate_preference_plot(path: Path, rows: list[dict[str, object]], *, title: str) -> None:
-    """Render a ranked additive ESMC LLR bar plot."""
+    """Render an ordered additive ESMC LLR review plot."""
 
     ordered = list(rows)
     values = [float(row["llr_total"]) for row in ordered]
@@ -48,7 +48,7 @@ def render_candidate_preference_plot(path: Path, rows: list[dict[str, object]], 
     ax.set_yticks(y_positions, labels, fontsize=y_tick_size)
     ax.invert_yaxis()
     ax.set_xlabel("WT-context single-substitution LLR sum", fontsize=LABEL_SIZE + 0.8, labelpad=8)
-    ax.set_ylabel("ProteinMPNN candidate rank by additive ESMC LLR", fontsize=LABEL_SIZE + 0.8, labelpad=9)
+    ax.set_ylabel("ProteinMPNN candidates ordered by additive ESMC LLR", fontsize=LABEL_SIZE + 0.8, labelpad=9)
     ax.set_title(title, fontsize=TITLE_SIZE + 1.0, pad=12)
     style_open_axes(ax, grid=True)
     ax.grid(axis="y", visible=False)
@@ -72,7 +72,7 @@ def render_candidate_preference_plot(path: Path, rows: list[dict[str, object]], 
         path,
         title=title,
         description=(
-            f"Ranked bar plot of additive WT-context ESMC LLR sums for {len(ordered)} ProteinMPNN "
+            f"Ordered bar plot of additive WT-context ESMC LLR sums for {len(ordered)} ProteinMPNN "
             "candidate sequences. Positive values indicate that the ESMC masked-marginal grid assigns "
             "higher probability to the candidate substitutions than to the WT residues at those positions."
         ),

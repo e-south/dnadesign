@@ -41,6 +41,43 @@ def test_current_study_records_do_not_name_retired_selection_plots() -> None:
         assert plot_id not in text
 
 
+def test_runtime_readme_names_current_selection_visual_count() -> None:
+    root = repo_root()
+    text = (root / "docs/studies/eco1_rt_repack/operations/runtime/command-groups/README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "six selection-readiness SVGs" in text
+    assert "seven selection-readiness SVGs" not in text
+    assert "orders variants by SAE" not in text
+
+
+def test_current_study_docs_do_not_reintroduce_removed_selection_surfaces() -> None:
+    text = _current_selection_doc_text().lower()
+
+    stale_fragments = (
+        "full-population stratification",
+        "handoff-boundary",
+        "handoff boundary",
+        "selection readiness and handoff boundary",
+        "semantic stratification",
+        "6b esmc llr scores rank candidates",
+        "orders variants by sae",
+    )
+    for fragment in stale_fragments:
+        assert fragment not in text
+
+
 def _current_record_text() -> str:
     root = repo_root()
     return "\n".join((root / path).read_text(encoding="utf-8") for path in _CURRENT_RECORD_SURFACES)
+
+
+def _current_selection_doc_text() -> str:
+    root = repo_root()
+    paths = (
+        *_CURRENT_RECORD_SURFACES,
+        Path("docs/studies/eco1_rt_repack/operations/runtime/command-groups/README.md"),
+        Path("docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md"),
+    )
+    return "\n".join((root / path).read_text(encoding="utf-8") for path in paths)
