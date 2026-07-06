@@ -48,14 +48,15 @@ def assert_selection_plot_contract(
 
     premise_text = plot_text_by_id["selection_premise_alignment"]
     assert "Core/direct edits" in premise_text
-    assert "ESMC/SAE" in premise_text
+    assert "Local structure" in premise_text
+    assert "ESMC/SAE" not in premise_text
     assert_heatmap_cells_are_square(premise_text, row_count=len(ALL_SPECS), column_count=7)
 
     gate_count_text = plot_text_by_id["selection_design_class_gate_counts"]
     assert "Passes protein gate" in gate_count_text
-    assert "Fold-review reserve" in gate_count_text
     assert "Blocked by gate" in gate_count_text
-    assert "Missing fold or feasibility input" in gate_count_text
+    assert "Missing gate input" in gate_count_text
+    assert "Fold-review reserve" not in gate_count_text
     assert "Manual reserve" not in gate_count_text
     assert "Excluded" not in gate_count_text
     assert_svg_has_square_panel(gate_count_text)
@@ -75,4 +76,6 @@ def assert_selection_plot_contract(
         row_count=len(ALL_SPECS),
         column_count=len(LOCAL_STRUCTURE_REGION_IDS),
     )
+    assert "selection_local_structure_stratification" in plot_text_by_id
+    assert "Exploratory threshold" in plot_text_by_id["selection_local_structure_stratification"]
     assert not retired_plot.exists()

@@ -65,13 +65,13 @@ def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> N
         "Distal edits",
         "Chemistry warnings",
         "Fold gate",
-        "ESMC/SAE",
+        "Local structure",
     ]
     assert len(row_labels) == len(ALL_SPECS)
     assert len(matrix) == len(ALL_SPECS)
     assert matrix[0][0].text == "0"
     assert matrix[0][5].text == "strong"
-    assert matrix[0][6].text == "review"
+    assert matrix[0][6].text == "1.25"
 
 
 def test_class_local_moderate_percentile_prefers_class_median() -> None:

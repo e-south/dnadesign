@@ -231,8 +231,11 @@ motif-QC, and explicit exclusion metadata. Both selected profile alignments
 have since been accepted under the declared Clustal Omega policy, and the
 study-owned conservation materializer has produced
 `conservation_profile.parquet`. The current mask is the clade-9 plurality-25 /
-direct-contact-5 A rule, and the current runtime gate is backend sample ingest
-into `sample_table.parquet`.
+direct-contact-5 A rule. Backend sample ingest has already produced
+`sample_table.parquet`; the current runtime gate for panel review is
+selection readiness over the expanded candidate pool, including exact
+six-class coverage, feasibility, fold class, mutation geography, local
+chemistry, and local-structure metric availability.
 
 ### External Source Links
 

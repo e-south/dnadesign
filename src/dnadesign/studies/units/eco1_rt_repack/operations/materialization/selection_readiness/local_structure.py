@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -30,6 +31,19 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 COORDINATE_SCOPE = "mapped_rt_chain_ca_after_global_fit"
 MIN_GLOBAL_ALIGNMENT_CA = 3
 MIN_REGION_CA = 3
+LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_structure_rmsd_gate_v1"
+LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE = (
+    "Exploratory local C-alpha RMSD limits set from the current all-candidate distribution and used as "
+    "selection-readiness preservation gates, not activity evidence."
+)
+LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
+    "catalytic_initiation_context": 1.50,
+    "retron_x_naxxh_context": 1.25,
+    "retron_y_vtg_context": 1.60,
+    "thumb_contact_track_context": 3.00,
+    "near_retained_dna_rna_annulus": 3.00,
+    "distal_scaffold_control": 4.75,
+}
 
 
 @dataclass(frozen=True)
@@ -40,6 +54,7 @@ class LocalStructureRegionSpec:
     label: str
     role: str
     positions: tuple[int, ...]
+    position_source: str
 
 
 _STATIC_REGION_SPECS = (
@@ -48,24 +63,28 @@ _STATIC_REGION_SPECS = (
         label="Catalytic YADD context",
         role="catalytic_initiation_review",
         positions=tuple(range(189, 205)),
+        position_source="explicit Eco1 residues 189-204 around the YADD catalytic motif",
     ),
     LocalStructureRegionSpec(
         region_id="retron_x_naxxh_context",
         label="Retron X NAxxH context",
         role="retron_motif_review",
         positions=tuple(range(99, 116)),
+        position_source="explicit Eco1 residues 99-115 around the NAxxH retron X motif",
     ),
     LocalStructureRegionSpec(
         region_id="retron_y_vtg_context",
         label="Retron Y VTG context",
         role="retron_motif_review",
         positions=tuple(range(237, 252)),
+        position_source="explicit Eco1 residues 237-251 around the VTG retron Y motif",
     ),
     LocalStructureRegionSpec(
         region_id="thumb_contact_track_context",
         label="Wang thumb-contact track",
         role="thumb_contact_review",
         positions=tuple(sorted(WANG_THUMB_CONTACT_TRACK_POSITIONS)),
+        position_source="explicit Wang/Ec86 thumb-contact positions 238,239,240,249,257,261,264,298",
     ),
 )
 
@@ -78,12 +97,16 @@ LOCAL_STRUCTURE_REGION_IDS = tuple(
             label="Near retained DNA/RNA annulus",
             role="substrate_proximal_review",
             positions=(),
+            position_source="derived from retained DNA/RNA distance shell after exclusions",
         ),
         LocalStructureRegionSpec(
             region_id="distal_scaffold_control",
             label="Distal scaffold control",
             role="distal_scaffold_control",
             positions=(),
+            position_source=(
+                "derived from mapped residues not assigned to motif, direct-contact, annulus, or thumb-track regions"
+            ),
         ),
     )
 )
@@ -227,14 +250,87 @@ def local_structure_region_specs(
             label="Near retained DNA/RNA annulus",
             role="substrate_proximal_review",
             positions=tuple(sorted(annulus_positions)),
+            position_source=(
+                f"derived Eco1 residues with retained DNA/RNA distance >{DIRECT_CONTACT_DISTANCE_ANGSTROM:g} A "
+                f"and <={NA_FACING_DISTANCE_ANGSTROM:g} A, excluding motif contexts, direct contacts, "
+                "and Wang thumb-contact positions"
+            ),
         ),
         LocalStructureRegionSpec(
             region_id="distal_scaffold_control",
             label="Distal scaffold control",
             role="distal_scaffold_control",
             positions=tuple(sorted(distal_positions)),
+            position_source=(
+                "derived mapped Eco1 residues outside motif contexts, direct contacts, near-DNA/RNA annulus, "
+                "and Wang thumb-contact positions"
+            ),
         ),
     )
+
+
+def build_local_structure_review_by_candidate(
+    local_structure_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, object]]:
+    """Summarize local-structure rows into a candidate-level gate contract."""
+
+    required_regions = set(LOCAL_STRUCTURE_REGION_IDS)
+    rows_by_candidate: dict[str, list[Mapping[str, Any]]] = {}
+    for row in local_structure_rows:
+        candidate_id = str(row.get("candidate_id") or "")
+        if candidate_id:
+            rows_by_candidate.setdefault(candidate_id, []).append(row)
+    summaries: dict[str, dict[str, object]] = {}
+    for candidate_id, rows in rows_by_candidate.items():
+        rows_by_region = {str(row.get("region_id") or ""): row for row in rows}
+        missing_regions = sorted(required_regions - set(rows_by_region))
+        unavailable_reasons = [f"{region_id}:missing_metric_row" for region_id in missing_regions]
+        available_values: list[float] = []
+        threshold_failures: list[str] = []
+        per_region_fields: dict[str, object] = {}
+        for region_id in LOCAL_STRUCTURE_REGION_IDS:
+            row = rows_by_region.get(region_id)
+            status = "" if row is None else str(row.get("status") or "")
+            value = None if row is None else row.get("local_ca_rmsd_angstrom")
+            per_region_fields[f"local_structure_{region_id}_ca_rmsd_angstrom"] = None if value is None else float(value)
+            if status == "available" and value is not None:
+                numeric_value = float(value)
+                available_values.append(numeric_value)
+                threshold = float(
+                    (row or {}).get("local_ca_rmsd_threshold_angstrom")
+                    or LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+                )
+                if (
+                    str(row.get("local_ca_rmsd_threshold_status") or "") == "threshold_exceeded"
+                    or numeric_value > threshold
+                ):
+                    threshold_failures.append(f"{region_id}:local_ca_rmsd {numeric_value:.3f} > {threshold:.3f}")
+                continue
+            if row is not None:
+                unavailable_reasons.append(f"{region_id}:{status or 'missing_status'}")
+        if unavailable_reasons:
+            gate_status = "unavailable"
+        elif threshold_failures:
+            gate_status = "threshold_exceeded"
+        else:
+            gate_status = "passed"
+        summaries[candidate_id] = {
+            "local_structure_gate_status": gate_status,
+            "local_structure_gate_failure_reasons_json": json.dumps(
+                sorted([*unavailable_reasons, *threshold_failures])
+            ),
+            "local_structure_region_count": len(LOCAL_STRUCTURE_REGION_IDS),
+            "local_structure_available_region_count": len(available_values),
+            "local_structure_unavailable_region_count": len(unavailable_reasons),
+            "local_structure_threshold_failed_region_count": len(threshold_failures),
+            "local_structure_threshold_policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+            "local_structure_max_ca_rmsd_angstrom": round(max(available_values), 3) if available_values else None,
+            "local_structure_mean_ca_rmsd_angstrom": round(sum(available_values) / len(available_values), 3)
+            if available_values
+            else None,
+            **per_region_fields,
+        }
+    return summaries
 
 
 def _metric_row(
@@ -268,6 +364,7 @@ def _metric_row(
             "local_ca_rmsd_angstrom": None,
             "mean_ca_displacement_angstrom": None,
             "max_ca_displacement_angstrom": None,
+            "local_ca_rmsd_threshold_status": "not_evaluated",
             "status": "insufficient_region_overlap",
             "status_reason": f"shared region C-alpha count {len(shared_positions)} is below {MIN_REGION_CA}",
         }
@@ -275,11 +372,16 @@ def _metric_row(
         float(np.linalg.norm(candidate_ca[position] - reference_ca[position])) for position in shared_positions
     ]
     squared = sum(displacement * displacement for displacement in displacements) / len(displacements)
+    local_ca_rmsd = round(math.sqrt(squared), 3)
     return {
         **base,
-        "local_ca_rmsd_angstrom": round(math.sqrt(squared), 3),
+        "local_ca_rmsd_angstrom": local_ca_rmsd,
         "mean_ca_displacement_angstrom": round(sum(displacements) / len(displacements), 3),
         "max_ca_displacement_angstrom": round(max(displacements), 3),
+        "local_ca_rmsd_threshold_status": _threshold_status(
+            region_id=spec.region_id,
+            local_ca_rmsd=local_ca_rmsd,
+        ),
         "status": "available",
         "status_reason": "",
     }
@@ -322,6 +424,7 @@ def _status_rows(
             "local_ca_rmsd_angstrom": None,
             "mean_ca_displacement_angstrom": None,
             "max_ca_displacement_angstrom": None,
+            "local_ca_rmsd_threshold_status": "not_evaluated",
             "status": status,
             "status_reason": status_reason,
         }
@@ -346,13 +449,24 @@ def _base_row(
         "region_id": spec.region_id,
         "region_label": spec.label,
         "region_role": spec.role,
+        "region_position_count": len(spec.positions),
+        "region_position_spec": _position_spec(spec.positions),
+        "region_position_source": spec.position_source,
         "coordinate_scope": COORDINATE_SCOPE,
         "n_reference_ca": n_reference_ca,
         "n_candidate_ca": n_candidate_ca,
         "n_shared_ca": n_shared_ca,
+        "local_ca_rmsd_threshold_angstrom": LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[spec.region_id],
+        "local_ca_rmsd_threshold_policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+        "local_ca_rmsd_threshold_policy_note": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE,
         "source_model_path": "" if source_model_path is None else str(source_model_path),
         "reference_model_path": str(reference_model_path),
     }
+
+
+def _threshold_status(*, region_id: str, local_ca_rmsd: float) -> str:
+    threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+    return "passed" if float(local_ca_rmsd) <= threshold else "threshold_exceeded"
 
 
 def _aligned_candidate_ca(
@@ -445,11 +559,36 @@ def _retained_na_distance(row: Mapping[str, Any]) -> float | None:
     return None
 
 
+def _position_spec(positions: Sequence[int]) -> str:
+    ordered = sorted({int(position) for position in positions})
+    if not ordered:
+        return ""
+    ranges: list[str] = []
+    start = ordered[0]
+    previous = ordered[0]
+    for position in ordered[1:]:
+        if position == previous + 1:
+            previous = position
+            continue
+        ranges.append(_format_range(start, previous))
+        start = previous = position
+    ranges.append(_format_range(start, previous))
+    return ",".join(ranges)
+
+
+def _format_range(start: int, end: int) -> str:
+    return str(start) if start == end else f"{start}-{end}"
+
+
 __all__ = [
     "COORDINATE_SCOPE",
     "LOCAL_STRUCTURE_REGION_IDS",
+    "LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID",
+    "LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE",
+    "LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM",
     "LocalStructureRegionSpec",
     "build_local_structure_region_rows",
+    "build_local_structure_review_by_candidate",
     "local_structure_region_specs",
     "mapped_positions_from_residue_map",
 ]

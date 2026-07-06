@@ -348,6 +348,27 @@ Phase 3 fold-check report validation:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_validation --repo-root . --phase phase3_foldcheck_report
 ```
 
+### Local-Structure Region Crosswalk
+
+The selection-readiness local-structure gate uses explicit Eco1 residue sets and
+derived contact shells. "Branch-recognition" is a shorthand for the protected
+retron-initiation context represented here by the NAxxH and VTG motif contexts,
+the YADD catalytic context, and retained DNA/RNA contact geometry; it is not a
+separate branch-pocket model in this slice.
+
+| Region id | Residue basis | Current local RMSD threshold |
+| --- | --- | ---: |
+| `retron_x_naxxh_context` | Eco1 residues 99-115 around NAxxH 105-109 | 1.25 A |
+| `catalytic_initiation_context` | Eco1 residues 189-204 around YADD 195-198 | 1.50 A |
+| `retron_y_vtg_context` | Eco1 residues 237-251 around VTG 243-245 | 1.60 A |
+| `thumb_contact_track_context` | Wang/Ec86 positions 238, 239, 240, 249, 257, 261, 264, and 298 | 3.00 A |
+| `near_retained_dna_rna_annulus` | Derived residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions | 3.00 A |
+| `distal_scaffold_control` | Mapped residues outside motif contexts, direct contacts, annulus, and thumb-track positions | 4.75 A |
+
+All local RMSD values are computed after one global mapped C-alpha fit to the
+ec86kit/7V9U-backed reference. Region-specific fitting is not used because it
+would hide local shifts relative to the global fold.
+
 ### Current Next Actions
 
 1. Review the expanded panel-selection bundle under
@@ -356,30 +377,37 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.contract_vali
    not a synthesis quote or wet-lab assembly plan. All 576 expanded synthetic
    rows are currently feasible under this computational gate.
 3. Use `candidate_triage_table.parquet` as the reviewer filter surface. It has
-   468 eligible rows, 105 low-confidence rows marked ineligible, and 3
-   review-band rows marked as manual reserve only. The regenerated table now
-   adds MSA support, mutation geography near retained DNA/RNA or thumb-track,
-   local chemistry, and source-artifact hashes for those review axes. Canonical
-   mutation tokens are parsed strictly because mutation geography now affects
-   hard-gate status.
-4. Use the eight panel-selection SVGs under `selection/plots/` for notebook
-   review: `selection_premise_alignment`, `selection_design_class_gate_counts`,
-   `selection_class_local_percentiles`, `selection_six_sequence_distance`,
+   468 eligible rows and 108 ineligible rows. The regenerated table now adds
+   MSA support, mutation geography near retained DNA/RNA or thumb-track, local
+   chemistry, local-structure gate fields, and source-artifact hashes for those
+   review axes. Canonical mutation tokens are parsed strictly because mutation
+   geography now affects hard-gate status. Local-structure metrics must be
+   available for each declared review region and pass the exploratory local
+   C-alpha RMSD thresholds before a row can be panel-eligible. In the current
+   expanded pool, 571 rows pass the local-structure gate and 5 rows exceed a
+   local RMSD threshold.
+4. Use the nine panel-selection SVGs under `selection/plots/` for notebook
+   review: `selection_design_class_gate_counts`,
+   `selection_local_structure_stratification`,
+   `selection_local_structure_by_region`,
+   `selection_class_local_percentiles`, `selection_premise_alignment`,
    `selection_selected_substitutions_across_rt`,
    `selection_regional_mutation_burden`,
-   `selection_local_structure_by_region`, and
-   `selection_na_facing_chemistry_balance`. They show the selected-panel
-   premise checklist, gate counts by design class, within-class review
-   percentiles, selected-row sequence distance, selected substitutions across
-   RT regions, regional mutation burden, local backbone-shift review by RT
-   region, and chemistry changes near retained DNA/RNA or thumb-track
-   positions.
+   `selection_na_facing_chemistry_balance`, and
+   `selection_six_sequence_distance`. They show pass/fail gate counts by design
+   class, local RMSD thresholds against the candidate population,
+   selected-row local RMSD by RT region, within-class review percentiles, the
+   selected-panel premise checklist, selected substitutions across RT regions,
+   regional mutation burden, chemistry changes near retained DNA/RNA or
+   thumb-track positions, and selected-row sequence distance.
 5. Use `candidate_selection_panel.parquet` and
    `candidate_handoff_sequences.csv` as the current six-row RT-only protein
    review surface. The panel selects one feasible, fold-preserved
-   representative from each design class by MSA support, mutation geography
-   near retained DNA/RNA or thumb-track, local chemistry warnings, sequence
-   nonredundancy, and fold metrics. The selected rows are all
+   representative from each design class after local-structure threshold gates,
+   then uses MSA support, mutation geography near retained DNA/RNA or
+   thumb-track, local chemistry warnings, local/global fold metrics, and
+   sequence nonredundancy.
+   The selected rows are all
    `strong_fold_preserved`:
    `thread_candidate_f8de74828ad8`,
    `thread_candidate_3b8ec09dffa4`, `thread_candidate_8145a7ffbfd6`,

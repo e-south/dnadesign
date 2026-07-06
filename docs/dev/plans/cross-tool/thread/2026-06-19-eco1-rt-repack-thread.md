@@ -105,7 +105,7 @@ Materialized inputs for this slice:
 - Baseline `foldcheck_review/foldcheck_full_structure_set.yaml`: local
   normalized PDBs for WT plus the first 96 baseline candidates, with raw
   ColabFold trees still on BU SCC. The expanded design-class fold-check root is
-  the current source for 576-row assay-panel preparation.
+  the current source for the 576-row protein review panel.
 - Baseline `biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits
   materialization accepted all 97 query rows.
 - `design_classes/biohub_esmc_sae_profile.parquet`: Biohub ESMC/logits
@@ -492,7 +492,6 @@ Allowed `hard_gate_status` values:
 ```text
 eligible
 ineligible
-needs_review
 missing_inputs
 ```
 
@@ -503,6 +502,9 @@ Hard gates stay narrow:
 - zero protected-position mutations;
 - zero catalytic or direct DNA/RNA-contact mutations;
 - accepted fold-check row;
+- available local-structure metrics for each declared RT review region;
+- local C-alpha RMSD at or below the exploratory threshold for each declared
+  RT review region;
 - fold-review class allowed by the selection policy;
 - feasible synthesis/buildability row;
 - required upstream hashes present.
@@ -1020,14 +1022,15 @@ Main outputs:
 - `candidate_triage_table.parquet`
 - `candidate_selection_panel.parquet`
 - `candidate_handoff_sequences.csv`
-- `plots/selection_premise_alignment.svg`
 - `plots/selection_design_class_gate_counts.svg`
+- `plots/selection_local_structure_stratification.svg`
+- `plots/selection_local_structure_by_region.svg`
 - `plots/selection_class_local_percentiles.svg`
-- `plots/selection_six_sequence_distance.svg`
+- `plots/selection_premise_alignment.svg`
 - `plots/selection_selected_substitutions_across_rt.svg`
 - `plots/selection_regional_mutation_burden.svg`
-- `plots/selection_local_structure_by_region.svg`
 - `plots/selection_na_facing_chemistry_balance.svg`
+- `plots/selection_six_sequence_distance.svg`
 
 Purpose:
 

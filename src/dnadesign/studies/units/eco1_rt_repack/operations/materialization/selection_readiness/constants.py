@@ -35,5 +35,4 @@ SELECTION_POLICY_ID = "eco1_rt_structure_evolution_class_representative_panel_v1
 CODON_POLICY_ID = "protein_sequence_only_no_codon_design_v1"
 SAE_WINDOW_SELECTION_THRESHOLD = 0.005
 ALLOWED_FOLD_CLASSES = {"strong_fold_preserved", "good_fold_preserved"}
-REVIEW_ONLY_FOLD_CLASSES = {"review_band"}
 AMINO_ACIDS = set("ACDEFGHIKLMNPQRSTVWY")

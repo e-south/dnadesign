@@ -24,6 +24,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
     LOCAL_STRUCTURE_REGION_IDS,
+    LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+    LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
     class_label,
@@ -140,17 +142,156 @@ def write_local_structure_by_region_plot(
         alt_text=alt,
         description=(
             "Shows local backbone shifts by RT review region after a single global mapped C-alpha alignment. "
+            "Every selected row must have all declared local-structure metrics and pass the exploratory local RMSD "
+            "thresholds. "
             f"Unavailable statuses: {', '.join(unavailable_statuses) if unavailable_statuses else 'none'}."
         ),
         interpretation_limit=(
-            "Local C-alpha RMSD is structural review evidence only. It is not an activity, processivity, "
-            "strand-displacement, or assay-readiness measurement."
+            "Local C-alpha RMSD is a structural review metric, not an activity, processivity, strand-displacement, "
+            "or assay-readiness measurement."
         ),
         render_mode="wide_visual",
     )
 
 
+def write_local_structure_stratification_plot(
+    plot_root: Path,
+    *,
+    triage_rows: list[dict[str, object]],
+    panel_rows: list[dict[str, object]],
+    local_structure_rows: list[dict[str, object]],
+    input_hashes: dict[str, str | None],
+) -> dict[str, Any]:
+    """Write population local-RMSD threshold stratification plot."""
+
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_local_structure_stratification"]
+    selected_candidates = {str(row["candidate_id"]) for row in panel_rows}
+    hard_gate_by_candidate = {
+        str(row["candidate_id"]): str(row.get("hard_gate_status") or "")
+        for row in triage_rows
+        if row.get("candidate_id")
+    }
+    labels_by_region = {
+        str(row["region_id"]): str(row.get("region_label") or row["region_id"]) for row in local_structure_rows
+    }
+    values_by_region: dict[str, list[tuple[float, str, bool, str]]] = {
+        region_id: [] for region_id in LOCAL_STRUCTURE_REGION_IDS
+    }
+    for row in local_structure_rows:
+        region_id = str(row.get("region_id") or "")
+        if region_id not in values_by_region or str(row.get("status") or "") != "available":
+            continue
+        value = row.get("local_ca_rmsd_angstrom")
+        if value is None:
+            continue
+        candidate_id = str(row.get("candidate_id") or "")
+        values_by_region[region_id].append(
+            (
+                float(value),
+                candidate_id,
+                candidate_id in selected_candidates,
+                hard_gate_by_candidate.get(candidate_id, ""),
+            )
+        )
+    region_labels = [
+        labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_REGION_IDS
+    ]
+    fig, ax = plt.subplots(figsize=(9.8, 7.4))
+    y_positions = np.arange(len(LOCAL_STRUCTURE_REGION_IDS), dtype=float)
+    max_x = 0.0
+    for y_index, region_id in enumerate(LOCAL_STRUCTURE_REGION_IDS):
+        region_values = values_by_region[region_id]
+        max_x = max(max_x, max([value for value, *_rest in region_values], default=0.0))
+        threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+        max_x = max(max_x, threshold)
+        all_values = [value for value, _candidate_id, selected, _status in region_values if not selected]
+        selected_values = [value for value, _candidate_id, selected, _status in region_values if selected]
+        if all_values:
+            jitter = _deterministic_jitter(len(all_values), amplitude=0.22)
+            ax.scatter(
+                all_values,
+                [y_positions[y_index] + offset for offset in jitter],
+                s=18,
+                color="#8c959f",
+                alpha=0.35,
+                linewidth=0,
+                label="Nonselected candidate" if y_index == 0 else None,
+            )
+        if selected_values:
+            ax.scatter(
+                selected_values,
+                [y_positions[y_index]] * len(selected_values),
+                s=68,
+                color="#0072b2",
+                edgecolor="#ffffff",
+                linewidth=0.85,
+                label="Selected panel row" if y_index == 0 else None,
+                zorder=4,
+            )
+        ax.plot(
+            [threshold, threshold],
+            [y_positions[y_index] - 0.35, y_positions[y_index] + 0.35],
+            color="#d55e00",
+            linewidth=2.0,
+            solid_capstyle="butt",
+            label="Exploratory threshold" if y_index == 0 else None,
+        )
+        failed = sum(value > threshold for value, *_rest in region_values)
+        ax.text(
+            max_x + 0.08,
+            y_positions[y_index],
+            f">{threshold:.2f} A: {failed}",
+            ha="left",
+            va="center",
+            fontsize=9.2,
+            color="#57606a",
+        )
+    ax.set_yticks(y_positions)
+    ax.set_yticklabels(region_labels, fontsize=LABEL_SIZE - 0.5)
+    ax.invert_yaxis()
+    ax.set_xlabel("Local C-alpha RMSD after global fit (A)", fontsize=LABEL_SIZE)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    ax.set_xlim(left=0.0, right=max_x + 0.9)
+    ax.legend(loc="lower right", frameon=False, fontsize=10)
+    style = {"color": "#d8dee4", "linewidth": 0.7}
+    ax.grid(axis="x", **style)
+    ax.grid(axis="y", visible=False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    fig.subplots_adjust(left=0.29, right=0.96, top=0.9, bottom=0.14)
+    path = plot_root / "selection_local_structure_stratification.svg"
+    alt = (
+        "Population stratification plot for local C-alpha RMSD by RT review region. Gray points are nonselected "
+        "candidates, blue points are selected panel rows, and orange markers show exploratory per-region thresholds."
+    )
+    save_accessible_svg(fig, path, title=title, description=alt)
+    return plot_row(
+        plot_id="selection_local_structure_stratification",
+        title=title,
+        path=path,
+        input_hashes=input_hashes,
+        alt_text=alt,
+        description=(
+            "Shows how the local-structure thresholds sit relative to the candidate population. Rows exceeding a "
+            f"region threshold fail the local-structure gate under {LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID}."
+        ),
+        interpretation_limit=(
+            "These thresholds are structural preservation gates for review readiness. They do not measure RT activity, "
+            "processivity, strand displacement, or assay readiness."
+        ),
+        render_mode="wide_visual",
+    )
+
+
+def _deterministic_jitter(count: int, *, amplitude: float) -> list[float]:
+    if count <= 1:
+        return [0.0] * count
+    offsets = np.linspace(-amplitude, amplitude, num=count)
+    return [float(offset) for offset in offsets]
+
+
 __all__ = [
     "build_selected_local_structure_matrix",
     "write_local_structure_by_region_plot",
+    "write_local_structure_stratification_plot",
 ]

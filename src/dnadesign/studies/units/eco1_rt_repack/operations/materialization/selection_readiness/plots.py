@@ -38,7 +38,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 from ..review_deliverables.rt_annotation_context import RTAnnotationContext
 from .chemistry_balance import write_na_facing_chemistry_balance_plot
-from .local_structure_plot import write_local_structure_by_region_plot
+from .local_structure_plot import write_local_structure_by_region_plot, write_local_structure_stratification_plot
 from .premise_alignment import write_premise_alignment_plot
 from .regional_plots import (
     write_regional_mutation_burden_plot,
@@ -49,18 +49,16 @@ from .visual_inventory import RETIRED_SELECTION_PLOT_FILE_NAMES, SELECTION_PLOT_
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-_STATUS_ORDER = ("eligible", "needs_review", "ineligible", "missing_inputs")
+_STATUS_ORDER = ("eligible", "ineligible", "missing_inputs")
 _STATUS_COLORS = {
     "eligible": OKABE_ITO["green"],
-    "needs_review": OKABE_ITO["orange"],
     "ineligible": "#8c959f",
     "missing_inputs": OKABE_ITO["vermillion"],
 }
 _STATUS_LABELS = {
     "eligible": "Passes protein gate",
-    "needs_review": "Fold-review reserve",
     "ineligible": "Blocked by gate",
-    "missing_inputs": "Missing fold or feasibility input",
+    "missing_inputs": "Missing gate input",
 }
 
 
@@ -80,18 +78,25 @@ def write_selection_readiness_plots(
     plot_root.mkdir(parents=True, exist_ok=True)
     _remove_retired_selection_plots(plot_root)
     return [
+        _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
+        write_local_structure_stratification_plot(
+            plot_root,
+            triage_rows=triage_rows,
+            panel_rows=panel_rows,
+            local_structure_rows=local_structure_rows,
+            input_hashes=input_hashes,
+        ),
+        write_local_structure_by_region_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            local_structure_rows=local_structure_rows,
+            input_hashes=input_hashes,
+        ),
+        _write_class_local_percentiles(plot_root, triage_rows, panel_rows, input_hashes),
         write_premise_alignment_plot(
             plot_root,
             panel_rows=panel_rows,
             triage_rows=triage_rows,
-            input_hashes=input_hashes,
-        ),
-        _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
-        _write_class_local_percentiles(plot_root, triage_rows, panel_rows, input_hashes),
-        _write_selected_sequence_distance(
-            plot_root,
-            panel_rows=panel_rows,
-            candidate_rows=candidate_rows,
             input_hashes=input_hashes,
         ),
         write_selected_substitutions_across_rt_plot(
@@ -109,16 +114,16 @@ def write_selection_readiness_plots(
             mask_residues=mask_residues,
             input_hashes=input_hashes,
         ),
-        write_local_structure_by_region_plot(
-            plot_root,
-            panel_rows=panel_rows,
-            local_structure_rows=local_structure_rows,
-            input_hashes=input_hashes,
-        ),
         write_na_facing_chemistry_balance_plot(
             plot_root,
             panel_rows=panel_rows,
             triage_rows=triage_rows,
+            input_hashes=input_hashes,
+        ),
+        _write_selected_sequence_distance(
+            plot_root,
+            panel_rows=panel_rows,
+            candidate_rows=candidate_rows,
             input_hashes=input_hashes,
         ),
     ]
@@ -256,9 +261,8 @@ def _write_design_class_gate_counts(
     fig.subplots_adjust(left=0.27, right=0.97, top=0.87, bottom=0.28)
     path = plot_root / "selection_design_class_gate_counts.svg"
     alt = (
-        "Stacked horizontal bars show candidates that pass the protein gate, fold-review reserve candidates, "
-        "blocked candidates, and candidates missing fold or feasibility input for each Eco1 design class. "
-        "Each class has one selected candidate label."
+        "Stacked horizontal bars show candidates that pass the protein gate, candidates blocked by gate checks, "
+        "and candidates missing gate inputs for each Eco1 design class. Each class has one selected candidate label."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(

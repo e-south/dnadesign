@@ -16,6 +16,8 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+_RT_LENGTH = 320
+
 
 def write_selection_source_inputs(source_root: Path) -> None:
     """Write compact source artifacts needed by review-axis materialization."""
@@ -45,7 +47,7 @@ def _residue_map_rows() -> list[dict[str, object]]:
             "wt_aa": "A",
             "mapping_status": "mapped",
         }
-        for position in range(1, 221)
+        for position in range(1, _RT_LENGTH + 1)
     ]
 
 
@@ -69,7 +71,7 @@ def _profile_rows(profile_id: str) -> list[dict[str, object]]:
             "mapping_status": "mapped",
             "evidence_status": "usable",
         }
-        for position in range(1, 221)
+        for position in range(1, _RT_LENGTH + 1)
     ]
 
 
@@ -79,13 +81,13 @@ def _contact_geometry_rows() -> list[dict[str, object]]:
             "canonical_position": position,
             "nearest_context_atom_distance_angstrom": 8.0 if position < 30 else 15.0,
         }
-        for position in range(1, 221)
+        for position in range(1, _RT_LENGTH + 1)
     ]
 
 
 def _mask_set_yaml() -> str:
     rows = ["mask_policy_id: test_mask", "residues:"]
-    for position in range(1, 221):
+    for position in range(1, _RT_LENGTH + 1):
         rows.extend(
             [
                 f"  - canonical_position: {position}",
@@ -96,7 +98,7 @@ def _mask_set_yaml() -> str:
 
 
 def _write_alignment(path: Path, *, row_prefix: str) -> None:
-    observed = list("A" * 220)
+    observed = list("A" * _RT_LENGTH)
     for position in range(3, 12):
         observed[position - 1] = "G"
     for position in range(21, 30):
@@ -105,11 +107,11 @@ def _write_alignment(path: Path, *, row_prefix: str) -> None:
         "\n".join(
             [
                 ">eco1_rt_ec86kit_reference",
-                "A" * 220,
+                "A" * _RT_LENGTH,
                 f">{row_prefix}_source_1",
                 "".join(observed),
                 f">{row_prefix}_source_2",
-                "A" * 220,
+                "A" * _RT_LENGTH,
             ]
         )
         + "\n",

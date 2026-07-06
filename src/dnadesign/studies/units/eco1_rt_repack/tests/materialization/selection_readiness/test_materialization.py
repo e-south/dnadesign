@@ -88,6 +88,10 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert all(row["selection_support_alt_observed_fraction"] is not None for row in triage)
     assert all(row["nucleic_acid_facing_mutation_count"] is not None for row in triage)
     assert all(row["nucleic_acid_facing_chemistry_warning_count"] is not None for row in triage)
+    assert all(row["local_structure_gate_status"] == "passed" for row in triage)
+    assert all(row["local_structure_unavailable_region_count"] == 0 for row in triage)
+    assert all(row["local_structure_threshold_failed_region_count"] == 0 for row in triage)
+    assert all(row["local_structure_max_ca_rmsd_angstrom"] is not None for row in triage)
 
     panel = pq.read_table(result.candidate_selection_panel_path).to_pylist()
     assert len(panel) == len(ALL_SPECS)
@@ -104,13 +108,17 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "selection_support_alt_observed_fraction" in panel[0]["tie_break_trace_json"]
     assert "mutation_count_total" in panel[0]["tie_break_trace_json"]
     assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
+    assert "local_structure_gate_status" in panel[0]["tie_break_trace_json"]
+    assert "local_structure_catalytic_initiation_context_ca_rmsd_angstrom" in panel[0]["tie_break_trace_json"]
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["path_policy"] == "paths_relative_to_selection_manifest"
     assert all(not Path(value).is_absolute() for value in manifest["source_tables"].values())
     assert all(not Path(value).is_absolute() for value in manifest["artifacts"].values())
     assert manifest["gate_counts"]["hard_gate_status"] == {"eligible": len(panel), "ineligible": 2}
+    assert manifest["gate_counts"]["local_structure_gate_status"] == {"passed": len(triage)}
     assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
+    assert "local_structure_rmsd_threshold_policy" in manifest
     assert manifest["selected_candidate_ids"] == [row["candidate_id"] for row in panel]
     assert manifest["handoff_readiness"] == {
         "handoff_kind": "rt_only_candidate_handoff",

@@ -25,14 +25,19 @@ class SelectionPlot:
 
 CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
-        plot_id="selection_premise_alignment",
-        file_name="selection_premise_alignment.svg",
-        plain_title="Selected candidates show zero core/contact edits and regional changes",
-    ),
-    SelectionPlot(
         plot_id="selection_design_class_gate_counts",
         file_name="selection_design_class_gate_counts.svg",
-        plain_title="Each mask class contributes fold-preserved candidates",
+        plain_title="Each mask class retains protein-gate candidates",
+    ),
+    SelectionPlot(
+        plot_id="selection_local_structure_stratification",
+        file_name="selection_local_structure_stratification.svg",
+        plain_title="Local RMSD thresholds are shown against the candidate pool",
+    ),
+    SelectionPlot(
+        plot_id="selection_local_structure_by_region",
+        file_name="selection_local_structure_by_region.svg",
+        plain_title="Selected local RT regions pass RMSD thresholds",
     ),
     SelectionPlot(
         plot_id="selection_class_local_percentiles",
@@ -40,9 +45,9 @@ CURRENT_SELECTION_PLOTS = (
         plain_title="Each selected row is reviewed within its own mask class",
     ),
     SelectionPlot(
-        plot_id="selection_six_sequence_distance",
-        file_name="selection_six_sequence_distance.svg",
-        plain_title="The selected six sample distinct sequence neighborhoods",
+        plot_id="selection_premise_alignment",
+        file_name="selection_premise_alignment.svg",
+        plain_title="Selected candidates show core/contact, local, and regional checks",
     ),
     SelectionPlot(
         plot_id="selection_selected_substitutions_across_rt",
@@ -55,14 +60,14 @@ CURRENT_SELECTION_PLOTS = (
         plain_title="Selected candidates differ in which RT regions carry mutations",
     ),
     SelectionPlot(
-        plot_id="selection_local_structure_by_region",
-        file_name="selection_local_structure_by_region.svg",
-        plain_title="Local RT regions are checked for backbone shifts",
-    ),
-    SelectionPlot(
         plot_id="selection_na_facing_chemistry_balance",
         file_name="selection_na_facing_chemistry_balance.svg",
         plain_title="Chemistry changes near DNA/RNA or thumb-track are review context",
+    ),
+    SelectionPlot(
+        plot_id="selection_six_sequence_distance",
+        file_name="selection_six_sequence_distance.svg",
+        plain_title="The selected six sample distinct sequence neighborhoods",
     ),
 )
 

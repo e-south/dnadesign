@@ -1,10 +1,12 @@
 ## Eco1 RT Repack Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-19
+**Last verified:** 2026-07-06
 
-This directory stores the planned machine-readable study contract. It is a
-record-plane scaffold, not an executable provider.
+This directory stores study-owned contract surfaces for Eco1 RT repack. Some
+early readiness files are scaffold records; current phase validation and
+selection-readiness checks also have executable providers under
+`src/dnadesign/studies/units/eco1_rt_repack/operations/`.
 
 ### Contents
 
@@ -30,12 +32,10 @@ record-plane scaffold, not an executable provider.
 | `candidate_handoff` | Requires selected candidates, upstream hash closure, fold QA, and feasibility. |
 | `downstream_rt_lnrna_handoff` | Routes RT-only candidates to the downstream study without claiming construct ownership. |
 
-Do not add an executable provider until at least one readiness group has a
-machine-checkable implementation target.
-
-Current readiness files intentionally use supported study preflight kinds. Most
-Phase 1 and Phase 2 checks are scaffold-level `path_exists` checks plus explicit
-validator intent. They are not acceptance evidence for materialized candidates
-until code-backed validators check artifact state, required fields/columns,
-upstream hashes, fixture-vs-materialized separation, and the negative cases in
-`fixtures/thread/conservative_mask_cases.yaml`.
+Current readiness files intentionally use supported study preflight kinds. Some
+Phase 1 and Phase 2 checks remain scaffold-level `path_exists` checks plus
+explicit validator intent. Candidate-level acceptance evidence now comes from
+code-backed validators and materializers that check artifact state, required
+fields/columns, upstream hashes, fixture-vs-materialized separation, exact
+six-class panel coverage, sequence-export scope, local-structure metric
+availability, and negative cases in `fixtures/thread/conservative_mask_cases.yaml`.

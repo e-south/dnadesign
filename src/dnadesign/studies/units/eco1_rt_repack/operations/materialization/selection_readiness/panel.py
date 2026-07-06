@@ -125,6 +125,7 @@ def _choose_representative(
             _int_value(row.get("selection_support_unobserved_mutation_count"), default=9999),
             _int_value(row.get("nucleic_acid_facing_chemistry_warning_count"), default=9999),
             _na_facing_burden_sort_values(row),
+            _local_structure_sort_values(row),
             -(nearest_distance if nearest_distance is not None else 0),
             -float(row.get("mean_plddt") or 0.0),
             float(row.get("wt_runtime_ca_rmsd") or 9999.0),
@@ -144,10 +145,10 @@ def _panel_row(
     input_hashes: dict[str, str | None],
 ) -> dict[str, object]:
     reason = (
-        f"Selected as the {row['design_class_id']} representative after feasibility and fold gates. "
+        f"Selected as the {row['design_class_id']} representative after feasibility, fold, and local-structure gates. "
         "The tie-breaks use MSA support, near-DNA/RNA chemistry warnings, moderate regional mutation burden, "
-        "fold metrics, and sequence nonredundancy. ESMC and SAE rows were retained for review but not used "
-        "for selection."
+        "local/global fold metrics, and sequence nonredundancy. ESMC and SAE rows were retained for review "
+        "but not used for selection."
     )
     na_facing_count, na_facing_ratio = _na_facing_count_and_ratio(row)
     trace = {
@@ -166,6 +167,17 @@ def _panel_row(
         "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
         "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
         "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
+        "local_structure_gate_status": row["local_structure_gate_status"],
+        "local_structure_max_ca_rmsd_angstrom": row["local_structure_max_ca_rmsd_angstrom"],
+        "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": row[
+            "local_structure_catalytic_initiation_context_ca_rmsd_angstrom"
+        ],
+        "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": row[
+            "local_structure_thumb_contact_track_context_ca_rmsd_angstrom"
+        ],
+        "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": row[
+            "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom"
+        ],
         "nearest_selected_distance_aa": nearest_distance,
         "fold_review_class": row["fold_review_class"],
         "mean_plddt": row["mean_plddt"],
@@ -239,6 +251,15 @@ def _na_facing_burden_band(count: int, ratio: float) -> str:
     if ratio <= NA_FACING_HIGH_BURDEN_RATIO:
         return "moderate"
     return "broad"
+
+
+def _local_structure_sort_values(row: dict[str, object]) -> tuple[float, float, float, float]:
+    return (
+        _float_value(row.get("local_structure_catalytic_initiation_context_ca_rmsd_angstrom"), default=9999.0),
+        _float_value(row.get("local_structure_thumb_contact_track_context_ca_rmsd_angstrom"), default=9999.0),
+        _float_value(row.get("local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom"), default=9999.0),
+        _float_value(row.get("local_structure_max_ca_rmsd_angstrom"), default=9999.0),
+    )
 
 
 def _float_value(value: object, *, default: float = -1.0) -> float:

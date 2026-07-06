@@ -49,6 +49,8 @@ def selected_triage_rows() -> list[dict[str, object]]:
             "nucleic_acid_facing_chemistry_warning_count": index % 2,
             "hard_gate_status": "eligible",
             "fold_review_class": "strong_fold_preserved",
+            "local_structure_gate_status": "passed",
+            "local_structure_max_ca_rmsd_angstrom": 1.25,
             "sae_window_status": "wt_like_not_used_for_selection",
             "nucleic_acid_facing_charge_delta": index - 3,
             "nucleic_acid_facing_basic_gain_count": index,

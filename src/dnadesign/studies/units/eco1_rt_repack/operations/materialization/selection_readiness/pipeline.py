@@ -46,7 +46,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     write_rows,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
+    LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+    LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE,
+    LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
     build_local_structure_region_rows,
+    build_local_structure_review_by_candidate,
     mapped_positions_from_residue_map,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.models import (
@@ -159,20 +163,9 @@ def materialize_selection_readiness(
         contact_geometry_rows=contact_geometry_rows,
         mask_residues=mask_residues,
     )
-    triage_rows = build_triage_rows(
-        candidate_rows=candidate_rows,
-        fold_review_rows=fold_review_rows,
-        feasibility_rows=feasibility_rows,
-        llr_300m_rows=llr_300m_rows,
-        llr_6b_rows=llr_6b_rows,
-        sae_window_rows=sae_window_rows,
-        review_axis_by_candidate=review_axis_by_candidate,
-        input_hashes=input_hashes,
-    )
-    write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
     local_structure_rows = build_local_structure_region_rows(
         fold_review_rows=_local_structure_source_rows(
-            triage_rows=triage_rows,
+            candidate_rows=candidate_rows,
             fold_review_rows=fold_review_rows,
         ),
         candidate_rows=candidate_rows,
@@ -186,6 +179,19 @@ def materialize_selection_readiness(
         local_structure_rows,
         schema_id="eco1_rt.local_structure_region_metrics",
     )
+    local_structure_review_by_candidate = build_local_structure_review_by_candidate(local_structure_rows)
+    triage_rows = build_triage_rows(
+        candidate_rows=candidate_rows,
+        fold_review_rows=fold_review_rows,
+        feasibility_rows=feasibility_rows,
+        llr_300m_rows=llr_300m_rows,
+        llr_6b_rows=llr_6b_rows,
+        sae_window_rows=sae_window_rows,
+        review_axis_by_candidate=review_axis_by_candidate,
+        local_structure_review_by_candidate=local_structure_review_by_candidate,
+        input_hashes=input_hashes,
+    )
+    write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
     panel_hashes = dict(input_hashes)
     panel_hashes["candidate_triage_table"] = sha256_uri(triage_path)
     rt_annotation_context = _load_rt_annotation_context_if_available(root)
@@ -264,18 +270,20 @@ def _load_rt_annotation_context_if_available(repo_root: Path) -> RTAnnotationCon
 
 def _local_structure_source_rows(
     *,
-    triage_rows: list[dict[str, object]],
+    candidate_rows: list[dict[str, object]],
     fold_review_rows: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     fold_review_by_candidate = {str(row["candidate_id"]): row for row in fold_review_rows if row.get("candidate_id")}
     rows: list[dict[str, object]] = []
-    for triage_row in triage_rows:
-        candidate_id = str(triage_row["candidate_id"])
+    for candidate_row in candidate_rows:
+        if str(candidate_row.get("status")) != "accepted":
+            continue
+        candidate_id = str(candidate_row["candidate_id"])
         fold_row = fold_review_by_candidate.get(candidate_id, {})
         rows.append(
             {
                 "candidate_id": candidate_id,
-                "design_class_id": str(triage_row.get("design_class_id") or ""),
+                "design_class_id": str(candidate_row.get("design_class_id") or ""),
                 "model_artifact_path": fold_row.get("model_artifact_path") or "",
             }
         )
@@ -336,10 +344,18 @@ def _write_manifest(
         "created_at": created_at,
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
-            "Select one feasible fold-preserved representative from each design class, then prefer natural "
-            "sequence support, fewer near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
-            "fold metrics, and sequence nonredundancy. Do not use ESMC or SAE as positive selection evidence."
+            "Select one feasible fold-preserved representative from each design class after all declared "
+            "local-structure metrics are available and within exploratory local RMSD thresholds, then prefer "
+            "natural sequence support, fewer near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
+            "lower local/global fold metrics, and sequence nonredundancy. Do not use ESMC or SAE as positive "
+            "selection evidence."
         ),
+        "local_structure_rmsd_threshold_policy": {
+            "policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+            "policy_note": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE,
+            "coordinate_scope": "mapped_rt_chain_ca_after_global_fit",
+            "thresholds_angstrom": dict(LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM),
+        },
         "sae_window_policy": (
             "SAE windows are retained as review evidence but not used for selection because the current pool "
             "does not meaningfully stratify in SAE-window space."
@@ -385,6 +401,7 @@ def _write_manifest(
             "feasibility_status": _count_by(feasibility_rows, "feasibility_status"),
             "hard_gate_status": _count_by(triage_rows, "hard_gate_status"),
             "fold_review_class": _count_by(triage_rows, "fold_review_class"),
+            "local_structure_gate_status": _count_by(triage_rows, "local_structure_gate_status"),
             "sae_window_status": _count_by(triage_rows, "sae_window_status"),
         },
         "selected_candidate_ids": [str(row["candidate_id"]) for row in panel_rows],
@@ -406,6 +423,8 @@ def _write_manifest(
             "selection-support unobserved mutation count",
             "near retained DNA/RNA or thumb-track chemistry warning count",
             "moderate near retained DNA/RNA or thumb-track mutation burden",
+            "local-structure region metrics available and below RMSD thresholds",
+            "lower local C-alpha RMSD within threshold in catalytic, thumb, and annulus regions",
             "nearest selected sequence distance",
             "fold metrics",
             "mutation count",

@@ -16,7 +16,6 @@ from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     ALLOWED_FOLD_CLASSES,
-    REVIEW_ONLY_FOLD_CLASSES,
     SAE_WINDOW_SELECTION_THRESHOLD,
 )
 
@@ -30,6 +29,7 @@ def build_triage_rows(
     llr_6b_rows: Sequence[dict[str, object]],
     sae_window_rows: Sequence[dict[str, object]],
     review_axis_by_candidate: dict[str, dict[str, object]],
+    local_structure_review_by_candidate: dict[str, dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> list[dict[str, object]]:
     """Build the flat reviewer-facing triage table."""
@@ -50,11 +50,13 @@ def build_triage_rows(
         if candidate_id not in review_axis_by_candidate:
             raise ValueError(f"Missing Eco1 selection review axes for candidate: {candidate_id}")
         review_axes = review_axis_by_candidate[candidate_id]
+        local_structure_review = local_structure_review_by_candidate.get(candidate_id)
         hard_gate_status, reasons = _hard_gate_status(
             candidate=candidate,
             fold=fold,
             feasibility=feasibility,
             review_axes=review_axes,
+            local_structure_review=local_structure_review,
         )
         rows.append(
             {
@@ -75,6 +77,7 @@ def build_triage_rows(
                 "sae_mechanistic_contrast_window_id": None,
                 "sae_mechanistic_contrast_rank": None,
                 **_review_axis_fields(review_axes),
+                **_local_structure_fields(local_structure_review),
                 "feasibility_status": str((feasibility or {}).get("feasibility_status") or ""),
                 "hard_gate_status": hard_gate_status,
                 "hard_gate_failure_reasons_json": json.dumps(reasons, sort_keys=True),
@@ -100,6 +103,7 @@ def _hard_gate_status(
     fold: dict[str, object] | None,
     feasibility: dict[str, object] | None,
     review_axes: dict[str, object] | None = None,
+    local_structure_review: dict[str, object] | None = None,
 ) -> tuple[str, list[str]]:
     reasons: list[str] = []
     if str(candidate.get("status")) != "accepted":
@@ -116,25 +120,29 @@ def _hard_gate_status(
         reasons.append("missing_feasibility_row")
     elif str(feasibility.get("feasibility_status")) != "feasible":
         reasons.append("feasibility_not_feasible")
+    if local_structure_review is None:
+        reasons.append("missing_local_structure_review")
+    else:
+        local_structure_status = str(local_structure_review.get("local_structure_gate_status") or "")
+        if local_structure_status == "unavailable":
+            reasons.append("local_structure_gate_unavailable")
+        elif local_structure_status == "threshold_exceeded":
+            reasons.append("local_structure_threshold_exceeded")
+        elif local_structure_status != "passed":
+            reasons.append("local_structure_gate_not_passed")
     review_class = str((fold or {}).get("review_class") or "")
-    if any(reason.startswith("missing_") for reason in reasons):
-        return "missing_inputs", sorted(reasons)
-    if reasons:
-        if review_class in REVIEW_ONLY_FOLD_CLASSES:
-            reasons.append("fold_review_class_requires_manual_review")
-        return "ineligible", sorted(reasons)
-    if review_class in REVIEW_ONLY_FOLD_CLASSES:
-        return "needs_review", ["fold_review_class_requires_manual_review"]
     if review_class and review_class not in ALLOWED_FOLD_CLASSES:
         reasons.append("fold_review_class_not_allowed")
-    return ("ineligible", sorted(reasons)) if reasons else ("eligible", [])
+    if any(reason.startswith("missing_") for reason in reasons) or "local_structure_gate_unavailable" in reasons:
+        return "missing_inputs", sorted(reasons)
+    if reasons:
+        return "ineligible", sorted(reasons)
+    return "eligible", []
 
 
 def _slot_candidate_status(hard_gate_status: str) -> str:
     if hard_gate_status == "eligible":
         return "eligible_for_class_representative"
-    if hard_gate_status == "needs_review":
-        return "manual_reserve_only"
     return "not_panel_eligible"
 
 
@@ -184,6 +192,29 @@ def _review_axis_fields(values: dict[str, object]) -> dict[str, object]:
         "nucleic_acid_facing_chemistry_warning_count": None,
     }
     fields.update({key: values.get(key) for key in fields if key in values})
+    return fields
+
+
+def _local_structure_fields(values: dict[str, object] | None) -> dict[str, object]:
+    fields = {
+        "local_structure_gate_status": "missing",
+        "local_structure_gate_failure_reasons_json": "[]",
+        "local_structure_region_count": None,
+        "local_structure_available_region_count": None,
+        "local_structure_unavailable_region_count": None,
+        "local_structure_threshold_failed_region_count": None,
+        "local_structure_threshold_policy_id": "",
+        "local_structure_max_ca_rmsd_angstrom": None,
+        "local_structure_mean_ca_rmsd_angstrom": None,
+        "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": None,
+        "local_structure_retron_x_naxxh_context_ca_rmsd_angstrom": None,
+        "local_structure_retron_y_vtg_context_ca_rmsd_angstrom": None,
+        "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": None,
+        "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": None,
+        "local_structure_distal_scaffold_control_ca_rmsd_angstrom": None,
+    }
+    if values is not None:
+        fields.update({key: values.get(key) for key in fields if key in values})
     return fields
 
 

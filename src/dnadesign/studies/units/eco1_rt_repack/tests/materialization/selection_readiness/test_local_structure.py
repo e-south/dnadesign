@@ -17,7 +17,10 @@ import pytest
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
     LOCAL_STRUCTURE_REGION_IDS,
+    LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
+    LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
     build_local_structure_region_rows,
+    build_local_structure_review_by_candidate,
 )
 
 
@@ -52,6 +55,18 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
     assert len(available) == len(LOCAL_STRUCTURE_REGION_IDS)
     assert max(float(row["local_ca_rmsd_angstrom"]) for row in available) == pytest.approx(0.0, abs=1e-6)
     assert max(float(row["mean_ca_displacement_angstrom"]) for row in available) == pytest.approx(0.0, abs=1e-6)
+    assert all(str(row["region_position_spec"]) for row in rows)
+    assert all(int(row["region_position_count"]) > 0 for row in rows)
+    assert all(str(row["region_position_source"]) for row in rows)
+    assert all(row["local_ca_rmsd_threshold_policy_id"] == LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID for row in rows)
+    assert all(row["local_ca_rmsd_threshold_status"] == "passed" for row in rows)
+    catalytic = next(row for row in rows if row["region_id"] == "catalytic_initiation_context")
+    assert catalytic["region_position_spec"] == "189-204"
+    assert "YADD" in str(catalytic["region_position_source"])
+    assert (
+        catalytic["local_ca_rmsd_threshold_angstrom"]
+        == LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["catalytic_initiation_context"]
+    )
 
 
 def test_local_structure_region_rows_report_missing_models(tmp_path: Path) -> None:
@@ -77,6 +92,7 @@ def test_local_structure_region_rows_report_missing_models(tmp_path: Path) -> No
 
     assert {row["status"] for row in rows} == {"model_structure_missing"}
     assert all(row["local_ca_rmsd_angstrom"] is None for row in rows)
+    assert all(row["local_ca_rmsd_threshold_status"] == "not_evaluated" for row in rows)
     assert all("candidate_missing.pdb" in str(row["status_reason"]) for row in rows)
 
 
@@ -104,6 +120,50 @@ def test_local_structure_region_rows_report_insufficient_overlap(tmp_path: Path)
 
     assert {row["status"] for row in rows} == {"insufficient_alignment_overlap"}
     assert all(row["n_shared_ca"] < 3 for row in rows)
+
+
+def test_local_structure_review_summary_requires_all_regions_available() -> None:
+    rows = [
+        {
+            "candidate_id": "candidate_a",
+            "region_id": region_id,
+            "status": "available",
+            "local_ca_rmsd_angstrom": 1.0,
+        }
+        for region_id in LOCAL_STRUCTURE_REGION_IDS
+    ]
+    rows[-1]["status"] = "model_structure_missing"
+
+    summary = build_local_structure_review_by_candidate(rows)["candidate_a"]
+
+    assert summary["local_structure_gate_status"] == "unavailable"
+    assert summary["local_structure_unavailable_region_count"] == 1
+    assert "distal_scaffold_control:model_structure_missing" in summary["local_structure_gate_failure_reasons_json"]
+
+
+def test_local_structure_review_summary_fails_threshold_excess() -> None:
+    rows = [
+        {
+            "candidate_id": "candidate_a",
+            "region_id": region_id,
+            "status": "available",
+            "local_ca_rmsd_angstrom": 1.0,
+            "local_ca_rmsd_threshold_status": "passed",
+        }
+        for region_id in LOCAL_STRUCTURE_REGION_IDS
+    ]
+    failed_region = "thumb_contact_track_context"
+    threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[failed_region]
+    failed_row = next(row for row in rows if row["region_id"] == failed_region)
+    failed_row["local_ca_rmsd_angstrom"] = threshold + 0.2
+    failed_row["local_ca_rmsd_threshold_status"] = "threshold_exceeded"
+    failed_row["local_ca_rmsd_threshold_angstrom"] = threshold
+
+    summary = build_local_structure_review_by_candidate(rows)["candidate_a"]
+
+    assert summary["local_structure_gate_status"] == "threshold_exceeded"
+    assert summary["local_structure_threshold_failed_region_count"] == 1
+    assert f"{failed_region}:local_ca_rmsd" in summary["local_structure_gate_failure_reasons_json"]
 
 
 def _write_ca_pdb(path: Path, rows: list[tuple[int, float, float, float]]) -> None:

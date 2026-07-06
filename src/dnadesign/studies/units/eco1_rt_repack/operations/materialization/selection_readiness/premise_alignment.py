@@ -49,7 +49,7 @@ _COLUMN_LABELS = [
     "Distal edits",
     "Chemistry warnings",
     "Fold gate",
-    "ESMC/SAE",
+    "Local structure",
 ]
 _KIND_TO_CODE = {
     "protected": 0,
@@ -95,7 +95,7 @@ def build_premise_alignment_matrix(
                 PremiseCell(str(_int_field(triage_row, "distal_scaffold_mutation_count")), "context"),
                 PremiseCell(str(chemistry_warnings), "protected" if chemistry_warnings == 0 else "warning"),
                 PremiseCell(_fold_gate_text(triage_row), _fold_gate_kind(triage_row)),
-                PremiseCell("review", "review"),
+                PremiseCell(_local_structure_text(triage_row), _local_structure_kind(triage_row)),
             ]
         )
     return list(_COLUMN_LABELS), row_labels, matrix
@@ -115,7 +115,7 @@ def write_premise_alignment_plot(
     if not matrix:
         raise ValueError("premise-alignment plot requires selected candidates")
     codes = [[_KIND_TO_CODE[cell.kind] for cell in row] for row in matrix]
-    fig, ax = plt.subplots(figsize=(8.6, 7.2))
+    fig, ax = plt.subplots(figsize=(9.4, 7.2))
     cmap = ListedColormap(_KIND_COLORS)
     norm = BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5, 4.5], cmap.N)
     ax.imshow(codes, aspect="equal", interpolation="nearest", cmap=cmap, norm=norm)
@@ -160,7 +160,7 @@ def write_premise_alignment_plot(
     alt = (
         "Selected-six matrix showing catalytic or direct-contact edit counts, near-DNA/RNA annulus edit counts, "
         "thumb-track edit counts, distal edit counts, near-DNA/RNA chemistry warnings, fold gate status, and "
-        "ESMC/SAE review-only status."
+        "local-structure gate status."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -171,8 +171,8 @@ def write_premise_alignment_plot(
         alt_text=alt,
         description=(
             "Summarizes the selected panel against the study premise: protect catalytic and direct-contact positions, "
-            "review peripheral near-DNA/RNA changes, treat distal edits as scaffold context, and keep ESMC/SAE as "
-            "annotations."
+            "review peripheral near-DNA/RNA changes, and treat distal edits as scaffold context. ESMC and SAE are "
+            "kept in model/method checks rather than this core premise matrix."
         ),
         interpretation_limit=(
             "This matrix is a review checklist. It does not establish activity, processivity, strand displacement, "
@@ -192,9 +192,9 @@ def _fold_gate_text(row: dict[str, object]) -> str:
         return "strong"
     if review_class == "good_fold_preserved":
         return "good"
-    if review_class == "review_band":
-        return "reserve"
     if review_class == "low_confidence":
+        return "blocked"
+    if review_class == "review_band":
         return "blocked"
     return review_class.replace("_", " ") or "missing"
 
@@ -202,6 +202,15 @@ def _fold_gate_text(row: dict[str, object]) -> str:
 def _fold_gate_kind(row: dict[str, object]) -> str:
     if str(row.get("hard_gate_status") or "") == "eligible":
         return "context"
-    if str(row.get("hard_gate_status") or "") == "needs_review":
-        return "warning"
     return "blocked"
+
+
+def _local_structure_text(row: dict[str, object]) -> str:
+    if str(row.get("local_structure_gate_status") or "") != "passed":
+        return "blocked"
+    value = row.get("local_structure_max_ca_rmsd_angstrom")
+    return "ok" if value is None else f"{float(value):.2f}"
+
+
+def _local_structure_kind(row: dict[str, object]) -> str:
+    return "context" if str(row.get("local_structure_gate_status") or "") == "passed" else "blocked"

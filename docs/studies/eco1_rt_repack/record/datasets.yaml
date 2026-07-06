@@ -702,7 +702,8 @@ datasets:
       Compact review visual showing the selected six against the panel premise:
       catalytic/direct-contact edits, near-DNA/RNA annulus edits, thumb-track
       edits, distal edits, near-DNA/RNA chemistry warnings, fold gate status,
-      and ESMC/SAE review-only status. It is a checklist for review, not
+      and local-structure gate status. ESMC and SAE stay in model/method
+      checks rather than this core checklist. It is a review visual, not
       activity evidence.
   - id: eco1_rt_selection_design_class_gate_counts
     owner: eco1_rt_repack
@@ -711,9 +712,19 @@ datasets:
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing candidates that pass the protein gate,
-      fold-review reserve candidates, blocked candidates, and rows missing fold
-      or feasibility inputs for each design class. It supports panel review but
-      does not measure RT activity or handoff acceptance.
+      blocked candidates, and rows missing gate inputs for each design class.
+      It supports panel review but does not measure RT activity or handoff
+      acceptance.
+  - id: eco1_rt_selection_local_structure_stratification
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_stratification.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing local C-alpha RMSD distributions by
+      declared RT review region, with selected rows and exploratory threshold
+      markers. It explains the local-structure gate against the candidate
+      population and does not measure RT activity.
   - id: eco1_rt_selection_class_local_percentiles
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -761,8 +772,9 @@ datasets:
     description: >-
       Compact review visual showing selected-candidate local C-alpha RMSD after
       one global mapped C-alpha fit, split by motif, thumb-track, annulus, and
-      distal control regions. It is structural review evidence, not activity or
-      assay-readiness evidence.
+      distal control regions. Local-structure metric availability and
+      per-region RMSD thresholds are selection-readiness gates; RMSD values are
+      structural review metrics, not activity or assay-readiness evidence.
   - id: eco1_rt_selection_na_facing_chemistry_balance
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -829,9 +841,12 @@ datasets:
       Study-owned table for the expanded nonredundant candidate pool. It joins
       fold-review classes, MSA support, mutation geography,
       near-DNA/RNA or thumb-track chemistry, sequence-diversity fields, ESMC additive
-      LLR fields, three-window SAE WT-delta fields, and feasibility status. It
-      is a triage surface, not a combined-score table. Canonical mutation tokens
-      are parsed strictly before mutation geography is used for hard-gate status.
+      LLR fields, three-window SAE WT-delta fields, feasibility status, and
+      local-structure gate fields. It is a triage surface, not a combined-score
+      table. Canonical mutation tokens are parsed strictly before mutation
+      geography is used for hard-gate status, and local-structure metric
+      availability plus local RMSD threshold status are enforced before panel
+      eligibility.
   - id: eco1_rt_local_structure_region_metrics
     owner: eco1_rt_repack
     kind: materialized_artifact
@@ -841,8 +856,12 @@ datasets:
       Study-owned derived metric table with one row per candidate and local RT
       review region. It reports local C-alpha RMSD and displacement after one
       global mapped C-alpha fit to the ec86kit/7V9U reference, with explicit
-      status fields for missing structures or insufficient overlap. It is not a
-      selector or activity metric in this slice.
+      status fields for missing structures or insufficient overlap. Each row
+      carries the explicit residue positions and source-basis note for the
+      region plus the local RMSD threshold and threshold policy. Metric
+      availability and per-region RMSD threshold pass status are
+      selection-readiness gates; RMSD values are structural review metrics, not
+      activity metrics.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: materialized_artifact
@@ -851,8 +870,10 @@ datasets:
     description: >-
       Study-owned six-row panel table built from the candidate triage table.
       It selects one feasible fold-preserved representative per design class
-      rather than descending by a combined score. MSA support, mutation
-      geography, local chemistry, and sequence nonredundancy explain the panel
+      after local-structure metrics are available and pass local RMSD
+      thresholds rather than descending by a combined score. MSA support,
+      mutation geography, local chemistry,
+      local/global fold metrics, and sequence nonredundancy explain the panel
       choices. ESMC and SAE are recorded but not used for selection.
   - id: eco1_rt_candidate_handoff_sequences
     owner: eco1_rt_repack
