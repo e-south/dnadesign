@@ -26,36 +26,23 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     _class_percentile,
     build_selected_sequence_distance_matrix,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.premise_alignment import (
+    build_premise_alignment_matrix,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.regional_plots import (
     build_regional_mutation_burden_matrix,
 )
-
-
-def _panel_rows() -> list[dict[str, object]]:
-    return [
-        {
-            "candidate_id": f"candidate_{index}",
-            "design_class_id": spec.design_class_id,
-        }
-        for index, spec in enumerate(ALL_SPECS, start=1)
-    ]
-
-
-def _candidate_rows() -> list[dict[str, object]]:
-    return [
-        {
-            "candidate_id": f"candidate_{index}",
-            "sequence": "A" * index + "C" * (8 - index),
-            "canonical_mutations": [f"A{index}G", f"L{index + 20}V"],
-        }
-        for index in range(1, len(ALL_SPECS) + 1)
-    ]
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._plot_rows import (
+    candidate_sequence_rows,
+    selected_panel_rows,
+    selected_triage_rows,
+)
 
 
 def test_selected_six_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     labels, matrix = build_selected_sequence_distance_matrix(
-        panel_rows=_panel_rows(),
-        candidate_rows=_candidate_rows(),
+        panel_rows=selected_panel_rows(),
+        candidate_rows=candidate_sequence_rows(),
     )
 
     assert labels == [f"candidate_{index}" for index in range(1, len(ALL_SPECS) + 1)]
@@ -65,6 +52,28 @@ def test_selected_six_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     assert matrix == [list(row) for row in zip(*matrix, strict=True)]
 
 
+def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> None:
+    column_labels, row_labels, matrix = build_premise_alignment_matrix(
+        panel_rows=selected_panel_rows(),
+        triage_rows=selected_triage_rows(),
+    )
+
+    assert column_labels == [
+        "Core/direct edits",
+        "NA annulus edits",
+        "Thumb-track edits",
+        "Distal edits",
+        "Chemistry warnings",
+        "Fold gate",
+        "ESMC/SAE",
+    ]
+    assert len(row_labels) == len(ALL_SPECS)
+    assert len(matrix) == len(ALL_SPECS)
+    assert matrix[0][0].text == "0"
+    assert matrix[0][5].text == "strong"
+    assert matrix[0][6].text == "review"
+
+
 def test_class_local_moderate_percentile_prefers_class_median() -> None:
     assert _class_percentile(selected_value=40.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 100.0
     assert _class_percentile(selected_value=90.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 0.0
@@ -72,8 +81,8 @@ def test_class_local_moderate_percentile_prefers_class_median() -> None:
 
 def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
     region_labels, row_labels, matrix = build_regional_mutation_burden_matrix(
-        panel_rows=_panel_rows(),
-        candidate_rows=_candidate_rows(),
+        panel_rows=selected_panel_rows(),
+        candidate_rows=candidate_sequence_rows(),
         mask_residues=[
             {"canonical_position": 1, "protected": True, "wang_ec86_direct_contact_prior": False},
             {"canonical_position": 2, "protected": False, "wang_ec86_direct_contact_prior": True},
@@ -138,19 +147,8 @@ def test_regional_mutation_burden_fallback_does_not_treat_conservation_as_contac
 
 def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
     row_labels, charge_delta, metric_labels, matrix = build_na_facing_chemistry_balance_matrix(
-        panel_rows=_panel_rows(),
-        triage_rows=[
-            {
-                "candidate_id": f"candidate_{index}",
-                "design_class_id": spec.design_class_id,
-                "nucleic_acid_facing_charge_delta": index - 3,
-                "nucleic_acid_facing_basic_gain_count": index,
-                "nucleic_acid_facing_basic_loss_count": 6 - index,
-                "nucleic_acid_facing_acidic_gain_count": index % 2,
-                "nucleic_acid_facing_proline_glycine_gain_count": index % 3,
-            }
-            for index, spec in enumerate(ALL_SPECS, start=1)
-        ],
+        panel_rows=selected_panel_rows(),
+        triage_rows=selected_triage_rows(),
     )
 
     assert len(row_labels) == len(ALL_SPECS)
@@ -161,23 +159,12 @@ def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
 
 
 def test_na_facing_chemistry_balance_matrix_fails_on_missing_selected_field() -> None:
-    triage_rows = [
-        {
-            "candidate_id": f"candidate_{index}",
-            "design_class_id": spec.design_class_id,
-            "nucleic_acid_facing_charge_delta": index - 3,
-            "nucleic_acid_facing_basic_gain_count": index,
-            "nucleic_acid_facing_basic_loss_count": 6 - index,
-            "nucleic_acid_facing_acidic_gain_count": index % 2,
-            "nucleic_acid_facing_proline_glycine_gain_count": index % 3,
-        }
-        for index, spec in enumerate(ALL_SPECS, start=1)
-    ]
+    triage_rows = selected_triage_rows()
     triage_rows[0].pop("nucleic_acid_facing_basic_loss_count")
     triage_rows[1]["nucleic_acid_facing_charge_delta"] = None
 
     with pytest.raises(ValueError) as error:
-        build_na_facing_chemistry_balance_matrix(panel_rows=_panel_rows(), triage_rows=triage_rows)
+        build_na_facing_chemistry_balance_matrix(panel_rows=selected_panel_rows(), triage_rows=triage_rows)
 
     message = str(error.value)
     assert "candidate_1" in message

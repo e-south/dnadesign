@@ -50,7 +50,12 @@ def build_triage_rows(
         if candidate_id not in review_axis_by_candidate:
             raise ValueError(f"Missing Eco1 selection review axes for candidate: {candidate_id}")
         review_axes = review_axis_by_candidate[candidate_id]
-        hard_gate_status, reasons = _hard_gate_status(candidate=candidate, fold=fold, feasibility=feasibility)
+        hard_gate_status, reasons = _hard_gate_status(
+            candidate=candidate,
+            fold=fold,
+            feasibility=feasibility,
+            review_axes=review_axes,
+        )
         rows.append(
             {
                 "candidate_id": candidate_id,
@@ -94,12 +99,15 @@ def _hard_gate_status(
     candidate: dict[str, object],
     fold: dict[str, object] | None,
     feasibility: dict[str, object] | None,
+    review_axes: dict[str, object] | None = None,
 ) -> tuple[str, list[str]]:
     reasons: list[str] = []
     if str(candidate.get("status")) != "accepted":
         reasons.append("candidate_status_not_accepted")
     if int(candidate.get("protected_mutation_count") or 0):
         reasons.append("protected_mutation_violation")
+    if int((review_axes or {}).get("catalytic_or_direct_contact_mutation_count") or 0):
+        reasons.append("catalytic_or_direct_contact_mutation")
     if fold is None:
         reasons.append("missing_fold_review_row")
     elif str(fold.get("foldcheck_status")) != "accepted":

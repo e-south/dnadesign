@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -27,8 +26,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     materialize_selection_readiness,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
-    CURRENT_SELECTION_PLOT_IDS,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
+    LOCAL_STRUCTURE_REGION_IDS,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness import (
+    _materialization_assertions as materialization_assertions,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
     write_inputs,
@@ -63,6 +65,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
 
     assert result.feasibility_report_path == selection_root / "feasibility_report.parquet"
     assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
+    assert result.local_structure_region_metrics_path == selection_root / "local_structure_region_metrics.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
     assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
     assert result.plots_root == selection_root / "plots"
@@ -128,37 +131,16 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "unexpected_design_classes": [],
         "valid": True,
     }
+    assert manifest["row_counts"]["local_structure_region_metrics"] == len(triage) * len(LOCAL_STRUCTURE_REGION_IDS)
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
+    assert manifest["artifacts"]["local_structure_region_metrics"] == "local_structure_region_metrics.parquet"
+    assert "local_structure_region_metrics" in manifest["artifact_hashes"]
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
-    assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
-    plot_text_by_id: dict[str, str] = {}
-    for plot in manifest["plots"]:
-        plot_path = result.manifest_path.parent / plot["path"]
-        assert plot_path.exists()
-        plot_text = plot_path.read_text(encoding="utf-8")
-        plot_text_by_id[str(plot["plot_id"])] = plot_text
-        assert "<title" in plot_text
-        assert plot["alt_text"].strip()
-        assert plot["interpretation_limit"].strip()
-    gate_count_text = plot_text_by_id["selection_design_class_gate_counts"]
-    assert "Passes protein gate" in gate_count_text
-    assert "Fold-review reserve" in gate_count_text
-    assert "Blocked by gate" in gate_count_text
-    assert "Missing fold or feasibility input" in gate_count_text
-    assert "Manual reserve" not in gate_count_text
-    assert "Excluded" not in gate_count_text
-    _assert_svg_has_square_panel(gate_count_text)
-    _assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_class_local_percentiles"],
-        row_count=len(ALL_SPECS),
-        column_count=6,
+    materialization_assertions.assert_selection_plot_contract(
+        result=result,
+        manifest=manifest,
+        retired_plot=retired_plot,
     )
-    _assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_regional_mutation_burden"],
-        row_count=len(ALL_SPECS),
-        column_count=4,
-    )
-    assert not retired_plot.exists()
 
 
 def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Path, capsys) -> None:
@@ -186,28 +168,3 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
     payload = json.loads(captured.out)
     assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
     assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
-
-
-def _svg_clip_rects(svg_text: str) -> list[tuple[float, float, float, float]]:
-    return [
-        tuple(float(value) for value in match)
-        for match in re.findall(
-            r'<clipPath id="[^"]+">\s*<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"',
-            svg_text,
-        )
-    ]
-
-
-def _assert_svg_has_square_panel(svg_text: str) -> None:
-    assert any(
-        width > 100.0 and height > 100.0 and abs(width - height) <= 1.0
-        for _x, _y, width, height in _svg_clip_rects(svg_text)
-    )
-
-
-def _assert_heatmap_cells_are_square(svg_text: str, *, row_count: int, column_count: int) -> None:
-    expected_ratio = column_count / row_count
-    assert any(
-        width > 80.0 and height > 80.0 and abs((width / height) - expected_ratio) <= 0.03
-        for _x, _y, width, height in _svg_clip_rects(svg_text)
-    )

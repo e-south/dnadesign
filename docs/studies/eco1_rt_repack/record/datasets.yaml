@@ -693,6 +693,17 @@ datasets:
       pLDDT, RMSD, sequence identity, and mutation burden. This is review
       context only; ChimeraX remains the publication still-render and
       pose-capture path.
+  - id: eco1_rt_selection_premise_alignment
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_premise_alignment.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing the selected six against the panel premise:
+      catalytic/direct-contact edits, near-DNA/RNA annulus edits, thumb-track
+      edits, distal edits, near-DNA/RNA chemistry warnings, fold gate status,
+      and ESMC/SAE review-only status. It is a checklist for review, not
+      activity evidence.
   - id: eco1_rt_selection_design_class_gate_counts
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -742,6 +753,16 @@ datasets:
       direct-contact, near retained DNA/RNA annulus, thumb-contact-track, and
       distal scaffold regions. It is regional review context, not a functional
       predictor.
+  - id: eco1_rt_selection_local_structure_by_region
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_by_region.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing selected-candidate local C-alpha RMSD after
+      one global mapped C-alpha fit, split by motif, thumb-track, annulus, and
+      distal control regions. It is structural review evidence, not activity or
+      assay-readiness evidence.
   - id: eco1_rt_selection_na_facing_chemistry_balance
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -809,7 +830,19 @@ datasets:
       fold-review classes, MSA support, mutation geography,
       near-DNA/RNA or thumb-track chemistry, sequence-diversity fields, ESMC additive
       LLR fields, three-window SAE WT-delta fields, and feasibility status. It
-      is a triage surface, not a combined-score table.
+      is a triage surface, not a combined-score table. Canonical mutation tokens
+      are parsed strictly before mutation geography is used for hard-gate status.
+  - id: eco1_rt_local_structure_region_metrics
+    owner: eco1_rt_repack
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/local_structure_region_metrics.parquet
+    status: materialized_review_metric
+    description: >-
+      Study-owned derived metric table with one row per candidate and local RT
+      review region. It reports local C-alpha RMSD and displacement after one
+      global mapped C-alpha fit to the ec86kit/7V9U reference, with explicit
+      status fields for missing structures or insufficient overlap. It is not a
+      selector or activity metric in this slice.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: materialized_artifact

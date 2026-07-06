@@ -30,6 +30,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     DEFAULT_SELECTION_DIR_NAME,
     DEFAULT_SOURCE_OUTPUT_ROOT,
     FEASIBILITY_REPORT_FILE_NAME,
+    LOCAL_STRUCTURE_REGION_METRICS_FILE_NAME,
     MANIFEST_FILE_NAME,
     PLOTS_DIR_NAME,
     SELECTION_POLICY_ID,
@@ -43,6 +44,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.io import (
     read_rows,
     write_rows,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
+    build_local_structure_region_rows,
+    mapped_positions_from_residue_map,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.models import (
     MaterializedSelectionReadiness,
@@ -94,6 +99,7 @@ def materialize_selection_readiness(
         paths["clade9_alignment"],
         paths["subtype_alignment"],
         paths["contact_geometry_profile"],
+        paths["residue_map"],
     ]
     for required in required_paths:
         if not required.exists():
@@ -110,6 +116,7 @@ def materialize_selection_readiness(
     mask_residues = list(mask_payload.get("residues") or [])
     feasibility_path = selected_root / FEASIBILITY_REPORT_FILE_NAME
     triage_path = selected_root / CANDIDATE_TRIAGE_TABLE_FILE_NAME
+    local_structure_path = selected_root / LOCAL_STRUCTURE_REGION_METRICS_FILE_NAME
     panel_path = selected_root / CANDIDATE_SELECTION_PANEL_FILE_NAME
     handoff_sequence_csv_path = selected_root / CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
     candidate_handoff_path = source_root / "candidate_handoff.yaml"
@@ -132,6 +139,17 @@ def materialize_selection_readiness(
         "clade9_alignment": sha256_uri(paths["clade9_alignment"]),
         "subtype_alignment": sha256_uri(paths["subtype_alignment"]),
         "contact_geometry_profile": sha256_uri(paths["contact_geometry_profile"]),
+        "residue_map": sha256_uri(paths["residue_map"]),
+        "foldcheck_full_structure_set": (
+            sha256_uri(paths["foldcheck_full_structure_set"])
+            if paths["foldcheck_full_structure_set"].exists()
+            else None
+        ),
+        "foldcheck_reference_backbone": (
+            sha256_uri(paths["foldcheck_reference_backbone"])
+            if paths["foldcheck_reference_backbone"].exists()
+            else None
+        ),
     }
     review_axis_by_candidate = build_review_axis_by_candidate(
         candidate_rows=candidate_rows,
@@ -152,6 +170,22 @@ def materialize_selection_readiness(
         input_hashes=input_hashes,
     )
     write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
+    local_structure_rows = build_local_structure_region_rows(
+        fold_review_rows=_local_structure_source_rows(
+            triage_rows=triage_rows,
+            fold_review_rows=fold_review_rows,
+        ),
+        candidate_rows=candidate_rows,
+        reference_backbone_path=paths["foldcheck_reference_backbone"],
+        model_root=paths["foldcheck_full_structure_root"],
+        mapped_positions=mapped_positions_from_residue_map(paths["residue_map"]),
+        contact_geometry_rows=contact_geometry_rows,
+    )
+    write_rows(
+        local_structure_path,
+        local_structure_rows,
+        schema_id="eco1_rt.local_structure_region_metrics",
+    )
     panel_hashes = dict(input_hashes)
     panel_hashes["candidate_triage_table"] = sha256_uri(triage_path)
     rt_annotation_context = _load_rt_annotation_context_if_available(root)
@@ -170,6 +204,7 @@ def materialize_selection_readiness(
     )
     plot_hashes = dict(panel_hashes)
     plot_hashes["candidate_selection_panel"] = sha256_uri(panel_path)
+    plot_hashes["local_structure_region_metrics"] = sha256_uri(local_structure_path)
     if rt_annotation_context is not None:
         plot_hashes["rt_annotation_tracks"] = sha256_uri(rt_annotation_context.annotation_tracks_path)
         plot_hashes["manual_mask_authority_source"] = sha256_uri(
@@ -181,6 +216,7 @@ def materialize_selection_readiness(
         panel_rows=panel_rows,
         candidate_rows=candidate_rows,
         mask_residues=mask_residues,
+        local_structure_rows=local_structure_rows,
         input_hashes=plot_hashes,
         rt_annotation_context=rt_annotation_context,
     )
@@ -190,12 +226,14 @@ def materialize_selection_readiness(
         paths=paths,
         feasibility_path=feasibility_path,
         triage_path=triage_path,
+        local_structure_path=local_structure_path,
         panel_path=panel_path,
         handoff_sequence_csv_path=handoff_sequence_csv_path,
         candidate_handoff_path=candidate_handoff_path,
         plot_rows=plot_rows,
         feasibility_rows=feasibility_rows,
         triage_rows=triage_rows,
+        local_structure_rows=local_structure_rows,
         panel_rows=panel_rows,
         handoff_sequence_rows=handoff_sequence_rows,
         created_at=created_at,
@@ -203,6 +241,7 @@ def materialize_selection_readiness(
     return MaterializedSelectionReadiness(
         feasibility_report_path=feasibility_path,
         candidate_triage_table_path=triage_path,
+        local_structure_region_metrics_path=local_structure_path,
         candidate_selection_panel_path=panel_path,
         candidate_handoff_sequence_csv_path=handoff_sequence_csv_path,
         plots_root=plots_root,
@@ -223,6 +262,26 @@ def _load_rt_annotation_context_if_available(repo_root: Path) -> RTAnnotationCon
     )
 
 
+def _local_structure_source_rows(
+    *,
+    triage_rows: list[dict[str, object]],
+    fold_review_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    fold_review_by_candidate = {str(row["candidate_id"]): row for row in fold_review_rows if row.get("candidate_id")}
+    rows: list[dict[str, object]] = []
+    for triage_row in triage_rows:
+        candidate_id = str(triage_row["candidate_id"])
+        fold_row = fold_review_by_candidate.get(candidate_id, {})
+        rows.append(
+            {
+                "candidate_id": candidate_id,
+                "design_class_id": str(triage_row.get("design_class_id") or ""),
+                "model_artifact_path": fold_row.get("model_artifact_path") or "",
+            }
+        )
+    return rows
+
+
 def _input_paths(*, class_root: Path, source_root: Path) -> dict[str, Path]:
     scoring_root = class_root / "review_deliverables/biohub_esmc_sequence_scoring"
     return {
@@ -235,6 +294,11 @@ def _input_paths(*, class_root: Path, source_root: Path) -> dict[str, Path]:
         "subtype_alignment": source_root
         / "conservation_alignments/ec86_iia3_cluster42_1_conservation_v1.aligned.fasta",
         "contact_geometry_profile": source_root / "contact_geometry_profile.parquet",
+        "residue_map": source_root / "residue_map.parquet",
+        "foldcheck_full_structure_set": class_root / "foldcheck_review/foldcheck_full_structure_set.yaml",
+        "foldcheck_reference_backbone": class_root
+        / "foldcheck_review/structures/ec86kit_chain_a_backbone_reference.pdb",
+        "foldcheck_full_structure_root": class_root / "foldcheck_review/structures/full_fold_set",
         "llr_300m": scoring_root / "biohub_esmc_variant_llr_scores.parquet",
         "llr_6b": scoring_root / "esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet",
         "sae_window": class_root / "biohub_esmc/sae_feature_window_summary.parquet",
@@ -247,12 +311,14 @@ def _write_manifest(
     paths: dict[str, Path],
     feasibility_path: Path,
     triage_path: Path,
+    local_structure_path: Path,
     panel_path: Path,
     handoff_sequence_csv_path: Path,
     candidate_handoff_path: Path,
     plot_rows: list[dict[str, object]],
     feasibility_rows: list[dict[str, object]],
     triage_rows: list[dict[str, object]],
+    local_structure_rows: list[dict[str, object]],
     panel_rows: list[dict[str, object]],
     handoff_sequence_rows: list[dict[str, object]],
     created_at: str,
@@ -282,11 +348,14 @@ def _write_manifest(
         "optional_review_sources": optional_review_sources,
         "missing_optional_review_sources": missing_optional_review_sources,
         "source_tables": {
-            key: _manifest_relative_path(path.parent, value) for key, value in paths.items() if value.exists()
+            key: _manifest_relative_path(path.parent, value)
+            for key, value in paths.items()
+            if value.exists() and value.is_file()
         },
         "artifacts": {
             "feasibility_report": _manifest_relative_path(path.parent, feasibility_path),
             "candidate_triage_table": _manifest_relative_path(path.parent, triage_path),
+            "local_structure_region_metrics": _manifest_relative_path(path.parent, local_structure_path),
             "candidate_selection_panel": _manifest_relative_path(path.parent, panel_path),
             "candidate_handoff_sequences": _manifest_relative_path(path.parent, handoff_sequence_csv_path),
             "plots_root": PLOTS_DIR_NAME,
@@ -296,9 +365,10 @@ def _write_manifest(
         "artifact_hashes": {
             key: sha256_uri(value)
             for key, value in {
-                **{key: value for key, value in paths.items() if value.exists()},
+                **{key: value for key, value in paths.items() if value.exists() and value.is_file()},
                 "feasibility_report": feasibility_path,
                 "candidate_triage_table": triage_path,
+                "local_structure_region_metrics": local_structure_path,
                 "candidate_selection_panel": panel_path,
                 "candidate_handoff_sequences": handoff_sequence_csv_path,
                 **{str(row["plot_id"]): Path(str(row["path"])) for row in plot_rows},
@@ -307,6 +377,7 @@ def _write_manifest(
         "row_counts": {
             "feasibility_report": len(feasibility_rows),
             "candidate_triage_table": len(triage_rows),
+            "local_structure_region_metrics": len(local_structure_rows),
             "candidate_selection_panel": len(panel_rows),
             "candidate_handoff_sequences": len(handoff_sequence_rows),
         },

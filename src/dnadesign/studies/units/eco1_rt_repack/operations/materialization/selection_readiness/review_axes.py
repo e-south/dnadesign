@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+from ast import literal_eval
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -84,7 +85,7 @@ def build_review_axis_by_candidate(
         if str(candidate.get("status")) != "accepted":
             continue
         candidate_id = str(candidate["candidate_id"])
-        mutations = _parse_mutations(candidate.get("canonical_mutations"))
+        mutations = _parse_mutations(candidate.get("canonical_mutations"), candidate_id=candidate_id)
         class_id = str(candidate["design_class_id"])
         if class_id not in profile_by_class:
             raise ValueError(f"Unknown Eco1 design class id for review-axis selection: {class_id}")
@@ -210,21 +211,45 @@ def _mutation_geography(
     }
 
 
-def _parse_mutations(value: object) -> list[Mutation]:
+def _parse_mutations(value: object, *, candidate_id: str = "unknown") -> list[Mutation]:
     if value is None:
         return []
-    values = value if isinstance(value, list | tuple) else _MUTATION_RE.findall(str(value))
+    values = _mutation_tokens(value, candidate_id=candidate_id)
     mutations: list[Mutation] = []
-    for item in values:
+    for index, item in enumerate(values, start=1):
         if isinstance(item, tuple):
             wt_aa, position, alt_aa = item
         else:
             match = _MUTATION_RE.fullmatch(str(item).strip())
             if match is None:
-                continue
+                raise ValueError(
+                    f"Malformed canonical mutation for {candidate_id} at token {index}: {str(item).strip()!r}"
+                )
             wt_aa, position, alt_aa = match.groups()
         mutations.append(Mutation(wt_aa=str(wt_aa), position=int(position), alt_aa=str(alt_aa)))
     return mutations
+
+
+def _mutation_tokens(value: object, *, candidate_id: str) -> list[object]:
+    if isinstance(value, list | tuple):
+        return list(value)
+    if hasattr(value, "tolist"):
+        loaded = value.tolist()
+        return list(loaded) if isinstance(loaded, list | tuple) else [loaded]
+    text = str(value).strip()
+    if not text:
+        return []
+    if _MUTATION_RE.fullmatch(text):
+        return [text]
+    try:
+        loaded = literal_eval(text)
+    except (SyntaxError, ValueError) as exc:
+        raise ValueError(f"Malformed canonical mutation list for {candidate_id}: {text!r}") from exc
+    if isinstance(loaded, list | tuple):
+        return list(loaded)
+    if _MUTATION_RE.fullmatch(str(loaded).strip()):
+        return [loaded]
+    raise ValueError(f"Malformed canonical mutation list for {candidate_id}: {text!r}")
 
 
 def _prefix(prefix: str, values: dict[str, object]) -> dict[str, object]:

@@ -92,8 +92,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             "fold review class",
             "selection-support MSA observed fraction",
             "selection-support unobserved mutation count",
-            "near retained DNA/RNA or thumb-track mutation count",
             "near retained DNA/RNA or thumb-track chemistry warning count",
+            "moderate near retained DNA/RNA or thumb-track mutation burden",
             "nearest selected sequence distance",
         ],
         "handoff_readiness": {
@@ -107,6 +107,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             "construct_subject_created": False,
         },
         "plots": [
+            plot_row(
+                plot_id="selection_premise_alignment",
+                title=plots["selection_premise_alignment"],
+                path="plots/selection_premise_alignment.svg",
+                alt_text="Fixture selected-panel premise checklist plot.",
+                description="Shows selected rows against the core review premise.",
+                interpretation_limit="The premise checklist does not measure activity.",
+                input_hash_tail="p",
+            ),
             plot_row(
                 plot_id="selection_design_class_gate_counts",
                 title=plots["selection_design_class_gate_counts"],
@@ -151,6 +160,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 description="Shows mutation burden by RT region.",
                 interpretation_limit="Regional mutation burden does not measure activity.",
                 input_hash_tail="f",
+            ),
+            plot_row(
+                plot_id="selection_local_structure_by_region",
+                title=plots["selection_local_structure_by_region"],
+                path="plots/selection_local_structure_by_region.svg",
+                alt_text="Fixture local-structure heatmap.",
+                description="Shows local backbone shifts by RT region.",
+                interpretation_limit="Local backbone shifts do not measure activity.",
+                input_hash_tail="h",
             ),
             plot_row(
                 plot_id="selection_na_facing_chemistry_balance",

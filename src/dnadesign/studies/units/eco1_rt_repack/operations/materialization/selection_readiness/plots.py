@@ -38,6 +38,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 from ..review_deliverables.rt_annotation_context import RTAnnotationContext
 from .chemistry_balance import write_na_facing_chemistry_balance_plot
+from .local_structure_plot import write_local_structure_by_region_plot
+from .premise_alignment import write_premise_alignment_plot
 from .regional_plots import (
     write_regional_mutation_burden_plot,
     write_selected_substitutions_across_rt_plot,
@@ -69,6 +71,7 @@ def write_selection_readiness_plots(
     panel_rows: list[dict[str, object]],
     candidate_rows: list[dict[str, object]],
     mask_residues: list[dict[str, object]],
+    local_structure_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
     rt_annotation_context: RTAnnotationContext | None = None,
 ) -> list[dict[str, Any]]:
@@ -77,6 +80,12 @@ def write_selection_readiness_plots(
     plot_root.mkdir(parents=True, exist_ok=True)
     _remove_retired_selection_plots(plot_root)
     return [
+        write_premise_alignment_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            triage_rows=triage_rows,
+            input_hashes=input_hashes,
+        ),
         _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
         _write_class_local_percentiles(plot_root, triage_rows, panel_rows, input_hashes),
         _write_selected_sequence_distance(
@@ -98,6 +107,12 @@ def write_selection_readiness_plots(
             panel_rows=panel_rows,
             candidate_rows=candidate_rows,
             mask_residues=mask_residues,
+            input_hashes=input_hashes,
+        ),
+        write_local_structure_by_region_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            local_structure_rows=local_structure_rows,
             input_hashes=input_hashes,
         ),
         write_na_facing_chemistry_balance_plot(

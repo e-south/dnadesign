@@ -21,6 +21,7 @@ def write_selection_source_inputs(source_root: Path) -> None:
     """Write compact source artifacts needed by review-axis materialization."""
 
     source_root.mkdir(parents=True, exist_ok=True)
+    _write_parquet(source_root / "residue_map.parquet", _residue_map_rows())
     _write_parquet(source_root / "conservation_profile.parquet", _conservation_rows())
     _write_parquet(source_root / "contact_geometry_profile.parquet", _contact_geometry_rows())
     (source_root / "mask_set.yaml").write_text(_mask_set_yaml(), encoding="utf-8")
@@ -35,6 +36,17 @@ def _conservation_rows() -> list[dict[str, object]]:
     for profile_id in ("ec86_clade9_conservation_v1", "ec86_iia3_cluster42_1_conservation_v1"):
         rows.extend(_profile_rows(profile_id))
     return rows
+
+
+def _residue_map_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "canonical_position": position,
+            "wt_aa": "A",
+            "mapping_status": "mapped",
+        }
+        for position in range(1, 221)
+    ]
 
 
 def _profile_rows(profile_id: str) -> list[dict[str, object]]:

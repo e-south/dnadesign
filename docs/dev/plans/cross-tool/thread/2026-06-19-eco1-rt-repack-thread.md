@@ -499,7 +499,9 @@ missing_inputs
 Hard gates stay narrow:
 
 - accepted candidate row;
+- canonical mutation tokens parse without partial matching;
 - zero protected-position mutations;
+- zero catalytic or direct DNA/RNA-contact mutations;
 - accepted fold-check row;
 - fold-review class allowed by the selection policy;
 - feasible synthesis/buildability row;
@@ -639,6 +641,7 @@ AND foldcheck_report.status == accepted
 AND foldcheck_review row is present
 AND feasibility_report.feasibility_status == feasible
 AND protected_mutation_violation_count == 0
+AND catalytic_or_direct_contact_mutation_count == 0
 AND required upstream hashes are present
 ```
 
@@ -651,8 +654,8 @@ Deterministic tie-break order:
 2. `strong_fold_preserved` before `good_fold_preserved`;
 3. higher selected-denominator MSA support for designed residues;
 4. fewer designed residues absent from the selected MSA denominator;
-5. more mutations in the nucleic-acid-facing review region;
-6. fewer local nucleic-acid-facing chemistry warnings;
+5. fewer local near-DNA/RNA or thumb-track chemistry warnings;
+6. moderate near-DNA/RNA or thumb-track mutation burden;
 7. nonredundancy to already selected variants;
 8. fold metrics inside the same fold class;
 9. lower mutation count;
@@ -700,6 +703,7 @@ Validator rules:
 - fail if `candidate_selection_panel.parquet` is missing;
 - fail if a selected candidate lacks an accepted fold-check row;
 - fail if a selected candidate is feasibility-blocked;
+- fail if a selected candidate mutates a catalytic or direct-contact position;
 - fail if any required upstream hash is missing;
 - fail if any construct-subject id is emitted;
 - fail if SAE is configured as an acceptance gate.
@@ -1016,19 +1020,21 @@ Main outputs:
 - `candidate_triage_table.parquet`
 - `candidate_selection_panel.parquet`
 - `candidate_handoff_sequences.csv`
+- `plots/selection_premise_alignment.svg`
 - `plots/selection_design_class_gate_counts.svg`
 - `plots/selection_class_local_percentiles.svg`
 - `plots/selection_six_sequence_distance.svg`
 - `plots/selection_selected_substitutions_across_rt.svg`
 - `plots/selection_regional_mutation_burden.svg`
+- `plots/selection_local_structure_by_region.svg`
 - `plots/selection_na_facing_chemistry_balance.svg`
 
 Purpose:
 
 ```text
 Show which candidates pass feasibility and fold gates, then explain the six
-class-balanced panel rows with within-class percentiles, sequence distance,
-regional substitutions, mutation burden, local chemistry, and flat
+class-balanced panel rows with a compact premise matrix, within-class
+percentiles, sequence distance, regional substitutions, mutation burden, local chemistry, and flat
 protein-sequence export.
 ```
 

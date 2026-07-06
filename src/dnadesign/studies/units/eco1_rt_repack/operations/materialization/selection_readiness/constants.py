@@ -23,6 +23,7 @@ DEFAULT_SOURCE_OUTPUT_ROOT = _DEFAULT_SOURCE_OUTPUT_ROOT
 DEFAULT_SELECTION_DIR_NAME = "selection"
 FEASIBILITY_REPORT_FILE_NAME = "feasibility_report.parquet"
 CANDIDATE_TRIAGE_TABLE_FILE_NAME = "candidate_triage_table.parquet"
+LOCAL_STRUCTURE_REGION_METRICS_FILE_NAME = "local_structure_region_metrics.parquet"
 CANDIDATE_SELECTION_PANEL_FILE_NAME = "candidate_selection_panel.parquet"
 CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME = "candidate_handoff_sequences.csv"
 MANIFEST_FILE_NAME = "selection_readiness_manifest.yaml"

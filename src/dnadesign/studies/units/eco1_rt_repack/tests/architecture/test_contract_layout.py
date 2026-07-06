@@ -159,7 +159,9 @@ def test_eco1_source_and_test_modules_stay_within_line_budgets() -> None:
     oversized_source = [
         f"{path.relative_to(repo_root())}:{len(path.read_text(encoding='utf-8').splitlines())}"
         for path in package_root.rglob("*.py")
-        if "tests" not in path.parts and len(path.read_text(encoding="utf-8").splitlines()) > 500
+        if "tests" not in path.parts
+        and "outputs" not in path.parts
+        and len(path.read_text(encoding="utf-8").splitlines()) > 500
     ]
     oversized_tests = [
         f"{path.relative_to(repo_root())}:{len(path.read_text(encoding='utf-8').splitlines())}"

@@ -21,6 +21,7 @@ class MaterializedSelectionReadiness:
 
     feasibility_report_path: Path
     candidate_triage_table_path: Path
+    local_structure_region_metrics_path: Path
     candidate_selection_panel_path: Path
     candidate_handoff_sequence_csv_path: Path
     plots_root: Path

@@ -223,7 +223,7 @@ presents constraint evidence for the design mask, baseline ProteinMPNN audit
 views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when those
 manifests exist. The expanded panel-selection tables are materialized separately under
 `outputs/thread/design_classes/selection/`; the review notebook links the
-six selection-readiness SVGs from that manifest. WT ESMC
+eight selection-readiness SVGs from that manifest. WT ESMC
 masked-marginal scoring is shown with the constraint
 evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same

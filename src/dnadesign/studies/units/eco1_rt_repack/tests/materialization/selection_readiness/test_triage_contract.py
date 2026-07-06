@@ -37,3 +37,15 @@ def test_review_band_does_not_override_hard_blockers() -> None:
     assert status == "ineligible"
     assert "protected_mutation_violation" in reasons
     assert "fold_review_class_requires_manual_review" in reasons
+
+
+def test_catalytic_or_direct_contact_mutation_fails_hard_gate() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        review_axes={"catalytic_or_direct_contact_mutation_count": 1},
+    )
+
+    assert status == "ineligible"
+    assert "catalytic_or_direct_contact_mutation" in reasons

@@ -25,6 +25,11 @@ class SelectionPlot:
 
 CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
+        plot_id="selection_premise_alignment",
+        file_name="selection_premise_alignment.svg",
+        plain_title="Selected candidates show zero core/contact edits and regional changes",
+    ),
+    SelectionPlot(
         plot_id="selection_design_class_gate_counts",
         file_name="selection_design_class_gate_counts.svg",
         plain_title="Each mask class contributes fold-preserved candidates",
@@ -48,6 +53,11 @@ CURRENT_SELECTION_PLOTS = (
         plot_id="selection_regional_mutation_burden",
         file_name="selection_regional_mutation_burden.svg",
         plain_title="Selected candidates differ in which RT regions carry mutations",
+    ),
+    SelectionPlot(
+        plot_id="selection_local_structure_by_region",
+        file_name="selection_local_structure_by_region.svg",
+        plain_title="Local RT regions are checked for backbone shifts",
     ),
     SelectionPlot(
         plot_id="selection_na_facing_chemistry_balance",
