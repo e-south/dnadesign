@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-05
+last_verified: 2026-07-06
 status_surface: record-only
 ---
 
@@ -169,13 +169,13 @@ handled separately.
   screening.
 - `review_deliverables/` is materialized as the study visual bundle. It writes
   `review_deliverable_manifest.yaml`, the clade 9 and subtype MSA panels,
-  linear mask tracks, a design-class mask overview, a ChimeraX mask-context
-  script, baseline ProteinMPNN audit plots, an expanded design-class
-  ProteinMPNN/ColabFold fold-validation plot, WT ESMC model-check plots,
-  ESMC/SAE check plots, three interactive structure-browser manifests,
-  expanded panel-selection plots, the selected-protein sequence CSV link, and a
-  marimo notebook. The MSA panels show the 25% mask denominator, the 50%
-  design-class threshold cue, and subtype membership in the clade 9 source set.
+  design-class mask evidence, a ChimeraX mask-context script, baseline
+  ProteinMPNN audit plots, an expanded design-class ProteinMPNN/ColabFold
+  fold-validation plot, WT ESMC model-check plots, ESMC/SAE check plots, three
+  interactive structure-browser manifests, expanded panel-selection plots, the
+  selected-protein sequence CSV link, and a marimo notebook. The MSA panels show
+  the 25% mask denominator, the 50% design-class threshold cue, and subtype
+  membership in the clade 9 source set.
   The notebook is organized by
   scientific question: mask basis, sequence proposals and fold checks, panel
   selection, and ESMC/SAE checks. WT ESMC masked-marginal scoring appears with

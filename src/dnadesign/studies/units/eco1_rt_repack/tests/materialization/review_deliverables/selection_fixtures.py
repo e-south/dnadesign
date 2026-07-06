@@ -99,7 +99,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         "handoff_readiness": {
             "handoff_kind": "rt_only_candidate_handoff",
             "panel_selected": True,
-            "candidate_handoff_path": "candidate_handoff.yaml",
+            "candidate_handoff_path": "../../candidate_handoff.yaml",
             "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
             "candidate_handoff_sequence_csv_materialized": True,
             "candidate_handoff_materialized": False,

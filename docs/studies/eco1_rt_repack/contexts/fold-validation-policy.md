@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fold-validation-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-26
+last_verified: 2026-07-06
 ---
 
 ## Fold Validation Policy
@@ -252,7 +252,7 @@ The Biohub ESMC SAE and Atlas context layers may be used for:
   public-neighborhood space.
 - Annotation: expose thumb/palm, primer-grip, fingers/palm, catalytic, and
   gating feature shifts.
-- Stratification: choose a balanced assay panel with semantic-retained and
+- Stratification: choose a balanced protein review panel with semantic-retained and
   semantic-shifted variants.
 - Learning: provide model-derived input fields for supervised models after biochemical data
   exist.

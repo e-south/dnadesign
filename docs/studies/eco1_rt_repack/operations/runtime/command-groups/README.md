@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Command Groups
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-02
+**Last verified:** 2026-07-06
 
 This directory is the reproducibility route for the study-owned Eco1 RT repack
 materialization path. It is not a hidden run-all pipeline. Each lane in
@@ -197,10 +197,10 @@ These outputs are WT-context masked-marginal additive LLR review tables. They
 are not whole-protein likelihoods, assay measurements, or panel-selection
 inputs.
 
-### Assay-Panel Preparation
+### Protein Review Panel Preparation
 
 The next local summaries prepare the expanded candidate pool for a six-variant
-assay panel. They explain buildability and local SAE changes; they do not
+protein review panel. They explain buildability and local SAE changes; they do not
 predict strand displacement.
 
 The SAE window summary uses existing Biohub ESMC sparse tables and does not make

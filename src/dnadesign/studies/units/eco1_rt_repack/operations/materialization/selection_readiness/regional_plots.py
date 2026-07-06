@@ -303,8 +303,7 @@ def _regional_bucket_index(position: int, residue: dict[str, object]) -> int:
 def _is_catalytic_or_direct_contact(residue: dict[str, object]) -> bool:
     distance = _retained_na_distance(residue)
     return (
-        bool(residue.get("protected"))
-        or bool(residue.get("motif_protected"))
+        bool(residue.get("motif_protected"))
         or bool(residue.get("wang_ec86_direct_contact_prior"))
         or bool(residue.get("direct_retained_dna_rna_contact_5a"))
         or (distance is not None and distance <= DIRECT_CONTACT_DISTANCE_ANGSTROM)

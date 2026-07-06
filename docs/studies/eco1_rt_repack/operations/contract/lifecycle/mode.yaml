@@ -7,8 +7,9 @@ phase_order:
   - phase4_downstream_promotion
 current_phase:
   strategy: explicit
-  id: phase0_scaffold
+  id: phase3_foldcheck_report
 provider_registered: false
 notes:
   - No OPS provider is registered for this study yet.
   - Use checked-in records and routes for status until executable providers exist.
+  - Selection readiness is materialized, but RT-only candidate_handoff.yaml remains a downstream blocker.

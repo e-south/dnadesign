@@ -17,6 +17,10 @@ from typing import Any
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.handoff_readiness import (
+    normalize_handoff_readiness,
+)
+
 
 def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_path: Path) -> Any:
     """Render selection-readiness counts and policy from the selection manifest."""
@@ -96,17 +100,7 @@ def _count_rows(*, row_counts: dict[str, Any], gate_counts: dict[str, Any]) -> l
 
 def _handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, object]:
     raw = _dict_or_empty(loaded.get("handoff_readiness"))
-    handoff_path = str(raw.get("candidate_handoff_path") or "candidate_handoff.yaml")
-    sequence_csv_path = str(raw.get("candidate_handoff_sequence_csv_path") or "candidate_handoff_sequences.csv")
-    return {
-        "handoff_kind": str(raw.get("handoff_kind") or "rt_only_candidate_handoff"),
-        "panel_selected": bool(raw.get("panel_selected")),
-        "candidate_handoff_path": handoff_path,
-        "candidate_handoff_sequence_csv_path": sequence_csv_path,
-        "candidate_handoff_sequence_csv_materialized": (manifest_path.parent / sequence_csv_path).exists(),
-        "candidate_handoff_materialized": (manifest_path.parent / handoff_path).exists(),
-        "construct_subject_created": bool(raw.get("construct_subject_created")),
-    }
+    return normalize_handoff_readiness(selection_root=manifest_path.parent, raw=raw)
 
 
 def _display_value(value: object) -> str:

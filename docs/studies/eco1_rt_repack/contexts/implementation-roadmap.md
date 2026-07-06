@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-02
+last_verified: 2026-07-06
 ---
 
 ## Implementation Roadmap
@@ -17,7 +17,7 @@ campaign.
 
 | Surface | Owns | First implementation obligation |
 | --- | --- | --- |
-| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, feasibility policy, study selection decisions, and downstream promotion policy. | Prepare the assay panel with explicit feasibility, local-SAE, selection, and handoff records. |
+| `eco1_rt_repack` | Eco1 profile authority, manual protected-residue policy, feasibility policy, study selection decisions, and downstream promotion policy. | Prepare the protein review panel with explicit feasibility, local-SAE, selection, and handoff records. |
 | `thread` | Generic fixed-backbone artifact contracts, residue maps, mask algebra, backend request/result normalization, candidate ids, fold-check contracts, and neutral handoff hash closure. | Materialize and validate the artifact chain against fixtures and negative cases. |
 | `infer` | Optional model-process execution and writeback for declared backends. | Expose backend run ids and result manifests if it executes MPNN or fold-check jobs. |
 | `construct` | Later sequence realization and placement/window feasibility. | Accept only explicit downstream promotion records, not raw `thread` candidates. |

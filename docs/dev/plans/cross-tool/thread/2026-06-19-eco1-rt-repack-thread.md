@@ -3,9 +3,9 @@ doc_id: dev-thread-eco1-rt-repack-candidate-review
 surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-02
+last_verified: 2026-07-06
 status: active_next_slice
-primary_slice: assay-panel-preparation-v1
+primary_slice: protein-review-panel-preparation-v1
 ---
 
 ## Eco1 RT Repack Candidate Review, Feasibility, And RT-Only Handoff
@@ -16,11 +16,11 @@ ProteinMPNN sampling, candidate normalization, ColabFold fold checking,
 fold-check review, local PDB staging, Biohub ESMC query-time SAE collection, and
 the expanded design-class candidate pool are materialized locally.
 
-The current task is to prepare a small assay panel from the 576 synthetic
+The current task is to prepare a small protein review panel from the 576 synthetic
 candidates. The current panel path checks computational buildability, removes
 fold-risk candidates, records that SAE windows remain WT-like, and selects one
 fold-preserved representative from each design class. These steps prepare the
-assay; they do not predict improved strand displacement.
+protein review set; they do not predict improved strand displacement.
 
 ### Scientific Flow
 
@@ -392,7 +392,7 @@ wt_control
 Current selection posture:
 
 ```text
-SAE confirms retention of the RT semantic basin and is not used for selection.
+SAE window summaries remain WT-like in this pool and are not used for selection.
 ```
 
 Future rule if a later pool separates in SAE-window space:
@@ -592,7 +592,7 @@ Materialized:
 src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
 ```
 
-This six-row table records the proposed assay panel between feasibility and handoff. It
+This six-row table records the proposed protein review panel between feasibility and handoff. It
 does not replace `candidate_table.parquet` or `candidate_triage_table.parquet`.
 
 Required fields:
@@ -1015,9 +1015,11 @@ Main outputs:
 - `candidate_handoff_sequences.csv`
 - `plots/selection_design_class_gate_counts.svg`
 - `plots/selection_population_stratification.svg`
-- `plots/selection_panel_review_axes.svg`
-- `plots/selection_panel_sequence_differences.svg`
-- `plots/selection_panel_mutation_geography_chemistry.svg`
+- `plots/selection_class_local_percentiles.svg`
+- `plots/selection_six_sequence_distance.svg`
+- `plots/selection_selected_substitutions_across_rt.svg`
+- `plots/selection_regional_mutation_burden.svg`
+- `plots/selection_na_facing_chemistry_balance.svg`
 
 Purpose:
 
@@ -1124,11 +1126,12 @@ or implement selection logic inline.
 
 8. **Visual bundle extension**
    - Foundation materialized in `operations/materialization/review_deliverables/`
-     with MSA plurality/mask context, linear mask tracks, a ChimeraX mask-context
-     script/render, ProteinMPNN candidate diversity, linked fold-review SVG/PNG
-     visuals, WT ESMC masked-marginal constraint visuals, exact-dictionary
-     Biohub ESMC SAE interpretation plots, an interactive selected-feature SAE
-     activation heatmap, and a manifest-driven marimo notebook.
+     with MSA plurality/mask panels, design-class mask evidence, a ChimeraX
+     mask-context script/render, ProteinMPNN candidate diversity, linked
+     fold-review SVG/PNG visuals, WT ESMC masked-marginal constraint visuals,
+     exact-dictionary Biohub ESMC SAE interpretation plots, an interactive
+     selected-feature SAE activation heatmap, and a manifest-driven marimo
+     notebook.
    - Visual manifests must use manifest-relative paths, and notebook dogfood
      must include `marimo check` plus HTML export so missing linked media is
      caught before review.
@@ -1149,7 +1152,7 @@ or implement selection logic inline.
 
 9. **Deferred v1.1/v2 metrics**
    - Whole-protein ESMC pseudo-likelihood is implemented as a resumable method
-     surface but is not required for the first assay panel. A full expanded run
+     surface but is not required for the first protein review panel. A full expanded run
      is request-heavy: WT plus 576 candidates at 320 positions requires 184,640
      masked sequence-logit calls.
    - Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings,

@@ -16,6 +16,9 @@ import pytest
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.handoff_readiness import (
+    build_handoff_readiness,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
     validate_exact_panel_coverage,
 )
@@ -71,3 +74,30 @@ def test_panel_count_other_than_six_fails() -> None:
 
     with pytest.raises(ValueError, match="Selected rows: 5"):
         validate_exact_panel_coverage(rows, expected_design_classes=_expected_classes())
+
+
+def test_handoff_readiness_uses_thread_root_candidate_handoff(tmp_path) -> None:
+    selection_root = tmp_path / "outputs/thread/design_classes/selection"
+    thread_handoff_path = tmp_path / "outputs/thread/candidate_handoff.yaml"
+    selection_root.mkdir(parents=True)
+    (selection_root / "candidate_handoff.yaml").write_text("handoff_kind: wrong_local_path\n", encoding="utf-8")
+
+    readiness = build_handoff_readiness(
+        selection_root=selection_root,
+        panel_rows=_panel_rows(_expected_classes()),
+        candidate_handoff_path=thread_handoff_path,
+    )
+
+    assert readiness["candidate_handoff_path"] == "../../candidate_handoff.yaml"
+    assert readiness["candidate_handoff_materialized"] is False
+
+    thread_handoff_path.write_text("handoff_kind: rt_only_candidate_handoff\n", encoding="utf-8")
+
+    assert (
+        build_handoff_readiness(
+            selection_root=selection_root,
+            panel_rows=_panel_rows(_expected_classes()),
+            candidate_handoff_path=thread_handoff_path,
+        )["candidate_handoff_materialized"]
+        is True
+    )

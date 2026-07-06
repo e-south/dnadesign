@@ -93,6 +93,43 @@ def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
     assert all(len(row) == len(region_labels) for row in matrix)
 
 
+def test_regional_mutation_burden_fallback_does_not_treat_conservation_as_contact() -> None:
+    _region_labels, _row_labels, matrix = build_regional_mutation_burden_matrix(
+        panel_rows=[
+            {
+                "candidate_id": "candidate_1",
+                "design_class_id": ALL_SPECS[0].design_class_id,
+            }
+        ],
+        candidate_rows=[
+            {
+                "candidate_id": "candidate_1",
+                "canonical_mutations": ["A10G", "L11V"],
+            }
+        ],
+        mask_residues=[
+            {
+                "canonical_position": 10,
+                "protected": True,
+                "motif_protected": False,
+                "wang_ec86_direct_contact_prior": False,
+                "direct_retained_dna_rna_contact_5a": False,
+                "distance_to_retained_na_angstrom": 8.0,
+            },
+            {
+                "canonical_position": 11,
+                "protected": True,
+                "motif_protected": False,
+                "wang_ec86_direct_contact_prior": False,
+                "direct_retained_dna_rna_contact_5a": False,
+                "distance_to_retained_na_angstrom": 20.0,
+            },
+        ],
+    )
+
+    assert matrix == [[0, 1, 0, 1]]
+
+
 def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
     row_labels, charge_delta, metric_labels, matrix = build_na_facing_chemistry_balance_matrix(
         panel_rows=_panel_rows(),

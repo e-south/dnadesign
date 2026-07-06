@@ -32,6 +32,7 @@ _SELECTION_READINESS_ROOT_FILES = {
     "cli.py",
     "constants.py",
     "feasibility.py",
+    "handoff_readiness.py",
     "io.py",
     "models.py",
     "panel.py",
@@ -42,6 +43,7 @@ _SELECTION_READINESS_ROOT_FILES = {
     "review_axis_contracts.py",
     "review_axes.py",
     "regional_plots.py",
+    "sequence_export.py",
     "triage.py",
     "visual_inventory.py",
 }
@@ -72,7 +74,10 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     plots_text = (source_root / "plots.py").read_text(encoding="utf-8")
     population_text = (source_root / "population_stratification.py").read_text(encoding="utf-8")
     review_axes_text = (source_root / "review_axes.py").read_text(encoding="utf-8")
+    sequence_export_text = (source_root / "sequence_export.py").read_text(encoding="utf-8")
     assert "argparse" not in pipeline_text
+    assert "csv.DictWriter" not in pipeline_text
+    assert "hashlib" not in pipeline_text
     assert "matplotlib" not in pipeline_text
     assert "pyarrow" not in pipeline_text
     assert "build_feasibility_rows" in feasibility_text
@@ -81,5 +86,7 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     assert "write_selection_readiness_plots" in plots_text
     assert "write_population_stratification_plot" in population_text
     assert "load_fasta_records" in review_axes_text
+    assert "csv.DictWriter" in sequence_export_text
+    assert "hashlib.sha256" in sequence_export_text
     assert "processivity_score" not in panel_text
     assert "activity_score" not in panel_text

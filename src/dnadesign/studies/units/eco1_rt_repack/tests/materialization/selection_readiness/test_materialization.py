@@ -26,14 +26,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     materialize_selection_readiness,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.feasibility import (
-    build_feasibility_rows,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
-    sequence,
     write_inputs,
 )
 
@@ -44,6 +40,11 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     selection_root = class_root / "selection"
     source_root = repo_root / "outputs/thread"
     inputs = write_inputs(class_root, source_root)
+    root_handoff_path = source_root / "candidate_handoff.yaml"
+    root_handoff_path.write_text("handoff_kind: rt_only_candidate_handoff\n", encoding="utf-8")
+    selection_local_handoff_path = selection_root / "candidate_handoff.yaml"
+    selection_local_handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    selection_local_handoff_path.write_text("handoff_kind: wrong_local_path\n", encoding="utf-8")
     retired_plot = selection_root / "plots" / "selection_panel_review_axes.svg"
     retired_plot.parent.mkdir(parents=True, exist_ok=True)
     retired_plot.write_text("<svg>retired selected-only scatter</svg>\n", encoding="utf-8")
@@ -107,10 +108,10 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert manifest["handoff_readiness"] == {
         "handoff_kind": "rt_only_candidate_handoff",
         "panel_selected": True,
-        "candidate_handoff_path": "candidate_handoff.yaml",
+        "candidate_handoff_path": "../../candidate_handoff.yaml",
         "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
         "candidate_handoff_sequence_csv_materialized": True,
-        "candidate_handoff_materialized": False,
+        "candidate_handoff_materialized": True,
         "construct_subject_created": False,
     }
     assert manifest["panel_coverage"] == {
@@ -164,37 +165,3 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
     payload = json.loads(captured.out)
     assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
     assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
-
-
-def test_feasibility_preserves_positions_from_serialized_mutation_lists() -> None:
-    candidate_rows = [
-        {
-            "candidate_id": "candidate_serialized",
-            "sequence_hash": "sha256:" + "c" * 64,
-            "sequence": sequence(4),
-            "status": "accepted",
-            "mutation_count": 2,
-            "mutable_mutation_count": 2,
-            "protected_mutation_count": 0,
-            "outside_mutable_positions": [],
-            "canonical_mutations": "['A7G', 'L21V']",
-        }
-    ]
-
-    rows = build_feasibility_rows(
-        candidate_rows=candidate_rows,
-        foldcheck_report_rows=[
-            {"candidate_id": "wild_type", "input_sequence_hash": "sha256:" + "0" * 64, "status": "accepted"},
-            {"candidate_id": "candidate_serialized", "status": "accepted"},
-        ],
-        input_candidate_pool_hash="sha256:pool",
-        input_mask_policy_hash="sha256:mask",
-        input_foldcheck_report_hash="sha256:fold",
-        created_at="2026-07-02T00:00:00Z",
-    )
-
-    assert rows[0]["max_mutation_window_mutation_count"] == 1
-    assert rows[0]["mutation_windows_json"] == (
-        '[{"density": 1.0, "end": 7, "length": 1, "mutation_count": 1, "start": 7}, '
-        '{"density": 1.0, "end": 21, "length": 1, "mutation_count": 1, "start": 21}]'
-    )

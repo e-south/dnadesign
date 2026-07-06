@@ -16,6 +16,10 @@ from typing import Any
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.handoff_readiness import (
+    normalize_handoff_readiness,
+)
+
 from .constants import SECTION_FEASIBILITY_AND_HANDOFF
 from .manifest import file_hashes, make_deliverable_row
 
@@ -276,19 +280,7 @@ def _normalized_handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]
     raw = loaded.get("handoff_readiness") or {}
     if not isinstance(raw, dict):
         raise ValueError(f"Expected handoff_readiness mapping in {manifest_path}")
-    handoff_path = str(raw.get("candidate_handoff_path") or "candidate_handoff.yaml")
-    resolved = _resolve_manifest_path(manifest_path, handoff_path)
-    sequence_csv_path = str(raw.get("candidate_handoff_sequence_csv_path") or "candidate_handoff_sequences.csv")
-    sequence_csv_resolved = _resolve_manifest_path(manifest_path, sequence_csv_path)
-    return {
-        "handoff_kind": str(raw.get("handoff_kind") or "rt_only_candidate_handoff"),
-        "panel_selected": bool(raw.get("panel_selected")),
-        "candidate_handoff_path": handoff_path,
-        "candidate_handoff_sequence_csv_path": sequence_csv_path,
-        "candidate_handoff_sequence_csv_materialized": sequence_csv_resolved.exists(),
-        "candidate_handoff_materialized": resolved.exists(),
-        "construct_subject_created": bool(raw.get("construct_subject_created")),
-    }
+    return normalize_handoff_readiness(selection_root=manifest_path.parent, raw=raw)
 
 
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
