@@ -77,5 +77,7 @@ def assert_selection_plot_contract(
         column_count=len(LOCAL_STRUCTURE_REGION_IDS),
     )
     assert "selection_local_structure_stratification" in plot_text_by_id
-    assert "Exploratory threshold" in plot_text_by_id["selection_local_structure_stratification"]
+    local_structure_stratification_text = plot_text_by_id["selection_local_structure_stratification"]
+    assert "Threshold" in local_structure_stratification_text
+    assert "Selected rows" in local_structure_stratification_text
     assert not retired_plot.exists()

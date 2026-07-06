@@ -288,7 +288,7 @@ def _write_class_local_percentiles(
     panel_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
-    title = "Each selected row is reviewed within its own mask class"
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_class_local_percentiles"]
     selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
     triage_by_id = {str(row["candidate_id"]): row for row in triage_rows}
     metrics = [
@@ -347,13 +347,14 @@ def _write_class_local_percentiles(
     for spine in ax.spines.values():
         spine.set_visible(False)
     cbar = fig.colorbar(image, ax=ax, shrink=0.82, pad=0.02)
-    cbar.set_label("Within-class percentile", fontsize=11)
+    cbar.set_label("Favorable within-class percentile", fontsize=11)
     cbar.ax.tick_params(labelsize=10)
     fig.subplots_adjust(left=0.3, right=0.93, top=0.88, bottom=0.24)
     path = plot_root / "selection_class_local_percentiles.svg"
     alt = (
         "Heatmap showing each selected candidate as a within-class percentile for MSA support, unsupported "
-        "substitutions, near-DNA/RNA chemistry warnings, regional mutation burden, pLDDT, and WT RMSD."
+        "substitutions, near-DNA/RNA chemistry warnings, regional mutation burden, pLDDT, and WT RMSD. Higher "
+        "percentiles are more favorable after direction handling."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -363,8 +364,10 @@ def _write_class_local_percentiles(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Compares each selected row only against candidates from the same mask class. Percentiles summarize "
-            "the lexicographic review variables without creating a composite score."
+            "Compares each selected row only against candidates from the same mask class. Higher percentiles mean "
+            "more favorable within-class placement after direction handling: higher MSA support and pLDDT, fewer "
+            "unsupported changes, fewer chemistry warnings, lower RMSD, and regional burden closer to the class "
+            "median. The plot does not create a composite score."
         ),
         interpretation_limit=(
             "Percentiles explain panel review context. They are not activity, processivity, or strand-displacement "
@@ -381,7 +384,7 @@ def _write_selected_sequence_distance(
     candidate_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
-    title = "The selected six sample distinct sequence neighborhoods"
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_six_sequence_distance"]
     labels, matrix = build_selected_sequence_distance_matrix(panel_rows=panel_rows, candidate_rows=candidate_rows)
     display_labels = [short_candidate(label) for label in labels]
     fig, ax = plt.subplots(figsize=(6.4, 6.0))

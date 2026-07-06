@@ -84,6 +84,11 @@ def build_selected_local_structure_matrix(
     return region_labels, row_labels, matrix, status_matrix
 
 
+def _region_label_with_threshold(*, region_id: str, label: str) -> str:
+    threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+    return f"{label}\n<= {threshold:.2f} A"
+
+
 def write_local_structure_by_region_plot(
     plot_root: Path,
     *,
@@ -98,6 +103,10 @@ def write_local_structure_by_region_plot(
         panel_rows=panel_rows,
         local_structure_rows=local_structure_rows,
     )
+    region_labels = [
+        _region_label_with_threshold(region_id=region_id, label=label)
+        for region_id, label in zip(LOCAL_STRUCTURE_REGION_IDS, region_labels, strict=True)
+    ]
     numeric_values = [value for row in matrix for value in row if value is not None]
     max_value = max(numeric_values, default=1.0)
     plot_values = np.asarray([[np.nan if value is None else value for value in row] for row in matrix], dtype=float)
@@ -109,7 +118,7 @@ def write_local_structure_by_region_plot(
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(region_labels))))
-    ax.set_xticklabels(region_labels, fontsize=LABEL_SIZE - 1.2, rotation=25, ha="right")
+    ax.set_xticklabels(region_labels, fontsize=LABEL_SIZE - 1.8, rotation=25, ha="right")
     for row_index, values in enumerate(matrix):
         for col_index, value in enumerate(values):
             if value is None:
@@ -124,14 +133,15 @@ def write_local_structure_by_region_plot(
     for spine in ax.spines.values():
         spine.set_visible(False)
     cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.02)
-    cbar.set_label("Local C-alpha RMSD after global fit (A)", fontsize=11)
+    cbar.set_label("Local C-alpha RMSD (A)", fontsize=11)
     cbar.ax.tick_params(labelsize=10)
     fig.subplots_adjust(left=0.3, right=0.94, top=0.88, bottom=0.28)
     path = plot_root / "selection_local_structure_by_region.svg"
     unavailable_statuses = sorted({status for row in status_matrix for status in row if status != "available"})
     alt = (
         "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, annulus, and distal "
-        "regions after one global mapped C-alpha fit. Unavailable cells are labeled NA."
+        "regions after one global mapped C-alpha fit. Column labels include the local RMSD threshold. Unavailable "
+        "cells are labeled NA."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -142,8 +152,8 @@ def write_local_structure_by_region_plot(
         alt_text=alt,
         description=(
             "Shows local backbone shifts by RT review region after a single global mapped C-alpha alignment. "
-            "Every selected row must have all declared local-structure metrics and pass the exploratory local RMSD "
-            "thresholds. "
+            "Every selected row must have all declared local-structure metrics and stay within the local RMSD "
+            "threshold shown for each region. "
             f"Unavailable statuses: {', '.join(unavailable_statuses) if unavailable_statuses else 'none'}."
         ),
         interpretation_limit=(
@@ -211,36 +221,38 @@ def write_local_structure_stratification_plot(
             ax.scatter(
                 all_values,
                 [y_positions[y_index] + offset for offset in jitter],
-                s=18,
+                s=15,
                 color="#8c959f",
-                alpha=0.35,
+                alpha=0.24,
                 linewidth=0,
-                label="Nonselected candidate" if y_index == 0 else None,
+                label="Other candidates" if y_index == 0 else None,
+                zorder=2,
             )
         if selected_values:
             ax.scatter(
                 selected_values,
                 [y_positions[y_index]] * len(selected_values),
-                s=68,
+                s=96,
                 color="#0072b2",
                 edgecolor="#ffffff",
-                linewidth=0.85,
-                label="Selected panel row" if y_index == 0 else None,
-                zorder=4,
+                linewidth=1.1,
+                label="Selected rows" if y_index == 0 else None,
+                zorder=5,
             )
         ax.plot(
             [threshold, threshold],
             [y_positions[y_index] - 0.35, y_positions[y_index] + 0.35],
             color="#d55e00",
-            linewidth=2.0,
+            linewidth=2.2,
             solid_capstyle="butt",
-            label="Exploratory threshold" if y_index == 0 else None,
+            label="Threshold" if y_index == 0 else None,
+            zorder=4,
         )
         failed = sum(value > threshold for value, *_rest in region_values)
         ax.text(
             max_x + 0.08,
             y_positions[y_index],
-            f">{threshold:.2f} A: {failed}",
+            f">{threshold:.2f} A: {failed} fail",
             ha="left",
             va="center",
             fontsize=9.2,
@@ -249,16 +261,16 @@ def write_local_structure_stratification_plot(
     ax.set_yticks(y_positions)
     ax.set_yticklabels(region_labels, fontsize=LABEL_SIZE - 0.5)
     ax.invert_yaxis()
-    ax.set_xlabel("Local C-alpha RMSD after global fit (A)", fontsize=LABEL_SIZE)
+    ax.set_xlabel("Local C-alpha RMSD (A)", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
-    ax.set_xlim(left=0.0, right=max_x + 0.9)
-    ax.legend(loc="lower right", frameon=False, fontsize=10)
+    ax.set_xlim(left=0.0, right=max_x + 1.15)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3, frameon=False, fontsize=10)
     style = {"color": "#d8dee4", "linewidth": 0.7}
     ax.grid(axis="x", **style)
     ax.grid(axis="y", visible=False)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    fig.subplots_adjust(left=0.29, right=0.96, top=0.9, bottom=0.14)
+    fig.subplots_adjust(left=0.29, right=0.96, top=0.9, bottom=0.24)
     path = plot_root / "selection_local_structure_stratification.svg"
     alt = (
         "Population stratification plot for local C-alpha RMSD by RT review region. Gray points are nonselected "
@@ -272,7 +284,7 @@ def write_local_structure_stratification_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Shows how the local-structure thresholds sit relative to the candidate population. Rows exceeding a "
+            "Shows each local-structure threshold relative to the candidate population. Rows exceeding a "
             f"region threshold fail the local-structure gate under {LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID}."
         ),
         interpretation_limit=(

@@ -32,17 +32,17 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_local_structure_stratification",
         file_name="selection_local_structure_stratification.svg",
-        plain_title="Local RMSD thresholds are shown against the candidate pool",
+        plain_title="Local RMSD thresholds by region",
     ),
     SelectionPlot(
         plot_id="selection_local_structure_by_region",
         file_name="selection_local_structure_by_region.svg",
-        plain_title="Selected local RT regions pass RMSD thresholds",
+        plain_title="Selected local RT regions stay within RMSD thresholds",
     ),
     SelectionPlot(
         plot_id="selection_class_local_percentiles",
         file_name="selection_class_local_percentiles.svg",
-        plain_title="Each selected row is reviewed within its own mask class",
+        plain_title="Selected rows are compared within mask class",
     ),
     SelectionPlot(
         plot_id="selection_premise_alignment",
@@ -67,7 +67,7 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_six_sequence_distance",
         file_name="selection_six_sequence_distance.svg",
-        plain_title="The selected six sample distinct sequence neighborhoods",
+        plain_title="Selected candidates span sequence neighborhoods",
     ),
 )
 
