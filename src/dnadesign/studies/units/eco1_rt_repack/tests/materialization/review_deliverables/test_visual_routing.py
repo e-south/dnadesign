@@ -19,6 +19,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
+    evidence_deliverables,
     visual_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
@@ -76,3 +77,20 @@ def test_review_notebook_routes_only_visual_artifacts_to_figure_selectors(tmp_pa
     assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
     assert "biohub_esmc_sae_delta_umap" not in audit_visual_ids
     assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids
+
+
+def test_review_notebook_routes_evidence_exports_outside_figure_selector(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+
+    evidence_ids = {entry["deliverable_id"] for entry in evidence_deliverables(manifest["deliverables"])}
+    visual_ids = {entry["deliverable_id"] for entry in visual_deliverables(manifest["deliverables"])}
+
+    assert {
+        "selection_panel_table",
+        "selection_handoff_sequences",
+        "selection_handoff_readiness",
+        "selection_funnel_summary",
+    }.issubset(evidence_ids)
+    assert evidence_ids.isdisjoint(visual_ids)

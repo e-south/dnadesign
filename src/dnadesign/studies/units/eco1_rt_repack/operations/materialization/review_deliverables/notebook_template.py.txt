@@ -8,7 +8,7 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
-        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable,
+        deliverable_lookup, evidence_deliverables, format_deliverable_label, is_interactive_structure_deliverable,
         is_residue_frequency_bundle_deliverable, load_review_manifest, render_deliverable_details,
         render_deliverable_panel, render_intro, render_residue_frequency_bundle, residue_frequency_view_lookup,
         review_lane_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
@@ -45,7 +45,7 @@ def _():
         )
 
     return (
-        deliverable_lookup, format_deliverable_label, is_interactive_structure_deliverable,
+        deliverable_lookup, evidence_deliverables, format_deliverable_label, is_interactive_structure_deliverable,
         is_residue_frequency_bundle_deliverable, is_sae_feature_heatmap_deliverable, load_review_manifest,
         load_sae_feature_heatmap_manifest, load_structure_browser_rows, mo, render_deliverable_details,
         render_deliverable_panel, render_intro, render_residue_frequency_bundle, render_sae_feature_heatmap,
@@ -98,6 +98,12 @@ def _(deliverables, section_label_lookup, selected_lane, visual_deliverables):
     section_lookup = section_label_lookup(visual_rows)
     section_options = list(section_lookup)
     return section_lookup, section_options, visual_rows
+
+
+@app.cell
+def _(deliverables, evidence_deliverables, selected_lane):
+    evidence_rows = evidence_deliverables(deliverables, selected_lane=selected_lane)
+    return evidence_rows
 
 
 @app.cell
@@ -413,6 +419,8 @@ def _(sae_heatmap_feature_map, sae_heatmap_feature_ui):
 def _(
     deliverable_id_ui,
     deliverable_section_ui,
+    evidence_rows,
+    format_deliverable_label,
     is_interactive_structure_deliverable,
     is_residue_frequency_bundle_deliverable,
     is_sae_feature_heatmap_deliverable,
@@ -428,6 +436,7 @@ def _(
     sae_heatmap_manifest,
     selected_residue_frequency_view,
     selected_sae_heatmap_feature,
+    selected_section,
     selected_structure_highlight,
     highlight_dna,
     highlight_protein,
@@ -449,6 +458,7 @@ def _(
     structure_sidechain_ui,
     structure_ui,
     review_lane_ui,
+    section_deliverables,
 ):
     navigation_controls = [
         control for control in (review_lane_ui, deliverable_section_ui, deliverable_id_ui) if control is not None
@@ -511,6 +521,23 @@ def _(
             ]
         else:
             rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
+    evidence_section_rows = section_deliverables(evidence_rows, selected_section)
+    if evidence_section_rows:
+        evidence_panels = {
+            format_deliverable_label(row): render_deliverable_panel(row, mo=mo, manifest_root=manifest_root)
+            for row in evidence_section_rows
+        }
+        rendered.append(
+            mo.vstack(
+                [
+                    mo.Html(
+                        "<h2 style='font-size:1.15rem; margin:0.2rem 0 0 0;'>Evidence tables and exports</h2>"
+                    ),
+                    mo.accordion(evidence_panels, multiple=False, lazy=True),
+                ],
+                gap=0.25,
+            )
+        )
     control_rows = [
         mo.hstack(
             navigation_controls,

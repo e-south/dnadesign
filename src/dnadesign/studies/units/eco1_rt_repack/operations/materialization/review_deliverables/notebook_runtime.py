@@ -48,6 +48,12 @@ _NOTEBOOK_LANE_LABELS = {
     "main_review": "Core evidence",
     "audit_supplement": "Model and method checks",
 }
+_NOTEBOOK_EVIDENCE_ARTIFACT_KINDS = {
+    "selection_funnel_summary",
+    "selection_panel_table",
+    "candidate_handoff_sequence_csv",
+    "handoff_readiness",
+}
 _SECTION_DELIVERABLE_ORDER = {
     SECTION_FEASIBILITY_AND_HANDOFF: (
         *CURRENT_SELECTION_PLOT_IDS,
@@ -145,6 +151,24 @@ def visual_deliverables(
         row
         for row in deliverables
         if str(row.get("role") or "manuscript_facing") in allowed_roles and _is_publication_visual(row)
+    ]
+
+
+def evidence_deliverables(
+    deliverables: list[dict[str, Any]],
+    *,
+    selected_lane: str = "main_review",
+) -> list[dict[str, Any]]:
+    """Return evidence/export rows for notebook sections outside figure selectors."""
+
+    allowed_roles = _NOTEBOOK_LANE_ROLES.get(selected_lane)
+    if allowed_roles is None:
+        raise ValueError(f"unknown review deliverable lane: {selected_lane}")
+    return [
+        row
+        for row in deliverables
+        if str(row.get("role") or "manuscript_facing") in allowed_roles
+        and str(row.get("artifact_kind") or "") in _NOTEBOOK_EVIDENCE_ARTIFACT_KINDS
     ]
 
 

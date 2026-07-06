@@ -369,6 +369,7 @@ def _remove_retired_deliverables(deliverable_root: Path) -> None:
         Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_mutation_density.svg",
         Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_tao_style_fold_validation.svg",
         Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_variant_similarity_heatmap.svg",
+        Path("feasibility_and_handoff") / "planned.md",
     ):
         retired_file = deliverable_root / relative_path
         if retired_file.is_file():

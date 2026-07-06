@@ -39,10 +39,18 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     stale_linear_mask_track = tmp_path / "review_deliverables" / "mask_structure_context" / "linear_mask_tracks.svg"
     stale_linear_mask_track.parent.mkdir(parents=True, exist_ok=True)
     stale_linear_mask_track.write_text("<svg>retired baseline-only mask track</svg>\n", encoding="utf-8")
+    stale_planned_handoff = tmp_path / "review_deliverables" / "feasibility_and_handoff" / "planned.md"
+    stale_planned_handoff.parent.mkdir(parents=True, exist_ok=True)
+    stale_planned_handoff.write_text(
+        "# Feasibility and RT-only handoff remain planned\n\n"
+        "The review bundle stops before synthesis feasibility and downstream handoff.\n",
+        encoding="utf-8",
+    )
 
     result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
 
     assert not stale_linear_mask_track.exists()
+    assert not stale_planned_handoff.exists()
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_id"] == "eco1_rt.review_deliverables"
