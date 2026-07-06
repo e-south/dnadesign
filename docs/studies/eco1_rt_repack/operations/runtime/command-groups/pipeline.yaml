@@ -439,7 +439,7 @@ lanes:
         - <colabfold_version>
   - id: design_class_downstream_inputs
     owner: eco1_rt_repack
-    status: planned_after_expanded_foldcheck_report
+    status: materialized_expanded_576_inputs
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/downstream_inputs_manifest.yaml
     secondary_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_table.parquet
@@ -459,7 +459,7 @@ lanes:
       - Does not stage a root-level mask_set.yaml because expanded rows carry multiple mask_policy_id values.
   - id: design_class_foldcheck_review
     owner: eco1_rt_repack
-    status: planned_after_expanded_foldcheck_report
+    status: materialized_expanded_foldcheck_review
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet
     command:
       argv:
@@ -477,7 +477,7 @@ lanes:
       gui_opt_in_flag: --render-chimerax-overlay
   - id: design_class_esmc_sequence_preference
     owner: eco1_rt_repack
-    status: planned_after_design_class_foldcheck_review
+    status: materialized_review_only
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_esmc_sequence_preference_manifest.yaml
     secondary_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet
@@ -818,7 +818,7 @@ lanes:
           - -f
   - id: candidate_handoff
     owner: thread
-    status: planned
+    status: planned_blocked_until_rt_only_handoff_materialization
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
     command: null
   - id: rt_lnrna_handoff

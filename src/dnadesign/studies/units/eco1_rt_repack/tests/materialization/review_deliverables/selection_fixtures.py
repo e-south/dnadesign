@@ -102,6 +102,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             "candidate_handoff_path": "../../candidate_handoff.yaml",
             "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
             "candidate_handoff_sequence_csv_materialized": True,
+            "candidate_handoff_file_present": False,
             "candidate_handoff_materialized": False,
             "construct_subject_created": False,
         },

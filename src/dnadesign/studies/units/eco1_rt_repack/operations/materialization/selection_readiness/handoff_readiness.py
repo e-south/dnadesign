@@ -15,6 +15,10 @@ import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_handoff import (
+    validate_candidate_handoff_content,
+)
+
 from .constants import CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
 
 
@@ -49,13 +53,17 @@ def normalize_handoff_readiness(
     sequence_csv_path = str(
         values.get("candidate_handoff_sequence_csv_path") or CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
     )
+    resolved_handoff_path = selection_root / handoff_path
+    handoff_file_present = resolved_handoff_path.exists()
+    handoff_valid = handoff_file_present and not validate_candidate_handoff_content(resolved_handoff_path)
     return {
         "handoff_kind": str(values.get("handoff_kind") or "rt_only_candidate_handoff"),
         "panel_selected": bool(values.get("panel_selected")),
         "candidate_handoff_path": handoff_path,
         "candidate_handoff_sequence_csv_path": sequence_csv_path,
         "candidate_handoff_sequence_csv_materialized": (selection_root / sequence_csv_path).exists(),
-        "candidate_handoff_materialized": (selection_root / handoff_path).exists(),
+        "candidate_handoff_file_present": handoff_file_present,
+        "candidate_handoff_materialized": handoff_valid,
         "construct_subject_created": bool(values.get("construct_subject_created")),
     }
 

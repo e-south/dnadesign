@@ -11,6 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
+
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
@@ -90,3 +94,19 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     assert "hashlib.sha256" in sequence_export_text
     assert "processivity_score" not in panel_text
     assert "activity_score" not in panel_text
+
+
+def test_selection_readiness_facade_does_not_import_plotting_stack() -> None:
+    code = """
+    import sys
+    import dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness as module
+
+    assert module.__all__ == [
+        "MaterializedSelectionReadiness",
+        "NA_FACING_CHEMISTRY_METRICS",
+        "materialize_selection_readiness",
+    ]
+    assert "matplotlib" not in sys.modules
+    assert "matplotlib.pyplot" not in sys.modules
+    """
+    subprocess.run([sys.executable, "-c", textwrap.dedent(code)], check=True)

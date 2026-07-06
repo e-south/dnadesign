@@ -14,6 +14,9 @@ from __future__ import annotations
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.artifacts import (
     validate_sampling_artifacts,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_handoff import (
+    validate_candidate_handoff_content,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_table import (
     validate_candidate_table_content,
 )
@@ -30,6 +33,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.thread
 __all__ = [
     "validate_proteinmpnn_request_content",
     "validate_candidate_table_content",
+    "validate_candidate_handoff_content",
     "validate_sample_table_content",
     "validate_sampling_artifacts",
     "validate_thread_plan_content",

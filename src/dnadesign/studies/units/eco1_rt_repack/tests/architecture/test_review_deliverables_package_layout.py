@@ -11,6 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
+
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
@@ -86,3 +90,15 @@ def test_review_deliverables_materializer_uses_semantic_modules() -> None:
     assert "write_interactive_structure_browser_manifest" in pipeline_text
     assert "linked_selection_readiness_rows" in pipeline_text
     assert "read_mask_residues" in pipeline_text
+
+
+def test_review_deliverables_facade_does_not_import_plotting_stack() -> None:
+    code = """
+    import sys
+    import dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables as module
+
+    assert module.__all__ == ["MaterializedReviewDeliverables", "materialize_review_deliverables"]
+    assert "matplotlib" not in sys.modules
+    assert "matplotlib.pyplot" not in sys.modules
+    """
+    subprocess.run([sys.executable, "-c", textwrap.dedent(code)], check=True)

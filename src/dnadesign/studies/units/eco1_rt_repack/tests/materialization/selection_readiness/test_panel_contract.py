@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
@@ -21,6 +22,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
     validate_exact_panel_coverage,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._handoff_fixture import (
+    candidate_handoff_payload,
 )
 
 
@@ -89,9 +93,20 @@ def test_handoff_readiness_uses_thread_root_candidate_handoff(tmp_path) -> None:
     )
 
     assert readiness["candidate_handoff_path"] == "../../candidate_handoff.yaml"
+    assert readiness["candidate_handoff_file_present"] is False
     assert readiness["candidate_handoff_materialized"] is False
 
     thread_handoff_path.write_text("handoff_kind: rt_only_candidate_handoff\n", encoding="utf-8")
+
+    invalid_readiness = build_handoff_readiness(
+        selection_root=selection_root,
+        panel_rows=_panel_rows(_expected_classes()),
+        candidate_handoff_path=thread_handoff_path,
+    )
+    assert invalid_readiness["candidate_handoff_file_present"] is True
+    assert invalid_readiness["candidate_handoff_materialized"] is False
+
+    thread_handoff_path.write_text(yaml.safe_dump(candidate_handoff_payload(), sort_keys=False), encoding="utf-8")
 
     assert (
         build_handoff_readiness(

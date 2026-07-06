@@ -19,6 +19,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.contracts.foldcheck impor
     validate_foldcheck_request_content,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.models import ContractIssue
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_handoff import (
+    validate_candidate_handoff_content,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling.candidate_table import (
     validate_candidate_table_content,
 )
@@ -118,12 +121,15 @@ def validate_sampling_artifacts(
             )
         else:
             issues.extend(validate_foldcheck_report_content(foldcheck_report, output_root=structure_root))
-    if _phase_rank(phase) >= _phase_rank("phase4_downstream_promotion") and not candidate_handoff.exists():
-        issues.append(
-            ContractIssue(
-                check_id="eco1_rt.handoff.candidate_handoff_not_materialized",
-                message="Phase 4 downstream promotion requires materialized RT-only candidate_handoff.yaml",
-                path=str(candidate_handoff),
+    if _phase_rank(phase) >= _phase_rank("phase4_downstream_promotion"):
+        if not candidate_handoff.exists():
+            issues.append(
+                ContractIssue(
+                    check_id="eco1_rt.handoff.candidate_handoff_not_materialized",
+                    message="Phase 4 downstream promotion requires materialized RT-only candidate_handoff.yaml",
+                    path=str(candidate_handoff),
+                )
             )
-        )
+        else:
+            issues.extend(validate_candidate_handoff_content(candidate_handoff))
     return issues

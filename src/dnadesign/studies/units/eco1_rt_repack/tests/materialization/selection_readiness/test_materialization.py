@@ -32,6 +32,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
     write_inputs,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._handoff_fixture import (
+    candidate_handoff_payload,
+)
 
 
 def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(tmp_path: Path) -> None:
@@ -41,7 +44,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     source_root = repo_root / "outputs/thread"
     inputs = write_inputs(class_root, source_root)
     root_handoff_path = source_root / "candidate_handoff.yaml"
-    root_handoff_path.write_text("handoff_kind: rt_only_candidate_handoff\n", encoding="utf-8")
+    root_handoff_path.write_text(yaml.safe_dump(candidate_handoff_payload(), sort_keys=False), encoding="utf-8")
     selection_local_handoff_path = selection_root / "candidate_handoff.yaml"
     selection_local_handoff_path.parent.mkdir(parents=True, exist_ok=True)
     selection_local_handoff_path.write_text("handoff_kind: wrong_local_path\n", encoding="utf-8")
@@ -111,6 +114,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "candidate_handoff_path": "../../candidate_handoff.yaml",
         "candidate_handoff_sequence_csv_path": "candidate_handoff_sequences.csv",
         "candidate_handoff_sequence_csv_materialized": True,
+        "candidate_handoff_file_present": True,
         "candidate_handoff_materialized": True,
         "construct_subject_created": False,
     }

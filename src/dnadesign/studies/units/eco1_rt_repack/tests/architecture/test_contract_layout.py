@@ -42,6 +42,7 @@ _CONTRACT_MASK_PACKAGES: set[str] = set()
 _CONTRACT_SAMPLING_FILES = {
     "__init__.py",
     "artifacts.py",
+    "candidate_handoff.py",
     "candidate_table.py",
     "proteinmpnn_request.py",
     "sample_table.py",
@@ -81,6 +82,7 @@ _CONTRACT_MASK_TEST_FILES = {
 _CONTRACT_MASK_TEST_PACKAGES: set[str] = set()
 _CONTRACT_SAMPLING_TEST_FILES = {
     "__init__.py",
+    "test_candidate_handoff.py",
     "test_candidate_table.py",
     "test_proteinmpnn_request.py",
     "test_sample_table.py",

@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from importlib import import_module
 from pathlib import Path
 
@@ -66,6 +68,14 @@ def test_review_deliverable_visual_content_is_plain_and_linked(tmp_path: Path) -
         forbidden_path_text=str(tmp_path),
     )
     assert_review_notebook_contract(result.notebook_path.read_text(encoding="utf-8"))
+
+
+def test_generated_review_notebook_passes_marimo_check(tmp_path: Path) -> None:
+    write_deliverable_inputs(tmp_path)
+
+    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path)
+
+    subprocess.run([sys.executable, "-m", "marimo", "check", str(result.notebook_path)], check=True)
 
 
 def test_design_class_mask_overview_renders_rt_context_spans_from_ontology(tmp_path: Path) -> None:

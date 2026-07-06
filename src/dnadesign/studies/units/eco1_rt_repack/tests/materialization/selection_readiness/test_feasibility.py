@@ -49,3 +49,32 @@ def test_feasibility_preserves_positions_from_serialized_mutation_lists() -> Non
         '[{"density": 1.0, "end": 7, "length": 1, "mutation_count": 1, "start": 7}, '
         '{"density": 1.0, "end": 21, "length": 1, "mutation_count": 1, "start": 21}]'
     )
+
+
+def test_feasibility_requires_wild_type_parent_sequence_hash() -> None:
+    try:
+        build_feasibility_rows(
+            candidate_rows=[
+                {
+                    "candidate_id": "candidate_without_parent",
+                    "sequence_hash": "sha256:" + "c" * 64,
+                    "sequence": sequence(4),
+                    "status": "accepted",
+                    "mutation_count": 1,
+                    "mutable_mutation_count": 1,
+                    "protected_mutation_count": 0,
+                    "outside_mutable_positions": [],
+                    "canonical_mutations": ["A7G"],
+                }
+            ],
+            foldcheck_report_rows=[{"candidate_id": "candidate_without_parent", "status": "accepted"}],
+            input_candidate_pool_hash="sha256:pool",
+            input_mask_policy_hash="sha256:mask",
+            input_foldcheck_report_hash="sha256:fold",
+            created_at="2026-07-02T00:00:00Z",
+        )
+    except ValueError as exc:
+        assert "wild_type" in str(exc)
+        assert "parent sequence hash" in str(exc)
+    else:  # pragma: no cover - pytest assertion path
+        raise AssertionError("feasibility rows must require a wild_type parent sequence hash")

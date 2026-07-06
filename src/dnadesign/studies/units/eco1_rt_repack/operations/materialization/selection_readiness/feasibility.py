@@ -105,9 +105,11 @@ def build_feasibility_rows(
 
 def _parent_sequence_hash(rows: Sequence[dict[str, object]]) -> str:
     for row in rows:
-        if str(row.get("candidate_id")) == "wild_type":
-            return str(row.get("input_sequence_hash") or row.get("sequence_hash") or "")
-    return ""
+        if str(row.get("candidate_id")) == "wild_type" and str(row.get("status")) == "accepted":
+            parent_hash = str(row.get("input_sequence_hash") or row.get("sequence_hash") or "")
+            if parent_hash:
+                return parent_hash
+    raise ValueError("foldcheck report must include an accepted wild_type parent sequence hash")
 
 
 def _synthesis_blockers(

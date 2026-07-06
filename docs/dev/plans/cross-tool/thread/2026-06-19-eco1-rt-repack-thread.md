@@ -1198,9 +1198,9 @@ Add focused tests for:
 - selection rejection when SAE is the only positive evidence;
 - deterministic reruns where output hashes should be stable.
 
-### Definition Of Done
+### Selection-Readiness Done State
 
-This slice is done when:
+The current selection-readiness slice is done when:
 
 ```text
 sae_feature_window_summary.parquet exists and validates
@@ -1208,7 +1208,6 @@ feasibility_report.parquet exists and validates
 candidate_triage_table.parquet exists and validates
 candidate_selection_panel.parquet exists and validates
 candidate_handoff_sequences.csv exists and validates
-candidate_handoff.yaml exists and validates
 review_deliverable_manifest.yaml exists and validates
 MSA plurality/mask context visual renders from declared alignment inputs
 linear-plus-3D mask context visual renders from declared mask/structure inputs
@@ -1222,10 +1221,26 @@ selected protein sequence CSV is visible in the review notebook and referenced b
 all visual manifests include alt text and interpretation limits
 status.md, datasets.yaml, routes, and command groups name the new state
 phase wording separates fold-check validation from downstream promotion
-handoff validator proves no construct subject was created
 ```
 
-The only final claim enabled by this slice is:
+This state supports only this claim:
+
+```text
+These six rows form a class-balanced RT-only protein review panel with fold, feasibility, sequence, and regional evidence attached.
+```
+
+### RT-Only Handoff Done State
+
+The downstream handoff slice is done only when:
+
+```text
+candidate_handoff.yaml exists and validates
+candidate_handoff.yaml links the selected sequence CSV and upstream artifact hashes
+handoff validator proves no construct subject was created
+downstream acceptance remains required and separate from Eco1 selection readiness
+```
+
+Only that later state enables this claim:
 
 ```text
 These RT-only candidates are fold-checked, structure-reviewed, computationally feasible, and ready for downstream accept/reject review.
@@ -1245,13 +1260,13 @@ Those claims require downstream experimental evidence.
 
 | Source | Identifier | Role in this study |
 | --- | --- | --- |
-| Tao et al. 2026 | DOI `10.1038/s41587-026-03149-6` | Fixed-backbone RT redesign method prior. |
-| Mestre et al. 2020 | DOI `10.1093/nar/gkaa1149` | Retron RT roster and Ec86 clade context. |
-| Simon et al. 2019 | DOI `10.1093/nar/gkz865` | RT motif grammar and annotation prior. |
-| Wang et al. 2022 | DOI `10.1038/s41564-022-01197-7`; PDB `7V9U` | Ec86 RT-msDNA/msrRNA scaffold and substrate-contact context. |
-| ProteinMPNN | `dauparas/ProteinMPNN`; DOI `10.1126/science.add2187` | Public fixed-backbone inverse-folding CLI and helper-file workflow. |
-| ColabFold | DOI `10.1038/s41592-022-01488-1` | Public `colabfold_batch` fold-check command path. |
-| Candido et al. 2026 | DOI `10.64898/2026.06.03.729735` | ESMC, ESMFold2, Atlas, and SAE representation context. |
+| Tao et al. 2026 | DOI [`10.1038/s41587-026-03149-6`](https://doi.org/10.1038/s41587-026-03149-6) | Fixed-backbone RT redesign method prior. |
+| Mestre et al. 2020 | DOI [`10.1093/nar/gkaa1149`](https://doi.org/10.1093/nar/gkaa1149) | Retron RT roster and Ec86 clade context. |
+| Simon et al. 2019 | DOI [`10.1093/nar/gkz865`](https://doi.org/10.1093/nar/gkz865) | RT motif grammar and annotation prior. |
+| Wang et al. 2022 | DOI [`10.1038/s41564-022-01197-7`](https://doi.org/10.1038/s41564-022-01197-7); PDB `7V9U` | Ec86 RT-msDNA/msrRNA scaffold and substrate-contact context. |
+| ProteinMPNN | `dauparas/ProteinMPNN`; DOI [`10.1126/science.add2187`](https://doi.org/10.1126/science.add2187) | Public fixed-backbone inverse-folding CLI and helper-file workflow. |
+| ColabFold | DOI [`10.1038/s41592-022-01488-1`](https://doi.org/10.1038/s41592-022-01488-1) | Public `colabfold_batch` fold-check command path. |
+| Candido et al. 2026 | DOI [`10.64898/2026.06.03.729735`](https://doi.org/10.64898/2026.06.03.729735) | ESMC, ESMFold2, Atlas, and SAE representation context. |
 | Biohub ESMC docs and notebooks | `/api/v1/encode`, `/api/v1/logits`, ESMC SAE and mutation-scoring notebooks | Public intended API and notebook patterns for query-time SAE and masked-marginal LLR review evidence. |
 
 - Tao et al. supplies the fixed-backbone RT redesign method pattern:
