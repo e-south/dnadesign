@@ -288,39 +288,44 @@ def write_design_class_fold_bin_counts(
         counts_by_class[class_id][review_class] += 1
 
     max_count = max((count for counts in counts_by_class.values() for count in counts.values()), default=0)
-    fig, axes = plt.subplots(3, 2, figsize=(8.8, 9.2), sharex=True, sharey=True)
-    axes_list = list(axes.flatten())
-    y_positions = np.arange(len(_REVIEW_CLASS_ORDER))
+    fig, axes = plt.subplots(
+        1,
+        len(class_ids),
+        figsize=(max(13.2, 2.35 * len(class_ids)), 4.2),
+        sharey=True,
+        squeeze=False,
+    )
+    axes_list = list(axes[0])
+    x_positions = np.arange(len(_REVIEW_CLASS_ORDER))
     for axis_index, (ax, class_id) in enumerate(zip(axes_list, class_ids, strict=False)):
         counts = counts_by_class[class_id]
         values = [counts.get(review_class, 0) for review_class in _REVIEW_CLASS_ORDER]
-        bars = ax.barh(
-            y_positions,
+        bars = ax.bar(
+            x_positions,
             values,
             color=[_REVIEW_CLASS_COLORS[review_class] for review_class in _REVIEW_CLASS_ORDER],
             edgecolor="#ffffff",
             linewidth=0.45,
         )
-        ax.bar_label(bars, labels=[str(value) if value else "" for value in values], padding=2, fontsize=8.5)
+        ax.bar_label(bars, labels=[str(value) if value else "" for value in values], padding=2, fontsize=7.8)
         ax.set_title(class_label(class_id), fontsize=LEGEND_SIZE, pad=5)
-        ax.set_xlim(0, max(1, max_count) * 1.14)
-        ax.set_yticks(
-            y_positions,
+        ax.set_ylim(0, max(1, max_count) * 1.2)
+        ax.set_xticks(
+            x_positions,
             [_review_class_axis_label(review_class) for review_class in _REVIEW_CLASS_ORDER],
-            fontsize=8.8,
+            fontsize=7.4,
+            rotation=58,
+            ha="right",
         )
-        ax.invert_yaxis()
+        if axis_index == 0:
+            ax.set_ylabel("Candidate count", fontsize=LEGEND_SIZE)
+        ax.set_box_aspect(1)
         style_open_axes(ax)
-        ax.grid(axis="x", alpha=0.24)
-        ax.grid(axis="y", visible=False)
-        if axis_index % 2 != 0:
-            ax.tick_params(axis="y", labelleft=False)
-        if axis_index >= 4:
-            ax.set_xlabel("Candidate count", fontsize=LEGEND_SIZE)
-    for ax in axes_list[len(class_ids) :]:
-        ax.axis("off")
+        ax.grid(axis="y", alpha=0.24)
+        ax.grid(axis="x", visible=False)
+        ax.tick_params(axis="y", labelsize=8.2)
     fig.suptitle(title, fontsize=TITLE_SIZE, y=0.972)
-    fig.subplots_adjust(left=0.27, right=0.985, top=0.91, bottom=0.085, hspace=0.42, wspace=0.11)
+    fig.subplots_adjust(left=0.045, right=0.995, top=0.79, bottom=0.32, wspace=0.34)
 
     alt_parts = []
     for class_id in class_ids:
@@ -360,6 +365,7 @@ def write_design_class_fold_bin_counts(
             "processivity, strand displacement, or construct acceptance."
         ),
         title=title,
+        render_mode="wide_visual",
         evidence_summary={
             "candidate_count": len(joined_rows),
             "design_class_count": len(class_ids),

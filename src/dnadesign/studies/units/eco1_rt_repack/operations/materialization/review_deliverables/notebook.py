@@ -474,17 +474,24 @@ def _(
     structure_ui,
     review_lane_ui,
 ):
+    navigation_controls = [
+        control for control in (review_lane_ui, deliverable_section_ui, deliverable_id_ui) if control is not None
+    ]
+    secondary_controls = []
     if selected_visual is None:
-        panel = mo.md("No deliverable is available for the selected section.")
+        rendered = [mo.md("No deliverable is available for the selected section.")]
     else:
         if is_interactive_structure_deliverable(selected_visual):
+            secondary_controls.extend(
+                control for control in (structure_group_ui, structure_ui, structure_highlight_ui) if control is not None
+            )
             rendered = [
                 render_structure_browser(
                     mo=mo,
                     selected_row=selected_structure_row,
-                    structure_ui=structure_ui,
-                    structure_group_ui=structure_group_ui,
-                    structure_highlight_ui=structure_highlight_ui,
+                    structure_ui=None,
+                    structure_group_ui=None,
+                    structure_highlight_ui=None,
                     selected_highlight_row=selected_structure_highlight,
                     structure_background_ui=structure_background_ui,
                     structure_mutation_ui=structure_mutation_ui,
@@ -504,45 +511,52 @@ def _(
                 render_deliverable_details(selected_visual, mo=mo),
             ]
         elif is_sae_feature_heatmap_deliverable(selected_visual):
+            secondary_controls.extend(control for control in (sae_heatmap_feature_ui,) if control is not None)
             rendered = [
                 render_sae_feature_heatmap(
                     mo=mo,
                     heatmap_manifest=sae_heatmap_manifest,
                     selected_feature_index=selected_sae_heatmap_feature,
-                    feature_ui=sae_heatmap_feature_ui,
+                    feature_ui=None,
                 ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
         elif is_residue_frequency_bundle_deliverable(selected_visual):
+            secondary_controls.extend(control for control in (residue_frequency_class_ui,) if control is not None)
             rendered = [
                 render_residue_frequency_bundle(
                     selected_visual,
                     mo=mo,
                     manifest_root=manifest_root,
                     selected_view=selected_residue_frequency_view,
-                    design_class_ui=residue_frequency_class_ui,
+                    design_class_ui=None,
                 ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
         else:
             rendered = [render_deliverable_panel(selected_visual, mo=mo, manifest_root=manifest_root)]
-        navigation_controls = [
-            control for control in (review_lane_ui, deliverable_section_ui, deliverable_id_ui) if control is not None
-        ]
-        panel = mo.vstack(
-            [
-                mo.hstack(
-                    navigation_controls,
-                    justify="start",
-                    align="stretch",
-                    wrap=True,
-                    gap=1.0,
-                    widths="equal",
-                ),
-                *rendered,
-            ],
-            gap=0.45,
+    control_rows = [
+        mo.hstack(
+            navigation_controls,
+            justify="start",
+            align="stretch",
+            wrap=True,
+            gap=1.0,
+            widths="equal",
         )
+    ]
+    if secondary_controls:
+        control_rows.append(
+            mo.hstack(
+                secondary_controls,
+                justify="start",
+                align="stretch",
+                wrap=True,
+                gap=1.0,
+                widths="equal",
+            )
+        )
+    panel = mo.vstack([*control_rows, *rendered], gap=0.45)
     panel
 
 

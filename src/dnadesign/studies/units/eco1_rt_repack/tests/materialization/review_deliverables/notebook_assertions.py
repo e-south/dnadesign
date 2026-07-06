@@ -115,6 +115,13 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'label="Figure or structure view"' in notebook_text
     assert "mo.hstack(" in notebook_text
     assert "control for control in (review_lane_ui, deliverable_section_ui, deliverable_id_ui)" in notebook_text
+    assert "secondary_controls = []" in notebook_text
+    assert "if secondary_controls:" in notebook_text
+    assert "control_rows.append(" in notebook_text
+    assert 'secondary_controls,\n                justify="start"' in notebook_text
+    assert "design_class_ui=None" in notebook_text
+    assert "feature_ui=None" in notebook_text
+    assert "structure_ui=None" in notebook_text
     assert 'widths="equal"' in notebook_text
     assert "section_deliverables" in combined_text
     assert "mo.accordion(visual_panels, multiple=False, lazy=True)" not in combined_text

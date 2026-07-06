@@ -83,7 +83,7 @@ def render_sae_feature_heatmap(
     mo: Any,
     heatmap_manifest: dict[str, Any],
     selected_feature_index: int | None,
-    feature_ui: Any,
+    feature_ui: Any | None,
 ) -> Any:
     """Render one selected SAE feature across WT and variant residue positions."""
 
@@ -116,23 +116,22 @@ def render_sae_feature_heatmap(
         residue_rows=residue_rows,
     )
     metric_rows = _feature_metric_rows(feature_map[int(selected_feature_index)], heatmap_manifest)
-    return mo.vstack(
-        [
-            feature_ui,
-            render_zoom_frame(
-                mo=mo,
-                frame_html=svg,
-                title="Zoomable visual: selected SAE feature activation across Eco1 RT variants",
-                height_css="84vh",
-            ),
-            mo.accordion(
-                {"Selected SAE feature evidence": mo.ui.table(metric_rows, page_size=8)},
-                multiple=False,
-                lazy=True,
-            ),
-        ],
-        gap=0.35,
-    )
+    panels = [
+        render_zoom_frame(
+            mo=mo,
+            frame_html=svg,
+            title="Zoomable visual: selected SAE feature activation across Eco1 RT variants",
+            height_css="84vh",
+        ),
+        mo.accordion(
+            {"Selected SAE feature evidence": mo.ui.table(metric_rows, page_size=8)},
+            multiple=False,
+            lazy=True,
+        ),
+    ]
+    if feature_ui is not None:
+        panels.insert(0, feature_ui)
+    return mo.vstack(panels, gap=0.35)
 
 
 def _resolve_payload_path(payload: dict[str, Any], value: str) -> Path:

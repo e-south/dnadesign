@@ -69,6 +69,7 @@ def assert_proteinmpnn_visual_content(manifest_path: Path, deliverables: dict[st
     assert "Review band" in fold_bin_text
     assert "Fold-review thresholds separate preserved folds" not in fold_bin_text
     assert "class-specific failures" in str(deliverables["foldcheck_review_review_class_counts"]["description"])
+    _assert_fold_bin_counts_are_one_row_square_panels(fold_bin_text)
 
 
 def _read_deliverable(manifest_path: Path, deliverables: dict[str, dict[str, object]], deliverable_id: str) -> str:
@@ -92,3 +93,19 @@ def _assert_top_marginal_matches_square_panel(svg_text: str) -> None:
     top_marginal = top_marginals[0]
     assert abs(top_marginal[0] - main_panel[0]) <= 0.5
     assert abs(top_marginal[2] - main_panel[2]) <= 0.5
+
+
+def _assert_fold_bin_counts_are_one_row_square_panels(svg_text: str) -> None:
+    rects = [
+        tuple(float(value) for value in match)
+        for match in re.findall(
+            r'<clipPath id="[^"]+">\s*<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"',
+            svg_text,
+        )
+    ]
+    square_panels = [rect for rect in rects if rect[2] > 45.0 and rect[3] > 45.0 and abs(rect[2] - rect[3]) <= 1.0]
+    assert len(square_panels) >= 6, "fold-bin SVG should render six square class panels"
+    first_row_y = square_panels[0][1]
+    assert all(abs(rect[1] - first_row_y) <= 1.0 for rect in square_panels[:6]), (
+        "fold-bin class panels should be arranged in one row"
+    )
