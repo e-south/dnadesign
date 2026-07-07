@@ -1,5 +1,12 @@
 """
-Reader SPOP composite path and provenance helpers.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/paths.py
+
+Path and provenance helpers for Reader SPOP composite artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

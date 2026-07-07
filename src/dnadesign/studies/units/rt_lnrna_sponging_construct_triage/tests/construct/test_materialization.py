@@ -45,6 +45,13 @@ from .helpers import (
 )
 from .source_fixtures import _fixture_source_record_resolver, _write_source_promotion_fixture
 
+GENBANK_CONSTRUCT_SUBJECT_COUNT = 42
+RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT = 19
+CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 2
+KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 0
+MSD_COMPILER_CONSTRUCT_SUBJECT_COUNT = 80
+CONTEXT_ROWS_PER_SUBJECT, SEQUENCE_VIEWS_PER_SUBJECT = 2, 6
+
 
 def test_rt_lnrna_materialization_source_is_split_by_contract_domain() -> None:
     unit_root = _repo_root() / "src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage"
@@ -170,9 +177,9 @@ def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_
     _assert_construct_subject_envelope_inputs(report)
     _assert_construct_output_subject_bridge(report)
     _assert_usr_contracts_strictly_validate(report)
-    assert len(report.input_ids_by_subject_id) == 36
+    assert len(report.input_ids_by_subject_id) == GENBANK_CONSTRUCT_SUBJECT_COUNT
     output = Dataset(report.usr_root, report.output_dataset).head(n=100)
-    assert output.shape[0] == 72
+    assert output.shape[0] == GENBANK_CONSTRUCT_SUBJECT_COUNT * CONTEXT_ROWS_PER_SUBJECT
 
     candidate_id = "rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO"
     input_id = report.input_ids_by_subject_id[candidate_id]
@@ -191,7 +198,7 @@ def test_rt_lnrna_catalog_variants_materialize_consolidated_construct_views(tmp_
     }
 
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
-    assert len(views) == 216
+    assert len(views) == GENBANK_CONSTRUCT_SUBJECT_COUNT * SEQUENCE_VIEWS_PER_SUBJECT
     assert {view.view_name for view in views if view.parent_sequence_id == input_id and view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
         "dual_cassette_2000bp_reverse_complement_seq_mean",
@@ -291,9 +298,10 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
         rt_cds_positions=(1,),
     )
 
-    assert report.genbank_construct_subject_count == 36
-    assert report.rt_cds_dms_construct_subject_count == 19
-    assert len(report.input_ids_by_subject_id) == 55
+    assert report.genbank_construct_subject_count == GENBANK_CONSTRUCT_SUBJECT_COUNT
+    assert report.rt_cds_dms_construct_subject_count == RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
+    expected_subjects = GENBANK_CONSTRUCT_SUBJECT_COUNT + RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
+    assert len(report.input_ids_by_subject_id) == expected_subjects
     assert report.permuter_request_id
     _assert_construct_subject_envelope_inputs(report)
     _assert_construct_output_subject_bridge(report)
@@ -311,10 +319,10 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
     ) == {"in_silico_rt_cds_dms_variant"}
 
     output = Dataset(report.usr_root, report.output_dataset).head(n=200)
-    assert output.shape[0] == 110
+    assert output.shape[0] == expected_subjects * CONTEXT_ROWS_PER_SUBJECT
     assert set(output["construct_subject__source_basis"]) == {"genbank_variant_catalog", "in_silico_rt_cds_dms"}
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
-    assert len(views) == 330
+    assert len(views) == expected_subjects * SEQUENCE_VIEWS_PER_SUBJECT
     assert {view.view_name for view in views if view.view_name is not None} == {
         "dual_cassette_2000bp_seq_mean",
         "dual_cassette_2000bp_reverse_complement_seq_mean",
@@ -351,16 +359,23 @@ def test_rt_lnrna_unified_construct_subjects_are_infer_ready_across_source_famil
     )
 
     assert audit.ok, "\n".join(audit.errors)
-    assert report.genbank_construct_subject_count == 36
-    assert report.crawford_construct_subject_count == 2
-    assert report.khan_construct_subject_count == 0
-    assert report.msd_compiler_construct_subject_count == 80
-    assert report.rt_cds_dms_construct_subject_count == 19
-    assert audit.input_count == 137
-    assert audit.output_count == 274
-    assert audit.sequence_view_count == 822
+    assert report.genbank_construct_subject_count == GENBANK_CONSTRUCT_SUBJECT_COUNT
+    assert report.crawford_construct_subject_count == CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT
+    assert report.khan_construct_subject_count == KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT
+    assert report.msd_compiler_construct_subject_count == MSD_COMPILER_CONSTRUCT_SUBJECT_COUNT
+    assert report.rt_cds_dms_construct_subject_count == RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
+    expected_subjects = (
+        GENBANK_CONSTRUCT_SUBJECT_COUNT
+        + CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT
+        + KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT
+        + MSD_COMPILER_CONSTRUCT_SUBJECT_COUNT
+        + RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
+    )
+    assert audit.input_count == expected_subjects
+    assert audit.output_count == expected_subjects * CONTEXT_ROWS_PER_SUBJECT
+    assert audit.sequence_view_count == expected_subjects * SEQUENCE_VIEWS_PER_SUBJECT
     assert audit.view_names == REQUIRED_INFER_READY_VIEW_NAMES
-    assert audit.construct_subject_count == 137
+    assert audit.construct_subject_count == expected_subjects
 
 
 def test_rt_lnrna_infer_readiness_rejects_missing_required_sequence_view(tmp_path: Path) -> None:

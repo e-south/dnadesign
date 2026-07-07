@@ -36,10 +36,10 @@ candidate-X vector are still absent.
   contained in pES-retron-26 at zero-based half-open vector coordinates
   `[56,2056)`.
 - `../workbench/provenance/retron-variant-genbank-metadata.yaml` preserves
-  available Benchling links, antibiotic markers, and user comments for 35
+  available Benchling links, antibiotic markers, and user comments for 41
   retron whole-plasmid variants plus the BL21 wild-type lnRNA-only source;
   `../workbench/provenance/retron-variant-genbank-catalog.yaml` records parsed
-  lnRNA and RT slot source authority for 36 Construct-representable rows.
+  lnRNA and RT slot source authority for 42 Construct-representable rows.
 - Multi-slot Construct projection is declared in
   `../operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
 - `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py`
@@ -56,10 +56,10 @@ candidate-X vector are still absent.
   prefix/interstitial/suffix sequence, forward/reverse-complement rows, and the
   forward/RC lnRNA plus RT CDS fixed-window anchor-mean views with
   `context_kind=template_custom`. The GenBank catalog uses one projection path
-  for all 36 representable rows. The retron26 fixture emits slot spans
+  for all 42 representable rows. The retron26 fixture emits slot spans
   `lnrna: [130,303)` and `rt_cds: [468,1431)`; the retron43 fixture emits
   `lnrna: [123,310)` and `rt_cds: [475,1438)`.
-- The catalog-to-Construct materializer now dogfoods all 36 catalog rows into
+- The catalog-to-Construct materializer now dogfoods all 42 catalog rows into
   the consolidated 2,000 bp output surface. It groups rows by per-candidate
   window offset so positive lnRNA/RT length deltas truncate only the outer
   prefix/suffix flanks, while preserving full lnRNA and RT slot spans. The
@@ -94,14 +94,14 @@ candidate-X vector are still absent.
   template MSD plus 5-prime/3-prime flanks, and writes ordinary Construct
   subject rows with fixed Eco1 WT RT. It does not formalize or materialize a
   pre-Infer concat.
-- The live consolidated Construct input dogfood contains 10,415 construct
-  subjects: 36 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
+- The live consolidated Construct input dogfood contains 10,421 construct
+  subjects: 42 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
   source-sequence subjects paired with fixed WT Eco1 RT, 71 abundance-affiliated
   Khan RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
   6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
   API.
-- The live Construct output dogfood validates strictly with 20,830 realized
-  context rows and 62,490 explicit sequence-view declarations. Each construct
+- The live Construct output dogfood validates strictly with 20,842 realized
+  context rows and 62,526 explicit sequence-view declarations. Each construct
   subject has all six required view names.
 - The executable Infer-readiness gate at
   `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
@@ -109,8 +109,8 @@ candidate-X vector are still absent.
   forward context row, one reverse-complement context row, and exactly the six
   declared source sequence-view names per construct subject before the study can
   hand the dataset to Infer. A full temp dogfood through public dnadesign-data
-  source IDs passed with 10,415 subjects, 20,830 Construct output rows, and
-  62,490 sequence-view rows; the source-promotion issues are explicit: 76
+  source IDs passed with 10,421 subjects, 20,842 Construct output rows, and
+  62,526 sequence-view rows; the source-promotion issues are explicit: 76
   missing affiliated abundance observations, 2 missing RT CDS rows, and 40
   over-window Khan rows.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the

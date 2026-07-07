@@ -27,3 +27,5 @@ validation_rules:
   - Structure paths must point to retron_hairpin_design materialized outputs.
   - Missing structures must not drop SPOP rows from the plot.
   - Route to retron_hairpin_design only to materialize missing structure assets, not to regenerate Reader SPOP evidence.
+  - Malformed retron_hairpin_design source tables must fail with an explicit manifest error.
+  - Rows marked available must have an existing PNG path before rendering.

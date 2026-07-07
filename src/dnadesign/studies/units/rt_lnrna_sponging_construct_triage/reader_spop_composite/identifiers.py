@@ -1,5 +1,12 @@
 """
-Reader SPOP composite identifier helpers.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/identifiers.py
+
+Identifier helpers for Reader SPOP composite variants.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -3,7 +3,9 @@ study_id: rt_lnrna_sponging_construct_triage
 status: materialized
 owner: dnadesign.studies.units.rt_lnrna_sponging_construct_triage
 source_owner: reader
+condition_ontology: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.conditions
 materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.condition_matrix
+table_writer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.tables
 row_grain: one row per Reader SPOP observation, assay subject, and represented condition
 identity:
   primary_join_keys:
