@@ -437,6 +437,9 @@ def _selection_payload(selection_row: dict[str, Any], triage_row: dict[str, Any]
             triage_row.get("catalytic_or_direct_contact_mutation_count")
         ),
         "thumb_contact_track_mutation_count": nullable_int(triage_row.get("thumb_contact_track_mutation_count")),
+        "c_terminal_primer_rna_recognition_mutation_count": nullable_int(
+            triage_row.get("c_terminal_primer_rna_recognition_mutation_count")
+        ),
         "distal_scaffold_mutation_count": nullable_int(triage_row.get("distal_scaffold_mutation_count")),
     }
 

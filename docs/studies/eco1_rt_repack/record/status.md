@@ -322,6 +322,31 @@ The previous 20 A all-fixed mask is diagnostic history: it showed that broad
 retained-nucleic-acid proximity fixes the whole RT and is therefore too blunt
 for Eco1. The current `mask_set.yaml` uses the direct 5 A rule.
 
+### Design-Class Orthogonality Audit
+
+The current six design classes are useful as mask-policy sensitivity contrasts,
+not as six independent mechanistic hypotheses. The 6 A, 8 A, and 10 A clade-9
+classes are nested subsets of the 5 A baseline. The 50% clade-9 class relaxes
+conservation and adds 16 mapped mutable positions relative to the baseline. The
+II-A3/`42_1` 50% class changes the conservation denominator, adding 13 mapped
+mutable positions and losing 18 relative to the baseline.
+
+| Class | Mutable mapped residues | Mutable near retained DNA/RNA residues | Mutable Wang thumb-track residues | Mutable C-terminal 255-311 residues |
+| --- | ---: | ---: | ---: | ---: |
+| `clade9_p25_5a` | 123 | 82 | 0 | 26 |
+| `clade9_p25_6a` | 103 | 65 | 0 | 21 |
+| `clade9_p25_8a` | 51 | 18 | 0 | 10 |
+| `clade9_p25_10a` | 32 | 0 | 0 | 3 |
+| `clade9_p50_5a` | 139 | 89 | 0 | 29 |
+| `iia3_42_1_p50_5a` | 118 | 73 | 0 | 23 |
+
+No declared design class leaves the eight-position Wang thumb-contact track
+mutable. The current selected six therefore preserve the declared thumb track
+while sampling near retained DNA/RNA and C-terminal/thumb-domain-adjacent
+mapped residues to different degrees. This supports a "mask-policy sensitivity
+panel" claim. It does not support saying that the current panel directly tests
+thumb-track tuning.
+
 ### Validator Commands
 
 Phase 0 scaffold validation:
@@ -362,12 +387,19 @@ separate branch-pocket model in this slice.
 | `catalytic_initiation_context` | Eco1 residues 189-204 around YADD 195-198 | 1.50 A |
 | `retron_y_vtg_context` | Eco1 residues 237-251 around VTG 243-245 | 1.60 A |
 | `thumb_contact_track_context` | Wang/Ec86 positions 238, 239, 240, 249, 257, 261, 264, and 298 | 3.00 A |
+| `c_terminal_primer_rna_recognition_context` | Eco1 mapped residues 255-311 in the C-terminal primer-RNA recognition context; canonical residues 312-320 are missing backbone in the current 7V9U-backed fixed-backbone scope | 3.50 A |
 | `near_retained_dna_rna_annulus` | Derived near retained DNA/RNA region: residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions | 3.00 A |
 | `distal_scaffold_control` | Mapped residues outside motif contexts, direct contacts, the near retained DNA/RNA region, and thumb-track positions | 4.75 A |
 
 All local RMSD values are computed after one global mapped C-alpha fit to the
 ec86kit/7V9U-backed reference. Region-specific fitting is not used because it
 would hide local shifts relative to the global fold.
+
+The C-terminal primer-RNA recognition context is an overlapping review region,
+not a mutually exclusive mutation bucket. It is included because Ec86
+primer-RNA studies support treating this C-terminal/thumb region as a cognate
+RNA-recognition context. The gate preserves local backbone geometry; it is not
+an activity or specificity prediction.
 
 ### Current Next Actions
 
@@ -377,14 +409,15 @@ would hide local shifts relative to the global fold.
    not a synthesis quote or wet-lab assembly plan. All 576 expanded synthetic
    rows are currently feasible under this computational gate.
 3. Use `candidate_triage_table.parquet` as the reviewer filter surface. It has
-   468 eligible rows and 108 ineligible rows. The regenerated table now adds
-   MSA support, mutation geography near retained DNA/RNA or thumb-track, local
-   chemistry, local-structure gate fields, and source-artifact hashes for those
-   review axes. Canonical mutation tokens are parsed strictly because mutation
+   445 eligible rows and 131 ineligible rows. The regenerated table records
+   MSA support, mutation geography near retained DNA/RNA, thumb-track, and
+   C-terminal primer-RNA recognition contexts, local chemistry,
+   local-structure gate fields, and source-artifact hashes for those review
+   axes. Canonical mutation tokens are parsed strictly because mutation
    geography now affects hard-gate status. Local-structure metrics must be
    available for each declared review region and pass the declared local
    C-alpha RMSD thresholds before a row can be panel-eligible. In the current
-   expanded pool, 571 rows pass the local-structure gate and 5 rows exceed a
+   expanded pool, 531 rows pass the local-structure gate and 45 rows exceed a
    local RMSD threshold.
 4. Use `local_structure_threshold_sensitivity.parquet` and
    `region_msa_support.parquet` as audit tables for the local RMSD gate and
@@ -401,13 +434,13 @@ would hide local shifts relative to the global fold.
    `selection_na_facing_chemistry_balance`,
    `selection_regionwise_msa_support`, and
    `selection_six_sequence_distance`. They show pass/fail gate counts by design
-   class, design-class mask-policy contrasts, local RMSD thresholds against the candidate population,
-   local-threshold sensitivity,
+   class, design-class mask-policy contrasts, local RMSD thresholds against
+   the candidate population, local-threshold sensitivity,
    selected-row local RMSD by RT region, within-class review percentiles, the
    selected-panel premise checklist, selected substitutions across RT regions,
    regional mutation burden, chemistry changes near retained DNA/RNA or
-   thumb-track positions, region-wise MSA support, and selected-row sequence
-   distance.
+   thumb-track positions, region-wise MSA support including the C-terminal
+   primer-RNA recognition context, and selected-row sequence distance.
 6. Use `candidate_selection_panel.parquet` and
    `candidate_handoff_sequences.csv` as the current six-row RT-only protein
    review surface. The panel selects one feasible, fold-preserved

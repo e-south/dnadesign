@@ -112,6 +112,8 @@ def _hard_gate_status(
         reasons.append("protected_mutation_violation")
     if int((review_axes or {}).get("catalytic_or_direct_contact_mutation_count") or 0):
         reasons.append("catalytic_or_direct_contact_mutation")
+    if int((review_axes or {}).get("thumb_contact_track_mutation_count") or 0):
+        reasons.append("thumb_contact_track_mutation")
     if fold is None:
         reasons.append("missing_fold_review_row")
     elif str(fold.get("foldcheck_status")) != "accepted":
@@ -183,6 +185,7 @@ def _review_axis_fields(values: dict[str, object]) -> dict[str, object]:
         "catalytic_or_direct_contact_mutation_count": None,
         "nucleic_acid_facing_mutation_count": None,
         "thumb_contact_track_mutation_count": None,
+        "c_terminal_primer_rna_recognition_mutation_count": None,
         "distal_scaffold_mutation_count": None,
         "nucleic_acid_facing_charge_delta": None,
         "nucleic_acid_facing_basic_gain_count": None,
@@ -210,6 +213,7 @@ def _local_structure_fields(values: dict[str, object] | None) -> dict[str, objec
         "local_structure_retron_x_naxxh_context_ca_rmsd_angstrom": None,
         "local_structure_retron_y_vtg_context_ca_rmsd_angstrom": None,
         "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": None,
+        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": None,
         "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": None,
         "local_structure_distal_scaffold_control_ca_rmsd_angstrom": None,
     }

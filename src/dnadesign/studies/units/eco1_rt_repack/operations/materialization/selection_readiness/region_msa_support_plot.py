@@ -92,7 +92,7 @@ def write_regionwise_msa_support_plot(
         dtype=float,
     )
     masked_values = np.ma.masked_invalid(plot_values)
-    fig, ax = plt.subplots(figsize=(7.8, 7.2))
+    fig, ax = plt.subplots(figsize=(8.6, 7.2))
     cmap = plt.get_cmap("YlGnBu").copy()
     cmap.set_bad("#d0d7de")
     image = ax.imshow(masked_values, aspect="equal", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=1.0)
@@ -120,7 +120,8 @@ def write_regionwise_msa_support_plot(
     path = plot_root / "selection_regionwise_msa_support.svg"
     alt = (
         "Heatmap of selected Eco1 RT candidates showing natural-sequence support for designed substitutions "
-        "within catalytic/direct-contact, near retained DNA/RNA, thumb-contact, and distal regions."
+        "within catalytic/direct-contact, near retained DNA/RNA, thumb-contact, C-terminal primer-RNA recognition, "
+        "and distal regions."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -130,8 +131,9 @@ def write_regionwise_msa_support_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Shows whether selected substitutions in each region are observed in the matching natural-sequence set. "
-            "Cells with no mutations are labeled as no edits rather than scored."
+            "Shows whether selected substitutions in each review region are observed in the matching natural-sequence "
+            "set. The C-terminal primer-RNA recognition region is an overlapping context. Cells with no mutations "
+            "are labeled as no edits rather than scored."
         ),
         interpretation_limit=(
             "Region-wise MSA support is evolutionary context for review. It is not functional proof and is not a "

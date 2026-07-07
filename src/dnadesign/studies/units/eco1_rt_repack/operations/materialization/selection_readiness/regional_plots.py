@@ -41,6 +41,7 @@ from .plot_support import (
     tie_break_trace,
 )
 from .review_axes import (
+    C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS,
     DIRECT_CONTACT_DISTANCE_ANGSTROM,
     NA_FACING_DISTANCE_ANGSTROM,
     WANG_THUMB_CONTACT_TRACK_POSITIONS,
@@ -62,6 +63,7 @@ def build_regional_mutation_burden_matrix(
         "Catalytic or direct contact",
         "Near retained DNA/RNA region",
         "Thumb-contact track",
+        "C-terminal primer-RNA recognition region",
         "Distal scaffold",
     ]
     ordered_panel = ordered_panel_rows(panel_rows)
@@ -76,11 +78,13 @@ def build_regional_mutation_burden_matrix(
             raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
         counts = _regional_counts_from_panel_trace(panel_row)
         if counts is None:
-            counts = [0, 0, 0, 0]
+            counts = [0, 0, 0, 0, 0]
             for mutation in canonical_mutations(candidate.get("canonical_mutations")):
                 parsed = parse_mutation(mutation)
                 position = int(parsed["position"])
                 counts[_regional_bucket_index(position, residue_by_position.get(position, {}))] += 1
+                if position in C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS:
+                    counts[3] += 1
         row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
         matrix.append(counts)
     return region_labels, row_labels, matrix
@@ -213,13 +217,13 @@ def write_regional_mutation_burden_plot(
     mask_residues: list[dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
-    title = "Selected candidates differ in which RT regions carry mutations"
+    title = "Selected mutation burden by region"
     region_labels, row_labels, matrix = build_regional_mutation_burden_matrix(
         panel_rows=panel_rows,
         candidate_rows=candidate_rows,
         mask_residues=mask_residues,
     )
-    fig, ax = plt.subplots(figsize=(7.8, 7.2))
+    fig, ax = plt.subplots(figsize=(8.6, 7.2))
     image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlOrBr")
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
@@ -247,8 +251,8 @@ def write_regional_mutation_burden_plot(
     fig.subplots_adjust(left=0.32, right=0.94, top=0.88, bottom=0.25)
     path = plot_root / "selection_regional_mutation_burden.svg"
     alt = (
-        "Heatmap of selected Eco1 RT candidates by mutation count in catalytic/contact, substrate-proximal, "
-        "thumb-track, and distal regions."
+        "Heatmap of selected Eco1 RT candidates by mutation count in catalytic/contact, near retained DNA/RNA, "
+        "thumb-track, C-terminal primer-RNA recognition, and distal regions."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -259,7 +263,7 @@ def write_regional_mutation_burden_plot(
         alt_text=alt,
         description=(
             "Summarizes selected substitutions by RT region so the panel can be read as regional review context "
-            "rather than a global top-six ranking."
+            "rather than a global top-six ranking. The C-terminal column is an overlapping review context."
         ),
         interpretation_limit=(
             "Regional mutation burden is not a functional predictor. A zero thumb-contact-track count should not be "
@@ -278,6 +282,7 @@ def _regional_counts_from_panel_trace(panel_row: dict[str, object]) -> list[int]
         "catalytic_or_direct_contact_mutation_count",
         "nucleic_acid_facing_mutation_count",
         "thumb_contact_track_mutation_count",
+        "c_terminal_primer_rna_recognition_mutation_count",
         "distal_scaffold_mutation_count",
     }
     if not required.issubset(trace):
@@ -288,6 +293,7 @@ def _regional_counts_from_panel_trace(panel_row: dict[str, object]) -> list[int]
         int(trace["catalytic_or_direct_contact_mutation_count"] or 0),
         near_dna_rna_count,
         thumb_count,
+        int(trace["c_terminal_primer_rna_recognition_mutation_count"] or 0),
         int(trace["distal_scaffold_mutation_count"] or 0),
     ]
 
@@ -300,7 +306,7 @@ def _regional_bucket_index(position: int, residue: dict[str, object]) -> int:
     distance = _retained_na_distance(residue)
     if distance is not None and distance <= NA_FACING_DISTANCE_ANGSTROM:
         return 1
-    return 3
+    return 4
 
 
 def _is_catalytic_or_direct_contact(residue: dict[str, object]) -> bool:

@@ -395,8 +395,8 @@ def _write_manifest(
             "Select one feasible fold-preserved representative from each design class after all declared "
             "local-structure metrics are available and within declared local RMSD thresholds, then prefer "
             "natural sequence support, fewer near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
-            "lower local/global fold metrics, and sequence nonredundancy. Do not use ESMC or SAE as positive "
-            "selection evidence."
+            "lower local/global fold metrics, and sequence nonredundancy. Direct Wang thumb-contact-track edits "
+            "are not ordinary-panel eligible. Do not use ESMC or SAE as positive selection evidence."
         ),
         "local_structure_rmsd_threshold_policy": {
             "policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
@@ -483,7 +483,8 @@ def _write_manifest(
             "near retained DNA/RNA or thumb-track chemistry warning count",
             "moderate near retained DNA/RNA or thumb-track mutation burden",
             "local-structure region metrics available and below RMSD thresholds",
-            "lower local C-alpha RMSD within threshold in catalytic, thumb, and near retained DNA/RNA regions",
+            "lower local C-alpha RMSD within threshold in catalytic, thumb, C-terminal primer-RNA recognition, "
+            "and near retained DNA/RNA regions",
             "nearest selected sequence distance",
             "fold metrics",
             "mutation count",

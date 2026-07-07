@@ -75,7 +75,7 @@ def assert_selection_plot_contract(
     assert_heatmap_cells_are_square(
         plot_text_by_id["selection_regional_mutation_burden"],
         row_count=len(ALL_SPECS),
-        column_count=4,
+        column_count=5,
     )
     assert_heatmap_cells_are_square(
         plot_text_by_id["selection_local_structure_by_region"],
@@ -91,6 +91,6 @@ def assert_selection_plot_contract(
     assert_heatmap_cells_are_square(
         plot_text_by_id["selection_regionwise_msa_support"],
         row_count=len(ALL_SPECS),
-        column_count=4,
+        column_count=5,
     )
     assert not retired_plot.exists()

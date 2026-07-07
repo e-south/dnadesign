@@ -37,7 +37,7 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_local_structure_stratification",
         file_name="selection_local_structure_stratification.svg",
-        plain_title="Local RMSD thresholds by region",
+        plain_title="Local RMSD gates",
     ),
     SelectionPlot(
         plot_id="selection_local_structure_threshold_sensitivity",
@@ -67,7 +67,7 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_regional_mutation_burden",
         file_name="selection_regional_mutation_burden.svg",
-        plain_title="Selected candidates differ in which RT regions carry mutations",
+        plain_title="Selected mutation burden by region",
     ),
     SelectionPlot(
         plot_id="selection_na_facing_chemistry_balance",

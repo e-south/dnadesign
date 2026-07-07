@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fixed-backbone-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-25
+last_verified: 2026-07-07
 ---
 
 ## Fixed-Backbone Method
@@ -47,6 +47,11 @@ a monolithic recipe:
   priors. The current mask consumes the audited direct-contact rows as active
   protection evidence; RT1-RT7 intervals remain review labels, not blanket mask
   authority.
+- Inouye et al. 1999 and Inouye et al. 2004 provide Ec86-specific evidence
+  that the C-terminal/thumb region participates in cognate primer-RNA
+  recognition. This supports a visible C-terminal/thumb review axis. It does
+  not make thumb mutation a conservative default and does not provide a
+  strand-displacement score.
 
 ### Method Posture
 

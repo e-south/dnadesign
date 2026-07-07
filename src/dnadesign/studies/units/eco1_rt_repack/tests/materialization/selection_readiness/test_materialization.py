@@ -110,6 +110,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert all(row["local_structure_max_ca_rmsd_angstrom"] is not None for row in panel)
     assert all(row["catalytic_or_direct_contact_mutation_count"] == 0 for row in panel)
     assert all("thumb_contact_track_mutation_count" in row for row in panel)
+    assert all("c_terminal_primer_rna_recognition_mutation_count" in row for row in panel)
     assert all("nucleic_acid_facing_mutation_count" in row for row in panel)
     assert "esmc_penalty_rank" not in panel[0]
     assert "sae_window_contrast_rank" not in panel[0]
@@ -119,8 +120,12 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "selection_support_alt_observed_fraction" in panel[0]["tie_break_trace_json"]
     assert "mutation_count_total" in panel[0]["tie_break_trace_json"]
     assert "distal_scaffold_mutation_count" in panel[0]["tie_break_trace_json"]
+    assert "c_terminal_primer_rna_recognition_mutation_count" in panel[0]["tie_break_trace_json"]
     assert "local_structure_gate_status" in panel[0]["tie_break_trace_json"]
     assert "local_structure_catalytic_initiation_context_ca_rmsd_angstrom" in panel[0]["tie_break_trace_json"]
+    assert (
+        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom" in panel[0]["tie_break_trace_json"]
+    )
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["path_policy"] == "paths_relative_to_selection_manifest"
@@ -148,9 +153,10 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "catalytic_or_direct_contact",
         "near_retained_dna_rna_region",
         "thumb_contact_track",
+        "c_terminal_primer_rna_recognition_region",
         "distal_scaffold",
     }
-    assert len(support) == len(triage) * 4
+    assert len(support) == len(triage) * 5
     assert all(row["region_label"] != "Near retained DNA/RNA annulus" for row in support)
     source_basis_by_id = {row["id"]: row for row in manifest["local_structure_source_basis"]}
     assert source_basis_by_id["tao_et_al_2026_functional_residue_preservation"]["source_ref"] == (
@@ -168,6 +174,14 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "tao_et_al_2026_functional_residue_preservation" in catalytic_region["region_source_basis_ids"]
     assert catalytic_region["coordinate_scope"] == "mapped_rt_chain_ca_after_global_fit"
     assert catalytic_region["local_ca_rmsd_threshold_angstrom"] == 1.5
+    c_terminal_region = next(
+        row
+        for row in manifest["local_structure_regions"]
+        if row["region_id"] == "c_terminal_primer_rna_recognition_context"
+    )
+    assert c_terminal_region["region_position_spec"] == "255-311"
+    assert "primer-RNA recognition" in c_terminal_region["region_position_source"]
+    assert "inouye_et_al_2004_ec86_thumb_primer_rna_binding" in c_terminal_region["region_source_basis_ids"]
     assert manifest["selected_candidate_ids"] == [row["candidate_id"] for row in panel]
     assert manifest["handoff_readiness"] == {
         "handoff_kind": "rt_only_candidate_handoff",
@@ -252,6 +266,16 @@ def _write_manual_mask_authority_source_basis(repo_root: Path) -> None:
                         "id": "wang_et_al_2022_ec86_cryoem_structure_priors",
                         "role": "ec86_structure_mask_prior",
                         "source_ref": "doi:10.1038/s41564-022-01197-7",
+                    },
+                    {
+                        "id": "inouye_et_al_1999_ec86_primer_template_recognition",
+                        "role": "c_terminal_specificity_review_prior",
+                        "source_ref": "doi:10.1074/jbc.274.44.31236",
+                    },
+                    {
+                        "id": "inouye_et_al_2004_ec86_thumb_primer_rna_binding",
+                        "role": "c_terminal_specificity_review_prior",
+                        "source_ref": "doi:10.1074/jbc.M408462200",
                     },
                 ]
             },

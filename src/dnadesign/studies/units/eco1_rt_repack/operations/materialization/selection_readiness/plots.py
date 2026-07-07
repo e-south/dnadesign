@@ -318,6 +318,7 @@ def _write_design_class_contrast(
         selected_id = selected_by_class.get(spec.design_class_id, "")
         selected_row = triage_by_id.get(selected_id, {})
         thumb_count = int(selected_row.get("thumb_contact_track_mutation_count") or 0)
+        c_terminal_count = int(selected_row.get("c_terminal_primer_rna_recognition_mutation_count") or 0)
         near_count = max(int(selected_row.get("nucleic_acid_facing_mutation_count") or 0) - thumb_count, 0)
         rows.append(
             [
@@ -329,6 +330,7 @@ def _write_design_class_contrast(
                 short_candidate(selected_id) if selected_id else "missing",
                 str(near_count),
                 str(thumb_count),
+                str(c_terminal_count),
             ]
         )
     columns = [
@@ -340,8 +342,9 @@ def _write_design_class_contrast(
         "Selected",
         "Near DNA/RNA",
         "Thumb track",
+        "C-term",
     ]
-    fig, ax = plt.subplots(figsize=(9.6, 5.1))
+    fig, ax = plt.subplots(figsize=(10.4, 5.1))
     ax.axis("off")
     table = ax.table(
         cellText=rows,
@@ -349,7 +352,7 @@ def _write_design_class_contrast(
         loc="center",
         cellLoc="center",
         colLoc="center",
-        colWidths=[0.17, 0.12, 0.09, 0.09, 0.08, 0.15, 0.15, 0.15],
+        colWidths=[0.16, 0.11, 0.08, 0.08, 0.07, 0.14, 0.13, 0.12, 0.11],
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8.2)
@@ -360,18 +363,19 @@ def _write_design_class_contrast(
         if row_index == 0:
             cell.set_facecolor("#f6f8fa")
             cell.set_text_props(weight="bold", color="#24292f")
-        elif col_index in {6, 7}:
+        elif col_index in {6, 7, 8}:
             cell.set_facecolor("#eef6ff" if int(rows[row_index - 1][col_index]) else "#f7f5ef")
         else:
             cell.set_facecolor("#ffffff")
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
     fig.subplots_adjust(left=0.02, right=0.98, top=0.84, bottom=0.06)
     path = plot_root / "selection_design_class_contrast.svg"
-    zero_thumb = all(int(row[-1]) == 0 for row in rows)
+    zero_thumb = all(int(row[7]) == 0 for row in rows)
     thumb_note = " The selected six do not mutate the declared Wang thumb-contact track." if zero_thumb else ""
     alt = (
         "Table-like summary of Eco1 design classes showing MSA set, conservation threshold, retained DNA/RNA contact "
-        "shell, gate-pass count, selected row, near DNA/RNA edits, and thumb-track edits."
+        "shell, gate-pass count, selected row, near DNA/RNA edits, thumb-track edits, and C-terminal primer-RNA "
+        "recognition-region edits."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -383,7 +387,8 @@ def _write_design_class_contrast(
         description=(
             "Shows that the six panel slots are declared mask-policy contrasts across conservation denominator, "
             "conservation threshold, and retained-DNA/RNA contact shell. "
-            "Near DNA/RNA and thumb-track edit counts are shown separately." + thumb_note
+            "Near DNA/RNA, thumb-track, and C-terminal edit counts are shown separately. The C-terminal count is "
+            "an overlapping review context. " + thumb_note
         ),
         interpretation_limit=(
             "Design-class contrast explains review coverage. It does not establish function and does not make the "

@@ -54,6 +54,19 @@ def test_catalytic_or_direct_contact_mutation_fails_hard_gate() -> None:
     assert "catalytic_or_direct_contact_mutation" in reasons
 
 
+def test_thumb_contact_track_mutation_fails_ordinary_panel_gate() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        review_axes={"thumb_contact_track_mutation_count": 1},
+        local_structure_review={"local_structure_gate_status": "passed"},
+    )
+
+    assert status == "ineligible"
+    assert "thumb_contact_track_mutation" in reasons
+
+
 def test_missing_local_structure_review_fails_hard_gate() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},

@@ -782,8 +782,9 @@ datasets:
     description: >-
       Compact review visual summarizing selected substitutions by catalytic or
       direct-contact, near retained DNA/RNA region, thumb-contact-track, and
-      distal scaffold regions. It is regional review context, not a functional
-      predictor.
+      distal scaffold regions, with the C-terminal primer-RNA recognition
+      context tracked as a separate overlapping review axis. It is regional
+      review context, not a functional predictor.
   - id: eco1_rt_selection_local_structure_by_region
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -792,9 +793,10 @@ datasets:
     description: >-
       Compact review visual showing selected-candidate local C-alpha RMSD after
       one global mapped C-alpha fit, split by motif, thumb-track, near retained
-      DNA/RNA, and distal control regions. Local-structure metric availability and
-      per-region RMSD thresholds are selection-readiness gates; RMSD values are
-      structural review metrics, not activity or assay-readiness evidence.
+      DNA/RNA, C-terminal primer-RNA recognition, and distal control regions.
+      Local-structure metric availability and per-region RMSD thresholds are
+      selection-readiness gates; RMSD values are structural review metrics, not
+      activity or assay-readiness evidence.
   - id: eco1_rt_selection_na_facing_chemistry_balance
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -813,8 +815,9 @@ datasets:
     description: >-
       Compact review visual showing whether selected substitutions are observed
       in the matching natural-sequence set by catalytic/direct-contact, near
-      retained DNA/RNA, thumb-contact-track, and distal regions. It is
-      evolutionary review context, not functional proof.
+      retained DNA/RNA, thumb-contact-track, C-terminal primer-RNA recognition,
+      and distal regions. The C-terminal region is an overlapping review
+      context. This is evolutionary review context, not functional proof.
   - id: eco1_rt_wt_model_check_visuals
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -870,8 +873,9 @@ datasets:
     description: >-
       Study-owned table for the expanded nonredundant candidate pool. It joins
       fold-review classes, MSA support, mutation geography,
-      near-DNA/RNA or thumb-track chemistry, sequence-diversity fields, ESMC additive
-      LLR fields, three-window SAE WT-delta fields, feasibility status, and
+      near-DNA/RNA, thumb-track, and C-terminal primer-RNA recognition review
+      fields, local chemistry, sequence-diversity fields, ESMC additive LLR
+      fields, three-window SAE WT-delta fields, feasibility status, and
       local-structure gate fields. It is a triage surface, not a combined-score
       table. Canonical mutation tokens are parsed strictly before mutation
       geography is used for hard-gate status, and local-structure metric
@@ -888,10 +892,11 @@ datasets:
       global mapped C-alpha fit to the ec86kit/7V9U reference, with explicit
       status fields for missing structures or insufficient overlap. Each row
       carries the explicit residue positions and source-basis note for the
-      region plus the local RMSD threshold and threshold policy. Metric
-      availability and per-region RMSD threshold pass status are
-      selection-readiness gates; RMSD values are structural review metrics, not
-      activity metrics.
+      region plus the local RMSD threshold and threshold policy. The C-terminal
+      primer-RNA recognition context is included as an overlapping local
+      structure region. Metric availability and per-region RMSD threshold pass
+      status are selection-readiness gates; RMSD values are structural review
+      metrics, not activity metrics.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: materialized_artifact

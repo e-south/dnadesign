@@ -102,6 +102,7 @@ def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
         "Catalytic or direct contact",
         "Near retained DNA/RNA region",
         "Thumb-contact track",
+        "C-terminal primer-RNA recognition region",
         "Distal scaffold",
     ]
     assert len(row_labels) == len(ALL_SPECS)
@@ -143,7 +144,7 @@ def test_regional_mutation_burden_fallback_does_not_treat_conservation_as_contac
         ],
     )
 
-    assert matrix == [[0, 1, 0, 1]]
+    assert matrix == [[0, 1, 0, 0, 1]]
 
 
 def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
@@ -179,6 +180,7 @@ def test_regionwise_msa_support_matrix_keeps_thumb_track_separate_when_zero() ->
             ("catalytic_or_direct_contact", "Catalytic or direct contact"),
             ("near_retained_dna_rna_region", "Near retained DNA/RNA region"),
             ("thumb_contact_track", "Thumb-contact track"),
+            ("c_terminal_primer_rna_recognition_region", "C-terminal primer-RNA recognition region"),
             ("distal_scaffold", "Distal scaffold"),
         ):
             support_rows.append(
@@ -201,9 +203,10 @@ def test_regionwise_msa_support_matrix_keeps_thumb_track_separate_when_zero() ->
         "Catalytic or direct contact",
         "Near retained DNA/RNA region",
         "Thumb-contact track",
+        "C-terminal primer-RNA recognition region",
         "Distal scaffold",
     ]
     assert len(row_labels) == len(ALL_SPECS)
-    assert all(len(row) == 4 for row in matrix)
+    assert all(len(row) == 5 for row in matrix)
     assert all(row[2] is None for row in matrix)
     assert all(row[2] == 0 for row in unobserved)

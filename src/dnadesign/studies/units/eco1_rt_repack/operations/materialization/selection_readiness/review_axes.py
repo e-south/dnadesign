@@ -30,6 +30,7 @@ RARE_RESIDUE_FREQUENCY = 0.01
 NA_FACING_DISTANCE_ANGSTROM = 10.0
 DIRECT_CONTACT_DISTANCE_ANGSTROM = 5.0
 WANG_THUMB_CONTACT_TRACK_POSITIONS = {238, 239, 240, 249, 257, 261, 264, 298}
+C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS = frozenset(range(255, 312))
 _MUTATION_RE = re.compile(r"([A-Z])(\d+)([A-Z*])")
 _BASIC = set("KRH")
 _ACIDIC = set("DE")
@@ -167,6 +168,7 @@ def _mutation_geography(
     catalytic_or_direct = 0
     na_facing = 0
     thumb_track = 0
+    c_terminal_primer_rna_recognition = 0
     distal = 0
     charge_delta = 0
     basic_gain = 0
@@ -185,9 +187,11 @@ def _mutation_geography(
             or (distance is not None and distance <= DIRECT_CONTACT_DISTANCE_ANGSTROM)
         )
         is_thumb_track = position in WANG_THUMB_CONTACT_TRACK_POSITIONS
+        is_c_terminal_primer_rna_recognition = position in C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS
         is_na_facing = (distance is not None and distance <= NA_FACING_DISTANCE_ANGSTROM) or is_thumb_track
         catalytic_or_direct += int(is_catalytic_or_direct)
         thumb_track += int(is_thumb_track)
+        c_terminal_primer_rna_recognition += int(is_c_terminal_primer_rna_recognition)
         na_facing += int(is_na_facing and not is_catalytic_or_direct)
         distal += int(not is_catalytic_or_direct and not is_na_facing)
         if is_na_facing:
@@ -201,6 +205,7 @@ def _mutation_geography(
         "catalytic_or_direct_contact_mutation_count": catalytic_or_direct,
         "nucleic_acid_facing_mutation_count": na_facing,
         "thumb_contact_track_mutation_count": thumb_track,
+        "c_terminal_primer_rna_recognition_mutation_count": c_terminal_primer_rna_recognition,
         "distal_scaffold_mutation_count": distal,
         "nucleic_acid_facing_charge_delta": charge_delta,
         "nucleic_acid_facing_basic_gain_count": basic_gain,

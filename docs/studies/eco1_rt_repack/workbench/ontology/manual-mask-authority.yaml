@@ -10,7 +10,7 @@ source_basis:
   - id: tao_et_al_2026_functional_residue_preservation
     role: method_prior
     source_ref: doi:10.1038/s41587-026-03149-6
-    note: Preserve catalytic, substrate-proximal, and conserved RT residues before scaffold redesign.
+    note: Preserve catalytic, retained-DNA/RNA-contact, and conserved RT residues before scaffold redesign.
   - id: simon_et_al_2019_retron_rt_motif_grammar
     role: motif_annotation_prior
     source_ref: doi:10.1093/nar/gkz865
@@ -23,6 +23,14 @@ source_basis:
     role: ec86_structure_mask_prior
     source_ref: doi:10.1038/s41564-022-01197-7
     note: Provides the Eco1/Ec86 cryo-EM structural prior for RT-msDNA/msrRNA interface residues, RT1-RT7 region context, catalytic sites, and retron X/Y anchors.
+  - id: inouye_et_al_1999_ec86_primer_template_recognition
+    role: c_terminal_specificity_review_prior
+    source_ref: doi:10.1074/jbc.274.44.31236
+    note: Supports treating the RT-Ec86 C-terminal region as primer-template RNA recognition context; review prior only, not an active mask source in this policy.
+  - id: inouye_et_al_2004_ec86_thumb_primer_rna_binding
+    role: c_terminal_specificity_review_prior
+    source_ref: doi:10.1074/jbc.M408462200
+    note: Supports tracking the RT-Ec86 255-320 C-terminal/thumb fragment as primer-recognition RNA-binding context; review prior only, not an active mask source in this policy.
 authority_sets:
   - id: ec86_retron_x_region
     label: Retron X NAxxH anchor

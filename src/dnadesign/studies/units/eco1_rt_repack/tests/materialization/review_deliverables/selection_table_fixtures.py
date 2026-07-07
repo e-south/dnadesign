@@ -33,6 +33,7 @@ def panel_row(
         f'"nucleic_acid_facing_chemistry_warning_count": {chemistry_warnings}, '
         f'"catalytic_or_direct_contact_mutation_count": 0, '
         f'"thumb_contact_track_mutation_count": 0, '
+        f'"c_terminal_primer_rna_recognition_mutation_count": 1, '
         f'"distal_scaffold_mutation_count": {mutation_count}}}'
     )
     return {
@@ -57,6 +58,7 @@ def triage_row(*, candidate_id: str, msa_fraction: float, charge_delta: int) -> 
         "nucleic_acid_facing_chemistry_warning_count": 1,
         "catalytic_or_direct_contact_mutation_count": 0,
         "thumb_contact_track_mutation_count": 0,
+        "c_terminal_primer_rna_recognition_mutation_count": 1,
         "distal_scaffold_mutation_count": 2,
         "hard_gate_status": "eligible",
         "sae_window_status": "wt_like_not_used_for_selection",

@@ -146,9 +146,9 @@ def _panel_row(
 ) -> dict[str, object]:
     reason = (
         f"Selected as the {row['design_class_id']} representative after feasibility, fold, and local-structure gates. "
-        "The tie-breaks use MSA support, near-DNA/RNA chemistry warnings, moderate regional mutation burden, "
-        "local/global fold metrics, and sequence nonredundancy. ESMC and SAE rows were retained for review "
-        "but not used for selection."
+        "The tie-breaks use MSA support, near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
+        "local/global fold metrics, and sequence nonredundancy. Direct Wang thumb-contact-track edits are not "
+        "ordinary-panel eligible. ESMC and SAE rows were retained for review but not used for selection."
     )
     na_facing_count, na_facing_ratio = _na_facing_count_and_ratio(row)
     trace = {
@@ -166,6 +166,7 @@ def _panel_row(
         "nucleic_acid_facing_charge_delta": row["nucleic_acid_facing_charge_delta"],
         "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
         "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
+        "c_terminal_primer_rna_recognition_mutation_count": row["c_terminal_primer_rna_recognition_mutation_count"],
         "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
         "local_structure_gate_status": row["local_structure_gate_status"],
         "local_structure_max_ca_rmsd_angstrom": row["local_structure_max_ca_rmsd_angstrom"],
@@ -174,6 +175,9 @@ def _panel_row(
         ],
         "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": row[
             "local_structure_thumb_contact_track_context_ca_rmsd_angstrom"
+        ],
+        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": row[
+            "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom"
         ],
         "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": row[
             "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom"
@@ -206,6 +210,7 @@ def _panel_row(
         "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
         "nucleic_acid_facing_mutation_count": row["nucleic_acid_facing_mutation_count"],
         "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
+        "c_terminal_primer_rna_recognition_mutation_count": row["c_terminal_primer_rna_recognition_mutation_count"],
         "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
         "nucleic_acid_facing_chemistry_warning_count": row["nucleic_acid_facing_chemistry_warning_count"],
         "input_candidate_triage_table_hash": input_hashes["candidate_triage_table"],
@@ -234,7 +239,7 @@ def _fold_rank(review_class: str) -> int:
 
 
 def _na_facing_burden_sort_values(row: dict[str, object]) -> tuple[int, float, int]:
-    """Prefer controlled substrate-proximal burden instead of maximizing it."""
+    """Prefer controlled near-retained-DNA/RNA burden instead of maximizing it."""
 
     count, ratio = _na_facing_count_and_ratio(row)
     band_rank = {
@@ -266,6 +271,10 @@ def _local_structure_sort_values(row: dict[str, object]) -> tuple[float, float, 
     return (
         _float_value(row.get("local_structure_catalytic_initiation_context_ca_rmsd_angstrom"), default=9999.0),
         _float_value(row.get("local_structure_thumb_contact_track_context_ca_rmsd_angstrom"), default=9999.0),
+        _float_value(
+            row.get("local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom"),
+            default=9999.0,
+        ),
         _float_value(row.get("local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom"), default=9999.0),
         _float_value(row.get("local_structure_max_ca_rmsd_angstrom"), default=9999.0),
     )

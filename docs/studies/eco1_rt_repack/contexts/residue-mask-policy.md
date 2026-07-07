@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-01
+last_verified: 2026-07-07
 ---
 
 ## Residue Mask Policy
@@ -75,6 +75,10 @@ The method rationale is intentionally plain:
 - Wang supplies the Eco1/Ec86 cryo-EM structure and specific RT-msDNA/msrRNA
   substrate-contact priors.
 - Simon supplies RT-region and motif annotation grammar.
+- Inouye et al. 1999 and Inouye et al. 2004 supply Ec86 C-terminal/thumb
+  primer-RNA recognition context. They justify keeping thumb and C-terminal
+  review axes visible, but they do not turn thumb-domain mutation into a
+  conservative default.
 
 Evidence-review artifacts explain the structure context but are not mask inputs.
 WT ESMC masked-marginal entropy and substitution LLRs are also review-only
@@ -102,6 +106,14 @@ The expansion classes are:
 | `eco1_rt_clade9_plurality25_contact10a_v1` | Conservative sentinel class with a small mutable surface | 32 |
 | `eco1_rt_clade9_plurality50_contact5a_v1` | Less restrictive clade 9 conservation threshold with the 5 A contact rule | 139 |
 | `eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1` | Closer II-A3/`42_1` family conservation denominator with the 5 A contact rule | 118 |
+
+The current design classes are mostly protection-stringency contrasts. The
+6 A, 8 A, and 10 A classes are nested subsets of the 5 A clade-9 baseline; they
+do not add new mutable positions. Neither the baseline nor any expanded class
+leaves declared Wang thumb-contact-track positions mutable. The classes still
+sample C-terminal/thumb-domain-adjacent mapped residues, especially under the
+5 A contact-shell classes, but the panel should not be described as a direct
+thumb-track tuning experiment.
 
 The candidate pool is nonredundant by `sequence_hash`. If the same sequence is
 produced in more than one class, the pool keeps one row and records the duplicate

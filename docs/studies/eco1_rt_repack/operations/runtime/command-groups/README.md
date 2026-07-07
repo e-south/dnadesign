@@ -221,10 +221,12 @@ mask-context script, WT ESMC model-check SVGs, exact-dictionary Biohub ESMC SAE
 review plots, interactive py3Dmol-backed structure-browser manifests, and a
 scoped marimo notebook organized by progressive analysis sections. The notebook
 presents constraint evidence for the design mask, baseline ProteinMPNN audit
-views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when those
-manifests exist. The expanded panel-selection tables are materialized separately under
-`outputs/thread/design_classes/selection/`; the review notebook links the
-nine selection-readiness SVGs from that manifest. WT ESMC
+views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when
+those manifests exist. The expanded panel-selection tables are materialized
+separately under `outputs/thread/design_classes/selection/`; the review notebook
+links the twelve selection-readiness SVGs from that manifest, including local
+RMSD threshold audits, C-terminal primer-RNA recognition review axes, and
+region-wise MSA support. WT ESMC
 masked-marginal scoring is shown with the constraint
 evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same
@@ -347,6 +349,10 @@ not a joint protein likelihood.
 - Simon is the annotation grammar for RT regions and motif visualization.
 - Wang is the Eco1/Ec86 structural prior for the selected cryo-EM context,
   active-site/motif spans, and candidate interface residues.
+- Inouye et al. 1999 and Inouye et al. 2004 are Ec86 C-terminal/thumb
+  specificity priors. They support tracking thumb and C-terminal primer-RNA
+  recognition context in review plots, but they are not active mask sources in
+  the current policy.
 - Paired-protomer dimerization is not a retention objective for the current
   monomeric RT-msDNA-msrRNA design profile; alpha-1/pre-RT1 residues are not
   fixed solely for dimer preservation.

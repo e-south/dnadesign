@@ -47,7 +47,9 @@ def test_runtime_readme_names_current_selection_visual_count() -> None:
         encoding="utf-8"
     )
 
-    assert "eight selection-readiness SVGs" in text
+    assert "twelve selection-readiness SVGs" in text
+    assert "nine selection-readiness SVGs" not in text
+    assert "eight selection-readiness SVGs" not in text
     assert "seven selection-readiness SVGs" not in text
     assert "six selection-readiness SVGs" not in text
     assert "orders variants by SAE" not in text

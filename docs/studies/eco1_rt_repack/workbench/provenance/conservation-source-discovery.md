@@ -247,6 +247,16 @@ chemistry, and local-structure metric availability.
   <https://academic.oup.com/nar/article/48/22/12632/6020195>
 - Simon et al. 2019:
   <https://academic.oup.com/nar/article/47/21/11007/5584520>
+- Lim and Maas 1989:
+  <https://doi.org/10.1016/0092-8674(89)90693-4>
+- Inouye and Inouye 1991:
+  <https://doi.org/10.1146/annurev.mi.45.100191.001115>
+- Inouye and Inouye 1992:
+  <https://doi.org/10.1128/jb.174.8.2419-2424.1992>
+- Inouye et al. 1999:
+  <https://doi.org/10.1074/jbc.274.44.31236>
+- Inouye et al. 2004:
+  <https://doi.org/10.1074/jbc.M408462200>
 - Khan et al. 2025:
   <https://pmc.ncbi.nlm.nih.gov/articles/PMC11911249/>
 - BV-BRC API:

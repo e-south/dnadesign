@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Vocabulary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-30
+**Last verified:** 2026-07-07
 
 | Term | Meaning |
 | --- | --- |
@@ -20,6 +20,7 @@
 | `MsaExemplarRows` | Study-owned explicit aligned FASTA row selections used to render local motif windows; these rows ground visualization only and are not the denominator for plurality. |
 | `MsaPanelSpec` | Study-owned display contract for all-record overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
 | `ManualMaskAuthority` | Study-owned mask ontology and generated runtime artifact. It records audited motif anchors, RT1-RT7 annotation/review spans, and Wang/Ec86 substrate-contact priors. RT1-RT7 spans do not blanket hard-fix residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
+| `C-terminal primer-RNA recognition region` | Eco1/Ec86 C-terminal/thumb context motivated by Ec86 primer-RNA recognition studies. In the current 7V9U-backed fixed-backbone scope, mapped residues `255-311` can be reviewed directly; canonical residues `312-320` are missing backbone and cannot be sampled by fixed-backbone ProteinMPNN in this run. |
 | `MaskRowAlgebra` | Study-local executable contract for composing protected, non-fixed mapped, and non-fixed missing-backbone rows under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. Implemented under `operations/masking/`, not inside a runtime writer. |
 | `EvidenceReviewArtifacts` | Contact-risk and contact-geometry review artifacts that explain structure context. They do not protect or release residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
 | `ResidueMaskSet` | Generic mutable/fixed/protected/unresolved mask contract. |

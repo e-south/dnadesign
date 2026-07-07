@@ -20,6 +20,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
 )
 
 from .review_axes import (
+    C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS,
     CLADE9_PROFILE_ID,
     DIRECT_CONTACT_DISTANCE_ANGSTROM,
     NA_FACING_DISTANCE_ANGSTROM,
@@ -59,6 +60,11 @@ REGION_MSA_SUPPORT_SPECS = (
         role="thumb_contact_review",
     ),
     RegionMsaSupportSpec(
+        region_id="c_terminal_primer_rna_recognition_region",
+        label="C-terminal primer-RNA recognition region",
+        role="c_terminal_primer_rna_recognition_review",
+    ),
+    RegionMsaSupportSpec(
         region_id="distal_scaffold",
         label="Distal scaffold",
         role="distal_scaffold_context",
@@ -76,7 +82,11 @@ def build_region_msa_support_rows(
     contact_geometry_rows: Sequence[Mapping[str, object]],
     mask_residues: Sequence[Mapping[str, object]],
 ) -> list[dict[str, object]]:
-    """Build candidate-by-region MSA support rows for the selected profile denominator."""
+    """Build candidate-by-region MSA support rows for the selected profile denominator.
+
+    The C-terminal primer-RNA recognition region is an overlapping review
+    context. Mutations there still remain in their distance/contact bucket.
+    """
 
     profile_support = {
         CLADE9_PROFILE_ID: _profile_support(
@@ -112,6 +122,8 @@ def build_region_msa_support_rows(
                     mask_by_position=mask_by_position,
                 )
             ].append(mutation)
+            if mutation.position in C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS:
+                mutations_by_region["c_terminal_primer_rna_recognition_region"].append(mutation)
         for spec in REGION_MSA_SUPPORT_SPECS:
             support = _natural_support(mutations_by_region[spec.region_id], profile_support[profile_id])
             rows.append(

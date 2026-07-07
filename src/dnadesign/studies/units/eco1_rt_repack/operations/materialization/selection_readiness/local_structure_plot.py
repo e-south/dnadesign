@@ -113,7 +113,7 @@ def write_local_structure_by_region_plot(
     max_value = max(numeric_values, default=1.0)
     plot_values = np.asarray([[np.nan if value is None else value for value in row] for row in matrix], dtype=float)
     masked_values = np.ma.masked_invalid(plot_values)
-    fig, ax = plt.subplots(figsize=(8.6, 7.2))
+    fig, ax = plt.subplots(figsize=(9.4, 7.2))
     cmap = plt.get_cmap("YlGnBu").copy()
     cmap.set_bad("#d0d7de")
     image = ax.imshow(masked_values, aspect="equal", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=max_value)
@@ -141,9 +141,9 @@ def write_local_structure_by_region_plot(
     path = plot_root / "selection_local_structure_by_region.svg"
     unavailable_statuses = sorted({status for row in status_matrix for status in row if status != "available"})
     alt = (
-        "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, near retained DNA/RNA, "
-        "and distal regions after one global mapped C-alpha fit. Column labels include the local RMSD threshold. "
-        "Unavailable cells are labeled NA."
+        "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, C-terminal "
+        "primer-RNA recognition, near retained DNA/RNA, and distal regions after one global mapped C-alpha fit. "
+        "Column labels include the local RMSD threshold. Unavailable cells are labeled NA."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -208,14 +208,21 @@ def write_local_structure_stratification_plot(
     region_labels = [
         labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_REGION_IDS
     ]
-    fig, ax = plt.subplots(figsize=(9.8, 7.4))
+    fig, ax = plt.subplots(figsize=(12.4, 7.8))
     y_positions = np.arange(len(LOCAL_STRUCTURE_REGION_IDS), dtype=float)
-    max_x = 0.0
+    max_x = max(
+        [LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id] for region_id in LOCAL_STRUCTURE_REGION_IDS]
+        + [
+            value
+            for region_values in values_by_region.values()
+            for value, _candidate_id, _selected, _status in region_values
+        ],
+        default=1.0,
+    )
+    threshold_label_x = max_x + 0.12
     for y_index, region_id in enumerate(LOCAL_STRUCTURE_REGION_IDS):
         region_values = values_by_region[region_id]
-        max_x = max(max_x, max([value for value, *_rest in region_values], default=0.0))
         threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
-        max_x = max(max_x, threshold)
         all_values = [value for value, _candidate_id, selected, _status in region_values if not selected]
         selected_values = [value for value, _candidate_id, selected, _status in region_values if selected]
         if all_values:
@@ -252,7 +259,7 @@ def write_local_structure_stratification_plot(
         )
         failed = sum(value > threshold for value, *_rest in region_values)
         ax.text(
-            max_x + 0.08,
+            threshold_label_x,
             y_positions[y_index],
             f">{threshold:.2f} A: {failed} fail",
             ha="left",
@@ -265,14 +272,23 @@ def write_local_structure_stratification_plot(
     ax.invert_yaxis()
     ax.set_xlabel("Local C-alpha RMSD (A)", fontsize=LABEL_SIZE)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
-    ax.set_xlim(left=0.0, right=max_x + 1.15)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3, frameon=False, fontsize=10)
+    ax.set_xlim(left=0.0, right=max_x + 1.45)
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.59, 0.04),
+        ncol=3,
+        frameon=False,
+        fontsize=10,
+    )
     style = {"color": "#d8dee4", "linewidth": 0.7}
     ax.grid(axis="x", **style)
     ax.grid(axis="y", visible=False)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    fig.subplots_adjust(left=0.29, right=0.96, top=0.9, bottom=0.24)
+    fig.subplots_adjust(left=0.29, right=0.94, top=0.88, bottom=0.2)
     path = plot_root / "selection_local_structure_stratification.svg"
     alt = (
         "Population stratification plot for local C-alpha RMSD by RT review region. Gray points are nonselected "

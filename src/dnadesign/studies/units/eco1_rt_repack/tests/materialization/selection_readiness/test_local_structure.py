@@ -62,6 +62,7 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
     assert all(row["local_ca_rmsd_threshold_policy_id"] == LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID for row in rows)
     assert all(row["local_ca_rmsd_threshold_status"] == "passed" for row in rows)
     catalytic = next(row for row in rows if row["region_id"] == "catalytic_initiation_context")
+    c_terminal = next(row for row in rows if row["region_id"] == "c_terminal_primer_rna_recognition_context")
     assert catalytic["region_position_spec"] == "189-204"
     assert "YADD" in str(catalytic["region_position_source"])
     assert "tao_et_al_2026_functional_residue_preservation" in str(catalytic["region_source_basis_ids_json"])
@@ -69,6 +70,9 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
         catalytic["local_ca_rmsd_threshold_angstrom"]
         == LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["catalytic_initiation_context"]
     )
+    assert c_terminal["region_position_spec"] == "255-311"
+    assert "primer-RNA recognition" in str(c_terminal["region_position_source"])
+    assert "inouye_et_al_2004_ec86_thumb_primer_rna_binding" in str(c_terminal["region_source_basis_ids_json"])
 
 
 def test_local_structure_region_rows_do_not_refit_each_region(tmp_path: Path) -> None:

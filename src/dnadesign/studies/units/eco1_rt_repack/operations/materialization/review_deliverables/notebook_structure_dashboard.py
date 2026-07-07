@@ -48,6 +48,7 @@ def structure_metric_rows(
         "nucleic_acid_facing_chemistry_warning_count",
         "catalytic_or_direct_contact_mutation_count",
         "thumb_contact_track_mutation_count",
+        "c_terminal_primer_rna_recognition_mutation_count",
         "distal_scaffold_mutation_count",
         "feature_index",
         "activation_max",
@@ -264,6 +265,10 @@ def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
         {
             "metric": "Thumb contact-track changes",
             "value": format_int(row.get("thumb_contact_track_mutation_count")),
+        },
+        {
+            "metric": "C-terminal primer-RNA recognition changes",
+            "value": format_int(row.get("c_terminal_primer_rna_recognition_mutation_count")),
         },
         {"metric": "Distal scaffold changes", "value": format_int(row.get("distal_scaffold_mutation_count"))},
         {"metric": "ESMC additive LLR total", "value": format_float(row.get("esmc_llr_total"), decimals=2)},

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.review_axes import (
+    C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS,
     DIRECT_CONTACT_DISTANCE_ANGSTROM,
     NA_FACING_DISTANCE_ANGSTROM,
     WANG_THUMB_CONTACT_TRACK_POSITIONS,
@@ -31,6 +32,7 @@ LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
     "retron_x_naxxh_context": 1.25,
     "retron_y_vtg_context": 1.60,
     "thumb_contact_track_context": 3.00,
+    "c_terminal_primer_rna_recognition_context": 3.50,
     "near_retained_dna_rna_annulus": 3.00,
     "distal_scaffold_control": 4.75,
 }
@@ -91,6 +93,21 @@ _STATIC_REGION_SPECS = (
         position_source="explicit Wang/Ec86 thumb-contact positions 238,239,240,249,257,261,264,298",
         source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
     ),
+    LocalStructureRegionSpec(
+        region_id="c_terminal_primer_rna_recognition_context",
+        label="C-terminal primer-RNA recognition region",
+        role="c_terminal_primer_rna_recognition_review",
+        positions=tuple(sorted(C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS)),
+        position_source=(
+            "explicit mapped Eco1 residues 255-311 from the RT-Ec86 C-terminal primer-RNA recognition "
+            "context; canonical residues 312-320 are missing backbone in the current 7V9U-backed scope"
+        ),
+        source_basis_ids=(
+            "inouye_et_al_1999_ec86_primer_template_recognition",
+            "inouye_et_al_2004_ec86_thumb_primer_rna_binding",
+            "wang_et_al_2022_ec86_cryoem_structure_priors",
+        ),
+    ),
 )
 
 LOCAL_STRUCTURE_REGION_IDS = tuple(
@@ -128,7 +145,12 @@ def local_structure_region_specs(
     """Return static and derived Eco1 local-structure regions."""
 
     mapped = set(int(position) for position in mapped_positions)
-    static_positions = {position for spec in _STATIC_REGION_SPECS for position in spec.positions}
+    exclusive_static_positions = {
+        position
+        for spec in _STATIC_REGION_SPECS
+        if spec.region_id != "c_terminal_primer_rna_recognition_context"
+        for position in spec.positions
+    }
     direct_contact_positions: set[int] = set()
     near_na_positions: set[int] = set()
     for row in contact_geometry_rows:
@@ -141,8 +163,12 @@ def local_structure_region_specs(
         elif distance <= NA_FACING_DISTANCE_ANGSTROM:
             near_na_positions.add(position)
     thumb_positions = set(WANG_THUMB_CONTACT_TRACK_POSITIONS)
-    near_na_positions = (near_na_positions & mapped) - direct_contact_positions - static_positions - thumb_positions
-    distal_positions = mapped - static_positions - thumb_positions - near_na_positions - direct_contact_positions
+    near_na_positions = (
+        (near_na_positions & mapped) - direct_contact_positions - exclusive_static_positions - thumb_positions
+    )
+    distal_positions = (
+        mapped - exclusive_static_positions - thumb_positions - near_na_positions - direct_contact_positions
+    )
     return (
         *_STATIC_REGION_SPECS,
         LocalStructureRegionSpec(
