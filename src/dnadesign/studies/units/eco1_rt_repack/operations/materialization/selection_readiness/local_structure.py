@@ -327,6 +327,7 @@ def _base_row(
         "region_position_count": len(spec.positions),
         "region_position_spec": position_spec(spec.positions),
         "region_position_source": spec.position_source,
+        "region_source_basis_ids_json": json.dumps(list(spec.source_basis_ids), sort_keys=True),
         "coordinate_scope": COORDINATE_SCOPE,
         "n_reference_ca": n_reference_ca,
         "n_candidate_ca": n_candidate_ca,

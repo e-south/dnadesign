@@ -14,8 +14,8 @@ status_surface: record-only
 Selection readiness is materialized for the expanded design-class pool, and
 RT-only `candidate_handoff.yaml` is not materialized. Phase 3 fold-check report
 validation still passes locally for the baseline WT plus 96-candidate ColabFold
-report and for the expanded design-class review bundle used for assay-panel
-preparation. The study has the required structure, source, alignment,
+report and for the expanded design-class review bundle used for protein-panel
+review. The study has the required structure, source, alignment,
 conservation evidence, manual mask authority, mask set, explicit thread plan,
 ProteinMPNN request, backend run manifests, sample/candidate tables, fold-check
 requests, compact fold-check reports, and expanded review evidence under
@@ -262,7 +262,7 @@ handled separately.
   `design_classes/biohub_esmc/sae_feature_window_summary.parquet`. It has 1,731
   rows: 577 sequences across the 23-position catalytic-palm control,
   120-position nucleic-acid contact surface, and 107-position mutable
-  substrate-proximal annulus/basic-surface windows. It reports WT-delta
+  near retained DNA/RNA/basic-surface windows. It reports WT-delta
   activation summaries, signed feature deltas, and window-space redundancy;
   it is local model review evidence, not a selection gate.
 - A WT-only Biohub ESMC masked-marginal mutation-scoring materializer is
@@ -362,8 +362,8 @@ separate branch-pocket model in this slice.
 | `catalytic_initiation_context` | Eco1 residues 189-204 around YADD 195-198 | 1.50 A |
 | `retron_y_vtg_context` | Eco1 residues 237-251 around VTG 243-245 | 1.60 A |
 | `thumb_contact_track_context` | Wang/Ec86 positions 238, 239, 240, 249, 257, 261, 264, and 298 | 3.00 A |
-| `near_retained_dna_rna_annulus` | Derived residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions | 3.00 A |
-| `distal_scaffold_control` | Mapped residues outside motif contexts, direct contacts, annulus, and thumb-track positions | 4.75 A |
+| `near_retained_dna_rna_annulus` | Derived near retained DNA/RNA region: residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions | 3.00 A |
+| `distal_scaffold_control` | Mapped residues outside motif contexts, direct contacts, the near retained DNA/RNA region, and thumb-track positions | 4.75 A |
 
 All local RMSD values are computed after one global mapped C-alpha fit to the
 ec86kit/7V9U-backed reference. Region-specific fitting is not used because it
@@ -382,25 +382,33 @@ would hide local shifts relative to the global fold.
    chemistry, local-structure gate fields, and source-artifact hashes for those
    review axes. Canonical mutation tokens are parsed strictly because mutation
    geography now affects hard-gate status. Local-structure metrics must be
-   available for each declared review region and pass the exploratory local
+   available for each declared review region and pass the declared local
    C-alpha RMSD thresholds before a row can be panel-eligible. In the current
    expanded pool, 571 rows pass the local-structure gate and 5 rows exceed a
    local RMSD threshold.
-4. Use the nine panel-selection SVGs under `selection/plots/` for notebook
+4. Use `local_structure_threshold_sensitivity.parquet` and
+   `region_msa_support.parquet` as audit tables for the local RMSD gate and
+   regional natural-sequence support.
+5. Use the twelve panel-selection SVGs under `selection/plots/` for notebook
    review: `selection_design_class_gate_counts`,
+   `selection_design_class_contrast`,
    `selection_local_structure_stratification`,
+   `selection_local_structure_threshold_sensitivity`,
    `selection_local_structure_by_region`,
    `selection_class_local_percentiles`, `selection_premise_alignment`,
    `selection_selected_substitutions_across_rt`,
    `selection_regional_mutation_burden`,
-   `selection_na_facing_chemistry_balance`, and
+   `selection_na_facing_chemistry_balance`,
+   `selection_regionwise_msa_support`, and
    `selection_six_sequence_distance`. They show pass/fail gate counts by design
-   class, local RMSD thresholds against the candidate population,
+   class, design-class mask-policy contrasts, local RMSD thresholds against the candidate population,
+   local-threshold sensitivity,
    selected-row local RMSD by RT region, within-class review percentiles, the
    selected-panel premise checklist, selected substitutions across RT regions,
    regional mutation burden, chemistry changes near retained DNA/RNA or
-   thumb-track positions, and selected-row sequence distance.
-5. Use `candidate_selection_panel.parquet` and
+   thumb-track positions, region-wise MSA support, and selected-row sequence
+   distance.
+6. Use `candidate_selection_panel.parquet` and
    `candidate_handoff_sequences.csv` as the current six-row RT-only protein
    review surface. The panel selects one feasible, fold-preserved
    representative from each design class after local-structure threshold gates,
@@ -437,11 +445,12 @@ would hide local shifts relative to the global fold.
 - RT-only `candidate_handoff.yaml` is not materialized.
 - Downstream RT-lnRNA acceptance or rejection is not materialized.
 - The review-deliverables marimo notebook includes the expanded panel-selection
-  table and plots: gate counts, class-local percentiles, selected-row sequence distance,
-  selected substitutions across RT regions, regional mutation burden, chemistry
-  changes near retained DNA/RNA or thumb-track positions, the selected protein
-  sequence CSV, the selected-panel structure browser, the candidate-handoff
-  readiness checklist, and the compact selected-panel table.
+  table and plots: gate counts, local-structure threshold audit views,
+  class-local percentiles, selected-row sequence distance, selected
+  substitutions across RT regions, regional mutation burden, chemistry changes
+  near retained DNA/RNA or thumb-track positions, region-wise MSA support, the
+  selected protein sequence CSV, the selected-panel structure browser, the
+  candidate-handoff readiness checklist, and the compact selected-panel table.
 
 ### Non-Goals
 

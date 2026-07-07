@@ -60,7 +60,7 @@ def build_regional_mutation_burden_matrix(
 
     region_labels = [
         "Catalytic or direct contact",
-        "Near retained DNA/RNA annulus",
+        "Near retained DNA/RNA region",
         "Thumb-contact track",
         "Distal scaffold",
     ]
@@ -283,10 +283,10 @@ def _regional_counts_from_panel_trace(panel_row: dict[str, object]) -> list[int]
     if not required.issubset(trace):
         return None
     thumb_count = int(trace["thumb_contact_track_mutation_count"] or 0)
-    near_annulus_count = max(int(trace["nucleic_acid_facing_mutation_count"] or 0) - thumb_count, 0)
+    near_dna_rna_count = max(int(trace["nucleic_acid_facing_mutation_count"] or 0) - thumb_count, 0)
     return [
         int(trace["catalytic_or_direct_contact_mutation_count"] or 0),
-        near_annulus_count,
+        near_dna_rna_count,
         thumb_count,
         int(trace["distal_scaffold_mutation_count"] or 0),
     ]

@@ -46,6 +46,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     selection_root = class_root / "selection"
     source_root = repo_root / "outputs/thread"
     inputs = write_inputs(class_root, source_root)
+    _write_manual_mask_authority_source_basis(repo_root)
     root_handoff_path = source_root / "candidate_handoff.yaml"
     root_handoff_path.write_text(yaml.safe_dump(candidate_handoff_payload(), sort_keys=False), encoding="utf-8")
     selection_local_handoff_path = selection_root / "candidate_handoff.yaml"
@@ -66,6 +67,10 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert result.feasibility_report_path == selection_root / "feasibility_report.parquet"
     assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
     assert result.local_structure_region_metrics_path == selection_root / "local_structure_region_metrics.parquet"
+    assert result.local_structure_threshold_sensitivity_path == (
+        selection_root / "local_structure_threshold_sensitivity.parquet"
+    )
+    assert result.region_msa_support_path == selection_root / "region_msa_support.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
     assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
     assert result.plots_root == selection_root / "plots"
@@ -100,6 +105,12 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert {row["fold_review_class"] for row in panel} == {"strong_fold_preserved"}
     assert all(row["selected_for_panel"] for row in panel)
     assert all(row["eligible_for_handoff"] for row in panel)
+    assert {row["local_structure_gate_status"] for row in panel} == {"passed"}
+    assert all(row["local_structure_threshold_failed_region_count"] == 0 for row in panel)
+    assert all(row["local_structure_max_ca_rmsd_angstrom"] is not None for row in panel)
+    assert all(row["catalytic_or_direct_contact_mutation_count"] == 0 for row in panel)
+    assert all("thumb_contact_track_mutation_count" in row for row in panel)
+    assert all("nucleic_acid_facing_mutation_count" in row for row in panel)
     assert "esmc_penalty_rank" not in panel[0]
     assert "sae_window_contrast_rank" not in panel[0]
     assert "MSA support" in panel[0]["selection_reason"]
@@ -119,6 +130,44 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert manifest["gate_counts"]["local_structure_gate_status"] == {"passed": len(triage)}
     assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
     assert "local_structure_rmsd_threshold_policy" in manifest
+    assert manifest["artifacts"]["local_structure_threshold_sensitivity"] == (
+        "local_structure_threshold_sensitivity.parquet"
+    )
+    assert manifest["artifacts"]["region_msa_support"] == "region_msa_support.parquet"
+    sensitivity = pq.read_table(result.local_structure_threshold_sensitivity_path).to_pylist()
+    assert {row["scenario_id"] for row in sensitivity} == {
+        "tighter_80_percent",
+        "declared_threshold",
+        "looser_120_percent",
+    }
+    assert {row["region_id"] for row in sensitivity} == set(LOCAL_STRUCTURE_REGION_IDS)
+    assert all(row["candidate_count"] == len(triage) for row in sensitivity)
+    assert all("selected_failure_count" in row for row in sensitivity)
+    support = pq.read_table(result.region_msa_support_path).to_pylist()
+    assert {row["region_id"] for row in support} == {
+        "catalytic_or_direct_contact",
+        "near_retained_dna_rna_region",
+        "thumb_contact_track",
+        "distal_scaffold",
+    }
+    assert len(support) == len(triage) * 4
+    assert all(row["region_label"] != "Near retained DNA/RNA annulus" for row in support)
+    source_basis_by_id = {row["id"]: row for row in manifest["local_structure_source_basis"]}
+    assert source_basis_by_id["tao_et_al_2026_functional_residue_preservation"]["source_ref"] == (
+        "doi:10.1038/s41587-026-03149-6"
+    )
+    assert source_basis_by_id["wang_et_al_2022_ec86_cryoem_structure_priors"]["source_ref"] == (
+        "doi:10.1038/s41564-022-01197-7"
+    )
+    assert [row["region_id"] for row in manifest["local_structure_regions"]] == list(LOCAL_STRUCTURE_REGION_IDS)
+    catalytic_region = next(
+        row for row in manifest["local_structure_regions"] if row["region_id"] == "catalytic_initiation_context"
+    )
+    assert catalytic_region["region_position_spec"] == "189-204"
+    assert "YADD" in catalytic_region["region_position_source"]
+    assert "tao_et_al_2026_functional_residue_preservation" in catalytic_region["region_source_basis_ids"]
+    assert catalytic_region["coordinate_scope"] == "mapped_rt_chain_ca_after_global_fit"
+    assert catalytic_region["local_ca_rmsd_threshold_angstrom"] == 1.5
     assert manifest["selected_candidate_ids"] == [row["candidate_id"] for row in panel]
     assert manifest["handoff_readiness"] == {
         "handoff_kind": "rt_only_candidate_handoff",
@@ -140,9 +189,13 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "valid": True,
     }
     assert manifest["row_counts"]["local_structure_region_metrics"] == len(triage) * len(LOCAL_STRUCTURE_REGION_IDS)
+    assert manifest["row_counts"]["local_structure_threshold_sensitivity"] == len(sensitivity)
+    assert manifest["row_counts"]["region_msa_support"] == len(support)
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
     assert manifest["artifacts"]["local_structure_region_metrics"] == "local_structure_region_metrics.parquet"
     assert "local_structure_region_metrics" in manifest["artifact_hashes"]
+    assert "local_structure_threshold_sensitivity" in manifest["artifact_hashes"]
+    assert "region_msa_support" in manifest["artifact_hashes"]
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     materialization_assertions.assert_selection_plot_contract(
         result=result,
@@ -176,3 +229,33 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
     payload = json.loads(captured.out)
     assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
     assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
+
+
+def _write_manual_mask_authority_source_basis(repo_root: Path) -> None:
+    path = repo_root / "docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "source_basis": [
+                    {
+                        "id": "tao_et_al_2026_functional_residue_preservation",
+                        "role": "method_prior",
+                        "source_ref": "doi:10.1038/s41587-026-03149-6",
+                    },
+                    {
+                        "id": "simon_et_al_2019_retron_rt_motif_grammar",
+                        "role": "motif_annotation_prior",
+                        "source_ref": "doi:10.1093/nar/gkz865",
+                    },
+                    {
+                        "id": "wang_et_al_2022_ec86_cryoem_structure_priors",
+                        "role": "ec86_structure_mask_prior",
+                        "source_ref": "doi:10.1038/s41564-022-01197-7",
+                    },
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )

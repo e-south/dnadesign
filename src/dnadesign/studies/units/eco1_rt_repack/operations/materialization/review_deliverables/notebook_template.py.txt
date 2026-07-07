@@ -7,16 +7,31 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import marimo as mo
-    from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
-        deliverable_lookup, evidence_deliverables, format_deliverable_label, is_interactive_structure_deliverable,
-        is_residue_frequency_bundle_deliverable, load_review_manifest, render_deliverable_details,
-        render_deliverable_panel, render_intro, render_residue_frequency_bundle, residue_frequency_view_lookup,
-        review_lane_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
-        selected_deliverable, visual_deliverables,
-    )
+
     from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
         notebook_sae_features as sae_runtime,
+    )
+    from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
         notebook_structure_browser as structure_runtime,
+    )
+    from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.notebook_runtime import (
+        deliverable_lookup,
+        evidence_deliverables,
+        format_deliverable_label,
+        is_interactive_structure_deliverable,
+        is_residue_frequency_bundle_deliverable,
+        load_review_manifest,
+        render_deliverable_details,
+        render_deliverable_panel,
+        render_intro,
+        render_residue_frequency_bundle,
+        residue_frequency_view_lookup,
+        review_lane_lookup,
+        section_deliverables,
+        section_label_lookup,
+        select_residue_frequency_view,
+        selected_deliverable,
+        visual_deliverables,
     )
 
     is_sae_feature_heatmap_deliverable = sae_runtime.is_sae_feature_heatmap_deliverable
@@ -524,7 +539,9 @@ def _(
     evidence_section_rows = section_deliverables(evidence_rows, selected_section)
     if evidence_section_rows:
         evidence_panels = {
-            format_deliverable_label(row): render_deliverable_panel(row, mo=mo, manifest_root=manifest_root)
+            format_deliverable_label(row): (
+                lambda row=row: render_deliverable_panel(row, mo=mo, manifest_root=manifest_root)
+            )
             for row in evidence_section_rows
         }
         rendered.append(

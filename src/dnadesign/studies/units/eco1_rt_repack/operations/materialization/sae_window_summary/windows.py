@@ -59,7 +59,7 @@ def default_window_specs(mask_rows: list[dict[str, Any]]) -> tuple[WindowSpec, .
         ),
         WindowSpec(
             "mutable_substrate_proximal_annulus_basic_surface",
-            "Mutable substrate-proximal annulus and basic surface",
+            "Mutable near retained DNA/RNA and basic surface",
             mutable_annulus_basic_surface,
             (
                 "Unprotected mapped residues outside the 5 A protected shell "

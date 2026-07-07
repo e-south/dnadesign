@@ -297,7 +297,7 @@ def _write_constraint_tracks(
     rows: list[dict[str, Any]],
     mask_join_path: Path,
 ) -> dict[str, Any]:
-    title = "MSA and ESMC signals align with mask classes"
+    title = "MSA and ESMC signals align with mask status"
     positions = [int(row["canonical_position"]) for row in rows]
     fig, axes = plt.subplots(
         4,

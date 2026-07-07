@@ -117,6 +117,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 input_hash_tail="a",
             ),
             plot_row(
+                plot_id="selection_design_class_contrast",
+                title=plots["selection_design_class_contrast"],
+                path="plots/selection_design_class_contrast.svg",
+                alt_text="Fixture design-class contrast summary.",
+                description="Shows mask-policy contrasts for the declared design classes.",
+                interpretation_limit="Design-class contrast does not measure activity.",
+                input_hash_tail="b",
+            ),
+            plot_row(
                 plot_id="selection_local_structure_stratification",
                 title=plots["selection_local_structure_stratification"],
                 path="plots/selection_local_structure_stratification.svg",
@@ -124,6 +133,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 description="Shows local RMSD thresholds against candidate distributions.",
                 interpretation_limit="Local RMSD thresholds do not measure activity.",
                 input_hash_tail="s",
+            ),
+            plot_row(
+                plot_id="selection_local_structure_threshold_sensitivity",
+                title=plots["selection_local_structure_threshold_sensitivity"],
+                path="plots/selection_local_structure_threshold_sensitivity.svg",
+                alt_text="Fixture local-RMSD threshold sensitivity plot.",
+                description="Shows failure counts under tighter, declared, and looser local RMSD thresholds.",
+                interpretation_limit="Threshold sensitivity does not measure activity.",
+                input_hash_tail="t",
             ),
             plot_row(
                 plot_id="selection_local_structure_by_region",
@@ -178,6 +196,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 description="Shows chemistry changes near retained DNA/RNA or thumb-track.",
                 interpretation_limit="Chemistry balance does not measure activity.",
                 input_hash_tail="g",
+            ),
+            plot_row(
+                plot_id="selection_regionwise_msa_support",
+                title=plots["selection_regionwise_msa_support"],
+                path="plots/selection_regionwise_msa_support.svg",
+                alt_text="Fixture region-wise MSA support heatmap.",
+                description="Shows selected substitution support by mutation region.",
+                interpretation_limit="Region-wise MSA support does not measure activity.",
+                input_hash_tail="m",
             ),
             plot_row(
                 plot_id="selection_six_sequence_distance",

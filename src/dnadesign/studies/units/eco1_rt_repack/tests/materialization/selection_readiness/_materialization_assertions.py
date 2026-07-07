@@ -38,6 +38,11 @@ def assert_selection_plot_contract(
     assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
     plot_text_by_id: dict[str, str] = {}
     for plot in manifest["plots"]:
+        metadata_text = " ".join(
+            str(plot.get(field) or "") for field in ("title", "description", "alt_text", "interpretation_limit")
+        )
+        assert "mask class" not in metadata_text.lower()
+        assert "annulus" not in metadata_text.lower()
         plot_path = result.manifest_path.parent / plot["path"]
         assert plot_path.exists()
         plot_text = plot_path.read_text(encoding="utf-8")
@@ -48,6 +53,7 @@ def assert_selection_plot_contract(
 
     premise_text = plot_text_by_id["selection_premise_alignment"]
     assert "Core/direct edits" in premise_text
+    assert "Near DNA/RNA edits" in premise_text
     assert "Local structure" in premise_text
     assert "ESMC/SAE" not in premise_text
     assert_heatmap_cells_are_square(premise_text, row_count=len(ALL_SPECS), column_count=7)
@@ -80,4 +86,11 @@ def assert_selection_plot_contract(
     local_structure_stratification_text = plot_text_by_id["selection_local_structure_stratification"]
     assert "Threshold" in local_structure_stratification_text
     assert "Selected rows" in local_structure_stratification_text
+    assert "selection_local_structure_threshold_sensitivity" in plot_text_by_id
+    assert "selection_regionwise_msa_support" in plot_text_by_id
+    assert_heatmap_cells_are_square(
+        plot_text_by_id["selection_regionwise_msa_support"],
+        row_count=len(ALL_SPECS),
+        column_count=4,
+    )
     assert not retired_plot.exists()

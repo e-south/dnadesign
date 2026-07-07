@@ -595,8 +595,8 @@ datasets:
     description: >-
       Model-compatible summary of sparse Biohub ESMC SAE activations over three
       declared Eco1 windows: catalytic-palm negative control, thumb/palm
-      nucleic-acid-binding surface, and mutable substrate-proximal
-      annulus/basic-surface region. This is local model review evidence, not
+      nucleic-acid-binding surface, and mutable near retained DNA/RNA/basic-surface
+      region. This is local model review evidence, not
       a processivity score and not a candidate acceptance gate.
   - id: eco1_rt_review_deliverable_manifest
     owner: eco1_rt_repack
@@ -700,7 +700,7 @@ datasets:
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing the selected six against the panel premise:
-      catalytic/direct-contact edits, near-DNA/RNA annulus edits, thumb-track
+      catalytic/direct-contact edits, near retained DNA/RNA edits, thumb-track
       edits, distal edits, near-DNA/RNA chemistry warnings, fold gate status,
       and local-structure gate status. ESMC and SAE stay in model/method
       checks rather than this core checklist. It is a review visual, not
@@ -715,6 +715,17 @@ datasets:
       blocked candidates, and rows missing gate inputs for each design class.
       It supports panel review but does not measure RT activity or handoff
       acceptance.
+  - id: eco1_rt_selection_design_class_contrast
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_contrast.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing the declared MSA set, conservation
+      threshold, retained-DNA/RNA contact shell, gate-pass count, selected row,
+      near retained DNA/RNA edits, and thumb-track edits for each design class.
+      It explains mask-policy contrasts without turning class balance into a
+      global top-six ranking.
   - id: eco1_rt_selection_local_structure_stratification
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -722,9 +733,18 @@ datasets:
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing local C-alpha RMSD distributions by
-      declared RT review region, with selected rows and exploratory threshold
+      declared RT review region, with selected rows and declared threshold
       markers. It explains the local-structure gate against the candidate
       population and does not measure RT activity.
+  - id: eco1_rt_selection_local_structure_threshold_sensitivity
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_threshold_sensitivity.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing local C-alpha RMSD gate failures under
+      tighter, declared, and looser thresholds. It audits threshold sensitivity
+      and does not replace the declared gate.
   - id: eco1_rt_selection_class_local_percentiles
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -761,7 +781,7 @@ datasets:
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual summarizing selected substitutions by catalytic or
-      direct-contact, near retained DNA/RNA annulus, thumb-contact-track, and
+      direct-contact, near retained DNA/RNA region, thumb-contact-track, and
       distal scaffold regions. It is regional review context, not a functional
       predictor.
   - id: eco1_rt_selection_local_structure_by_region
@@ -771,8 +791,8 @@ datasets:
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing selected-candidate local C-alpha RMSD after
-      one global mapped C-alpha fit, split by motif, thumb-track, annulus, and
-      distal control regions. Local-structure metric availability and
+      one global mapped C-alpha fit, split by motif, thumb-track, near retained
+      DNA/RNA, and distal control regions. Local-structure metric availability and
       per-region RMSD thresholds are selection-readiness gates; RMSD values are
       structural review metrics, not activity or assay-readiness evidence.
   - id: eco1_rt_selection_na_facing_chemistry_balance
@@ -785,6 +805,16 @@ datasets:
       or thumb-track positions into charge change, basic gain, basic loss, acidic
       gain, and proline/glycine gain. It treats chemistry as review risk and
       context, not as a positive activity predictor.
+  - id: eco1_rt_selection_regionwise_msa_support
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regionwise_msa_support.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual showing whether selected substitutions are observed
+      in the matching natural-sequence set by catalytic/direct-contact, near
+      retained DNA/RNA, thumb-contact-track, and distal regions. It is
+      evolutionary review context, not functional proof.
   - id: eco1_rt_wt_model_check_visuals
     owner: eco1_rt_repack
     kind: generated_artifact

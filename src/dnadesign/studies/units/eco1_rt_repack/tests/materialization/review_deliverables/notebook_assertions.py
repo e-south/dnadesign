@@ -125,6 +125,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'widths="equal"' in notebook_text
     assert "section_deliverables" in combined_text
     assert "mo.accordion(visual_panels, multiple=False, lazy=True)" not in combined_text
+    assert "lambda row=row: render_deliverable_panel(row, mo=mo, manifest_root=manifest_root)" in notebook_text
     assert "format_section_label(" in combined_text
     assert "format_deliverable_label(" in combined_text
     assert 'str(row.get("title") or "")' in runtime_text

@@ -38,6 +38,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     SELECTION_PLOT_PLAIN_TITLES,
 )
 
+from .local_structure_sensitivity import LOCAL_STRUCTURE_THRESHOLD_SCENARIOS
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
@@ -139,9 +141,9 @@ def write_local_structure_by_region_plot(
     path = plot_root / "selection_local_structure_by_region.svg"
     unavailable_statuses = sorted({status for row in status_matrix for status in row if status != "available"})
     alt = (
-        "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, annulus, and distal "
-        "regions after one global mapped C-alpha fit. Column labels include the local RMSD threshold. Unavailable "
-        "cells are labeled NA."
+        "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, near retained DNA/RNA, "
+        "and distal regions after one global mapped C-alpha fit. Column labels include the local RMSD threshold. "
+        "Unavailable cells are labeled NA."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -274,7 +276,7 @@ def write_local_structure_stratification_plot(
     path = plot_root / "selection_local_structure_stratification.svg"
     alt = (
         "Population stratification plot for local C-alpha RMSD by RT review region. Gray points are nonselected "
-        "candidates, blue points are selected panel rows, and orange markers show exploratory per-region thresholds."
+        "candidates, blue points are selected panel rows, and orange markers show declared per-region thresholds."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -295,6 +297,101 @@ def write_local_structure_stratification_plot(
     )
 
 
+def write_local_structure_threshold_sensitivity_plot(
+    plot_root: Path,
+    *,
+    threshold_sensitivity_rows: list[dict[str, object]],
+    input_hashes: dict[str, str | None],
+) -> dict[str, Any]:
+    """Write local RMSD threshold sensitivity heatmap."""
+
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_local_structure_threshold_sensitivity"]
+    row_by_region_scenario = {
+        (str(row["region_id"]), str(row["scenario_id"])): row
+        for row in threshold_sensitivity_rows
+        if row.get("region_id") and row.get("scenario_id")
+    }
+    labels_by_region = {
+        str(row["region_id"]): str(row.get("region_label") or row["region_id"]) for row in threshold_sensitivity_rows
+    }
+    region_labels = [
+        labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_REGION_IDS
+    ]
+    scenario_labels = [scenario.label for scenario in LOCAL_STRUCTURE_THRESHOLD_SCENARIOS]
+    matrix: list[list[int]] = []
+    selected_failures: list[list[int]] = []
+    for region_id in LOCAL_STRUCTURE_REGION_IDS:
+        row_values: list[int] = []
+        selected_values: list[int] = []
+        for scenario in LOCAL_STRUCTURE_THRESHOLD_SCENARIOS:
+            row = row_by_region_scenario.get((region_id, scenario.scenario_id))
+            if row is None:
+                raise ValueError(
+                    f"Missing local-structure threshold-sensitivity row: {region_id}/{scenario.scenario_id}"
+                )
+            row_values.append(int(row.get("failure_count") or 0))
+            selected_values.append(int(row.get("selected_failure_count") or 0))
+        matrix.append(row_values)
+        selected_failures.append(selected_values)
+    fig, ax = plt.subplots(figsize=(7.2, 7.4))
+    max_failures = max((max(values) for values in matrix), default=0)
+    image = ax.imshow(
+        matrix,
+        aspect="equal",
+        interpolation="nearest",
+        cmap="Oranges",
+        vmin=0,
+        vmax=max(max_failures, 1),
+    )
+    ax.set_yticks(list(range(len(region_labels))))
+    ax.set_yticklabels(region_labels, fontsize=LABEL_SIZE - 0.5)
+    ax.set_xticks(list(range(len(scenario_labels))))
+    ax.set_xticklabels(scenario_labels, fontsize=LABEL_SIZE - 1, rotation=24, ha="right")
+    for row_index, values in enumerate(matrix):
+        for col_index, value in enumerate(values):
+            selected_failed = selected_failures[row_index][col_index]
+            suffix = "" if selected_failed == 0 else f"\n{selected_failed} selected"
+            ax.text(
+                col_index,
+                row_index,
+                f"{value} fail{suffix}",
+                ha="center",
+                va="center",
+                fontsize=8.4,
+                color=matrix_text_color(float(value), max_value=float(max(max_failures, 1))),
+            )
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    ax.tick_params(axis="both", length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.02)
+    cbar.set_label("Candidate failures", fontsize=10.5)
+    cbar.ax.tick_params(labelsize=9.5)
+    fig.subplots_adjust(left=0.34, right=0.94, top=0.88, bottom=0.24)
+    path = plot_root / "selection_local_structure_threshold_sensitivity.svg"
+    alt = (
+        "Heatmap of local C-alpha RMSD threshold sensitivity by RT review region. Columns show tighter, declared, "
+        "and looser thresholds; cells report candidate failures and selected-row failures."
+    )
+    save_accessible_svg(fig, path, title=title, description=alt)
+    return plot_row(
+        plot_id="selection_local_structure_threshold_sensitivity",
+        title=title,
+        path=path,
+        input_hashes=input_hashes,
+        alt_text=alt,
+        description=(
+            "Audits whether local RMSD gates are sensitive to small threshold changes. The declared threshold is "
+            "the enforced selection-readiness gate; tighter and looser columns are review context only."
+        ),
+        interpretation_limit=(
+            "Threshold sensitivity is a gate-audit view. It does not score processivity, strand displacement, or "
+            "assay readiness."
+        ),
+        render_mode="wide_visual",
+    )
+
+
 def _deterministic_jitter(count: int, *, amplitude: float) -> list[float]:
     if count <= 1:
         return [0.0] * count
@@ -306,4 +403,5 @@ __all__ = [
     "build_selected_local_structure_matrix",
     "write_local_structure_by_region_plot",
     "write_local_structure_stratification_plot",
+    "write_local_structure_threshold_sensitivity_plot",
 ]

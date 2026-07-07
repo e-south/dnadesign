@@ -23,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_structure_rmsd_gate_v1"
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE = (
-    "Exploratory local C-alpha RMSD limits set from the current all-candidate distribution and used as "
+    "Declared local C-alpha RMSD limits set from the current all-candidate distribution and enforced as "
     "selection-readiness preservation gates, not activity evidence."
 )
 LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
@@ -45,6 +45,7 @@ class LocalStructureRegionSpec:
     role: str
     positions: tuple[int, ...]
     position_source: str
+    source_basis_ids: tuple[str, ...]
 
 
 _STATIC_REGION_SPECS = (
@@ -54,6 +55,11 @@ _STATIC_REGION_SPECS = (
         role="catalytic_initiation_review",
         positions=tuple(range(189, 205)),
         position_source="explicit Eco1 residues 189-204 around the YADD catalytic motif",
+        source_basis_ids=(
+            "tao_et_al_2026_functional_residue_preservation",
+            "simon_et_al_2019_retron_rt_motif_grammar",
+            "wang_et_al_2022_ec86_cryoem_structure_priors",
+        ),
     ),
     LocalStructureRegionSpec(
         region_id="retron_x_naxxh_context",
@@ -61,6 +67,10 @@ _STATIC_REGION_SPECS = (
         role="retron_motif_review",
         positions=tuple(range(99, 116)),
         position_source="explicit Eco1 residues 99-115 around the NAxxH retron X motif",
+        source_basis_ids=(
+            "simon_et_al_2019_retron_rt_motif_grammar",
+            "wang_et_al_2022_ec86_cryoem_structure_priors",
+        ),
     ),
     LocalStructureRegionSpec(
         region_id="retron_y_vtg_context",
@@ -68,6 +78,10 @@ _STATIC_REGION_SPECS = (
         role="retron_motif_review",
         positions=tuple(range(237, 252)),
         position_source="explicit Eco1 residues 237-251 around the VTG retron Y motif",
+        source_basis_ids=(
+            "simon_et_al_2019_retron_rt_motif_grammar",
+            "wang_et_al_2022_ec86_cryoem_structure_priors",
+        ),
     ),
     LocalStructureRegionSpec(
         region_id="thumb_contact_track_context",
@@ -75,6 +89,7 @@ _STATIC_REGION_SPECS = (
         role="thumb_contact_review",
         positions=tuple(sorted(WANG_THUMB_CONTACT_TRACK_POSITIONS)),
         position_source="explicit Wang/Ec86 thumb-contact positions 238,239,240,249,257,261,264,298",
+        source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
     ),
 )
 
@@ -84,10 +99,11 @@ LOCAL_STRUCTURE_REGION_IDS = tuple(
         *_STATIC_REGION_SPECS,
         LocalStructureRegionSpec(
             region_id="near_retained_dna_rna_annulus",
-            label="Near retained DNA/RNA annulus",
+            label="Near retained DNA/RNA region",
             role="substrate_proximal_review",
             positions=(),
             position_source="derived from retained DNA/RNA distance shell after exclusions",
+            source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
         ),
         LocalStructureRegionSpec(
             region_id="distal_scaffold_control",
@@ -95,8 +111,10 @@ LOCAL_STRUCTURE_REGION_IDS = tuple(
             role="distal_scaffold_control",
             positions=(),
             position_source=(
-                "derived from mapped residues not assigned to motif, direct-contact, annulus, or thumb-track regions"
+                "derived from mapped residues not assigned to motif, direct-contact, near DNA/RNA, "
+                "or thumb-track regions"
             ),
+            source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
         ),
     )
 )
@@ -112,7 +130,7 @@ def local_structure_region_specs(
     mapped = set(int(position) for position in mapped_positions)
     static_positions = {position for spec in _STATIC_REGION_SPECS for position in spec.positions}
     direct_contact_positions: set[int] = set()
-    annulus_positions: set[int] = set()
+    near_na_positions: set[int] = set()
     for row in contact_geometry_rows:
         position = int(row["canonical_position"])
         distance = _retained_na_distance(row)
@@ -121,22 +139,23 @@ def local_structure_region_specs(
         if distance <= DIRECT_CONTACT_DISTANCE_ANGSTROM:
             direct_contact_positions.add(position)
         elif distance <= NA_FACING_DISTANCE_ANGSTROM:
-            annulus_positions.add(position)
+            near_na_positions.add(position)
     thumb_positions = set(WANG_THUMB_CONTACT_TRACK_POSITIONS)
-    annulus_positions = (annulus_positions & mapped) - direct_contact_positions - static_positions - thumb_positions
-    distal_positions = mapped - static_positions - thumb_positions - annulus_positions - direct_contact_positions
+    near_na_positions = (near_na_positions & mapped) - direct_contact_positions - static_positions - thumb_positions
+    distal_positions = mapped - static_positions - thumb_positions - near_na_positions - direct_contact_positions
     return (
         *_STATIC_REGION_SPECS,
         LocalStructureRegionSpec(
             region_id="near_retained_dna_rna_annulus",
-            label="Near retained DNA/RNA annulus",
+            label="Near retained DNA/RNA region",
             role="substrate_proximal_review",
-            positions=tuple(sorted(annulus_positions)),
+            positions=tuple(sorted(near_na_positions)),
             position_source=(
                 f"derived Eco1 residues with retained DNA/RNA distance >{DIRECT_CONTACT_DISTANCE_ANGSTROM:g} A "
                 f"and <={NA_FACING_DISTANCE_ANGSTROM:g} A, excluding motif contexts, direct contacts, "
                 "and Wang thumb-contact positions"
             ),
+            source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
         ),
         LocalStructureRegionSpec(
             region_id="distal_scaffold_control",
@@ -144,9 +163,10 @@ def local_structure_region_specs(
             role="distal_scaffold_control",
             positions=tuple(sorted(distal_positions)),
             position_source=(
-                "derived mapped Eco1 residues outside motif contexts, direct contacts, near-DNA/RNA annulus, "
-                "and Wang thumb-contact positions"
+                "derived mapped Eco1 residues outside motif contexts, direct contacts, the near retained DNA/RNA "
+                "region, and Wang thumb-contact positions"
             ),
+            source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),
         ),
     )
 

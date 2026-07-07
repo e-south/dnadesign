@@ -80,6 +80,7 @@ eco1_rt_repack/
     residue-mask-policy.md
     fold-validation-policy.md
     synthesis-feasibility-policy.md
+    selection-hardening-dev-spec.md
   operations/
     ops.study.yaml
     contract/

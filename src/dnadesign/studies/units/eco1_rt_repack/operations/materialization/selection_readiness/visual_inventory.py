@@ -27,7 +27,12 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_design_class_gate_counts",
         file_name="selection_design_class_gate_counts.svg",
-        plain_title="Each mask class retains protein-gate candidates",
+        plain_title="Each design class retains protein-gate candidates",
+    ),
+    SelectionPlot(
+        plot_id="selection_design_class_contrast",
+        file_name="selection_design_class_contrast.svg",
+        plain_title="Design-class mask policies",
     ),
     SelectionPlot(
         plot_id="selection_local_structure_stratification",
@@ -35,14 +40,19 @@ CURRENT_SELECTION_PLOTS = (
         plain_title="Local RMSD thresholds by region",
     ),
     SelectionPlot(
+        plot_id="selection_local_structure_threshold_sensitivity",
+        file_name="selection_local_structure_threshold_sensitivity.svg",
+        plain_title="Local RMSD threshold sensitivity",
+    ),
+    SelectionPlot(
         plot_id="selection_local_structure_by_region",
         file_name="selection_local_structure_by_region.svg",
-        plain_title="Selected local RT regions stay within RMSD thresholds",
+        plain_title="Selected local RMSD by region",
     ),
     SelectionPlot(
         plot_id="selection_class_local_percentiles",
         file_name="selection_class_local_percentiles.svg",
-        plain_title="Selected rows are compared within mask class",
+        plain_title="Selected rows are compared within design class",
     ),
     SelectionPlot(
         plot_id="selection_premise_alignment",
@@ -63,6 +73,11 @@ CURRENT_SELECTION_PLOTS = (
         plot_id="selection_na_facing_chemistry_balance",
         file_name="selection_na_facing_chemistry_balance.svg",
         plain_title="Chemistry changes near DNA/RNA or thumb-track are review context",
+    ),
+    SelectionPlot(
+        plot_id="selection_regionwise_msa_support",
+        file_name="selection_regionwise_msa_support.svg",
+        plain_title="MSA support is reviewed by mutation region",
     ),
     SelectionPlot(
         plot_id="selection_six_sequence_distance",

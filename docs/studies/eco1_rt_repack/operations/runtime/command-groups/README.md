@@ -200,8 +200,9 @@ inputs.
 ### Protein Review Panel Preparation
 
 The next local summaries prepare the expanded candidate pool for a six-variant
-protein review panel. They explain buildability and local SAE changes; they do not
-predict strand displacement.
+protein review panel. They explain computational feasibility, local structure,
+local SAE changes, and selection-readiness evidence; they do not predict strand
+displacement.
 
 The SAE window summary uses existing Biohub ESMC sparse tables and does not make
 new Biohub requests:
@@ -223,7 +224,7 @@ presents constraint evidence for the design mask, baseline ProteinMPNN audit
 views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when those
 manifests exist. The expanded panel-selection tables are materialized separately under
 `outputs/thread/design_classes/selection/`; the review notebook links the
-eight selection-readiness SVGs from that manifest. WT ESMC
+nine selection-readiness SVGs from that manifest. WT ESMC
 masked-marginal scoring is shown with the constraint
 evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same

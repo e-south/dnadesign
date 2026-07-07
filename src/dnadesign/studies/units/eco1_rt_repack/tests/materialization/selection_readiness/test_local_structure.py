@@ -58,15 +58,50 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
     assert all(str(row["region_position_spec"]) for row in rows)
     assert all(int(row["region_position_count"]) > 0 for row in rows)
     assert all(str(row["region_position_source"]) for row in rows)
+    assert all(str(row["region_source_basis_ids_json"]) for row in rows)
     assert all(row["local_ca_rmsd_threshold_policy_id"] == LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID for row in rows)
     assert all(row["local_ca_rmsd_threshold_status"] == "passed" for row in rows)
     catalytic = next(row for row in rows if row["region_id"] == "catalytic_initiation_context")
     assert catalytic["region_position_spec"] == "189-204"
     assert "YADD" in str(catalytic["region_position_source"])
+    assert "tao_et_al_2026_functional_residue_preservation" in str(catalytic["region_source_basis_ids_json"])
     assert (
         catalytic["local_ca_rmsd_threshold_angstrom"]
         == LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["catalytic_initiation_context"]
     )
+
+
+def test_local_structure_region_rows_do_not_refit_each_region(tmp_path: Path) -> None:
+    reference_path = tmp_path / "reference.pdb"
+    model_root = tmp_path / "models"
+    model_root.mkdir()
+    mapped_positions = list(range(1, 321))
+    reference_rows = [(index, float(index), float(index % 17), float(index % 31)) for index in mapped_positions]
+    shifted_rows = [
+        (index, x, y + 3.0, z) if 189 <= index <= 204 else (index, x, y, z) for index, x, y, z in reference_rows
+    ]
+    _write_ca_pdb(reference_path, reference_rows)
+    _write_ca_pdb(model_root / "candidate_local_shift.pdb", shifted_rows)
+
+    rows = build_local_structure_region_rows(
+        fold_review_rows=[
+            {
+                "candidate_id": "candidate_local_shift",
+                "design_class_id": "class_a",
+                "model_artifact_path": "candidate_local_shift.pdb",
+            }
+        ],
+        reference_backbone_path=reference_path,
+        model_root=model_root,
+        mapped_positions=mapped_positions,
+        contact_geometry_rows=_contact_geometry_rows(mapped_positions),
+    )
+
+    catalytic = next(row for row in rows if row["region_id"] == "catalytic_initiation_context")
+    distal = next(row for row in rows if row["region_id"] == "distal_scaffold_control")
+    assert catalytic["coordinate_scope"] == "mapped_rt_chain_ca_after_global_fit"
+    assert float(catalytic["local_ca_rmsd_angstrom"]) > 2.0
+    assert float(distal["local_ca_rmsd_angstrom"]) < float(catalytic["local_ca_rmsd_angstrom"])
 
 
 def test_local_structure_region_rows_report_missing_models(tmp_path: Path) -> None:

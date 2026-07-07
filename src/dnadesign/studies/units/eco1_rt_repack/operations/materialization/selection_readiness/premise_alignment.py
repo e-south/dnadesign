@@ -44,7 +44,7 @@ class PremiseCell:
 
 _COLUMN_LABELS = [
     "Core/direct edits",
-    "NA annulus edits",
+    "Near DNA/RNA edits",
     "Thumb-track edits",
     "Distal edits",
     "Chemistry warnings",
@@ -84,13 +84,13 @@ def build_premise_alignment_matrix(
             raise ValueError(f"Selection panel references missing triage row: {candidate_id}")
         row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
         thumb_count = _int_field(triage_row, "thumb_contact_track_mutation_count")
-        na_annulus_count = max(_int_field(triage_row, "nucleic_acid_facing_mutation_count") - thumb_count, 0)
+        near_dna_rna_count = max(_int_field(triage_row, "nucleic_acid_facing_mutation_count") - thumb_count, 0)
         core_direct_count = _int_field(triage_row, "catalytic_or_direct_contact_mutation_count")
         chemistry_warnings = _int_field(triage_row, "nucleic_acid_facing_chemistry_warning_count")
         matrix.append(
             [
                 PremiseCell(str(core_direct_count), "protected" if core_direct_count == 0 else "blocked"),
-                PremiseCell(str(na_annulus_count), "review" if na_annulus_count else "protected"),
+                PremiseCell(str(near_dna_rna_count), "review" if near_dna_rna_count else "protected"),
                 PremiseCell(str(thumb_count), "review" if thumb_count else "protected"),
                 PremiseCell(str(_int_field(triage_row, "distal_scaffold_mutation_count")), "context"),
                 PremiseCell(str(chemistry_warnings), "protected" if chemistry_warnings == 0 else "warning"),
@@ -158,7 +158,7 @@ def write_premise_alignment_plot(
     fig.subplots_adjust(left=0.31, right=0.97, top=0.88, bottom=0.27)
     path = plot_root / "selection_premise_alignment.svg"
     alt = (
-        "Selected-six matrix showing catalytic or direct-contact edit counts, near-DNA/RNA annulus edit counts, "
+        "Selected-six matrix showing catalytic or direct-contact edit counts, near retained DNA/RNA edit counts, "
         "thumb-track edit counts, distal edit counts, near-DNA/RNA chemistry warnings, fold gate status, and "
         "local-structure gate status."
     )

@@ -15,9 +15,6 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
-from matplotlib import rc_context
-
 OKABE_ITO = {
     "blue": "#0072B2",
     "orange": "#E69F00",
@@ -37,6 +34,9 @@ LEGEND_SIZE = 12
 
 def save_accessible_svg(fig: Any, path: Path, *, title: str, description: str, dpi: int = 180) -> None:
     """Save a Matplotlib figure as an SVG with a title and description node."""
+
+    import matplotlib.pyplot as plt
+    from matplotlib import rc_context
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with rc_context({"svg.fonttype": "none"}):

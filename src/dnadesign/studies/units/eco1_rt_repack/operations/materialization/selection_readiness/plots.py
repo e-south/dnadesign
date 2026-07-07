@@ -38,8 +38,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 from ..review_deliverables.rt_annotation_context import RTAnnotationContext
 from .chemistry_balance import write_na_facing_chemistry_balance_plot
-from .local_structure_plot import write_local_structure_by_region_plot, write_local_structure_stratification_plot
+from .local_structure_plot import (
+    write_local_structure_by_region_plot,
+    write_local_structure_stratification_plot,
+    write_local_structure_threshold_sensitivity_plot,
+)
 from .premise_alignment import write_premise_alignment_plot
+from .region_msa_support_plot import write_regionwise_msa_support_plot
 from .regional_plots import (
     write_regional_mutation_burden_plot,
     write_selected_substitutions_across_rt_plot,
@@ -70,6 +75,8 @@ def write_selection_readiness_plots(
     candidate_rows: list[dict[str, object]],
     mask_residues: list[dict[str, object]],
     local_structure_rows: list[dict[str, object]],
+    local_structure_threshold_sensitivity_rows: list[dict[str, object]],
+    region_msa_support_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
     rt_annotation_context: RTAnnotationContext | None = None,
 ) -> list[dict[str, Any]]:
@@ -79,11 +86,17 @@ def write_selection_readiness_plots(
     _remove_retired_selection_plots(plot_root)
     return [
         _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
+        _write_design_class_contrast(plot_root, triage_rows, panel_rows, input_hashes),
         write_local_structure_stratification_plot(
             plot_root,
             triage_rows=triage_rows,
             panel_rows=panel_rows,
             local_structure_rows=local_structure_rows,
+            input_hashes=input_hashes,
+        ),
+        write_local_structure_threshold_sensitivity_plot(
+            plot_root,
+            threshold_sensitivity_rows=local_structure_threshold_sensitivity_rows,
             input_hashes=input_hashes,
         ),
         write_local_structure_by_region_plot(
@@ -118,6 +131,12 @@ def write_selection_readiness_plots(
             plot_root,
             panel_rows=panel_rows,
             triage_rows=triage_rows,
+            input_hashes=input_hashes,
+        ),
+        write_regionwise_msa_support_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            region_msa_support_rows=region_msa_support_rows,
             input_hashes=input_hashes,
         ),
         _write_selected_sequence_distance(
@@ -282,6 +301,98 @@ def _write_design_class_gate_counts(
     )
 
 
+def _write_design_class_contrast(
+    plot_root: Path,
+    triage_rows: list[dict[str, object]],
+    panel_rows: list[dict[str, object]],
+    input_hashes: dict[str, str | None],
+) -> dict[str, Any]:
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_design_class_contrast"]
+    eligible_counts = Counter(
+        str(row["design_class_id"]) for row in triage_rows if str(row.get("hard_gate_status") or "") == "eligible"
+    )
+    triage_by_id = {str(row["candidate_id"]): row for row in triage_rows if row.get("candidate_id")}
+    selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
+    rows: list[list[str]] = []
+    for spec in ALL_SPECS:
+        selected_id = selected_by_class.get(spec.design_class_id, "")
+        selected_row = triage_by_id.get(selected_id, {})
+        thumb_count = int(selected_row.get("thumb_contact_track_mutation_count") or 0)
+        near_count = max(int(selected_row.get("nucleic_acid_facing_mutation_count") or 0) - thumb_count, 0)
+        rows.append(
+            [
+                class_label(spec.design_class_id),
+                _profile_label(spec.conservation_profile_id),
+                f">= {spec.conservation_threshold:.0%}",
+                f"<= {spec.contact_threshold_angstrom:g} A",
+                str(eligible_counts[spec.design_class_id]),
+                short_candidate(selected_id) if selected_id else "missing",
+                str(near_count),
+                str(thumb_count),
+            ]
+        )
+    columns = [
+        "Class",
+        "MSA",
+        "WT %",
+        "Contact",
+        "Pass",
+        "Selected",
+        "Near DNA/RNA",
+        "Thumb track",
+    ]
+    fig, ax = plt.subplots(figsize=(9.6, 5.1))
+    ax.axis("off")
+    table = ax.table(
+        cellText=rows,
+        colLabels=columns,
+        loc="center",
+        cellLoc="center",
+        colLoc="center",
+        colWidths=[0.17, 0.12, 0.09, 0.09, 0.08, 0.15, 0.15, 0.15],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8.2)
+    table.scale(1.0, 1.55)
+    for (row_index, col_index), cell in table.get_celld().items():
+        cell.set_edgecolor("#d0d7de")
+        cell.set_linewidth(0.6)
+        if row_index == 0:
+            cell.set_facecolor("#f6f8fa")
+            cell.set_text_props(weight="bold", color="#24292f")
+        elif col_index in {6, 7}:
+            cell.set_facecolor("#eef6ff" if int(rows[row_index - 1][col_index]) else "#f7f5ef")
+        else:
+            cell.set_facecolor("#ffffff")
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.84, bottom=0.06)
+    path = plot_root / "selection_design_class_contrast.svg"
+    zero_thumb = all(int(row[-1]) == 0 for row in rows)
+    thumb_note = " The selected six do not mutate the declared Wang thumb-contact track." if zero_thumb else ""
+    alt = (
+        "Table-like summary of Eco1 design classes showing MSA set, conservation threshold, retained DNA/RNA contact "
+        "shell, gate-pass count, selected row, near DNA/RNA edits, and thumb-track edits."
+    )
+    save_accessible_svg(fig, path, title=title, description=alt)
+    return plot_row(
+        plot_id="selection_design_class_contrast",
+        title=title,
+        path=path,
+        input_hashes=input_hashes,
+        alt_text=alt,
+        description=(
+            "Shows that the six panel slots are declared mask-policy contrasts across conservation denominator, "
+            "conservation threshold, and retained-DNA/RNA contact shell. "
+            "Near DNA/RNA and thumb-track edit counts are shown separately." + thumb_note
+        ),
+        interpretation_limit=(
+            "Design-class contrast explains review coverage. It does not establish function and does not make the "
+            "selected rows a global top-six ranking."
+        ),
+        render_mode="wide_visual",
+    )
+
+
 def _write_class_local_percentiles(
     plot_root: Path,
     triage_rows: list[dict[str, object]],
@@ -364,7 +475,7 @@ def _write_class_local_percentiles(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Compares each selected row only against candidates from the same mask class. Higher percentiles mean "
+            "Compares each selected row only against candidates from the same design class. Higher percentiles mean "
             "more favorable within-class placement after direction handling: higher MSA support and pLDDT, fewer "
             "unsupported changes, fewer chemistry warnings, lower RMSD, and regional burden closer to the class "
             "median. The plot does not create a composite score."
@@ -375,6 +486,14 @@ def _write_class_local_percentiles(
         ),
         render_mode="wide_visual",
     )
+
+
+def _profile_label(profile_id: str) -> str:
+    if profile_id == "ec86_clade9_conservation_v1":
+        return "Ec86 clade 9"
+    if profile_id == "ec86_iia3_cluster42_1_conservation_v1":
+        return "II-A3 42_1"
+    return profile_id
 
 
 def _write_selected_sequence_distance(

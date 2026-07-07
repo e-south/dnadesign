@@ -46,7 +46,7 @@ PLAIN_DELIVERABLE_TITLES = {
     "wt_esmc_substitution_llr_heatmap": "ESMC scores WT-context substitutions",
     "msa_plurality_vs_esmc_entropy": "Clade 9 plurality tracks lower ESMC entropy",
     "msa_plurality_vs_best_alt_llr": "Highest alternate LLR marks MSA-model disagreement",
-    "msa_esmc_constraint_tracks": "MSA and ESMC signals align with mask classes",
+    "msa_esmc_constraint_tracks": "MSA and ESMC signals align with mask status",
     "biohub_esmc_protein_top_sae_features": "Strongest SAE features are ordered by activation",
     "biohub_esmc_wt_top_sae_feature_activation_pattern": "WT-active SAE features localize by residue",
     "biohub_esmc_sae_feature_activation_heatmap": "Selected SAE features activate across RT variants",

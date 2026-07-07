@@ -9,15 +9,19 @@ mask_policy_id: eco1_rt_manual_motif_wang_direct_contact_v1
 source_basis:
   - id: tao_et_al_2026_functional_residue_preservation
     role: method_prior
+    source_ref: doi:10.1038/s41587-026-03149-6
     note: Preserve catalytic, substrate-proximal, and conserved RT residues before scaffold redesign.
   - id: simon_et_al_2019_retron_rt_motif_grammar
     role: motif_annotation_prior
+    source_ref: doi:10.1093/nar/gkz865
     note: Provides retron RT region and motif labels used to audit NAxxH, catalytic DD/YADD, and VTG anchors.
   - id: mestre_et_al_2020_retron_rt_clade_context
     role: roster_and_region_context
+    source_ref: doi:10.1093/nar/gkaa1149
     note: Provides retron RT clade context and RT-region terminology used to keep Eco1/Ec86 interval naming aligned with retron classifications.
   - id: wang_et_al_2022_ec86_cryoem_structure_priors
     role: ec86_structure_mask_prior
+    source_ref: doi:10.1038/s41564-022-01197-7
     note: Provides the Eco1/Ec86 cryo-EM structural prior for RT-msDNA/msrRNA interface residues, RT1-RT7 region context, catalytic sites, and retron X/Y anchors.
 authority_sets:
   - id: ec86_retron_x_region
