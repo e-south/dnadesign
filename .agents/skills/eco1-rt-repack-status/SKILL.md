@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.16
+  version: 0.1.17
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -48,10 +48,10 @@ Out of scope:
 - The answer distinguishes materialized evidence from missing decision records:
   the baseline WT-plus-96 and expanded WT-plus-576 fold/ESMC/SAE evidence are
   available; computational feasibility, candidate triage, compact
-  panel-selection plots, and a six-row one-per-design-class panel are
-  materialized under the expanded design-class selection root and linked into
-  the review notebook when the selection manifest is present. RT-only handoff
-  is not yet finished.
+  panel-selection plots, and a primary conservative panel are materialized
+  under the expanded design-class selection root and linked into the review
+  notebook when the selection manifest is present. RT-only handoff is not yet
+  finished.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
@@ -68,9 +68,12 @@ Out of scope:
   this study's repacking policy.
 - Report ESMC LLR and SAE windows as review evidence only. They do not select
   panel rows, do not define candidate acceptance, and do not show improved
-  strand displacement. Current panel tie-breaks use MSA support, mutation
-  geography, nucleic-acid-facing chemistry, and sequence nonredundancy after
-  feasibility and fold checks. Whole-protein ESMC pseudo-likelihood and computational stability
+  strand displacement. Current panel eligibility also requires local-structure
+  metrics to pass declared regional C-alpha RMSD thresholds after one global
+  mapped C-alpha fit. Current panel tie-breaks use MSA support, mutation
+  geography, near retained DNA/RNA chemistry, C-terminal primer-RNA recognition
+  context, and sequence nonredundancy after feasibility, fold, and
+  local-structure gates. Whole-protein ESMC pseudo-likelihood and computational stability
   prediction stay deferred unless a later task explicitly reopens those paths.
 - Missing or mismatched `study_id` fails visibly.
 
@@ -135,6 +138,11 @@ Out of scope:
   annotation/review labels and do not blanket hard-fix residues. Terminal
   residues 1, 2, and 312-320 are `non_fixed_missing_backbone`: unprotected, but
   not directly fixed-backbone ProteinMPNN mutable until coordinates exist.
+  Treat mapped residues 255-311 as the current C-terminal primer-RNA
+  recognition review context, and treat direct Wang thumb-contact-track
+  substitutions as outside ordinary-panel eligibility. The Wang thumb-contact
+  track also uses a stricter local RMSD preservation gate than the generic near
+  retained DNA/RNA region.
   `contact_risk_profile.yaml` is an evidence review; it does not decide which
   residues are protected unless a future task explicitly reopens the mask rule.
 - Do not infer MSA source authority from review figures, prose, or public

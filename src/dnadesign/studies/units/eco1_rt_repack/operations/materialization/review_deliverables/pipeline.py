@@ -441,7 +441,7 @@ def _linked_foldcheck_review_rows(manifest_path: Path) -> list[dict[str, Any]]:
                 description=str(plot.get("description") or ""),
                 interpretation_limit=str(plot.get("interpretation_limit") or ""),
                 title=str(plot.get("title") or ""),
-                role="manuscript_facing" if plot_id == "review_class_counts" else "review_only",
+                role="review_only",
                 skip_reason=str(plot.get("skip_reason") or "")
                 if linked_status != "skipped_missing_input"
                 else f"Missing linked fold-review visual: {plot_path}",

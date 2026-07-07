@@ -37,7 +37,7 @@ campaign.
 | `candidate-builder` | `thread.candidates` | sample table and mask set | `candidate_table.parquet` | duplicate ids, non-deterministic ordering, or mask violations are accepted |
 | `foldcheck-normalizer` | `thread.adapters` or `infer` handoff | candidate table and fold runtime output | `foldcheck_report.parquet` | WT baseline, thresholds, runtime parameters, or errored rows are missing |
 | `atlas-semantic-profiler` | `thread.adapters` plus study wrapper | accepted fold-check rows and candidate sequences | `atlas_semantic_profile.parquet` | Atlas/SAE affiliations are treated as function proof, query hashes are missing, or API schema drift is hidden |
-| `panel-selection-builder` | study policy plus expanded candidate and fold-review inputs | accepted full-sequence candidates | `selection/feasibility_report.parquet`, `selection/candidate_triage_table.parquet`, `selection/candidate_selection_panel.parquet` | selected rows are not one-per-design-class, SAE becomes a gate, a combined score is stored, or required exclusion inputs are missing |
+| `panel-selection-builder` | study policy plus expanded candidate and fold-review inputs | accepted full-sequence candidates | `selection/feasibility_report.parquet`, `selection/candidate_triage_table.parquet`, `selection/candidate_selection_panel.parquet` | non-primary rows are selected, SAE becomes a gate, a combined score is stored, or required exclusion inputs are missing |
 | `sae-window-summarizer` | study wrapper around Biohub ESMC sparse tables | exact-dictionary SAE rows and declared windows | `sae_feature_window_summary.parquet` | global SAE clustering or long feature prose replaces local WT-delta summaries |
 | `candidate-handoff-builder` | neutral handoff builder plus study selection policy | candidate, fold, feasibility, triage, and selection-panel reports | `candidate_handoff.yaml` | upstream hashes, nonfixture fold acceptance, feasible rows, selection-panel rows, or RT-only handoff fields are missing |
 | `rt-lnrna-promotion-check` | downstream study | RT-only candidate handoff | downstream accept/reject record | construct-subject ids are preclaimed before downstream binding |
@@ -466,11 +466,9 @@ plus five candidate-table rows where `status=accepted`.
 
 The smoke raw output lives on SCC project storage under
 `/project/dunlop/esouth/foldcheck/eco1_rt/eco1_colabfold_foldcheck.6224446/`.
-After the residue-map missing-backbone policy was renamed, the fold-check
-request hash changed and the compact local `foldcheck_report.parquet` was
-re-normalized from that SCC raw output. The report now validates against the
-current request hash, with six `accepted` rows and 91 explicit `errored` rows
-for candidates outside the smoke subset.
+The current compact local `foldcheck_report.parquet` covers the full WT plus
+96-candidate request. It validates against the current request hash with 97
+`accepted` rows.
 
 The smoke also exposed one generic portability bug: fold-check request hashes
 must not include host-local FASTA/output paths. `dnadesign.thread.foldcheck`
@@ -512,12 +510,14 @@ backbone from the local normalized full structure set. Raw ColabFold outputs
 remain on SCC project storage; the study-local review bundle keeps one PDB per
 accepted fold row for ChimeraX and direct structure review.
 
-The current review classes are `strong_fold_preserved: 17`,
-`good_fold_preserved: 53`, `low_confidence: 9`, `review_band: 14`, and
-`structural_outlier: 3`. The structure-panel manifest selects WT, fold-preserved
-examples, high-RMSD outliers, low-pLDDT rows, intermediate rows, and
-deterministic controls. The Atlas subset manifest records a contrastive panel
-for later model annotation; it is not a candidate acceptance gate.
+The original 96-row foldcheck-review slice used this bundle to define the fold
+class vocabulary and review plots. Current expanded class counts and selection
+readiness counts are recorded in `docs/studies/eco1_rt_repack/record/status.md`
+and the generated selection-readiness manifest. The structure-panel manifest
+selects WT, fold-preserved examples, high-RMSD outliers, low-pLDDT rows,
+intermediate rows, and deterministic controls. The Atlas subset manifest records
+a contrastive panel for later model annotation; it is not a candidate acceptance
+gate.
 
 ### Next Slice: SAE Window Summary, Feasibility, Selection, And RT-Only Handoff v1
 
@@ -724,14 +724,13 @@ interpreted in the study record.
   `candidate_table.parquet`, and the ColabFold CLI
   `foldcheck_request/foldcheck_request_manifest.yaml` are materialized locally.
   A full WT plus 96-candidate ColabFold `foldcheck_report.parquet` is
-  materialized and validates. Fold-check review, the local full-fold PDB set,
-  selected-panel Atlas lookup, and all-97 Biohub ESMC query-time SAE profile
-  are materialized. Feasibility, candidate triage, six-row panel selection, and
-  the selected protein-sequence CSV are materialized. RT-only
+  materialized and validates locally. Fold-check review, the local full-fold PDB
+  set, selected-panel Atlas lookup, and all-97 Biohub ESMC query-time SAE
+  profile are materialized. Feasibility, candidate triage, primary-panel
+  selection, and the selected protein-sequence CSV are materialized. RT-only
   `candidate_handoff.yaml` is not materialized.
 - Phase 1 now has content validators for the local structure, contact,
   conservation, mask, thread-plan, ProteinMPNN request, and fold-check request
-  artifacts. Phase 2 backend ingest passes locally through the candidate table,
-  and Phase 3 fold-check report validation passes for the full report. The next
-  gate is RT-only candidate handoff materialization and downstream accept/reject
-  review.
+  artifacts. Phase 2 backend ingest passes locally through the candidate table.
+  Phase 3 fold-check report validation passes locally. The next gates are
+  RT-only candidate handoff materialization and downstream accept/reject review.

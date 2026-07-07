@@ -25,13 +25,15 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_structure_rmsd_gate_v1"
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE = (
     "Declared local C-alpha RMSD limits set from the current all-candidate distribution and enforced as "
-    "selection-readiness preservation gates, not activity evidence."
+    "selection-readiness preservation gates, not activity evidence. The Wang thumb-contact track uses a stricter "
+    "limit than the generic near retained DNA/RNA region because those positions are tracked as documented "
+    "thumb/RNA contact context."
 )
 LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
     "catalytic_initiation_context": 1.50,
     "retron_x_naxxh_context": 1.25,
     "retron_y_vtg_context": 1.60,
-    "thumb_contact_track_context": 3.00,
+    "thumb_contact_track_context": 2.50,
     "c_terminal_primer_rna_recognition_context": 3.50,
     "near_retained_dna_rna_annulus": 3.00,
     "distal_scaffold_control": 4.75,
@@ -128,7 +130,7 @@ LOCAL_STRUCTURE_REGION_IDS = tuple(
             role="distal_scaffold_control",
             positions=(),
             position_source=(
-                "derived from mapped residues not assigned to motif, direct-contact, near DNA/RNA, "
+                "derived from mapped residues not assigned to motif, direct-contact, near retained DNA/RNA, "
                 "or thumb-track regions"
             ),
             source_basis_ids=("wang_et_al_2022_ec86_cryoem_structure_priors",),

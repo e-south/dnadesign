@@ -51,14 +51,13 @@ def test_selection_panel_table_reads_metrics_from_trace_json(tmp_path: Path) -> 
     assert rows[0]["WT RMSD A"] == 0.82
     assert rows[0]["cryoEM RMSD A"] == 1.23
     assert rows[0]["unobserved MSA changes"] == 1
-    assert rows[0]["near DNA/RNA or thumb charge change"] == 1
-    why = rendered["items"][2]
-    assert why["kind"] == "accordion"
-    assert "Why this row: thread_candidate_alpha" in why["items"]
-    assert "MSA observed fraction: 0.75" in str(why["items"]["Why this row: thread_candidate_alpha"])
-    assert "Near retained DNA/RNA or thumb-track mutations: 1" in str(
-        why["items"]["Why this row: thread_candidate_alpha"]
-    )
+    assert rows[0]["near retained DNA/RNA edits"] == 1
+    assert rows[0]["near-region charge change"] == 1
+    assert rows[0]["near-region chemistry warnings"] == 0
+    assert rows[0]["Wang thumb-track edits"] == 0
+    assert rows[0]["C-terminal primer-RNA edits"] == 1
+    assert len(rendered["items"]) == 2
+    assert "Why this row" not in str(rendered)
 
 
 def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: Path) -> None:
@@ -74,6 +73,9 @@ def test_selection_funnel_and_handoff_readiness_render_from_manifest(tmp_path: P
     )
     funnel_text = str(funnel)
     assert "Selection policy" in funnel_text
+    assert "Accepted candidate pool" in funnel_text
+    assert "Conservative-diverse six-row selection" in funnel_text
+    assert "design class is context, not a quota" in funnel_text
     assert "hard_gate_status" in funnel_text
     assert "wt_like_not_used_for_selection" in funnel_text
     assert "thread_candidate_alpha" in funnel_text

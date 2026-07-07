@@ -38,14 +38,15 @@ from Mestre-derived MSA profiles. Different conservation and proximity
 thresholds define design classes. ProteinMPNN samples protein sequences at the
 unprotected positions for each design class. ColabFold predictions then remove
 poor fold-model candidates. The remaining pool is triaged by MSA support,
-localized mutation geography, near retained DNA/RNA or thumb-track chemistry, sequence
-nonredundancy, and model-check annotations that are kept out of the acceptance
-gate.
+localized mutation geography, C-terminal/thumb local structure, near retained
+DNA/RNA or thumb-track chemistry, sequence nonredundancy, and model-check
+annotations that are kept out of the acceptance gate.
 
-The current reviewer-facing endpoint is a six-row panel with one feasible,
-fold-preserved representative per design class. The review notebook should let
-a user inspect the full population, the selected six, py3Dmol structure views,
-and the selected protein sequences. The flat
+The current reviewer-facing endpoint is a primary conservative protein panel
+selected globally from stricter primary-panel candidates. Design classes remain
+mask-policy context rather than quotas. The review notebook should let a user
+inspect the full population, the primary panel, py3Dmol structure views, and
+the selected protein sequences. The flat
 `candidate_handoff_sequences.csv` is the protein-sequence export for RT-only
 handoff planning; codon optimization, restriction-site screening, and construct
 subject creation remain downstream work.
@@ -134,16 +135,17 @@ The review-deliverables bundle materializes additive WT-context ESMC LLR tables
 and plots. That score compares candidate substitutions with the WT residue at
 the same positions under a WT masked-marginal context; it is not a whole-protein
 pseudo-likelihood and not an activity measurement. Whole-protein ESMC
-pseudo-likelihood is not part of the v1 six-variant panel.
+pseudo-likelihood is not part of the v1 primary panel.
 
 The protein review panel layer is now materialized for the expanded pool under
 `outputs/thread/design_classes/selection/`. It contains a computational
-full-gene feasibility report, a candidate triage table, and a six-row panel
-with one feasible fold-preserved representative from each design class. The
-triage table now records MSA support for designed residues, mutation geography,
-near retained DNA/RNA or thumb-track chemistry, and sequence nonredundancy. ESMC
-and SAE remain review evidence only. The review fields explain the panel; they
-are not a single combined score.
+full-gene feasibility report, a candidate triage table, and a primary panel
+selected from primary candidates that pass broad protein contracts, stricter
+C-terminal/thumb local RMSD review, and minimum directional chemistry checks
+near retained DNA/RNA. The final selection ranks proximal MSA support, local
+chemistry warnings, mutation-set dissimilarity, local structure, and fold
+metrics. ESMC and SAE remain review evidence only. The review fields explain
+the panel; they are not a single combined score.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic

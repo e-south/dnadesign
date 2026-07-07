@@ -19,6 +19,9 @@ import yaml
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.handoff_readiness import (
     normalize_handoff_readiness,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    SELECTION_PLOT_METADATA,
+)
 
 from .constants import SECTION_FEASIBILITY_AND_HANDOFF
 from .manifest import file_hashes, make_deliverable_row
@@ -56,31 +59,39 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
         plot_status = str(plot.get("status") or "rendered")
         linked_status = "linked_existing" if plot_status == "rendered" and plot_path.exists() else plot_status
         if plot_status == "rendered" and not plot_path.exists():
-            linked_status = "skipped_missing_input"
-        rows.append(
-            make_deliverable_row(
-                deliverable_id=plot_id,
-                section=SECTION_FEASIBILITY_AND_HANDOFF,
-                artifact_kind=str(plot.get("artifact_kind") or "svg"),
-                status=linked_status,
-                path=plot_path,
-                source_tables=[str(source) for source in plot.get("data_sources", [])],
-                input_hashes={
-                    **{str(key): str(value) for key, value in dict(plot.get("input_hashes") or {}).items()},
-                    **file_hashes({"selection_readiness_manifest": manifest_path, "linked_plot": plot_path}),
-                },
-                alt_text=str(plot.get("alt_text") or ""),
-                description=str(plot.get("description") or ""),
-                interpretation_limit=str(plot.get("interpretation_limit") or ""),
-                title=str(plot.get("title") or ""),
-                role=str(plot.get("role") or "manuscript_facing"),
-                render_mode=str(plot.get("render_mode") or "wide_visual"),
-                skip_reason=""
-                if linked_status != "skipped_missing_input"
-                else f"Missing linked panel-selection visual: {plot_path}",
-            )
+            raise FileNotFoundError(f"Panel-selection visual declared rendered but missing: {plot_path}")
+        row = make_deliverable_row(
+            deliverable_id=plot_id,
+            section=SECTION_FEASIBILITY_AND_HANDOFF,
+            artifact_kind=str(plot.get("artifact_kind") or "svg"),
+            status=linked_status,
+            path=plot_path,
+            source_tables=[str(source) for source in plot.get("data_sources", [])],
+            input_hashes={
+                **{str(key): str(value) for key, value in dict(plot.get("input_hashes") or {}).items()},
+                **file_hashes({"selection_readiness_manifest": manifest_path, "linked_plot": plot_path}),
+            },
+            alt_text=str(plot.get("alt_text") or ""),
+            description=str(plot.get("description") or ""),
+            interpretation_limit=str(plot.get("interpretation_limit") or ""),
+            title=str(plot.get("title") or ""),
+            role=str(plot.get("role") or "manuscript_facing"),
+            render_mode=str(plot.get("render_mode") or "wide_visual"),
+            skip_reason=""
+            if linked_status != "skipped_missing_input"
+            else f"Missing linked panel-selection visual: {plot_path}",
         )
+        row.update(_selection_plot_metadata(plot_id=plot_id, plot=plot))
+        rows.append(row)
     return rows
+
+
+def _selection_plot_metadata(*, plot_id: str, plot: dict[str, Any]) -> dict[str, object]:
+    metadata = dict(SELECTION_PLOT_METADATA.get(plot_id, {}))
+    for key in ("selection_role", "funnel_stage_id", "notebook_group", "notebook_group_label", "not_a_selector_reason"):
+        if plot.get(key):
+            metadata[key] = str(plot[key])
+    return metadata
 
 
 def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
@@ -108,7 +119,8 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
         input_hashes=file_hashes(input_paths),
         alt_text="Selection-funnel summary table with row counts, gate counts, selected IDs, and policy notes.",
         description=(
-            "Shows row counts, gate counts, selected IDs, and selection policy from selection_readiness_manifest.yaml."
+            "Shows the broad protein-contract, stricter primary-panel, boundary-candidate, and global selection "
+            "stages from selection_readiness_manifest.yaml."
         ),
         interpretation_limit=(
             "ESMC and SAE are review annotations, not panel-selection evidence. The summary does not establish "
@@ -132,7 +144,8 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
     if not table_value:
         raise ValueError(f"Panel-selection manifest is missing artifacts.{_PANEL_TABLE_ARTIFACT_KEY}")
     table_path = _resolve_manifest_path(manifest_path, table_value)
-    linked_status = "linked_existing" if table_path.exists() else "skipped_missing_input"
+    if not table_path.exists():
+        raise FileNotFoundError(f"Panel-selection table declared by manifest is missing: {table_path}")
     manifest_hashes = {
         str(key): str(value)
         for key, value in dict(loaded.get("artifact_hashes") or {}).items()
@@ -142,26 +155,26 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
         deliverable_id=_PANEL_TABLE_DELIVERABLE_ID,
         section=SECTION_FEASIBILITY_AND_HANDOFF,
         artifact_kind="selection_panel_table",
-        status=linked_status,
+        status="linked_existing",
         path=table_path,
         source_tables=["design_classes/selection/candidate_selection_panel.parquet"],
         input_hashes={
             **manifest_hashes,
             **file_hashes({"selection_readiness_manifest": manifest_path, "selection_panel_table": table_path}),
         },
-        alt_text="Compact table of the six selected Eco1 design-class representatives.",
+        alt_text="Compact table of the selected Eco1 primary-panel variants.",
         description=(
-            "Lists the selected fold-preserved representative for each design class with feasibility, fold, "
-            "sequence-distance, MSA-support, mutation-geography, and local-chemistry fields."
+            "Lists the selected primary-panel variants with feasibility, fold, sequence-distance, MSA-support, "
+            "mutation-geography, and local-chemistry fields. Design class is retained as context, not as a quota."
         ),
         interpretation_limit=(
             "The table records the proposed computational panel. It does not establish activity, strand "
             "displacement, or structured-template readthrough."
         ),
-        title="Six Eco1 RT variants form a protein review panel",
+        title="Selected Eco1 RT variants form a primary protein review panel",
         role="manuscript_facing",
         render_mode="table",
-        skip_reason="" if linked_status != "skipped_missing_input" else f"Missing selection panel table: {table_path}",
+        skip_reason="",
     )
 
 
@@ -171,24 +184,10 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
         raise ValueError(f"Expected artifacts mapping in {manifest_path}")
     table_value = str(artifacts.get(_HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY) or "")
     if not table_value:
-        return make_deliverable_row(
-            deliverable_id=_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID,
-            section=SECTION_FEASIBILITY_AND_HANDOFF,
-            artifact_kind="candidate_handoff_sequence_csv",
-            status="skipped_missing_input",
-            path=manifest_path.parent / "candidate_handoff_sequences.csv",
-            source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
-            input_hashes=file_hashes({"selection_readiness_manifest": manifest_path}),
-            alt_text="Selected RT protein sequence CSV was not declared by the panel-selection manifest.",
-            description="Selected protein-sequence CSV is unavailable until selection readiness is regenerated.",
-            interpretation_limit="Missing sequence CSV cannot support handoff review.",
-            title="Selected protein sequences keep handoff scope explicit",
-            role="manuscript_facing",
-            render_mode="table",
-            skip_reason="selection_readiness_manifest.yaml has no candidate_handoff_sequences artifact",
-        )
+        raise ValueError(f"Panel-selection manifest is missing artifacts.{_HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY}")
     table_path = _resolve_manifest_path(manifest_path, table_value)
-    linked_status = "linked_existing" if table_path.exists() else "skipped_missing_input"
+    if not table_path.exists():
+        raise FileNotFoundError(f"Panel-selection sequence CSV declared by manifest is missing: {table_path}")
     manifest_hashes = {
         str(key): str(value)
         for key, value in dict(loaded.get("artifact_hashes") or {}).items()
@@ -198,7 +197,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
         deliverable_id=_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID,
         section=SECTION_FEASIBILITY_AND_HANDOFF,
         artifact_kind="candidate_handoff_sequence_csv",
-        status=linked_status,
+        status="linked_existing",
         path=table_path,
         source_tables=[
             "design_classes/selection/candidate_handoff_sequences.csv",
@@ -220,7 +219,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
         title="Selected protein sequences keep handoff scope explicit",
         role="manuscript_facing",
         render_mode="table",
-        skip_reason="" if linked_status != "skipped_missing_input" else f"Missing handoff sequence CSV: {table_path}",
+        skip_reason="",
     )
 
 

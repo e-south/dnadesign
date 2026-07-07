@@ -28,6 +28,7 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
     loaded = _load_selection_manifest(manifest_path)
     row_counts = _dict_or_empty(loaded.get("row_counts"))
     gate_counts = _dict_or_empty(loaded.get("gate_counts"))
+    funnel_stages = [dict(stage) for stage in list(loaded.get("selection_funnel_stages") or [])]
     selected_ids = [str(value) for value in list(loaded.get("selected_candidate_ids") or [])]
     policy_rows = [
         {"field": "Source manifest", "value": "selection_readiness_manifest.yaml"},
@@ -39,9 +40,15 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
     count_rows = _count_rows(row_counts=row_counts, gate_counts=gate_counts)
     selected_rows = [{"candidate_id": candidate_id} for candidate_id in selected_ids]
     title = html.escape(str(row.get("title") or "Panel selection keeps fold checks separate from activity claims"))
+    stage_note = (
+        "The funnel table lists the steps that actually filter or rank candidates. "
+        "Other views explain or audit the selected rows."
+    )
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),
+            mo.md(stage_note),
+            mo.ui.table(funnel_stages, page_size=10),
             mo.md("ESMC and SAE are review annotations, not panel-selection evidence."),
             mo.ui.table(policy_rows, page_size=8),
             mo.ui.table(count_rows, page_size=16),

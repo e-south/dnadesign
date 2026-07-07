@@ -224,11 +224,11 @@ def write_selected_panel_structure_browser_manifest(
         section=SECTION_FEASIBILITY_AND_HANDOFF,
         title="Selected Eco1 panel structures can be inspected one at a time",
         alt_text=(
-            "Manifest for interactive browser review of WT and the six selected expanded-panel Eco1 "
+            "Manifest for interactive browser review of WT and the selected primary-panel Eco1 "
             "ColabFold structure models."
         ),
         description=(
-            "Lists WT and the six selected design-class representatives from the expanded fold-check structure set. "
+            "Lists WT and the selected primary-panel variants from the expanded fold-check structure set. "
             "The side summary shows fold metrics, mutation count, MSA support, chemistry near retained DNA/RNA or "
             "thumb-track, and "
             "selection context beside the py3Dmol viewer."

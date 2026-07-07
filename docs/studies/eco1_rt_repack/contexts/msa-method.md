@@ -3,13 +3,15 @@ doc_id: study-eco1-rt-repack-msa-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-06-22
+last_verified: 2026-07-07
 ---
 
 ## MSA Method
 
-This page explains how the Eco1 RT conservation profile should be built. It is
-not an MSA, and it does not satisfy `conservation_profile.parquet`.
+This page records the Eco1 RT MSA and conservation-profile method. The current
+`conservation_profile.parquet` is materialized from the declared clade 9 and
+II-A3/`42_1` source bundles; this page is the method and provenance narrative,
+not the parquet artifact itself.
 
 The machine-readable source contract is:
 

@@ -17,9 +17,6 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME,
     CANDIDATE_SELECTION_PANEL_FILE_NAME,
@@ -34,6 +31,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     LOCAL_STRUCTURE_THRESHOLD_SENSITIVITY_FILE_NAME,
     MANIFEST_FILE_NAME,
     PLOTS_DIR_NAME,
+    PRIMARY_PANEL_SELECTION_TRACE_FILE_NAME,
     REGION_MSA_SUPPORT_FILE_NAME,
     SELECTION_POLICY_ID,
 )
@@ -60,6 +58,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     MaterializedSelectionReadiness,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
+    build_primary_panel_selection_trace_rows,
     build_selection_panel_rows,
     panel_coverage_summary,
 )
@@ -74,6 +73,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.triage import (
     build_triage_rows,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    SELECTION_PLOT_METADATA,
 )
 from dnadesign.thread.adapters.proteinmpnn.hashing import sha256_uri
 
@@ -92,7 +94,7 @@ def materialize_selection_readiness(
     selection_root: Path | None = None,
     created_at: str = DEFAULT_CREATED_AT,
 ) -> MaterializedSelectionReadiness:
-    """Materialize feasibility, triage, and class-balanced panel artifacts."""
+    """Materialize feasibility, triage, and primary-panel selection artifacts."""
 
     root = repo_root.expanduser().resolve()
     class_root = _resolve(root, output_root or DEFAULT_OUTPUT_ROOT)
@@ -128,10 +130,12 @@ def materialize_selection_readiness(
     local_structure_path = selected_root / LOCAL_STRUCTURE_REGION_METRICS_FILE_NAME
     local_structure_threshold_sensitivity_path = selected_root / LOCAL_STRUCTURE_THRESHOLD_SENSITIVITY_FILE_NAME
     region_msa_support_path = selected_root / REGION_MSA_SUPPORT_FILE_NAME
+    primary_panel_selection_trace_path = selected_root / PRIMARY_PANEL_SELECTION_TRACE_FILE_NAME
     panel_path = selected_root / CANDIDATE_SELECTION_PANEL_FILE_NAME
     handoff_sequence_csv_path = selected_root / CANDIDATE_HANDOFF_SEQUENCE_CSV_FILE_NAME
     candidate_handoff_path = source_root / "candidate_handoff.yaml"
     plots_root = selected_root / PLOTS_DIR_NAME
+    (selected_root / "class_local_elimination_trace.parquet").unlink(missing_ok=True)
     feasibility_rows = build_feasibility_rows(
         candidate_rows=candidate_rows,
         foldcheck_report_rows=foldcheck_report_rows,
@@ -209,6 +213,7 @@ def materialize_selection_readiness(
         sae_window_rows=sae_window_rows,
         review_axis_by_candidate=review_axis_by_candidate,
         local_structure_review_by_candidate=local_structure_review_by_candidate,
+        region_msa_support_rows=region_msa_support_rows,
         input_hashes=input_hashes,
     )
     write_rows(triage_path, triage_rows, schema_id="eco1_rt.candidate_triage_table")
@@ -221,6 +226,15 @@ def materialize_selection_readiness(
         input_hashes=panel_hashes,
     )
     write_rows(panel_path, panel_rows, schema_id="eco1_rt.candidate_selection_panel")
+    primary_panel_selection_trace_rows = build_primary_panel_selection_trace_rows(
+        triage_rows=triage_rows,
+        panel_rows=panel_rows,
+    )
+    write_rows(
+        primary_panel_selection_trace_path,
+        primary_panel_selection_trace_rows,
+        schema_id="eco1_rt.primary_panel_selection_trace",
+    )
     local_structure_threshold_sensitivity_rows = build_local_structure_threshold_sensitivity_rows(
         local_structure_rows=local_structure_rows,
         selected_candidate_ids=[str(row["candidate_id"]) for row in panel_rows],
@@ -239,6 +253,7 @@ def materialize_selection_readiness(
     )
     plot_hashes = dict(panel_hashes)
     plot_hashes["candidate_selection_panel"] = sha256_uri(panel_path)
+    plot_hashes["primary_panel_selection_trace"] = sha256_uri(primary_panel_selection_trace_path)
     plot_hashes["local_structure_region_metrics"] = sha256_uri(local_structure_path)
     plot_hashes["local_structure_threshold_sensitivity"] = sha256_uri(local_structure_threshold_sensitivity_path)
     plot_hashes["region_msa_support"] = sha256_uri(region_msa_support_path)
@@ -256,6 +271,7 @@ def materialize_selection_readiness(
         local_structure_rows=local_structure_rows,
         local_structure_threshold_sensitivity_rows=local_structure_threshold_sensitivity_rows,
         region_msa_support_rows=region_msa_support_rows,
+        primary_panel_selection_trace_rows=primary_panel_selection_trace_rows,
         input_hashes=plot_hashes,
         rt_annotation_context=rt_annotation_context,
     )
@@ -268,6 +284,7 @@ def materialize_selection_readiness(
         local_structure_path=local_structure_path,
         local_structure_threshold_sensitivity_path=local_structure_threshold_sensitivity_path,
         region_msa_support_path=region_msa_support_path,
+        primary_panel_selection_trace_path=primary_panel_selection_trace_path,
         panel_path=panel_path,
         handoff_sequence_csv_path=handoff_sequence_csv_path,
         candidate_handoff_path=candidate_handoff_path,
@@ -277,6 +294,7 @@ def materialize_selection_readiness(
         local_structure_rows=local_structure_rows,
         local_structure_threshold_sensitivity_rows=local_structure_threshold_sensitivity_rows,
         region_msa_support_rows=region_msa_support_rows,
+        primary_panel_selection_trace_rows=primary_panel_selection_trace_rows,
         local_structure_source_basis_rows=_local_structure_source_basis_rows(
             repo_root=root,
             local_structure_rows=local_structure_rows,
@@ -291,6 +309,7 @@ def materialize_selection_readiness(
         local_structure_region_metrics_path=local_structure_path,
         local_structure_threshold_sensitivity_path=local_structure_threshold_sensitivity_path,
         region_msa_support_path=region_msa_support_path,
+        primary_panel_selection_trace_path=primary_panel_selection_trace_path,
         candidate_selection_panel_path=panel_path,
         candidate_handoff_sequence_csv_path=handoff_sequence_csv_path,
         plots_root=plots_root,
@@ -365,6 +384,7 @@ def _write_manifest(
     local_structure_path: Path,
     local_structure_threshold_sensitivity_path: Path,
     region_msa_support_path: Path,
+    primary_panel_selection_trace_path: Path,
     panel_path: Path,
     handoff_sequence_csv_path: Path,
     candidate_handoff_path: Path,
@@ -374,6 +394,7 @@ def _write_manifest(
     local_structure_rows: list[dict[str, object]],
     local_structure_threshold_sensitivity_rows: list[dict[str, object]],
     region_msa_support_rows: list[dict[str, object]],
+    primary_panel_selection_trace_rows: list[dict[str, object]],
     local_structure_source_basis_rows: list[dict[str, object]],
     panel_rows: list[dict[str, object]],
     handoff_sequence_rows: list[dict[str, object]],
@@ -392,12 +413,20 @@ def _write_manifest(
         "created_at": created_at,
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
-            "Select one feasible fold-preserved representative from each design class after all declared "
-            "local-structure metrics are available and within declared local RMSD thresholds, then prefer "
-            "natural sequence support, fewer near-DNA/RNA chemistry warnings, controlled regional mutation burden, "
-            "lower local/global fold metrics, and sequence nonredundancy. Direct Wang thumb-contact-track edits "
-            "are not ordinary-panel eligible. Do not use ESMC or SAE as positive selection evidence."
+            "Select six primary conservative candidates globally after protein-contract gates and a stricter "
+            "C-terminal/thumb primer-RNA recognition local RMSD check. Proximal MSA support, near retained DNA/RNA "
+            "chemistry warnings, mutation-set dissimilarity, local structure, and fold metrics define the final "
+            "selection order. Design classes remain mask-policy context, not quotas. Direct Wang thumb-contact-track "
+            "edits are not ordinary-panel eligible. Do not use ESMC or SAE as positive selection evidence."
         ),
+        "primary_panel_policy": {
+            "policy_id": SELECTION_POLICY_ID,
+            "scope": "global_primary_candidate_pool",
+            "interpretation": (
+                "Primary panel candidates pass the preservation contract. Rows that fail the contract remain review "
+                "or context rows and are not conservative handoff choices."
+            ),
+        },
         "local_structure_rmsd_threshold_policy": {
             "policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
             "policy_note": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE,
@@ -427,6 +456,7 @@ def _write_manifest(
                 local_structure_threshold_sensitivity_path,
             ),
             "region_msa_support": _manifest_relative_path(path.parent, region_msa_support_path),
+            "primary_panel_selection_trace": _manifest_relative_path(path.parent, primary_panel_selection_trace_path),
             "candidate_selection_panel": _manifest_relative_path(path.parent, panel_path),
             "candidate_handoff_sequences": _manifest_relative_path(path.parent, handoff_sequence_csv_path),
             "plots_root": PLOTS_DIR_NAME,
@@ -442,6 +472,7 @@ def _write_manifest(
                 "local_structure_region_metrics": local_structure_path,
                 "local_structure_threshold_sensitivity": local_structure_threshold_sensitivity_path,
                 "region_msa_support": region_msa_support_path,
+                "primary_panel_selection_trace": primary_panel_selection_trace_path,
                 "candidate_selection_panel": panel_path,
                 "candidate_handoff_sequences": handoff_sequence_csv_path,
                 **{str(row["plot_id"]): Path(str(row["path"])) for row in plot_rows},
@@ -453,6 +484,7 @@ def _write_manifest(
             "local_structure_region_metrics": len(local_structure_rows),
             "local_structure_threshold_sensitivity": len(local_structure_threshold_sensitivity_rows),
             "region_msa_support": len(region_msa_support_rows),
+            "primary_panel_selection_trace": len(primary_panel_selection_trace_rows),
             "candidate_selection_panel": len(panel_rows),
             "candidate_handoff_sequences": len(handoff_sequence_rows),
         },
@@ -462,32 +494,37 @@ def _write_manifest(
             "fold_review_class": _count_by(triage_rows, "fold_review_class"),
             "local_structure_gate_status": _count_by(triage_rows, "local_structure_gate_status"),
             "sae_window_status": _count_by(triage_rows, "sae_window_status"),
+            "selection_candidate_tier": _count_by(triage_rows, "selection_candidate_tier"),
+            "primary_c_terminal_local_rmsd_gate_status": _count_by(
+                triage_rows,
+                "primary_c_terminal_local_rmsd_gate_status",
+            ),
         },
+        "selection_funnel_stages": primary_panel_selection_trace_rows,
         "selected_candidate_ids": [str(row["candidate_id"]) for row in panel_rows],
-        "panel_coverage": panel_coverage_summary(
-            panel_rows,
-            expected_design_classes=[spec.design_class_id for spec in ALL_SPECS],
-        ),
+        "panel_coverage": panel_coverage_summary(panel_rows),
         "handoff_readiness": build_handoff_readiness(
             selection_root=path.parent,
             panel_rows=panel_rows,
             candidate_handoff_path=candidate_handoff_path,
         ),
-        "hard_gate_allowed_fold_classes": ["strong_fold_preserved", "good_fold_preserved"],
-        "default_excluded_fold_classes": ["low_confidence", "review_band"],
+        "hard_gate_allowed_fold_classes": ["strong_fold_preserved"],
+        "default_excluded_fold_classes": ["good_fold_preserved", "low_confidence", "review_band"],
         "panel_tie_break_order": [
-            "fold review class",
+            "fewest proximal unsupported substitutions",
+            "fewest proximal rare or unobserved substitutions",
+            "fewest acidic gains near retained DNA/RNA or thumb-track",
+            "fewest basic losses near retained DNA/RNA or thumb-track",
+            "fewest Pro/Gly gains near retained DNA/RNA or thumb-track",
+            "largest nearest selected mutation-position Jaccard distance",
+            "largest nearest selected exact-substitution Jaccard distance",
+            "lowest C-terminal primer-RNA recognition-region C-alpha RMSD",
+            "lowest substrate-relevant local C-alpha RMSD",
+            "fewest chemistry warnings",
+            "fewest near retained DNA/RNA mutations",
             "selection-support MSA observed fraction",
             "selection-support MSA mean alternate-residue frequency",
-            "selection-support unobserved mutation count",
-            "near retained DNA/RNA or thumb-track chemistry warning count",
-            "moderate near retained DNA/RNA or thumb-track mutation burden",
-            "local-structure region metrics available and below RMSD thresholds",
-            "lower local C-alpha RMSD within threshold in catalytic, thumb, C-terminal primer-RNA recognition, "
-            "and near retained DNA/RNA regions",
-            "nearest selected sequence distance",
             "fold metrics",
-            "mutation count",
             "sequence hash",
         ],
     }
@@ -593,4 +630,5 @@ def _json_list(value: object) -> list[str]:
 def _plot_manifest_row(row: dict[str, object], *, manifest_root: Path) -> dict[str, object]:
     normalized = dict(row)
     normalized["path"] = str(Path(str(row["path"])).relative_to(manifest_root))
+    normalized.update(SELECTION_PLOT_METADATA.get(str(row.get("plot_id") or ""), {}))
     return normalized

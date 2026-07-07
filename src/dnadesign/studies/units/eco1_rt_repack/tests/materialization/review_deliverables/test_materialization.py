@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
@@ -22,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     SECTION_CONSTRAINT_EVIDENCE,
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
     SECTION_FEASIBILITY_AND_HANDOFF,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
+    write_manifest,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
@@ -98,7 +102,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
     assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
-    assert deliverables["mask_structure_browser_manifest"]["title"] == "The EC86 structure maps each fixed-mask rule"
+    assert deliverables["mask_structure_browser_manifest"]["title"] == "The Ec86 structure maps each fixed-mask rule"
     assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
     assert deliverables["interactive_structure_browser_manifest"]["title"] == (
         "Folded candidates can be inspected one at a time"
@@ -137,8 +141,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
-    assert deliverables["selection_class_local_percentiles"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
-    assert deliverables["selection_class_local_percentiles"]["status"] == "linked_existing"
+    assert deliverables["selection_primary_panel_sankey"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_primary_panel_sankey"]["status"] == "linked_existing"
+    assert "selection_class_local_percentiles" not in deliverables
     assert deliverables["selection_six_sequence_distance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_six_sequence_distance"]["status"] == "linked_existing"
     assert deliverables["selection_selected_substitutions_across_rt"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
@@ -175,3 +180,28 @@ def test_review_deliverables_require_canonical_selection_manifest(tmp_path: Path
         assert "design_classes/selection/selection_readiness_manifest.yaml" in str(exc)
     else:  # pragma: no cover - pytest assertion path
         raise AssertionError("review deliverables should require the panel-selection manifest")
+
+
+def test_review_manifest_rejects_missing_visual_metadata(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="missing required metadata field: alt_text"):
+        write_manifest(
+            tmp_path / "review_deliverables" / "review_deliverable_manifest.yaml",
+            notebook_path=tmp_path / "review_deliverables" / "notebooks" / "eco1_review_deliverables.py",
+            deliverables=[
+                {
+                    "deliverable_id": "metadata_incomplete_visual",
+                    "title": "Metadata incomplete visual",
+                    "section": "Panel selection",
+                    "artifact_kind": "svg",
+                    "status": "rendered",
+                    "role": "manuscript_facing",
+                    "render_mode": "wide_visual",
+                    "path": str(tmp_path / "plot.svg"),
+                    "source_tables": ["source.parquet"],
+                    "input_hashes": {"source": "sha256:test"},
+                    "alt_text": "",
+                    "description": "A test row missing required alt text.",
+                    "interpretation_limit": "This row is not valid.",
+                }
+            ],
+        )

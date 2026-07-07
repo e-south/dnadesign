@@ -22,6 +22,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
+    SELECTION_PLOT_METADATA,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._svg_assertions import (
     assert_heatmap_cells_are_square,
@@ -50,10 +51,15 @@ def assert_selection_plot_contract(
         assert "<title" in plot_text
         assert plot["alt_text"].strip()
         assert plot["interpretation_limit"].strip()
+        expected_metadata = SELECTION_PLOT_METADATA[str(plot["plot_id"])]
+        assert plot["selection_role"] == expected_metadata["selection_role"]
+        assert plot["notebook_group"] == expected_metadata["notebook_group"]
+        if expected_metadata["not_a_selector_reason"]:
+            assert plot["not_a_selector_reason"] == expected_metadata["not_a_selector_reason"]
 
     premise_text = plot_text_by_id["selection_premise_alignment"]
     assert "Core/direct edits" in premise_text
-    assert "Near DNA/RNA edits" in premise_text
+    assert "Near retained DNA/RNA edits" in premise_text
     assert "Local structure" in premise_text
     assert "ESMC/SAE" not in premise_text
     assert_heatmap_cells_are_square(premise_text, row_count=len(ALL_SPECS), column_count=7)
@@ -67,11 +73,11 @@ def assert_selection_plot_contract(
     assert "Excluded" not in gate_count_text
     assert_svg_has_square_panel(gate_count_text)
 
-    assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_class_local_percentiles"],
-        row_count=len(ALL_SPECS),
-        column_count=6,
-    )
+    primary_sankey_text = plot_text_by_id["selection_primary_panel_sankey"]
+    assert "Broad protein" in primary_sankey_text
+    assert "Primary panel" in primary_sankey_text
+    assert "Selected primary" in primary_sankey_text
+    assert "design-class quota" in primary_sankey_text
     assert_heatmap_cells_are_square(
         plot_text_by_id["selection_regional_mutation_burden"],
         row_count=len(ALL_SPECS),

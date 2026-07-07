@@ -15,6 +15,7 @@ from __future__ import annotations
 def panel_row(
     *,
     slot: str,
+    design_class_id: str,
     candidate_id: str,
     mutation_count: int,
     msa_fraction: float,
@@ -31,6 +32,8 @@ def panel_row(
         f'"nucleic_acid_facing_mutation_count": {na_facing}, '
         f'"nucleic_acid_facing_charge_delta": 1, '
         f'"nucleic_acid_facing_chemistry_warning_count": {chemistry_warnings}, '
+        f'"selection_candidate_tier": "primary_panel_candidate", '
+        f'"primary_panel_candidate": true, '
         f'"catalytic_or_direct_contact_mutation_count": 0, '
         f'"thumb_contact_track_mutation_count": 0, '
         f'"c_terminal_primer_rna_recognition_mutation_count": 1, '
@@ -39,7 +42,10 @@ def panel_row(
     return {
         "selection_slot": slot,
         "candidate_id": candidate_id,
-        "design_class_id": slot,
+        "design_class_id": design_class_id,
+        "slot_rank": int(slot.rsplit("_", 1)[-1]),
+        "selection_candidate_tier": "primary_panel_candidate",
+        "primary_panel_candidate": True,
         "fold_review_class": "strong_fold_preserved",
         "feasibility_status": "pass",
         "nearest_selected_distance_aa": 4,
@@ -61,6 +67,11 @@ def triage_row(*, candidate_id: str, msa_fraction: float, charge_delta: int) -> 
         "c_terminal_primer_rna_recognition_mutation_count": 1,
         "distal_scaffold_mutation_count": 2,
         "hard_gate_status": "eligible",
+        "selection_candidate_tier": "primary_panel_candidate",
+        "primary_panel_candidate": True,
+        "near_retained_dna_rna_acidic_gain_review_status": "passed",
+        "primary_c_terminal_local_rmsd_gate_status": "passed",
+        "proximal_msa_support_review_status": "passed",
         "sae_window_status": "wt_like_not_used_for_selection",
     }
 

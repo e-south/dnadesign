@@ -60,14 +60,15 @@ def tie_break_trace(row: dict[str, object]) -> dict[str, object]:
 
 
 def ordered_panel_rows(panel_rows: list[dict[str, object]]) -> list[dict[str, object]]:
-    by_class = {str(row["design_class_id"]): row for row in panel_rows}
-    ordered = [by_class[spec.design_class_id] for spec in ALL_SPECS if spec.design_class_id in by_class]
-    known_classes = {spec.design_class_id for spec in ALL_SPECS}
-    extra = sorted(
-        [row for row in panel_rows if str(row["design_class_id"]) not in known_classes],
-        key=lambda row: (str(row["design_class_id"]), str(row["candidate_id"])),
+    return sorted(
+        panel_rows,
+        key=lambda row: (
+            int(row.get("slot_rank") or 9999),
+            str(row.get("selection_slot") or ""),
+            str(row["design_class_id"]),
+            str(row["candidate_id"]),
+        ),
     )
-    return ordered + extra
 
 
 def canonical_mutations(value: object) -> list[str]:

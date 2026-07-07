@@ -13,6 +13,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    SELECTION_PLOT_METADATA,
+)
+
 
 def plot_row(
     *,
@@ -24,7 +28,7 @@ def plot_row(
     interpretation_limit: str,
     input_hash_tail: str,
 ) -> dict[str, object]:
-    return {
+    row = {
         "plot_id": plot_id,
         "title": title,
         "artifact_kind": "svg",
@@ -38,6 +42,8 @@ def plot_row(
         "role": "manuscript_facing",
         "render_mode": "wide_visual",
     }
+    row.update(SELECTION_PLOT_METADATA.get(plot_id, {}))
+    return row
 
 
 def write_svg(path: Path, *, plot_id: str, title: str) -> None:

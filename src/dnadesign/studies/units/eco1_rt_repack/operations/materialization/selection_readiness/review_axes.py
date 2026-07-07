@@ -201,6 +201,7 @@ def _mutation_geography(
             acidic_gain += int(mutation.wt_aa not in _ACIDIC and mutation.alt_aa in _ACIDIC)
             proline_glycine_gain += int(mutation.wt_aa not in _PROLINE_GLYCINE and mutation.alt_aa in _PROLINE_GLYCINE)
     warnings = basic_loss + acidic_gain + proline_glycine_gain
+    chemistry_compatible = charge_delta >= 0 and acidic_gain <= basic_gain
     return {
         "catalytic_or_direct_contact_mutation_count": catalytic_or_direct,
         "nucleic_acid_facing_mutation_count": na_facing,
@@ -213,6 +214,8 @@ def _mutation_geography(
         "nucleic_acid_facing_acidic_gain_count": acidic_gain,
         "nucleic_acid_facing_proline_glycine_gain_count": proline_glycine_gain,
         "nucleic_acid_facing_chemistry_warning_count": warnings,
+        "nucleic_acid_facing_chemistry_compatible": chemistry_compatible,
+        "nucleic_acid_facing_chemistry_gate_status": "passed" if chemistry_compatible else "incompatible",
     }
 
 

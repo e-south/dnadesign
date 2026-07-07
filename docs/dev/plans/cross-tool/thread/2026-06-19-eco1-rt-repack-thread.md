@@ -121,7 +121,7 @@ Materialized inputs for this slice:
 - `design_classes/biohub_esmc/sae_feature_window_summary.parquet`: materialized
   three-window SAE summary with 1,731 rows, covering 577 sequences across the
   23-position catalytic-palm control, 120-position nucleic-acid contact surface,
-  and 107-position mutable substrate-proximal annulus/basic-surface windows.
+  and 107-position mutable near retained DNA/RNA review windows.
 - `biohub_esmc/mutation_scoring/`: implemented WT-only ESMC masked-marginal
   mutation-scoring lane. The full 320-position WT run is materialized with
   position entropy, 6,080 non-WT single-substitution LLR rows, mask-join,
@@ -383,7 +383,7 @@ Declared Eco1 windows for v1:
 | --- | --- |
 | `catalytic_palm_control` | Negative-control window around the catalytic palm. It should remain WT-like; large shifts are concerning, not exciting. |
 | `thumb_palm_na_binding_surface` | Mechanism-adjacent thumb/palm surface near nucleic-acid handling. Use only after feasibility and fold checks. |
-| `mutable_substrate_proximal_annulus_basic_surface` | Mutable substrate-proximal annulus and basic surface. This is the minimal local proxy for strand-displacement-relevant surface changes. |
+| `mutable_near_retained_dna_rna_region` | Mutable near retained DNA/RNA review window and basic/polar surface context. This is a distance-defined protein-review window for hypothesis selection, not a strand-displacement proxy. |
 
 Allowed status values:
 

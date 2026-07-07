@@ -75,6 +75,7 @@ def write_manifest(
     path.parent.mkdir(parents=True, exist_ok=True)
     manifest_root = path.parent
     relative_deliverables = [_with_manifest_relative_path(row, manifest_root) for row in deliverables]
+    _validate_deliverable_metadata(relative_deliverables)
     manifest = {
         "schema_id": SCHEMA_ID,
         "schema_version": 1,
@@ -97,7 +98,11 @@ def write_manifest(
             "requires_interpretation_limit": True,
             "complete_status": "materialized_complete",
             "degraded_status": "materialized_degraded",
-            "degraded_when_statuses": ["skipped_missing_input", "errored"],
+            "degraded_when_statuses": [
+                "skipped_missing_input",
+                "errored",
+                "reused_existing_optional_render",
+            ],
             "candidate_acceptance_gate": False,
             "plain_language_limit": (
                 "Visuals support review and concise methods writing. They do "
@@ -110,12 +115,29 @@ def write_manifest(
 
 
 def _manifest_status(deliverables: list[dict[str, Any]]) -> str:
-    degraded_prefixes = ("errored", "skipped_missing_input")
+    degraded_prefixes = ("errored", "skipped_missing_input", "reused_existing_optional_render")
     for row in deliverables:
         status = str(row.get("status") or "")
         if status.startswith(degraded_prefixes):
             return "materialized_degraded"
     return "materialized_complete"
+
+
+def _validate_deliverable_metadata(deliverables: list[dict[str, Any]]) -> None:
+    required_text_fields = ("deliverable_id", "title", "alt_text", "description", "interpretation_limit")
+    required_collection_fields = ("source_tables", "input_hashes")
+    for index, row in enumerate(deliverables):
+        deliverable_id = str(row.get("deliverable_id") or f"row[{index}]")
+        for field in required_text_fields:
+            value = str(row.get(field) or "").strip()
+            if not value:
+                raise ValueError(f"Review deliverable {deliverable_id} is missing required metadata field: {field}")
+        for field in required_collection_fields:
+            value = row.get(field)
+            if not value:
+                raise ValueError(f"Review deliverable {deliverable_id} is missing required metadata field: {field}")
+        if str(row["title"]).strip().endswith("."):
+            raise ValueError(f"Review deliverable {deliverable_id} title should be a label, not a sentence")
 
 
 def _with_manifest_relative_path(row: dict[str, Any], manifest_root: Path) -> dict[str, Any]:

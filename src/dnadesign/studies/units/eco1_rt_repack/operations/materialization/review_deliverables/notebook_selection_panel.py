@@ -34,15 +34,14 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
         "selection_reason",
         "tie_break_trace_json",
     ]
-    table = pq.read_table(table_path)
-    available_columns = [column for column in selected_columns if column in table.column_names]
-    rows = table.select(available_columns).to_pylist()
+    parquet_file = pq.ParquetFile(table_path)
+    available_columns = [column for column in selected_columns if column in parquet_file.schema.names]
+    rows = parquet_file.read(columns=available_columns).to_pylist()
     title = html.escape(str(row.get("title") or "Six Eco1 RT variants form a protein review panel"))
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),
             mo.ui.table([_display_row(raw) for raw in rows], page_size=10),
-            _candidate_reason_accordion(rows, mo=mo),
         ],
         gap=0.25,
     )
@@ -60,11 +59,21 @@ def _display_row(row: dict[str, Any]) -> dict[str, object]:
         "WT RMSD A": _round_or_none(trace.get("wt_runtime_ca_rmsd")),
         "cryoEM RMSD A": _round_or_none(trace.get("cryoem_mapped_ca_rmsd")),
         "nearest selected distance": row.get("nearest_selected_distance_aa"),
+        "nearest mutation-position distance": _round_or_none(
+            trace.get("nearest_selected_mutation_position_jaccard_distance")
+            or row.get("nearest_selected_mutation_position_jaccard_distance")
+        ),
+        "nearest exact-substitution distance": _round_or_none(
+            trace.get("nearest_selected_mutation_token_jaccard_distance")
+            or row.get("nearest_selected_mutation_token_jaccard_distance")
+        ),
         "MSA observed fraction": _round_or_none(trace.get("selection_support_alt_observed_fraction")),
         "unobserved MSA changes": _int_or_none(trace.get("selection_support_unobserved_mutation_count")),
-        "near DNA/RNA or thumb mutations": trace.get("nucleic_acid_facing_mutation_count"),
-        "near DNA/RNA or thumb charge change": trace.get("nucleic_acid_facing_charge_delta"),
-        "chemistry warnings": trace.get("nucleic_acid_facing_chemistry_warning_count"),
+        "near retained DNA/RNA edits": _int_or_none(trace.get("nucleic_acid_facing_mutation_count")),
+        "near-region charge change": _int_or_none(trace.get("nucleic_acid_facing_charge_delta")),
+        "near-region chemistry warnings": _int_or_none(trace.get("nucleic_acid_facing_chemistry_warning_count")),
+        "Wang thumb-track edits": _int_or_none(trace.get("thumb_contact_track_mutation_count")),
+        "C-terminal primer-RNA edits": _int_or_none(trace.get("c_terminal_primer_rna_recognition_mutation_count")),
         "reason": str(row.get("selection_reason") or ""),
     }
 
@@ -77,44 +86,6 @@ def _parse_trace(value: object) -> dict[str, object]:
     except json.JSONDecodeError:
         return {}
     return loaded if isinstance(loaded, dict) else {}
-
-
-def _candidate_reason_accordion(rows: list[dict[str, Any]], *, mo: Any) -> Any:
-    panels: dict[str, Any] = {}
-    for row in rows:
-        candidate_id = str(row.get("candidate_id") or "")
-        if not candidate_id:
-            continue
-        trace = _parse_trace(row.get("tie_break_trace_json"))
-        panels[f"Why this row: {candidate_id}"] = mo.md(_candidate_reason_text(row=row, trace=trace))
-    return mo.accordion(panels, multiple=False, lazy=True)
-
-
-def _candidate_reason_text(*, row: dict[str, Any], trace: dict[str, object]) -> str:
-    lines = [
-        str(row.get("selection_reason") or "").strip(),
-        f"MSA observed fraction: {_display_metric(trace.get('selection_support_alt_observed_fraction'))}",
-        f"Unobserved MSA changes: {_display_metric(trace.get('selection_support_unobserved_mutation_count'))}",
-        f"Near retained DNA/RNA or thumb-track mutations: "
-        f"{_display_metric(trace.get('nucleic_acid_facing_mutation_count'))}",
-        f"Near retained DNA/RNA or thumb-track charge change: "
-        f"{_display_metric(trace.get('nucleic_acid_facing_charge_delta'))}",
-        f"Chemistry warnings: {_display_metric(trace.get('nucleic_acid_facing_chemistry_warning_count'))}",
-        f"Distal scaffold changes: {_display_metric(trace.get('distal_scaffold_mutation_count'))}",
-        f"Nearest selected distance: {_display_metric(trace.get('nearest_selected_distance_aa'))}",
-    ]
-    return "\n".join(f"- {line}" for line in lines if line)
-
-
-def _display_metric(value: object) -> str:
-    if value is None:
-        return "n/a"
-    rounded = _round_or_none(value)
-    if rounded is not None:
-        if rounded.is_integer():
-            return str(int(rounded))
-        return str(rounded)
-    return str(value)
 
 
 def _round_or_none(value: object) -> float | None:

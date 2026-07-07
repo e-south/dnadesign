@@ -24,6 +24,14 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 
 
+def test_wang_thumb_contact_track_uses_stricter_local_rmsd_gate() -> None:
+    thumb_threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["thumb_contact_track_context"]
+    near_region_threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["near_retained_dna_rna_annulus"]
+
+    assert thumb_threshold == 2.5
+    assert thumb_threshold < near_region_threshold
+
+
 def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) -> None:
     reference_path = tmp_path / "reference.pdb"
     model_root = tmp_path / "models"

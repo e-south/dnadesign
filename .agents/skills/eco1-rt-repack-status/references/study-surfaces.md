@@ -220,7 +220,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   `review_deliverable_manifest.yaml` and a marimo notebook organized as mask
   evidence, sequence proposals and fold checks, ESMC/SAE checks, and panel
   selection. The
-  expanded feasibility, triage, six-row selection table, and compact
+  expanded feasibility, triage, primary-panel table, and compact
   panel-selection plots exist under `design_classes/selection/`; the
   review notebook links those plots through the selection manifest. It
   includes py3Dmol structure-browser manifests for notebook inspection and keeps
@@ -331,12 +331,13 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- Computational feasibility, candidate triage, and a six-row
-  one-per-design-class panel are materialized under the expanded design-class
-  selection root. RT-only handoff is the remaining assay-panel blocker. The
-  current panel uses MSA support, mutation geography, nucleic-acid-facing
-  chemistry, and sequence nonredundancy after fold and feasibility gates. ESMC
-  and SAE are recorded for review only; they do not select rows. Broader
+- Computational feasibility, candidate triage, a primary conservative panel,
+  and boundary-candidate review evidence are materialized under the expanded
+  design-class selection root. RT-only handoff is the remaining assay-panel
+  blocker. The current panel uses local structure, proximal MSA support,
+  mutation geography, nucleic-acid-facing chemistry, and sequence
+  nonredundancy after fold and feasibility gates. ESMC and SAE are recorded
+  for review only; they do not select rows. Broader
   reusable fold-model execution and handoff mechanics are still planned; the
   current executable `thread` surfaces are the generic ProteinMPNN adapter,
   candidate-table package, Biohub adapter, ColabFold normalizer, and fold-check

@@ -17,6 +17,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
+    ALL_SPECS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     SELECTION_PLOT_PLAIN_TITLES,
 )
@@ -31,7 +34,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
     plot_root.mkdir(parents=True, exist_ok=True)
     panel_rows = [
         panel_row(
-            slot="clade9_p25_contact5a",
+            slot="primary_panel_01",
+            design_class_id=ALL_SPECS[-1].design_class_id,
             candidate_id="thread_candidate_alpha",
             mutation_count=2,
             msa_fraction=0.75,
@@ -39,7 +43,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             chemistry_warnings=0,
         ),
         panel_row(
-            slot="clade9_p25_contact6a",
+            slot="primary_panel_02",
+            design_class_id=ALL_SPECS[-1].design_class_id,
             candidate_id="thread_candidate_beta",
             mutation_count=3,
             msa_fraction=0.6,
@@ -48,6 +53,55 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         ),
     ]
     pq.write_table(pa.Table.from_pylist(panel_rows), selection_root / "candidate_selection_panel.parquet")
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "selection_policy_id": "eco1_rt_primary_conservative_panel_v1",
+                    "stage_order": index,
+                    "stage_id": stage_id,
+                    "stage_label": stage_label,
+                    "selector_role": selector_role,
+                    "filter_rule": "Fixture primary-panel funnel stage.",
+                    "input_count": input_count,
+                    "removed_count": 0,
+                    "remaining_count": remaining_count,
+                    "is_hard_gate": is_hard_gate,
+                }
+                for index, (
+                    stage_id,
+                    stage_label,
+                    selector_role,
+                    input_count,
+                    remaining_count,
+                    is_hard_gate,
+                ) in enumerate(
+                    (
+                        ("candidate_pool", "Accepted candidate pool", "input_pool", 2, 2, False),
+                        ("broad_contract_pool", "Broad protein contract", "hard_gate", 2, 2, True),
+                        (
+                            "primary_panel_candidate_pool",
+                            "Primary candidate pool",
+                            "preservation_contract",
+                            2,
+                            2,
+                            False,
+                        ),
+                        (
+                            "global_conservative_diverse_selection",
+                            "Conservative-diverse six-row selection",
+                            "global_rank",
+                            2,
+                            2,
+                            False,
+                        ),
+                    ),
+                    start=1,
+                )
+            ]
+        ),
+        selection_root / "primary_panel_selection_trace.parquet",
+    )
     write_handoff_sequence_csv(selection_root / "candidate_handoff_sequences.csv", panel_rows)
     pq.write_table(
         pa.Table.from_pylist(
@@ -65,21 +119,23 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         "schema_id": "eco1_rt.selection_readiness_manifest",
         "schema_version": 1,
         "status": "materialized",
-        "selection_policy_id": "eco1_rt_structure_evolution_class_representative_panel_v1",
+        "selection_policy_id": "eco1_rt_primary_conservative_panel_v1",
         "governing_rule": (
-            "Select one feasible fold-preserved representative from each design class. Do not use ESMC or SAE "
-            "as positive selection evidence."
+            "Select primary conservative candidates globally after broad protein-contract and stricter "
+            "primary-panel checks. Do not use ESMC or SAE as positive selection evidence."
         ),
         "sae_window_policy": "SAE windows are retained for review evidence and are not panel-selection inputs.",
         "esmc_policy": "ESMC additive LLR rows are retained for review and are not panel-selection tie-breaks.",
         "path_policy": "paths_relative_to_selection_manifest",
         "artifacts": {
             "candidate_triage_table": "candidate_triage_table.parquet",
+            "primary_panel_selection_trace": "primary_panel_selection_trace.parquet",
             "candidate_selection_panel": "candidate_selection_panel.parquet",
             "candidate_handoff_sequences": "candidate_handoff_sequences.csv",
         },
         "row_counts": {
             "candidate_triage_table": 2,
+            "primary_panel_selection_trace": 4,
             "candidate_selection_panel": 2,
             "candidate_handoff_sequences": 2,
         },
@@ -87,14 +143,63 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             "hard_gate_status": {"eligible": 2},
             "sae_window_status": {"wt_like_not_used_for_selection": 2},
         },
+        "selection_funnel_stages": [
+            {
+                "stage_id": "candidate_pool",
+                "stage_label": "Accepted candidate pool",
+                "selector_role": "input_pool",
+                "filter_rule": "Accepted ProteinMPNN candidate rows before protein-level selection checks.",
+                "input_count": 2,
+                "removed_count": 0,
+                "remaining_count": 2,
+                "is_hard_gate": False,
+            },
+            {
+                "stage_id": "broad_contract_pool",
+                "stage_label": "Broad protein contract",
+                "selector_role": "hard_gate",
+                "filter_rule": "Keep rows passing protein preservation checks.",
+                "input_count": 2,
+                "removed_count": 0,
+                "remaining_count": 2,
+                "is_hard_gate": True,
+            },
+            {
+                "stage_id": "primary_panel_candidate_pool",
+                "stage_label": "Primary candidate pool",
+                "selector_role": "preservation_contract",
+                "filter_rule": "Keep rows passing the stricter C-terminal/thumb local RMSD check.",
+                "input_count": 2,
+                "removed_count": 0,
+                "remaining_count": 2,
+                "is_hard_gate": False,
+            },
+            {
+                "stage_id": "global_conservative_diverse_selection",
+                "stage_label": "Conservative-diverse six-row selection",
+                "selector_role": "global_rank",
+                "filter_rule": (
+                    "Select primary-panel candidates globally by conservative rank fields and mutation-set "
+                    "dissimilarity; design class is context, not a quota."
+                ),
+                "input_count": 2,
+                "removed_count": 0,
+                "remaining_count": 2,
+                "is_hard_gate": False,
+            },
+        ],
         "selected_candidate_ids": ["thread_candidate_alpha", "thread_candidate_beta"],
         "panel_tie_break_order": [
-            "fold review class",
-            "selection-support MSA observed fraction",
-            "selection-support unobserved mutation count",
-            "near retained DNA/RNA or thumb-track chemistry warning count",
-            "moderate near retained DNA/RNA or thumb-track mutation burden",
-            "nearest selected sequence distance",
+            "fewest proximal unsupported substitutions",
+            "fewest acidic gains near retained DNA/RNA or thumb-track",
+            "fewest basic losses near retained DNA/RNA or thumb-track",
+            "fewest Pro/Gly gains near retained DNA/RNA or thumb-track",
+            "largest nearest selected mutation-position Jaccard distance",
+            "largest nearest selected exact-substitution Jaccard distance",
+            "lowest C-terminal primer-RNA recognition-region C-alpha RMSD",
+            "lowest substrate-relevant local C-alpha RMSD",
+            "fold metrics",
+            "sequence hash",
         ],
         "handoff_readiness": {
             "handoff_kind": "rt_only_candidate_handoff",
@@ -126,6 +231,15 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 input_hash_tail="b",
             ),
             plot_row(
+                plot_id="selection_primary_panel_sankey",
+                title=plots["selection_primary_panel_sankey"],
+                path="plots/selection_primary_panel_sankey.svg",
+                alt_text="Fixture primary-panel funnel Sankey.",
+                description="Shows broad, primary, boundary, and selected rows.",
+                interpretation_limit="The primary-panel funnel does not measure activity.",
+                input_hash_tail="i",
+            ),
+            plot_row(
                 plot_id="selection_local_structure_stratification",
                 title=plots["selection_local_structure_stratification"],
                 path="plots/selection_local_structure_stratification.svg",
@@ -151,15 +265,6 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 description="Shows local backbone shifts by RT region.",
                 interpretation_limit="Local backbone shifts do not measure activity.",
                 input_hash_tail="h",
-            ),
-            plot_row(
-                plot_id="selection_class_local_percentiles",
-                title=plots["selection_class_local_percentiles"],
-                path="plots/selection_class_local_percentiles.svg",
-                alt_text="Fixture class-local percentile plot.",
-                description="Shows selected rows against their own design classes.",
-                interpretation_limit="Class-local review variables do not measure activity.",
-                input_hash_tail="c",
             ),
             plot_row(
                 plot_id="selection_premise_alignment",
@@ -210,9 +315,9 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
                 plot_id="selection_six_sequence_distance",
                 title=plots["selection_six_sequence_distance"],
                 path="plots/selection_six_sequence_distance.svg",
-                alt_text="Fixture selected-six sequence-distance heatmap.",
-                description="Shows selected candidate sequence distances.",
-                interpretation_limit="Sequence distance does not measure activity.",
+                alt_text="Fixture selected mutation-set dissimilarity heatmap.",
+                description="Shows selected candidate mutation-set dissimilarity.",
+                interpretation_limit="Mutation-set dissimilarity does not measure activity.",
                 input_hash_tail="d",
             ),
         ],

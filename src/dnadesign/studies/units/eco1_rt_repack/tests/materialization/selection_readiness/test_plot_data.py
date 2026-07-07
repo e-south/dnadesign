@@ -24,7 +24,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     build_na_facing_chemistry_balance_matrix,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
-    _class_percentile,
+    build_selected_mutation_dissimilarity_matrices,
     build_selected_sequence_distance_matrix,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.premise_alignment import (
@@ -40,7 +40,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_read
 )
 
 
-def test_selected_six_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
+def test_selected_primary_panel_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     labels, matrix = build_selected_sequence_distance_matrix(
         panel_rows=selected_panel_rows(),
         candidate_rows=candidate_sequence_rows(),
@@ -53,6 +53,21 @@ def test_selected_six_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     assert matrix == [list(row) for row in zip(*matrix, strict=True)]
 
 
+def test_selected_mutation_dissimilarity_matrices_are_symmetric_with_zero_diagonal() -> None:
+    labels, position_matrix, token_matrix = build_selected_mutation_dissimilarity_matrices(
+        panel_rows=selected_panel_rows(),
+        candidate_rows=candidate_sequence_rows(),
+    )
+
+    assert labels == [f"candidate_{index}" for index in range(1, len(ALL_SPECS) + 1)]
+    assert len(position_matrix) == len(ALL_SPECS)
+    assert len(token_matrix) == len(ALL_SPECS)
+    assert all(position_matrix[index][index] == 0 for index in range(len(position_matrix)))
+    assert all(token_matrix[index][index] == 0 for index in range(len(token_matrix)))
+    assert position_matrix == [list(row) for row in zip(*position_matrix, strict=True)]
+    assert token_matrix == [list(row) for row in zip(*token_matrix, strict=True)]
+
+
 def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> None:
     column_labels, row_labels, matrix = build_premise_alignment_matrix(
         panel_rows=selected_panel_rows(),
@@ -61,7 +76,7 @@ def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> N
 
     assert column_labels == [
         "Core/direct edits",
-        "Near DNA/RNA edits",
+        "Near retained DNA/RNA edits",
         "Thumb-track edits",
         "Distal edits",
         "Chemistry warnings",
@@ -73,11 +88,6 @@ def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> N
     assert matrix[0][0].text == "0"
     assert matrix[0][5].text == "strong"
     assert matrix[0][6].text == "1.25"
-
-
-def test_class_local_moderate_percentile_prefers_class_median() -> None:
-    assert _class_percentile(selected_value=40.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 100.0
-    assert _class_percentile(selected_value=90.0, class_values=[0.0, 40.0, 90.0], direction="moderate") == 0.0
 
 
 def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:

@@ -44,7 +44,7 @@ class PremiseCell:
 
 _COLUMN_LABELS = [
     "Core/direct edits",
-    "Near DNA/RNA edits",
+    "Near retained DNA/RNA edits",
     "Thumb-track edits",
     "Distal edits",
     "Chemistry warnings",
@@ -159,7 +159,7 @@ def write_premise_alignment_plot(
     path = plot_root / "selection_premise_alignment.svg"
     alt = (
         "Selected-six matrix showing catalytic or direct-contact edit counts, near retained DNA/RNA edit counts, "
-        "thumb-track edit counts, distal edit counts, near-DNA/RNA chemistry warnings, fold gate status, and "
+        "thumb-track edit counts, distal edit counts, near retained DNA/RNA chemistry warnings, fold gate status, and "
         "local-structure gate status."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
@@ -171,8 +171,8 @@ def write_premise_alignment_plot(
         alt_text=alt,
         description=(
             "Summarizes the selected panel against the study premise: protect catalytic and direct-contact positions, "
-            "review peripheral near-DNA/RNA changes, and treat distal edits as scaffold context. ESMC and SAE are "
-            "kept in model/method checks rather than this core premise matrix."
+            "review peripheral near retained DNA/RNA changes, and treat distal edits as scaffold context. ESMC and "
+            "SAE are kept in model/method checks rather than this core premise matrix."
         ),
         interpretation_limit=(
             "This matrix is a review checklist. It does not establish activity, processivity, strand displacement, "

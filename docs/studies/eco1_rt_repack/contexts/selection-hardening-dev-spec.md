@@ -4,7 +4,7 @@ surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
 last_verified: 2026-07-07
-status: planning
+status: active-hardening-contract
 primary_audience:
   - future-agents
   - dnadesign-maintainers
@@ -13,9 +13,10 @@ primary_audience:
 
 ## Selection Hardening Dev Spec
 
-This spec defines the next hardening pass for the Eco1 RT repack selection
-notebook and panel contract. It is a study-owned development spec, not a
-generated artifact and not a candidate-handoff record.
+This spec records the current hardening contract for the Eco1 RT repack
+selection notebook and panel contract. It separates implemented guarantees from
+optional follow-up work. It is a study-owned development spec, not a generated
+artifact and not a candidate-handoff record.
 
 ### Intent
 
@@ -25,7 +26,7 @@ defensible premise:
 ```text
 Preserve catalytic and branch-recognition machinery.
 Preserve direct retained DNA/RNA contacts.
-Review peripheral near-DNA/RNA and thumb-contact changes cautiously.
+Review peripheral near retained DNA/RNA and thumb-contact changes cautiously.
 Treat distal redesign as scaffold/fold context.
 Keep ESMC and SAE as annotations, not selectors.
 ```
@@ -47,7 +48,7 @@ Use the cited literature in narrow roles:
 | Inouye and Inouye 1992, Journal of Bacteriology, DOI `10.1128/jb.174.8.2419-2424.1992` | Primary review-style source for retrons and multicopy single-stranded DNA. | Background for retron biology; not a candidate-selection metric. |
 | Inouye and Inouye 1991, Annual Review of Microbiology, DOI `10.1146/annurev.mi.45.100191.001115` | Review source for msDNA and bacterial reverse transcriptase context. | Background source only; not a mask authority. |
 | RCSB PDB `7V9U` | Coordinate source for the Ec86 RT-msDNA-RNA structure and chain identity. | Coordinate authority only; not a design score. |
-| Kabsch-style RMSD superposition literature | Precedent for optimal rigid-body superposition before comparing C-alpha displacements. | Supports the geometry calculation; threshold values still need study-specific justification. |
+| Kabsch 1976/1978, Acta Crystallographica, DOI `10.1107/S0567739476001873` and DOI `10.1107/S0567739478001680` | Precedent for optimal rigid-body superposition before comparing C-alpha displacements. | Supports the geometry calculation; threshold values still need study-specific justification. |
 | Enzyme-design and motif-scaffolding literature | General precedent for protecting functionally important sites and substrate/catalytic geometry. | Supports local-site caution; does not define Eco1 RT-specific thresholds. |
 
 Useful source links:
@@ -60,7 +61,8 @@ Useful source links:
 - Inouye and Inouye 1992: <https://doi.org/10.1128/jb.174.8.2419-2424.1992>
 - Inouye and Inouye 1991: <https://doi.org/10.1146/annurev.mi.45.100191.001115>
 - RCSB 7V9U: <https://www.rcsb.org/structure/7V9U>
-- RMSD superposition background: <https://link.springer.com/article/10.1186/1471-2105-11-363>
+- Kabsch 1976: <https://doi.org/10.1107/S0567739476001873>
+- Kabsch 1978: <https://doi.org/10.1107/S0567739478001680>
 - Functionally important site design context: <https://proceedings.mlr.press/v235/song24k.html>
 
 ### Plain Region Vocabulary
@@ -82,23 +84,28 @@ hide old labels.
 
 ### Required Region Semantics
 
-The next implementation pass must keep these review axes separate:
+The implementation must keep these review axes separate:
 
 | Axis | Required treatment |
 | --- | --- |
 | Catalytic/retron motif contexts | Hard preservation gate. Use explicit residue windows and local RMSD gates. |
 | Direct retained DNA/RNA contacts | Hard preservation gate. Nonzero edits are ineligible for the main panel. |
-| Wang thumb-contact track | Separate metric and plot column. Do not merge into the near retained DNA/RNA region. |
+| Wang thumb-contact track | Separate metric and plot column. Do not merge into the near retained DNA/RNA region. Use a stricter local RMSD preservation threshold than the generic near retained DNA/RNA region. |
 | Near retained DNA/RNA region | Primary peripheral review window. Evaluate mutation count, MSA support, charge changes, and chemistry warnings. |
 | Distal scaffold | Fold/scaffold context. Do not describe distal edits as direct processivity tuning. |
 
-The thumb-contact track is relevant enough to track even when the selected six
+The thumb-contact track is relevant enough to track even when the selected panel
 have zero thumb-track substitutions. A zero count is a result, not a failure:
 the notebook should state that the current selected panel does not directly test
 thumb-track substitution effects.
 
+The Wang thumb-contact-track local RMSD gate should be stricter than the generic
+near retained DNA/RNA region gate. These positions are a documented contact/readout
+track, so high local backbone shift there is not ordinary conservative repack
+behavior even when no direct thumb-track substitutions are present.
+
 The C-terminal/thumb domain is also a cognate-RNA recognition context, not just
-a generic processivity clamp. Inouye et al. 1999 supports treating the broader
+a generic polymerase-clamp surface. Inouye et al. 1999 supports treating the broader
 RT-Ec86 C-terminal region as important for primer-template recognition, and
 Inouye et al. 2004 supports tracking the 255-320 C-terminal fragment as a
 primer-recognition RNA-binding context. In the current fixed-backbone scope,
@@ -146,7 +153,7 @@ Acceptance rule:
 ```text
 All candidates must have local-structure rows for every declared region.
 Missing local-structure metrics are missing inputs.
-Threshold-exceeded rows are ineligible for the main six-row panel.
+Threshold-exceeded rows are ineligible for the primary panel.
 Selected rows must pass every declared local RMSD threshold.
 ```
 
@@ -159,7 +166,7 @@ High near-retained-DNA/RNA chemistry-warning counts are a review smell. They do
 not automatically invalidate a candidate unless the warning touches a hard-gate
 region, but they must be explained by within-class comparison.
 
-The next selection notebook should answer:
+The selection notebook should answer:
 
 ```text
 Did the selected row have fewer chemistry warnings than close alternatives?
@@ -168,10 +175,10 @@ Were acidic gains and basic losses separated from neutral/polar substitutions?
 Did MSA support justify accepting any risky peripheral substitution?
 ```
 
-If selected candidates still carry many warnings, add a per-class "why this row"
-strip before adding more plots. The strip should show the selected row and the
-next 3-5 eligible within-class alternatives across the actual lexicographic
-fields:
+If selected candidates still carry many warnings after the compact table and
+plots are reviewed, prefer a small alternatives table over another narrative
+panel. The table should show the selected row and the next 3-5 eligible
+within-class alternatives across the actual lexicographic fields:
 
 ```text
 MSA support
@@ -181,7 +188,7 @@ near retained DNA/RNA mutation burden
 Wang thumb-contact-track mutation count
 local RMSD max and key regional RMSDs
 global fold metrics
-sequence distance from already selected rows
+mutation-set dissimilarity from already selected rows
 ```
 
 Do not collapse these fields into a single composite score.
@@ -224,13 +231,11 @@ while the II-A3/`42_1` 50% class adds 13 and loses 18 relative to the baseline.
 | `clade9_p50_5a` | 139 | 89 | 0 | 29 | Less restrictive clade-9 conservation threshold. |
 | `iia3_42_1_p50_5a` | 118 | 73 | 0 | 23 | Different conservation denominator with a similar 5 A contact shell. |
 
-Selected-row behavior follows the same pattern. The selected six have zero
-declared Wang thumb-contact-track substitutions. Their selected near retained
-DNA/RNA mutation counts are `60`, `45`, `13`, `0`, `60`, and `51`; selected
-C-terminal 255-311 mutation counts are `14`, `15`, `7`, `2`, `14`, and `15`.
-The current panel therefore preserves the declared thumb track while sampling
-near retained DNA/RNA and C-terminal/thumb-domain-adjacent residues to different
-degrees.
+Selected-row behavior should be summarized from the regenerated panel, not
+copied from earlier class-quota selections. The current selector treats the
+declared Wang thumb-contact track as protected for the primary panel, then
+selects globally from rows that pass stricter C-terminal/thumb, proximal MSA,
+and near retained DNA/RNA chemistry checks.
 
 Interpretation: one representative per class is reasonable if the claim is
 "mask-policy sensitivity panel." It is weaker if read as six orthogonal
@@ -238,7 +243,7 @@ mechanistic hypotheses. A future thumb-focused or strand-displacement-motivated
 panel should either add a deliberate thumb-adjacent/C-terminal class or merge
 nested radius classes that do not add a distinct review question.
 
-### Plot Set To Harden
+### Plot Set
 
 Keep the dropdown-based progressive disclosure. Harden the plot content and
 order inside the selection section.
@@ -249,7 +254,7 @@ Core views:
    - Purpose: threshold sanity check.
    - Must show thresholds, selected rows, and failure counts.
 
-2. Local structure by region for the selected six.
+2. Local structure by region for the selected primary panel.
    - Purpose: selected-row structural preservation.
    - Must show threshold values or normalized RMSD-to-threshold values.
 
@@ -270,7 +275,7 @@ Core views:
 
 Support views:
 
-- six-sequence distance heatmap for nonredundancy;
+- selected mutation-set dissimilarity heatmap for nonredundancy;
 - design-class gate counts for opening context;
 - ESMC LLR and SAE feature heatmaps under model/method checks only.
 
@@ -298,6 +303,8 @@ Implemented:
   and distal scaffold contexts;
 - direct Wang thumb-contact-track substitutions are not ordinary-panel
   eligible;
+- the Wang thumb-contact-track local RMSD threshold is stricter than the
+  generic near retained DNA/RNA region threshold;
 - selection readiness and review deliverables are regenerated through
   materializers.
 
@@ -322,7 +329,7 @@ Use:
 > The selected candidates preserve declared catalytic/contact regions and pass
 > local backbone-shift thresholds after one global mapped C-alpha fit. They
 > sample different mutation burdens and chemistry in the near retained DNA/RNA
-> region and distal scaffold. The current selected six do not mutate the
+> region and distal scaffold. The current selected panel does not mutate the
 > declared Wang thumb-contact track.
 
 Avoid:
@@ -335,22 +342,22 @@ Avoid:
 
 Avoid:
 
-> The near-DNA/RNA region is a processivity proxy.
+> The near retained DNA/RNA region is a processivity proxy.
 
 Prefer:
 
 > The near retained DNA/RNA region is a distance-defined review window. It is
 > useful for choosing protein hypotheses, not for proving a phenotype.
 
-### Done Criteria
+### Maintained Criteria
 
-The next hardening slice is ready when:
+The selection surface is ready when:
 
 - local RMSD thresholds are visibly enforced and visually auditable;
 - every local-structure region lists explicit residue positions and source
   basis;
 - the notebook uses "near retained DNA/RNA region" in user-facing prose;
-- thumb-contact-track metrics are separate from near-DNA/RNA region metrics;
+- thumb-contact-track metrics are separate from near retained DNA/RNA region metrics;
 - design classes are explained as mask-policy contrasts;
 - ESMC and SAE remain visible only as model/method annotations;
 - docs, manifest rows, captions, and tests agree on the same claim boundary.

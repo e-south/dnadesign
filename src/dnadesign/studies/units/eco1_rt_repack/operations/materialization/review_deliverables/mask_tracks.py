@@ -123,8 +123,8 @@ def write_mask_structure_context(
     ]
     if not render_png:
         if png_path.exists():
-            status = "rendered"
-            skip_reason = "Using an existing ChimeraX PNG; rendering was disabled for this materialization run."
+            status = "reused_existing_optional_render"
+            skip_reason = "Reusing an existing ChimeraX PNG; rendering was disabled for this materialization run."
         else:
             status = "skipped_optional_render_disabled"
             skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."

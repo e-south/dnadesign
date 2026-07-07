@@ -40,7 +40,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_read
 )
 
 
-def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(tmp_path: Path) -> None:
+def test_selection_readiness_writes_feasibility_triage_and_primary_panel(tmp_path: Path) -> None:
     repo_root = tmp_path
     class_root = repo_root / "outputs/thread/design_classes"
     selection_root = class_root / "selection"
@@ -71,6 +71,7 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         selection_root / "local_structure_threshold_sensitivity.parquet"
     )
     assert result.region_msa_support_path == selection_root / "region_msa_support.parquet"
+    assert result.primary_panel_selection_trace_path == selection_root / "primary_panel_selection_trace.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
     assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
     assert result.plots_root == selection_root / "plots"
@@ -93,14 +94,24 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert all(row["selection_support_alt_observed_fraction"] is not None for row in triage)
     assert all(row["nucleic_acid_facing_mutation_count"] is not None for row in triage)
     assert all(row["nucleic_acid_facing_chemistry_warning_count"] is not None for row in triage)
+    assert all(row["nucleic_acid_facing_chemistry_compatible"] is not None for row in triage)
+    assert all(row["proximal_review_unobserved_mutation_count"] is not None for row in triage)
+    assert all(row["proximal_review_rare_or_unobserved_mutation_count"] is not None for row in triage)
     assert all(row["local_structure_gate_status"] == "passed" for row in triage)
     assert all(row["local_structure_unavailable_region_count"] == 0 for row in triage)
     assert all(row["local_structure_threshold_failed_region_count"] == 0 for row in triage)
     assert all(row["local_structure_max_ca_rmsd_angstrom"] is not None for row in triage)
+    assert all(row["local_structure_substrate_relevant_max_ca_rmsd_angstrom"] is not None for row in triage)
+    assert {row["selection_candidate_tier"] for row in triage} == {"not_panel_candidate", "primary_panel_candidate"}
+    assert all(
+        row["primary_panel_candidate"] is True
+        for row in triage
+        if row["selection_candidate_tier"] == "primary_panel_candidate"
+    )
 
     panel = pq.read_table(result.candidate_selection_panel_path).to_pylist()
     assert len(panel) == len(ALL_SPECS)
-    assert {row["selection_slot"] for row in panel} == {spec.design_class_id for spec in ALL_SPECS}
+    assert [row["selection_slot"] for row in panel] == [f"primary_panel_{index:02d}" for index in range(1, 7)]
     assert {row["design_class_id"] for row in panel} == {spec.design_class_id for spec in ALL_SPECS}
     assert {row["fold_review_class"] for row in panel} == {"strong_fold_preserved"}
     assert all(row["selected_for_panel"] for row in panel)
@@ -112,9 +123,20 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert all("thumb_contact_track_mutation_count" in row for row in panel)
     assert all("c_terminal_primer_rna_recognition_mutation_count" in row for row in panel)
     assert all("nucleic_acid_facing_mutation_count" in row for row in panel)
+    assert {row["nucleic_acid_facing_chemistry_gate_status"] for row in panel} == {"passed"}
+    assert all(row["nucleic_acid_facing_chemistry_compatible"] for row in panel)
+    assert {row["selection_candidate_tier"] for row in panel} == {"primary_panel_candidate"}
+    assert {row["primary_c_terminal_local_rmsd_gate_status"] for row in panel} == {"passed"}
+    assert {row["near_retained_dna_rna_acidic_gain_review_status"] for row in panel} == {"passed"}
+    assert {row["proximal_msa_support_review_status"] for row in panel} == {"passed"}
+    assert {row["local_structure_substrate_relevant_max_gate_status"] for row in panel} == {"passed"}
+    assert all(row["local_structure_substrate_relevant_max_ca_rmsd_angstrom"] is not None for row in panel)
+    assert all("proximal_review_unobserved_mutation_count" in row for row in panel)
+    assert all("proximal_review_rare_or_unobserved_mutation_count" in row for row in panel)
     assert "esmc_penalty_rank" not in panel[0]
     assert "sae_window_contrast_rank" not in panel[0]
-    assert "MSA support" in panel[0]["selection_reason"]
+    assert "primary conservative panel" in panel[0]["selection_reason"]
+    assert "design classes remain review context rather than quotas" in panel[0]["selection_reason"]
     assert "not used for selection" in panel[0]["selection_reason"]
     assert "esmc_6b_additive_llr_total" not in panel[0]["tie_break_trace_json"]
     assert "selection_support_alt_observed_fraction" in panel[0]["tie_break_trace_json"]
@@ -126,6 +148,11 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert (
         "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom" in panel[0]["tie_break_trace_json"]
     )
+    assert "nearest_selected_mutation_token_jaccard_distance" in panel[0]["tie_break_trace_json"]
+    assert "nearest_selected_mutation_position_jaccard_distance" in panel[0]["tie_break_trace_json"]
+    assert "class_local_elimination_policy_id" not in panel[0]["tie_break_trace_json"]
+    assert "selection_candidate_tier" in panel[0]["tie_break_trace_json"]
+    assert "nucleic_acid_facing_chemistry_gate_status" in panel[0]["tie_break_trace_json"]
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["path_policy"] == "paths_relative_to_selection_manifest"
@@ -134,11 +161,32 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert manifest["gate_counts"]["hard_gate_status"] == {"eligible": len(panel), "ineligible": 2}
     assert manifest["gate_counts"]["local_structure_gate_status"] == {"passed": len(triage)}
     assert manifest["gate_counts"]["sae_window_status"] == {"wt_like_not_used_for_selection": len(triage)}
+    funnel_stages = manifest["selection_funnel_stages"]
+    assert [row["stage_id"] for row in funnel_stages] == [
+        "candidate_pool",
+        "broad_contract_pool",
+        "primary_panel_candidate_pool",
+        "global_conservative_diverse_selection",
+    ]
+    stage_by_id = {row["stage_id"]: row for row in funnel_stages}
+    assert stage_by_id["candidate_pool"]["remaining_count"] == len(triage)
+    assert stage_by_id["broad_contract_pool"]["remaining_count"] == len(panel)
+    assert stage_by_id["primary_panel_candidate_pool"]["remaining_count"] == len(panel)
+    assert stage_by_id["global_conservative_diverse_selection"]["remaining_count"] == len(panel)
+    assert stage_by_id["global_conservative_diverse_selection"]["selector_role"] == "global_rank"
+    assert manifest["hard_gate_allowed_fold_classes"] == ["strong_fold_preserved"]
+    assert "good_fold_preserved" in manifest["default_excluded_fold_classes"]
     assert "local_structure_rmsd_threshold_policy" in manifest
     assert manifest["artifacts"]["local_structure_threshold_sensitivity"] == (
         "local_structure_threshold_sensitivity.parquet"
     )
     assert manifest["artifacts"]["region_msa_support"] == "region_msa_support.parquet"
+    assert manifest["artifacts"]["primary_panel_selection_trace"] == "primary_panel_selection_trace.parquet"
+    trace = pq.read_table(result.primary_panel_selection_trace_path).to_pylist()
+    trace_stage_ids = {row["stage_id"] for row in trace}
+    assert trace_stage_ids == {row["stage_id"] for row in funnel_stages}
+    assert len(trace) == len(funnel_stages)
+    assert "global_conservative_diverse_selection" in trace_stage_ids
     sensitivity = pq.read_table(result.local_structure_threshold_sensitivity_path).to_pylist()
     assert {row["scenario_id"] for row in sensitivity} == {
         "tighter_80_percent",
@@ -174,6 +222,15 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
     assert "tao_et_al_2026_functional_residue_preservation" in catalytic_region["region_source_basis_ids"]
     assert catalytic_region["coordinate_scope"] == "mapped_rt_chain_ca_after_global_fit"
     assert catalytic_region["local_ca_rmsd_threshold_angstrom"] == 1.5
+    thumb_track_region = next(
+        row for row in manifest["local_structure_regions"] if row["region_id"] == "thumb_contact_track_context"
+    )
+    near_region = next(
+        row for row in manifest["local_structure_regions"] if row["region_id"] == "near_retained_dna_rna_annulus"
+    )
+    assert thumb_track_region["local_ca_rmsd_threshold_angstrom"] == 2.5
+    assert thumb_track_region["local_ca_rmsd_threshold_angstrom"] < near_region["local_ca_rmsd_threshold_angstrom"]
+    assert "Wang/Ec86" in thumb_track_region["region_position_source"]
     c_terminal_region = next(
         row
         for row in manifest["local_structure_regions"]
@@ -194,22 +251,24 @@ def test_selection_readiness_writes_feasibility_triage_and_one_per_class_panel(t
         "construct_subject_created": False,
     }
     assert manifest["panel_coverage"] == {
-        "expected_design_class_count": len(ALL_SPECS),
+        "required_primary_panel_size": len(ALL_SPECS),
         "selected_row_count": len(panel),
-        "required_rows_per_class": 1,
-        "missing_design_classes": [],
-        "duplicate_design_classes": [],
-        "unexpected_design_classes": [],
+        "design_class_quota_enforced": False,
+        "selected_design_class_counts": {spec.design_class_id: 1 for spec in ALL_SPECS},
+        "duplicate_candidate_ids": [],
+        "non_primary_selected_candidate_ids": [],
         "valid": True,
     }
     assert manifest["row_counts"]["local_structure_region_metrics"] == len(triage) * len(LOCAL_STRUCTURE_REGION_IDS)
     assert manifest["row_counts"]["local_structure_threshold_sensitivity"] == len(sensitivity)
     assert manifest["row_counts"]["region_msa_support"] == len(support)
+    assert manifest["row_counts"]["primary_panel_selection_trace"] == len(trace)
     assert manifest["row_counts"]["candidate_handoff_sequences"] == len(panel)
     assert manifest["artifacts"]["local_structure_region_metrics"] == "local_structure_region_metrics.parquet"
     assert "local_structure_region_metrics" in manifest["artifact_hashes"]
     assert "local_structure_threshold_sensitivity" in manifest["artifact_hashes"]
     assert "region_msa_support" in manifest["artifact_hashes"]
+    assert "primary_panel_selection_trace" in manifest["artifact_hashes"]
     assert "candidate_handoff_sequences" in manifest["artifact_hashes"]
     materialization_assertions.assert_selection_plot_contract(
         result=result,

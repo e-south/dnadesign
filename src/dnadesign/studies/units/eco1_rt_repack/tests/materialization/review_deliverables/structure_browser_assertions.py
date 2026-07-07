@@ -22,7 +22,7 @@ def assert_candidate_structure_browser_render(rendered_text: str, unescaped_rend
     assert "Ec86/7V9U all-atom reference" in rendered_text
     assert "ProteinMPNN variant rank 1" in rendered_text
     assert "Variant summary" in rendered_text
-    assert "ESMC additive LLR total" in rendered_text
+    assert "ESMC additive LLR total" not in rendered_text
     assert "<sae-highlight-dropdown>" in rendered_text
     assert "<side-chain-toggle>" in rendered_text
     assert "<protein-color-toggle>" in rendered_text

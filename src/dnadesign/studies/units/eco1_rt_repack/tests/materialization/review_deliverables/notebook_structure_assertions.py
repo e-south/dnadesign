@@ -39,7 +39,7 @@ def assert_structure_notebook_contract(*, notebook_text: str, combined_text: str
     assert "structure_group_ui = review_dropdown" in notebook_text
     assert 'structure_group_label = "Structure group"' in notebook_text
     assert 'structure_group_label = "Mask evidence category"' in notebook_text
-    assert 'structure_group_label = "Design class"' in notebook_text
+    assert 'structure_group_label = "Panel slot"' in notebook_text
     assert "label=structure_group_label" in notebook_text
     assert "if not is_interactive_structure_deliverable(selected_visual):" in notebook_text
     assert "structure_group_ui = None" in notebook_text

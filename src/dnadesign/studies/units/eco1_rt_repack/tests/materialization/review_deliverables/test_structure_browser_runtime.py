@@ -146,12 +146,12 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
         selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
         selected_deliverable_id="selected_panel_structure_browser_manifest",
     )
-    assert "1 Selected panel: clade9_p25_contact5a" in group_lookup
+    assert "1 Selected panel: primary_panel_01" in group_lookup
     lookup = structure_browser.structure_browser_lookup(
         selected_rows,
         selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
         selected_deliverable_id="selected_panel_structure_browser_manifest",
-        selected_group=group_lookup["1 Selected panel: clade9_p25_contact5a"],
+        selected_group=group_lookup["1 Selected panel: primary_panel_01"],
     )
     selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
 
@@ -168,10 +168,11 @@ def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path:
     assert "eco1-protein-sequence-panel" in rendered_text
     assert "Protein sequence" in rendered_text
     assert "MKSAGG" in rendered_text
-    assert "Design class" in rendered_text
-    assert "clade9_p25_contact5a" in rendered_text
+    assert "Panel slot" in rendered_text
+    assert "primary_panel_01" in rendered_text
     assert "MSA observed fraction" in rendered_text
-    assert "Near DNA/RNA or thumb charge change" in rendered_text
+    assert "Near retained DNA/RNA edits" in rendered_text
+    assert "Near-region charge change" in rendered_text
     assert "Distal scaffold changes" in rendered_text
 
 

@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
     RETIRED_SELECTION_PLOT_IDS,
+    SELECTION_PLOT_METADATA,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -77,6 +78,14 @@ def test_review_notebook_routes_only_visual_artifacts_to_figure_selectors(tmp_pa
     assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
     assert "biohub_esmc_sae_delta_umap" not in audit_visual_ids
     assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids
+
+    deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
+    for plot_id, expected_metadata in SELECTION_PLOT_METADATA.items():
+        row = deliverables[plot_id]
+        assert row["selection_role"] == expected_metadata["selection_role"]
+        assert row["notebook_group"] == expected_metadata["notebook_group"]
+    assert deliverables["selection_design_class_contrast"]["notebook_group_label"] == "Funnel"
+    assert deliverables["selection_design_class_gate_counts"]["not_a_selector_reason"]
 
 
 def test_review_notebook_routes_evidence_exports_outside_figure_selector(tmp_path: Path) -> None:

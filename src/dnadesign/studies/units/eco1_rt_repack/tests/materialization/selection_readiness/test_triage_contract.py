@@ -16,12 +16,38 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 
 
+def _passed_local_structure_review(**overrides: object) -> dict[str, object]:
+    values: dict[str, object] = {
+        "local_structure_gate_status": "passed",
+        "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": 1.0,
+        "local_structure_retron_x_naxxh_context_ca_rmsd_angstrom": 1.0,
+        "local_structure_retron_y_vtg_context_ca_rmsd_angstrom": 1.0,
+        "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": 1.0,
+        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": 1.0,
+        "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": 1.0,
+    }
+    values.update(overrides)
+    return values
+
+
 def test_review_band_without_other_blockers_is_ineligible() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "review_band"},
         feasibility={"feasibility_status": "feasible"},
-        local_structure_review={"local_structure_gate_status": "passed"},
+        local_structure_review=_passed_local_structure_review(),
+    )
+
+    assert status == "ineligible"
+    assert reasons == ["fold_review_class_not_allowed"]
+
+
+def test_good_fold_without_other_blockers_is_ineligible_for_conservative_panel() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "good_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        local_structure_review=_passed_local_structure_review(),
     )
 
     assert status == "ineligible"
@@ -33,7 +59,7 @@ def test_review_band_does_not_override_hard_blockers() -> None:
         candidate={"status": "accepted", "protected_mutation_count": 1},
         fold={"foldcheck_status": "accepted", "review_class": "review_band"},
         feasibility={"feasibility_status": "feasible"},
-        local_structure_review={"local_structure_gate_status": "passed"},
+        local_structure_review=_passed_local_structure_review(),
     )
 
     assert status == "ineligible"
@@ -47,7 +73,7 @@ def test_catalytic_or_direct_contact_mutation_fails_hard_gate() -> None:
         fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
         feasibility={"feasibility_status": "feasible"},
         review_axes={"catalytic_or_direct_contact_mutation_count": 1},
-        local_structure_review={"local_structure_gate_status": "passed"},
+        local_structure_review=_passed_local_structure_review(),
     )
 
     assert status == "ineligible"
@@ -60,11 +86,28 @@ def test_thumb_contact_track_mutation_fails_ordinary_panel_gate() -> None:
         fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
         feasibility={"feasibility_status": "feasible"},
         review_axes={"thumb_contact_track_mutation_count": 1},
-        local_structure_review={"local_structure_gate_status": "passed"},
+        local_structure_review=_passed_local_structure_review(),
     )
 
     assert status == "ineligible"
     assert "thumb_contact_track_mutation" in reasons
+
+
+def test_directional_chemistry_incompatibility_fails_hard_gate() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        review_axes={
+            "nucleic_acid_facing_charge_delta": -1,
+            "nucleic_acid_facing_acidic_gain_count": 2,
+            "nucleic_acid_facing_basic_gain_count": 0,
+        },
+        local_structure_review=_passed_local_structure_review(),
+    )
+
+    assert status == "ineligible"
+    assert "nucleic_acid_facing_chemistry_incompatible" in reasons
 
 
 def test_missing_local_structure_review_fails_hard_gate() -> None:
@@ -101,9 +144,35 @@ def test_local_structure_threshold_excess_fails_hard_gate() -> None:
         feasibility={"feasibility_status": "feasible"},
         local_structure_review={
             "local_structure_gate_status": "threshold_exceeded",
-            "local_structure_gate_failure_reasons_json": '["thumb_contact_track_context:local_ca_rmsd 3.20 > 3.00"]',
+            "local_structure_gate_failure_reasons_json": '["thumb_contact_track_context:local_ca_rmsd 2.70 > 2.50"]',
         },
     )
 
     assert status == "ineligible"
     assert reasons == ["local_structure_threshold_exceeded"]
+
+
+def test_substrate_relevant_local_rmsd_excess_fails_hard_gate() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        local_structure_review=_passed_local_structure_review(
+            local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom=3.2
+        ),
+    )
+
+    assert status == "ineligible"
+    assert reasons == ["local_structure_substrate_relevant_rmsd_exceeded"]
+
+
+def test_missing_substrate_relevant_local_rmsd_is_missing_input() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
+        feasibility={"feasibility_status": "feasible"},
+        local_structure_review={"local_structure_gate_status": "passed"},
+    )
+
+    assert status == "missing_inputs"
+    assert reasons == ["missing_substrate_relevant_local_structure_rmsd"]

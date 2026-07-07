@@ -236,7 +236,7 @@ def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
         },
         {"metric": "Protein sequence length", "value": format_int(row.get("protein_sequence_length"))},
         {"metric": "Mutation count", "value": format_int(row.get("mutation_count"))},
-        {"metric": "Design class", "value": str(row.get("selection_slot") or "")},
+        {"metric": "Panel slot", "value": str(row.get("selection_slot") or "")},
         {"metric": "Nearest selected distance", "value": format_int(row.get("nearest_selected_distance_aa"))},
         {
             "metric": "MSA observed fraction",
@@ -247,11 +247,11 @@ def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
             "value": format_int(row.get("selection_support_unobserved_mutation_count")),
         },
         {
-            "metric": "Near DNA/RNA or thumb mutations",
+            "metric": "Near retained DNA/RNA edits",
             "value": format_int(row.get("nucleic_acid_facing_mutation_count")),
         },
         {
-            "metric": "Near DNA/RNA or thumb charge change",
+            "metric": "Near-region charge change",
             "value": format_int(row.get("nucleic_acid_facing_charge_delta")),
         },
         {
@@ -271,9 +271,6 @@ def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
             "value": format_int(row.get("c_terminal_primer_rna_recognition_mutation_count")),
         },
         {"metric": "Distal scaffold changes", "value": format_int(row.get("distal_scaffold_mutation_count"))},
-        {"metric": "ESMC additive LLR total", "value": format_float(row.get("esmc_llr_total"), decimals=2)},
-        {"metric": "ESMC additive LLR / mutation", "value": format_float(row.get("esmc_llr_per_mutation"), decimals=2)},
-        {"metric": "ESMC scoring method", "value": str(row.get("esmc_scoring_method_id") or "")},
     ]
 
 

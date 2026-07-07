@@ -263,7 +263,7 @@ def write_regional_mutation_burden_plot(
         alt_text=alt,
         description=(
             "Summarizes selected substitutions by RT region so the panel can be read as regional review context "
-            "rather than a global top-six ranking. The C-terminal column is an overlapping review context."
+            "rather than an activity ranking. The C-terminal column is an overlapping review context."
         ),
         interpretation_limit=(
             "Regional mutation burden is not a functional predictor. A zero thumb-contact-track count should not be "

@@ -32,6 +32,8 @@ def selected_panel_rows() -> list[dict[str, object]]:
         {
             "candidate_id": f"candidate_{index}",
             "design_class_id": spec.design_class_id,
+            "selection_slot": f"primary_panel_{index:02d}",
+            "slot_rank": index,
         }
         for index, spec in enumerate(ALL_SPECS, start=1)
     ]

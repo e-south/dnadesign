@@ -240,7 +240,7 @@ def _(
         if selected_visual_id == "mask_structure_browser_manifest":
             structure_group_label = "Mask evidence category"
         elif selected_visual_id == "selected_panel_structure_browser_manifest":
-            structure_group_label = "Design class"
+            structure_group_label = "Panel slot"
         structure_group_options = list(structure_group_map)
         structure_group_ui = review_dropdown(
             structure_group_options,

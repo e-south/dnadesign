@@ -33,5 +33,5 @@ def test_existing_chimerax_png_stays_visible_when_rendering_is_disabled(tmp_path
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
-    assert deliverables["mask_structure_context_png"]["status"] == "rendered"
+    assert deliverables["mask_structure_context_png"]["status"] == "reused_existing_optional_render"
     assert "existing ChimeraX PNG" in deliverables["mask_structure_context_png"]["skip_reason"]

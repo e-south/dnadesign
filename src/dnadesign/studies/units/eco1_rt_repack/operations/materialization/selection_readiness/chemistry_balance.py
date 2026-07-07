@@ -72,7 +72,7 @@ def write_na_facing_chemistry_balance_plot(
         triage_rows=triage_rows,
     )
     if not matrix:
-        raise ValueError("near-DNA/RNA chemistry-balance plot requires selected candidates")
+        raise ValueError("near retained DNA/RNA chemistry-balance plot requires selected candidates")
     fig = plt.figure(figsize=(7.8, 7.2))
     grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 4.2], wspace=0.1)
     ax_charge = fig.add_subplot(grid[0, 0])
@@ -164,5 +164,6 @@ def _require_na_facing_chemistry_fields(*, candidate_id: str, triage_row: dict[s
     missing = [field for field in NA_FACING_CHEMISTRY_REQUIRED_FIELDS if triage_row.get(field) is None]
     if missing:
         raise ValueError(
-            f"Selected triage row is missing near-DNA/RNA chemistry fields for {candidate_id}: {', '.join(missing)}"
+            "Selected triage row is missing near retained DNA/RNA chemistry fields "
+            f"for {candidate_id}: {', '.join(missing)}"
         )

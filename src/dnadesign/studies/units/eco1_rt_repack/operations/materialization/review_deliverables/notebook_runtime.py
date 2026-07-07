@@ -258,6 +258,9 @@ def render_deliverable_details(row: dict[str, Any], *, mo: Any) -> Any:
     evidence_rows = [
         {"field": "title", "value": str(row.get("title") or "")},
         {"field": "path", "value": str(row.get("path") or "")},
+        {"field": "selection role", "value": str(row.get("selection_role") or "")},
+        {"field": "funnel stage", "value": str(row.get("funnel_stage_id") or "")},
+        {"field": "not a selector", "value": str(row.get("not_a_selector_reason") or "")},
         {"field": "input sources", "value": ", ".join(row.get("source_tables", []))},
         {"field": "alt_text", "value": str(row.get("alt_text") or "")},
         {"field": "skip_reason", "value": str(row.get("skip_reason") or "")},
@@ -333,6 +336,8 @@ def format_section_label(section: str) -> str:
 def format_deliverable_label(row: dict[str, Any] | str) -> str:
     deliverable_id = str(row.get("deliverable_id") if isinstance(row, dict) else row)
     row_title = str(row.get("title") or "") if isinstance(row, dict) else ""
+    if isinstance(row, dict) and row.get("notebook_group_label"):
+        return f"{row['notebook_group_label']} - {row_title or deliverable_id.replace('_', ' ').title()}"
     if row_title:
         return row_title
     return deliverable_id.replace("_", " ").title()
@@ -353,7 +358,11 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
     if is_interactive_structure_deliverable(row):
         return True
     suffix = Path(str(row.get("path") or "")).suffix.lower()
-    return suffix in {".svg", ".png"} and str(row.get("status") or "") in {"rendered", "linked_existing"}
+    return suffix in {".svg", ".png"} and str(row.get("status") or "") in {
+        "rendered",
+        "linked_existing",
+        "reused_existing_optional_render",
+    }
 
 
 def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Path) -> Any:

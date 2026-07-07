@@ -142,7 +142,7 @@ Do not hide model execution behind an implicit run-all framework. Eco1 can call
 the generic ProteinMPNN adapter with an explicit tool root and request manifest,
 then call generic candidate-table construction after sample ingest. Fold
 checking is now materialized for WT plus the 96 accepted candidates; feasibility
-analysis and six-row panel selection are now materialized for the expanded
+analysis and primary-panel selection are now materialized for the expanded
 design-class pool; RT-only candidate handoff remains an explicit later gate.
 
 Use `implementation-roadmap.md` for the exact implementation slice order. That

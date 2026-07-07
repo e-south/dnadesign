@@ -30,7 +30,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
     class_label,
-    matrix_text_color,
     ordered_panel_rows,
     plot_row,
     short_candidate,
@@ -43,6 +42,11 @@ from .local_structure_plot import (
     write_local_structure_stratification_plot,
     write_local_structure_threshold_sensitivity_plot,
 )
+from .mutation_distance import (
+    canonical_mutation_positions,
+    canonical_mutation_tokens,
+    jaccard_distance,
+)
 from .premise_alignment import write_premise_alignment_plot
 from .region_msa_support_plot import write_regionwise_msa_support_plot
 from .regional_plots import (
@@ -53,6 +57,8 @@ from .visual_inventory import RETIRED_SELECTION_PLOT_FILE_NAMES, SELECTION_PLOT_
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.patches import FancyBboxPatch, PathPatch  # noqa: E402
+from matplotlib.path import Path as MplPath  # noqa: E402
 
 _STATUS_ORDER = ("eligible", "ineligible", "missing_inputs")
 _STATUS_COLORS = {
@@ -77,6 +83,7 @@ def write_selection_readiness_plots(
     local_structure_rows: list[dict[str, object]],
     local_structure_threshold_sensitivity_rows: list[dict[str, object]],
     region_msa_support_rows: list[dict[str, object]],
+    primary_panel_selection_trace_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
     rt_annotation_context: RTAnnotationContext | None = None,
 ) -> list[dict[str, Any]]:
@@ -85,8 +92,12 @@ def write_selection_readiness_plots(
     plot_root.mkdir(parents=True, exist_ok=True)
     _remove_retired_selection_plots(plot_root)
     return [
-        _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
         _write_design_class_contrast(plot_root, triage_rows, panel_rows, input_hashes),
+        _write_primary_panel_sankey_plot(
+            plot_root,
+            primary_panel_selection_trace_rows=primary_panel_selection_trace_rows,
+            input_hashes=input_hashes,
+        ),
         write_local_structure_stratification_plot(
             plot_root,
             triage_rows=triage_rows,
@@ -105,21 +116,6 @@ def write_selection_readiness_plots(
             local_structure_rows=local_structure_rows,
             input_hashes=input_hashes,
         ),
-        _write_class_local_percentiles(plot_root, triage_rows, panel_rows, input_hashes),
-        write_premise_alignment_plot(
-            plot_root,
-            panel_rows=panel_rows,
-            triage_rows=triage_rows,
-            input_hashes=input_hashes,
-        ),
-        write_selected_substitutions_across_rt_plot(
-            plot_root,
-            panel_rows=panel_rows,
-            candidate_rows=candidate_rows,
-            mask_residues=mask_residues,
-            input_hashes=input_hashes,
-            rt_annotation_context=rt_annotation_context,
-        ),
         write_regional_mutation_burden_plot(
             plot_root,
             panel_rows=panel_rows,
@@ -137,6 +133,21 @@ def write_selection_readiness_plots(
             plot_root,
             panel_rows=panel_rows,
             region_msa_support_rows=region_msa_support_rows,
+            input_hashes=input_hashes,
+        ),
+        write_selected_substitutions_across_rt_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            candidate_rows=candidate_rows,
+            mask_residues=mask_residues,
+            input_hashes=input_hashes,
+            rt_annotation_context=rt_annotation_context,
+        ),
+        _write_design_class_gate_counts(plot_root, triage_rows, panel_rows, input_hashes),
+        write_premise_alignment_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            triage_rows=triage_rows,
             input_hashes=input_hashes,
         ),
         _write_selected_sequence_distance(
@@ -177,43 +188,33 @@ def build_selected_sequence_distance_matrix(
     return labels, matrix
 
 
+def build_selected_mutation_dissimilarity_matrices(
+    *,
+    panel_rows: list[dict[str, object]],
+    candidate_rows: list[dict[str, object]],
+) -> tuple[list[str], list[list[float]], list[list[float]]]:
+    """Return pairwise mutated-position and exact-substitution Jaccard distances."""
+
+    ordered_panel = ordered_panel_rows(panel_rows)
+    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
+    labels: list[str] = []
+    position_sets: list[frozenset[int]] = []
+    token_sets: list[frozenset[str]] = []
+    for panel_row in ordered_panel:
+        candidate_id = str(panel_row["candidate_id"])
+        candidate = candidate_by_id.get(candidate_id)
+        if candidate is None:
+            raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
+        labels.append(candidate_id)
+        position_sets.append(canonical_mutation_positions(candidate.get("canonical_mutations")))
+        token_sets.append(canonical_mutation_tokens(candidate.get("canonical_mutations")))
+    position_matrix = [[round(jaccard_distance(left, right), 3) for right in position_sets] for left in position_sets]
+    token_matrix = [[round(jaccard_distance(left, right), 3) for right in token_sets] for left in token_sets]
+    return labels, position_matrix, token_matrix
+
+
 def _hamming_distance(left: str, right: str) -> int:
     return sum(a != b for a, b in zip(left, right, strict=False)) + abs(len(left) - len(right))
-
-
-def _class_percentile(
-    *,
-    selected_value: float,
-    class_values: list[float],
-    direction: str,
-) -> float:
-    values = [value for value in class_values if value == value]
-    if not values:
-        return 0.0
-    if direction == "lower":
-        return 100.0 * sum(value >= selected_value for value in values) / len(values)
-    if direction == "higher":
-        return 100.0 * sum(value <= selected_value for value in values) / len(values)
-    if direction == "moderate":
-        sorted_values = sorted(values)
-        midpoint = len(sorted_values) // 2
-        if len(sorted_values) % 2:
-            median = sorted_values[midpoint]
-        else:
-            median = (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
-        max_distance = max(abs(value - median) for value in sorted_values)
-        if max_distance == 0.0:
-            return 100.0
-        return max(0.0, 100.0 * (1.0 - abs(selected_value - median) / max_distance))
-    raise ValueError(f"Unknown class-local percentile direction: {direction}")
-
-
-def _float_value(value: object, *, default: float = 0.0) -> float:
-    return default if value is None else float(value)
-
-
-def _float_or_none(value: object) -> float | None:
-    return None if value is None else float(value)
 
 
 def _write_design_class_gate_counts(
@@ -229,7 +230,7 @@ def _write_design_class_gate_counts(
         if class_id not in counts_by_class:
             raise ValueError(f"Unknown design class id in triage rows: {class_id}")
         counts_by_class[class_id][str(row["hard_gate_status"])] += 1
-    selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
+    selected_counts = Counter(str(row["design_class_id"]) for row in panel_rows)
     labels = [class_label(spec.design_class_id) for spec in ALL_SPECS]
     y_positions = list(range(len(ALL_SPECS)))
     fig, ax = plt.subplots(figsize=(7.8, 7.8))
@@ -248,12 +249,12 @@ def _write_design_class_gate_counts(
         )
         left = [start + width for start, width in zip(left, widths, strict=True)]
     for y_position, spec in zip(y_positions, ALL_SPECS, strict=True):
-        selected = selected_by_class.get(spec.design_class_id)
-        if selected:
+        selected_count = selected_counts[spec.design_class_id]
+        if selected_count:
             ax.text(
                 max(left[y_position], 1) + 1.25,
                 y_position,
-                short_candidate(selected),
+                f"selected {selected_count}",
                 va="center",
                 ha="left",
                 fontsize=10.5,
@@ -281,7 +282,7 @@ def _write_design_class_gate_counts(
     path = plot_root / "selection_design_class_gate_counts.svg"
     alt = (
         "Stacked horizontal bars show candidates that pass the protein gate, candidates blocked by gate checks, "
-        "and candidates missing gate inputs for each Eco1 design class. Each class has one selected candidate label."
+        "and candidates missing gate inputs for each Eco1 design class. Selected-row counts are shown by class."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -291,7 +292,8 @@ def _write_design_class_gate_counts(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Counts candidates by protein-level gate outcome in each design class before choosing one representative."
+            "Counts candidates by protein-level gate outcome in each design class. Design class is review context, "
+            "not a primary-panel quota."
         ),
         interpretation_limit=(
             "Counts show panel preparation only. They do not measure RT activity, processivity, strand "
@@ -311,15 +313,29 @@ def _write_design_class_contrast(
     eligible_counts = Counter(
         str(row["design_class_id"]) for row in triage_rows if str(row.get("hard_gate_status") or "") == "eligible"
     )
-    triage_by_id = {str(row["candidate_id"]): row for row in triage_rows if row.get("candidate_id")}
-    selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
+    primary_counts = Counter(
+        str(row["design_class_id"])
+        for row in triage_rows
+        if str(row.get("selection_candidate_tier") or "") == "primary_panel_candidate"
+    )
+    selected_by_class: dict[str, list[dict[str, object]]] = {}
+    for row in panel_rows:
+        selected_by_class.setdefault(str(row["design_class_id"]), []).append(row)
     rows: list[list[str]] = []
     for spec in ALL_SPECS:
-        selected_id = selected_by_class.get(spec.design_class_id, "")
-        selected_row = triage_by_id.get(selected_id, {})
-        thumb_count = int(selected_row.get("thumb_contact_track_mutation_count") or 0)
-        c_terminal_count = int(selected_row.get("c_terminal_primer_rna_recognition_mutation_count") or 0)
-        near_count = max(int(selected_row.get("nucleic_acid_facing_mutation_count") or 0) - thumb_count, 0)
+        selected_rows = selected_by_class.get(spec.design_class_id, [])
+        thumb_count = sum(int(row.get("thumb_contact_track_mutation_count") or 0) for row in selected_rows)
+        c_terminal_count = sum(
+            int(row.get("c_terminal_primer_rna_recognition_mutation_count") or 0) for row in selected_rows
+        )
+        near_count = sum(
+            max(
+                int(row.get("nucleic_acid_facing_mutation_count") or 0)
+                - int(row.get("thumb_contact_track_mutation_count") or 0),
+                0,
+            )
+            for row in selected_rows
+        )
         rows.append(
             [
                 class_label(spec.design_class_id),
@@ -327,7 +343,8 @@ def _write_design_class_contrast(
                 f">= {spec.conservation_threshold:.0%}",
                 f"<= {spec.contact_threshold_angstrom:g} A",
                 str(eligible_counts[spec.design_class_id]),
-                short_candidate(selected_id) if selected_id else "missing",
+                str(primary_counts[spec.design_class_id]),
+                str(len(selected_rows)),
                 str(near_count),
                 str(thumb_count),
                 str(c_terminal_count),
@@ -338,9 +355,10 @@ def _write_design_class_contrast(
         "MSA",
         "WT %",
         "Contact",
-        "Pass",
+        "Broad\npass",
+        "Primary\ncandidates",
         "Selected",
-        "Near DNA/RNA",
+        "Near retained\nDNA/RNA",
         "Thumb track",
         "C-term",
     ]
@@ -352,7 +370,7 @@ def _write_design_class_contrast(
         loc="center",
         cellLoc="center",
         colLoc="center",
-        colWidths=[0.16, 0.11, 0.08, 0.08, 0.07, 0.14, 0.13, 0.12, 0.11],
+        colWidths=[0.15, 0.1, 0.075, 0.075, 0.075, 0.115, 0.08, 0.12, 0.11, 0.1],
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8.2)
@@ -363,7 +381,7 @@ def _write_design_class_contrast(
         if row_index == 0:
             cell.set_facecolor("#f6f8fa")
             cell.set_text_props(weight="bold", color="#24292f")
-        elif col_index in {6, 7, 8}:
+        elif col_index in {7, 8, 9}:
             cell.set_facecolor("#eef6ff" if int(rows[row_index - 1][col_index]) else "#f7f5ef")
         else:
             cell.set_facecolor("#ffffff")
@@ -371,11 +389,13 @@ def _write_design_class_contrast(
     fig.subplots_adjust(left=0.02, right=0.98, top=0.84, bottom=0.06)
     path = plot_root / "selection_design_class_contrast.svg"
     zero_thumb = all(int(row[7]) == 0 for row in rows)
-    thumb_note = " The selected six do not mutate the declared Wang thumb-contact track." if zero_thumb else ""
+    thumb_note = (
+        " The selected primary panel does not mutate the declared Wang thumb-contact track." if zero_thumb else ""
+    )
     alt = (
         "Table-like summary of Eco1 design classes showing MSA set, conservation threshold, retained DNA/RNA contact "
-        "shell, gate-pass count, selected row, near DNA/RNA edits, thumb-track edits, and C-terminal primer-RNA "
-        "recognition-region edits."
+        "shell, broad-pass count, primary-candidate count, selected-row count, near retained DNA/RNA edits, "
+        "thumb-track edits, and C-terminal primer-RNA recognition-region edits."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -385,112 +405,236 @@ def _write_design_class_contrast(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Shows that the six panel slots are declared mask-policy contrasts across conservation denominator, "
-            "conservation threshold, and retained-DNA/RNA contact shell. "
-            "Near DNA/RNA, thumb-track, and C-terminal edit counts are shown separately. The C-terminal count is "
-            "an overlapping review context. " + thumb_note
+            "Shows how the declared mask policies differ across conservation denominator, conservation threshold, "
+            "and retained-DNA/RNA contact shell. Broad-pass, primary-candidate, and selected-row counts are shown "
+            "separately because design class is context, not a selection quota. Near retained DNA/RNA, thumb-track, "
+            "and C-terminal edit counts are shown separately. The C-terminal count is an overlapping review context. "
+            + thumb_note
         ),
         interpretation_limit=(
-            "Design-class contrast explains review coverage. It does not establish function and does not make the "
-            "selected rows a global top-six ranking."
+            "Design-class contrast explains review coverage. It does not establish function and does not require one "
+            "selected row per mask policy."
         ),
         render_mode="wide_visual",
     )
 
 
-def _write_class_local_percentiles(
+def _write_primary_panel_sankey_plot(
     plot_root: Path,
-    triage_rows: list[dict[str, object]],
-    panel_rows: list[dict[str, object]],
+    *,
+    primary_panel_selection_trace_rows: list[dict[str, object]],
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
-    title = SELECTION_PLOT_PLAIN_TITLES["selection_class_local_percentiles"]
-    selected_by_class = {str(row["design_class_id"]): str(row["candidate_id"]) for row in panel_rows}
-    triage_by_id = {str(row["candidate_id"]): row for row in triage_rows}
-    metrics = [
-        ("selection_support_alt_observed_fraction", "MSA support", "higher"),
-        ("selection_support_unobserved_mutation_count", "Unsupported changes", "lower"),
-        ("nucleic_acid_facing_chemistry_warning_count", "Chemistry warnings", "lower"),
-        ("nucleic_acid_facing_mutation_count", "Regional burden", "moderate"),
-        ("mean_plddt", "pLDDT", "higher"),
-        ("wt_runtime_ca_rmsd", "WT RMSD", "lower"),
-    ]
-    matrix: list[list[float]] = []
-    row_labels: list[str] = []
-    for spec in ALL_SPECS:
-        candidate_id = selected_by_class.get(spec.design_class_id)
-        if candidate_id is None:
-            continue
-        selected = triage_by_id.get(candidate_id)
-        if selected is None:
-            raise ValueError(f"Selected candidate is missing from triage rows: {candidate_id}")
-        class_rows = [row for row in triage_rows if str(row.get("design_class_id") or "") == spec.design_class_id]
-        matrix.append(
-            [
-                _class_percentile(
-                    selected_value=_float_value(selected.get(metric)),
-                    class_values=[_float_value(row.get(metric)) for row in class_rows if row.get(metric) is not None],
-                    direction=direction,
-                )
-                for metric, _label, direction in metrics
-            ]
-        )
-        row_labels.append(f"{class_label(spec.design_class_id)}  {short_candidate(candidate_id)}")
-    if not matrix:
-        raise ValueError("class-local percentile plot requires selected rows")
-    fig, ax = plt.subplots(figsize=(7.6, 7.2))
-    image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlGnBu", vmin=0, vmax=100)
-    ax.set_yticks(list(range(len(row_labels))))
-    ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
-    ax.set_xticks(list(range(len(metrics))))
-    ax.set_xticklabels(
-        [label for _metric, label, _direction in metrics], fontsize=LABEL_SIZE - 1, rotation=25, ha="right"
+    title = SELECTION_PLOT_PLAIN_TITLES["selection_primary_panel_sankey"]
+    if not primary_panel_selection_trace_rows:
+        raise ValueError("primary-panel Sankey plot requires selection trace rows")
+    by_stage = {str(row["stage_id"]): row for row in primary_panel_selection_trace_rows}
+    required = {
+        "candidate_pool",
+        "broad_contract_pool",
+        "primary_panel_candidate_pool",
+        "global_conservative_diverse_selection",
+    }
+    missing = required - set(by_stage)
+    if missing:
+        raise ValueError(f"Primary-panel Sankey plot is missing trace stages: {', '.join(sorted(missing))}")
+    counts = {stage_id: int(by_stage[stage_id]["remaining_count"]) for stage_id in required}
+    other_primary = max(counts["primary_panel_candidate_pool"] - counts["global_conservative_diverse_selection"], 0)
+    max_flow = max(counts.values())
+    fig, ax = plt.subplots(figsize=(10.2, 5.8))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    nodes = {
+        "candidate_pool": (0.04, 0.47, "Accepted\ncandidates", counts["candidate_pool"], OKABE_ITO["blue"]),
+        "broad_contract_pool": (
+            0.28,
+            0.47,
+            "Broad protein\ncontract",
+            counts["broad_contract_pool"],
+            OKABE_ITO["green"],
+        ),
+        "primary_panel_candidate_pool": (
+            0.53,
+            0.52,
+            "Primary panel\ncandidates",
+            counts["primary_panel_candidate_pool"],
+            OKABE_ITO["sky"],
+        ),
+        "global_conservative_diverse_selection": (
+            0.79,
+            0.66,
+            "Selected primary\npanel",
+            counts["global_conservative_diverse_selection"],
+            OKABE_ITO["orange"],
+        ),
+        "other_primary": (
+            0.79,
+            0.41,
+            "Other primary\ncandidates",
+            other_primary,
+            "#c9d1d9",
+        ),
+    }
+    _draw_flow(
+        ax,
+        start=(0.22, 0.55),
+        end=(0.28, 0.55),
+        count=counts["broad_contract_pool"],
+        max_count=max_flow,
+        color=OKABE_ITO["green"],
+        label=f"{counts['broad_contract_pool']} broad-contract rows",
     )
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
-    ax.tick_params(axis="both", length=0)
-    max_percentile = 100.0
-    for row_index, values in enumerate(matrix):
-        for col_index, value in enumerate(values):
-            ax.text(
-                col_index,
-                row_index,
-                f"{value:.0f}",
-                ha="center",
-                va="center",
-                fontsize=9.2,
-                color=matrix_text_color(value, max_value=max_percentile),
-            )
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    cbar = fig.colorbar(image, ax=ax, shrink=0.82, pad=0.02)
-    cbar.set_label("Favorable within-class percentile", fontsize=11)
-    cbar.ax.tick_params(labelsize=10)
-    fig.subplots_adjust(left=0.3, right=0.93, top=0.88, bottom=0.24)
-    path = plot_root / "selection_class_local_percentiles.svg"
+    _draw_flow(
+        ax,
+        start=(0.46, 0.62),
+        end=(0.53, 0.6),
+        count=counts["primary_panel_candidate_pool"],
+        max_count=max_flow,
+        color=OKABE_ITO["sky"],
+        label=f"{counts['primary_panel_candidate_pool']} primary candidates",
+    )
+    _draw_flow(
+        ax,
+        start=(0.71, 0.74),
+        end=(0.79, 0.74),
+        count=counts["global_conservative_diverse_selection"],
+        max_count=max_flow,
+        color=OKABE_ITO["orange"],
+        label=f"{counts['global_conservative_diverse_selection']} selected",
+    )
+    _draw_flow(
+        ax,
+        start=(0.71, 0.66),
+        end=(0.79, 0.49),
+        count=other_primary,
+        max_count=max_flow,
+        color="#c9d1d9",
+        label=f"{other_primary} not selected",
+    )
+    for x, y, label, count, color in nodes.values():
+        _draw_sankey_node(ax, x=x, y=y, label=label, count=count, color=color)
+    ax.text(
+        0.04,
+        0.89,
+        (
+            f"{counts['candidate_pool']} accepted -> {counts['broad_contract_pool']} broad-contract rows -> "
+            f"{counts['primary_panel_candidate_pool']} primary candidates -> "
+            f"{counts['global_conservative_diverse_selection']} selected"
+        ),
+        ha="left",
+        va="center",
+        fontsize=10.8,
+        color="#57606a",
+    )
+    ax.text(
+        0.04,
+        0.08,
+        "The final step is a global conservative-diverse selection, not a design-class quota.",
+        ha="left",
+        va="center",
+        fontsize=10.5,
+        color="#57606a",
+    )
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
+    path = plot_root / "selection_primary_panel_sankey.svg"
     alt = (
-        "Heatmap showing each selected candidate as a within-class percentile for MSA support, unsupported "
-        "substitutions, near-DNA/RNA chemistry warnings, regional mutation burden, pLDDT, and WT RMSD. Higher "
-        "percentiles are more favorable after direction handling."
+        "Sankey-style flow showing accepted Eco1 RT candidates, rows passing the preservation contract, rows in the "
+        "primary candidate pool, and the selected conservative-diverse primary-panel rows."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
-        plot_id="selection_class_local_percentiles",
+        plot_id="selection_primary_panel_sankey",
         title=title,
         path=path,
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Compares each selected row only against candidates from the same design class. Higher percentiles mean "
-            "more favorable within-class placement after direction handling: higher MSA support and pLDDT, fewer "
-            "unsupported changes, fewer chemistry warnings, lower RMSD, and regional burden closer to the class "
-            "median. The plot does not create a composite score."
+            "Shows how the selector moves from accepted candidates through the preservation contract to a primary "
+            "candidate pool and then to the final conservative-diverse selected panel."
         ),
         interpretation_limit=(
-            "Percentiles explain panel review context. They are not activity, processivity, or strand-displacement "
-            "measurements."
+            "The flow is a protein-level selection record. It does not measure RT activity, processivity, or strand "
+            "displacement."
         ),
         render_mode="wide_visual",
     )
+
+
+def _draw_flow(
+    ax: plt.Axes,
+    *,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    count: int,
+    max_count: int,
+    color: str,
+    label: str,
+) -> None:
+    _ = label
+    if count <= 0:
+        return
+    width = 4.0 + 30.0 * (count / max(max_count, 1)) ** 0.5
+    control_dx = max((end[0] - start[0]) * 0.55, 0.02)
+    path = MplPath(
+        [
+            start,
+            (start[0] + control_dx, start[1]),
+            (end[0] - control_dx, end[1]),
+            end,
+        ],
+        [MplPath.MOVETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4],
+    )
+    ax.add_patch(
+        PathPatch(
+            path,
+            facecolor="none",
+            edgecolor=color,
+            lw=width,
+            alpha=0.34,
+            capstyle="round",
+            zorder=1,
+        )
+    )
+
+
+def _draw_sankey_node(
+    ax: plt.Axes,
+    *,
+    x: float,
+    y: float,
+    label: str,
+    count: int,
+    color: str,
+) -> None:
+    width = 0.18
+    height = 0.14
+    ax.add_patch(
+        FancyBboxPatch(
+            (x, y),
+            width,
+            height,
+            boxstyle="round,pad=0.012,rounding_size=0.016",
+            linewidth=0.8,
+            edgecolor="#d0d7de",
+            facecolor="#ffffff",
+            zorder=4,
+        )
+    )
+    ax.add_patch(
+        FancyBboxPatch(
+            (x, y),
+            0.018,
+            height,
+            boxstyle="round,pad=0.0,rounding_size=0.012",
+            linewidth=0,
+            facecolor=color,
+            alpha=0.95,
+            zorder=5,
+        )
+    )
+    ax.text(x + 0.03, y + 0.088, label, ha="left", va="center", fontsize=10.2, color="#24292f", zorder=6)
+    ax.text(x + 0.03, y + 0.038, str(count), ha="left", va="center", fontsize=13.0, weight="bold", zorder=6)
 
 
 def _profile_label(profile_id: str) -> str:
@@ -509,36 +653,51 @@ def _write_selected_sequence_distance(
     input_hashes: dict[str, str | None],
 ) -> dict[str, Any]:
     title = SELECTION_PLOT_PLAIN_TITLES["selection_six_sequence_distance"]
-    labels, matrix = build_selected_sequence_distance_matrix(panel_rows=panel_rows, candidate_rows=candidate_rows)
+    labels, position_matrix, token_matrix = build_selected_mutation_dissimilarity_matrices(
+        panel_rows=panel_rows,
+        candidate_rows=candidate_rows,
+    )
     display_labels = [short_candidate(label) for label in labels]
     fig, ax = plt.subplots(figsize=(6.4, 6.0))
-    image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="Blues")
+    image = ax.imshow(position_matrix, aspect="equal", interpolation="nearest", cmap="Blues", vmin=0.0, vmax=1.0)
     ax.set_xticks(list(range(len(display_labels))))
     ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=10)
     ax.set_yticks(list(range(len(display_labels))))
     ax.set_yticklabels(display_labels, fontsize=10)
-    max_distance = max((max(values) for values in matrix), default=0)
-    for row_index, values in enumerate(matrix):
+    for row_index, values in enumerate(position_matrix):
         for col_index, value in enumerate(values):
+            exact_value = token_matrix[row_index][col_index]
             ax.text(
                 col_index,
                 row_index,
-                str(value),
+                f"{value:.2f}\n{exact_value:.2f}",
                 ha="center",
                 va="center",
-                fontsize=9.2,
-                color=matrix_text_color(float(value), max_value=float(max_distance)),
+                fontsize=8.3,
+                color="#24292f" if value < 0.55 else "#ffffff",
             )
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    fig.text(
+        0.5,
+        0.045,
+        "Cell text: mutation-position distance / exact-substitution distance",
+        ha="center",
+        va="center",
+        fontsize=9.6,
+        color="#57606a",
+    )
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
     cbar = fig.colorbar(image, ax=ax, shrink=0.74, pad=0.03)
-    cbar.set_label("Pairwise amino-acid differences", fontsize=11)
+    cbar.set_label("Mutated-position Jaccard distance", fontsize=11)
     cbar.ax.tick_params(labelsize=10)
-    fig.subplots_adjust(left=0.2, right=0.92, top=0.88, bottom=0.2)
+    fig.subplots_adjust(left=0.2, right=0.92, top=0.88, bottom=0.25)
     path = plot_root / "selection_six_sequence_distance.svg"
-    alt = "Six-by-six heatmap of pairwise amino-acid Hamming distances among the selected Eco1 RT candidates."
+    alt = (
+        "Six-by-six heatmap of pairwise mutation-set dissimilarity among selected Eco1 RT candidates. Cell text shows "
+        "mutated-position Jaccard distance on the first line and exact-substitution Jaccard distance on the second."
+    )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
         plot_id="selection_six_sequence_distance",
@@ -546,7 +705,10 @@ def _write_selected_sequence_distance(
         path=path,
         input_hashes=input_hashes,
         alt_text=alt,
-        description="Shows whether the selected panel is sequence-redundant or spans different sequence neighborhoods.",
-        interpretation_limit="Sequence distance is a diversity context metric, not functional evidence.",
+        description=(
+            "Audits whether selected rows reuse the same mutation positions or exact substitutions. Mutation-set "
+            "dissimilarity is part of the global selection order after conservative safety fields."
+        ),
+        interpretation_limit="Mutation-set dissimilarity guards redundancy; it is not functional evidence.",
         render_mode="compact_wide_visual",
     )
