@@ -1,0 +1,331 @@
+contract: retron_msd_region_record_bundle_v1
+schema_version: 1
+source_policy: decomposed_records_are_authority
+source_path: /Users/Shockwing/Dropbox/projects/phd/msd-regions - all DNA RNA.gb
+source_sha256: 69ee73a9e6e83cee8c6047f9938832456562ec82a0f78144e6810c4465b1db75  # pragma: allowlist secret
+source_record_count: 41
+included_record_count: 36
+skipped_record_count: 5
+skipped_records:
+- record_id: Copy_of_Copy_of_Copy_of_m
+  reason: unresolved_variant_id
+  sequence_length_nt: 74
+- record_id: Copy_of_Copy_of_Copy_of_m
+  reason: unresolved_variant_id
+  sequence_length_nt: 74
+- record_id: Copy_of_Copy_of_Copy_of_m
+  reason: unresolved_variant_id
+  sequence_length_nt: 74
+- record_id: Copy_of_Copy_of_Copy_of_m
+  reason: unresolved_variant_id
+  sequence_length_nt: 74
+- record_id: Copy_of_Copy_of_Copy_of_m
+  reason: unresolved_variant_id
+  sequence_length_nt: 74
+compiler_spec: compiler/reader_spop_msd_structure_panel_v1.spec.yaml
+discrepancy_report: reports/discrepancies.yaml
+records:
+- variant_id: retron26
+  display_id: pES-retron-26
+  record: variants/pes-retron-26-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron43
+  display_id: pES-retron-43
+  record: variants/pes-retron-43-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron45
+  display_id: pES-retron-45
+  record: variants/pes-retron-45-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 2
+  annotation_warnings:
+  - kind: stem_base_annotation_span_adjusted
+    role: stem_base_left
+    label: Left base
+    source_span_0:
+    - 85
+    - 93
+    display_span_0:
+    - 11
+    - 19
+    annotated_sequence_5to3: CGGGTTTC
+    compiler_sequence_5to3: CGGG
+    note: Source annotation span is not 4 bp; compiler-facing stem base was derived
+      as the 4 bp boundary sequence.
+  - kind: stem_base_annotation_span_adjusted
+    role: stem_base_right
+    label: Right base
+    source_span_0:
+    - 13
+    - 21
+    display_span_0:
+    - 83
+    - 91
+    annotated_sequence_5to3: GAAAACAG
+    compiler_sequence_5to3: ACAG
+    note: Source annotation span is not 4 bp; compiler-facing stem base was derived
+      as the 4 bp boundary sequence.
+  msd_sequence_sha256: e9358ed99682e7184b90aaee6d9391130eab16e55f367a46f13c111fa74cf444  # pragma: allowlist secret
+- variant_id: retron46
+  display_id: pES-retron-46
+  record: variants/pes-retron-46-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 2
+  annotation_warnings:
+  - kind: stem_base_annotation_span_adjusted
+    role: stem_base_left
+    label: Left base
+    source_span_0:
+    - 89
+    - 101
+    display_span_0:
+    - 11
+    - 23
+    annotated_sequence_5to3: CGGGTTTCAGAT
+    compiler_sequence_5to3: CGGG
+    note: Source annotation span is not 4 bp; compiler-facing stem base was derived
+      as the 4 bp boundary sequence.
+  - kind: stem_base_annotation_span_adjusted
+    role: stem_base_right
+    label: Right base
+    source_span_0:
+    - 13
+    - 25
+    display_span_0:
+    - 87
+    - 99
+    annotated_sequence_5to3: AGATGAAAACAG
+    compiler_sequence_5to3: ACAG
+    note: Source annotation span is not 4 bp; compiler-facing stem base was derived
+      as the 4 bp boundary sequence.
+  msd_sequence_sha256: 4eb08e288727ec03a280219457bd53e0660aa32ea5b608064b5b2c3fc305112b  # pragma: allowlist secret
+- variant_id: retron47
+  display_id: pES-retron-47
+  record: variants/pes-retron-47-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron48
+  display_id: pES-retron-48
+  record: variants/pes-retron-48-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron49
+  display_id: pES-retron-49
+  record: variants/pes-retron-49-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron50
+  display_id: pES-retron-50
+  record: variants/pes-retron-50-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron51
+  display_id: pES-retron-51
+  record: variants/pes-retron-51-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron52
+  display_id: pES-retron-52
+  record: variants/pes-retron-52-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron53
+  display_id: pES-retron-53
+  record: variants/pes-retron-53-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron54
+  display_id: pES-retron-54
+  record: variants/pes-retron-54-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron55
+  display_id: pES-retron-55
+  record: variants/pes-retron-55-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron56
+  display_id: pES-retron-56
+  record: variants/pes-retron-56-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron170
+  display_id: pES-retron-170
+  record: variants/pes-retron-170-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 04d3b7f42e6801fe3e029a525f033ef3dac2e54ef3a2f32314a51fbc40511c69  # pragma: allowlist secret
+- variant_id: retron171
+  display_id: pES-retron-171
+  record: variants/pes-retron-171-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 7bf99fa973a5427f6864348335bae02ec94166c2824cfcb2cba552eecbf6bd36  # pragma: allowlist secret
+- variant_id: retron172
+  display_id: pES-retron-172
+  record: variants/pes-retron-172-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: dcb500d4a90ad99855d29a18fbab20a944fbce4a9a06c9a173e76796c21cc3cf  # pragma: allowlist secret
+- variant_id: retron173
+  display_id: pES-retron-173
+  record: variants/pes-retron-173-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 4dd5bec93c39b48bae1effa76cd384ae0a6a5b34a848f4da8285e85aa195e9ae  # pragma: allowlist secret
+- variant_id: retron174
+  display_id: pES-retron-174
+  record: variants/pes-retron-174-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: e1bf3cb311877a8f85994e3b068c362685d9e48992d034b8922aa2a4ee07e597  # pragma: allowlist secret
+- variant_id: retron175
+  display_id: pES-retron-175
+  record: variants/pes-retron-175-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: f06255ec32718e9a4d8fdc9cde9d74a1585b9e91d48762da856d73bc7b19fa84  # pragma: allowlist secret
+- variant_id: retron177
+  display_id: pES-retron-177
+  record: variants/pes-retron-177-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 3193a1df6e6bef88a236fc53c7fe1e5191849dd686ecfa725aea5305ab9337d4  # pragma: allowlist secret
+- variant_id: retron178
+  display_id: pES-retron-178
+  record: variants/pes-retron-178-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 742082e0b546f6b7dc9682564e74d506722941a1163f87ab24a7e41dca8f82ab  # pragma: allowlist secret
+- variant_id: retron179
+  display_id: pES-retron-179
+  record: variants/pes-retron-179-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 4fbb790743b0b13d3db0ed03c59c867b399dec63ac7f0da3a1921e043084e04a  # pragma: allowlist secret
+- variant_id: retron180
+  display_id: pES-retron-180
+  record: variants/pes-retron-180-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: c286ec719e5e5de2256f335959f0ed5e286ba3111d0f8830ee6d844eab5aed19  # pragma: allowlist secret
+- variant_id: retron181
+  display_id: pES-retron-181
+  record: variants/pes-retron-181-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: e00daa5b7d7e3f9b5e0c29e17f3e4034e32b57f505d69ada87b4234d85f1606a  # pragma: allowlist secret
+- variant_id: retron182
+  display_id: pES-retron-182
+  record: variants/pes-retron-182-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 3024ceeec0140b48dcdf84314520128fbd6ece682bc0cb74272856ae5a87acc7  # pragma: allowlist secret
+- variant_id: retron183
+  display_id: pES-retron-183
+  record: variants/pes-retron-183-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 6f3f32b7111a69a564ef8a03655f44324816d519f2cd1ec6d7219da43ed2b48a  # pragma: allowlist secret
+- variant_id: retron184
+  display_id: pES-retron-184
+  record: variants/pes-retron-184-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 4eb46f2808298f5bb02305cc8bf657075d5adaaaacad7ec056148e6eff626317  # pragma: allowlist secret
+- variant_id: retron185
+  display_id: pES-retron-185
+  record: variants/pes-retron-185-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 2385daa2a070124fe70019b7461b3b4a1819d404266aa2a42288abfb0df85c33  # pragma: allowlist secret
+- variant_id: retron186
+  display_id: pES-retron-186
+  record: variants/pes-retron-186-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 51e9d90c2b4b3b45467c4e5834d931199114d09d1a7c0bf1f179d62331e9c9ec  # pragma: allowlist secret
+- variant_id: retron195
+  display_id: pES-retron-195
+  record: variants/pes-retron-195-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: fd494658da0c4c75a7877a9f7216a3738e891e9aba0018bcfc3af2d235ae8a5b  # pragma: allowlist secret
+- variant_id: retron196
+  display_id: pES-retron-196
+  record: variants/pes-retron-196-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 7c1cb0f4fad74c41f94fc83d49ba6a8d8245c6d1af2cb9d35905a33be1264e03  # pragma: allowlist secret
+- variant_id: retron197
+  display_id: pES-retron-197
+  record: variants/pes-retron-197-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 52a4a742d4368d2e4f4df2753db385701d1debd586dc7c7ae56fe9018ee3d60d  # pragma: allowlist secret
+- variant_id: retron198
+  display_id: pES-retron-198
+  record: variants/pes-retron-198-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: bc7f600260e5009049e261a02028452c8179c28ad2c5d947ffa40f2cae5e2309  # pragma: allowlist secret
+- variant_id: retron199
+  display_id: pES-retron-199
+  record: variants/pes-retron-199-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: 904c499c2e4eca7363e085c3e5045c9676e7776ab9f603876859acf840e30848  # pragma: allowlist secret
+- variant_id: retron200
+  display_id: pES-retron-200
+  record: variants/pes-retron-200-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  msd_sequence_sha256: d336af2e8b2f541c7d79cfb5ae39dccbaf4d785765c721cfa10ba2684f5b6aec  # pragma: allowlist secret

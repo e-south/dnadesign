@@ -1,0 +1,125 @@
+variant_id: retron182
+display_id: pES-retron-182
+file_stem: pes-retron-182-msd-region
+source_record_id: msd-retron-182
+source_description: ''
+source_sequence_sha256: 660646eacff7e304db0957f8e5207063aa7216ff7864b0a29bfe34cae96290d8  # pragma: allowlist secret
+msd_sequence_sha256: 3024ceeec0140b48dcdf84314520128fbd6ece682bc0cb74272856ae5a87acc7  # pragma: allowlist secret
+sequence_length_nt: 79
+msd_sequence_5to3: GTCAGAAAAAAAGTGTCCCTATCAGTGATAGAGAGAGAGACTCTCTCTATCACTGATAGGGACGATACAGTAACTCAGA
+rna_sequence_5to3: GUCAGAAAAAAAGUGUCCCUAUCAGUGAUAGAGAGAGAGACUCUCUCUAUCACUGAUAGGGACGAUACAGUAACUCAGA
+annotation_status: typed_dnadesign_roles
+annotation_warnings: []
+features:
+- role: flank_3p
+  source_role: flank_3p
+  label: 3' Flanking
+  feature_type: misc_feature
+  source_start_0: 0
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 62
+  display_end_0: 79
+  display_strand: -1
+  sequence_5to3: CGATACAGTAACTCAGA
+- role: stem_base_right
+  source_role: stem_base_right
+  label: Right Base
+  feature_type: misc_feature
+  source_start_0: 13
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 62
+  display_end_0: 66
+  display_strand: -1
+  sequence_5to3: CGAT
+- role: payload_complement
+  source_role: payload_complement
+  label: msd[teto] complement
+  feature_type: misc_feature
+  source_start_0: 17
+  source_end_0: 36
+  source_strand: 1
+  display_start_0: 43
+  display_end_0: 62
+  display_strand: -1
+  sequence_5to3: TCTCTATCACTGATAGGGA
+- role: snapback_foldback_return
+  source_role: snapback_foldback_return
+  label: Foldback return
+  feature_type: misc_feature
+  source_start_0: 36
+  source_end_0: 39
+  source_strand: 1
+  display_start_0: 40
+  display_end_0: 43
+  display_strand: -1
+  sequence_5to3: CTC
+- role: snapback_foldback_geometry
+  source_role: snapback_foldback_geometry
+  label: Foldback
+  feature_type: misc_feature
+  source_start_0: 36
+  source_end_0: 45
+  source_strand: 1
+  display_start_0: 34
+  display_end_0: 43
+  display_strand: -1
+  sequence_5to3: GAGAGACTC
+- role: snapback_cap
+  source_role: snapback_cap
+  label: Cap
+  feature_type: misc_feature
+  source_start_0: 39
+  source_end_0: 42
+  source_strand: 1
+  display_start_0: 37
+  display_end_0: 40
+  display_strand: -1
+  sequence_5to3: AGA
+- role: snapback_retained_stem
+  source_role: snapback_retained_stem
+  label: Foldback stem
+  feature_type: misc_feature
+  source_start_0: 42
+  source_end_0: 45
+  source_strand: -1
+  display_start_0: 34
+  display_end_0: 37
+  display_strand: 1
+  sequence_5to3: GAG
+- role: payload_primary
+  source_role: payload_primary
+  label: msd[teto]
+  feature_type: misc_feature
+  source_start_0: 45
+  source_end_0: 64
+  source_strand: -1
+  display_start_0: 15
+  display_end_0: 34
+  display_strand: 1
+  sequence_5to3: TCCCTATCAGTGATAGAGA
+- role: flank_5p
+  source_role: flank_5p
+  label: 5' Flanking
+  feature_type: misc_feature
+  source_start_0: 64
+  source_end_0: 79
+  source_strand: -1
+  display_start_0: 0
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: GTCAGAAAAAAAGTG
+- role: stem_base_left
+  source_role: stem_base_left
+  label: Left Base
+  feature_type: misc_feature
+  source_start_0: 64
+  source_end_0: 68
+  source_strand: -1
+  display_start_0: 11
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: AGTG
+contract: retron_msd_region_record_v1
+schema_version: 1
