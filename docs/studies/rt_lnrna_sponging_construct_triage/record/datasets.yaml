@@ -329,7 +329,7 @@ datasets:
       read recorded at artifact time 0 h but interpreted as approximately 10 h
       after seeding; the 20260507 retron176 wells are omitted because no actual
       strain was present. The 20260705 benchmark contributes retron195-200 plus
-      retron26/retron180 observations and uses 20 nm aTc as its positive
+      retron26/retron180 observations and uses 200 nm aTc as its positive
       control condition.
   - role: reader_spop_condition_structure_matrix
     owner_tool: study_reader_bridge
@@ -349,8 +349,8 @@ datasets:
       plot_manifest: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/plots/manifest.json
     row_count: 178
     variant_count: 36
-    condition_count: 6
-    missing_cell_count: 87
+    condition_count: 5
+    missing_cell_count: 53
     structure_thumbnail_rows: 36
     notes: >-
       Study-owned composite evidence surface joining Reader SPOP condition-long

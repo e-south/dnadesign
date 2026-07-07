@@ -21,7 +21,6 @@ label_contract:
   reporter_readout: RFP/OD600
   positive_control_condition_policy: aTc_nM > 0 and IPTG_uM == 0
   positive_control_condition_examples:
-    - 20 nm aTc; 0 uM IPTG
     - 200 nm aTc; 0 uM IPTG
   positive_control_atc_nM: recorded_per_observation
   baseline_condition: 0 nm aTc; 0 uM IPTG

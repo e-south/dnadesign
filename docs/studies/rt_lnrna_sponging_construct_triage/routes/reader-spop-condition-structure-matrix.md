@@ -86,8 +86,8 @@ It shows Reader SPOP normalized derepression values:
 
 - `0 nm aTc; 0 uM IPTG` is the within-observation baseline and maps to 0.
 - The observed aTc positive-control condition at `IPTG = 0` maps to 1 while
-  preserving the actual aTc dose, so 20 nm and 200 nm aTc remain separate
-  columns.
+  preserving the actual aTc dose. The current curated Reader retron benchmark
+  set uses `200 nm aTc; 0 uM IPTG`.
 - IPTG dose tiles are condition medians. They may be reconstructed from Reader
   normalized endpoint values when the Reader SPOP observation table does not
   carry raw dose-level RFP/OD600 rows.
@@ -116,8 +116,8 @@ changes in `render.py`; keep source-asset joins in `structure_manifest.py`.
 ### Missing Data Policy
 
 - Missing condition tiles are rendered as masked gray cells, not zero.
-- Positive-control columns are dose-specific because historical retron
-  experiments use both 20 nm and 200 nm aTc.
+- Positive-control columns are dose-specific. The current curated Reader
+  retron benchmark set has one positive-control dose: `200 nm aTc; 0 uM IPTG`.
 - If a variant lacks an MSD thumbnail, keep the row and mark
   `structure_status`, then route to
   `docs/studies/retron_hairpin_design/routes/README.md` only to materialize

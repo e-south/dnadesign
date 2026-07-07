@@ -27,8 +27,8 @@ reader_spop_endpoint_dose_mean_v1
 The scalar is endpoint RFP/OD600 derepression under nonzero IPTG, normalized
 within each Reader experiment by the zero-inducer baseline and the aTc positive
 control. Positive control means positive aTc and zero IPTG; the actual aTc dose
-is recorded per observation because historical Reader retron benchmarks include
-both 20 nM and 200 nM aTc positive controls. This is an endpoint dose-ladder mean, not an AUC.
+is recorded per observation. The curated Reader retron benchmarks currently use
+200 nM aTc positive controls. This is an endpoint dose-ladder mean, not an AUC.
 
 The bridge delegates all numeric scoring to Reader's public
 `score_spop_endpoint` API. It must not duplicate SPOP math in dnadesign. The

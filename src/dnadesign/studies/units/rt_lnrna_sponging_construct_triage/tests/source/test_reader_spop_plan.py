@@ -346,7 +346,7 @@ def test_reader_spop_default_experiments_include_retron_177_186_benchmark() -> N
     assert "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
 
 
-def test_reader_spop_condition_matrix_accepts_20nm_positive_control_and_preserves_missing_cells(
+def test_reader_spop_condition_matrix_uses_200nm_positive_control_and_preserves_missing_cells(
     tmp_path: Path,
 ) -> None:
     reader_root = tmp_path / "reader"
@@ -357,7 +357,7 @@ def test_reader_spop_condition_matrix_accepts_20nm_positive_control_and_preserve
             time=10.0,
             z_by_treatment={
                 "0 nm aTc; 0 uM IPTG": 100.0,
-                "20 nm aTc; 0 uM IPTG": 500.0,
+                "200 nm aTc; 0 uM IPTG": 500.0,
                 "0 nm aTc; 5 uM IPTG": 180.0,
                 "0 nm aTc; 500 uM IPTG": 460.0,
             },
@@ -367,7 +367,7 @@ def test_reader_spop_condition_matrix_accepts_20nm_positive_control_and_preserve
             time=10.0,
             z_by_treatment={
                 "0 nm aTc; 0 uM IPTG": 100.0,
-                "20 nm aTc; 0 uM IPTG": 500.0,
+                "200 nm aTc; 0 uM IPTG": 500.0,
                 "0 nm aTc; 500 uM IPTG": 340.0,
             },
         ),
@@ -379,14 +379,14 @@ def test_reader_spop_condition_matrix_accepts_20nm_positive_control_and_preserve
 
     assert tuple(row.condition_key for row in matrix.condition_columns) == (
         "0 nm aTc; 0 uM IPTG",
-        "20 nm aTc; 0 uM IPTG",
+        "200 nm aTc; 0 uM IPTG",
         "0 nm aTc; 5 uM IPTG",
         "0 nm aTc; 500 uM IPTG",
     )
     assert len(matrix.rows) == 7
     by_variant_condition = {(row.assay_subject_key, row.condition_key): row for row in matrix.rows}
     assert by_variant_condition[("retron26", "0 nm aTc; 0 uM IPTG")].normalized_derepression == 0.0
-    assert by_variant_condition[("retron26", "20 nm aTc; 0 uM IPTG")].normalized_derepression == 1.0
+    assert by_variant_condition[("retron26", "200 nm aTc; 0 uM IPTG")].normalized_derepression == 1.0
     assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].condition_role == "iptg_dose"
     assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].rfp_over_od600 == pytest.approx(244.0)
     assert (
@@ -628,7 +628,7 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     assert "reader_design_id" in schema["required_fields"]
     assert "construct_subject_bridge_status" in schema["required_fields"]
     assert schema["label_contract"]["positive_control_condition_policy"] == "aTc_nM > 0 and IPTG_uM == 0"
-    assert "20 nm aTc; 0 uM IPTG" in schema["label_contract"]["positive_control_condition_examples"]
+    assert schema["label_contract"]["positive_control_condition_examples"] == ["200 nm aTc; 0 uM IPTG"]
 
     contract_doc = repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md"
     assert contract_doc.exists()
