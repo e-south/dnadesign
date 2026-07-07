@@ -45,11 +45,15 @@ command_groups:
   - id: reader_spop_label_materialization
     status: materialized_for_latentdna_overlay
     purpose: Materialize Reader-derived SPOP scalar labels for RT-lnRNA assay subjects without promoting unresolved sequence identities.
-    blockers:
-      - unresolved_variant_sequence_authority_for_construct_promotion
     commands:
       - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --write-label-tables src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs --json
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
+  - id: reader_spop_condition_structure_matrix
+    status: materialized
+    purpose: Materialize the study-owned condition-long SPOP matrix and MSD structure thumbnail heatmap.
+    commands:
+      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.materialize --reader-root ../reader --json
+      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_composite.py
   - id: opal_readiness
     status: blocked
     purpose: Validate candidate records with one fixed-size vector X and real labels.

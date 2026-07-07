@@ -1,0 +1,29 @@
+schema_id: retron_structure_thumbnail_manifest_v1
+study_id: rt_lnrna_sponging_construct_triage
+status: materialized
+owner: dnadesign.studies.units.rt_lnrna_sponging_construct_triage
+source_owner: retron_hairpin_design
+materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.structure_manifest
+row_grain: one row per assay_subject_key in the plotted condition matrix
+required_fields:
+  assay_subject_key: string
+  display_variant_id: string
+  hairpin_variant_id: string_or_null
+  construct_id: string_or_null
+  source_precedent_id: string_or_null
+  sequence_sha256: string_or_null
+  sequence_length_nt: integer_or_null
+  folding_status: string
+  structure_status: string
+  structure_png_path: string
+  composition_png_path: string
+  source_bundle_path: string
+  review_manifest_path: string
+structure_status_values:
+  - available
+  - missing_hairpin_materialization
+  - missing_thumbnail_path
+validation_rules:
+  - Structure paths must point to retron_hairpin_design materialized outputs.
+  - Missing structures must not drop SPOP rows from the plot.
+  - Route to retron_hairpin_design only to materialize missing structure assets, not to regenerate Reader SPOP evidence.

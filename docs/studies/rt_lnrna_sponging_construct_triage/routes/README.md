@@ -27,6 +27,7 @@ registered through the study execution surfaces.
 | Current state | `../record/status.md` |
 | Source inventories | `../record/datasets.yaml` |
 | Reader SPOP label contract | `../contexts/reader-spop-label-contract.md` |
+| Reader SPOP condition-structure matrix | `reader-spop-condition-structure-matrix.md` |
 | GenBank source authority | `../workbench/provenance/genbank-source-authority.yaml` |
 | Variant GenBank metadata | `../workbench/provenance/retron-variant-genbank-metadata.yaml` |
 | Variant GenBank catalog | `../workbench/provenance/retron-variant-genbank-catalog.yaml` |
@@ -51,12 +52,13 @@ registered through the study execution surfaces.
 | Cross-study manuscript framing | `../contexts/retron-tf-decoy-design-logic.md` | routed prose context present |
 | Construct subject universe | `../workbench/design_sets/v1-construct-subject-scope.md` | Phase 0 planned |
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
-| Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 36 cataloged sources: 35 retron whole-plasmid variants plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
+| Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 42 cataloged sources: 35 retron whole-plasmid variants, six retron-hairpin MSD-only handoffs paired with WT Eco1 RT, plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
 | Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
 | RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned construct-subject-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
 | Infer/LatentDNA handoff | `../contexts/representation-contract.md` plus `../operations/contract/schemas/representation-table.schema.yaml` | explicit view-name fixture, six-view batch runbook, and sidecar-backed LatentDNA review surfaces present |
 | Reader SPOP labels | `../contexts/reader-spop-label-contract.md` plus `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml` | materialized for LatentDNA overlays; OPAL blocked until selected X and training table handoff |
+| Reader SPOP condition-structure composite | `reader-spop-condition-structure-matrix.md` | study-owned condition-long matrix plus MSD thumbnail heatmap materialized under workbench outputs |
 | OPAL readiness | `../contexts/opal-handoff.md` | `rt_lnrna_sponging_construct_triage_opal_training_examples_v1` absent; OPAL run blocked |
 
 ### Boundary Rules

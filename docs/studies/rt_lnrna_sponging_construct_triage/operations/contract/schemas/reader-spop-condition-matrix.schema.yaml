@@ -1,0 +1,43 @@
+schema_id: reader_spop_condition_matrix_v1
+study_id: rt_lnrna_sponging_construct_triage
+status: materialized
+owner: dnadesign.studies.units.rt_lnrna_sponging_construct_triage
+source_owner: reader
+materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.condition_matrix
+row_grain: one row per Reader SPOP observation, assay subject, and represented condition
+identity:
+  primary_join_keys:
+    - assay_subject_key
+    - reader_experiment_id
+    - condition_key
+  condition_key_policy: human-readable Reader treatment string with ASCII units
+required_fields:
+  observation_id: string
+  assay_subject_key: string
+  reader_design_id: string
+  reader_experiment_id: string
+  condition_key: string
+  condition_role: baseline_or_positive_control_or_iptg_dose
+  atc_nM: numeric
+  iptg_uM: numeric
+  normalized_derepression: numeric
+  rfp_over_od600: numeric
+  viability_relative_to_baseline: numeric_or_null
+  replicate_count: integer
+  construct_subject_id: string_or_null
+  construct_subject_bridge_status: string
+  qc_flags: string_list
+  value_basis: string
+condition_roles:
+  baseline: 0 nm aTc; 0 uM IPTG
+  positive_control: aTc_nM > 0 and IPTG_uM == 0
+  iptg_dose: aTc_nM == 0 and IPTG_uM > 0
+missing_data_policy:
+  missing_conditions_are_absent_rows: true
+  missing_plot_cells: masked_gray_not_zero
+  impute_missing_as_zero: false
+validation_rules:
+  - Condition columns must be explicit and dose-specific.
+  - Positive controls must preserve the observed aTc dose.
+  - The matrix may reconstruct RFP/OD600 values from Reader SPOP normalized endpoints when the Reader observation table does not carry raw dose rows.
+  - Do not use this table as a replacement for Reader-owned SPOP scalar scoring.

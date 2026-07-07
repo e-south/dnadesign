@@ -331,6 +331,84 @@ records:
     variant_class: lnrna_variant_wt_rt
     rt_mode: wt_eco1_rt
     comment: Two middle G:T wobbles; bottom nick via Nb.BtsI.
+  - variant_id: retron195
+    retron_number: 195
+    plasmid_name: pES-retron-195
+    source_file: pes-retron-195-msd-tetr-r26-w02-17.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
+  - variant_id: retron196
+    retron_number: 196
+    plasmid_name: pES-retron-196
+    source_file: pes-retron-196-msd-tetr-r26-w03-16.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
+  - variant_id: retron197
+    retron_number: 197
+    plasmid_name: pES-retron-197
+    source_file: pes-retron-197-msd-tetr-r43-w02-17.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [2,17).
+  - variant_id: retron198
+    retron_number: 198
+    plasmid_name: pES-retron-198
+    source_file: pes-retron-198-msd-tetr-r43-w03-16.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [3,16).
+  - variant_id: retron199
+    retron_number: 199
+    plasmid_name: pES-retron-199
+    source_file: pes-retron-199-msd-tetr-r180-w02-17.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
+  - variant_id: retron200
+    retron_number: 200
+    plasmid_name: pES-retron-200
+    source_file: pes-retron-200-msd-tetr-r180-w03-16.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
   - variant_id: msrmsdwt_bl21
     retron_number: 0
     plasmid_name: msr/msd(wt)_BL21

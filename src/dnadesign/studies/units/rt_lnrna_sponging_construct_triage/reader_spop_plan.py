@@ -36,6 +36,7 @@ DEFAULT_READER_EXPERIMENT_IDS: tuple[str, ...] = (
     "20260418_retron_Eco1_26_43_170_171_benchmark",
     "20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark",
     "20260529_retron_Eco1_26_43_177_186_benchmark",
+    "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark",
 )
 
 SPOP_SOURCE_OF_TRUTH_DOC = "reader/docs/lib/spop_endpoint_in_reader.md"

@@ -20,6 +20,10 @@ import pyarrow.parquet as pq
 import pytest
 import yaml
 
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.condition_matrix import (
+    build_reader_spop_condition_matrix,
+    write_reader_spop_condition_matrix,
+)
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan import (
     DEFAULT_READER_EXPERIMENT_IDS,
     ReaderSpopContractError,
@@ -339,6 +343,63 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
 
 def test_reader_spop_default_experiments_include_retron_177_186_benchmark() -> None:
     assert "20260529_retron_Eco1_26_43_177_186_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
+    assert "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
+
+
+def test_reader_spop_condition_matrix_accepts_20nm_positive_control_and_preserves_missing_cells(
+    tmp_path: Path,
+) -> None:
+    reader_root = tmp_path / "reader"
+    experiment_id = "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark"
+    rows = [
+        *_ratio_rows(
+            design_id="pES-retron-26; pBbS2c-rfp",
+            time=10.0,
+            z_by_treatment={
+                "0 nm aTc; 0 uM IPTG": 100.0,
+                "20 nm aTc; 0 uM IPTG": 500.0,
+                "0 nm aTc; 5 uM IPTG": 180.0,
+                "0 nm aTc; 500 uM IPTG": 460.0,
+            },
+        ),
+        *_ratio_rows(
+            design_id="pES-retron-195; pBbS2c-rfp",
+            time=10.0,
+            z_by_treatment={
+                "0 nm aTc; 0 uM IPTG": 100.0,
+                "20 nm aTc; 0 uM IPTG": 500.0,
+                "0 nm aTc; 500 uM IPTG": 340.0,
+            },
+        ),
+    ]
+    _write_reader_experiment(reader_root, experiment_id=experiment_id, report_time=10.0, rows=rows)
+    plan = build_reader_spop_plan(reader_root=reader_root, experiment_ids=(experiment_id,), strict=True)
+
+    matrix = build_reader_spop_condition_matrix(plan)
+
+    assert tuple(row.condition_key for row in matrix.condition_columns) == (
+        "0 nm aTc; 0 uM IPTG",
+        "20 nm aTc; 0 uM IPTG",
+        "0 nm aTc; 5 uM IPTG",
+        "0 nm aTc; 500 uM IPTG",
+    )
+    assert len(matrix.rows) == 7
+    by_variant_condition = {(row.assay_subject_key, row.condition_key): row for row in matrix.rows}
+    assert by_variant_condition[("retron26", "0 nm aTc; 0 uM IPTG")].normalized_derepression == 0.0
+    assert by_variant_condition[("retron26", "20 nm aTc; 0 uM IPTG")].normalized_derepression == 1.0
+    assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].condition_role == "iptg_dose"
+    assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].rfp_over_od600 == pytest.approx(244.0)
+    assert (
+        by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].value_basis
+        == "reader_spop_reconstructed_from_normalized_endpoint"
+    )
+    assert ("retron195", "0 nm aTc; 5 uM IPTG") not in by_variant_condition
+    assert matrix.missing_cell_count == 1
+
+    tables = write_reader_spop_condition_matrix(matrix, output_dir=tmp_path / "matrix")
+    written = pq.read_table(tables.condition_matrix_path).to_pylist()
+    assert len(written) == 7
+    assert tables.missing_cell_count == 1
 
 
 def test_reader_spop_label_tables_materialize_construct_subject_overlay(tmp_path: Path) -> None:
@@ -566,6 +627,8 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     assert "spop_score_calibrated" in schema["derived_fields"]
     assert "reader_design_id" in schema["required_fields"]
     assert "construct_subject_bridge_status" in schema["required_fields"]
+    assert schema["label_contract"]["positive_control_condition_policy"] == "aTc_nM > 0 and IPTG_uM == 0"
+    assert "20 nm aTc; 0 uM IPTG" in schema["label_contract"]["positive_control_condition_examples"]
 
     contract_doc = repo_root / "docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md"
     assert contract_doc.exists()
@@ -605,7 +668,14 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
         dataset for dataset in datasets["datasets"] if dataset["role"] == "reader_spop_label_plan"
     )
     assert "20260529_retron_Eco1_26_43_177_186_benchmark" in reader_spop_dataset["reader_experiment_ids"]
+    assert (
+        "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in reader_spop_dataset["reader_experiment_ids"]
+    )
     assert reader_spop_dataset["source_of_truth_api"] == "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
+    composite_dataset = next(
+        dataset for dataset in datasets["datasets"] if dataset["role"] == "reader_spop_condition_structure_matrix"
+    )
+    assert composite_dataset["route"].endswith("reader-spop-condition-structure-matrix.md")
 
     pipeline = yaml.safe_load(
         (
@@ -618,3 +688,8 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
         group for group in pipeline["command_groups"] if group["id"] == "reader_spop_label_materialization"
     )
     assert "--write-label-tables" in " ".join(spop_group["commands"])
+    assert any(group["id"] == "reader_spop_condition_structure_matrix" for group in pipeline["command_groups"])
+    composite_group = next(
+        group for group in pipeline["command_groups"] if group["id"] == "reader_spop_condition_structure_matrix"
+    )
+    assert "reader_spop_composite.materialize" in " ".join(composite_group["commands"])

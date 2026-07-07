@@ -32,7 +32,7 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     catalog = build_variant_genbank_catalog(repo_root=_repo_root())
 
     assert catalog.ok, "\n".join(catalog.errors)
-    assert catalog.variant_count == 36
+    assert catalog.variant_count == 42
 
     retron26 = catalog.record("retron26")
     assert retron26.plasmid_name == "pES-retron-26"
@@ -85,6 +85,21 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     assert retron176.construct_projection_status == "representable"
     assert "033-GTG-ACG-CAC" in retron176.comment
 
+    retron195 = catalog.record("retron195")
+    assert retron195.source_kind == "lnrna_only"
+    assert retron195.plasmid_name == "pES-retron-195"
+    assert retron195.lnrna.authority_kind == "msd_record"
+    assert retron195.lnrna.length_nt == 66
+    assert retron195.rt_cds.authority_kind == "wt_eco1_rt"
+    assert retron195.rt_cds.sequence_sha256 == retron26.rt_cds.sequence_sha256
+    assert retron195.construct_subject_id == "rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO"
+    assert "retron_hairpin_design" in retron195.comment
+
+    retron200 = catalog.record("retron200")
+    assert retron200.source_kind == "lnrna_only"
+    assert retron200.lnrna.length_nt == 67
+    assert retron200.rt_cds.sequence_sha256 == retron26.rt_cds.sequence_sha256
+
     bl21 = catalog.record("msrmsdwt_bl21")
     assert bl21.variant_class == "native_lnrna_wt_rt"
     assert bl21.lnrna.label == "record"
@@ -101,7 +116,7 @@ def test_variant_genbank_catalog_source_files_are_study_owned_and_complete() -> 
     temp_dir = repo_root.parent / "temp_location_for_retron_genbanks"
 
     assert not temp_dir.exists()
-    assert len(list(genbank_dir.glob("*.gb"))) == 40
+    assert len(list(genbank_dir.glob("*.gb"))) == 46
     assert not catalog.missing_metadata_source_files
     assert not catalog.missing_genbank_source_files
 
@@ -111,6 +126,7 @@ def test_variant_genbank_catalog_source_files_are_study_owned_and_complete() -> 
     )
     payload = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     assert payload["catalog_id"] == "rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1"
-    assert payload["variant_count"] == 36
+    assert payload["variant_count"] == 42
     assert payload["records"]["retron47"]["rt_cds"]["length_nt"] == 1170
+    assert payload["records"]["retron195"]["lnrna"]["authority_kind"] == "msd_record"
     assert payload["records"]["msrmsdwt_bl21"]["lnrna"]["length_nt"] == 170

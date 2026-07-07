@@ -26,7 +26,9 @@ reader_spop_endpoint_dose_mean_v1
 
 The scalar is endpoint RFP/OD600 derepression under nonzero IPTG, normalized
 within each Reader experiment by the zero-inducer baseline and the aTc positive
-control. This is an endpoint dose-ladder mean, not an AUC.
+control. Positive control means positive aTc and zero IPTG; the actual aTc dose
+is recorded per observation because historical Reader retron benchmarks include
+both 20 nM and 200 nM aTc positive controls. This is an endpoint dose-ladder mean, not an AUC.
 
 The bridge delegates all numeric scoring to Reader's public
 `score_spop_endpoint` API. It must not duplicate SPOP math in dnadesign. The
@@ -59,14 +61,14 @@ Construct-representable. Rows without catalog authority may carry assay labels,
 but they must remain `missing_construct_sequence_authority` until promoted
 through Construct.
 
-As of 2026-05-31, the live Reader bridge resolves the observed catalog-backed
+As of 2026-07-07, the live Reader bridge resolves the observed catalog-backed
 retron rows to Construct subject ids, including retron47/retron48, retron49-56,
-retron170-175, retron177-186, retron26, and retron43. It materializes 42
-Reader SPOP observations across 30 candidate summaries for LatentDNA overlays.
-The 2025-11-05 RT-variant experiment is a single-point mid-log read, not a time
-course; the Reader artifact stores row time as 0 h, but the study planner
-records the endpoint as approximately 10 h after seeding and adds
-`single_point_endpoint_time_override`. The 2026-05-07 retron176 wells are
+retron170-175, retron177-186, retron195-200, retron26, retron43, and retron180.
+It materializes 50 Reader SPOP observations across 36 candidate summaries for
+LatentDNA overlays. The 2025-11-05 RT-variant experiment is a single-point
+mid-log read, not a time course; the Reader artifact stores row time as 0 h, but
+the study planner records the endpoint as approximately 10 h after seeding and
+adds `single_point_endpoint_time_override`. The 2026-05-07 retron176 wells are
 omitted from labels because the plate map carried retron176 but no actual strain
 was present in those wells.
 

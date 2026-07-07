@@ -163,14 +163,15 @@ datasets:
     metadata_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
     catalog_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
     source_dir: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank
-    row_count: 36
-    source_file_count: 40
+    row_count: 42
+    source_file_count: 46
     notes: >-
       Study-owned GenBank authority for additional retron whole-plasmid
-      variants plus the BL21 wild-type lnRNA-only source. The catalog preserves
-      available Benchling URLs and user comments, extracts lnRNA and RT slot
-      spans, and records the prefix/suffix flank adjustment needed to keep full
-      biological slots inside the 2,000 bp Construct view.
+      variants, six retron-hairpin MSD-only handoff records paired with the
+      Eco1 WT RT reference, plus the BL21 wild-type lnRNA-only source. The
+      catalog preserves available Benchling URLs and user comments, extracts
+      lnRNA and RT slot spans, and records the prefix/suffix flank adjustment
+      needed to keep biological slots inside the 2,000 bp Construct view.
   - role: construct_slot_inputs_usr_dataset
     owner_tool: study
     lifecycle: construct_materialization_input
@@ -314,6 +315,7 @@ datasets:
       - 20260418_retron_Eco1_26_43_170_171_benchmark
       - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       - 20260529_retron_Eco1_26_43_177_186_benchmark
+      - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
     notes: >-
       Reader-derived TF-sponging scalar labels from pES-retron plus
       pBbS2c-RFP experiments, materialized for LatentDNA GenBank overlays.
@@ -326,7 +328,34 @@ datasets:
       The 20251105 RT-variant Reader artifact is a single-point mid-log
       read recorded at artifact time 0 h but interpreted as approximately 10 h
       after seeding; the 20260507 retron176 wells are omitted because no actual
-      strain was present.
+      strain was present. The 20260705 benchmark contributes retron195-200 plus
+      retron26/retron180 observations and uses 20 nm aTc as its positive
+      control condition.
+  - role: reader_spop_condition_structure_matrix
+    owner_tool: study_reader_bridge
+    lifecycle: composite_plot_evidence
+    status: materialized_by_study_route
+    source_owner_tool: reader
+    materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.materialize
+    route: docs/studies/rt_lnrna_sponging_construct_triage/routes/reader-spop-condition-structure-matrix.md
+    schemas:
+      condition_matrix: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/reader-spop-condition-matrix.schema.yaml
+      structure_thumbnail_manifest: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/retron-structure-thumbnail-manifest.schema.yaml
+    materialized_outputs:
+      output_root: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1
+      condition_matrix: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/reader_spop_condition_matrix.parquet
+      condition_columns: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/reader_spop_condition_columns.parquet
+      structure_thumbnail_manifest: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/retron_structure_thumbnail_manifest.parquet
+      plot_manifest: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/plots/manifest.json
+    row_count: 178
+    variant_count: 36
+    condition_count: 6
+    missing_cell_count: 87
+    structure_thumbnail_rows: 36
+    notes: >-
+      Study-owned composite evidence surface joining Reader SPOP condition-long
+      rows to retron-hairpin MSD structure thumbnails. Missing condition tiles
+      remain missing in plots and tables; they are not imputed as zero.
   - role: opal_training_examples_usr_dataset
     owner_tool: study
     lifecycle: opal_training_examples

@@ -221,8 +221,19 @@ def write_variant_genbank_catalog(
     if not catalog.ok:
         raise VariantGenBankCatalogError("; ".join(catalog.errors))
     destination = root / (output_path or _DEFAULT_CATALOG_PATH)
-    destination.write_text(yaml.safe_dump(catalog.to_dict(), sort_keys=False), encoding="utf-8")
+    destination.write_text(_catalog_yaml_text(catalog), encoding="utf-8")
     return catalog
+
+
+def _catalog_yaml_text(catalog: VariantGenBankCatalog) -> str:
+    text = yaml.safe_dump(catalog.to_dict(), sort_keys=False)
+    lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith(("source_sha256:", "sequence_sha256:")) and "# pragma: allowlist secret" not in line:
+            line = f"{line}  # pragma: allowlist secret"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
 
 
 def _build_record(
@@ -248,7 +259,11 @@ def _build_record(
         raise VariantGenBankCatalogError(
             f"{variant_id}: whole-plasmid source must be circular, got {record.topology!r}"
         )
-    if source_kind == "lnrna_only" and record.topology != "linear":
+    if (
+        source_kind == "lnrna_only"
+        and record.topology != "linear"
+        and not (record.topology is None and _allows_missing_linear_topology(item))
+    ):
         raise VariantGenBankCatalogError(f"{variant_id}: lnRNA-only source must be linear, got {record.topology!r}")
 
     lnrna = _extract_lnrna_authority(variant_id=variant_id, item=item, record=record, source_file=source_file)
@@ -311,6 +326,11 @@ def _extract_lnrna_authority(
         start = 0
         end = len(record.sequence)
         label = "record"
+    elif extraction == "msd_record":
+        _require_hairpin_msd_roles(record, variant_id=variant_id)
+        start = 0
+        end = len(record.sequence)
+        label = "msd_record"
     elif extraction == "legacy_msr_to_a2":
         start_feature = _one_feature(record, "msr", variant_id=variant_id)
         end_feature = _one_feature(record, "a2", variant_id=variant_id)
@@ -540,6 +560,19 @@ def _require_mutation_labels(record: Any, *, labels: tuple[str, ...], variant_id
         raise VariantGenBankCatalogError(f"{variant_id}: missing expected RT mutation label(s): {missing}")
 
 
+def _require_hairpin_msd_roles(record: Any, *, variant_id: str) -> None:
+    observed_roles = {
+        qualifier.value
+        for feature in record.features
+        for qualifier in feature.qualifiers
+        if qualifier.key == "dnadesign_role"
+    }
+    required_roles = {"payload_primary", "payload_complement", "snapback_foldback_geometry"}
+    missing = sorted(required_roles - observed_roles)
+    if missing:
+        raise VariantGenBankCatalogError(f"{variant_id}: missing MSD handoff role(s): {', '.join(missing)}")
+
+
 def _single_record(
     *,
     parser: BiopythonGenBankParser,
@@ -572,6 +605,10 @@ def _source_kind(item: Mapping[str, object]) -> str:
         variant_id = str(item.get("variant_id") or "<unknown>")
         raise VariantGenBankCatalogError(f"{variant_id}: unsupported source_kind {kind!r}")
     return kind
+
+
+def _allows_missing_linear_topology(item: Mapping[str, object]) -> bool:
+    return str(item.get("lnrna_extraction") or "").strip() == "msd_record"
 
 
 def _duplicates(values: Sequence[str]) -> tuple[str, ...]:

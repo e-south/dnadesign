@@ -19,7 +19,11 @@ label_contract:
   reporter_plasmid_id: pBbS2c-RFP
   reporter_design_id: pBbS2c-rfp
   reporter_readout: RFP/OD600
-  positive_control_condition: 200 nm aTc; 0 uM IPTG
+  positive_control_condition_policy: aTc_nM > 0 and IPTG_uM == 0
+  positive_control_condition_examples:
+    - 20 nm aTc; 0 uM IPTG
+    - 200 nm aTc; 0 uM IPTG
+  positive_control_atc_nM: recorded_per_observation
   baseline_condition: 0 nm aTc; 0 uM IPTG
   iptg_scoring_policy: nonzero_iptg_only
   default_lambda_viability: 0.5
@@ -72,6 +76,7 @@ construct_subject_bridge_status_values:
 validation_rules:
   - Reader rows must parse treatment strings into explicit aTc nM and IPTG uM values.
   - The zero-inducer baseline and aTc positive-control rows are required before scoring.
+  - Positive-control rows must have positive aTc and zero IPTG; the actual aTc nM value must be recorded per observation rather than normalized to 200 nM.
   - At least one nonzero IPTG condition is required before emitting a scalar label.
   - Wider retron variants may receive Reader SPOP labels before Construct promotion, but must carry missing_construct_sequence_authority until explicit RT plus lnRNA authority exists.
   - OPAL SPOP campaigns receive this scalar through spop_v1/spop after a selected fixed-size X and real Reader labels exist; OPAL remains blocked before then.
