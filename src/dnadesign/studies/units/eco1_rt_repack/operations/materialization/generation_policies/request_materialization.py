@@ -35,7 +35,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     DEFAULT_SOURCE_OUTPUT_ROOT,
     GENERATION_POLICY_VERSION,
     POLICY_INPUT_DIR_NAME,
-    PRIMARY_POLICY_IDS,
     PROTEINMPNN_BATCH_SIZE,
     PROTEINMPNN_CHAIN_ID,
     PROTEINMPNN_NAME,
@@ -45,11 +44,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     REQUEST_DIR_NAME,
     STRUCTURE_SOURCES,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.manifest_io import (
+    load_valid_generation_policy_manifest,
+    resolve_recorded_path,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.models import (
     MaterializedGenerationPolicyRequests,
-)
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.pipeline import (
-    generation_policy_payload_hash,
 )
 from dnadesign.thread.adapters.proteinmpnn import (
     assigned_chains_payload,
@@ -79,9 +79,9 @@ def materialize_generation_policy_requests(
     policy_root = _resolve_path(root, generation_policy_root or DEFAULT_GENERATION_POLICIES_ROOT)
     source_root = _resolve_path(root, source_output_root or DEFAULT_SOURCE_OUTPUT_ROOT)
     policy_manifest_path = policy_root / "generation_policy_manifest.yaml"
-    manifest = _load_valid_policy_manifest(policy_manifest_path)
-    positions_path = _resolve_recorded_path(policy_root, manifest["position_manifest_path"])
-    alphabets_path = _resolve_recorded_path(policy_root, manifest["alphabet_manifest_path"])
+    manifest = load_valid_generation_policy_manifest(policy_manifest_path)
+    positions_path = resolve_recorded_path(policy_root, manifest["position_manifest_path"])
+    alphabets_path = resolve_recorded_path(policy_root, manifest["alphabet_manifest_path"])
     positions = pq.read_table(positions_path).to_pylist()
     alphabets = pq.read_table(alphabets_path).to_pylist()
 
@@ -277,32 +277,6 @@ def _materialize_one_policy_request(
     return manifest_path
 
 
-def _load_valid_policy_manifest(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        raise FileNotFoundError(path)
-    manifest = load_yaml(path)
-    if manifest.get("schema_id") != "eco1_rt.generation_policy_manifest":
-        raise ValueError("generation_policy_manifest.yaml must use schema_id eco1_rt.generation_policy_manifest")
-    if manifest.get("generation_policy_version") != GENERATION_POLICY_VERSION:
-        raise ValueError(f"generation_policy_version must be {GENERATION_POLICY_VERSION}")
-    policies = manifest.get("generation_policies")
-    if not isinstance(policies, list) or not policies:
-        raise ValueError("generation_policy_manifest.yaml must declare generation_policies")
-    for policy in policies:
-        policy_map = require_mapping(policy, "generation_policies[]")
-        policy_id = require_text(policy_map, "policy_id")
-        if _looks_like_legacy_design_class_id(policy_id):
-            raise ValueError(f"legacy design-class id {policy_id!r} is not valid for v2 request materialization")
-        if policy_id not in PRIMARY_POLICY_IDS:
-            raise ValueError(f"unknown generation policy id {policy_id!r}")
-    observed_hash = manifest.get("policy_manifest_hash")
-    without_hash = {key: value for key, value in manifest.items() if key != "policy_manifest_hash"}
-    expected_hash = generation_policy_payload_hash(without_hash)
-    if observed_hash != expected_hash:
-        raise ValueError(f"policy_manifest_hash mismatch: {observed_hash!r} != {expected_hash!r}")
-    return manifest
-
-
 def _copy_policy_inputs(
     *,
     policy_root: Path,
@@ -354,15 +328,6 @@ def _alphabet_enforcement_note(modes: Sequence[str]) -> str:
 def _resolve_path(repo_root: Path, path: Path) -> Path:
     resolved = path.expanduser()
     return resolved if resolved.is_absolute() else (repo_root / resolved).resolve()
-
-
-def _resolve_recorded_path(root: Path, value: Any) -> Path:
-    path = Path(str(value)).expanduser()
-    return path if path.is_absolute() else (root / path).resolve()
-
-
-def _looks_like_legacy_design_class_id(policy_id: str) -> bool:
-    return policy_id.startswith("eco1_rt_") and "contact" in policy_id and policy_id.endswith("_v1")
 
 
 def _require_positive_int(value: Any, name: str) -> int:

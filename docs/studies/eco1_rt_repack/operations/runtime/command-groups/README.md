@@ -234,6 +234,46 @@ rsync -avz \
 ProteinMPNN generation ends at the per-policy sample and candidate tables. It
 does not run fold checks, selection, or review deliverable regeneration.
 
+After `generation_policies_v2/` has been pulled back to the local clone,
+aggregate complete generated sequences by policy and write a local ColabFold
+request:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
+  --repo-root . \
+  candidate-pool
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
+  --repo-root . \
+  foldcheck-request
+```
+
+The candidate pool deduplicates exact protein sequences and records source
+policy provenance. It does not combine mutations across policy outputs. The
+fold-check request writes `generation_policies_v2/foldcheck_request/` with a
+WT-plus-candidate FASTA and a request manifest for the external ColabFold CLI.
+
+For a local smoke run, first materialize a bounded FASTA from that request:
+
+```bash
+uv run python -m dnadesign.thread.foldcheck.subset \
+  --request-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_request/foldcheck_request_manifest.yaml \
+  --sequence-limit 6 \
+  --sequence-start 1 \
+  --input-fasta src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  --run-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_run_manifest.yaml \
+  --output-dir src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs \
+  --schema-id eco1_rt.colabfold_local_run_manifest \
+  --execution-status planned_local_colabfold_cli
+```
+
+Then run the local ColabFold binary against the staged subset:
+
+```bash
+colabfold_batch --num-models 1 \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs
+```
+
 The active accepted study record remains the v1 design-class bundle until the
 v2 ProteinMPNN outputs, candidate pool, fold checks, selection, and review
 bundle are regenerated and accepted.

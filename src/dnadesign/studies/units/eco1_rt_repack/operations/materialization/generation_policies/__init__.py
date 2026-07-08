@@ -21,6 +21,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     GenerationPolicyConfig,
     GenerationPolicySpec,
     MaterializedGenerationPolicies,
+    MaterializedGenerationPolicyCandidatePool,
+    MaterializedGenerationPolicyFoldCheckRequest,
     MaterializedGenerationPolicyRequests,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.pipeline import (
@@ -28,6 +30,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     materialize_generation_policies,
 )
 
+from .candidate_pool import materialize_generation_policy_candidate_pool
+from .foldcheck import materialize_generation_policy_foldcheck_request
 from .request_materialization import materialize_generation_policy_requests
 
 __all__ = [
@@ -35,10 +39,14 @@ __all__ = [
     "PRIMARY_POLICY_IDS",
     "GenerationPolicyConfig",
     "GenerationPolicySpec",
+    "MaterializedGenerationPolicyCandidatePool",
+    "MaterializedGenerationPolicyFoldCheckRequest",
     "MaterializedGenerationPolicies",
     "MaterializedGenerationPolicyRequests",
     "build_default_generation_policy_config",
     "generation_policy_payload_hash",
+    "materialize_generation_policy_candidate_pool",
+    "materialize_generation_policy_foldcheck_request",
     "materialize_generation_policy_requests",
     "materialize_generation_policies",
     "validate_generation_policy_config",

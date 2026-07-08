@@ -52,3 +52,22 @@ class MaterializedGenerationPolicyRequests:
     positions_path: Path
     alphabets_path: Path
     request_manifest_paths: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class MaterializedGenerationPolicyCandidatePool:
+    """Paths emitted by v2 candidate-pool aggregation."""
+
+    policy_manifest_path: Path
+    candidate_pool_path: Path
+    manifest_path: Path
+
+
+@dataclass(frozen=True)
+class MaterializedGenerationPolicyFoldCheckRequest:
+    """Paths emitted by v2 fold-check request materialization."""
+
+    candidate_pool_path: Path
+    candidate_pool_manifest_path: Path
+    input_fasta_path: Path
+    request_manifest_path: Path

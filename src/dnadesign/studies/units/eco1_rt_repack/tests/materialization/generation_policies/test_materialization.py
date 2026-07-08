@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import yaml
@@ -22,6 +23,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     PRIMARY_POLICY_IDS,
     build_default_generation_policy_config,
     materialize_generation_policies,
+    materialize_generation_policy_candidate_pool,
+    materialize_generation_policy_foldcheck_request,
     materialize_generation_policy_requests,
     request_materialization,
     validate_generation_policy_config,
@@ -196,3 +199,99 @@ def test_bu_scc_generation_policy_job_template_is_policy_first() -> None:
     assert "materialization.generation_policies" in text
     assert "design_classes" not in text
     assert "DESIGN_CLASS_ID" not in text
+
+
+def test_generation_policy_candidate_pool_aggregates_complete_policy_outputs(tmp_path: Path) -> None:
+    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    _write_candidate_table(
+        tmp_path / "distal_scaffold_repack_v1" / "candidate_table.parquet",
+        [
+            _candidate_row("thread_candidate_a", "sha256:a", ["M20I"], 1),
+            _candidate_row("thread_candidate_shared", "sha256:shared", ["M20I", "D25S"], 2),
+        ],
+    )
+    _write_candidate_table(
+        tmp_path / "near_dna_rna_acid_free_v1" / "candidate_table.parquet",
+        [
+            _candidate_row("thread_candidate_b", "sha256:b", ["N21R"], 1),
+            _candidate_row("thread_candidate_shared", "sha256:shared", ["M20I", "D25S"], 2),
+        ],
+    )
+    _write_candidate_table(
+        tmp_path / "combined_near_acid_free_plus_distal_v1" / "candidate_table.parquet",
+        [_candidate_row("thread_candidate_c", "sha256:c", ["M20I", "N21R"], 1)],
+    )
+
+    result = materialize_generation_policy_candidate_pool(repo_root=Path.cwd(), generation_policy_root=tmp_path)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    rows = pq.read_table(result.candidate_pool_path).to_pylist()
+
+    assert result.policy_manifest_path == tmp_path / "generation_policy_manifest.yaml"
+    assert manifest["schema_id"] == "eco1_rt.generation_policy_candidate_pool_manifest"
+    assert manifest["candidate_pool_row_count"] == 4
+    assert manifest["duplicate_sequence_count"] == 1
+    assert len(rows) == 4
+    assert {row["policy_id"] for row in rows} <= set(PRIMARY_POLICY_IDS)
+    shared = next(row for row in rows if row["sequence_hash"] == "sha256:shared")
+    assert shared["source_policy_ids"] == ["distal_scaffold_repack_v1", "near_dna_rna_acid_free_v1"]
+    assert shared["primary_policy_id"] == "distal_scaffold_repack_v1"
+
+
+def test_generation_policy_foldcheck_request_writes_v2_fasta(tmp_path: Path) -> None:
+    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    _write_candidate_table(
+        tmp_path / "distal_scaffold_repack_v1" / "candidate_table.parquet",
+        [_candidate_row("thread_candidate_a", "sha256:a", ["M20I"], 1)],
+    )
+    _write_candidate_table(
+        tmp_path / "near_dna_rna_acid_free_v1" / "candidate_table.parquet",
+        [_candidate_row("thread_candidate_b", "sha256:b", ["N21R"], 1)],
+    )
+    _write_candidate_table(
+        tmp_path / "combined_near_acid_free_plus_distal_v1" / "candidate_table.parquet",
+        [_candidate_row("thread_candidate_c", "sha256:c", ["M20I", "N21R"], 1)],
+    )
+
+    result = materialize_generation_policy_foldcheck_request(repo_root=Path.cwd(), generation_policy_root=tmp_path)
+    manifest = yaml.safe_load(result.request_manifest_path.read_text(encoding="utf-8"))
+    fasta = result.input_fasta_path.read_text(encoding="utf-8")
+
+    assert result.candidate_pool_path == tmp_path / "candidate_pool.parquet"
+    assert manifest["schema_id"] == "thread.foldcheck_request"
+    assert manifest["artifact_id"] == "eco1_rt_generation_policies_v2.foldcheck_request"
+    assert manifest["sequence_count"] == 4
+    assert manifest["storage_policy"]["preferred_runtime_locus"] == "local_julius_colabfold"
+    assert ">wild_type" in fasta
+    assert ">thread_candidate_a" in fasta
+    assert ">thread_candidate_b" in fasta
+    assert ">thread_candidate_c" in fasta
+
+
+def _write_candidate_table(path: Path, rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.Table.from_pylist(rows), path)
+
+
+def _candidate_row(candidate_id: str, sequence_hash: str, mutations: list[str], rank: int) -> dict[str, object]:
+    return {
+        "candidate_id": candidate_id,
+        "source_sample_id": f"sample_{candidate_id}",
+        "backend_run_id": "test_run",
+        "request_hash": "sha256:test",
+        "sequence_hash": sequence_hash,
+        "sequence": "TEST",
+        "score": 1.0,
+        "global_score": 1.0,
+        "seq_recovery": 0.5,
+        "seed": 101,
+        "temperature": 0.1,
+        "sample_index": rank,
+        "duplicate_sample_count": 1,
+        "mutation_count": len(mutations),
+        "mutable_mutation_count": len(mutations),
+        "protected_mutation_count": 0,
+        "outside_mutable_positions": [],
+        "canonical_mutations": mutations,
+        "status": "accepted",
+        "rank": rank,
+    }

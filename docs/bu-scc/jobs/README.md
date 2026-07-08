@@ -286,6 +286,33 @@ and `candidate_table.parquet` materialization. It does not automatically run
 ColabFold. After local pull-back, regenerate the v2 candidate-pool/fold-check
 inputs from the policy-provenance tables, then run the local ColabFold path.
 
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
+  --repo-root . \
+  candidate-pool
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
+  --repo-root . \
+  foldcheck-request
+```
+
+For a bounded local smoke run, create a six-record FASTA from the v2 request
+before running `colabfold_batch`:
+
+```bash
+uv run python -m dnadesign.thread.foldcheck.subset \
+  --request-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_request/foldcheck_request_manifest.yaml \
+  --sequence-limit 6 \
+  --sequence-start 1 \
+  --input-fasta src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  --run-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_run_manifest.yaml \
+  --output-dir src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs \
+  --schema-id eco1_rt.colabfold_local_run_manifest \
+  --execution-status planned_local_colabfold_cli
+colabfold_batch --num-models 1 \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs
+```
+
 ### Eco1 ColabFold fold-check submissions
 
 The Eco1 ColabFold template consumes the materialized fold-check request:
