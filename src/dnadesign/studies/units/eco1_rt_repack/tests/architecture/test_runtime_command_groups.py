@@ -40,6 +40,7 @@ _EXECUTABLE_LANES = {
     "contact_risk_profile",
     "design_class_requests",
     "design_class_candidate_pool",
+    "generation_policy_requests",
     "sampling_plan",
     "sample_ingest",
     "candidate_table",
@@ -56,6 +57,8 @@ _EXTERNAL_LANES = {
     "colabfold_scc_smoke",
     "design_class_proteinmpnn_scc_array",
     "design_class_proteinmpnn_scc_smoke",
+    "generation_policy_proteinmpnn_scc_array",
+    "generation_policy_proteinmpnn_scc_smoke",
 }
 _PLANNED_LANES = {
     "refine_dev_spec",
@@ -116,6 +119,8 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["colabfold_scc_smoke"]["owner"] == "bu_scc_runtime"
     assert by_id["design_class_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
     assert by_id["design_class_proteinmpnn_scc_array"]["owner"] == "bu_scc_runtime"
+    assert by_id["generation_policy_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
+    assert by_id["generation_policy_proteinmpnn_scc_array"]["owner"] == "bu_scc_runtime"
     assert by_id["foldcheck_report"]["owner"] == "thread"
     assert by_id["atlas_semantic_profile"]["owner"] == "thread"
     assert by_id["biohub_esmc_sae_profile"]["owner"] == "thread"
@@ -127,6 +132,7 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
     assert by_id["design_class_requests"]["owner"] == "eco1_rt_repack"
     assert by_id["design_class_candidate_pool"]["owner"] == "eco1_rt_repack"
+    assert by_id["generation_policy_requests"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]
     assert "dnadesign.aligner.msa.visualization" in by_id["conservation_visualizations"]["command"]["argv"]
 

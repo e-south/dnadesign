@@ -1,0 +1,112 @@
+#!/bin/bash -l
+#$ -N eco1_proteinmpnn_generation_policy
+#$ -P dunlop
+#$ -l h_rt=04:00:00
+#$ -pe omp 1
+#$ -l mem_per_core=8G
+#$ -j y
+#$ -o /project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
+
+set -euo pipefail
+
+# Eco1 ProteinMPNN generation-policy runtime lane.
+# This job consumes one complete v2 policy request at a time. Combined proximal
+# plus distal hypotheses must come from the combined upstream policy, not from
+# mutation merging after generation.
+
+module purge
+
+export OMP_NUM_THREADS="${NSLOTS:-1}"
+
+repo_root="${DNADESIGN_REPO:-$PWD}"
+cd "$repo_root"
+
+generation_policies_root="${ECO1_GENERATION_POLICIES_ROOT:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2}"
+policy_ids_csv="${ECO1_GENERATION_POLICY_IDS:-distal_scaffold_repack_v1,near_dna_rna_acid_free_v1,combined_near_acid_free_plus_distal_v1}"
+proteinmpnn_root="${PROTEINMPNN_ROOT:-.var/tools/proteinmpnn}"
+
+IFS=',' read -r -a policy_ids <<<"$policy_ids_csv"
+
+if [[ -n "${GENERATION_POLICY_ID:-}" ]]; then
+  policy_id="$GENERATION_POLICY_ID"
+else
+  task_id="${SGE_TASK_ID:-1}"
+  if ! [[ "$task_id" =~ ^[0-9]+$ ]]; then
+    echo "SGE_TASK_ID must be numeric when GENERATION_POLICY_ID is not set: $task_id" >&2
+    exit 2
+  fi
+  policy_index=$((task_id - 1))
+  if ((policy_index < 0 || policy_index >= ${#policy_ids[@]})); then
+    echo "SGE_TASK_ID $task_id is outside the policy map with ${#policy_ids[@]} entries." >&2
+    exit 2
+  fi
+  policy_id="${policy_ids[$policy_index]}"
+fi
+
+case "$policy_id" in
+  distal_scaffold_repack_v1|near_dna_rna_acid_free_v1|combined_near_acid_free_plus_distal_v1) ;;
+  *)
+    echo "Unknown Eco1 v2 generation policy: $policy_id" >&2
+    exit 2
+    ;;
+esac
+
+if [[ ! -f "$proteinmpnn_root/protein_mpnn_run.py" ]]; then
+  echo "PROTEINMPNN_ROOT must point to an official ProteinMPNN checkout containing protein_mpnn_run.py: $proteinmpnn_root" >&2
+  exit 2
+fi
+
+policy_root="$generation_policies_root/$policy_id"
+request_manifest="$policy_root/proteinmpnn_request/request_manifest.yaml"
+sample_table="$policy_root/sample_table.parquet"
+candidate_table="$policy_root/candidate_table.parquet"
+
+if [[ ! -f "$request_manifest" ]]; then
+  mkdir -p "$generation_policies_root"
+  requests_lock="$generation_policies_root/.requests.lock"
+  (
+    flock 9
+    if [[ ! -f "$request_manifest" ]]; then
+      uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
+        --repo-root . \
+        --output-root "$generation_policies_root" \
+        all
+    fi
+  ) 9>"$requests_lock"
+fi
+
+if [[ ! -f "$request_manifest" ]]; then
+  echo "Generation-policy ProteinMPNN request manifest does not exist: $request_manifest" >&2
+  exit 2
+fi
+
+overwrite_args=()
+if [[ "${ECO1_PROTEINMPNN_OVERWRITE:-0}" == "1" ]]; then
+  overwrite_args+=(--overwrite)
+fi
+
+echo "Running Eco1 generation policy: $policy_id"
+echo "Request manifest: $request_manifest"
+echo "ProteinMPNN root: $proteinmpnn_root"
+
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest \
+  --repo-root . \
+  --output-root "$policy_root" \
+  --proteinmpnn-root "$proteinmpnn_root" \
+  "${overwrite_args[@]}"
+
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table \
+  --repo-root . \
+  --output-root "$policy_root"
+
+if [[ ! -f "$sample_table" ]]; then
+  echo "ProteinMPNN sample table was not written: $sample_table" >&2
+  exit 2
+fi
+if [[ ! -f "$candidate_table" ]]; then
+  echo "Generation-policy candidate_table.parquet was not written: $candidate_table" >&2
+  exit 2
+fi
+
+echo "Wrote $sample_table"
+echo "Wrote $candidate_table"

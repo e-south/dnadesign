@@ -197,6 +197,33 @@ These outputs are WT-context masked-marginal additive LLR review tables. They
 are not whole-protein likelihoods, assay measurements, or panel-selection
 inputs.
 
+### Generation-Policy V2 Request Lane
+
+The planned v2 cleanup uses complete generation policies rather than the nested
+distance-mask design classes. The request lane writes
+`generation_policies_v2/generation_policy_manifest.yaml`, position and alphabet
+manifests, and one `proteinmpnn_request/request_manifest.yaml` per policy:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies --repo-root . all
+```
+
+The SCC template runs one complete policy per array task and does not combine
+mutations across policies:
+
+```bash
+qsub -t 1 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
+qsub -t 2-3 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
+```
+
+The active accepted study record remains the v1 design-class bundle until the
+v2 ProteinMPNN outputs, candidate pool, fold checks, selection, and review
+bundle are regenerated and accepted.
+
 ### Protein Review Panel Preparation
 
 The next local summaries prepare the expanded candidate pool for a six-variant

@@ -13,6 +13,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `eco1-proteinmpnn-design-class.qsub`: Eco1 ProteinMPNN design-class array run
+- `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v2 generation-policy array run
 - `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
@@ -37,6 +38,9 @@ qsub -P <project> \
 qsub -t 1 \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
+qsub -t 1 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 qsub \
   -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
@@ -193,6 +197,47 @@ Use `qsub -t 1-5` only when no class has already been materialized or when
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . foldcheck-request
 ```
+
+### Eco1 ProteinMPNN generation-policy submissions
+
+The Eco1 generation-policy template is the forward v2 lane. It consumes request
+roots under:
+
+```text
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+```
+
+It maps SGE task ids to the three complete v2 policies:
+`distal_scaffold_repack_v1`, `near_dna_rna_acid_free_v1`, and
+`combined_near_acid_free_plus_distal_v1`. Each task runs one complete
+ProteinMPNN policy. The template does not combine mutations across policy
+outputs.
+
+If request sidecars are missing, the template materializes
+`generation_policy_manifest.yaml`, `generation_policy_positions.parquet`,
+`generation_policy_alphabets.parquet`, and per-policy
+`proteinmpnn_request/request_manifest.yaml` before running ProteinMPNN.
+
+Use a one-policy smoke first:
+
+```bash
+mkdir -p /project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs
+qsub -t 1 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
+```
+
+After the smoke writes `sample_table.parquet` and `candidate_table.parquet` for
+the first policy, run the remaining policies:
+
+```bash
+qsub -t 2-3 \
+  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
+  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
+```
+
+Use `qsub -t 1-3` only when no policy has already been materialized or when
+`ECO1_PROTEINMPNN_OVERWRITE=1` is intentional.
 
 ### Eco1 ColabFold fold-check submissions
 
