@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/rendering.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/rendering.py
 
-Shared SVG rendering helpers for Eco1 review deliverables.
+Shared SVG rendering helpers for Eco1 materializers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

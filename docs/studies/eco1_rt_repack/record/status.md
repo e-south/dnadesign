@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-status
 surface: study-record
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 status_surface: record-only
 ---
 
@@ -14,8 +14,11 @@ status_surface: record-only
 Selection readiness is materialized for the expanded design-class pool, and
 RT-only `candidate_handoff.yaml` is not materialized. The compact Phase 3
 fold-check contract validates locally, and the expanded selection-readiness and
-review-deliverables surfaces are current for protein-panel review. The study
-has the required structure, source, alignment,
+review-deliverables surfaces are current for protein-panel review. The
+review-deliverables bundle is materialized with a degraded optional-render
+status: core notebook, selection, and structure-browser artifacts are current,
+while optional ChimeraX PNG renders are reused or skipped unless explicitly
+regenerated. The study has the required structure, source, alignment,
 conservation evidence, manual mask authority, mask set, explicit thread plan,
 ProteinMPNN request, backend run manifests, sample/candidate tables, fold-check
 requests, compact fold-check reports, and expanded review evidence under
@@ -167,7 +170,8 @@ handled separately.
   policy id, DNA-design status, and restriction-screen status. It is not an
   E. coli codon-optimized DNA design and has not passed restriction-site
   screening.
-- `review_deliverables/` is materialized as the study visual bundle. It writes
+- `review_deliverables/` is materialized as the study visual bundle with
+  degraded optional-render status. It writes
   `review_deliverable_manifest.yaml`, the clade 9 and subtype MSA panels,
   design-class mask evidence, a ChimeraX mask-context script, baseline
   ProteinMPNN audit plots, an expanded design-class ProteinMPNN/ColabFold
@@ -342,10 +346,9 @@ mutable positions and losing 18 relative to the baseline.
 
 No declared design class leaves the eight-position Wang thumb-contact track
 mutable. The current primary panel therefore preserves the declared thumb track
-while sampling near retained DNA/RNA and C-terminal/thumb-domain-adjacent
-mapped residues only through positions allowed by the stricter primary-panel
-checks. It does not support saying that the current panel directly tests
-thumb-track tuning.
+and only samples near retained DNA/RNA residues if a row passes the preservation
+and chemistry/support gates. It does not support saying that the current panel
+directly tests thumb-track tuning.
 
 ### Validator Commands
 
@@ -393,8 +396,8 @@ separate branch-pocket model in this slice.
 | `catalytic_initiation_context` | Eco1 residues 189-204 around YADD 195-198 | 1.50 A |
 | `retron_y_vtg_context` | Eco1 residues 237-251 around VTG 243-245 | 1.60 A |
 | `thumb_contact_track_context` | Wang/Ec86 positions 238, 239, 240, 249, 257, 261, 264, and 298; stricter preservation screen for documented thumb/RNA contact context | 2.50 A |
-| `c_terminal_primer_rna_recognition_context` | Eco1 mapped residues 255-311 in the C-terminal primer-RNA recognition context; canonical residues 312-320 are missing backbone in the current 7V9U-backed fixed-backbone scope | 3.50 A |
-| `near_retained_dna_rna_annulus` | Derived near retained DNA/RNA region: residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions | 3.00 A |
+| `c_terminal_primer_rna_recognition_context` | Eco1 mapped residues 255-311 in the C-terminal primer-RNA recognition context; canonical residues 312-320 are missing backbone in the current 7V9U-backed fixed-backbone scope | 2.50 A |
+| Near retained DNA/RNA region | Derived near retained DNA/RNA region: residues >5 A and <=10 A from retained DNA/RNA, excluding motif contexts, direct contacts, and thumb-track positions. Legacy machine id: `near_retained_dna_rna_annulus` | 3.00 A |
 | `distal_scaffold_control` | Mapped residues outside motif contexts, direct contacts, the near retained DNA/RNA region, and thumb-track positions | 4.75 A |
 
 All local RMSD values are computed after one global mapped C-alpha fit to the
@@ -414,19 +417,23 @@ an activity or specificity prediction.
 2. Treat `feasibility_report.parquet` as computational full-gene feasibility,
    not a synthesis quote or wet-lab assembly plan. All 576 expanded synthetic
    rows are currently feasible under this computational gate.
-3. Use `candidate_triage_table.parquet` as the reviewer filter surface. It has
-   220 broad-contract rows, 29 boundary-candidate rows, 191 primary-panel
-   candidate rows, and 356 rows outside the panel contract. The regenerated
-   table records MSA support, mutation geography near retained DNA/RNA,
+3. Use `candidate_triage_table.parquet` as the reviewer filter surface. The
+   current simplified funnel is 576 accepted candidates, 204 preservation-pass
+   rows, 105 chemistry/support-pass primary candidates, and 6 selected rows.
+   The table records MSA support, mutation geography near retained DNA/RNA,
    thumb-track, and C-terminal primer-RNA recognition contexts, local chemistry,
    local-structure gate fields, and source-artifact hashes for those review
    axes. Canonical mutation tokens are parsed strictly because mutation
    geography now affects hard-gate status. Local-structure metrics must be
    available for each declared review region and pass the declared local
-   C-alpha RMSD thresholds before a row can be panel-eligible. The Wang
-   thumb-contact track uses a stricter `2.50 A` local RMSD threshold than the
-   generic near retained DNA/RNA region. In the current expanded pool, 504 rows
-   pass the local-structure gate and 72 rows exceed a local RMSD threshold.
+   C-alpha RMSD thresholds before a row can be panel-eligible. These
+   thresholds are declared structural-preservation review cutoffs, not
+   literature-calibrated activity boundaries. The Wang thumb-contact track and
+   C-terminal primer-RNA recognition context use stricter `2.50 A` local RMSD
+   thresholds than the generic near retained DNA/RNA region. In the current
+   expanded pool, 215 rows pass the local-structure gate and 361 rows exceed at
+   least one local RMSD threshold; most failures are driven by the C-terminal
+   primer-RNA recognition context and Wang thumb-track local-structure checks.
 4. Use `local_structure_threshold_sensitivity.parquet` and
    `region_msa_support.parquet` as audit tables for the local RMSD gate and
    regional natural-sequence support.
@@ -449,29 +456,43 @@ an activity or specificity prediction.
    C-terminal primer-RNA recognition context, selected substitutions across RT
    regions, pass/fail gate counts by design class, the selected-panel premise
    checklist, and selected-row mutation-set dissimilarity.
-6. Use `candidate_selection_panel.parquet` and
+6. Treat `contexts/generation-policy-cleanup-dev-spec.md` as the planned
+   breaking cleanup for the next upstream generation-policy redesign. It is not
+   current runtime behavior. The intended cleanup replaces the nested
+   distance-mask design-class story with complete ProteinMPNN generation
+   policies and a full end-to-end regeneration.
+7. Use `candidate_selection_panel.parquet` and
    `candidate_handoff_sequences.csv` as the current RT-only protein
-   review surface. The panel is selected globally from primary candidates after
-   protein-contract checks, stricter C-terminal/thumb local RMSD review, and
-   minimum directional chemistry checks near retained DNA/RNA. Proximal MSA
-   support, local chemistry warnings, mutation-set dissimilarity, local
-   structure, and fold metrics define the final rank order. Design classes
-   remain mask-policy context, not quotas. The final reduction is panel
-   selection, not a global activity ranking.
-   The selected rows are all `strong_fold_preserved` and all come from the
-   conservative `eco1_rt_clade9_plurality25_contact10a_v1` design class:
-   `thread_candidate_2adf3e3a8881`,
-   `thread_candidate_898e18218173`, `thread_candidate_930a654cf13f`,
-   `thread_candidate_28087f9250c9`, `thread_candidate_e0b40d275837`, and
-   `thread_candidate_9545e08c9ab9`. The selected rows preserve the declared
-   near retained DNA/RNA region and Wang thumb-contact track in this primary
-   panel; they do not test direct substrate-facing or thumb-track tuning.
-7. Keep SAE windowing as review evidence only. The current table records
+   review surface. The panel is selected globally after preservation and
+   chemistry/support gates. The preservation gate requires strong fold,
+   protected/contact/thumb-track preservation, and one declared local RMSD gate
+   table that includes the C-terminal primer-RNA recognition region. The
+   chemistry/support gate requires no acidic gains near retained DNA/RNA and no
+   unobserved proximal substitutions. Mutation-set dissimilarity, basic losses
+   and Pro/Gly gains near retained DNA/RNA, regional MSA support, local RMSD
+   values inside the gate, and fold metrics define the final rank order.
+   Design classes remain mask-policy
+   context, not quotas. The final reduction is panel selection, not a global
+   activity ranking.
+   The selected rows are all `strong_fold_preserved`, have zero Wang
+   thumb-contact-track mutations, and pass the near retained DNA/RNA acidic-gain
+   and proximal-support checks. If near retained DNA/RNA basic-gain candidates
+   enter the panel, they do so through the same safety and diversity order, not
+   through a forced lane. The correct interpretation is: the current primary
+   panel preserves the direct substrate-facing and Wang thumb-track contexts
+   while including one acid-free near-region basic-gain row. The selected rows
+   share recurring ProteinMPNN substitutions, so the panel is partly
+   nonredundant rather than six independent mechanistic hypotheses. It does not
+   test direct thumb-track tuning or claim processivity or strand-displacement
+   improvement.
+8. Keep SAE windowing as review evidence only. The current table records
    `wt_like_not_used_for_selection` for every synthetic row, so SAE does not
    nominate a mechanistic slot.
-8. Emit `candidate_handoff.yaml` only after the selected rows, sequence hashes,
+9. Emit `candidate_handoff.yaml` only after the selected rows, sequence hashes,
    and upstream artifact hashes are reviewed and accepted by the RT-only
-   handoff contract.
+   handoff contract. The current `candidate_handoff_sequences.csv` marks
+   protein rows as eligible for RT-only handoff review; it is not the completed
+   downstream handoff file.
 
 ### Blockers
 

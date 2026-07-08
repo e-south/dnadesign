@@ -18,13 +18,7 @@ import matplotlib
 import pyarrow.parquet as pq
 from matplotlib.lines import Line2D
 
-from .constants import SECTION_DESIGNS_AND_FOLD_TRIAGE
-from .manifest import (
-    file_hashes,
-    make_deliverable_row,
-)
-from .proteinmpnn_residue_frequency import write_residue_frequency_heatmap
-from .rendering import (
+from ..shared.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
     OKABE_ITO,
@@ -32,6 +26,12 @@ from .rendering import (
     save_accessible_svg,
     style_open_axes,
 )
+from .constants import SECTION_DESIGNS_AND_FOLD_TRIAGE
+from .manifest import (
+    file_hashes,
+    make_deliverable_row,
+)
+from .proteinmpnn_residue_frequency import write_residue_frequency_heatmap
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402

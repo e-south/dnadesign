@@ -18,6 +18,12 @@ import textwrap
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
+_SHARED_MATERIALIZATION_ROOT_FILES = {
+    "__init__.py",
+    "design_class_mask_annotations.py",
+    "rendering.py",
+    "rt_annotation_context.py",
+}
 _SAE_WINDOW_SUMMARY_ROOT_FILES = {
     "__init__.py",
     "__main__.py",
@@ -42,8 +48,12 @@ _SELECTION_READINESS_ROOT_FILES = {
     "local_structure_plot.py",
     "local_structure_regions.py",
     "local_structure_sensitivity.py",
+    "manifest.py",
     "models.py",
+    "mutation_distance.py",
+    "mutation_distance_plot.py",
     "panel.py",
+    "panel_rows.py",
     "pipeline.py",
     "plot_support.py",
     "plots.py",
@@ -53,7 +63,9 @@ _SELECTION_READINESS_ROOT_FILES = {
     "review_axis_contracts.py",
     "review_axes.py",
     "regional_plots.py",
+    "sankey_plot.py",
     "sequence_export.py",
+    "selection_summary.py",
     "triage.py",
     "visual_inventory.py",
 }
@@ -73,6 +85,16 @@ def test_sae_window_summary_materializer_keeps_vector_math_separate_from_pipelin
     assert "pyarrow.parquet" in io_text
 
 
+def test_shared_materialization_helpers_are_neutral() -> None:
+    source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/shared"
+
+    assert sorted(path.name for path in source_root.glob("*.py")) == sorted(_SHARED_MATERIALIZATION_ROOT_FILES)
+    for path in source_root.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "selection_readiness" not in text
+        assert "review_deliverables" not in text
+
+
 def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> None:
     source_root = repo_root() / _PACKAGE_ROOT / "operations/materialization/selection_readiness"
 
@@ -84,6 +106,11 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     plots_text = (source_root / "plots.py").read_text(encoding="utf-8")
     review_axes_text = (source_root / "review_axes.py").read_text(encoding="utf-8")
     sequence_export_text = (source_root / "sequence_export.py").read_text(encoding="utf-8")
+    selection_summary_text = (source_root / "selection_summary.py").read_text(encoding="utf-8")
+    for path in source_root.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "operations.materialization.review_deliverables" not in text
+        assert "..review_deliverables" not in text
     assert "argparse" not in pipeline_text
     assert "csv.DictWriter" not in pipeline_text
     assert "hashlib" not in pipeline_text
@@ -96,6 +123,7 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     assert "load_fasta_records" in review_axes_text
     assert "csv.DictWriter" in sequence_export_text
     assert "hashlib.sha256" in sequence_export_text
+    assert "build_selection_summary" in selection_summary_text
     assert "processivity_score" not in panel_text
     assert "activity_score" not in panel_text
 

@@ -19,7 +19,6 @@ from pathlib import Path
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    design_class_mask_annotations,
     materialize_review_deliverables,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.design_class_masks import (
@@ -27,6 +26,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     _MASK_MATRIX_ZORDER,
     write_design_class_mask_overview,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared import design_class_mask_annotations
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.chimerax_assertions import (
     assert_chimerax_context_scripts,
 )
@@ -45,9 +45,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
 
 from .proteinmpnn_visual_assertions import assert_proteinmpnn_visual_content
 
-_RT_CONTEXT_MODULE = (
-    "dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rt_annotation_context"
-)
+_RT_CONTEXT_MODULE = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rt_annotation_context"
 load_rt_annotation_context = import_module(_RT_CONTEXT_MODULE).load_rt_annotation_context
 
 

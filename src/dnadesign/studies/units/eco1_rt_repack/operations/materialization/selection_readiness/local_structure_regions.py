@@ -24,17 +24,16 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_structure_rmsd_gate_v1"
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE = (
-    "Declared local C-alpha RMSD limits set from the current all-candidate distribution and enforced as "
-    "selection-readiness preservation gates, not activity evidence. The Wang thumb-contact track uses a stricter "
-    "limit than the generic near retained DNA/RNA region because those positions are tracked as documented "
-    "thumb/RNA contact context."
+    "Declared local C-alpha RMSD limits are enforced as selection-readiness preservation gates, not activity "
+    "evidence. The Wang thumb-contact track and C-terminal primer-RNA recognition region use stricter limits than "
+    "the generic near retained DNA/RNA region because those positions are tracked as thumb/RNA recognition context."
 )
 LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
     "catalytic_initiation_context": 1.50,
     "retron_x_naxxh_context": 1.25,
     "retron_y_vtg_context": 1.60,
     "thumb_contact_track_context": 2.50,
-    "c_terminal_primer_rna_recognition_context": 3.50,
+    "c_terminal_primer_rna_recognition_context": 2.50,
     "near_retained_dna_rna_annulus": 3.00,
     "distal_scaffold_control": 4.75,
 }

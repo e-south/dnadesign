@@ -37,9 +37,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
     resolve_manifest_path,
 )
 
-_RT_CONTEXT_MODULE = (
-    "dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rt_annotation_context"
-)
+_RT_CONTEXT_MODULE = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rt_annotation_context"
 load_rt_annotation_context = import_module(_RT_CONTEXT_MODULE).load_rt_annotation_context
 
 

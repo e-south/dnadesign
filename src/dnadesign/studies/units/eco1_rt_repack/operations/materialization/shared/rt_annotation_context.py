@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/rt_annotation_context.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/rt_annotation_context.py
 
-RT annotation context for Eco1 review-deliverable visuals.
+RT annotation context for Eco1 materialization visuals.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

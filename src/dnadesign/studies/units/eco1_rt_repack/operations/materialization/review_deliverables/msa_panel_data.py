@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     shorten_label,
 )
 

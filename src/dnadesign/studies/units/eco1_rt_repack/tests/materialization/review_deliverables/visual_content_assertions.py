@@ -121,8 +121,8 @@ def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[
 def assert_selection_content(deliverables: dict[str, dict[str, object]]) -> None:
     funnel = deliverables["selection_funnel_summary"]
     assert funnel["path"].endswith("design_classes/selection/selection_readiness_manifest.yaml")
-    assert "stricter primary-panel" in str(funnel["description"])
-    assert "boundary-candidate" in str(funnel["description"])
+    assert "preservation" in str(funnel["description"])
+    assert "chemistry/support" in str(funnel["description"])
     assert "ESMC and SAE are review annotations, not panel-selection evidence" in str(funnel["interpretation_limit"])
     assert "backend" not in str(funnel).lower()
     assert "generated" not in str(funnel).lower()

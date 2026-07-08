@@ -26,10 +26,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import ALL_SPECS
 
+from ..shared.rendering import LABEL_SIZE, LEGEND_SIZE, TITLE_SIZE, save_accessible_svg
 from .constants import CONSERVATION_CLADE9_PROFILE_ID, CONSERVATION_SUBTYPE_PROFILE_ID, SECTION_DESIGNS_AND_FOLD_TRIAGE
 from .manifest import file_hashes, make_deliverable_row
 from .mask_rows import read_mask_residues
-from .rendering import LABEL_SIZE, LEGEND_SIZE, TITLE_SIZE, save_accessible_svg
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402

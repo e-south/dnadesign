@@ -35,6 +35,7 @@ _MATERIALIZATION_PRIMITIVES = {
     "foldcheck_review",
     "foldcheck_report",
     "foldcheck_request",
+    "generation_policies",
     "manual_mask_authority",
     "mask_set",
     "proteinmpnn_request",
@@ -46,6 +47,13 @@ _MATERIALIZATION_PRIMITIVES = {
     "structure",
     "structure_preprocessing",
     "thread_plan",
+}
+_MATERIALIZATION_SUPPORT_PACKAGES = {"shared"}
+_MATERIALIZATION_SHARED_FILES = {
+    "__init__.py",
+    "design_class_mask_annotations.py",
+    "rendering.py",
+    "rt_annotation_context.py",
 }
 
 
@@ -89,7 +97,7 @@ def test_materialization_primitives_are_semantic_packages() -> None:
     assert sorted(path.name for path in test_root.glob("*.py")) == ["__init__.py"]
     assert sorted(
         path.name for path in source_root.iterdir() if path.is_dir() and path.name != "__pycache__"
-    ) == sorted(_MATERIALIZATION_PRIMITIVES)
+    ) == sorted(_MATERIALIZATION_PRIMITIVES | _MATERIALIZATION_SUPPORT_PACKAGES)
     assert sorted(path.name for path in test_root.iterdir() if path.is_dir() and path.name != "__pycache__") == sorted(
         _MATERIALIZATION_PRIMITIVES
     )
@@ -99,3 +107,4 @@ def test_materialization_primitives_are_semantic_packages() -> None:
         assert (source_root / primitive / "pipeline.py").is_file()
         assert (test_root / primitive / "__init__.py").is_file()
         assert (test_root / primitive / "test_materialization.py").is_file()
+    assert sorted(path.name for path in (source_root / "shared").glob("*.py")) == sorted(_MATERIALIZATION_SHARED_FILES)

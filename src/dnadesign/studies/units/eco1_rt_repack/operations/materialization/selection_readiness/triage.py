@@ -16,19 +16,9 @@ from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     ALLOWED_FOLD_CLASSES,
-    PRIMARY_C_TERMINAL_LOCAL_RMSD_MAX_ANGSTROM,
     SAE_WINDOW_SELECTION_THRESHOLD,
-    SUBSTRATE_RELEVANT_LOCAL_RMSD_MAX_ANGSTROM,
 )
 
-_SUBSTRATE_RELEVANT_LOCAL_STRUCTURE_FIELDS = (
-    "local_structure_catalytic_initiation_context_ca_rmsd_angstrom",
-    "local_structure_retron_x_naxxh_context_ca_rmsd_angstrom",
-    "local_structure_retron_y_vtg_context_ca_rmsd_angstrom",
-    "local_structure_thumb_contact_track_context_ca_rmsd_angstrom",
-    "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom",
-    "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom",
-)
 _PROXIMAL_REGION_MSA_SUPPORT_IDS = frozenset(
     {
         "catalytic_or_direct_contact",
@@ -136,8 +126,6 @@ def _hard_gate_status(
         reasons.append("catalytic_or_direct_contact_mutation")
     if int((review_axes or {}).get("thumb_contact_track_mutation_count") or 0):
         reasons.append("thumb_contact_track_mutation")
-    if not _chemistry_compatible(review_axes):
-        reasons.append("nucleic_acid_facing_chemistry_incompatible")
     if fold is None:
         reasons.append("missing_fold_review_row")
     elif str(fold.get("foldcheck_status")) != "accepted":
@@ -156,12 +144,6 @@ def _hard_gate_status(
             reasons.append("local_structure_threshold_exceeded")
         elif local_structure_status != "passed":
             reasons.append("local_structure_gate_not_passed")
-        if local_structure_status == "passed":
-            substrate_rmsd = _substrate_relevant_local_rmsd(local_structure_review)
-            if substrate_rmsd is None:
-                reasons.append("missing_substrate_relevant_local_structure_rmsd")
-            elif substrate_rmsd > SUBSTRATE_RELEVANT_LOCAL_RMSD_MAX_ANGSTROM:
-                reasons.append("local_structure_substrate_relevant_rmsd_exceeded")
     review_class = str((fold or {}).get("review_class") or "")
     if review_class and review_class not in ALLOWED_FOLD_CLASSES:
         reasons.append("fold_review_class_not_allowed")
@@ -174,34 +156,28 @@ def _hard_gate_status(
 
 def _slot_candidate_status(hard_gate_status: str) -> str:
     if hard_gate_status == "eligible":
-        return "passes_broad_protein_contract"
+        return "passes_preservation_contract"
     return "not_panel_eligible"
 
 
 def _primary_panel_candidate_fields(row: dict[str, object]) -> dict[str, object]:
     reasons: list[str] = []
     if str(row.get("hard_gate_status") or "") != "eligible":
-        reasons.append("broad_protein_contract_not_met")
-
-    c_terminal_rmsd = _float_or_none(
-        row.get("local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom")
-    )
-    if c_terminal_rmsd is None:
-        reasons.append("missing_c_terminal_primer_rna_recognition_rmsd")
-        c_terminal_status = "missing"
-    elif c_terminal_rmsd > PRIMARY_C_TERMINAL_LOCAL_RMSD_MAX_ANGSTROM:
-        reasons.append("c_terminal_primer_rna_recognition_rmsd_exceeded")
-        c_terminal_status = "threshold_exceeded"
-    else:
-        c_terminal_status = "passed"
+        reasons.append("preservation_contract_not_met")
 
     acidic_gain_count = int(row.get("nucleic_acid_facing_acidic_gain_count") or 0)
-    chemistry_status = "acidic_gain_present" if acidic_gain_count else "passed"
+    if acidic_gain_count:
+        reasons.append("near_retained_dna_rna_acidic_gain")
+        chemistry_status = "acidic_gain_present"
+    else:
+        chemistry_status = "passed"
 
     proximal_unobserved_count = row.get("proximal_review_unobserved_mutation_count")
     if proximal_unobserved_count is None:
+        reasons.append("missing_proximal_msa_support")
         support_status = "missing"
     elif int(proximal_unobserved_count) != 0:
+        reasons.append("proximal_unobserved_substitution")
         support_status = "unobserved_substitution_present"
     else:
         support_status = "passed"
@@ -209,15 +185,12 @@ def _primary_panel_candidate_fields(row: dict[str, object]) -> dict[str, object]
     primary = not reasons
     if primary:
         tier = "primary_panel_candidate"
-    elif str(row.get("hard_gate_status") or "") == "eligible":
-        tier = "boundary_candidate"
     else:
         tier = "not_panel_candidate"
     return {
         "primary_panel_candidate": primary,
         "selection_candidate_tier": tier,
         "primary_panel_failure_reasons_json": json.dumps(sorted(reasons), sort_keys=True),
-        "primary_c_terminal_local_rmsd_gate_status": c_terminal_status,
         "near_retained_dna_rna_acidic_gain_review_status": chemistry_status,
         "proximal_msa_support_review_status": support_status,
     }
@@ -293,19 +266,9 @@ def _local_structure_fields(values: dict[str, object] | None) -> dict[str, objec
         "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": None,
         "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": None,
         "local_structure_distal_scaffold_control_ca_rmsd_angstrom": None,
-        "local_structure_substrate_relevant_max_ca_rmsd_angstrom": None,
-        "local_structure_substrate_relevant_max_gate_status": "missing",
     }
     if values is not None:
         fields.update({key: values.get(key) for key in fields if key in values})
-        substrate_max = _substrate_relevant_local_rmsd(values)
-        fields["local_structure_substrate_relevant_max_ca_rmsd_angstrom"] = substrate_max
-        if substrate_max is None:
-            fields["local_structure_substrate_relevant_max_gate_status"] = "missing"
-        else:
-            fields["local_structure_substrate_relevant_max_gate_status"] = (
-                "passed" if substrate_max <= SUBSTRATE_RELEVANT_LOCAL_RMSD_MAX_ANGSTROM else "threshold_exceeded"
-            )
     return fields
 
 
@@ -342,25 +305,6 @@ def _proximal_region_support_fields(values: dict[str, int] | None) -> dict[str, 
         if values is None
         else values["proximal_review_rare_or_unobserved_mutation_count"],
     }
-
-
-def _chemistry_compatible(review_axes: dict[str, object] | None) -> bool:
-    if review_axes is None:
-        return True
-    compatible = review_axes.get("nucleic_acid_facing_chemistry_compatible")
-    if compatible is not None:
-        return bool(compatible)
-    charge_delta = int(review_axes.get("nucleic_acid_facing_charge_delta") or 0)
-    acidic_gain = int(review_axes.get("nucleic_acid_facing_acidic_gain_count") or 0)
-    basic_gain = int(review_axes.get("nucleic_acid_facing_basic_gain_count") or 0)
-    return charge_delta >= 0 and acidic_gain <= basic_gain
-
-
-def _substrate_relevant_local_rmsd(values: dict[str, object]) -> float | None:
-    numeric_values = [
-        float(values[field]) for field in _SUBSTRATE_RELEVANT_LOCAL_STRUCTURE_FIELDS if values.get(field) is not None
-    ]
-    return round(max(numeric_values), 3) if numeric_values else None
 
 
 def _float_or_none(value: object) -> float | None:

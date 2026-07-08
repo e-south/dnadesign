@@ -18,14 +18,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     NA_FACING_CHEMISTRY_METRICS,
-    region_msa_support_plot,
+    mutation_distance_plot,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.chemistry_balance import (
     build_na_facing_chemistry_balance_matrix,
-)
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plots import (
-    build_selected_mutation_dissimilarity_matrices,
-    build_selected_sequence_distance_matrix,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.premise_alignment import (
     build_premise_alignment_matrix,
@@ -41,7 +37,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_read
 
 
 def test_selected_primary_panel_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
-    labels, matrix = build_selected_sequence_distance_matrix(
+    labels, matrix = mutation_distance_plot.build_selected_sequence_distance_matrix(
         panel_rows=selected_panel_rows(),
         candidate_rows=candidate_sequence_rows(),
     )
@@ -54,7 +50,7 @@ def test_selected_primary_panel_distance_matrix_is_symmetric_with_zero_diagonal(
 
 
 def test_selected_mutation_dissimilarity_matrices_are_symmetric_with_zero_diagonal() -> None:
-    labels, position_matrix, token_matrix = build_selected_mutation_dissimilarity_matrices(
+    labels, position_matrix, token_matrix = mutation_distance_plot.build_selected_mutation_dissimilarity_matrices(
         panel_rows=selected_panel_rows(),
         candidate_rows=candidate_sequence_rows(),
     )
@@ -181,42 +177,3 @@ def test_na_facing_chemistry_balance_matrix_fails_on_missing_selected_field() ->
     message = str(error.value)
     assert "candidate_1" in message
     assert "nucleic_acid_facing_basic_loss_count" in message
-
-
-def test_regionwise_msa_support_matrix_keeps_thumb_track_separate_when_zero() -> None:
-    support_rows = []
-    for panel_row in selected_panel_rows():
-        for region_id, region_label in (
-            ("catalytic_or_direct_contact", "Catalytic or direct contact"),
-            ("near_retained_dna_rna_region", "Near retained DNA/RNA region"),
-            ("thumb_contact_track", "Thumb-contact track"),
-            ("c_terminal_primer_rna_recognition_region", "C-terminal primer-RNA recognition region"),
-            ("distal_scaffold", "Distal scaffold"),
-        ):
-            support_rows.append(
-                {
-                    "candidate_id": panel_row["candidate_id"],
-                    "region_id": region_id,
-                    "region_label": region_label,
-                    "alt_observed_fraction": 0.5 if region_id != "thumb_contact_track" else None,
-                    "unobserved_mutation_count": 0,
-                    "mutation_count": 1 if region_id != "thumb_contact_track" else 0,
-                }
-            )
-
-    region_labels, row_labels, matrix, unobserved = region_msa_support_plot.build_selected_region_msa_support_matrix(
-        panel_rows=selected_panel_rows(),
-        region_msa_support_rows=support_rows,
-    )
-
-    assert region_labels == [
-        "Catalytic or direct contact",
-        "Near retained DNA/RNA region",
-        "Thumb-contact track",
-        "C-terminal primer-RNA recognition region",
-        "Distal scaffold",
-    ]
-    assert len(row_labels) == len(ALL_SPECS)
-    assert all(len(row) == 5 for row in matrix)
-    assert all(row[2] is None for row in matrix)
-    assert all(row[2] == 0 for row in unobserved)

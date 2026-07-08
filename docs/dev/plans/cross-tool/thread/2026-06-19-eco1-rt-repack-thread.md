@@ -3,7 +3,7 @@ doc_id: dev-thread-eco1-rt-repack-candidate-review
 surface: cross-tool-dev-spec
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-06
+last_verified: 2026-07-08
 status: active_handoff_slice
 primary_slice: rt-only-candidate-handoff-v1
 ---
@@ -17,12 +17,13 @@ fold-check review, local PDB staging, Biohub ESMC query-time SAE collection, and
 the expanded design-class candidate pool are materialized locally.
 
 Selection readiness is now materialized for a six-row protein review panel from
-the 576 synthetic candidates. The active task is to review those rows and emit
-the RT-only `candidate_handoff.yaml` through the handoff contract. The panel
-path checks computational buildability, removes fold-risk candidates, records
-that SAE windows remain WT-like, and selects one fold-preserved representative
-from each design class. These steps prepare the protein review set; they do not
-predict improved strand displacement.
+the 576 synthetic candidates. The active task is to review those rows before
+emitting the RT-only `candidate_handoff.yaml` through the handoff contract. The
+panel path checks computational buildability, removes fold-risk candidates,
+requires local-structure and near retained DNA/RNA chemistry/support checks,
+and selects six globally without forcing one row per design class. These steps
+prepare the protein review set; they do not predict improved strand
+displacement.
 
 ### Scientific Flow
 
@@ -33,24 +34,27 @@ accepted candidate row
 + accepted fold-check row
 + reviewed structure metrics
 + feasible synthesis row
-+ one planned design-class slot
++ preservation and chemistry/support gates
++ nonredundant global panel selection
 + upstream hash closure
--> RT-only candidate_handoff eligibility
+-> RT-only protein review eligibility
 ```
 
 The panel-selection deliverables are materialized under
 `outputs/thread/design_classes/selection/`:
 `feasibility_report.parquet`, `candidate_triage_table.parquet`, and
 `candidate_selection_panel.parquet`, plus the flat
-`candidate_handoff_sequences.csv` protein sequence export. The panel has six
-rows, one per design class. Feasibility can exclude candidates. Fold class is
-the first review filter. The panel tie-breaks use MSA support, mutation
-geography, nucleic-acid-facing chemistry, and sequence nonredundancy inside
-the eligible set. The review plots include design-class gate counts,
-class-local percentiles, sequence-distance context, and selected-row regional
-detail views. ESMC LLR and
-SAE windows are retained as review evidence, but they are not used for
-selection because they do not meaningfully stratify the current pool.
+`candidate_handoff_sequences.csv` protein sequence export. The current funnel
+is 576 accepted candidates, 204 preservation-pass rows, 105
+chemistry/support-pass rows, and 6 selected rows. Design classes are
+mask-policy context, not panel quotas; the selected panel currently includes
+five `contact10a` rows and one `contact8a` near-region basic-gain row. The
+panel tie-breaks use mutation-set dissimilarity, local chemistry risk, regional
+MSA support, local RMSD values inside the declared gate, and fold metrics
+inside the eligible set. The review plots include the primary-panel funnel,
+local-structure gate views, regional mutation/chemistry/MSA support views,
+selected substitutions, and mutation-set dissimilarity. ESMC LLR and SAE
+windows are retained as review evidence, but they are not used for selection.
 
 Defer APBS, HADDOCK, AlphaFold3 complex modeling, MD, EVcouplings, Tranception,
 Evo2, computational stability prediction, whole-protein ESMC
@@ -652,28 +656,26 @@ panel.
 
 Deterministic tie-break order:
 
-1. feasibility pass;
-2. `strong_fold_preserved` before `good_fold_preserved`;
-3. higher selected-denominator MSA support for designed residues;
-4. fewer designed residues absent from the selected MSA denominator;
-5. fewer local near-DNA/RNA or thumb-track chemistry warnings;
-6. moderate near-DNA/RNA or thumb-track mutation burden;
-7. nonredundancy to already selected variants;
-8. fold metrics inside the same fold class;
-9. lower mutation count;
-10. `sequence_hash` lexical order.
+1. pass the preservation and chemistry/support gates;
+2. avoid near retained DNA/RNA basic losses and Pro/Gly gains;
+3. add mutation-set dissimilarity from already selected rows;
+4. retain regional MSA support;
+5. keep local RMSD values low inside the declared gate;
+6. retain fold metrics inside the accepted fold class;
+7. use deterministic hashes as the final tie-break.
 
-The panel tests the design policies themselves, not the top six rows by a
-combined score:
+The panel is a global conservative-diverse selection from the eligible pool,
+not a top-six activity ranking and not one required row per design class.
+Design classes remain useful context for where candidates came from:
 
-| Design class | Panel role |
+| Design class | Current role |
 | --- | --- |
-| `eco1_rt_clade9_plurality25_contact5a_v1` | Baseline 5 A clade 9 p25 design class. |
-| `eco1_rt_clade9_plurality25_contact6a_v1` | Modestly stricter 6 A substrate-contact shell. |
-| `eco1_rt_clade9_plurality25_contact8a_v1` | Stronger 8 A substrate-contact shell. |
-| `eco1_rt_clade9_plurality25_contact10a_v1` | Conservative 10 A sentinel class. |
-| `eco1_rt_clade9_plurality50_contact5a_v1` | Less restrictive clade 9 conservation threshold. |
-| `eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1` | Closer-family conservation denominator. |
+| `eco1_rt_clade9_plurality25_contact5a_v1` | Input mask-policy context; not selected in the current primary panel. |
+| `eco1_rt_clade9_plurality25_contact6a_v1` | Input mask-policy context; not selected in the current primary panel. |
+| `eco1_rt_clade9_plurality25_contact8a_v1` | Input mask-policy context; contributes the current near-region basic-gain row. |
+| `eco1_rt_clade9_plurality25_contact10a_v1` | Input mask-policy context; contributes five current selected rows. |
+| `eco1_rt_clade9_plurality50_contact5a_v1` | Input mask-policy context; not selected in the current primary panel. |
+| `eco1_rt_iia3_cluster42_1_plurality50_contact5a_v1` | Input mask-policy context; not selected in the current primary panel. |
 
 ### RT-Only Candidate Handoff
 
@@ -1022,23 +1024,25 @@ Main outputs:
 - `candidate_triage_table.parquet`
 - `candidate_selection_panel.parquet`
 - `candidate_handoff_sequences.csv`
-- `plots/selection_design_class_gate_counts.svg`
+- `plots/selection_primary_panel_sankey.svg`
+- `plots/selection_design_class_contrast.svg`
 - `plots/selection_local_structure_stratification.svg`
 - `plots/selection_local_structure_by_region.svg`
-- `plots/selection_class_local_percentiles.svg`
+- `plots/selection_local_structure_threshold_sensitivity.svg`
 - `plots/selection_premise_alignment.svg`
 - `plots/selection_selected_substitutions_across_rt.svg`
 - `plots/selection_regional_mutation_burden.svg`
 - `plots/selection_na_facing_chemistry_balance.svg`
+- `plots/selection_regionwise_msa_support.svg`
 - `plots/selection_six_sequence_distance.svg`
 
 Purpose:
 
 ```text
-Show which candidates pass feasibility and fold gates, then explain the six
-class-balanced panel rows with a compact premise matrix, within-class
-percentiles, sequence distance, regional substitutions, mutation burden, local chemistry, and flat
-protein-sequence export.
+Show how accepted candidates pass preservation and chemistry/support gates,
+then explain the global six-row primary panel with mutation-set dissimilarity,
+regional substitutions, local RMSD, region-wise MSA support, chemistry fields,
+and the flat protein-sequence export.
 ```
 
 Inputs:
@@ -1235,7 +1239,7 @@ phase wording separates fold-check validation from downstream promotion
 This state supports only this claim:
 
 ```text
-These six rows form a class-balanced RT-only protein review panel with fold, feasibility, sequence, and regional evidence attached.
+These six rows form a global RT-only protein review panel with fold, feasibility, sequence, regional, chemistry, and local-structure evidence attached.
 ```
 
 ### RT-Only Handoff Done State
@@ -1273,6 +1277,8 @@ Those claims require downstream experimental evidence.
 | Mestre et al. 2020 | DOI [`10.1093/nar/gkaa1149`](https://doi.org/10.1093/nar/gkaa1149) | Retron RT roster and Ec86 clade context. |
 | Simon et al. 2019 | DOI [`10.1093/nar/gkz865`](https://doi.org/10.1093/nar/gkz865) | RT motif grammar and annotation prior. |
 | Wang et al. 2022 | DOI [`10.1038/s41564-022-01197-7`](https://doi.org/10.1038/s41564-022-01197-7); PDB `7V9U` | Ec86 RT-msDNA/msrRNA scaffold and substrate-contact context. |
+| Inouye et al. 1999 | DOI [`10.1074/jbc.274.44.31236`](https://doi.org/10.1074/jbc.274.44.31236) | Primary Ec86 prior for primer-template RNA recognition and branch-G initiation context; not activity prediction. |
+| Inouye et al. 2004 | DOI [`10.1074/jbc.M408462200`](https://doi.org/10.1074/jbc.M408462200) | Primary Ec86 prior for C-terminal/thumb primer-RNA binding context; not a reason to relax thumb-track protection. |
 | ProteinMPNN | `dauparas/ProteinMPNN`; DOI [`10.1126/science.add2187`](https://doi.org/10.1126/science.add2187) | Public fixed-backbone inverse-folding CLI and helper-file workflow. |
 | ColabFold | DOI [`10.1038/s41592-022-01488-1`](https://doi.org/10.1038/s41592-022-01488-1) | Public `colabfold_batch` fold-check command path. |
 | Candido et al. 2026 | DOI [`10.64898/2026.06.03.729735`](https://doi.org/10.64898/2026.06.03.729735) | ESMC, ESMFold2, Atlas, and SAE representation context. |

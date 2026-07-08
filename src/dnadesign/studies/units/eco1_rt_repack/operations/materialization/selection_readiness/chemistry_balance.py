@@ -17,7 +17,7 @@ from typing import Any
 import matplotlib
 from matplotlib.colors import TwoSlopeNorm
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     TITLE_SIZE,
     save_accessible_svg,
@@ -150,11 +150,12 @@ def write_na_facing_chemistry_balance_plot(
         alt_text=alt,
         description=(
             "Separates the near retained DNA/RNA or thumb-track chemistry fields into charge change, basic gain, "
-            "basic loss, acidic gain, and proline/glycine gain for the selected panel."
+            "basic loss, acidic gain, and proline/glycine gain for the selected panel. Zero acidic gains near "
+            "retained DNA/RNA is part of the chemistry/support gate."
         ),
         interpretation_limit=(
-            "Chemistry changes are review risks and context only. They do not establish activity, processivity, "
-            "strand displacement, or assay readiness."
+            "The no-acidic-gain rule is a conservative screen. The remaining chemistry fields are review context "
+            "and do not establish activity, processivity, strand displacement, or assay readiness."
         ),
         render_mode="wide_visual",
     )

@@ -119,8 +119,8 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
         input_hashes=file_hashes(input_paths),
         alt_text="Selection-funnel summary table with row counts, gate counts, selected IDs, and policy notes.",
         description=(
-            "Shows the broad protein-contract, stricter primary-panel, boundary-candidate, and global selection "
-            "stages from selection_readiness_manifest.yaml."
+            "Shows the accepted candidate pool, preservation gate, chemistry/support gate, and global selection "
+            "stage from selection_readiness_manifest.yaml."
         ),
         interpretation_limit=(
             "ESMC and SAE are review annotations, not panel-selection evidence. The summary does not establish "
@@ -132,6 +132,7 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
         evidence_summary={
             "selection_policy_id": str(loaded.get("selection_policy_id") or ""),
             "selected_candidate_count": len(list(loaded.get("selected_candidate_ids") or [])),
+            "selection_summary": loaded.get("selection_summary") or {},
         },
     )
 

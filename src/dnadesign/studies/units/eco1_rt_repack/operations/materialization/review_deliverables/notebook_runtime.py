@@ -80,24 +80,30 @@ def render_intro(mo: Any) -> Any:
 
     intro_lead = (
         "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported RNA/DNA-bound scaffold. "
-        "The study asks whether fold-preserved RT sequence variants can support downstream assays for "
-        "processivity and strand displacement. The computational deliverable is a bounded set of protein "
-        "sequence candidates for review, not an activity claim."
+        "The study asks whether fixed-backbone sequence proposals can be reduced to a small protein-only "
+        "review panel that preserves known catalytic, retron-initiation, direct-contact, thumb-track, and "
+        "local structural contexts. The computational deliverable is a bounded set of protein sequence "
+        "candidates for review, not an activity claim."
     )
     intro_flow = (
         "Evidence order: cryoEM scaffold, Tao-style mask evidence, ProteinMPNN sequence proposals, "
-        "ColabFold fold checks, localized triage, panel selection, and sequence export. "
+        "ColabFold fold checks, local preservation and chemistry/support gates, global panel selection, "
+        "and sequence export. "
         "The active design classes vary homolog-conservation "
         "and retained-DNA/RNA proximity thresholds while always protecting catalytic anchors and Wang/Ec86 "
         "direct-contact priors. The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, "
         "retained-substrate proximity, and Mestre-derived clade 9 plurality at the 25% threshold. "
         "ProteinMPNN proposes variants at unprotected residues to repack the remaining designable residues, "
         "ColabFold removes poor "
-        "fold predictions, and the remaining pool is stratified by MSA support, local mutation geography, "
-        "chemistry near retained DNA/RNA or thumb-track, and selected model checks. WT ESMC masked-marginal scores "
+        "fold predictions, and the remaining pool is filtered by preservation checks, no acidic gains near "
+        "retained DNA/RNA, and no unobserved proximal substitutions. Final selection then uses basic-loss and "
+        "Pro/Gly penalties, simple mutation-set dissimilarity, regional MSA support, local RMSD values inside "
+        "the gate, and fold metrics. "
+        "WT ESMC masked-marginal scores "
         "and Biohub ESMC "
         "SAE features annotate the review set; they are not mask inputs or acceptance gates. The selected protein "
-        "sequences are exported as a flat CSV for RT-only handoff planning."
+        "sequences are exported as a flat CSV for RT-only handoff planning. The panel is not a processivity, "
+        "strand-displacement, or direct thumb-track tuning claim."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "

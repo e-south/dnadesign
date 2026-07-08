@@ -36,6 +36,7 @@ def _():
 
     is_sae_feature_heatmap_deliverable = sae_runtime.is_sae_feature_heatmap_deliverable
     load_sae_feature_heatmap_manifest = sae_runtime.load_sae_feature_heatmap_manifest
+    load_structure_highlight_rows = structure_runtime.load_structure_highlight_rows
     load_structure_browser_rows = structure_runtime.load_structure_browser_rows
     render_sae_feature_heatmap = sae_runtime.render_sae_feature_heatmap
     sae_heatmap_feature_lookup = sae_runtime.sae_heatmap_feature_lookup
@@ -62,7 +63,8 @@ def _():
     return (
         deliverable_lookup, evidence_deliverables, format_deliverable_label, is_interactive_structure_deliverable,
         is_residue_frequency_bundle_deliverable, is_sae_feature_heatmap_deliverable, load_review_manifest,
-        load_sae_feature_heatmap_manifest, load_structure_browser_rows, mo, render_deliverable_details,
+        load_sae_feature_heatmap_manifest, load_structure_browser_rows, load_structure_highlight_rows, mo,
+        render_deliverable_details,
         render_deliverable_panel, render_intro, render_residue_frequency_bundle, render_sae_feature_heatmap,
         render_structure_browser, residue_frequency_view_lookup, review_dropdown, review_lane_lookup,
         sae_heatmap_feature_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
@@ -209,11 +211,28 @@ def _(
 
 
 @app.cell
-def _(deliverables, load_structure_browser_rows, manifest_root):
-    structure_browser_rows = load_structure_browser_rows(
-        manifest_root=manifest_root,
-        deliverables=deliverables,
-    )
+def _(selected_visual):
+    selected_visual_id = str(selected_visual.get("deliverable_id") or "") if selected_visual else ""
+    return selected_visual_id
+
+
+@app.cell
+def _(
+    deliverables,
+    is_interactive_structure_deliverable,
+    load_structure_browser_rows,
+    manifest_root,
+    selected_visual,
+    selected_visual_id,
+):
+    if not is_interactive_structure_deliverable(selected_visual):
+        structure_browser_rows = []
+    else:
+        structure_browser_rows = load_structure_browser_rows(
+            manifest_root=manifest_root,
+            deliverables=deliverables,
+            selected_deliverable_id=selected_visual_id,
+        )
     return structure_browser_rows
 
 
@@ -223,10 +242,10 @@ def _(
     review_dropdown,
     selected_section,
     selected_visual,
+    selected_visual_id,
     structure_browser_rows,
     structure_group_lookup,
 ):
-    selected_visual_id = str(selected_visual.get("deliverable_id") or "") if selected_visual else ""
     if not is_interactive_structure_deliverable(selected_visual):
         structure_group_map = {}
         structure_group_ui = None
@@ -248,7 +267,7 @@ def _(
             label=structure_group_label,
             searchable=True,
         )
-    return selected_visual_id, structure_group_map, structure_group_ui
+    return structure_group_map, structure_group_ui
 
 
 @app.cell
@@ -302,10 +321,22 @@ def _(structure_map, structure_ui):
 
 
 @app.cell
-def _(review_dropdown, selected_structure_row, structure_browser_rows, structure_highlight_lookup):
+def _(
+    deliverables,
+    load_structure_highlight_rows,
+    manifest_root,
+    review_dropdown,
+    selected_structure_row,
+    structure_highlight_lookup,
+):
     if selected_structure_row is not None:
+        structure_highlight_rows = load_structure_highlight_rows(
+            manifest_root=manifest_root,
+            deliverables=deliverables,
+            selected_row=selected_structure_row,
+        )
         structure_highlight_map = structure_highlight_lookup(
-            structure_browser_rows,
+            structure_highlight_rows,
             selected_row=selected_structure_row,
         )
         structure_highlight_options = list(structure_highlight_map)

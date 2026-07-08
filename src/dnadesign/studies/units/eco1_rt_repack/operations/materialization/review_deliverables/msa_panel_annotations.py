@@ -16,8 +16,8 @@ from typing import Any
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.transforms import ScaledTranslation
 
+from ..shared.rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 from .msa_panel_layout import _TRACK_TOP_Y_LIMIT
-from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 
 _TRACK_CONTEXT = "retron_rt_context_spans"
 _TRACK_CORE_INTERVALS = "retron_rt_core_intervals"

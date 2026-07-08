@@ -20,7 +20,11 @@ import matplotlib
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
+    class_label,
+    plot_row,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
     OKABE_ITO,
@@ -28,24 +32,16 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
     style_open_axes,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
-    class_label,
-    ordered_panel_rows,
-    plot_row,
-    short_candidate,
-)
 
-from ..review_deliverables.rt_annotation_context import RTAnnotationContext
+from ..shared.rt_annotation_context import RTAnnotationContext
 from .chemistry_balance import write_na_facing_chemistry_balance_plot
 from .local_structure_plot import (
     write_local_structure_by_region_plot,
     write_local_structure_stratification_plot,
     write_local_structure_threshold_sensitivity_plot,
 )
-from .mutation_distance import (
-    canonical_mutation_positions,
-    canonical_mutation_tokens,
-    jaccard_distance,
+from .mutation_distance_plot import (
+    write_selected_mutation_dissimilarity_plot,
 )
 from .premise_alignment import write_premise_alignment_plot
 from .region_msa_support_plot import write_regionwise_msa_support_plot
@@ -53,12 +49,11 @@ from .regional_plots import (
     write_regional_mutation_burden_plot,
     write_selected_substitutions_across_rt_plot,
 )
+from .sankey_plot import write_primary_panel_sankey_plot
 from .visual_inventory import RETIRED_SELECTION_PLOT_FILE_NAMES, SELECTION_PLOT_PLAIN_TITLES
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import FancyBboxPatch, PathPatch  # noqa: E402
-from matplotlib.path import Path as MplPath  # noqa: E402
 
 _STATUS_ORDER = ("eligible", "ineligible", "missing_inputs")
 _STATUS_COLORS = {
@@ -93,7 +88,7 @@ def write_selection_readiness_plots(
     _remove_retired_selection_plots(plot_root)
     return [
         _write_design_class_contrast(plot_root, triage_rows, panel_rows, input_hashes),
-        _write_primary_panel_sankey_plot(
+        write_primary_panel_sankey_plot(
             plot_root,
             primary_panel_selection_trace_rows=primary_panel_selection_trace_rows,
             input_hashes=input_hashes,
@@ -150,7 +145,7 @@ def write_selection_readiness_plots(
             triage_rows=triage_rows,
             input_hashes=input_hashes,
         ),
-        _write_selected_sequence_distance(
+        write_selected_mutation_dissimilarity_plot(
             plot_root,
             panel_rows=panel_rows,
             candidate_rows=candidate_rows,
@@ -164,57 +159,6 @@ def _remove_retired_selection_plots(plot_root: Path) -> None:
         path = plot_root / file_name
         if path.exists():
             path.unlink()
-
-
-def build_selected_sequence_distance_matrix(
-    *,
-    panel_rows: list[dict[str, object]],
-    candidate_rows: list[dict[str, object]],
-) -> tuple[list[str], list[list[int]]]:
-    """Return selected candidate ids and pairwise protein-sequence distances."""
-
-    ordered_panel = ordered_panel_rows(panel_rows)
-    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
-    labels: list[str] = []
-    sequences: list[str] = []
-    for panel_row in ordered_panel:
-        candidate_id = str(panel_row["candidate_id"])
-        candidate = candidate_by_id.get(candidate_id)
-        if candidate is None:
-            raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
-        labels.append(candidate_id)
-        sequences.append(str(candidate.get("sequence") or ""))
-    matrix = [[_hamming_distance(left, right) for right in sequences] for left in sequences]
-    return labels, matrix
-
-
-def build_selected_mutation_dissimilarity_matrices(
-    *,
-    panel_rows: list[dict[str, object]],
-    candidate_rows: list[dict[str, object]],
-) -> tuple[list[str], list[list[float]], list[list[float]]]:
-    """Return pairwise mutated-position and exact-substitution Jaccard distances."""
-
-    ordered_panel = ordered_panel_rows(panel_rows)
-    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
-    labels: list[str] = []
-    position_sets: list[frozenset[int]] = []
-    token_sets: list[frozenset[str]] = []
-    for panel_row in ordered_panel:
-        candidate_id = str(panel_row["candidate_id"])
-        candidate = candidate_by_id.get(candidate_id)
-        if candidate is None:
-            raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
-        labels.append(candidate_id)
-        position_sets.append(canonical_mutation_positions(candidate.get("canonical_mutations")))
-        token_sets.append(canonical_mutation_tokens(candidate.get("canonical_mutations")))
-    position_matrix = [[round(jaccard_distance(left, right), 3) for right in position_sets] for left in position_sets]
-    token_matrix = [[round(jaccard_distance(left, right), 3) for right in token_sets] for left in token_sets]
-    return labels, position_matrix, token_matrix
-
-
-def _hamming_distance(left: str, right: str) -> int:
-    return sum(a != b for a, b in zip(left, right, strict=False)) + abs(len(left) - len(right))
 
 
 def _write_design_class_gate_counts(
@@ -419,296 +363,9 @@ def _write_design_class_contrast(
     )
 
 
-def _write_primary_panel_sankey_plot(
-    plot_root: Path,
-    *,
-    primary_panel_selection_trace_rows: list[dict[str, object]],
-    input_hashes: dict[str, str | None],
-) -> dict[str, Any]:
-    title = SELECTION_PLOT_PLAIN_TITLES["selection_primary_panel_sankey"]
-    if not primary_panel_selection_trace_rows:
-        raise ValueError("primary-panel Sankey plot requires selection trace rows")
-    by_stage = {str(row["stage_id"]): row for row in primary_panel_selection_trace_rows}
-    required = {
-        "candidate_pool",
-        "broad_contract_pool",
-        "primary_panel_candidate_pool",
-        "global_conservative_diverse_selection",
-    }
-    missing = required - set(by_stage)
-    if missing:
-        raise ValueError(f"Primary-panel Sankey plot is missing trace stages: {', '.join(sorted(missing))}")
-    counts = {stage_id: int(by_stage[stage_id]["remaining_count"]) for stage_id in required}
-    other_primary = max(counts["primary_panel_candidate_pool"] - counts["global_conservative_diverse_selection"], 0)
-    max_flow = max(counts.values())
-    fig, ax = plt.subplots(figsize=(10.2, 5.8))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis("off")
-    nodes = {
-        "candidate_pool": (0.04, 0.47, "Accepted\ncandidates", counts["candidate_pool"], OKABE_ITO["blue"]),
-        "broad_contract_pool": (
-            0.28,
-            0.47,
-            "Broad protein\ncontract",
-            counts["broad_contract_pool"],
-            OKABE_ITO["green"],
-        ),
-        "primary_panel_candidate_pool": (
-            0.53,
-            0.52,
-            "Primary panel\ncandidates",
-            counts["primary_panel_candidate_pool"],
-            OKABE_ITO["sky"],
-        ),
-        "global_conservative_diverse_selection": (
-            0.79,
-            0.66,
-            "Selected primary\npanel",
-            counts["global_conservative_diverse_selection"],
-            OKABE_ITO["orange"],
-        ),
-        "other_primary": (
-            0.79,
-            0.41,
-            "Other primary\ncandidates",
-            other_primary,
-            "#c9d1d9",
-        ),
-    }
-    _draw_flow(
-        ax,
-        start=(0.22, 0.55),
-        end=(0.28, 0.55),
-        count=counts["broad_contract_pool"],
-        max_count=max_flow,
-        color=OKABE_ITO["green"],
-        label=f"{counts['broad_contract_pool']} broad-contract rows",
-    )
-    _draw_flow(
-        ax,
-        start=(0.46, 0.62),
-        end=(0.53, 0.6),
-        count=counts["primary_panel_candidate_pool"],
-        max_count=max_flow,
-        color=OKABE_ITO["sky"],
-        label=f"{counts['primary_panel_candidate_pool']} primary candidates",
-    )
-    _draw_flow(
-        ax,
-        start=(0.71, 0.74),
-        end=(0.79, 0.74),
-        count=counts["global_conservative_diverse_selection"],
-        max_count=max_flow,
-        color=OKABE_ITO["orange"],
-        label=f"{counts['global_conservative_diverse_selection']} selected",
-    )
-    _draw_flow(
-        ax,
-        start=(0.71, 0.66),
-        end=(0.79, 0.49),
-        count=other_primary,
-        max_count=max_flow,
-        color="#c9d1d9",
-        label=f"{other_primary} not selected",
-    )
-    for x, y, label, count, color in nodes.values():
-        _draw_sankey_node(ax, x=x, y=y, label=label, count=count, color=color)
-    ax.text(
-        0.04,
-        0.89,
-        (
-            f"{counts['candidate_pool']} accepted -> {counts['broad_contract_pool']} broad-contract rows -> "
-            f"{counts['primary_panel_candidate_pool']} primary candidates -> "
-            f"{counts['global_conservative_diverse_selection']} selected"
-        ),
-        ha="left",
-        va="center",
-        fontsize=10.8,
-        color="#57606a",
-    )
-    ax.text(
-        0.04,
-        0.08,
-        "The final step is a global conservative-diverse selection, not a design-class quota.",
-        ha="left",
-        va="center",
-        fontsize=10.5,
-        color="#57606a",
-    )
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=10)
-    path = plot_root / "selection_primary_panel_sankey.svg"
-    alt = (
-        "Sankey-style flow showing accepted Eco1 RT candidates, rows passing the preservation contract, rows in the "
-        "primary candidate pool, and the selected conservative-diverse primary-panel rows."
-    )
-    save_accessible_svg(fig, path, title=title, description=alt)
-    return plot_row(
-        plot_id="selection_primary_panel_sankey",
-        title=title,
-        path=path,
-        input_hashes=input_hashes,
-        alt_text=alt,
-        description=(
-            "Shows how the selector moves from accepted candidates through the preservation contract to a primary "
-            "candidate pool and then to the final conservative-diverse selected panel."
-        ),
-        interpretation_limit=(
-            "The flow is a protein-level selection record. It does not measure RT activity, processivity, or strand "
-            "displacement."
-        ),
-        render_mode="wide_visual",
-    )
-
-
-def _draw_flow(
-    ax: plt.Axes,
-    *,
-    start: tuple[float, float],
-    end: tuple[float, float],
-    count: int,
-    max_count: int,
-    color: str,
-    label: str,
-) -> None:
-    _ = label
-    if count <= 0:
-        return
-    width = 4.0 + 30.0 * (count / max(max_count, 1)) ** 0.5
-    control_dx = max((end[0] - start[0]) * 0.55, 0.02)
-    path = MplPath(
-        [
-            start,
-            (start[0] + control_dx, start[1]),
-            (end[0] - control_dx, end[1]),
-            end,
-        ],
-        [MplPath.MOVETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4],
-    )
-    ax.add_patch(
-        PathPatch(
-            path,
-            facecolor="none",
-            edgecolor=color,
-            lw=width,
-            alpha=0.34,
-            capstyle="round",
-            zorder=1,
-        )
-    )
-
-
-def _draw_sankey_node(
-    ax: plt.Axes,
-    *,
-    x: float,
-    y: float,
-    label: str,
-    count: int,
-    color: str,
-) -> None:
-    width = 0.18
-    height = 0.14
-    ax.add_patch(
-        FancyBboxPatch(
-            (x, y),
-            width,
-            height,
-            boxstyle="round,pad=0.012,rounding_size=0.016",
-            linewidth=0.8,
-            edgecolor="#d0d7de",
-            facecolor="#ffffff",
-            zorder=4,
-        )
-    )
-    ax.add_patch(
-        FancyBboxPatch(
-            (x, y),
-            0.018,
-            height,
-            boxstyle="round,pad=0.0,rounding_size=0.012",
-            linewidth=0,
-            facecolor=color,
-            alpha=0.95,
-            zorder=5,
-        )
-    )
-    ax.text(x + 0.03, y + 0.088, label, ha="left", va="center", fontsize=10.2, color="#24292f", zorder=6)
-    ax.text(x + 0.03, y + 0.038, str(count), ha="left", va="center", fontsize=13.0, weight="bold", zorder=6)
-
-
 def _profile_label(profile_id: str) -> str:
     if profile_id == "ec86_clade9_conservation_v1":
         return "Ec86 clade 9"
     if profile_id == "ec86_iia3_cluster42_1_conservation_v1":
         return "II-A3 42_1"
     return profile_id
-
-
-def _write_selected_sequence_distance(
-    plot_root: Path,
-    *,
-    panel_rows: list[dict[str, object]],
-    candidate_rows: list[dict[str, object]],
-    input_hashes: dict[str, str | None],
-) -> dict[str, Any]:
-    title = SELECTION_PLOT_PLAIN_TITLES["selection_six_sequence_distance"]
-    labels, position_matrix, token_matrix = build_selected_mutation_dissimilarity_matrices(
-        panel_rows=panel_rows,
-        candidate_rows=candidate_rows,
-    )
-    display_labels = [short_candidate(label) for label in labels]
-    fig, ax = plt.subplots(figsize=(6.4, 6.0))
-    image = ax.imshow(position_matrix, aspect="equal", interpolation="nearest", cmap="Blues", vmin=0.0, vmax=1.0)
-    ax.set_xticks(list(range(len(display_labels))))
-    ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=10)
-    ax.set_yticks(list(range(len(display_labels))))
-    ax.set_yticklabels(display_labels, fontsize=10)
-    for row_index, values in enumerate(position_matrix):
-        for col_index, value in enumerate(values):
-            exact_value = token_matrix[row_index][col_index]
-            ax.text(
-                col_index,
-                row_index,
-                f"{value:.2f}\n{exact_value:.2f}",
-                ha="center",
-                va="center",
-                fontsize=8.3,
-                color="#24292f" if value < 0.55 else "#ffffff",
-            )
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
-    fig.text(
-        0.5,
-        0.045,
-        "Cell text: mutation-position distance / exact-substitution distance",
-        ha="center",
-        va="center",
-        fontsize=9.6,
-        color="#57606a",
-    )
-    ax.tick_params(axis="both", length=0)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    cbar = fig.colorbar(image, ax=ax, shrink=0.74, pad=0.03)
-    cbar.set_label("Mutated-position Jaccard distance", fontsize=11)
-    cbar.ax.tick_params(labelsize=10)
-    fig.subplots_adjust(left=0.2, right=0.92, top=0.88, bottom=0.25)
-    path = plot_root / "selection_six_sequence_distance.svg"
-    alt = (
-        "Six-by-six heatmap of pairwise mutation-set dissimilarity among selected Eco1 RT candidates. Cell text shows "
-        "mutated-position Jaccard distance on the first line and exact-substitution Jaccard distance on the second."
-    )
-    save_accessible_svg(fig, path, title=title, description=alt)
-    return plot_row(
-        plot_id="selection_six_sequence_distance",
-        title=title,
-        path=path,
-        input_hashes=input_hashes,
-        alt_text=alt,
-        description=(
-            "Audits whether selected rows reuse the same mutation positions or exact substitutions. Mutation-set "
-            "dissimilarity is part of the global selection order after conservative safety fields."
-        ),
-        interpretation_limit="Mutation-set dissimilarity guards redundancy; it is not functional evidence.",
-        render_mode="compact_wide_visual",
-    )

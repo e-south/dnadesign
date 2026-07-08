@@ -27,11 +27,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     write_manifest,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
-    CURRENT_SELECTION_PLOT_IDS,
-)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.materialization_expected import (
+    EXPECTED_LINKED_MODEL_CHECK_DELIVERABLE_IDS,
+    EXPECTED_RENDERED_DELIVERABLE_IDS,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.notebook_assertions import (
     assert_manifest_visual_contract,
@@ -65,36 +66,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert not Path(manifest["notebook"]["path"]).is_absolute()
 
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
-    expected_rendered = {
-        "msa_plurality_mask_panel",
-        "msa_subtype_plurality_panel",
-        "design_class_mask_overview",
-        "proteinmpnn_score_mutation_burden",
-        "proteinmpnn_residue_frequency_heatmap",
-        "expanded_proteinmpnn_fold_validation",
-        "foldcheck_review_review_class_counts",
-        "mask_structure_context_script",
-        "mask_structure_context_orientation_template",
-        "mask_structure_browser_manifest",
-        "biohub_esmc_sae_structure_browser_manifest",
-        "msa_plurality_vs_esmc_entropy",
-        "msa_plurality_vs_best_alt_llr",
-        "msa_esmc_constraint_tracks",
-        *CURRENT_SELECTION_PLOT_IDS,
-        "selection_funnel_summary",
-        "selection_panel_table",
-        "selection_handoff_sequences",
-        "selection_handoff_readiness",
-        "selected_panel_structure_browser_manifest",
-    }
-    expected_linked_model_check = {
-        "wt_esmc_entropy_by_position",
-        "wt_esmc_fraction_negative_alternate_llr",
-        "wt_esmc_substitution_llr_heatmap",
-    }
-    assert expected_rendered.issubset(deliverables)
+    assert EXPECTED_RENDERED_DELIVERABLE_IDS.issubset(deliverables)
     assert "linear_mask_tracks" not in deliverables
-    assert expected_linked_model_check.issubset(deliverables)
+    assert EXPECTED_LINKED_MODEL_CHECK_DELIVERABLE_IDS.issubset(deliverables)
     assert deliverables["mask_structure_context_png"]["status"] == "skipped_optional_render_disabled"
     assert "proteinmpnn_tao_style_fold_validation" not in deliverables
     assert "foldcheck_review_fold_metric_scatter" not in deliverables
@@ -139,6 +113,17 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_review_class_counts"]["evidence_summary"]["design_class_count"] == 6
     assert deliverables["interactive_structure_browser_manifest"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
     assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    for browser_id in (
+        "mask_structure_browser_manifest",
+        "interactive_structure_browser_manifest",
+        "selected_panel_structure_browser_manifest",
+        "biohub_esmc_sae_structure_browser_manifest",
+    ):
+        browser_payload = yaml.safe_load(
+            (result.manifest_path.parent / deliverables[browser_id]["path"]).read_text(encoding="utf-8")
+        )
+        for field in ("title", "alt_text", "description", "interpretation_limit"):
+            assert str(browser_payload.get(field) or "").strip()
     assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
     assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
     assert deliverables["selection_primary_panel_sankey"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
@@ -166,7 +151,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         manifest_path=result.manifest_path,
         manifest=manifest,
         deliverables=deliverables,
-        expected_rendered=expected_rendered,
+        expected_rendered=EXPECTED_RENDERED_DELIVERABLE_IDS,
     )
 
 

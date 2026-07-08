@@ -17,11 +17,6 @@ from typing import Any
 import matplotlib
 import numpy as np
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
-    LABEL_SIZE,
-    TITLE_SIZE,
-    save_accessible_svg,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
     LOCAL_STRUCTURE_REGION_IDS,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
@@ -36,6 +31,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     SELECTION_PLOT_PLAIN_TITLES,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
+    LABEL_SIZE,
+    TITLE_SIZE,
+    save_accessible_svg,
 )
 
 from .local_structure_sensitivity import LOCAL_STRUCTURE_THRESHOLD_SCENARIOS

@@ -59,6 +59,11 @@ def assert_structure_notebook_contract(*, notebook_text: str, combined_text: str
     assert "highlight_rna = show_rna" in notebook_text
     assert "show_dna" in notebook_text
     assert "show_rna" in notebook_text
+    assert "structure_browser_rows = []" in notebook_text
     assert "selected_deliverable_id=selected_visual_id" in notebook_text
+    assert "load_structure_highlight_rows(" in notebook_text
+    assert "structure_highlight_rows" in notebook_text
     assert "selected_group=selected_structure_group" in notebook_text
     assert "structure_group_lookup" in combined_text
+    eager_load_snippet = "structure_browser_rows = load_structure_browser_rows(\n        manifest_root=manifest_root,"
+    assert eager_load_snippet not in notebook_text

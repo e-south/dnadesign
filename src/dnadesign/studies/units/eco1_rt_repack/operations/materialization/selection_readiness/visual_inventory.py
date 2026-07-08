@@ -35,6 +35,7 @@ CURRENT_SELECTION_PLOTS = (
         selection_role="input_stratification",
         funnel_stage_id="candidate_pool",
         notebook_group="core_funnel",
+        not_a_selector_reason=("Explains input mask policies; design class is context and is not a final-panel quota."),
     ),
     SelectionPlot(
         plot_id="selection_primary_panel_sankey",
@@ -56,7 +57,7 @@ CURRENT_SELECTION_PLOTS = (
         plot_id="selection_local_structure_threshold_sensitivity",
         file_name="selection_local_structure_threshold_sensitivity.svg",
         plain_title="Local RMSD threshold sensitivity",
-        selection_role="hard_gate",
+        selection_role="gate_audit",
         funnel_stage_id="local_structure_gate",
         notebook_group="context_checks",
         not_a_selector_reason=(
@@ -70,6 +71,9 @@ CURRENT_SELECTION_PLOTS = (
         selection_role="selected_panel_audit",
         funnel_stage_id="local_structure_gate",
         notebook_group="core_funnel",
+        not_a_selector_reason=(
+            "Audits selected rows after the local-structure gate; the declared threshold table is the filter."
+        ),
     ),
     SelectionPlot(
         plot_id="selection_regional_mutation_burden",
@@ -78,22 +82,31 @@ CURRENT_SELECTION_PLOTS = (
         selection_role="tie_break_context",
         funnel_stage_id="global_conservative_diverse_selection",
         notebook_group="selection_rationale",
+        not_a_selector_reason=(
+            "Contributes to post-gate selection review only; it is not activity evidence or an independent gate."
+        ),
     ),
     SelectionPlot(
         plot_id="selection_na_facing_chemistry_balance",
         file_name="selection_na_facing_chemistry_balance.svg",
-        plain_title="Chemistry changes near retained DNA/RNA are review context",
-        selection_role="tie_break_context",
-        funnel_stage_id="global_conservative_diverse_selection",
+        plain_title="Chemistry changes near retained DNA/RNA",
+        selection_role="gate_audit_and_tie_break_context",
+        funnel_stage_id="chemistry_support_gate",
         notebook_group="selection_rationale",
+        not_a_selector_reason=(
+            "Audits the near-region chemistry gate and post-gate chemistry fields; it is not activity evidence."
+        ),
     ),
     SelectionPlot(
         plot_id="selection_regionwise_msa_support",
         file_name="selection_regionwise_msa_support.svg",
         plain_title="MSA support is reviewed by mutation region",
-        selection_role="tie_break_context",
-        funnel_stage_id="global_conservative_diverse_selection",
+        selection_role="gate_audit_and_tie_break_context",
+        funnel_stage_id="chemistry_support_gate",
         notebook_group="selection_rationale",
+        not_a_selector_reason=(
+            "Audits the proximal support gate and regional support fields; it is not activity evidence."
+        ),
     ),
     SelectionPlot(
         plot_id="selection_selected_substitutions_across_rt",
@@ -102,13 +115,14 @@ CURRENT_SELECTION_PLOTS = (
         selection_role="selected_panel_audit",
         funnel_stage_id="global_conservative_diverse_selection",
         notebook_group="selection_rationale",
+        not_a_selector_reason=("Audits selected-row mutation locations; it does not add a hidden selection rule."),
     ),
     SelectionPlot(
         plot_id="selection_design_class_gate_counts",
         file_name="selection_design_class_gate_counts.svg",
         plain_title="Each design class retains protein-gate candidates",
         selection_role="context_check",
-        funnel_stage_id="broad_contract_pool",
+        funnel_stage_id="preservation_gate",
         notebook_group="context_checks",
         not_a_selector_reason=(
             "Context plot for per-class gate counts; the manifest funnel table is the selector record."

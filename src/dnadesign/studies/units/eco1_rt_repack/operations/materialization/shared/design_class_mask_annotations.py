@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/design_class_mask_annotations.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/design_class_mask_annotations.py
 
-RT annotation span drawing for design-class mask overview plots.
+RT annotation span drawing for Eco1 sequence-position plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

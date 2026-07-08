@@ -24,6 +24,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
+from ..shared.rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 from .mask_structure_highlights import (
     GROUP_RT_ANNOTATION_SPANS,
     design_class_fixed_mask_views,
@@ -33,7 +34,6 @@ from .mask_structure_highlights import (
     mask_input_evidence_views,
     reference_selection_view,
 )
-from .rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
 from .structure_browser_common import (
     REFERENCE_COLOR,
     RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
@@ -66,6 +66,16 @@ def write_mask_structure_browser_manifest(
 
     panel_root.mkdir(parents=True, exist_ok=True)
     manifest_path = panel_root / MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME
+    title = "The Ec86 structure shows which residues each fixed-mask rule protects"
+    alt_text = (
+        "Interactive Ec86 reference structure viewer with selectable design-class fixed masks, "
+        "mask inputs, and RT annotation spans."
+    )
+    description = (
+        "Shows the Ec86/7V9U reference structure with one fixed-mask, mask-input, or RT annotation "
+        "choice highlighted at a time. The base structure remains off-white so the selected residue "
+        "set is visually separable."
+    )
     if not reference_structure_path.exists():
         return _missing_mask_row(manifest_path, reference_structure_path)
     design_class_rows = load_design_class_mask_rows(
@@ -90,6 +100,9 @@ def write_mask_structure_browser_manifest(
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
         "schema_version": 1,
         "status": "materialized",
+        "title": title,
+        "alt_text": alt_text,
+        "description": description,
         "viewer_contract": "dnadesign.thread.structure_views",
         "backend_kind": "browser_structure_view",
         "default_backend": "py3dmol",
@@ -127,17 +140,10 @@ def write_mask_structure_browser_manifest(
         + [repo_relative_hint(reference_structure_path)]
         + rt_annotation_context.source_table_labels,
         input_hashes=file_hashes(source_paths),
-        alt_text=(
-            "Interactive Ec86 reference structure viewer with selectable design-class fixed masks, "
-            "mask inputs, and RT annotation spans."
-        ),
-        description=(
-            "Shows the Ec86/7V9U reference structure with one fixed-mask, mask-input, or RT annotation "
-            "choice highlighted at a time. The base structure remains off-white so the selected residue "
-            "set is visually separable."
-        ),
+        alt_text=alt_text,
+        description=description,
         interpretation_limit=payload["interpretation_limit"],
-        title="The Ec86 structure shows which residues each fixed-mask rule protects",
+        title=title,
         role="interactive_review",
     )
 

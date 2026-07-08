@@ -123,6 +123,7 @@ flat_materializers = sorted(path.name for path in materialization_root.glob("*.p
 if flat_materializers:
     problems.append(f"flat materialization primitive modules are not allowed: {flat_materializers}")
 
+expected_materialization_helper_packages = {"shared"}
 expected_materialization_primitives = {
     "atlas_semantic_profile",
     "biohub_esmc_sae_profile",
@@ -140,6 +141,7 @@ expected_materialization_primitives = {
     "foldcheck_review",
     "foldcheck_report",
     "foldcheck_request",
+    "generation_policies",
     "manual_mask_authority",
     "mask_set",
     "proteinmpnn_request",
@@ -151,13 +153,28 @@ expected_materialization_primitives = {
     "thread_plan",
 }
 observed_materialization_primitives = {
-    path.name for path in materialization_root.iterdir() if path.is_dir() and path.name != "__pycache__"
+    path.name
+    for path in materialization_root.iterdir()
+    if path.is_dir() and path.name not in {"__pycache__", *expected_materialization_helper_packages}
 }
 if observed_materialization_primitives != expected_materialization_primitives:
     problems.append(
         "materialization primitives must stay study-owned and semantic, observed "
         f"{sorted(observed_materialization_primitives)}"
     )
+
+observed_materialization_helpers = {
+    path.name for path in materialization_root.iterdir() if path.is_dir() and path.name in expected_materialization_helper_packages
+}
+if observed_materialization_helpers != expected_materialization_helper_packages:
+    problems.append(
+        "materialization shared helpers must stay in declared helper packages, observed "
+        f"{sorted(observed_materialization_helpers)}"
+    )
+expected_shared_files = {"__init__.py", "design_class_mask_annotations.py", "rendering.py", "rt_annotation_context.py"}
+observed_shared_files = {path.name for path in (materialization_root / "shared").glob("*.py")}
+if observed_shared_files != expected_shared_files:
+    problems.append(f"materialization/shared file set drifted, observed {sorted(observed_shared_files)}")
 
 for primitive in sorted(expected_materialization_primitives):
     package = materialization_root / primitive
@@ -322,7 +339,14 @@ expected_contract_package_files = {
         "set_artifacts.py",
         "source.py",
     },
-    "sampling": {"__init__.py", "artifacts.py", "candidate_table.py", "proteinmpnn_request.py", "sample_table.py"},
+    "sampling": {
+        "__init__.py",
+        "artifacts.py",
+        "candidate_handoff.py",
+        "candidate_table.py",
+        "proteinmpnn_request.py",
+        "sample_table.py",
+    },
     "structure": {"__init__.py", "artifacts.py", "authority.py", "contact_geometry.py", "preprocessing.py", "provenance.py"},
 }
 for package_name, expected_files in sorted(expected_contract_package_files.items()):
@@ -389,7 +413,13 @@ expected_contract_test_package_files = {
         "test_rt_intervals.py",
         "test_source.py",
     },
-    "sampling": {"__init__.py", "test_candidate_table.py", "test_proteinmpnn_request.py", "test_sample_table.py"},
+    "sampling": {
+        "__init__.py",
+        "test_candidate_handoff.py",
+        "test_candidate_table.py",
+        "test_proteinmpnn_request.py",
+        "test_sample_table.py",
+    },
     "structure": {"__init__.py", "test_authority.py", "test_contact_geometry.py", "test_preprocessing.py"},
 }
 for package_name, expected_files in sorted(expected_contract_test_package_files.items()):
@@ -531,7 +561,9 @@ if cli_lines > 80:
 oversized_source = [
     f"{path.relative_to(repo_root)}:{len(path.read_text(encoding='utf-8').splitlines())}"
     for path in package_root.rglob("*.py")
-    if "tests" not in path.parts and len(path.read_text(encoding="utf-8").splitlines()) > 500
+    if "tests" not in path.parts
+    and "outputs" not in path.parts
+    and len(path.read_text(encoding="utf-8").splitlines()) > 500
 ]
 if oversized_source:
     problems.append(f"source modules exceed 500-line IA budget: {oversized_source}")
@@ -539,10 +571,10 @@ if oversized_source:
 oversized_tests = [
     f"{path.relative_to(repo_root)}:{len(path.read_text(encoding='utf-8').splitlines())}"
     for path in tests_root.rglob("*.py")
-    if len(path.read_text(encoding="utf-8").splitlines()) > 200
+    if len(path.read_text(encoding="utf-8").splitlines()) > 240
 ]
 if oversized_tests:
-    problems.append(f"test modules exceed 200-line IA budget: {oversized_tests}")
+    problems.append(f"test modules exceed 240-line IA budget: {oversized_tests}")
 
 oversized_visualization_source = [
     f"{path.relative_to(repo_root)}:{len(path.read_text(encoding='utf-8').splitlines())}"

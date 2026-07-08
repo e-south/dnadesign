@@ -94,10 +94,20 @@ def write_sae_structure_browser_manifest(
             reason="No SAE feature rows with mapped residue activations and local structures were available.",
         )
 
+    title = "Biohub ESMC SAE activation regions can be inspected on structure"
+    alt_text = "Interactive structure browser for Biohub ESMC SAE feature activation regions."
+    description = (
+        "Maps the highest per-protein SAE activation regions onto the Ec86 reference or fitted "
+        "ProteinMPNN candidate structures. The viewer keeps activation highlights separate from "
+        "fold-quality and activity interpretation."
+    )
     payload = {
         "schema_id": "eco1_rt.interactive_structure_browser_manifest",
         "schema_version": 1,
         "status": "materialized",
+        "title": title,
+        "alt_text": alt_text,
+        "description": description,
         "viewer_contract": "dnadesign.thread.structure_views",
         "backend_kind": "browser_structure_view",
         "default_backend": "py3dmol",
@@ -159,14 +169,10 @@ def write_sae_structure_browser_manifest(
                 "alignment_reference": alignment_reference_path,
             }
         ),
-        alt_text="Interactive structure browser for Biohub ESMC SAE feature activation regions.",
-        description=(
-            "Maps the highest per-protein SAE activation regions onto the Ec86 reference or fitted "
-            "ProteinMPNN candidate structures. The viewer keeps activation highlights separate from "
-            "fold-quality and activity interpretation."
-        ),
+        alt_text=alt_text,
+        description=description,
         interpretation_limit=payload["interpretation_limit"],
-        title="Biohub ESMC SAE activation regions can be inspected on structure",
+        title=title,
         role="review_only",
     )
 

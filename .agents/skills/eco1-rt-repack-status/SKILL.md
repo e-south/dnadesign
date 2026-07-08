@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.17
+  version: 0.1.18
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -50,8 +50,9 @@ Out of scope:
   available; computational feasibility, candidate triage, compact
   panel-selection plots, and a primary conservative panel are materialized
   under the expanded design-class selection root and linked into the review
-  notebook when the selection manifest is present. RT-only handoff is not yet
-  finished.
+  notebook when the selection manifest is present. The selected protein
+  sequence CSV is materialized for review, but RT-only `candidate_handoff.yaml`
+  and downstream RT-lnRNA acceptance are not materialized.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
@@ -73,8 +74,12 @@ Out of scope:
   mapped C-alpha fit. Current panel tie-breaks use MSA support, mutation
   geography, near retained DNA/RNA chemistry, C-terminal primer-RNA recognition
   context, and sequence nonredundancy after feasibility, fold, and
-  local-structure gates. Whole-protein ESMC pseudo-likelihood and computational stability
-  prediction stay deferred unless a later task explicitly reopens those paths.
+  local-structure gates. Current panel tie-breaks favor lower near retained
+  DNA/RNA chemistry risk, mutation-set dissimilarity, regional MSA support,
+  local RMSD values inside the declared gate, and fold metrics. Design classes
+  are input-mask context, not final-panel quotas. Whole-protein ESMC
+  pseudo-likelihood and computational stability prediction stay deferred unless
+  a later task explicitly reopens those paths.
 - Missing or mismatched `study_id` fails visibly.
 
 ## Workflow
@@ -89,6 +94,8 @@ Out of scope:
    `contexts/msa-method.md`,
    `contexts/residue-mask-policy.md`,
    `contexts/fold-validation-policy.md`, or
+   `contexts/selection-hardening-dev-spec.md` for panel-selection semantics,
+   claim boundaries, and plot-role wording, or
    `contexts/synthesis-feasibility-policy.md`.
 4. For current contract scaffolding, inspect
    `operations/contract/readiness/`, `operations/contract/fixtures/thread/`,

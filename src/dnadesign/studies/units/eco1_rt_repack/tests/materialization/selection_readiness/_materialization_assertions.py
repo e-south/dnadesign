@@ -74,8 +74,8 @@ def assert_selection_plot_contract(
     assert_svg_has_square_panel(gate_count_text)
 
     primary_sankey_text = plot_text_by_id["selection_primary_panel_sankey"]
-    assert "Broad protein" in primary_sankey_text
-    assert "Primary panel" in primary_sankey_text
+    assert "Preservation" in primary_sankey_text
+    assert "Chemistry and" in primary_sankey_text
     assert "Selected primary" in primary_sankey_text
     assert "design-class quota" in primary_sankey_text
     assert_heatmap_cells_are_square(

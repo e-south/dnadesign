@@ -11,12 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
-    PRIMARY_C_TERMINAL_LOCAL_RMSD_MAX_ANGSTROM,
     PRIMARY_PANEL_SIZE,
     SELECTION_POLICY_ID,
 )
@@ -24,25 +22,31 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     canonical_mutation_positions,
     canonical_mutation_tokens,
     nearest_jaccard_distance,
+    nearest_shared_count,
 )
-
-NA_FACING_LOW_BURDEN_RATIO = 0.05
-NA_FACING_HIGH_BURDEN_RATIO = 0.75
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_rows import (
+    build_panel_row,
+)
 
 _PRIMARY_RANK_FIELDS = (
     (
-        "proximal_unobserved_support",
-        "proximal_review_unobserved_mutation_count",
+        "nearest_selected_mutation_position_jaccard_distance",
+        "nearest_selected_mutation_position_jaccard_distance",
+        "higher",
+    ),
+    (
+        "nearest_selected_mutation_token_jaccard_distance",
+        "nearest_selected_mutation_token_jaccard_distance",
+        "higher",
+    ),
+    (
+        "nearest_selected_mutation_position_shared_count",
+        "nearest_selected_mutation_position_shared_count",
         "lower",
     ),
     (
-        "proximal_rare_support",
-        "proximal_review_rare_or_unobserved_mutation_count",
-        "lower",
-    ),
-    (
-        "acidic_gain_near_retained_dna_rna",
-        "nucleic_acid_facing_acidic_gain_count",
+        "nearest_selected_mutation_token_shared_count",
+        "nearest_selected_mutation_token_shared_count",
         "lower",
     ),
     (
@@ -56,36 +60,6 @@ _PRIMARY_RANK_FIELDS = (
         "lower",
     ),
     (
-        "nearest_selected_mutation_position_jaccard_distance",
-        "nearest_selected_mutation_position_jaccard_distance",
-        "higher",
-    ),
-    (
-        "nearest_selected_mutation_token_jaccard_distance",
-        "nearest_selected_mutation_token_jaccard_distance",
-        "higher",
-    ),
-    (
-        "c_terminal_primer_rna_recognition_rmsd",
-        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom",
-        "lower",
-    ),
-    (
-        "substrate_relevant_local_rmsd",
-        "local_structure_substrate_relevant_max_ca_rmsd_angstrom",
-        "lower",
-    ),
-    (
-        "chemistry_warning_count",
-        "nucleic_acid_facing_chemistry_warning_count",
-        "lower",
-    ),
-    (
-        "near_retained_dna_rna_burden",
-        "nucleic_acid_facing_mutation_count",
-        "lower",
-    ),
-    (
         "selection_msa_observed_fraction",
         "selection_support_alt_observed_fraction",
         "higher",
@@ -94,6 +68,16 @@ _PRIMARY_RANK_FIELDS = (
         "selection_msa_alt_frequency",
         "selection_support_alt_frequency_mean",
         "higher",
+    ),
+    (
+        "c_terminal_primer_rna_recognition_rmsd",
+        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom",
+        "lower",
+    ),
+    (
+        "thumb_contact_track_rmsd",
+        "local_structure_thumb_contact_track_context_ca_rmsd_angstrom",
+        "lower",
     ),
     ("mean_plddt", "mean_plddt", "higher"),
     ("cryoem_mapped_rmsd", "cryoem_mapped_ca_rmsd", "lower"),
@@ -138,7 +122,7 @@ def build_selection_panel_rows(
         selected.append(chosen)
         remaining = [row for row in remaining if str(row["candidate_id"]) != str(chosen["candidate_id"])]
         panel_rows.append(
-            _panel_row(
+            build_panel_row(
                 chosen,
                 nearest_distance=nearest_distance,
                 input_hashes=input_hashes,
@@ -154,7 +138,7 @@ def build_primary_panel_selection_trace_rows(
     triage_rows: Sequence[dict[str, object]],
     panel_rows: Sequence[dict[str, object]],
 ) -> list[dict[str, object]]:
-    """Return stage counts for the primary-panel funnel and boundary-candidate split."""
+    """Return stage counts for the primary-panel funnel."""
 
     all_rows = list(triage_rows)
     trace_rows: list[dict[str, object]] = [
@@ -169,41 +153,40 @@ def build_primary_panel_selection_trace_rows(
             is_hard_gate=False,
         )
     ]
-    broad_rows = [row for row in all_rows if str(row.get("hard_gate_status") or "") == "eligible"]
+    preservation_rows = [row for row in all_rows if str(row.get("hard_gate_status") or "") == "eligible"]
     trace_rows.append(
         _trace_row(
             stage_order=2,
-            stage_id="broad_contract_pool",
-            stage_label="Broad protein contract",
+            stage_id="preservation_gate",
+            stage_label="Preservation gate",
             selector_role="hard_gate",
             filter_rule=(
                 "Keep strong-fold candidates with feasible rows, no protected/core/direct-contact/thumb-track edits, "
-                "passed declared local RMSD gates, substrate-relevant local RMSD <= 3.0 A, and minimum directional "
-                "near retained DNA/RNA chemistry."
+                "and passed declared local RMSD gate. The C-terminal primer-RNA recognition region is controlled "
+                "through that same local-region threshold table, not a second RMSD overlay."
             ),
             input_count=len(all_rows),
-            remaining_count=len(broad_rows),
+            remaining_count=len(preservation_rows),
             is_hard_gate=True,
         )
     )
     primary_rows = [
-        row for row in broad_rows if str(row.get("selection_candidate_tier") or "") == "primary_panel_candidate"
+        row for row in preservation_rows if str(row.get("selection_candidate_tier") or "") == "primary_panel_candidate"
     ]
     trace_rows.append(
         _trace_row(
             stage_order=3,
-            stage_id="primary_panel_candidate_pool",
-            stage_label="Primary candidate pool",
-            selector_role="preservation_contract",
+            stage_id="chemistry_support_gate",
+            stage_label="Chemistry and support gate",
+            selector_role="hard_gate",
             filter_rule=(
-                "Keep broad-contract rows with C-terminal primer-RNA recognition-region C-alpha RMSD <= "
-                f"{PRIMARY_C_TERMINAL_LOCAL_RMSD_MAX_ANGSTROM:.1f} A after the global mapped C-alpha fit. "
-                "Proximal MSA support and near-region chemistry warnings remain selector fields, not separate "
-                "displayed gates."
+                "Keep preservation-pass rows with zero acidic gains near retained DNA/RNA and zero unobserved "
+                "proximal substitutions. Basic losses and Pro/Gly gains remain ranking penalties, not separate "
+                "hard gates."
             ),
-            input_count=len(broad_rows),
+            input_count=len(preservation_rows),
             remaining_count=len(primary_rows),
-            is_hard_gate=False,
+            is_hard_gate=True,
         )
     )
     trace_rows.append(
@@ -213,9 +196,10 @@ def build_primary_panel_selection_trace_rows(
             stage_label="Conservative-diverse six-row selection",
             selector_role="global_rank",
             filter_rule=(
-                "Select six rows globally from primary candidates by proximal MSA support, near retained DNA/RNA and "
-                "thumb-track chemistry warnings, mutation-set dissimilarity to already selected rows, local RMSD, "
-                "fold metrics, and a deterministic tie-break. Design class is context, not a quota."
+                "Select six rows globally from primary candidates by simple mutation-set dissimilarity to already "
+                "selected rows, fewer near retained DNA/RNA basic losses and Pro/Gly gains, regional MSA support, "
+                "local RMSD values inside the gate, fold metrics, and a deterministic tie-break. Design class is "
+                "context, not a quota."
             ),
             input_count=len(primary_rows),
             remaining_count=len(panel_rows),
@@ -309,6 +293,20 @@ def _choose_primary_candidate(
         )
         for row in candidate_rows
     }
+    nearest_token_shared_by_id = {
+        str(row["candidate_id"]): nearest_shared_count(
+            mutation_tokens_by_id.get(str(row["candidate_id"]), frozenset()),
+            selected_token_sets,
+        )
+        for row in candidate_rows
+    }
+    nearest_position_shared_by_id = {
+        str(row["candidate_id"]): nearest_shared_count(
+            mutation_positions_by_id.get(str(row["candidate_id"]), frozenset()),
+            selected_position_sets,
+        )
+        for row in candidate_rows
+    }
     chosen = min(
         candidate_rows,
         key=lambda row: _primary_sort_key(
@@ -316,6 +314,8 @@ def _choose_primary_candidate(
             nearest_distance=nearest_distance_by_id[str(row["candidate_id"])],
             nearest_mutation_token_jaccard=nearest_token_jaccard_by_id[str(row["candidate_id"])],
             nearest_mutation_position_jaccard=nearest_position_jaccard_by_id[str(row["candidate_id"])],
+            nearest_mutation_token_shared=nearest_token_shared_by_id[str(row["candidate_id"])],
+            nearest_mutation_position_shared=nearest_position_shared_by_id[str(row["candidate_id"])],
         ),
     )
     chosen["nearest_selected_mutation_token_jaccard_distance"] = nearest_token_jaccard_by_id[
@@ -324,142 +324,11 @@ def _choose_primary_candidate(
     chosen["nearest_selected_mutation_position_jaccard_distance"] = nearest_position_jaccard_by_id[
         str(chosen["candidate_id"])
     ]
+    chosen["nearest_selected_mutation_token_shared_count"] = nearest_token_shared_by_id[str(chosen["candidate_id"])]
+    chosen["nearest_selected_mutation_position_shared_count"] = nearest_position_shared_by_id[
+        str(chosen["candidate_id"])
+    ]
     return chosen, nearest_distance_by_id[str(chosen["candidate_id"])]
-
-
-def _panel_row(
-    row: dict[str, object],
-    *,
-    nearest_distance: int | None,
-    input_hashes: dict[str, str | None],
-    slot_rank: int,
-) -> dict[str, object]:
-    reason = (
-        "Selected for the primary conservative panel after protein-contract gates and a stricter C-terminal/thumb "
-        "primer-RNA recognition RMSD check. The final panel is selected globally using proximal MSA support, "
-        "near retained DNA/RNA chemistry risk, mutation-set dissimilarity, local structure, and fold metrics; design "
-        "classes remain review context rather than quotas. ESMC and SAE rows were retained for review but not used "
-        "for selection."
-    )
-    na_facing_count, na_facing_ratio = _na_facing_count_and_ratio(row)
-    trace = {
-        "selection_policy_id": SELECTION_POLICY_ID,
-        "selection_candidate_tier": row.get("selection_candidate_tier"),
-        "primary_panel_candidate": row.get("primary_panel_candidate"),
-        "primary_panel_failure_reasons_json": row.get("primary_panel_failure_reasons_json"),
-        "design_class_id": row["design_class_id"],
-        "proximal_review_unobserved_mutation_count": row.get("proximal_review_unobserved_mutation_count"),
-        "proximal_review_rare_or_unobserved_mutation_count": row.get(
-            "proximal_review_rare_or_unobserved_mutation_count"
-        ),
-        "selection_support_profile_id": row["selection_support_profile_id"],
-        "selection_support_alt_observed_fraction": row["selection_support_alt_observed_fraction"],
-        "selection_support_alt_frequency_mean": row["selection_support_alt_frequency_mean"],
-        "selection_support_unobserved_mutation_count": row["selection_support_unobserved_mutation_count"],
-        "mutation_count_total": row["mutation_count_total"],
-        "nucleic_acid_facing_mutation_count": row["nucleic_acid_facing_mutation_count"],
-        "nucleic_acid_facing_burden_ratio": na_facing_ratio,
-        "nucleic_acid_facing_burden_band": _na_facing_burden_band(na_facing_count, na_facing_ratio),
-        "nucleic_acid_facing_chemistry_warning_count": row["nucleic_acid_facing_chemistry_warning_count"],
-        "nucleic_acid_facing_chemistry_compatible": row.get("nucleic_acid_facing_chemistry_compatible"),
-        "nucleic_acid_facing_chemistry_gate_status": row.get("nucleic_acid_facing_chemistry_gate_status"),
-        "near_retained_dna_rna_acidic_gain_review_status": row.get("near_retained_dna_rna_acidic_gain_review_status"),
-        "primary_c_terminal_local_rmsd_gate_status": row.get("primary_c_terminal_local_rmsd_gate_status"),
-        "proximal_msa_support_review_status": row.get("proximal_msa_support_review_status"),
-        "nucleic_acid_facing_charge_delta": row["nucleic_acid_facing_charge_delta"],
-        "nucleic_acid_facing_acidic_gain_count": row["nucleic_acid_facing_acidic_gain_count"],
-        "nucleic_acid_facing_basic_loss_count": row["nucleic_acid_facing_basic_loss_count"],
-        "nucleic_acid_facing_proline_glycine_gain_count": row["nucleic_acid_facing_proline_glycine_gain_count"],
-        "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
-        "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
-        "c_terminal_primer_rna_recognition_mutation_count": row["c_terminal_primer_rna_recognition_mutation_count"],
-        "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
-        "local_structure_gate_status": row["local_structure_gate_status"],
-        "local_structure_max_ca_rmsd_angstrom": row["local_structure_max_ca_rmsd_angstrom"],
-        "local_structure_substrate_relevant_max_ca_rmsd_angstrom": row.get(
-            "local_structure_substrate_relevant_max_ca_rmsd_angstrom"
-        ),
-        "local_structure_substrate_relevant_max_gate_status": row.get(
-            "local_structure_substrate_relevant_max_gate_status"
-        ),
-        "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": row[
-            "local_structure_catalytic_initiation_context_ca_rmsd_angstrom"
-        ],
-        "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": row[
-            "local_structure_thumb_contact_track_context_ca_rmsd_angstrom"
-        ],
-        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": row[
-            "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom"
-        ],
-        "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom": row[
-            "local_structure_near_retained_dna_rna_annulus_ca_rmsd_angstrom"
-        ],
-        "nearest_selected_distance_aa": nearest_distance,
-        "nearest_selected_mutation_token_jaccard_distance": row.get("nearest_selected_mutation_token_jaccard_distance"),
-        "nearest_selected_mutation_position_jaccard_distance": row.get(
-            "nearest_selected_mutation_position_jaccard_distance"
-        ),
-        "fold_review_class": row["fold_review_class"],
-        "mean_plddt": row["mean_plddt"],
-        "wt_runtime_ca_rmsd": row["wt_runtime_ca_rmsd"],
-        "cryoem_mapped_ca_rmsd": row["cryoem_mapped_ca_rmsd"],
-        "sae_window_status": row["sae_window_status"],
-    }
-    return {
-        "candidate_id": row["candidate_id"],
-        "sequence_hash": row["sequence_hash"],
-        "design_class_id": row["design_class_id"],
-        "eligible_for_handoff": True,
-        "selection_slot": f"primary_panel_{slot_rank:02d}",
-        "slot_rank": slot_rank,
-        "selected_for_panel": True,
-        "selection_reason": reason,
-        "tie_break_trace_json": json.dumps(trace, sort_keys=True),
-        "nearest_selected_distance_aa": nearest_distance,
-        "fold_review_class": row["fold_review_class"],
-        "feasibility_status": row["feasibility_status"],
-        "hard_gate_status": row["hard_gate_status"],
-        "primary_panel_candidate": bool(row.get("primary_panel_candidate")),
-        "selection_candidate_tier": str(row.get("selection_candidate_tier") or ""),
-        "primary_panel_failure_reasons_json": row.get("primary_panel_failure_reasons_json"),
-        "near_retained_dna_rna_acidic_gain_review_status": row.get("near_retained_dna_rna_acidic_gain_review_status"),
-        "primary_c_terminal_local_rmsd_gate_status": row.get("primary_c_terminal_local_rmsd_gate_status"),
-        "proximal_msa_support_review_status": row.get("proximal_msa_support_review_status"),
-        "nearest_selected_mutation_token_jaccard_distance": row.get("nearest_selected_mutation_token_jaccard_distance"),
-        "nearest_selected_mutation_position_jaccard_distance": row.get(
-            "nearest_selected_mutation_position_jaccard_distance"
-        ),
-        "local_structure_gate_status": row["local_structure_gate_status"],
-        "local_structure_threshold_policy_id": row["local_structure_threshold_policy_id"],
-        "local_structure_threshold_failed_region_count": row["local_structure_threshold_failed_region_count"],
-        "local_structure_max_ca_rmsd_angstrom": row["local_structure_max_ca_rmsd_angstrom"],
-        "catalytic_or_direct_contact_mutation_count": row["catalytic_or_direct_contact_mutation_count"],
-        "nucleic_acid_facing_mutation_count": row["nucleic_acid_facing_mutation_count"],
-        "thumb_contact_track_mutation_count": row["thumb_contact_track_mutation_count"],
-        "c_terminal_primer_rna_recognition_mutation_count": row["c_terminal_primer_rna_recognition_mutation_count"],
-        "distal_scaffold_mutation_count": row["distal_scaffold_mutation_count"],
-        "nucleic_acid_facing_chemistry_warning_count": row["nucleic_acid_facing_chemistry_warning_count"],
-        "nucleic_acid_facing_chemistry_compatible": row.get("nucleic_acid_facing_chemistry_compatible"),
-        "nucleic_acid_facing_chemistry_gate_status": row.get("nucleic_acid_facing_chemistry_gate_status"),
-        "nucleic_acid_facing_acidic_gain_count": row.get("nucleic_acid_facing_acidic_gain_count"),
-        "proximal_review_unobserved_mutation_count": row.get("proximal_review_unobserved_mutation_count"),
-        "proximal_review_rare_or_unobserved_mutation_count": row.get(
-            "proximal_review_rare_or_unobserved_mutation_count"
-        ),
-        "local_structure_substrate_relevant_max_ca_rmsd_angstrom": row.get(
-            "local_structure_substrate_relevant_max_ca_rmsd_angstrom"
-        ),
-        "local_structure_substrate_relevant_max_gate_status": row.get(
-            "local_structure_substrate_relevant_max_gate_status"
-        ),
-        "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": row[
-            "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom"
-        ],
-        "input_candidate_triage_table_hash": input_hashes["candidate_triage_table"],
-        "input_foldcheck_review_hash": input_hashes["foldcheck_review"],
-        "input_feasibility_report_hash": input_hashes["feasibility_report"],
-        "input_sae_window_summary_hash": input_hashes.get("sae_window_summary"),
-    }
 
 
 def _primary_sort_key(
@@ -468,6 +337,8 @@ def _primary_sort_key(
     nearest_distance: int | None,
     nearest_mutation_token_jaccard: float | None = None,
     nearest_mutation_position_jaccard: float | None = None,
+    nearest_mutation_token_shared: int | None = None,
+    nearest_mutation_position_shared: int | None = None,
 ) -> tuple[object, ...]:
     values: list[object] = []
     for _stage_id, field_name, direction in _PRIMARY_RANK_FIELDS:
@@ -477,6 +348,10 @@ def _primary_sort_key(
             value = nearest_mutation_token_jaccard if nearest_mutation_token_jaccard is not None else 0.0
         elif field_name == "nearest_selected_mutation_position_jaccard_distance":
             value = nearest_mutation_position_jaccard if nearest_mutation_position_jaccard is not None else 0.0
+        elif field_name == "nearest_selected_mutation_token_shared_count":
+            value = nearest_mutation_token_shared if nearest_mutation_token_shared is not None else 0
+        elif field_name == "nearest_selected_mutation_position_shared_count":
+            value = nearest_mutation_position_shared if nearest_mutation_position_shared is not None else 0
         else:
             value = row.get(field_name)
         if direction == "lexicographic":
@@ -523,22 +398,6 @@ def _nearest_distance(sequence: str, selected_sequences: list[str]) -> int | Non
 
 def _hamming_distance(left: str, right: str) -> int:
     return sum(a != b for a, b in zip(left, right, strict=False)) + abs(len(left) - len(right))
-
-
-def _na_facing_count_and_ratio(row: dict[str, object]) -> tuple[int, float]:
-    count = _int_value(row.get("nucleic_acid_facing_mutation_count"))
-    total = max(_int_value(row.get("mutation_count_total")), 0)
-    return count, count / total if total else 0.0
-
-
-def _na_facing_burden_band(count: int, ratio: float) -> str:
-    if count == 0:
-        return "none"
-    if ratio < NA_FACING_LOW_BURDEN_RATIO:
-        return "low"
-    if ratio <= NA_FACING_HIGH_BURDEN_RATIO:
-        return "moderate"
-    return "broad"
 
 
 def _format_list(values: Sequence[str]) -> str:

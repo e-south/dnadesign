@@ -332,11 +332,12 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
 - Computational feasibility, candidate triage, a primary conservative panel,
-  and boundary-candidate review evidence are materialized under the expanded
-  design-class selection root. RT-only handoff is the remaining assay-panel
-  blocker. The current panel uses local structure, proximal MSA support,
-  mutation geography, nucleic-acid-facing chemistry, and sequence
-  nonredundancy after fold and feasibility gates. ESMC and SAE are recorded
+  and audit evidence are materialized under the expanded design-class
+  selection root. The selected protein sequence CSV is present for review, but
+  RT-only `candidate_handoff.yaml` and downstream acceptance remain the
+  blockers. The current panel uses local structure, proximal MSA support,
+  mutation geography, near retained DNA/RNA chemistry, and mutation-set
+  dissimilarity after fold and feasibility gates. ESMC and SAE are recorded
   for review only; they do not select rows. Broader
   reusable fold-model execution and handoff mechanics are still planned; the
   current executable `thread` surfaces are the generic ProteinMPNN adapter,

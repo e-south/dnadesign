@@ -21,12 +21,12 @@ from matplotlib.lines import Line2D
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
-    LEGEND_SIZE,
-    OKABE_ITO,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
     class_label,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
+    LEGEND_SIZE,
+    OKABE_ITO,
 )
 
 TEMPERATURE_COLORS = {

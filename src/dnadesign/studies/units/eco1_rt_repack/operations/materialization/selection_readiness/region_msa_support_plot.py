@@ -17,7 +17,7 @@ from typing import Any
 import matplotlib
 import numpy as np
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     TITLE_SIZE,
     save_accessible_svg,
@@ -133,11 +133,12 @@ def write_regionwise_msa_support_plot(
         description=(
             "Shows whether selected substitutions in each review region are observed in the matching natural-sequence "
             "set. The C-terminal primer-RNA recognition region is an overlapping context. Cells with no mutations "
-            "are labeled as no edits rather than scored."
+            "are labeled as no edits rather than scored. Zero unobserved proximal substitutions is part of the "
+            "chemistry/support gate."
         ),
         interpretation_limit=(
-            "Region-wise MSA support is evolutionary context for review. It is not functional proof and is not a "
-            "composite selection score."
+            "The proximal observed-support rule is a conservative screen. Region-wise MSA support is not functional "
+            "proof and is not a composite selection score."
         ),
         render_mode="wide_visual",
     )

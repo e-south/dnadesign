@@ -34,6 +34,13 @@ def nearest_jaccard_distance[T](value: frozenset[T], selected_values: Iterable[f
     return round(min(distances), 6) if distances else None
 
 
+def nearest_shared_count[T](value: frozenset[T], selected_values: Iterable[frozenset[T]]) -> int | None:
+    """Return the largest overlap count with already selected mutation sets."""
+
+    shared_counts = [len(value & selected) for selected in selected_values]
+    return max(shared_counts) if shared_counts else None
+
+
 def jaccard_distance[T](left: frozenset[T], right: frozenset[T]) -> float:
     """Return Jaccard distance for two finite sets."""
 

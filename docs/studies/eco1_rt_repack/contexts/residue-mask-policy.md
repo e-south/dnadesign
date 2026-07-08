@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 ---
 
 ## Residue Mask Policy
@@ -114,6 +114,23 @@ leaves declared Wang thumb-contact-track positions mutable. The classes still
 sample C-terminal/thumb-domain-adjacent mapped residues, especially under the
 5 A contact-shell classes, but the panel should not be described as a direct
 thumb-track tuning experiment.
+
+### Planned Generation-Policy Cleanup
+
+The planned cleanup in
+`generation-policy-cleanup-dev-spec.md` would replace this design-class family
+as the primary generation story. It uses explicit complete ProteinMPNN
+generation policies:
+
+- `distal_scaffold_repack_v1`
+- `near_dna_rna_acid_free_v1`
+- `combined_near_acid_free_plus_distal_v1`
+
+Those policies would keep one shared protected set, make open/designable
+positions explicit, and record per-policy provenance. They must not combine
+mutations from separate ProteinMPNN outputs after generation. Until that
+cleanup is implemented and regenerated, the current `contact5a` baseline plus
+expanded design-class outputs remain the active materialized record.
 
 The candidate pool is nonredundant by `sequence_hash`. If the same sequence is
 produced in more than one class, the pool keeps one row and records the duplicate

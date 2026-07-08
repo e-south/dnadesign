@@ -15,7 +15,7 @@ from pathlib import Path
 
 import matplotlib
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
     OKABE_ITO,

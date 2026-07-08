@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-04
+last_verified: 2026-07-08
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -33,23 +33,26 @@ selects a bounded protein sequence panel for review and handoff.
 
 The method starts from the selected Ec86 cryoEM scaffold. The study defines
 fixed and mutable positions using catalytic motifs, Wang/Ec86 direct-contact
-priors, retained DNA/RNA proximity, and Tao-style homolog-conservation masks
-from Mestre-derived MSA profiles. Different conservation and proximity
-thresholds define design classes. ProteinMPNN samples protein sequences at the
-unprotected positions for each design class. ColabFold predictions then remove
-poor fold-model candidates. The remaining pool is triaged by MSA support,
-localized mutation geography, C-terminal/thumb local structure, near retained
-DNA/RNA or thumb-track chemistry, sequence nonredundancy, and model-check
-annotations that are kept out of the acceptance gate.
+priors, retained DNA/RNA proximity, selected MSA/profile context from Mestre,
+and RT motif/region grammar from Simon. Tao supports the constraint-first
+redesign and structural-filtering pattern; it does not define an Eco1 activity
+score. Different conservation and proximity thresholds define design classes.
+ProteinMPNN samples protein sequences at the unprotected positions for each
+design class. ColabFold predictions then remove poor fold-model candidates.
+The remaining pool is triaged by MSA support, localized mutation geography,
+C-terminal/thumb local structure, near retained DNA/RNA or thumb-track
+chemistry, mutation-set nonredundancy, and model-check annotations that are
+kept out of the acceptance gate.
 
 The current reviewer-facing endpoint is a primary conservative protein panel
-selected globally from stricter primary-panel candidates. Design classes remain
-mask-policy context rather than quotas. The review notebook should let a user
-inspect the full population, the primary panel, py3Dmol structure views, and
-the selected protein sequences. The flat
-`candidate_handoff_sequences.csv` is the protein-sequence export for RT-only
-handoff planning; codon optimization, restriction-site screening, and construct
-subject creation remain downstream work.
+selected globally after a preservation gate and a chemistry/support gate.
+Design classes remain mask-policy context rather than quotas. Local RMSD
+thresholds are declared review cutoffs for structural preservation, not
+functional boundaries. The review notebook should let a user inspect the full
+population, the primary panel, py3Dmol structure views, and the selected protein
+sequences. The flat `candidate_handoff_sequences.csv` is the protein-sequence
+export for RT-only handoff planning; codon optimization, restriction-site
+screening, and construct subject creation remain downstream work.
 
 This study intentionally separates three layers:
 
@@ -82,6 +85,7 @@ eco1_rt_repack/
     fold-validation-policy.md
     synthesis-feasibility-policy.md
     selection-hardening-dev-spec.md
+    generation-policy-cleanup-dev-spec.md
   operations/
     ops.study.yaml
     contract/
@@ -140,12 +144,24 @@ pseudo-likelihood is not part of the v1 primary panel.
 The protein review panel layer is now materialized for the expanded pool under
 `outputs/thread/design_classes/selection/`. It contains a computational
 full-gene feasibility report, a candidate triage table, and a primary panel
-selected from primary candidates that pass broad protein contracts, stricter
-C-terminal/thumb local RMSD review, and minimum directional chemistry checks
-near retained DNA/RNA. The final selection ranks proximal MSA support, local
-chemistry warnings, mutation-set dissimilarity, local structure, and fold
+selected from candidates that pass preservation and chemistry/support gates.
+The preservation gate requires strong fold, protected/contact/thumb-track
+preservation, and one declared local RMSD gate table that includes the
+C-terminal primer-RNA recognition region. The chemistry/support gate requires
+no acidic gains near retained DNA/RNA and no unobserved proximal substitutions.
+The final selection ranks mutation-set dissimilarity, basic-loss and Pro/Gly
+penalties, regional MSA support, local RMSD values inside the gate, and fold
 metrics. ESMC and SAE remain review evidence only. The review fields explain
-the panel; they are not a single combined score.
+the panel; they are not a single combined score. The current selected panel is
+best read as a preserved protein review panel that includes one acid-free near
+retained DNA/RNA basic-gain row. It is not a processivity-improved,
+strand-displacement-improved, or direct thumb-track-tuned panel.
+
+A planned breaking cleanup is recorded in
+`contexts/generation-policy-cleanup-dev-spec.md`. That spec would replace the
+current nested distance-mask design-class story with three complete
+ProteinMPNN generation policies, require policy-version provenance, and
+regenerate the pool end to end. It is not the current runtime record.
 
 Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
 policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic

@@ -18,7 +18,7 @@ import matplotlib
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
     OKABE_ITO,
@@ -26,8 +26,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
-from ..review_deliverables.design_class_mask_annotations import add_rt_annotation_context
-from ..review_deliverables.rt_annotation_context import RTAnnotationContext
+from ..shared.design_class_mask_annotations import add_rt_annotation_context
+from ..shared.rt_annotation_context import RTAnnotationContext
 from .plot_support import (
     canonical_mutations,
     class_label,

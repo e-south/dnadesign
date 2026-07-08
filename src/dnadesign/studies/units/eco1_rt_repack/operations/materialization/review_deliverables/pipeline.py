@@ -22,6 +22,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_g
     resolve_output_root,
 )
 
+from ..shared.rt_annotation_context import (
+    MANUAL_MASK_AUTHORITY_SOURCE_LABEL,
+    RT_ANNOTATION_TRACKS_SOURCE_LABEL,
+    load_rt_annotation_context,
+)
 from .biohub_esmc_sae_interpretation import write_biohub_esmc_sae_interpretation_panels
 from .biohub_esmc_sequence_preference import (
     TITLE_6B,
@@ -81,11 +86,6 @@ from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
 from .proteinmpnn_fold_validation import (
     write_design_class_fold_bin_counts,
     write_expanded_design_class_fold_validation,
-)
-from .rt_annotation_context import (
-    MANUAL_MASK_AUTHORITY_SOURCE_LABEL,
-    RT_ANNOTATION_TRACKS_SOURCE_LABEL,
-    load_rt_annotation_context,
 )
 from .sae_structure_browser import write_sae_structure_browser_manifest
 from .selection_readiness import linked_selection_readiness_rows

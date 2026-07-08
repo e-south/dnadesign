@@ -59,7 +59,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     _subtype_fill_left_extension,
     _track_tick_labels,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     LABEL_SIZE,
     LEGEND_SIZE,
     OKABE_ITO,
@@ -68,8 +68,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     save_accessible_svg,
 )
 
+from ..shared.rt_annotation_context import RTAnnotationContext
 from .msa_panel_annotations import add_rt_annotation_context
-from .rt_annotation_context import RTAnnotationContext
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -300,6 +300,15 @@ def write_msa_plurality_mask_panel(
     fig.subplots_adjust(**margins)
 
     path = panel_root / panel_profile.file_name
+    subtype_note = (
+        "This subtype view is a separate closer-family context; it does not replace the clade 9 denominator "
+        "used by the active mask policy."
+        if panel_profile.profile_id == CONSERVATION_SUBTYPE_PROFILE_ID
+        else (
+            "The clade 9 view also marks rows that belong to the narrower II-A3/42_1 subtype set "
+            "when that source set is available."
+        )
+    )
     alt = (
         f"Canonical-coordinate MSA panel for all {len(selected_records)} accepted alignment rows from the "
         f"{len(records)}-record {panel_profile.profile_id} alignment. The first row is {target_id}; "
@@ -307,8 +316,7 @@ def write_msa_plurality_mask_panel(
         f"accessions. Vertical markings show columns passing the 25 percent WT-plurality rule in the "
         f"{panel_profile.scope_label} profile, the 50 percent design-class threshold cue, and current "
         "protected mask positions. Display-only background bands mark audited RT context spans, RT intervals, "
-        "and motif anchors. The clade 9 view also marks rows that belong to the narrower II-A3/42_1 subtype "
-        "set when that source set is available."
+        f"and motif anchors. {subtype_note}"
     )
     source_tables = [
         panel_profile.aligned_fasta_source_table,

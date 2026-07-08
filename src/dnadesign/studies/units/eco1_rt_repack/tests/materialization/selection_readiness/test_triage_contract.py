@@ -93,7 +93,7 @@ def test_thumb_contact_track_mutation_fails_ordinary_panel_gate() -> None:
     assert "thumb_contact_track_mutation" in reasons
 
 
-def test_directional_chemistry_incompatibility_fails_hard_gate() -> None:
+def test_near_region_directional_chemistry_does_not_fail_preservation_gate() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
@@ -106,8 +106,8 @@ def test_directional_chemistry_incompatibility_fails_hard_gate() -> None:
         local_structure_review=_passed_local_structure_review(),
     )
 
-    assert status == "ineligible"
-    assert "nucleic_acid_facing_chemistry_incompatible" in reasons
+    assert status == "eligible"
+    assert "nucleic_acid_facing_chemistry_incompatible" not in reasons
 
 
 def test_missing_local_structure_review_fails_hard_gate() -> None:
@@ -152,7 +152,7 @@ def test_local_structure_threshold_excess_fails_hard_gate() -> None:
     assert reasons == ["local_structure_threshold_exceeded"]
 
 
-def test_substrate_relevant_local_rmsd_excess_fails_hard_gate() -> None:
+def test_hard_gate_uses_declared_local_structure_status_without_extra_rmsd_overlay() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
@@ -162,11 +162,11 @@ def test_substrate_relevant_local_rmsd_excess_fails_hard_gate() -> None:
         ),
     )
 
-    assert status == "ineligible"
-    assert reasons == ["local_structure_substrate_relevant_rmsd_exceeded"]
+    assert status == "eligible"
+    assert reasons == []
 
 
-def test_missing_substrate_relevant_local_rmsd_is_missing_input() -> None:
+def test_hard_gate_does_not_require_region_rmsd_fields_after_declared_pass() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
@@ -174,5 +174,5 @@ def test_missing_substrate_relevant_local_rmsd_is_missing_input() -> None:
         local_structure_review={"local_structure_gate_status": "passed"},
     )
 
-    assert status == "missing_inputs"
-    assert reasons == ["missing_substrate_relevant_local_structure_rmsd"]
+    assert status == "eligible"
+    assert reasons == []

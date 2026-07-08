@@ -44,12 +44,13 @@ Use the cited literature in narrow roles:
 | Wang et al. 2022, Nature Microbiology, DOI `10.1038/s41564-022-01197-7` | Structural authority for Ec86 RT, retained DNA/RNA, electropositive substrate-facing surface, X/NAxxH and Y/VTG context, and thumb/contact annotations. | Supports region definitions and contact caution; does not prove which Eco1 substitutions improve processivity. |
 | Inouye et al. 1999, Journal of Biological Chemistry, DOI `10.1074/jbc.274.44.31236` | Primary evidence that RT-Ec86 recognizes specific primer-template RNA structures and that the C-terminal 91 residues are important for Ec86 primer-template recognition. | Supports thumb/C-terminal specificity caution; does not define a safe redesign threshold. |
 | Inouye et al. 2004, Journal of Biological Chemistry, DOI `10.1074/jbc.M408462200` | Primary evidence that the RT-Ec86 255-320 C-terminal fragment binds primer-recognition RNA. | Supports tracking the C-terminal/thumb domain as a specificity context; does not make thumb mutation a conservative default. |
+| Simon et al. 2019, Nucleic Acids Research, DOI `10.1093/nar/gkz865` | Retron biology and motif/region grammar for retron RTs and msDNA context. | Supports terminology and biological context; not a candidate-selection score. |
+| Mestre et al. 2020, Nucleic Acids Research, DOI `10.1093/nar/gkaa1149` | Retron RT diversity, tripartite-system classification, and selected clade/profile context used by the study's MSA surfaces. | Supports source-family and profile context; not a direct mask threshold or activity predictor. |
 | Lim and Maas 1989, Cell, DOI `10.1016/0092-8674(89)90693-4` | Primary retron/msDNA evidence for a covalently linked branched DNA-RNA compound in E. coli B. | Background for retron branch-linked product biology; not an Eco1 RT redesign rule. |
 | Inouye and Inouye 1992, Journal of Bacteriology, DOI `10.1128/jb.174.8.2419-2424.1992` | Primary review-style source for retrons and multicopy single-stranded DNA. | Background for retron biology; not a candidate-selection metric. |
 | Inouye and Inouye 1991, Annual Review of Microbiology, DOI `10.1146/annurev.mi.45.100191.001115` | Review source for msDNA and bacterial reverse transcriptase context. | Background source only; not a mask authority. |
 | RCSB PDB `7V9U` | Coordinate source for the Ec86 RT-msDNA-RNA structure and chain identity. | Coordinate authority only; not a design score. |
 | Kabsch 1976/1978, Acta Crystallographica, DOI `10.1107/S0567739476001873` and DOI `10.1107/S0567739478001680` | Precedent for optimal rigid-body superposition before comparing C-alpha displacements. | Supports the geometry calculation; threshold values still need study-specific justification. |
-| Enzyme-design and motif-scaffolding literature | General precedent for protecting functionally important sites and substrate/catalytic geometry. | Supports local-site caution; does not define Eco1 RT-specific thresholds. |
 
 Useful source links:
 
@@ -57,13 +58,14 @@ Useful source links:
 - Wang et al.: <https://www.nature.com/articles/s41564-022-01197-7>
 - Inouye et al. 1999: <https://doi.org/10.1074/jbc.274.44.31236>
 - Inouye et al. 2004: <https://doi.org/10.1074/jbc.M408462200>
+- Simon et al. 2019: <https://doi.org/10.1093/nar/gkz865>
+- Mestre et al. 2020: <https://doi.org/10.1093/nar/gkaa1149>
 - Lim and Maas 1989: <https://doi.org/10.1016/0092-8674(89)90693-4>
 - Inouye and Inouye 1992: <https://doi.org/10.1128/jb.174.8.2419-2424.1992>
 - Inouye and Inouye 1991: <https://doi.org/10.1146/annurev.mi.45.100191.001115>
 - RCSB 7V9U: <https://www.rcsb.org/structure/7V9U>
 - Kabsch 1976: <https://doi.org/10.1107/S0567739476001873>
 - Kabsch 1978: <https://doi.org/10.1107/S0567739478001680>
-- Functionally important site design context: <https://proceedings.mlr.press/v235/song24k.html>
 
 ### Plain Region Vocabulary
 
@@ -211,8 +213,9 @@ Add or keep one view that shows, for every design class:
 
 If a design class does not create a distinct review hypothesis after gates and
 selection, mark it as a removal or merge candidate in the next planning pass.
-The contract can remain one representative per declared class, but the classes
-must earn their place as design-policy contrasts.
+Do not require one representative per declared class unless the study is
+explicitly presenting a mask-policy sensitivity panel. In the current primary
+panel, design class is input provenance and review context, not a quota.
 
 #### Current Mask Orthogonality Audit
 
@@ -237,11 +240,12 @@ declared Wang thumb-contact track as protected for the primary panel, then
 selects globally from rows that pass stricter C-terminal/thumb, proximal MSA,
 and near retained DNA/RNA chemistry checks.
 
-Interpretation: one representative per class is reasonable if the claim is
-"mask-policy sensitivity panel." It is weaker if read as six orthogonal
-mechanistic hypotheses. A future thumb-focused or strand-displacement-motivated
-panel should either add a deliberate thumb-adjacent/C-terminal class or merge
-nested radius classes that do not add a distinct review question.
+Interpretation: one representative per class would be reasonable only for a
+mask-policy sensitivity panel. It is not the current primary-panel rule and is
+weak if read as six orthogonal mechanistic hypotheses. A future thumb-focused
+or strand-displacement-motivated panel should either add a deliberate
+thumb-adjacent/C-terminal class or merge nested radius classes that do not add a
+distinct review question.
 
 ### Plot Set
 
@@ -328,9 +332,11 @@ Use:
 
 > The selected candidates preserve declared catalytic/contact regions and pass
 > local backbone-shift thresholds after one global mapped C-alpha fit. They
-> sample different mutation burdens and chemistry in the near retained DNA/RNA
-> region and distal scaffold. The current selected panel does not mutate the
-> declared Wang thumb-contact track.
+> reject acidic gains near retained DNA/RNA and unobserved proximal
+> substitutions before global selection. Any near retained DNA/RNA basic-gain
+> row should enter the panel only by the same conservative rank order, not by a
+> forced lane. The current selected panel does not mutate the declared Wang
+> thumb-contact track.
 
 Avoid:
 

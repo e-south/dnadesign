@@ -35,14 +35,14 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.mask_rows import (
     read_mask_residues,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.rendering import (
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.rendering import (
     OKABE_ITO,
     TITLE_SIZE,
     save_accessible_svg,
 )
 
-from .design_class_mask_annotations import add_rt_annotation_context
-from .rt_annotation_context import RTAnnotationContext
+from ..shared.design_class_mask_annotations import add_rt_annotation_context
+from ..shared.rt_annotation_context import RTAnnotationContext
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402

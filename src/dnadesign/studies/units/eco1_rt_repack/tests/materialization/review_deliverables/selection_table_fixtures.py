@@ -70,7 +70,6 @@ def triage_row(*, candidate_id: str, msa_fraction: float, charge_delta: int) -> 
         "selection_candidate_tier": "primary_panel_candidate",
         "primary_panel_candidate": True,
         "near_retained_dna_rna_acidic_gain_review_status": "passed",
-        "primary_c_terminal_local_rmsd_gate_status": "passed",
         "proximal_msa_support_review_status": "passed",
         "sae_window_status": "wt_like_not_used_for_selection",
     }
