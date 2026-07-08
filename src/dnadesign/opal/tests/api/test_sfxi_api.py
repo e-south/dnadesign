@@ -60,6 +60,49 @@ def test_score_vec8_public_api_uses_objective_channel_names() -> None:
     assert "score" not in row
 
 
+def test_score_vec8_is_monotone_for_setpoint_weighted_right_and_bright() -> None:
+    cfg = SFXIScoringConfig(
+        setpoint_vector=(0.0, 0.0, 0.0, 1.0),
+        scaling_percentile=95,
+        scaling_min_n=5,
+        intensity_log2_offset_delta=0.0,
+    )
+    scaling_vec8 = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 3.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 4.0],
+        ],
+        dtype=float,
+    )
+
+    desired_brightness = np.array(
+        [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, y11] for y11 in [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0]],
+        dtype=float,
+    )
+    desired_result = score_vec8(desired_brightness, cfg, scaling_vec8=scaling_vec8)
+    assert np.all(np.diff(desired_result.effect_raw) > 0.0)
+    assert np.all(np.diff(desired_result.sfxi) >= 0.0)
+
+    wrong_state_brightness = np.array(
+        [[0.0, 0.0, 0.0, 1.0, 0.0, y10, 0.0, 2.0] for y10 in [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0]],
+        dtype=float,
+    )
+    wrong_state_result = score_vec8(wrong_state_brightness, cfg, scaling_vec8=scaling_vec8)
+    assert np.allclose(wrong_state_result.effect_raw, wrong_state_result.effect_raw[0])
+    assert np.allclose(wrong_state_result.sfxi, wrong_state_result.sfxi[0])
+
+    wrong_logic = np.array(
+        [[0.0, v10, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0] for v10 in [0.0, 0.25, 0.5, 0.75, 1.0]],
+        dtype=float,
+    )
+    wrong_logic_result = score_vec8(wrong_logic, cfg, scaling_vec8=scaling_vec8)
+    assert np.all(np.diff(wrong_logic_result.logic_fidelity) < 0.0)
+    assert np.all(np.diff(wrong_logic_result.sfxi) < 0.0)
+
+
 def test_sfxi_reference_overlay_records_are_namespaced() -> None:
     vec8 = np.array(
         [
