@@ -239,6 +239,53 @@ qsub -t 2-3 \
 Use `qsub -t 1-3` only when no policy has already been materialized or when
 `ECO1_PROTEINMPNN_OVERWRITE=1` is intentional.
 
+After all policy tasks finish, check that each policy wrote the expected sample
+and candidate tables before starting fold checks:
+
+```bash
+cd <dnadesign_repo>
+uv run python - <<'PY'
+from pathlib import Path
+import polars as pl
+
+root = Path(
+    "src/dnadesign/studies/units/eco1_rt_repack/workspaces/"
+    "eco1_rt_conservative_v1/outputs/thread/generation_policies_v2"
+)
+for policy_id in (
+    "distal_scaffold_repack_v1",
+    "near_dna_rna_acid_free_v1",
+    "combined_near_acid_free_plus_distal_v1",
+):
+    policy_root = root / policy_id
+    sample = policy_root / "sample_table.parquet"
+    candidate = policy_root / "candidate_table.parquet"
+    sample_rows = pl.read_parquet(sample).height if sample.exists() else "missing"
+    candidate_rows = pl.read_parquet(candidate).height if candidate.exists() else "missing"
+    print(f"{policy_id}\tsample_rows={sample_rows}\tcandidate_rows={candidate_rows}")
+PY
+```
+
+To continue the study on a local workstation, pull the generated v2 policy
+bundle back into the same ignored output path. This is a generated-artifact
+transfer, not a USR dataset sync:
+
+```bash
+rsync -avz \
+  esouth@scc1.bu.edu:/project/dunlop/esouth/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/ \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+
+mkdir -p src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/sge_logs
+rsync -avz \
+  esouth@scc1.bu.edu:/project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs/ \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/sge_logs/
+```
+
+This ProteinMPNN generation lane stops after per-policy `sample_table.parquet`
+and `candidate_table.parquet` materialization. It does not automatically run
+ColabFold. After local pull-back, regenerate the v2 candidate-pool/fold-check
+inputs from the policy-provenance tables, then run the local ColabFold path.
+
 ### Eco1 ColabFold fold-check submissions
 
 The Eco1 ColabFold template consumes the materialized fold-check request:

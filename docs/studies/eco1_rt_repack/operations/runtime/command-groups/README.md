@@ -220,6 +220,20 @@ qsub -t 2-3 \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 ```
 
+Each task writes that policy's `sample_table.parquet` and
+`candidate_table.parquet`. When the SCC run is complete, pull
+`generation_policies_v2/` back to the local clone before preparing local
+fold-check inputs:
+
+```bash
+rsync -avz \
+  esouth@scc1.bu.edu:/project/dunlop/esouth/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/ \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+```
+
+ProteinMPNN generation ends at the per-policy sample and candidate tables. It
+does not run fold checks, selection, or review deliverable regeneration.
+
 The active accepted study record remains the v1 design-class bundle until the
 v2 ProteinMPNN outputs, candidate pool, fold checks, selection, and review
 bundle are regenerated and accepted.
