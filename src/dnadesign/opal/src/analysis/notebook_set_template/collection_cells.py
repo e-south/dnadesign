@@ -44,10 +44,10 @@ def _view_mode_cell() -> str:
         """
         @app.cell
         def _(collection_set_choices, mo):
-            view_mode_options = ["Campaign", "Campaign set"] if collection_set_choices else ["Campaign"]
-            default_view_mode = "Campaign set" if collection_set_choices else "Campaign"
-            view_mode_ui = mo.ui.radio(view_mode_options, value=default_view_mode, label="Review surface")
-            return default_view_mode, view_mode_options, view_mode_ui
+            if collection_set_choices:
+                view_mode_ui = mo.ui.dropdown(["Campaign", "Campaign set"], value="Campaign", label="View")
+            else: view_mode_ui = None
+            return view_mode_ui
         """
     )
 
@@ -57,7 +57,7 @@ def _active_view_mode_cell() -> str:
         """
         @app.cell
         def _(view_mode_ui):
-            active_view_mode = str(view_mode_ui.value)
+            active_view_mode = str(view_mode_ui.value) if view_mode_ui is not None else "Campaign"
             return active_view_mode
         """
     )

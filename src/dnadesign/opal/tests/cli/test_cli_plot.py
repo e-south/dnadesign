@@ -516,9 +516,9 @@ def test_plot_cli_list_configured_json_error_when_config_missing():
 
 def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
     config_paths = [
-        Path("src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
-        Path("src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml"),
-        Path("src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml"),
     ]
     expected = {
         "score_selected_over_rounds": "metric_over_rounds",

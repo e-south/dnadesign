@@ -88,6 +88,51 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
         assert hasattr(module, "app")
 
 
+def test_notebook_generate_json_next_commands_are_app_first(tmp_path: Path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    out_path = workdir / "notebooks" / "opal_demo_analysis.py"
+
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "-c",
+            str(campaign),
+            "--out",
+            str(out_path),
+            "--no-validate",
+            "--json",
+        ],
+    )
+
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.stdout)
+    assert payload["next_commands"]["run"] == f"uv run opal notebook run -c {campaign} --path {out_path}"
+    assert payload["next_commands"]["edit"] == f"uv run opal notebook edit -c {campaign} --path {out_path}"
+    assert payload["next_commands"]["marimo_check"] == f"uv run marimo check {out_path}"
+
+
 def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -117,7 +162,7 @@ def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) ->
     assert out_path.exists()
     text = out_path.read_text()
     assert "build_campaign_set_notebook_view_model" in text
-    assert "No plot media are available" in text
+    assert "No plot deliverables are available" in text
 
 
 def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:
@@ -233,10 +278,10 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert out_path.exists()
     assert smoke_checked == [out_path]
     text = out_path.read_text()
-    assert "# Campaign Review" in text
+    assert "# OPAL Review Notebook" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
-    assert 'label="Visual surface"' in text
+    assert 'label="Plot deliverable"' in text
 
 
 def test_notebook_generate_campaign_set_accepts_all_round_scope(tmp_path: Path, monkeypatch) -> None:
@@ -379,8 +424,8 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
     assert res.exit_code == 0, res.output
     text = out_path.read_text()
     assert f"collection_manifest_path = {str(collection_path)!r}" in text
-    assert 'label="Review surface"' in text
-    assert "view_mode_ui = mo.ui.radio(" in text
+    assert 'label="View"' in text
+    assert "view_mode_ui = mo.ui.dropdown(" in text
     assert "collection_visual_index_path" in text
     collection_visual_index = out_path.parent / "collection_visuals" / "collection_visual_manifest.json"
     assert collection_visual_index.exists()
@@ -727,10 +772,70 @@ def test_notebook_run_selects_single_notebook(tmp_path: Path, monkeypatch) -> No
             "run",
             "-c",
             str(campaign),
+            "--headless",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "28510",
         ],
     )
     assert res.exit_code == 0, res.stdout
     assert calls
+    assert calls[0] == [
+        "marimo",
+        "run",
+        str(nb_path),
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "28510",
+        "--headless",
+    ]
+
+
+def test_notebook_edit_selects_single_notebook(tmp_path: Path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+
+    nb_path = workdir / "notebooks" / "only.py"
+    nb_path.parent.mkdir(parents=True, exist_ok=True)
+    nb_path.write_text("import marimo\n")
+
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(notebook_cmd.importlib.util, "find_spec", lambda name: object())
+    calls: list[list[str]] = []
+
+    def _fake_run(args, check):
+        _unused = check
+        calls.append(list(args))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(notebook_cmd.subprocess, "run", _fake_run)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "edit",
+            "-c",
+            str(campaign),
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert calls
+    assert calls[0][:2] == ["marimo", "edit"]
     assert str(nb_path) in calls[0]
 
 

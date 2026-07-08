@@ -124,6 +124,83 @@ def _pick_notebook_interactive(paths: list[Path]) -> Path:
     return paths[idx]
 
 
+def _resolve_notebook_path(analysis: CampaignAnalysis, path: Path | None) -> Path:
+    ws = analysis.workspace
+    notebooks_dir = ws.workdir / "notebooks"
+    if path is None:
+        notebooks = _list_notebooks(notebooks_dir)
+        if not notebooks:
+            raise OpalError(
+                (
+                    f"No notebooks found in {notebooks_dir}. "
+                    f"Run `uv run opal notebook generate -c {analysis.config_path}` first."
+                ),
+                ExitCodes.BAD_ARGS,
+            )
+        if len(notebooks) == 1:
+            return notebooks[0]
+        if sys.stdin.isatty():
+            return _pick_notebook_interactive(notebooks)
+        msg = "Multiple notebooks found:\n" + _format_notebook_choices(notebooks) + "\nUse --path to select one."
+        raise OpalError(msg, ExitCodes.BAD_ARGS)
+
+    nb_path = Path(path)
+    if not nb_path.is_absolute():
+        nb_path = (Path.cwd() / nb_path).resolve()
+    if not nb_path.exists():
+        raise OpalError(
+            f"Notebook not found: {nb_path}. Run `uv run opal notebook generate -c <campaign.yaml>` first.",
+            ExitCodes.BAD_ARGS,
+        )
+    return nb_path
+
+
+def _marimo_command(
+    *,
+    mode: str,
+    notebook_path: Path,
+    host: str | None,
+    port: int | None,
+    headless: bool,
+) -> list[str]:
+    if mode not in {"run", "edit"}:
+        raise ValueError(f"Unsupported marimo notebook mode: {mode}")
+    command = ["marimo", mode, str(notebook_path)]
+    if host is not None:
+        command.extend(["--host", str(host)])
+    if port is not None:
+        command.extend(["--port", str(port)])
+    if headless:
+        command.append("--headless")
+    return command
+
+
+def _launch_marimo_notebook(
+    *,
+    mode: str,
+    notebook_path: Path,
+    host: str | None,
+    port: int | None,
+    headless: bool,
+) -> None:
+    if importlib.util.find_spec("marimo") is None:
+        command_hint = "run" if mode == "run" else "edit"
+        raise OpalError(
+            f"marimo is not installed. Install with `uv sync --locked` or use `uv run marimo {command_hint} ...`.",
+            ExitCodes.BAD_ARGS,
+        )
+    subprocess.run(
+        _marimo_command(
+            mode=mode,
+            notebook_path=notebook_path,
+            host=host,
+            port=port,
+            headless=headless,
+        ),
+        check=True,
+    )
+
+
 def _resolve_notebook_name(name: Optional[str], default_name: str) -> str:
     if not name:
         return default_name
@@ -567,7 +644,7 @@ def _generate_campaign_set_notebook(
     print_stdout(f"Campaign-set notebook written: {out_path}")
 
 
-@notebook_app.command("run", help="Launch a marimo notebook (if installed).")
+@notebook_app.command("run", help="Launch a generated notebook in read-only marimo app mode.")
 def cmd_notebook_run(
     config: Optional[Path] = typer.Option(
         None,
@@ -577,60 +654,57 @@ def cmd_notebook_run(
         envvar="OPAL_CONFIG",
     ),
     path: Optional[Path] = typer.Option(None, "--path", help="Notebook path (defaults to generated path)."),
+    host: Optional[str] = typer.Option(None, "--host", help="Host passed to `marimo run`."),
+    port: Optional[int] = typer.Option(None, "--port", help="Port passed to `marimo run`."),
+    headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
 ) -> None:
     try:
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
-        ws = analysis.workspace
-        notebooks_dir = ws.workdir / "notebooks"
-        if path is None:
-            notebooks = _list_notebooks(notebooks_dir)
-            if not notebooks:
-                raise OpalError(
-                    (
-                        f"No notebooks found in {notebooks_dir}. "
-                        f"Run `uv run opal notebook generate -c {analysis.config_path}` first."
-                    ),
-                    ExitCodes.BAD_ARGS,
-                )
-            if len(notebooks) == 1:
-                nb_path = notebooks[0]
-            else:
-                if sys.stdin.isatty():
-                    nb_path = _pick_notebook_interactive(notebooks)
-                else:
-                    msg = (
-                        "Multiple notebooks found:\n"
-                        + _format_notebook_choices(notebooks)
-                        + "\nUse --path to select one."
-                    )
-                    raise OpalError(msg, ExitCodes.BAD_ARGS)
-        else:
-            nb_path = Path(path)
-            if not nb_path.is_absolute():
-                nb_path = (Path.cwd() / nb_path).resolve()
-            if not nb_path.exists():
-                raise OpalError(
-                    f"Notebook not found: {nb_path}. Run `uv run opal notebook generate -c <campaign.yaml>` first.",
-                    ExitCodes.BAD_ARGS,
-                )
-
-        if importlib.util.find_spec("marimo") is None:
-            raise OpalError(
-                "marimo is not installed. Install with `uv sync --locked` or `uv pip install marimo`.",
-                ExitCodes.BAD_ARGS,
-            )
-
-        print_stdout(f"Launching marimo: {nb_path}")
-        subprocess.run(["marimo", "edit", str(nb_path)], check=True)
+        nb_path = _resolve_notebook_path(analysis, path)
+        print_stdout(f"Launching marimo app: {nb_path}")
+        _launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
     except OpalError as e:
         opal_error("notebook.run", e)
         raise typer.Exit(code=e.exit_code)
     except FileNotFoundError:
         opal_error(
             "notebook.run",
-            OpalError("marimo CLI not found on PATH. Install marimo or use `uv run marimo edit ...`."),
+            OpalError("marimo CLI not found on PATH. Install marimo or use `uv run marimo run ...`."),
         )
         raise typer.Exit(code=ExitCodes.BAD_ARGS)
     except Exception as e:
         internal_error("notebook.run", e)
+        raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
+
+
+@notebook_app.command("edit", help="Launch a generated notebook in editable marimo mode.")
+def cmd_notebook_edit(
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="campaign.yaml or campaign directory",
+        envvar="OPAL_CONFIG",
+    ),
+    path: Optional[Path] = typer.Option(None, "--path", help="Notebook path (defaults to generated path)."),
+    host: Optional[str] = typer.Option(None, "--host", help="Host passed to `marimo edit`."),
+    port: Optional[int] = typer.Option(None, "--port", help="Port passed to `marimo edit`."),
+    headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
+) -> None:
+    try:
+        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        nb_path = _resolve_notebook_path(analysis, path)
+        print_stdout(f"Launching marimo editor: {nb_path}")
+        _launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)
+    except OpalError as e:
+        opal_error("notebook.edit", e)
+        raise typer.Exit(code=e.exit_code)
+    except FileNotFoundError:
+        opal_error(
+            "notebook.edit",
+            OpalError("marimo CLI not found on PATH. Install marimo or use `uv run marimo edit ...`."),
+        )
+        raise typer.Exit(code=ExitCodes.BAD_ARGS)
+    except Exception as e:
+        internal_error("notebook.edit", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

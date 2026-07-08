@@ -195,6 +195,31 @@ def build_notebook_plot_inventory_rows(visual_surface_model: Mapping[str, Any]) 
     return rows
 
 
+def render_notebook_plot_choice_image(plot_choice: Mapping[str, Any], *, mo: Any) -> Any:
+    """Render one plot-choice media artifact at notebook-column width."""
+
+    path = Path(str(plot_choice.get("path") or ""))
+    path_label = str(plot_choice.get("path_label") or plot_choice.get("path") or "not generated")
+    if not path.exists():
+        return mo.md(f"Plot media missing: `{path_label}`")
+    return mo.image(
+        path.read_bytes(),
+        alt=str(plot_choice.get("alt_text") or plot_choice.get("title") or plot_choice.get("label")),
+        caption=str(plot_choice.get("caption") or "") or None,
+        rounded=True,
+        style={
+            "width": "auto",
+            "max-height": "min(62vh, 720px)",
+            "max-width": "100%",
+            "height": "auto",
+            "object-fit": "contain",
+            "margin": "0 auto",
+            "display": "block",
+            "background": "white",
+        },
+    )
+
+
 def _plot_kind_metadata(kind: str) -> Mapping[str, Any]:
     return describe_plot_kind(kind)
 

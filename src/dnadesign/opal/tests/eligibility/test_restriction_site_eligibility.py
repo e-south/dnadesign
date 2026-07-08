@@ -28,6 +28,7 @@ from dnadesign.opal.src.config.types import (
     SelectionBlock,
     TrainingBlock,
 )
+from dnadesign.opal.src.eligibility.restriction_sites import restriction_site_exclusion
 from dnadesign.opal.src.runtime.round_plan import plan_round
 from dnadesign.opal.src.storage.data_access import RecordsStore
 
@@ -138,6 +139,27 @@ def test_round_plan_filters_unexpected_restriction_sites_before_selection(tmp_pa
     assert plan.candidate_total_before_filter == 1
     assert plan.candidate_eligibility_reports[0]["rule"] == "restriction_site_exclusion"
     assert plan.candidate_eligibility_reports[0]["excluded_rows"] == 2
+
+
+def test_restriction_site_exclusion_can_pre_exclude_non_synthesis_controls() -> None:
+    frame = pd.DataFrame(
+        {
+            "id": ["candidate-a", "control-a"],
+            "sequence": ["A" * 60, "G" * 165],
+            "opal_candidate__design_family": ["ethanol", "control"],
+        }
+    )
+    params = {
+        **_eligibility_rule().params,
+        "exclude_rows_where": [{"column": "id", "equals": "control-a"}],
+    }
+
+    result = restriction_site_exclusion(frame=frame, params=params)
+
+    assert result.frame["id"].tolist() == ["candidate-a"]
+    assert result.report["pre_excluded_rows"] == 1
+    assert result.report["scanned_rows"] == 1
+    assert result.report["restriction_site_excluded_rows"] == 0
 
 
 def test_round_plan_fails_fast_when_eligibility_leaves_too_few_candidates(tmp_path) -> None:

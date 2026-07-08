@@ -222,6 +222,13 @@ def render(context, params: dict) -> None:
         fig, ax = plt.subplots(figsize=figsize)
         cax = None
         ax_mse = None
+    tick_font_size = _adaptive_heatmap_tick_font_size(
+        dim=dim,
+        row_count=len(y_labels),
+        figsize=figsize,
+        requested=tick_font_size,
+        has_reference_panel=ax_mse is not None,
+    )
     cmap = sequential_colormap(params.get("cmap", "opal_seafoam"))
     masked_matrix = np.ma.masked_invalid(matrix)
     x_edges = np.arange(dim + 1)
@@ -341,6 +348,23 @@ def _short_colorbar_title(label: str) -> str:
 
 def _heatmap_channel_tick_labels(labels: Sequence[str]) -> list[str]:
     return [str(label) for label in labels]
+
+
+def _adaptive_heatmap_tick_font_size(
+    *,
+    dim: int,
+    row_count: int,
+    figsize: Sequence[float],
+    requested: float,
+    has_reference_panel: bool,
+) -> float:
+    width, height = (float(figsize[0]), float(figsize[1]))
+    heatmap_width_fraction = 0.40 if has_reference_panel else 0.70
+    heatmap_height_fraction = 0.60 if has_reference_panel else 0.64
+    x_pitch = width * heatmap_width_fraction * 72.0 / max(int(dim), 1)
+    y_pitch = height * heatmap_height_fraction * 72.0 / max(int(row_count), 1)
+    fitted = min(float(requested), x_pitch * 0.82, y_pitch * 0.78)
+    return max(8.5, min(13.0, fitted))
 
 
 def _coerce_vector(value: object, *, field: str) -> list[float]:

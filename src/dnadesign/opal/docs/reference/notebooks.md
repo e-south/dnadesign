@@ -1,7 +1,19 @@
-## OPAL Notebooks
+---
+id: opal-reference-notebooks
+title: OPAL notebooks
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-08
+audience:
+  - operator
+  - maintainer
+  - agent
+entrypoints:
+  cli: uv run opal notebook
+  api: dnadesign.opal.notebooks.api.generated
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-26
+## OPAL Notebooks
 
 
 OPAL notebooks are generated marimo campaign analysis surfaces. They summarize
@@ -16,6 +28,18 @@ Generate one with:
 
 ```bash
 uv run opal notebook generate --config /path/to/campaign --round latest --force --json
+```
+
+Open a generated notebook in read-only app mode:
+
+```bash
+uv run opal notebook run --config /path/to/campaign --path /path/to/notebook.py
+```
+
+Open the same notebook in editable marimo mode only when changing notebook code:
+
+```bash
+uv run opal notebook edit --config /path/to/campaign --path /path/to/notebook.py
 ```
 
 Pin a single-campaign notebook to a specific rerun when a round has multiple
@@ -57,13 +81,14 @@ Generated notebooks import public helpers from
 `dnadesign.opal.notebooks.api.generated`. The canonical generated surface is the
 campaign-set template, and a single-campaign notebook is the same template with
 one campaign config. Generated notebooks embed
-`__opal_notebook_template_schema__ = "opal.generated_campaign_notebook.v2"` so
+`__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"` so
 non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
 run ID, optional `collection_manifest_path`, optional
-`collection_visual_index_path`, and follow-up `opal notebook run` /
-`marimo check` commands.
+`collection_visual_index_path`, and follow-up `opal notebook run` / `marimo
+check` commands. App review uses `opal notebook run`, which delegates to
+`marimo run`. Editable authoring uses the separate `opal notebook edit` command.
 
 Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 `opal.notebook_view_model.v1`; the enclosing campaign surface uses
@@ -97,20 +122,25 @@ The generated notebook renders the view model with progressive disclosure:
 - round selector for progress and manifest-backed plot scope;
 - an `OPAL Campaign Review` header that names the number of OPAL campaigns,
   the review scope, and any materialized campaign-set visual count;
-- a top-level `Review surface` control: `Campaign` for one selected campaign's plot
-  surfaces, and `Campaign set` for manifest-backed collection comparison
-  visuals when collection visuals are available;
-- a visual-surface selector for manifest-backed campaign plots;
+- a top-level `Review scope` control only when there is a real campaign versus
+  campaign-set choice: `Campaign` for one selected campaign's plot deliverables,
+  and `Campaign set` for manifest-backed collection comparison visuals;
+- a top-level plot deliverable selector for manifest-backed campaign plots;
 - a campaign-set selector for explicit matched sets, such as one positive/null
   control pair for a target/family/split;
-- a collection-visual selector for materialized comparison artifacts within the
+- a collection-plot selector for materialized comparison artifacts within the
   selected campaign set;
 - a plot-scope selector when the active plot has multiple manifest-backed
   scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
   `round_variants`;
+- selected OPAL plot artifacts and selected Reader plot artifacts before
+  secondary tables, so app-mode review can iterate plots through dropdowns
+  without opening detail sections;
 - plot metric/data-shape definitions from plot-manifest metadata;
-- plot-local method, math, failure-mode, and evidence tables inside
-  progressively disclosed accordions;
+- plot-local method, math, failure-mode, and evidence tables in a compact
+  progressively disclosed evidence section;
+- Reader evidence manifests, artifact tables, and renderable Reader plot
+  artifacts when a campaign stages measured Reader evidence;
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
 - limitations and evidence rows.
@@ -152,7 +182,10 @@ inspection remain CLI/API concerns unless they are promoted through a
 manifest-backed OPAL plot or another public notebook component. This keeps the
 single-campaign and multi-campaign surfaces from drifting.
 
-Heavy sections should use marimo accordions with lazy loading. Reusable
+Heavy secondary sections should use marimo accordions for progressive
+disclosure, but selected plot deliverables belong above those sections. Use lazy
+loading only for static sections; do not wrap nested widgets or media previews
+in lazy accordions when their values must update in app mode. Reusable
 generated-cell builders and public component primitives live in
 `src/analysis/notebook_components/`. Current reusable primitives cover
 campaign summary rows, at-a-glance rows, validity lines, change summary lines

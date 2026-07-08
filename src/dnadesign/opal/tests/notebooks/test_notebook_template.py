@@ -87,8 +87,9 @@ def test_notebook_template_removes_extra_tables() -> None:
 
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'label="Review surface"' in text
-    assert 'label="Visual surface"' in text
+    assert 'label="View"' in text
+    assert "view_mode_ui = None" in text
+    assert 'label="Plot deliverable"' in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
@@ -97,7 +98,7 @@ def test_notebook_template_has_visual_surface() -> None:
 def test_notebook_template_has_opal_schema_sentinel() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"' in text
+    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v4"' in text
 
 
 def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> None:
@@ -114,12 +115,12 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert render_visual_surface_cells.__module__.endswith(".notebook_components.visual_surface")
     assert "def render_visual_surface_cells" not in text
     assert surface_text not in text
-    assert "plot media are available" in text
-    assert "build_notebook_no_plot_scope_rows" in text
-    assert "Current campaign and plot evidence" in text
-    assert 'label="Visual surface"' in text
+    assert "plot deliverables are available" in text
+    assert "build_notebook_no_plot_scope_rows" not in text
+    assert "Current campaign and plot evidence" not in text
+    assert 'label="Plot deliverable"' in text
     assert '"label": plot_choice["title"]' not in text
-    assert "max-height" in text
+    assert "render_notebook_plot_choice_image" in text
     assert "Plot:" not in text
     assert "build_notebook_plot_method_sections" in text
     assert "thumbnail_gallery" not in text
@@ -144,11 +145,9 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     assert "mo.accordion(" in text
     for section in [
         "Campaigns at a glance",
-        "Selected campaign",
-        "Validity",
-        "Changes",
-        "Metric definitions",
-        "Artifacts",
+        "Campaign status",
+        "Reader evidence records",
+        "Data inputs and artifacts",
         "Warnings and stale artifacts",
     ]:
         assert section in text
@@ -162,6 +161,11 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "dnadesign.opal.src" not in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "build_notebook_campaign_summary_row" in text
+    assert "build_notebook_label_staging_rows" in text
+    assert "render_notebook_reader_evidence_artifact_visual" in text
+    assert "render_notebook_reader_evidence_panel" in text
+    assert "render_notebook_reader_evidence_plot_type_control" in text
+    assert "render_notebook_reader_evidence_artifact_control" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_collection_set_choices" in text
     assert "build_notebook_collection_visual_choices" in text
@@ -169,10 +173,26 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_notebook_campaign_set_visual_choices" not in text
 
 
+def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert 'reader_evidence_surface = _reader_evidence["surface"]' in text
+    assert "render_notebook_reader_evidence_plot_type_control(" in text
+    assert "render_notebook_reader_evidence_artifact_control(" in text
+    assert "render_notebook_reader_evidence_artifact_visual(" in text
+    assert "render_notebook_reader_evidence_panel(" in text
+    assert "mo.accordion(_accordion_items, multiple=True)" in text
+    assert "mo.accordion(_accordion_items, multiple=True, lazy=True)" not in text
+    assert "_table(_df(_metric_rows))" not in text
+    assert "_table(_df(_change_rows))" not in text
+    assert "_table(_df(_artifact_rows))" not in text
+    assert "_table(_df(_artifact_summary_rows))" not in text
+
+
 def test_notebook_template_degrades_without_runs() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "No plot media are available" in text
+    assert "No plot deliverables are available" in text
     assert "mo.stop(len(rounds) == 0" not in text
 
 
@@ -425,15 +445,15 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
         collection_visual_index_path=Path("collection_visuals/collection_visual_manifest.json"),
     )
 
-    assert 'label="Review surface"' in text
-    assert "view_mode_ui = mo.ui.radio(" in text
-    assert 'default_view_mode = "Campaign set" if collection_set_choices else "Campaign"' in text
-    assert "value=default_view_mode" in text
+    assert 'label="View"' in text
+    assert "view_mode_ui = mo.ui.dropdown(" in text
+    assert 'value="Campaign"' in text
+    assert 'active_view_mode = str(view_mode_ui.value) if view_mode_ui is not None else "Campaign"' in text
     assert 'label="Campaign set"' in text
     assert 'label="Campaign"' in text
-    assert 'label="Collection visual"' in text
+    assert 'label="Collection plot"' in text
     assert "build_notebook_collection_set_choices" in text
-    assert "_top_control_items = [view_mode_ui]" in text
+    assert "_top_control_items = [campaign_ui]" in text
     assert "elif collection_set_ui is not None:" in text
     assert "mo.vstack(_top_control_items" in text
     visual_panel_cell = text[
@@ -1037,7 +1057,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
         round_selector="latest",
     )
 
-    assert "# Campaign Review" in text
+    assert "# OPAL Review Notebook" in text
     assert "from dnadesign.opal.notebooks.api.generated import (" in text
     assert "from dnadesign.opal.notebooks.api import (" not in text
     assert "build_campaign_set_notebook_view_model" in text
@@ -1051,24 +1071,24 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert 'label="Campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
-    assert 'label="Visual surface"' in text
+    assert 'label="Plot deliverable"' in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
     assert "_preferred_visual_label = visual_label_memory()" in text
     assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
     assert "Campaigns at a glance" in text
-    assert "Selected campaign" in text
-    assert "Validity" in text
-    assert "Changes" in text
+    assert "Campaign status" in text
     assert "build_notebook_artifact_garden_rows" in text
     assert "build_notebook_change_rows" in text
     assert "build_notebook_metric_definition_rows" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_plot_card_rows" in text
     assert "build_notebook_plot_method_sections" in text
-    assert "build_notebook_no_plot_scope_rows" in text
+    assert "build_notebook_no_plot_scope_rows" not in text
     assert "build_notebook_validity_rows" in text
-    assert "Current campaign and plot evidence" in text
+    assert "render_notebook_reader_evidence_plot_type_control" in text
+    assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "Current campaign and plot evidence" not in text
     assert 'Campaign-set comparison"))' not in text
     assert "build_notebook_validity_lines" not in text
     assert "build_notebook_artifact_garden_lines" not in text
@@ -1086,7 +1106,7 @@ def test_campaign_review_notebook_schema_matches_single_or_set_surface() -> None
         round_selector="latest",
     )
 
-    schema_line = '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"'
+    schema_line = '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v4"'
     assert schema_line in single
     assert schema_line in campaign_set
     assert "opal.generated_campaign_notebook" not in single
@@ -1152,8 +1172,8 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "render_notebook_baserender_record" in text
     assert '"width": "100%"' in text
     assert '"background-color": "#FFFFFF"' in text
-    assert "What this sequence view shows" in text
-    assert "What this visual shows" in text
+    assert "Selection evidence" in text
+    assert "Collection plot evidence" in text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
 

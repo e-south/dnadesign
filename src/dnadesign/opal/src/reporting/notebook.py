@@ -19,6 +19,11 @@ from pathlib import Path
 from typing import Any
 
 from ..analysis.campaign import CampaignAnalysis
+from ..analysis.notebook_components import (
+    discover_label_staging_inputs,
+    discover_reader_evidence_artifacts,
+    discover_reader_evidence_manifests,
+)
 from ..analysis.notebook_scope import resolve_notebook_run_scope
 from ..core.utils import ExitCodes, OpalError, now_iso
 from ..plots.config import list_configured_plot_specs, load_plot_config
@@ -141,6 +146,9 @@ def build_notebook_view_model(
         "review_manifest_path": str(review_path),
         "review_manifest": review_manifest,
         "configured_plots": configured_plots,
+        "label_staging": discover_label_staging_inputs(ws.workdir),
+        "reader_evidence": discover_reader_evidence_manifests(ws.workdir),
+        "reader_evidence_artifacts": discover_reader_evidence_artifacts(ws.workdir),
         "plot_manifests": plot_manifests,
         "artifact_garden": artifact_garden,
         "stale_artifacts": stale_artifacts,

@@ -1,7 +1,18 @@
-## OPAL Command Line Interface
+---
+id: opal-reference-cli
+title: OPAL Command Line Interface
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-08
+audience:
+  - operator
+  - maintainer
+  - agent
+entrypoints:
+  cli: uv run opal
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+## OPAL Command Line Interface
 
 
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
@@ -743,7 +754,8 @@ Generate or run OPAL marimo artifact viewers.
 uv run opal notebook
 uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate] [--json]
 uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>] [--json]
-uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
+uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]
+uv run opal notebook edit --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]
 ```
 
 **Notes**
@@ -753,8 +765,9 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
   selection summaries, and manifest-backed `outputs/plots` deliverables.
 * Repeating `--campaign` writes an explicit campaign-set notebook with a
   campaign dropdown, at-a-glance campaign table, selected-campaign status, plot
-  dropdown, and warnings/stale-artifact panel. This is a review surface over
-  OPAL campaign contracts, not a study/probe dashboard.
+  deliverable dropdowns, selected plot artifacts at the top, and
+  warnings/stale-artifact panels behind supporting detail sections. This is a
+  review surface over OPAL campaign contracts, not a study/probe dashboard.
 * `generate` requires the campaign `records.parquet` to exist so the notebook
   can inspect schema and identity columns. The generated preview is
   schema-pruned and does not load the configured X payload on startup.
@@ -775,7 +788,10 @@ uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
   outside canonical OPAL notebooks.
 * When `--validate` is on and ledger runs already exist, `--round` must resolve
   in those runs. `--no-validate` skips that round check.
-* `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
+* `run` launches `marimo run` app mode for review. Use `--host`,
+  `--port`, and `--headless` for local dogfood or automation.
+* `edit` launches `marimo edit` for notebook authoring. Do not use edit mode
+  as review evidence when app behavior is the question.
 * `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
 * Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
 * Checked-in notebook fixtures are maintainer/test surfaces. Operator-facing

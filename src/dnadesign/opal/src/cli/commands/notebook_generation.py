@@ -53,6 +53,7 @@ def notebook_generate_payload(
         "workdirs": workdirs,
         "next_commands": {
             "run": f"uv run opal notebook run -c {config_paths[0]} --path {out_path}",
+            "edit": f"uv run opal notebook edit -c {config_paths[0]} --path {out_path}",
             "marimo_check": f"uv run marimo check {out_path}",
         },
     }

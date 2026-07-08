@@ -33,13 +33,12 @@ def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
 
 def test_campaign_progress_is_not_atlas() -> None:
     text = NOTEBOOK_PATH.read_text()
-    assert "# Campaign Review" in text
+    assert "# OPAL Review Notebook" in text
     assert "mo.accordion(" in text
     assert "mo.ui.table" in text
     assert "Campaigns at a glance" in text
-    assert "Selected campaign" in text
-    assert "Validity" in text
-    assert "Visual surface" in text
+    assert "Campaign status" in text
+    assert "Plot deliverable" in text
 
 
 def test_campaign_progress_uses_tables_for_contract_and_record_status() -> None:
@@ -61,16 +60,18 @@ def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     assert 'selected_round_selector = "all"' in text
     assert 'label="Campaign"' in text
     assert 'label="Campaign set"' in text
-    assert 'label="Visual surface"' in text
-    assert 'label="Review surface"' in text
-    assert "view_mode_ui = mo.ui.radio(" in text
-    assert 'default_view_mode = "Campaign set" if collection_set_choices else "Campaign"' in text
-    assert "value=default_view_mode" in text
+    assert 'label="Plot deliverable"' in text
+    assert 'label="View"' in text
+    assert "view_mode_ui = mo.ui.dropdown(" in text
+    assert 'value="Campaign"' in text
+    assert 'active_view_mode = str(view_mode_ui.value) if view_mode_ui is not None else "Campaign"' in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
     assert "on_change=set_visual_label_memory" in text
     assert "build_notebook_collection_set_choices" in text
     assert "build_notebook_collection_visual_choices" in text
     assert "build_notebook_campaign_set_visual_choices" not in text
+    assert "render_notebook_reader_evidence_plot_type_control" in text
+    assert "render_notebook_reader_evidence_artifact_control" in text
 
 
 def test_campaign_progress_keeps_lateral_tools_out_of_opal_surface() -> None:

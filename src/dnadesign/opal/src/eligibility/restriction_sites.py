@@ -122,6 +122,28 @@ def _unexpected_summary(report: RestrictionSiteScanReport) -> str:
     )
 
 
+def _exclude_rows_where_mask(frame: pd.DataFrame, params: Mapping[str, Any]) -> pd.Series:
+    specs = params.get("exclude_rows_where") or ()
+    mask = pd.Series(False, index=frame.index, dtype=bool)
+    if not specs:
+        return mask
+    if not isinstance(specs, Sequence) or isinstance(specs, str | bytes):
+        raise OpalError("restriction_site_exclusion.params.exclude_rows_where must be a list")
+    for spec in specs:
+        if not isinstance(spec, Mapping):
+            raise OpalError("restriction_site_exclusion.params.exclude_rows_where entries must be mappings")
+        column = str(spec.get("column", "")).strip()
+        if not column:
+            raise OpalError("restriction_site_exclusion.params.exclude_rows_where.column must be non-empty")
+        if column not in frame.columns:
+            raise OpalError(f"restriction_site_exclusion exclude_rows_where missing column {column!r}")
+        if "equals" not in spec:
+            raise OpalError("restriction_site_exclusion.params.exclude_rows_where entries require equals")
+        expected = str(spec["equals"])
+        mask |= frame[column].astype("string").fillna("").eq(expected)
+    return mask
+
+
 @register_candidate_eligibility("restriction_site_exclusion")
 def restriction_site_exclusion(*, frame: pd.DataFrame, params: Mapping[str, Any]) -> CandidateEligibilityRuleResult:
     """Exclude rows whose assembled insert contains non-designated restriction sites."""
@@ -148,10 +170,14 @@ def restriction_site_exclusion(*, frame: pd.DataFrame, params: Mapping[str, Any]
     right_flank = str(params.get("right_flank", ""))
     expected_core_length = int(params.get("expected_core_length", 0))
     sites = _restriction_sites_from_params(params)
+    pre_exclude_mask = _exclude_rows_where_mask(frame, params)
+    scan_frame = frame.loc[~pre_exclude_mask].copy()
+    if scan_frame.empty:
+        raise OpalError("restriction_site_exclusion excluded every candidate before restriction-site scanning")
 
     keep_mask: list[bool] = []
     violation_rows: list[dict[str, Any]] = []
-    for _, row in frame.iterrows():
+    for _, row in scan_frame.iterrows():
         candidate_id = str(row["id"])
         report = scan_restriction_sites(
             candidate_id=candidate_id,
@@ -172,7 +198,7 @@ def restriction_site_exclusion(*, frame: pd.DataFrame, params: Mapping[str, Any]
                 }
             )
 
-    filtered = frame.loc[keep_mask].copy().reset_index(drop=True)
+    filtered = scan_frame.loc[keep_mask].copy().reset_index(drop=True)
     min_remaining_raw = params.get("min_remaining_candidates")
     if min_remaining_raw is not None:
         min_remaining = int(min_remaining_raw)
@@ -191,8 +217,11 @@ def restriction_site_exclusion(*, frame: pd.DataFrame, params: Mapping[str, Any]
         "assembly_strategy_ref": str(params.get("assembly_strategy_ref", "")),
         "params_sha256": params_sha256(params),
         "input_rows": int(len(frame)),
+        "pre_excluded_rows": int(pre_exclude_mask.sum()),
+        "scanned_rows": int(len(scan_frame)),
         "output_rows": int(len(filtered)),
         "excluded_rows": int(len(frame) - len(filtered)),
+        "restriction_site_excluded_rows": int(len(scan_frame) - len(filtered)),
         "min_remaining_candidates": min_remaining,
         "violation_preview": violation_rows[:10],
     }

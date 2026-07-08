@@ -72,3 +72,23 @@ def test_vector_summary_explicit_reference_does_not_require_objective_setpoint(t
     assert set(tidy["row_type"]) == {"reference_vector", "reference_mse", "round"}
     assert tidy.loc[tidy["row_type"] == "reference_vector", "cohort"].unique().tolist() == ["target vec2"]
     assert tidy.loc[tidy["row_type"] == "reference_mse", "channel"].unique().tolist() == ["mse"]
+
+
+def test_vector_summary_heatmap_tick_size_adapts_to_channel_count() -> None:
+    normal = plot_mod._adaptive_heatmap_tick_font_size(
+        dim=8,
+        row_count=5,
+        figsize=(10.8, 5.2),
+        requested=13,
+        has_reference_panel=True,
+    )
+    dense = plot_mod._adaptive_heatmap_tick_font_size(
+        dim=48,
+        row_count=18,
+        figsize=(10.8, 5.2),
+        requested=13,
+        has_reference_panel=True,
+    )
+
+    assert normal == 13
+    assert 8.5 <= dense < normal

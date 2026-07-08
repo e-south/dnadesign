@@ -473,6 +473,20 @@ class _RestrictionSiteParams(BaseModel):
         return v
 
 
+class _RestrictionSiteExclusionRowFilter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str
+    equals: str
+
+    @field_validator("column", "equals")
+    @classmethod
+    def _filter_text_non_empty(cls, v: str) -> str:
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("filter text fields must be non-empty")
+        return vv
+
+
 @register_param_schema("candidate_eligibility", "restriction_site_exclusion")
 class _RestrictionSiteExclusionParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -485,6 +499,7 @@ class _RestrictionSiteExclusionParams(BaseModel):
     min_remaining_candidates: Optional[int] = None
     on_violation: Literal["exclude"] = "exclude"
     forbidden_sites: List[_RestrictionSiteParams]
+    exclude_rows_where: List[_RestrictionSiteExclusionRowFilter] = []
 
     @field_validator("sequence_column", "assembly_strategy_ref")
     @classmethod

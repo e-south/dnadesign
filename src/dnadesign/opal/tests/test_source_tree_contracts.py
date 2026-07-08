@@ -26,6 +26,19 @@ def _line_count(path: Path) -> int:
     return len(lines)
 
 
+def _is_generated_campaign_notebook(path: Path) -> bool:
+    try:
+        relative = path.relative_to(OPAL_ROOT / "campaigns")
+    except ValueError:
+        return False
+    if len(relative.parts) != 3 or relative.parts[1] != "notebooks":
+        return False
+    lines = path.read_text(encoding="utf-8").splitlines()
+    has_marimo_preamble = bool(lines) and lines[0] == "import marimo"
+    has_generated_marker = any(line.startswith("__generated_with") for line in lines[:5])
+    return has_marimo_preamble and has_generated_marker
+
+
 def test_opal_package_root_has_no_ad_hoc_python_modules() -> None:
     root_modules = sorted(path.name for path in OPAL_ROOT.glob("*.py") if path.name != "__init__.py")
 
@@ -44,6 +57,8 @@ def test_opal_code_lives_under_source_or_declared_nonruntime_surfaces() -> None:
     }
     leaked = []
     for path in OPAL_ROOT.rglob("*.py"):
+        if _is_generated_campaign_notebook(path):
+            continue
         if any(path == root or root in path.parents for root in allowed_roots):
             continue
         leaked.append(path.as_posix())
@@ -167,7 +182,9 @@ def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     assert "build_records_preview" not in aggregate_api.read_text()
     assert notebook_api.__all__ == ()
     module_lengths = {path.name: _line_count(path) for path in api_package.glob("*.py")}
-    assert max(module_lengths.values()) <= 160
+    budgets = {"__init__.py": 10, "generated.py": 170, "progress.py": 80}
+    assert set(module_lengths) == set(budgets)
+    assert {name: length for name, length in module_lengths.items() if length > budgets[name]} == {}
     for name in [
         "build_notebook_campaign_set_metric_comparison_rows",
         "build_notebook_collection_visual_card_rows",

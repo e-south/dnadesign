@@ -36,15 +36,12 @@ def _campaign_visual_model_cell() -> str:
         """
         @app.cell
         def _(
-            build_notebook_plot_inventory_rows,
             build_notebook_visual_surface_model,
             selected_campaign_model,
         ):
             campaign_visual_surface_model = build_notebook_visual_surface_model(selected_campaign_model)
             campaign_plot_choices = campaign_visual_surface_model["choices"]
-            plot_inventory_rows = build_notebook_plot_inventory_rows(campaign_visual_surface_model)
-            plot_inventory_counts = campaign_visual_surface_model["inventory_status_counts"]
-            return campaign_plot_choices, plot_inventory_counts, plot_inventory_rows
+            return campaign_plot_choices
         """
     )
 
@@ -71,6 +68,7 @@ def _visual_choices_cell() -> str:
             build_notebook_collection_visual_choices,
             campaign_plot_choices,
             collection_visuals,
+            selected_baserender_ids,
             selected_campaign_baserender_contract,
             selected_collection_set_choice,
         ):
@@ -84,7 +82,11 @@ def _visual_choices_cell() -> str:
                     collection_visuals,
                     comparison_set_key=_set_key,
                 )
-                if baserender_role_ui is not None and selected_campaign_baserender_contract.get("available"):
+                if (
+                    baserender_role_ui is not None
+                    and selected_campaign_baserender_contract.get("available")
+                    and selected_baserender_ids
+                ):
                     visual_choices.append(
                         {
                             "label": "Selected sequence render",
@@ -94,7 +96,7 @@ def _visual_choices_cell() -> str:
                     )
             else:
                 visual_choices = []
-                if selected_campaign_baserender_contract.get("available"):
+                if selected_campaign_baserender_contract.get("available") and selected_baserender_ids:
                     visual_choices.append(
                         {
                             "label": "Selected sequence render",
@@ -121,14 +123,14 @@ def _visual_selector_cell() -> str:
                     plot_ui = mo.ui.dropdown(
                         _labels,
                         value=_preferred_visual_label,
-                        label="Collection visual",
+                        label="Collection plot",
                         on_change=set_visual_label_memory,
                     )
                 else:
                     plot_ui = mo.ui.dropdown(
                         _labels,
                         value=_preferred_visual_label,
-                        label="Visual surface",
+                        label="Plot deliverable",
                         on_change=set_visual_label_memory,
                     )
             else: plot_ui = None

@@ -1,10 +1,21 @@
-# OPAL Modernization Development Specification
+---
+id: opal-maintainer-dev-spec-modernization
+title: OPAL Modernization Development Specification
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-08
+audience:
+  - maintainer
+  - study-integrator
+  - developer-experience-owner
+scope:
+  - campaign-runtime
+  - reporting
+  - plot-artifacts
+  - generated-marimo-notebooks
+---
 
-**Status:** Active maintainer modernization plan
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-25
-**Audience:** OPAL maintainers, study integrators, and developer-experience owners
-**Scope:** OPAL campaign runtime, reporting, plot artifacts, CLI JSON surfaces, and generated marimo review notebooks
+# OPAL Modernization Development Specification
 
 OPAL maintainer plans live in the tool-local docs tree. Public operator contracts live in reference docs, CLI JSON schemas, checked-in tests, and manifest-backed artifacts.
 
@@ -97,7 +108,7 @@ Implemented checklist for this slice:
   provenance without study-specific parsing.
 - Pass collection relationship pairs through first-class collection visual
   surfaces and build comparison rows only from validated pairs.
-- Expose campaign-set selection separately from collection-visual selection in
+- Expose campaign-set selection separately from collection-plot selection in
   generated notebooks.
 - Materialize collection comparison CSV/PNG/manifest artifacts before notebook
   review instead of recomputing them inside marimo.
@@ -205,7 +216,7 @@ The main plot gap has moved from artifactization to semantic completeness. Confi
 
 ### Notebook Generation
 
-The generated marimo notebook is campaign-specific and covers records, ledgers, selection summaries, label/prediction summaries, configured plot deliverables, and CLI handoff. It now imports public OPAL helpers, reads a manifest-backed `NotebookViewModel`, exposes round/run/record/data-source/plot dropdowns, and uses lazy accordions. Campaign-set notebook generation now exists as an explicit repeated `--campaign` mode backed by `NotebookCampaignSetViewModel`; it provides campaign and plot dropdowns without changing the single-campaign contract. The remaining UX work is deeper componentization and richer campaign-set drill-downs, not first support for campaign navigation.
+The generated marimo notebook is campaign-specific and covers records, ledgers, selection summaries, label/prediction summaries, configured plot deliverables, and CLI handoff. It now imports public OPAL helpers, reads a manifest-backed `NotebookViewModel`, exposes round/run/record/data-source/plot dropdowns, keeps selected plot deliverables above secondary evidence tables, and uses progressive-disclosure accordions for supporting detail. Campaign-set notebook generation now exists as an explicit repeated `--campaign` mode backed by `NotebookCampaignSetViewModel`; it provides campaign and plot dropdowns without changing the single-campaign contract. The remaining UX work is deeper componentization and richer campaign-set drill-downs, not first support for campaign navigation.
 
 ### Study/Probe Separation
 
@@ -274,7 +285,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Training-X lookup reads only matching Parquet row groups for requested IDs and preserves requested order | `src/dnadesign/opal/src/storage/data_access.py`, `src/dnadesign/opal/tests/transforms/test_transform_matrix.py` |
 | Generated notebook imports public OPAL helpers rather than `dnadesign.opal.src.*` | `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:59-70` |
 | Generated notebook builds a manifest-backed view model and uses manifest-backed plot choices | `src/dnadesign/opal/src/reporting/notebook.py:34-113`, `src/dnadesign/opal/src/analysis/notebook_template/setup_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/plot_cells.py` |
-| Generated notebook exposes round, run, record, data-source, and plot dropdowns plus lazy accordions | `src/dnadesign/opal/src/analysis/notebook_template/run_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/record_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/data_cells.py`, `src/dnadesign/opal/src/analysis/notebook_template/layout_cells.py` |
+| Generated notebook exposes round, run, record, data-source, and plot dropdowns; selected plot artifacts render before supporting accordions | `src/dnadesign/opal/src/analysis/notebook_set_template/visual_cells.py`, `src/dnadesign/opal/src/analysis/notebook_set_template/visual_panel_cells.py`, `src/dnadesign/opal/src/analysis/notebook_set_template/details_cells.py` |
 | Notebook generated-source wiring is split into semantic source-fragment modules with IA regression caps | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/analysis/notebook_components/`, `src/dnadesign/opal/tests/test_source_tree_contracts.py` |
 | Active dashboard analysis includes UMAP chart/view code | `src/dnadesign/opal/src/analysis/dashboard/views/plots.py:6-7`, `src/dnadesign/opal/src/analysis/dashboard/views/plots.py:101-139` |
 | Notebook tests already assert lateral tools and default UMAP column strings stay out of generated template | `src/dnadesign/opal/tests/notebooks/test_notebook_template.py:70-86` |
@@ -302,7 +313,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 | Public/private API hygiene | Study/probe code and generated notebooks use `dnadesign.opal` public APIs or documented subpackages; `dnadesign.opal.src.*` remains internal. |
 | Robust progress and review | Progress and review are run_id-scoped, lock-aware, abort-aware, manifest-authoritative, and clear about stale/missing data. |
 | Artifactized plots | Every plot run emits a per-plot manifest plus media and optional tidy CSV so review surfaces can render evidence without directory scraping. |
-| Marimo notebook UX | Generated notebooks become manifest-backed campaign review viewers with at-a-glance state, validity/change/evidence/limitations sections, lazy accordions, and no representation-browser content. |
+| Marimo notebook UX | Generated notebooks become manifest-backed campaign review viewers with at-a-glance state, validity/change/evidence/limitations sections, progressive-disclosure accordions, and no representation-browser content. |
 | Extensible plot ontology | New plots are based on reusable data shapes: scalar, vector, matrix, categorical, overlap, attribution, uncertainty/support, objective decomposition, audit table, and calibration. |
 | Campaign-agnostic review | OPAL review describes campaign contracts, ledgers, progress, selection behavior, configured plots, and limitations without encoding study semantics. |
 | CI/testability | Contracts are tested through unit tests, CLI JSON tests, schema fixtures, snapshot tests, and dogfood gates with explicit coverage labels. |
@@ -333,7 +344,7 @@ That `.var` run is ignored local evidence, not durable CI evidence. It is a mech
 9. **Public API boundaries.** Cross-package consumers use public APIs. Internal module imports are allowed inside OPAL implementation but not as durable external contracts.
 10. **Campaign agnosticism.** OPAL primitives operate on data shapes and declared channels. Study-specific semantics configure those primitives.
 11. **Machine readability.** CLI JSON, ledgers, manifests, plot data, and notebook view models carry schema versions and stable error/warning structures.
-12. **Progressive disclosure.** CLI/JSON are the control plane. Static review and marimo are inspection layers with heavy sections hidden behind lazy accordions.
+12. **Progressive disclosure.** CLI/JSON are the control plane. Static review and marimo are inspection layers. Selected plot deliverables stay at the top; heavy supporting tables live behind accordions. Lazy loading is acceptable for static sections, but not for nested widgets or media previews that must update in app mode.
 13. **Memory proportionality.** Ingest and inspection memory should scale with the requested operation, not with the full candidate feature payload unless the operation explicitly scores or validates that payload. Selected/top-k plot primitives should push selection/rank predicates into ledger reads before collecting data.
 14. **Leakage fails closed.** Generic OPAL contamination states and study-owned forbidden-input states are errors by default; warnings are only acceptable for read-only inspections that cannot prove contamination.
 15. **Generated artifact lifecycle.** Artifact creation, stale detection, retention, pruning, and local-only evidence summaries are explicit lifecycle states, not incidental filesystem residue.
@@ -691,11 +702,11 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 | Field | Specification |
 | --- | --- |
 | Problem | The generated single-campaign notebook is useful and manifest-backed. Reusable helper panels now live in the semantic `notebook_components/` package, generated source wiring is split under `notebook_template/`, and campaign-set generation exists as a separate overview notebook. Remaining UX risk is future drift away from reusable panel primitives and weak live marimo interaction evidence. |
-| Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same visual surface, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
-| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `visual_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_evidence`, `visual_surface`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `At a glance`, `Visual surface`, `Validity`, `Changes`, `Evidence`, `Metric definitions`, `Distrust and limitations`, `Artifacts`, `Raw tables`. |
+| Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same plot-deliverable surface, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
+| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `plot_deliverable_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_evidence`, `visual_surface_model`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `Plot deliverable`, `Campaign status`, `Evidence`, `Data inputs and artifacts`, `Distrust and limitations`, `Raw tables`. |
 | Affected modules | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/notebook.py`, public notebook API, tests, CLI notebook command. |
 | Migration notes | Preserve current ability to generate before first run. In that state, the view model reports `not_started` and missing manifest states explicitly. Keep the single-campaign path as the default; add campaign-set mode only when the user supplies a campaign index, run-root manifest, or explicit repeated `--campaign` values. |
-| Acceptance criteria | First viewport shows campaign selector when multiple campaigns exist, campaign status, run scope, X column, label source, latest run_id, selected count, stale warnings, and missing artifacts. Heavy tables and plots are inside `mo.accordion(..., multiple=True, lazy=True)`. The generated notebook should be mostly wiring; reusable component/view-model code should be importable and unit-tested outside marimo. |
+| Acceptance criteria | First viewport shows campaign selector when multiple campaigns exist, plot-deliverable controls, the selected plot artifact, campaign status, run scope, X column, label source, latest run_id, selected count, stale warnings, and missing artifacts. Heavy supporting tables are inside `mo.accordion(..., multiple=True)` sections; lazy loading is limited to static panels that do not contain reactive widgets or media previews. The generated notebook should be mostly wiring; reusable component/view-model code should be importable and unit-tested outside marimo. |
 | Tests | `marimo check` smoke, generated Python parse, no private imports, no UMAP/LatentDNA strings, manifest-only plot rendering, missing/stale plot states, component-level unit tests, campaign-set fixture with two campaigns, and a text guard against re-growing a large all-in-one template. |
 
 Notebook design rule: the user path is "Is it valid?", "What changed?", "What visual evidence supports that?", and "What should I distrust?" Plot cards must show source data, params, status, stale/fresh state, generated time, media links, and tidy CSV links. This is a product UX principle, not a static art direction: the visual language should be quiet evidence cartography, where status, scope, and distrust are visible before detailed tables.
@@ -716,8 +727,8 @@ and gates those modules in `test_source_tree_contracts.py`. Remaining work in
 this section is manifest/index inputs for campaign sets, live marimo interaction
 validation, and richer visual treatment of validity/change state.
 
-Current visual-surface status: the canonical generated notebook now uses one
-`Visual` selector for endpoint visuals rather than gallery/contact-sheet controls.
+Current plot-deliverable status: the canonical generated notebook now uses one
+plot-deliverable selector for endpoint visuals rather than gallery/contact-sheet controls.
 Manifest-backed plots render as full operative visuals with alt text, plot-method
 rows, and plot-evidence rows in progressive-disclosure tables. Promoter-like
 record rendering is capability-gated by a public OPAL notebook BaseRender
@@ -804,7 +815,7 @@ Required test coverage:
 | Artifact gardening | Stale sibling detection, ignored `.var` local-only reporting, byte-count inventory, prune dry-run output, and refusal to delete without explicit apply |
 | Plot plugin metadata | Every registered plot has `PlotMeta`, required inputs, output data shape, failure modes, and `--describe` coverage |
 | Plot tidy CSV shape | Each plot with `save_data` writes declared tidy schema and manifest references it |
-| Marimo notebook | Python parse, `marimo check`, no private imports, no UMAP/LatentDNA residue, manifest-backed plot cards, lazy accordions, component-level helpers, campaign-set dropdown fixture, and template-size regression guard |
+| Marimo notebook | Python parse, `marimo check`, no private imports, no UMAP/LatentDNA residue, manifest-backed plot cards, progressive-disclosure accordions, component-level helpers, campaign-set dropdown fixture, and template-size regression guard |
 | Public API import paths | Study code imports OPAL public API only; generated notebooks use public API only |
 | Module decomposition | Size/regrowth guards for notebook templates and study probe review modules; component-level tests cover extracted primitives before deleting old code paths |
 | Dogfood | cipro random positive/null, ethanol random, dual/AND random, leave-sigma35 variants, and real-assay workflows only when evidence exists |
@@ -859,7 +870,7 @@ Update these docs as implementation lands:
 | P2: X contract unification | Enforce canonical fixed-size list at run/review; add explicit normalization/import path for noncanonical X | P1 helpful | Medium/high; existing fixtures may use noncanonical X | Runtime, validator, docs, and tests agree on canonical schema | Provide explicit import command; do not silently coerce during run |
 | P3: Plot artifact manifest hardening | Complete metadata, stale/fresh state, interpretability captions, registry completeness, and all-round/default semantics for multi-round plots | P0c/P1 | Medium; all plot plugins affected indirectly | Every configured plot produces written/failed/skipped manifest with meaningful metadata | Runner-level manifest wrapper minimizes plugin edits |
 | P4: Generic plot primitives | Extend beyond existing `metric_over_rounds`, `feature_importance_heatmap`, and `vector_summary_heatmap` into overlap/composition/uncertainty/support/calibration primitives | P3 | Medium; temptation to over-abstract | New primitives pass data-shape contracts and avoid study names | Keep SFXI-specific plots during transition as configured diagnostics |
-| P5: Marimo review notebook modernization | Public component primitives shared by single-campaign and campaign-set notebooks, manifest-backed plot cards, campaign/plot dropdowns, lazy accordions, smoke checks | P3 | Medium; generated artifacts are durable | Notebook uses public imports and manifest authority; related campaigns are navigable from one generated notebook without duplicating implementation | Keep behavior stable through explicit view-model versioning; avoid legacy template shims |
+| P5: Marimo review notebook modernization | Public component primitives shared by single-campaign and campaign-set notebooks, manifest-backed plot cards, campaign/plot dropdowns, progressive-disclosure accordions, smoke checks | P3 | Medium; generated artifacts are durable | Notebook uses public imports and manifest authority; related campaigns are navigable from one generated notebook without duplicating implementation | Keep behavior stable through explicit view-model versioning; avoid legacy template shims |
 | P6: Campaign information architecture | Decide and execute ownership model for study-specific campaign configs: move to studies or mark as study fixtures with metadata | P1-P5 not required but helpful | Medium; path churn affects docs/tests | OPAL package contains generic configs/templates; study configs are study-owned or explicitly marked | Use explicit docs/tests migration, not hidden compatibility paths |
 | P7: Module decomposition | Split `ingest_y/`, probe `review.py`, probe `decision.py`, and notebook templates by contract | Can proceed slice-by-slice | Medium; review churn | Smaller modules have focused tests and no behavior drift | Extract helpers under tests before deleting old paths |
 | P8: Dogfood expansion and CI gates | Add broader synthetic and real-data smoke coverage with explicit evidence labels, including multi-round synthetic probe loops owned by study code | P0-P7 depending gate | High; runtime cost and study availability | Reports distinguish cipro/random, random-all, leave-sigma35, multi-round synthetic pressure tests, and real assay evidence | Keep expensive gates optional/nightly; never block core OPAL unit tests on study-specific benchmarks |
@@ -906,7 +917,7 @@ Update these docs as implementation lands:
 - [ ] Artifact gardening surfaces inventory local-only run roots, stale siblings, byte counts, retention state, and dry-run/apply prune plans.
 - [ ] Every plot plugin declares metadata, required inputs, output data shape, and failure modes.
 - [ ] Generic plot primitives cover scalar over rounds, vector over rounds, attribution heatmap, overlap, composition, uncertainty/support, objective decomposition, audit table, and calibration.
-- [ ] Generated marimo notebooks use public OPAL APIs, manifest-backed view models, reusable marimo component primitives, lazy accordions, plot cards, campaign/plot dropdowns, metric-definition accordions, artifact-garden panels, and smoke checks.
+- [ ] Generated marimo notebooks use public OPAL APIs, manifest-backed view models, reusable marimo component primitives, top-level plot deliverable dropdowns, compact progressive-disclosure evidence sections, artifact-garden panels, and smoke checks.
 - [ ] Single-campaign and campaign-set notebooks share component primitives; campaign-set navigation is not a second bespoke template surface.
 - [ ] Study-specific campaign config ownership is explicit: configs are either moved under the owning study or marked as study fixtures with owner metadata.
 - [ ] Docs are updated for CLI config resolution, data contracts, plot authoring, review manifests, notebooks, public APIs, and study/probe boundary guidance.

@@ -59,6 +59,10 @@ from .evidence import (
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
 )
+from .label_staging import (
+    build_notebook_label_staging_rows,
+    discover_label_staging_inputs,
+)
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
     build_notebook_at_a_glance_rows,
@@ -80,8 +84,22 @@ from .plot_scopes import build_notebook_plot_scope_options, select_notebook_plot
 from .plots import (
     build_notebook_plot_inventory_rows,
     build_notebook_visual_surface_model,
+    render_notebook_plot_choice_image,
 )
 from .project import find_notebook_repo_root, list_notebook_campaign_paths
+from .reader_evidence import (
+    build_notebook_reader_evidence_artifact_options,
+    build_notebook_reader_evidence_artifact_rows,
+    build_notebook_reader_evidence_plot_type_options,
+    build_notebook_reader_evidence_rows,
+    build_notebook_reader_evidence_surface,
+    discover_reader_evidence_artifacts,
+    discover_reader_evidence_manifests,
+    render_notebook_reader_evidence_artifact_control,
+    render_notebook_reader_evidence_artifact_visual,
+    render_notebook_reader_evidence_panel,
+    render_notebook_reader_evidence_plot_type_control,
+)
 from .runs import (
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -123,6 +141,7 @@ __all__ = [
     "build_notebook_distrust_lines",
     "build_notebook_distrust_rows",
     "build_notebook_evidence_rows",
+    "build_notebook_label_staging_rows",
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
     "build_notebook_no_plot_scope_rows",
@@ -131,6 +150,11 @@ __all__ = [
     "build_notebook_plot_method_sections",
     "build_notebook_plot_method_rows",
     "build_notebook_plot_scope_options",
+    "build_notebook_reader_evidence_artifact_rows",
+    "build_notebook_reader_evidence_artifact_options",
+    "build_notebook_reader_evidence_plot_type_options",
+    "build_notebook_reader_evidence_rows",
+    "build_notebook_reader_evidence_surface",
     "build_notebook_visual_surface_model",
     "build_notebook_run_options",
     "build_notebook_run_summary_lines",
@@ -140,6 +164,10 @@ __all__ = [
     "build_notebook_validity_rows",
     "compact_notebook_path",
     "CAMPAIGN_SET_BASERENDER_SURFACE_KIND",
+    "discover_label_staging_inputs",
+    "discover_reader_evidence_artifacts",
+    "discover_reader_evidence_manifests",
+    "render_notebook_reader_evidence_artifact_control",
     "find_notebook_repo_root",
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
@@ -147,6 +175,10 @@ __all__ = [
     "render_notebook_campaign_set_metric_comparison_image",
     "render_notebook_campaign_set_vector_heatmap_comparison_image",
     "render_notebook_campaign_set_plot_gallery_image",
+    "render_notebook_plot_choice_image",
+    "render_notebook_reader_evidence_artifact_visual",
+    "render_notebook_reader_evidence_panel",
+    "render_notebook_reader_evidence_plot_type_control",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_baserender_default_record_id",

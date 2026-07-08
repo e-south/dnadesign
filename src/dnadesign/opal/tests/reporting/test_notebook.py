@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dnadesign.opal.src.analysis.notebook_components import (
@@ -97,6 +98,101 @@ def test_notebook_view_model_includes_configured_plot_inventory(tmp_path: Path) 
     visual_surface = build_notebook_visual_surface_model(payload)
     assert visual_surface["missing_outputs"] == ["score_vs_rank"]
     assert visual_surface["inventory_status_counts"] == {"configured_missing_output": 1}
+
+
+def test_notebook_view_model_includes_reader_vec8_label_staging_inputs(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path)
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
+    label_input = workdir / "inputs" / "r0" / "reader_vec8_batch0.csv"
+    label_input.parent.mkdir(parents=True, exist_ok=True)
+    label_input.write_text(
+        "id,sequence,v00,v10,v01,v11,y00_star,y10_star,y01_star,y11_star,intensity_log2_offset_delta\n"
+        "candidate-1,ACGT,0,1,0,1,0.1,0.2,0.3,0.4,0.0\n",
+        encoding="utf-8",
+    )
+
+    payload = build_notebook_view_model(config_path, round_selector="latest")
+
+    assert payload["label_staging"] == [
+        {
+            "path": str(label_input),
+            "path_label": "inputs/r0/reader_vec8_batch0.csv",
+            "round": "r0",
+            "status": "ready",
+            "rows": 1,
+            "distinct_ids": 1,
+            "missing_columns": [],
+        }
+    ]
+
+
+def test_notebook_view_model_includes_reader_evidence_manifests(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path)
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
+    reader_plot = tmp_path / "reader" / "experiments" / "2026" / "20260706_sfxi" / "outputs" / "plots" / "ts_ETH-01.pdf"
+    reader_plot.parent.mkdir(parents=True, exist_ok=True)
+    reader_plot.write_bytes(b"%PDF-1.4\n")
+    evidence_manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
+    evidence_manifest.parent.mkdir(parents=True, exist_ok=True)
+    evidence_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "stress_ethanol_cipro_growth.reader_evidence.v1",
+                "campaign_slug": "secg_ethanol_rf_sfxi_topn",
+                "round": "r0",
+                "observed_round": 0,
+                "summary": {
+                    "rows": 1,
+                    "distinct_ids": 1,
+                    "reader_experiments": 1,
+                    "artifact_count": 1,
+                    "missing_artifact_rows": 0,
+                },
+                "rows": [
+                    {
+                        "id": "candidate-1",
+                        "design_id": "pDual-10-SECG-B0-ETH-01",
+                        "reader_experiment_id": "20260706_sfxi",
+                        "time_selected_h": 12.04,
+                        "artifacts": [
+                            {
+                                "semantic_kind": "raw_kinetics",
+                                "path": str(reader_plot),
+                                "exists": True,
+                                "media_type": "application/pdf",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = build_notebook_view_model(config_path, round_selector="latest")
+
+    assert payload["reader_evidence"] == [
+        {
+            "path": str(evidence_manifest),
+            "path_label": "inputs/r0/reader_evidence_manifest.json",
+            "round": "r0",
+            "status": "ready",
+            "rows": 1,
+            "distinct_ids": 1,
+            "reader_experiments": 1,
+            "artifact_count": 1,
+            "missing_artifact_rows": 0,
+        }
+    ]
 
 
 def test_notebook_view_model_marks_progress_contract_errors_blocking(tmp_path: Path, monkeypatch) -> None:
