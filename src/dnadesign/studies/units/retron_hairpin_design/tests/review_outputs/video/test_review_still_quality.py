@@ -31,7 +31,7 @@ def test_review_still_masks_compiler_title_and_uses_video_resolution(tmp_path: P
     write_sequence_montage(
         [frame],
         out_dir=tmp_path / "out",
-        deliverable_plan_id="teto_pwm_trim_rescue_v1",
+        deliverable_plan_id="teto_retained_span_trim_tetr_pwm_elite_v1",
         materialized_root=tmp_path / "materialized",
         review_variant_ids={"r180-w02-17": "pES-retron-199"},
         video_writer=_write_mock_video,

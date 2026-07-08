@@ -1,0 +1,199 @@
+contract: retron_msd_design_set_v1
+schema_version: 1
+study_id: retron_hairpin_design
+design_set_id: teto_retained_span_trim_ecoli_working_v1
+title: Eco1 tetO retained-span trim v1
+authority: persistent study workbench design cohort
+payload_source_policy: payload_family_catalog_terms_not_variant_specific_semantics
+allow_non_ligatable_s0: true
+label_count: 6
+expected_variant_count: 6
+compiler_spec_ref: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml
+deliverable_plan_ref: docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml
+source_refs:
+  directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
+  payload_binding_catalog: docs/studies/retron_hairpin_design/workbench/ontology/payload_binding_sites.yaml
+  compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml
+  previous_trim_design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
+  retron180_context_selection: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml#retron180_context_selection
+non_goals:
+  final_plasmid_number_assignment: excluded_until_benchling_handoff
+  reader_score_interpretation: excluded_until_wet_lab_data_exists
+  changing_reader_spop_math: excluded
+selection_basis:
+  - Preserve the prior retained-span trim logic from the bidirectional TetR PWM elite trim pilot.
+  - Change payload family from the Cruncher TetR PWM elite sequence to the Eco1 tetO sequence used by retron26 and retron43.
+  - Keep retron26 as the scaffold control and retron43 plus retron180 as target scaffolds for the bounded payload-family contrast.
+  - Do not encode retron26-specific semantics in code; payload family membership comes from the payload binding-site catalog.
+parent_payload:
+  payload_family_id: tetO_ecoli_working
+  parent_payload_id: tetO_ecoli_working_w00_19
+  source_variant_id: retron26
+  source_construct_id: pES-retron-26
+  source_sequence_5to3: TCCCTATCAGTGATAGAGA
+  motif_model_ref: cruncher:westmann_tetr_mitomi:tetR
+  motif_occurrences:
+    - motif_instance_id: tetR:1:18:+:1
+      start: 1
+      end: 18
+      strand: "+"
+      occurrence_rank: 1
+    - motif_instance_id: tetR:1:18:-:2
+      start: 1
+      end: 18
+      strand: "-"
+      occurrence_rank: 2
+payload_trims:
+  tetO_ecoli_working_w00_19:
+    payload_family_id: tetO_ecoli_working
+    payload_trim_id: tetO_ecoli_working_w00_19
+    parent_payload_id: tetO_ecoli_working_w00_19
+    exact_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    sequence_length_nt: 19
+    trim_5p_nt: 0
+    trim_3p_nt: 0
+    retained_parent_span_0: {start: 0, end: 19}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    retained_information_fraction: 1.0
+    selection_basis: untrimmed_teto_payload_prior_review_baseline
+  tetO_ecoli_working_w02_17:
+    payload_family_id: tetO_ecoli_working
+    payload_trim_id: tetO_ecoli_working_w02_17
+    parent_payload_id: tetO_ecoli_working_w00_19
+    exact_sequence_5to3: CCTATCAGTGATAGA
+    complement_sequence_5to3: TCTATCACTGATAGG
+    sequence_length_nt: 15
+    trim_5p_nt: 2
+    trim_3p_nt: 2
+    retained_parent_span_0: {start: 2, end: 17}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    retained_information_fraction: 0.973163
+    selection_basis: retained_span_from_teto_payload_prior
+  tetO_ecoli_working_w03_16:
+    payload_family_id: tetO_ecoli_working
+    payload_trim_id: tetO_ecoli_working_w03_16
+    parent_payload_id: tetO_ecoli_working_w00_19
+    exact_sequence_5to3: CTATCAGTGATAG
+    complement_sequence_5to3: CTATCACTGATAG
+    sequence_length_nt: 13
+    trim_5p_nt: 3
+    trim_3p_nt: 3
+    retained_parent_span_0: {start: 3, end: 16}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    retained_information_fraction: 0.928737
+    selection_basis: retained_span_from_teto_payload_prior
+decision_logic:
+  - id: trim_logic_fails_in_working_payload_family
+    condition: retron26 trim controls lose SPOP despite acceptable viability.
+    interpretation: Payload length/register may be limiting even when using the retron26/retron43 Eco1 tetO payload family.
+  - id: ecoli_working_payload_improves_r180_trim
+    condition: r180 Eco1 tetO retained-span trims rise above the 199/200 failure floor while retron26 controls remain active.
+    interpretation: Prior 199/200 weakness may be partly payload-family sensitive rather than scaffold-only.
+  - id: ecoli_working_payload_improves_r43_trim
+    condition: r43 Eco1 tetO retained-span trims rise above the 197/198 failure floor while retron26 controls remain active.
+    interpretation: Prior 197/198 weakness may be partly payload-family sensitive rather than scaffold-only.
+  - id: scaffold_dominates_after_payload_family_swap
+    condition: retron26 controls remain active but r43 and r180 Eco1 tetO retained-span trims remain near the failure floor.
+    interpretation: scaffold/processability remains the leading limitation under the tested trims.
+designs:
+  - construct_id: pES-teto-r26-w02-17
+    expected_msd_design_id: msd-tetO-ecoli-working-w02-17-C26-LCGGG-RACAG-MXMX
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w02_17
+    payload_trim_id: tetO_ecoli_working_w02_17
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    profile_s3s2s1s0: MXMX
+    variant_role: control
+    scaffold_context: retron26
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_mild_retained_span_trim, payload_family_contrast, retron26_control, wt_eco1_only]
+    source_precedent_id: pES-retron-26
+    rationale: Control row for the 15 nt retained-span trim from the Eco1 tetO payload family.
+  - construct_id: pES-teto-r26-w03-16
+    expected_msd_design_id: msd-tetO-ecoli-working-w03-16-C26-LCGGG-RACAG-MXMX
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w03_16
+    payload_trim_id: tetO_ecoli_working_w03_16
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    profile_s3s2s1s0: MXMX
+    variant_role: control
+    scaffold_context: retron26
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_stronger_retained_span_trim, payload_family_contrast, retron26_control, wt_eco1_only]
+    source_precedent_id: pES-retron-26
+    rationale: Control row for the 13 nt retained-span trim from the Eco1 tetO payload family.
+  - construct_id: pES-teto-r43-w02-17
+    expected_msd_design_id: msd-tetO-ecoli-working-w02-17-C43-LCAAG-RCTCG-MXMM
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w02_17
+    payload_trim_id: tetO_ecoli_working_w02_17
+    cap_id: C43
+    left_base: CAAG
+    right_base: CTCG
+    profile_s3s2s1s0: MXMM
+    variant_role: trim_candidate
+    scaffold_context: retron43
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_mild_retained_span_trim, payload_family_contrast, retron43_target, wt_eco1_only]
+    source_precedent_id: pES-retron-43
+    rationale: Applies the 197-style scaffold and retained-span logic to the Eco1 tetO payload family.
+  - construct_id: pES-teto-r43-w03-16
+    expected_msd_design_id: msd-tetO-ecoli-working-w03-16-C43-LCAAG-RCTCG-MXMM
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w03_16
+    payload_trim_id: tetO_ecoli_working_w03_16
+    cap_id: C43
+    left_base: CAAG
+    right_base: CTCG
+    profile_s3s2s1s0: MXMM
+    variant_role: trim_candidate
+    scaffold_context: retron43
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_stronger_retained_span_trim, payload_family_contrast, retron43_target, wt_eco1_only]
+    source_precedent_id: pES-retron-43
+    rationale: Applies the 198-style scaffold and retained-span logic to the Eco1 tetO payload family.
+  - construct_id: pES-teto-r180-w02-17
+    expected_msd_design_id: msd-tetO-ecoli-working-w02-17-C172-LAGTG-RCATG-XWMM
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w02_17
+    payload_trim_id: tetO_ecoli_working_w02_17
+    cap_id: C172
+    left_base: AGTG
+    right_base: CATG
+    profile_s3s2s1s0: XWMM
+    variant_role: trim_candidate
+    scaffold_context: retron180
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_mild_retained_span_trim, payload_family_contrast, retron180_target, wt_eco1_only]
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    source_precedent_id: pES-retron-180
+    rationale: Applies the 199-style scaffold and retained-span logic to the Eco1 tetO payload family.
+  - construct_id: pES-teto-r180-w03-16
+    expected_msd_design_id: msd-tetO-ecoli-working-w03-16-C172-LAGTG-RCATG-XWMM
+    payload_family_id: tetO_ecoli_working
+    payload_id: tetO_ecoli_working_w03_16
+    payload_trim_id: tetO_ecoli_working_w03_16
+    cap_id: C172
+    left_base: AGTG
+    right_base: CATG
+    profile_s3s2s1s0: XWMM
+    variant_role: trim_candidate
+    scaffold_context: retron180
+    rt_mode: wt_eco1
+    direction_ids: [teto_retained_span_trim_ecoli_working]
+    effect_tags: [teto_ecoli_working_payload_family, teto_ecoli_working_stronger_retained_span_trim, payload_family_contrast, retron180_target, wt_eco1_only]
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    source_precedent_id: pES-retron-180
+    rationale: Applies the 200-style scaffold and retained-span logic to the Eco1 tetO payload family.

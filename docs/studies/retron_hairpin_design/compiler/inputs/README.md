@@ -12,14 +12,14 @@ experimental meaning belongs in `../../workbench/design_sets/`.
   `scar_nick.s0_match_required=false`. C26 has no subsection topology, so
   materialization emits the whole `AGGC` segment without
   retained-stem/cap/foldback-return labels.
-- `teto_pwm_trim_rescue_v1.spec.yaml`: nine-design bidirectional TetR PWM trim
+- `teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml`: nine-design bidirectional TetR PWM trim
   spec for retron26 control, retron43 target scaffold, and the pES-retron-180
   C172/AGTG/CATG/XWMM precedent. Payload entries are literal 5'->3'
   sequences from the Cruncher monotypic TetR elite with trim metadata; durable
   experimental meaning stays in
-  `../../workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`.
-- `teto_payload_trim_retest_v1.spec.yaml`: four-design tetO payload-prior
-  retest spec for pES-retron-201 through pES-retron-204. It keeps the retained
+  `../../workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml`.
+- `teto_retained_span_trim_ecoli_working_v1.spec.yaml`: six-design Eco1 tetO
+  retained-span spec for pES-retron-201 through pES-retron-206. It keeps the retained
   spans used by the 195-200 TetR PWM pilot, but swaps in the retron26/retron43
-  tetO payload prior. Durable meaning stays in
-  `../../workbench/design_sets/teto_payload_trim_retest_v1.yaml`.
+  Eco1 tetO payload family. Durable meaning stays in
+  `../../workbench/design_sets/teto_retained_span_trim_ecoli_working_v1.yaml`.

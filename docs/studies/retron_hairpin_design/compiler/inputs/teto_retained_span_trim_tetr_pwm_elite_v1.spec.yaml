@@ -2,7 +2,7 @@ contract: retron_msd_compiler_spec_v1
 schema_version: 1
 allow_non_ligatable_s0: true
 
-# Literal compiler spec for the bidirectional TetR PWM trim v1 pilot.
+# Literal compiler spec for the TetR PWM elite retained-span trim v1 pilot.
 # Payload trim candidates are source-backed literals derived upstream from the
 # Cruncher monotypic TetR PWM elite; this compiler does not resolve payload PWM
 # sources or expand cap x stem-base grids implicitly.

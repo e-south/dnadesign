@@ -47,7 +47,7 @@ def test_sequence_montage_trims_compiler_png_edge_lines(tmp_path: Path) -> None:
     write_sequence_montage(
         (frame,),
         out_dir=tmp_path / "review",
-        deliverable_plan_id="teto_pwm_trim_rescue_v1",
+        deliverable_plan_id="teto_retained_span_trim_tetr_pwm_elite_v1",
         materialized_root=tmp_path,
         review_variant_ids={"r26-w00-19": "pES-retron-26"},
         video_writer=_fake_video_writer,

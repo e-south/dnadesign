@@ -1,13 +1,13 @@
 contract: retron_msd_compiler_run_record_v1
 schema_version: 1
 study_id: retron_hairpin_design
-run_id: 2026-06-20-teto-pwm-trim-rescue-v1.compile
+run_id: 2026-06-20-teto-retained-span-trim-tetr-pwm-elite-v1.compile
 run_kind: compile
 status: verified_transient
 verified_at: "2026-06-22"
 git_revision: 127b716f39e9d1d3575341fd14413726832a63bf # pragma: allowlist secret
 worktree_status: verified_before_commit
-design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
 command:
   cwd: repo:.
   argv:
@@ -18,18 +18,18 @@ command:
     - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
     - compile
     - --spec
-    - docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+    - docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
     - --out-dir
-    - /tmp/dnadesign_teto_pwm_trim_rescue_v1_compile
+    - /tmp/dnadesign_teto_retained_span_trim_tetr_pwm_elite_v1_compile
     - --format
     - json
 inputs:
   design_set:
-    path: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+    path: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
     sha256: 02e9cd58a32ec950c265fa4487c9656c5434bf985cd8ddd89b3a06db04099191 # pragma: allowlist secret
     role: persistent experimental cohort and decision logic
   compiler_spec:
-    path: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+    path: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
     sha256: d6815ed3dc7e161215ea7be985def2cec2b771c0d45641ee894a57a65f1b276c # pragma: allowlist secret
     role: executable literal payload/cap/stem-base spec
   registry:
@@ -42,7 +42,7 @@ inputs:
     role: checked-in cap source labels and 5'->3' sequences
 observed_output:
   output_policy: transient_not_checked_in
-  audit_out_dir: /private/tmp/dnadesign_teto_pwm_trim_rescue_v1_compile # pragma: allowlist secret
+  audit_out_dir: /private/tmp/dnadesign_teto_retained_span_trim_tetr_pwm_elite_v1_compile # pragma: allowlist secret
   record_count: 9
   catalog_contract: msd_design_catalog_v1
   bundle_contract: msd_design_catalog_bundle_v1
@@ -56,6 +56,6 @@ observed_output:
     - scaffold_context
     - rt_mode
 handoff_policy:
-  persistent_meaning: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
+  persistent_meaning: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
   generated_catalogs: explicit transient directory or owning Reader experiment inputs/designs directory
   do_not_commit_generated_artifacts_by_default: true

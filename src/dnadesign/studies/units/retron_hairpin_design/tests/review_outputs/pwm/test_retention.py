@@ -49,3 +49,32 @@ def test_dual_site_retention_selector_finds_mild_and_stronger_trim_windows(tmp_p
     assert stronger.sequence_from("CTCTATATCTGATATAGAG") == "TATATCTGATATA"
     assert round(stronger.retained_information_fraction, 6) == 0.915756
     assert [round(value, 6) for value in stronger.retained_bits_by_occurrence] == [6.443849, 6.443849]
+
+
+def test_teto_payload_prior_retention_selector_uses_top_and_bottom_strands(tmp_path: Path) -> None:
+    meme_path = write_test_tetr_meme_pwm(tmp_path / "tetR__westmann_tetr_mitomi__tetR.meme")
+    motif_bits = load_meme_information_bits(Path(meme_path))
+    occurrences = (
+        PwmMotifOccurrence(motif_instance_id="tetR:1:18:+:1", start_0=1, end_0=18, strand="+", occurrence_rank=1),
+        PwmMotifOccurrence(motif_instance_id="tetR:1:18:-:2", start_0=1, end_0=18, strand="-", occurrence_rank=2),
+    )
+
+    mild = select_best_retained_span(
+        parent_length=19, retained_length=15, motif_bits=motif_bits, occurrences=occurrences
+    )
+    stronger = select_best_retained_span(
+        parent_length=19,
+        retained_length=13,
+        motif_bits=motif_bits,
+        occurrences=occurrences,
+    )
+
+    assert (mild.start_0, mild.end_0) == (2, 17)
+    assert mild.sequence_from("TCCCTATCAGTGATAGAGA") == "CCTATCAGTGATAGA"
+    assert round(mild.retained_information_fraction, 6) == 0.973163
+    assert [round(value, 6) for value in mild.retained_bits_by_occurrence] == [6.847801, 6.847801]
+
+    assert (stronger.start_0, stronger.end_0) == (3, 16)
+    assert stronger.sequence_from("TCCCTATCAGTGATAGAGA") == "CTATCAGTGATAG"
+    assert round(stronger.retained_information_fraction, 6) == 0.928737
+    assert [round(value, 6) for value in stronger.retained_bits_by_occurrence] == [6.535194, 6.535194]

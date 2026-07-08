@@ -22,7 +22,7 @@ def write_fake_materialized_bundle(
     *,
     repo_root: Path,
     row_count: int | None = None,
-    design_set_id: str = "teto_pwm_trim_rescue_v1",
+    design_set_id: str = "teto_retained_span_trim_tetr_pwm_elite_v1",
 ) -> Path:
     design_set = yaml.safe_load(
         (
@@ -144,7 +144,7 @@ def _sequence_index_row(
         "cap_selector_id": "",
         "stem_base_selector_id": "",
         "rt_mode": str(design["rt_mode"]),
-        "decision_group": "teto_pwm_trim_rescue_v1",
+        "decision_group": "teto_retained_span_trim_tetr_pwm_elite_v1",
         "control_id": "",
         "composition_id": f"composition-{idx}",
         "unit_count": "1",

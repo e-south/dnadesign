@@ -210,7 +210,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     workbench_design_sets_readme = _read("docs/studies/retron_hairpin_design/workbench/design_sets/README.md")
     workbench_deliverables_readme = _read("docs/studies/retron_hairpin_design/workbench/deliverables/README.md")
     workbench_deliverable_plan = _read(
-        "docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
+        "docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     )
     workbench_provenance_readme = _read("docs/studies/retron_hairpin_design/workbench/provenance/README.md")
     workbench_directions = _read("docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml")
@@ -331,8 +331,8 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "authoritative answer" in workbench_design_sets_readme
     assert "Hypothesis-specific expectations for PWM panels" in workbench_design_sets_readme
     assert "hypothesis-specific review and handoff deliverables" in workbench_deliverables_readme
-    assert "teto_pwm_trim_rescue_v1.pwm_trim_triptych.png" in workbench_deliverable_plan
-    assert "teto_pwm_trim_rescue_v1.sequence_montage.mp4" in workbench_deliverable_plan
+    assert "teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png" in workbench_deliverable_plan
+    assert "teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4" in workbench_deliverable_plan
     assert "reviews/review_manifest.json" in workbench_deliverable_plan
     assert "sequence_handoff" in workbench_deliverable_plan
     assert "Reader owns SPOP math" in workbench_deliverable_plan
@@ -586,19 +586,24 @@ def test_retron_hairpin_workbench_keeps_root_bounded_by_record_lanes() -> None:
     assert (workbench / "ontology" / "directions.yaml").exists()
     assert (workbench / "design_sets" / "README.md").exists()
     assert (workbench / "design_sets" / "scar_nick_profile_panel_v1.yaml").exists()
-    assert (workbench / "design_sets" / "teto_pwm_trim_rescue_v1.yaml").exists()
-    assert (workbench / "design_sets" / "teto_payload_trim_retest_v1.yaml").exists()
+    assert (workbench / "design_sets" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml").exists()
+    assert (workbench / "design_sets" / "teto_retained_span_trim_ecoli_working_v1.yaml").exists()
     assert (workbench / "deliverables" / "README.md").exists()
-    assert (workbench / "deliverables" / "teto_pwm_trim_rescue_v1.yaml").exists()
-    assert (workbench / "deliverables" / "teto_payload_trim_retest_v1.yaml").exists()
+    assert (workbench / "deliverables" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml").exists()
+    assert (workbench / "deliverables" / "teto_retained_span_trim_ecoli_working_v1.yaml").exists()
     assert (workbench / "provenance" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "2026-05-18-msd-177-194.compile.yaml").exists()
-    assert (workbench / "provenance" / "compiler_runs" / "2026-06-20-teto-pwm-trim-rescue-v1.compile.yaml").exists()
+    assert (
+        workbench / "provenance" / "compiler_runs" / "2026-06-20-teto-retained-span-trim-tetr-pwm-elite-v1.compile.yaml"
+    ).exists()
     assert (workbench / "provenance" / "materializations" / "README.md").exists()
     assert (workbench / "provenance" / "materializations" / "2026-05-18-msd-177-194.single-unit.yaml").exists()
     assert (
-        workbench / "provenance" / "materializations" / "2026-06-20-teto-pwm-trim-rescue-v1.single-unit.yaml"
+        workbench
+        / "provenance"
+        / "materializations"
+        / "2026-06-20-teto-retained-span-trim-tetr-pwm-elite-v1.single-unit.yaml"
     ).exists()
 
 

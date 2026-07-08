@@ -31,6 +31,7 @@ class BenchlingGenbankImportPlan:
     included_payload_trim_ids: tuple[str, ...]
     assigned_retron_ids: Mapping[str, str]
     source_precedent_ids: Mapping[str, str]
+    descriptions: Mapping[str, str]
     expected_files: tuple[str, ...]
 
     @property
@@ -53,6 +54,12 @@ class BenchlingGenbankImportPlan:
             raise RetronMsdCompilerError(
                 f"Retron Benchling import plan has no source precedent id for {variant_id}"
             ) from exc
+
+    def description_for(self, variant_id: str) -> str:
+        try:
+            return self.descriptions[variant_id]
+        except KeyError as exc:
+            raise RetronMsdCompilerError(f"Retron Benchling import plan has no description for {variant_id}") from exc
 
 
 def parse_benchling_genbank_import_plan(families: Mapping[str, object]) -> BenchlingGenbankImportPlan:
@@ -89,6 +96,12 @@ def parse_benchling_genbank_import_plan(families: Mapping[str, object]) -> Bench
             "Retron Benchling GenBank source_precedent_ids must match assigned_retron_ids in order: "
             f"{list(precedents)} != {list(assigned)}"
         )
+    descriptions = _require_string_mapping(raw_plan.get("descriptions"), "descriptions")
+    if tuple(descriptions) != tuple(assigned):
+        raise RetronMsdCompilerError(
+            "Retron Benchling GenBank descriptions must match assigned_retron_ids in order: "
+            f"{list(descriptions)} != {list(assigned)}"
+        )
     included = _require_string_list(raw_plan.get("included_payload_trim_ids"), "included_payload_trim_ids")
     if not included:
         raise RetronMsdCompilerError("Retron Benchling GenBank import must include at least one payload trim id")
@@ -99,6 +112,7 @@ def parse_benchling_genbank_import_plan(families: Mapping[str, object]) -> Bench
         included_payload_trim_ids=included,
         assigned_retron_ids=assigned,
         source_precedent_ids=precedents,
+        descriptions=descriptions,
         expected_files=expected_files,
     )
 
@@ -113,6 +127,19 @@ def _require_string_list(raw: object, label: str) -> tuple[str, ...]:
     if not isinstance(raw, list) or not all(isinstance(item, str) and item.strip() for item in raw):
         raise RetronMsdCompilerError(f"Retron Benchling GenBank import expected non-empty string list for {label}")
     return tuple(item.strip() for item in raw)
+
+
+def _require_string_mapping(raw: object, label: str) -> Mapping[str, str]:
+    if not isinstance(raw, Mapping) or not raw:
+        raise RetronMsdCompilerError(f"Retron Benchling GenBank import expected non-empty mapping for {label}")
+    parsed: dict[str, str] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key.strip():
+            raise RetronMsdCompilerError(f"Retron Benchling GenBank import has invalid key in {label}")
+        if not isinstance(value, str) or not value.strip() or "\n" in value:
+            raise RetronMsdCompilerError(f"Retron Benchling GenBank import has invalid value for {label}.{key}")
+        parsed[key.strip()] = value.strip()
+    return parsed
 
 
 __all__ = ["BENCHLING_GENBANK_DIRNAME", "BenchlingGenbankImportPlan", "parse_benchling_genbank_import_plan"]

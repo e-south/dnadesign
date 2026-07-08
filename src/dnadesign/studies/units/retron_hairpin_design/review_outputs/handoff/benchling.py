@@ -26,6 +26,7 @@ BENCHLING_INDEX_COLUMNS = (
     "variant_id",
     "assigned_construct_id",
     "filename",
+    "description",
     "source_construct_id",
     "source_reverse_complement_genbank",
 )
@@ -70,6 +71,7 @@ def write_benchling_genbank_import(
         identity = identity_for_frame(frame)
         assigned_construct_id = benchling_plan.assigned_construct_id(identity.variant_id)
         filename = benchling_plan.filename_for(identity.variant_id)
+        description = benchling_plan.description_for(identity.variant_id)
         source = materialized_root / frame.row["reverse_complement_genbank"]
         target = target_dir / filename
         _write_relabelled_genbank(
@@ -77,8 +79,7 @@ def write_benchling_genbank_import(
             target=target,
             assigned_construct_id=assigned_construct_id,
             payload_label=benchling_plan.filename_payload_label,
-            variant_id=identity.variant_id,
-            source_precedent_id=benchling_plan.source_precedent_id(identity.variant_id),
+            description=description,
             source_construct_id=frame.construct_id,
             sequence_length=int(frame.row["sequence_length"]),
         )
@@ -89,6 +90,7 @@ def write_benchling_genbank_import(
                 "variant_id": identity.variant_id,
                 "assigned_construct_id": assigned_construct_id,
                 "filename": filename,
+                "description": description,
                 "source_construct_id": frame.construct_id,
                 "source_reverse_complement_genbank": _review_relative(source, review_root=review_root),
             }
@@ -104,8 +106,7 @@ def _write_relabelled_genbank(
     target: Path,
     assigned_construct_id: str,
     payload_label: str,
-    variant_id: str,
-    source_precedent_id: str,
+    description: str,
     source_construct_id: str,
     sequence_length: int,
 ) -> None:
@@ -117,8 +118,8 @@ def _write_relabelled_genbank(
     except StopIteration as exc:
         raise RetronMsdCompilerError(f"Retron Benchling GenBank source has no FEATURES section: {source}") from exc
     definition = (
-        f"{assigned_construct_id}-msd[{payload_label}]; {variant_id}; derived from "
-        f"{source_precedent_id}; reverse-complement MSD handoff from {source_construct_id}."
+        f"{assigned_construct_id}-msd[{payload_label}]; {description}; "
+        f"reverse-complement MSD handoff from {source_construct_id}."
     )
     header = [
         f"LOCUS       {assigned_construct_id:<16}{sequence_length:>11} bp ss-DNA linear SYN",

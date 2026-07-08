@@ -10,8 +10,8 @@ direction_order:
   - double_hard_challenge
   - mxmm_route_replicate
   - top_nick_comparator
-  - teto_pwm_trim_rescue
-  - teto_payload_trim_retest
+  - teto_retained_span_trim_tetr_pwm_elite
+  - teto_retained_span_trim_ecoli_working
 directions:
   - id: cap_permissiveness
     label: Cap permissiveness
@@ -41,27 +41,27 @@ directions:
     label: Top-nick comparator
     question: Do top-nick Nt.BsmAI routes preserve the same MXMM design-reference posture?
     effect_tags: [mxmm_replicate, top_nick]
-  - id: teto_pwm_trim_rescue
-    label: bidirectional TetR PWM trim test
-    question: Does PWM-informed cargo shortening of the bidirectional TetR motif payload improve SPOP in retron43 or retron180 contexts under WT Eco1 RT?
+  - id: teto_retained_span_trim_tetr_pwm_elite
+    label: TetR PWM elite retained-span trim
+    question: How does retained-span shortening of the bidirectional TetR PWM elite payload affect SPOP in retron43 and retron180 contexts under WT Eco1 RT?
     effect_tags:
-      - teto_full_payload_control
-      - teto_mild_pwm_edge_trim
-      - teto_stronger_pwm_edge_trim
-      - teto_flank_only_trim_control
+      - teto_pwm_elite_full_parent
+      - teto_pwm_elite_mild_retained_span_trim
+      - teto_pwm_elite_stronger_retained_span_trim
+      - teto_flank_only_trim_contrast
       - cargo_length_test
       - retron26_control
       - retron43_target
       - retron180_target
       - wt_eco1_only
-  - id: teto_payload_trim_retest
-    label: tetO payload trim retest
+  - id: teto_retained_span_trim_ecoli_working
+    label: Eco1 tetO retained-span trim
     question: Does the same retained-span trim logic behave differently when applied to the working Eco1 tetO-like payload family instead of the Cruncher TetR PWM elite payload family?
     effect_tags:
-      - teto_working_payload_family
-      - teto_mild_edge_trim_retest
-      - teto_stronger_edge_trim_retest
-      - payload_family_retest
+      - teto_ecoli_working_payload_family
+      - teto_ecoli_working_mild_retained_span_trim
+      - teto_ecoli_working_stronger_retained_span_trim
+      - payload_family_contrast
       - retron26_control
       - retron180_target
       - wt_eco1_only
@@ -90,12 +90,12 @@ effect_tags:
   retron26_control: Uses retron26 as a positive scaffold or binding control, not as the optimization target.
   retron43_target: Uses the retron43 target scaffold.
   top_nick: Resolved through a top-nick scar-nick route.
-  teto_full_payload_control: Uses the full 19 nt bidirectional TetR motif payload.
-  teto_flank_only_trim_control: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
-  teto_mild_pwm_edge_trim: Uses the 15 nt mild dual-site TetR trim.
-  teto_mild_edge_trim_retest: Uses the 15 nt retained-span trim from a non-PWM-elite tetO-like payload parent.
-  teto_stronger_pwm_edge_trim: Uses the 13 nt stronger dual-site TetR trim.
-  teto_stronger_edge_trim_retest: Uses the 13 nt retained-span trim from a non-PWM-elite tetO-like payload parent.
-  teto_working_payload_family: Uses a cataloged tetO-like payload family sourced from the working Eco1 retron26 scaffold.
-  payload_family_retest: Reuses a prior trim scaffold while changing payload family in a controlled way.
+  teto_pwm_elite_full_parent: Uses the full 19 nt bidirectional TetR motif payload.
+  teto_flank_only_trim_contrast: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
+  teto_pwm_elite_mild_retained_span_trim: Uses the 15 nt mild dual-site TetR trim.
+  teto_ecoli_working_mild_retained_span_trim: Uses the 15 nt retained-span trim from the Eco1 tetO-like payload family.
+  teto_pwm_elite_stronger_retained_span_trim: Uses the 13 nt stronger dual-site TetR trim.
+  teto_ecoli_working_stronger_retained_span_trim: Uses the 13 nt retained-span trim from the Eco1 tetO-like payload family.
+  teto_ecoli_working_payload_family: Uses the cataloged tetO-like payload family sourced from the working Eco1 retron26 scaffold.
+  payload_family_contrast: Uses the same retained-span rule while changing payload family.
   wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from trim-effect classification.

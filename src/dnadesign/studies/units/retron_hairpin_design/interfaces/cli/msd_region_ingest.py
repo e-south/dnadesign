@@ -103,7 +103,7 @@ def ingest_msd_regions_command(
 def _default_msd_region_comparison_roots(study_dir: Path) -> list[Path]:
     return [
         study_dir / "workbench/outputs/retron-msd-177-194-user-fidelity-20260519",  # pragma: allowlist secret
-        study_dir / "workbench/outputs/teto_pwm_trim_rescue_v1",
+        study_dir / "workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1",
     ]
 
 

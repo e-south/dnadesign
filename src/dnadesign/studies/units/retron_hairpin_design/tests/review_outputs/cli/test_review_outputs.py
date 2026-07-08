@@ -47,7 +47,7 @@ def test_review_outputs_cli_uses_explicit_plan_and_output_roots(
 ) -> None:
     repo_root = repo_root_from(__file__)
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
-    deliverable_plan = study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml"
+    deliverable_plan = study_dir / "workbench" / "deliverables" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     materialized_root = tmp_path / "materialized"
     expected_root = tmp_path / "review-outputs"
 
@@ -75,16 +75,16 @@ def test_review_outputs_cli_uses_explicit_plan_and_output_roots(
     assert payload["review_manifest_path"] == (expected_root / "reviews" / "review_manifest.json").as_posix()
     assert (
         payload["handoff_tsv"]
-        == (expected_root / "reviews" / "handoff" / "teto_pwm_trim_rescue_v1.handoff.tsv").as_posix()
+        == (expected_root / "reviews" / "handoff" / "teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv").as_posix()
     )
     assert payload["benchling_genbank_dir"] == (expected_root / "benchling_genbank").as_posix()
     assert (
         payload["benchling_genbank_index"]
-        == (expected_root / "reviews" / "handoff" / "teto_pwm_trim_rescue_v1.benchling_genbank.tsv").as_posix()
+        == (
+            expected_root / "reviews" / "handoff" / "teto_retained_span_trim_tetr_pwm_elite_v1.benchling_genbank.tsv"
+        ).as_posix()
     )
     assert payload["benchling_genbank_count"] == 6
     assert payload["handoff_verified_count"] == 9
-    assert "clone_handoff_index_tsv" not in payload
-    assert "clone_handoff_verified_count" not in payload
     assert payload["record_count"] == 9
-    assert "teto_pwm_trim_rescue_v1.pwm_trim_triptych.png" in payload["next_step"]
+    assert "teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png" in payload["next_step"]

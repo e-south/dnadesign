@@ -1,0 +1,162 @@
+contract: retron_hairpin_deliverable_plan_v1
+schema_version: 1
+study_id: retron_hairpin_design
+deliverable_plan_id: teto_retained_span_trim_ecoli_working_v1
+title: Eco1 tetO retained-span trim v1 deliverables
+authority: persistent study workbench deliverable contract
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_ecoli_working_v1.yaml
+compiler_spec_ref: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml
+output_policy:
+  durable_records:
+    - workbench/design_sets
+    - workbench/deliverables
+    - workbench/provenance
+  generated_artifacts: ignored_workbench_outputs_preferred_or_explicit_transient_output_root
+  preferred_generated_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_ecoli_working_v1
+  preferred_materialized_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_ecoli_working_v1/materialized
+  preferred_benchling_import_root: docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_ecoli_working_v1/benchling_genbank
+  do_not_commit_by_default:
+    - GenBank exports
+    - PNG/SVG review renders
+    - video renders
+    - compiled catalogs
+reader_boundary:
+  status: experiment_time_only
+  note: Reader owns SPOP and viability evidence after these constructs are assayed; this plan only prepares pre-assay review and Benchling handoff outputs.
+source_refs:
+  design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_ecoli_working_v1.yaml
+  compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml
+  payload_binding_catalog: docs/studies/retron_hairpin_design/workbench/ontology/payload_binding_sites.yaml
+  prior_trim_design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
+  meme_pwm: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/outputs/artifacts/meme/tetR__westmann_tetr_mitomi__tetR.meme
+  materialized_sequence_index: manifest/indexes/sequence_index.tsv
+artifact_families:
+  pwm_trim_review_panel:
+    status: planned_review_renderer_output
+    owner_surface: study-owned review renderer consuming the MEME PWM source and workbench trim spans
+    purpose: Show the full, 15 nt, and 13 nt retained spans on the Eco1 tetO payload-family sequence, using the same trim extents as the 195-200 TetR PWM elite trim pilot while keeping handoff limited to the trimmed rows.
+    expected_output_group: reviews/pwm/
+    expected_files:
+      - reviews/pwm/teto_retained_span_trim_ecoli_working_v1.pwm_trim_triptych.svg
+      - reviews/pwm/teto_retained_span_trim_ecoli_working_v1.pwm_trim_triptych.png
+    panels:
+      - payload_trim_id: tetO_ecoli_working_w00_19
+        label: full 19 nt Eco1 tetO payload
+        retained_parent_span_0: {start: 0, end: 19}
+        requires_materialized_sequence: false
+      - payload_trim_id: tetO_ecoli_working_w02_17
+        label: 15 nt retained-span trim
+        retained_parent_span_0: {start: 2, end: 17}
+      - payload_trim_id: tetO_ecoli_working_w03_16
+        label: 13 nt retained-span trim
+        retained_parent_span_0: {start: 3, end: 16}
+    motif_layers:
+      - motif_instance_id: tetR:1:18:+:1
+        retained_parent_span_0: {start: 1, end: 18}
+        strand: "+"
+      - motif_instance_id: tetR:1:18:-:2
+        retained_parent_span_0: {start: 1, end: 18}
+        strand: "-"
+    invariants:
+      - Render the 19 nt Eco1 tetO parent payload sequence as the coordinate system.
+      - Render both top- and bottom-strand TetR-like PWM hits at parent span 1-18 before applying the retained spans.
+      - Keep retained spans at 2-17 and 3-16 so this cohort changes payload family, not truncation extent.
+      - Treat the 0-19 full-site panel as a review baseline only; it does not add a Benchling import row.
+      - Do not derive compiler payload sequences from the plotted PWM.
+  msd_sequence_review_stills:
+    status: planned_review_renderer_output
+    owner_surface: study-owned review renderer consuming materialized BaseRender composition stills
+    purpose: Provide one canonically named review still per compiled MSD sequence.
+    expected_output_group: reviews/video/stills/
+    expected_count: 6
+    source_index: manifest/indexes/sequence_index.tsv
+    expected_filename_pattern: reviews/video/stills/<order>_<pES-retron-id>_tetO-w<start>-<end>.png
+    review_variant_ids:
+      r26-w02-17: pES-retron-201
+      r26-w03-16: pES-retron-202
+      r43-w02-17: pES-retron-205
+      r43-w03-16: pES-retron-206
+      r180-w02-17: pES-retron-203
+      r180-w03-16: pES-retron-204
+    invariants:
+      - One MSD unit per design; no complete-unit repeat expansion.
+      - Plot deliverables require folding_status == ok.
+      - Review still filenames use the assigned pES-retron id plus the retained tetO PWM window slug.
+      - Review variant ids must match design-set row order and Benchling assigned_retron_ids.
+  msd_sequence_review_video:
+    status: planned_review_renderer_output
+    owner_surface: study-owned review renderer consuming materialized sequence_index.tsv
+    purpose: Compile the sequence review stills into a human-inspectable montage video ordered by design-set row.
+    expected_output_group: reviews/video/
+    expected_files:
+      - reviews/video/teto_retained_span_trim_ecoli_working_v1.sequence_montage.mp4
+      - reviews/video/teto_retained_span_trim_ecoli_working_v1.sequence_montage.manifest.json
+    source_frames: reviews/video/stills/<order>_<pES-retron-id>_tetO-w<start>-<end>.png
+    ordering: design_set_order
+  sequence_handoff:
+    status: planned_materialize_output
+    owner_surface: Retron MSD materialize command
+    purpose: Map each compact variant id to its GenBank, FASTA, and feature CSV exports.
+    expected_count: 6
+    required_index: manifest/indexes/sequence_index.tsv
+    review_indexes:
+      - reviews/handoff/teto_retained_span_trim_ecoli_working_v1.handoff.tsv
+      - reviews/handoff/teto-retained-span-trim-ecoli-working-v1.handoff.md
+  benchling_genbank_import:
+    status: planned_review_renderer_output
+    owner_surface: study-owned review renderer consuming materialized reverse-complement GenBank exports
+    purpose: Provide a flat, drag-to-Benchling import folder for the six Eco1 tetO retained-span variants.
+    expected_output_group: benchling_genbank/
+    expected_count: 6
+    source_index: manifest/indexes/sequence_index.tsv
+    orientation: reverse_complement_only
+    filename_payload_label: TetR
+    included_payload_trim_ids:
+      - tetO_ecoli_working_w02_17
+      - tetO_ecoli_working_w03_16
+    assigned_retron_ids:
+      r26-w02-17: pES-retron-201
+      r26-w03-16: pES-retron-202
+      r43-w02-17: pES-retron-205
+      r43-w03-16: pES-retron-206
+      r180-w02-17: pES-retron-203
+      r180-w03-16: pES-retron-204
+    source_precedent_ids:
+      r26-w02-17: pES-retron-26
+      r26-w03-16: pES-retron-26
+      r43-w02-17: pES-retron-43
+      r43-w03-16: pES-retron-43
+      r180-w02-17: pES-retron-180
+      r180-w03-16: pES-retron-180
+    descriptions:
+      r26-w02-17: pES-retron-26 P4 scaffold; 15 nt [2,17) retained span from the tetO payload used by pES-retron-26
+      r26-w03-16: pES-retron-26 P4 scaffold; 13 nt [3,16) retained span from the tetO payload used by pES-retron-26
+      r43-w02-17: pES-retron-43 P4 scaffold; 15 nt [2,17) retained span from the tetO payload used by pES-retron-26
+      r43-w03-16: pES-retron-43 P4 scaffold; 13 nt [3,16) retained span from the tetO payload used by pES-retron-26
+      r180-w02-17: pES-retron-180 P4 scaffold; 15 nt [2,17) retained span from the tetO payload used by pES-retron-26
+      r180-w03-16: pES-retron-180 P4 scaffold; 13 nt [3,16) retained span from the tetO payload used by pES-retron-26
+    expected_files:
+      - benchling_genbank/pES-retron-201-msd[TetR]-r26-w02-17.gb
+      - benchling_genbank/pES-retron-202-msd[TetR]-r26-w03-16.gb
+      - benchling_genbank/pES-retron-205-msd[TetR]-r43-w02-17.gb
+      - benchling_genbank/pES-retron-206-msd[TetR]-r43-w03-16.gb
+      - benchling_genbank/pES-retron-203-msd[TetR]-r180-w02-17.gb
+      - benchling_genbank/pES-retron-204-msd[TetR]-r180-w03-16.gb
+    invariants:
+      - The import folder contains only the six .gb files listed above.
+      - assigned_retron_ids, source_precedent_ids, descriptions, included_payload_trim_ids, and filename_payload_label are the source of truth for import selection, naming, and GenBank definitions.
+      - The full 0-19 Eco1 tetO payload panel is excluded from Benchling import because this cohort only assigns the retained-span constructs pES-retron-201 through pES-retron-206.
+      - Metadata for verification stays in reviews/handoff/ and reviews/review_manifest.json.
+  review_package_manifest:
+    status: planned_review_renderer_output
+    owner_surface: study-owned review renderer
+    purpose: Tie the PWM review panel, sequence montage, materialized sequence index, and handoff verification into one local review package.
+    expected_output_group: reviews/
+    expected_files:
+      - reviews/review_manifest.json
+quality_gates:
+  - The compiler spec lints with 6 records.
+  - Materialized sequence_index.tsv has 6 rows and no missing row-referenced files.
+  - All materialized rows report folding_status == ok before plot deliverables are complete.
+  - The PWM review panel uses the same retained spans as the 195-200 trim pilot and renders both motif orientations.
+  - review-outputs writes exactly 6 reverse-complement Benchling import GenBanks named pES-retron-201 through pES-retron-206.

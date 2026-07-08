@@ -20,21 +20,23 @@ running or interpreting output generation.
 
 ### Records
 
-- `teto_pwm_trim_rescue_v1.yaml`: deliverable plan for the nine-design
+- `teto_retained_span_trim_tetr_pwm_elite_v1.yaml`: deliverable plan for the nine-design
   bidirectional TetR PWM trim pilot. It links the design set, compiler spec,
   PWM provenance, materialized sequence bundle, PWM trim triptych, sequence
   montage video, review manifest, and GenBank handoff surfaces.
-- `teto_payload_trim_retest_v1.yaml`: deliverable plan for the four-design
-  tetO payload-prior retest. It assigns pES-retron-201 through pES-retron-204
-  and keeps the same retained-span extents as the 195-200 TetR PWM pilot.
+- `teto_retained_span_trim_ecoli_working_v1.yaml`: deliverable plan for the six-design
+  Eco1 tetO retained-span trim cohort. It assigns pES-retron-201 through pES-retron-206
+  and keeps the same retained-span extents as the 195-200 TetR PWM pilot. Its
+  PWM review panel also includes the untrimmed Eco1 tetO parent payload as a
+  review-only baseline.
 
 ### tetO Trim Review Outputs
 
 Open these first when reviewing the generated package:
 
-1. `reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md`
-2. `reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png`
-3. `reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4`
+1. `reviews/handoff/teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md`
+2. `reviews/pwm/teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png`
+3. `reviews/video/teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4`
 4. `reviews/review_manifest.json`
 
 The handoff Markdown is the entry point. It maps compact variant ids such as
@@ -58,7 +60,7 @@ declared in the deliverable plan, then consumed by the review renderer.
 Preferred local output root:
 
 ```text
-docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/
+docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/
 ```
 
 Recommended sequence-bundle root under that directory:
@@ -71,17 +73,17 @@ Generate the review package after materializing the nine-design compiler spec:
 
 ```bash
 uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app review-outputs \
-  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml \
+  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml \
   --study-dir docs/studies/retron_hairpin_design \
-  --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized \
-  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1 \
+  --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized \
+  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1 \
   --format json
 ```
 
 Expected review files:
 
-- `reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.svg`
-- `reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png`
+- `reviews/pwm/teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.svg`
+- `reviews/pwm/teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png`
 - `reviews/video/stills/01_pES-retron-26_tetO-w00-19.png`
 - `reviews/video/stills/02_pES-retron-195_tetO-w02-17.png`
 - `reviews/video/stills/03_pES-retron-196_tetO-w03-16.png`
@@ -91,10 +93,10 @@ Expected review files:
 - `reviews/video/stills/07_pES-retron-180_tetO-w00-19.png`
 - `reviews/video/stills/08_pES-retron-199_tetO-w02-17.png`
 - `reviews/video/stills/09_pES-retron-200_tetO-w03-16.png`
-- `reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4`
-- `reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.manifest.json`
-- `reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv`
-- `reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md`
+- `reviews/video/teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4`
+- `reviews/video/teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.manifest.json`
+- `reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv`
+- `reviews/handoff/teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md`
 - `reviews/review_manifest.json`
 
 Expected Benchling import files, all reverse-complement GenBank records:
@@ -106,49 +108,59 @@ Expected Benchling import files, all reverse-complement GenBank records:
 - `benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb`
 - `benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb`
 
-### tetO Payload-Prior Retest Outputs
+### Eco1 tetO Retained-Span Trim Outputs
 
-Open the retest deliverable plan first:
+Open the Eco1 retained-span deliverable plan first:
 
 ```text
-workbench/deliverables/teto_payload_trim_retest_v1.yaml
+workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml
 ```
 
-That plan assigns `pES-retron-201` through `pES-retron-204`, sets
-`filename_payload_label: tetO-retest`, and keeps the retained spans at
-`[2,17)` and `[3,16)`. The retest changes the payload prior, not the trim
-extent.
+That plan assigns `pES-retron-201` through `pES-retron-206`, sets
+`filename_payload_label: TetR`, and keeps the retained spans at
+`[2,17)` and `[3,16)`. This cohort changes the payload family, not the trim
+extent. The PWM triptych has three panels: full Eco1 tetO parent payload, 15 nt trim,
+and 13 nt trim. The full panel is a review baseline and is not copied into the
+Benchling import folder. The `benchling_genbank_import.descriptions` mapping
+is the source for the concise GenBank definition text and Benchling index prose.
 
 Generate the review package after materializing
-`../../compiler/inputs/teto_payload_trim_retest_v1.spec.yaml`:
+`../../compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml`:
 
 ```bash
 uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app review-outputs \
-  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_payload_trim_retest_v1.yaml \
-  --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_payload_trim_retest_v1/materialized \
-  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_payload_trim_retest_v1 \
+  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml \
+  --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_ecoli_working_v1/materialized \
+  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_ecoli_working_v1 \
   --format json
 ```
 
 Expected Benchling import files, all reverse-complement GenBank records:
 
-- `benchling_genbank/pES-retron-201-msd[tetO-retest]-r26-w02-17.gb`
-- `benchling_genbank/pES-retron-202-msd[tetO-retest]-r26-w03-16.gb`
-- `benchling_genbank/pES-retron-203-msd[tetO-retest]-r180-w02-17.gb`
-- `benchling_genbank/pES-retron-204-msd[tetO-retest]-r180-w03-16.gb`
+- `benchling_genbank/pES-retron-201-msd[TetR]-r26-w02-17.gb`
+- `benchling_genbank/pES-retron-202-msd[TetR]-r26-w03-16.gb`
+- `benchling_genbank/pES-retron-205-msd[TetR]-r43-w02-17.gb`
+- `benchling_genbank/pES-retron-206-msd[TetR]-r43-w03-16.gb`
+- `benchling_genbank/pES-retron-203-msd[TetR]-r180-w02-17.gb`
+- `benchling_genbank/pES-retron-204-msd[TetR]-r180-w03-16.gb`
+
+Expected PWM review files:
+
+- `reviews/pwm/teto_retained_span_trim_ecoli_working_v1.pwm_trim_triptych.svg`
+- `reviews/pwm/teto_retained_span_trim_ecoli_working_v1.pwm_trim_triptych.png`
 
 ### Visual Contract
 
-The PWM triptych is a 19 nt monotypic TetR elite view: every panel keeps a pale
-full-site backdrop, retained payload positions are base-colored, trimmed-out
-positions are light gray, and retained-edge cut lines mark the active span
-instead of generic coordinate ticks. It renders the plus-strand motif
-occurrence at `[0,17)` and the minus-strand occurrence at `[2,19)` as separate
-logo layers. Compact subtitles report only the nt count, retained span, and
-rounded information content. The active triptych uses full 19 nt, mild 15 nt,
-and stronger 13 nt payloads selected by the dual-site sliding-window IC rule.
-The PNG is rendered at no less than 3000 x 800 px; the SVG carries the same
-metadata and remains the structured review source.
+The PWM triptych renders one 19 nt parent payload coordinate system per
+deliverable. Every panel keeps a pale full-site backdrop, base-colors retained
+payload positions, dims trimmed-out positions, and uses retained-edge cut lines
+instead of generic coordinate ticks. The TetR PWM elite cohort renders plus and minus
+motif occurrences at `[0,17)` and `[2,19)`. The Eco1 tetO cohort renders both motif
+orientations at `[1,18)`. Compact subtitles report only nt count, retained
+span, and rounded information content. The active panels are full 19 nt, mild
+15 nt, and stronger 13 nt payload views. A full panel can be review-only when
+the deliverable assigns only trimmed constructs. The SVG records
+`data-requires-materialized-sequence` for each panel.
 The video consumes review stills named with the canonical `pES-retron-*` id and
 the retained tetO PWM window slug, while compact variant ids, source construct
 ids, MSD ids, composition plots, folding status, and reverse-complement

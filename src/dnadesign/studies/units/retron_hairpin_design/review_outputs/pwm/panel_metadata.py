@@ -36,6 +36,7 @@ def panel_metadata_attributes(columns: Sequence[PwmLogoColumn], panel: PwmTrimPa
             f'data-trim-3p-nt="{panel.trim_3p_nt}"',
             f'data-retained-nt="{retained_nt}"',
             f'data-retained-information-fraction="{panel.retained_information_fraction:.6f}"',
+            f'data-requires-materialized-sequence="{str(panel.requires_materialized_sequence).lower()}"',
             f'data-compact-subtitle="{escape(compact_panel_subtitle(panel))}"',
             f'data-retained-edge-cuts-0="{panel.retained_start_0},{panel.retained_end_0}"',
             f'data-visible-trim-summary="{escape(visible_trim_summary(panel))}"',

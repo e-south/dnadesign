@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_teto_pwm_trim_rescue_design_set.py
+src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_teto_retained_span_trim_tetr_pwm_elite_design_set.py
 
 Tests for the tetO PWM trim study-owned design set.
 
@@ -18,22 +18,22 @@ from dnadesign.studies.units.retron_hairpin_design.catalog.compiler_spec import 
 from ..support.paths import repo_root_from
 
 
-def test_teto_pwm_trim_rescue_design_set_is_study_owned_and_compiler_ready() -> None:
+def test_teto_retained_span_trim_tetr_pwm_elite_design_set_is_study_owned_and_compiler_ready() -> None:
     root = repo_root_from(__file__)
     study_dir = root / "docs" / "studies" / "retron_hairpin_design"
-    design_set_path = study_dir / "workbench" / "design_sets" / "teto_pwm_trim_rescue_v1.yaml"
-    spec_path = study_dir / "compiler" / "inputs" / "teto_pwm_trim_rescue_v1.spec.yaml"
+    design_set_path = study_dir / "workbench" / "design_sets" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
+    spec_path = study_dir / "compiler" / "inputs" / "teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml"
     directions = yaml.safe_load((study_dir / "workbench" / "ontology" / "directions.yaml").read_text(encoding="utf-8"))
     design_set = yaml.safe_load(design_set_path.read_text(encoding="utf-8"))
     spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     resolved = load_msd_compiler_spec(spec_path, study_dir=study_dir)
 
     assert design_set["contract"] == "retron_msd_design_set_v1"
-    assert design_set["design_set_id"] == "teto_pwm_trim_rescue_v1"
+    assert design_set["design_set_id"] == "teto_retained_span_trim_tetr_pwm_elite_v1"
     assert design_set["authority"] == "persistent study workbench design cohort"
     assert design_set["expected_variant_count"] == 9
     assert design_set["compiler_spec_ref"] == (
-        "docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml"
+        "docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml"
     )
     assert design_set["non_goals"]["rt_fusions"] == "excluded_viability_confounded"
     assert set(design_set["payload_trims"]) == {"TetR_w00_19", "TetR_w02_17", "TetR_w03_16"}

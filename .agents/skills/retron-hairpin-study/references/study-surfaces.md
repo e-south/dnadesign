@@ -22,26 +22,26 @@ base-junction scar-nick work.
   direction and effect-tag vocabulary for workbench records
 - `docs/studies/retron_hairpin_design/workbench/design_sets/`: authoritative
   persistent design cohorts for experimental meaning
-- `docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`:
+- `docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml`:
   authoritative cargo-shortening cohort for retron26 control, retron43 target,
   and the pES-retron-180 C172/AGTG/CATG/XWMM context
-- `docs/studies/retron_hairpin_design/workbench/design_sets/teto_payload_trim_retest_v1.yaml`:
-  tetO payload-prior retest cohort for pES-retron-201 through pES-retron-204;
+- `docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_ecoli_working_v1.yaml`:
+  Eco1 tetO retained-span trim cohort for pES-retron-201 through pES-retron-206;
   it keeps the 15 nt and 13 nt retained-span extents from the 195-200 pilot
-  while changing the payload prior
+  while changing the payload family
 - `docs/studies/retron_hairpin_design/workbench/deliverables/`: persistent
   review and handoff deliverable contracts for study hypotheses
-- `docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml`:
+- `docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml`:
   tetO trim deliverable plan for PWM triptych, nine sequence review stills,
   sequence montage video, review manifest, nine-row GenBank sequence handoff,
   six-file Benchling import folder, and future Reader outcome overlay routing
-- `docs/studies/retron_hairpin_design/workbench/deliverables/teto_payload_trim_retest_v1.yaml`:
-  tetO payload-prior retest deliverable plan for pES-retron-201 through
-  pES-retron-204, with plan-owned PWM review, sequence montage, handoff, and
-  four-file Benchling import expectations
+- `docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml`:
+  Eco1 tetO retained-span deliverable plan for pES-retron-201 through
+  pES-retron-206, with plan-owned PWM review, sequence montage, handoff, and
+  six-file Benchling import expectations
 - `docs/studies/retron_hairpin_design/workbench/outputs/`: ignored generated
   output roots for local materialized bundles and review packages; preferred
-  tetO trim root is `workbench/outputs/teto_pwm_trim_rescue_v1/`
+  tetO trim root is `workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/`
 - `docs/studies/retron_hairpin_design/workbench/provenance/`: compiler-run and
   materialization records that cite workbench design sets without storing bulky
   generated artifacts
@@ -67,13 +67,13 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml`:
   full checked-in materialization spec that supplies selected cap/foldback
   segments as explicit 5'->3' sequences
-- `docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml`:
+- `docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml`:
   nine-design tetO PWM trim compiler spec with literal payload
   sequences, payload-trim metadata, WT Eco1-only variant metadata, and explicit
   cap/stem-base choices
-- `docs/studies/retron_hairpin_design/compiler/inputs/teto_payload_trim_retest_v1.spec.yaml`:
-  four-design tetO payload-prior retest compiler spec for pES-retron-201
-  through pES-retron-204 handoff generation
+- `docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml`:
+  six-design Eco1 tetO retained-span compiler spec for pES-retron-201
+  through pES-retron-206 handoff generation
 - `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need

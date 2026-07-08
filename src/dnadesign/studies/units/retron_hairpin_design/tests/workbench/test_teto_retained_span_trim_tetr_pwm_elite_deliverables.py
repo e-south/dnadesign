@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_teto_pwm_trim_rescue_deliverables.py
+src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_teto_retained_span_trim_tetr_pwm_elite_deliverables.py
 
 Tests for tetO PWM trim deliverable IA.
 
@@ -20,27 +20,31 @@ from dnadesign.studies.units.retron_hairpin_design.review_outputs.handoff.contra
 from ..support.paths import repo_root_from
 
 
-def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs() -> None:
+def test_teto_retained_span_trim_tetr_pwm_elite_deliverable_plan_maps_review_and_handoff_outputs() -> None:
     root = repo_root_from(__file__)
     study_dir = root / "docs" / "studies" / "retron_hairpin_design"
     design_set = yaml.safe_load(
-        (study_dir / "workbench" / "design_sets" / "teto_pwm_trim_rescue_v1.yaml").read_text(encoding="utf-8")
+        (study_dir / "workbench" / "design_sets" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml").read_text(
+            encoding="utf-8"
+        )
     )
-    plan_path = study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml"
+    plan_path = study_dir / "workbench" / "deliverables" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     plan = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
 
     assert plan["contract"] == "retron_hairpin_deliverable_plan_v1"
     assert plan["design_set_ref"] == (
-        "docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml"
+        "docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     )
     assert design_set["deliverable_plan_ref"] == (
-        "docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
+        "docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     )
     assert plan["compiler_spec_ref"] == design_set["compiler_spec_ref"]
     assert plan["output_policy"]["generated_artifacts"] == (
         "ignored_workbench_outputs_preferred_or_explicit_transient_output_root"
     )
-    assert plan["output_policy"]["preferred_generated_root"].endswith("workbench/outputs/teto_pwm_trim_rescue_v1")
+    assert plan["output_policy"]["preferred_generated_root"].endswith(
+        "workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1"
+    )
     assert "workbench/deliverables" in plan["output_policy"]["durable_records"]
     assert "GenBank exports" in plan["output_policy"]["do_not_commit_by_default"]
     assert plan["reader_boundary"]["status"] == "experiment_time_only"
@@ -98,8 +102,8 @@ def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs()
     assert any("assigned_retron_ids" in item for item in families["benchling_genbank_import"]["invariants"])
     assert any("source_precedent_ids" in item for item in families["benchling_genbank_import"]["invariants"])
     assert families["sequence_handoff"]["review_indexes"] == [
-        "reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv",
-        "reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md",
+        "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv",
+        "reviews/handoff/teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md",
     ]
     assert families["future_reader_outcome_overlay"]["owner_surface"] == (
         "Reader SPOP bridge and future trim-outcome join"
@@ -108,11 +112,11 @@ def test_teto_pwm_trim_rescue_deliverable_plan_maps_review_and_handoff_outputs()
     pwm_panel_ids = {panel["payload_trim_id"] for panel in families["pwm_trim_review_panel"]["panels"]}
     assert pwm_panel_ids == set(design_set["payload_trims"])
     assert (
-        "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png"
+        "reviews/pwm/teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png"
         in families["pwm_trim_review_panel"]["expected_files"]
     )
     assert (
-        "reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4"
+        "reviews/video/teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4"
         in families["msd_sequence_review_video"]["expected_files"]
     )
     assert families["sequence_handoff"]["review_columns"] == list(SEQUENCE_HANDOFF_COLUMNS[1:])

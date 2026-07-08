@@ -13,15 +13,15 @@ from __future__ import annotations
 
 from ..contracts.plan import PwmTrimPanel
 
-PANEL_DISPLAY_TITLES = {
-    "TetR_w00_19": "Full site",
-    "TetR_w02_17": "Trim 02-17",
-    "TetR_w03_16": "Trim 03-16",
-}
-
 
 def panel_title(panel: PwmTrimPanel) -> str:
-    return PANEL_DISPLAY_TITLES.get(panel.payload_trim_id, panel.label)
+    if panel.payload_trim_id.endswith("_w00_19") or panel.payload_trim_id.endswith("-w00-19"):
+        return "Full site"
+    if panel.payload_trim_id.endswith("_w02_17") or panel.payload_trim_id.endswith("-w02-17"):
+        return "Trim 02-17"
+    if panel.payload_trim_id.endswith("_w03_16") or panel.payload_trim_id.endswith("-w03-16"):
+        return "Trim 03-16"
+    return panel.label
 
 
 def compact_panel_subtitle(panel: PwmTrimPanel) -> str:

@@ -1,17 +1,17 @@
 contract: retron_msd_design_set_v1
 schema_version: 1
 study_id: retron_hairpin_design
-design_set_id: teto_pwm_trim_rescue_v1
-title: bidirectional TetR PWM trim v1
+design_set_id: teto_retained_span_trim_tetr_pwm_elite_v1
+title: TetR PWM elite retained-span trim v1
 authority: persistent study workbench design cohort
 allow_non_ligatable_s0: true
 label_count: 9
 expected_variant_count: 9
-compiler_spec_ref: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
-deliverable_plan_ref: docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml
+compiler_spec_ref: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
+deliverable_plan_ref: docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
 source_refs:
   directions: docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml
-  compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+  compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
   registry: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
   cap_source_lookup: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml
   tetr_pwm_summary: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/.cruncher/parse/provenance/pwm_summary.json
@@ -147,8 +147,8 @@ designs:
     variant_role: control
     scaffold_context: retron26
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_full_payload_control, retron26_control, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_full_parent, retron26_control, wt_eco1_only]
     rationale: Full bidirectional TetR payload in the working retron26 scaffold control.
   - construct_id: pES-tetr-r26-w02-17
     label: pES-tetr-r26-w02-17-msd[TetR_w02_17]; C26-LCGGG-RACAG-MXMX
@@ -163,8 +163,8 @@ designs:
     variant_role: control
     scaffold_context: retron26
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_mild_pwm_edge_trim, retron26_control, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_mild_retained_span_trim, retron26_control, wt_eco1_only]
     rationale: Mild 15 nt dual-site TetR trim in the working retron26 scaffold control.
   - construct_id: pES-tetr-r26-w03-16
     label: pES-tetr-r26-w03-16-msd[TetR_w03_16]; C26-LCGGG-RACAG-MXMX
@@ -179,8 +179,8 @@ designs:
     variant_role: control
     scaffold_context: retron26
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_stronger_pwm_edge_trim, retron26_control, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_stronger_retained_span_trim, retron26_control, wt_eco1_only]
     rationale: Stronger 13 nt dual-site TetR trim in the working retron26 scaffold control.
   - construct_id: pES-tetr-r43-w00-19
     label: pES-tetr-r43-w00-19-msd[TetR_w00_19]; C43-LCAAG-RCTCG-MXMM
@@ -194,8 +194,8 @@ designs:
     variant_role: scaffold_target
     scaffold_context: retron43
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_full_payload_control, retron43_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_full_parent, retron43_target, cargo_length_test, wt_eco1_only]
     rationale: Full bidirectional TetR baseline in the retron43 target scaffold.
   - construct_id: pES-tetr-r43-w02-17
     label: pES-tetr-r43-w02-17-msd[TetR_w02_17]; C43-LCAAG-RCTCG-MXMM
@@ -209,8 +209,8 @@ designs:
     variant_role: trim_candidate
     scaffold_context: retron43
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_mild_pwm_edge_trim, retron43_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_mild_retained_span_trim, retron43_target, cargo_length_test, wt_eco1_only]
     rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
   - construct_id: pES-tetr-r43-w03-16
     label: pES-tetr-r43-w03-16-msd[TetR_w03_16]; C43-LCAAG-RCTCG-MXMM
@@ -224,8 +224,8 @@ designs:
     variant_role: trim_candidate
     scaffold_context: retron43
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_stronger_pwm_edge_trim, retron43_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_stronger_retained_span_trim, retron43_target, cargo_length_test, wt_eco1_only]
     rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
   - construct_id: pES-tetr-r180-w00-19
     label: pES-tetr-r180-w00-19-msd[TetR_w00_19]; C172-LAGTG-RCATG-XWMM
@@ -239,8 +239,8 @@ designs:
     variant_role: scaffold_target
     scaffold_context: retron180
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_full_payload_control, retron180_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_full_parent, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
     source_precedent_id: pES-retron-180
@@ -257,8 +257,8 @@ designs:
     variant_role: trim_candidate
     scaffold_context: retron180
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_mild_pwm_edge_trim, retron180_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_mild_retained_span_trim, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
     source_precedent_id: pES-retron-180
@@ -275,8 +275,8 @@ designs:
     variant_role: trim_candidate
     scaffold_context: retron180
     rt_mode: wt_eco1
-    direction_ids: [teto_pwm_trim_rescue]
-    effect_tags: [teto_stronger_pwm_edge_trim, retron180_target, cargo_length_test, wt_eco1_only]
+    direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
+    effect_tags: [teto_pwm_elite_stronger_retained_span_trim, retron180_target, cargo_length_test, wt_eco1_only]
     nick_orientation: bottom
     nickase: Nb.BtsI
     source_precedent_id: pES-retron-180

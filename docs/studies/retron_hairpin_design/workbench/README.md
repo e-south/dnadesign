@@ -30,11 +30,11 @@ workbench/
     directions.yaml
   design_sets/
     scar_nick_profile_panel_v1.yaml
-    teto_pwm_trim_rescue_v1.yaml
-    teto_payload_trim_retest_v1.yaml
+    teto_retained_span_trim_tetr_pwm_elite_v1.yaml
+    teto_retained_span_trim_ecoli_working_v1.yaml
   deliverables/
-    teto_pwm_trim_rescue_v1.yaml
-    teto_payload_trim_retest_v1.yaml
+    teto_retained_span_trim_tetr_pwm_elite_v1.yaml
+    teto_retained_span_trim_ecoli_working_v1.yaml
   provenance/
     compiler_runs/
       2026-05-18-msd-177-194.compile.yaml

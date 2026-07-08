@@ -22,7 +22,7 @@ def write_review_plan_with_test_pwm(root: Path, *, repo_root: Path) -> Path:
     return write_review_plan_fixture(
         root,
         repo_root=repo_root,
-        deliverable_plan_id="teto_pwm_trim_rescue_v1",
+        deliverable_plan_id="teto_retained_span_trim_tetr_pwm_elite_v1",
     )
 
 

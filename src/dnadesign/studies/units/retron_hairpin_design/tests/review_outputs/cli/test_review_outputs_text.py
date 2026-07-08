@@ -29,7 +29,7 @@ def test_review_outputs_cli_text_reports_sequence_handoff(
 ) -> None:
     repo_root = repo_root_from(__file__)
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
-    deliverable_plan = study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml"
+    deliverable_plan = study_dir / "workbench" / "deliverables" / "teto_retained_span_trim_tetr_pwm_elite_v1.yaml"
     materialized_root = tmp_path / "materialized"
     out_dir = tmp_path / "review-outputs"
 

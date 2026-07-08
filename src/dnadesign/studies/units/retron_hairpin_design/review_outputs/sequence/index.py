@@ -69,11 +69,11 @@ def load_validated_sequence_frames(
             f"{plan.deliverable_plan_id}, found {len(rows)} in {index_path}"
         )
 
-    expected_trim_ids = {panel.payload_trim_id for panel in plan.pwm_panels}
+    expected_trim_ids = {panel.payload_trim_id for panel in plan.pwm_panels if panel.requires_materialized_sequence}
     observed_trim_ids = {row.get("payload_trim_id", "") for row in rows}
     if observed_trim_ids != expected_trim_ids:
         raise RetronMsdCompilerError(
-            "Retron review sequence_index.tsv payload_trim_id set does not match the PWM triptych panels: "
+            "Retron review sequence_index.tsv payload_trim_id set does not match materialized PWM triptych panels: "
             f"{sorted(observed_trim_ids)} != {sorted(expected_trim_ids)}"
         )
     frames = []

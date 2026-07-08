@@ -1,11 +1,11 @@
 contract: retron_msd_materialization_record_v1
 schema_version: 1
 study_id: retron_hairpin_design
-materialization_id: 2026-06-20-teto-pwm-trim-rescue-v1.single-unit
+materialization_id: 2026-06-20-teto-retained-span-trim-tetr-pwm-elite-v1.single-unit
 run_kind: materialize
 status: verified_transient
-design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml
-compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-06-20-teto-pwm-trim-rescue-v1.compile.yaml
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
+compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-06-20-teto-retained-span-trim-tetr-pwm-elite-v1.compile.yaml
 reason: The bidirectional TetR PWM trim pilot materializes from a typed spec with literal full, mild 15 nt, and stronger 13 nt monotypic-elite payloads plus explicit C26, C43, and C172 cap/foldback segments. The cohort keeps WT Eco1 fixed, excludes RT fusions, treats retron26 as a scaffold/binding control, and uses pES-retron-180 as the selected C172/AGTG/CATG/XWMM precedent.
 validated_at: 2026-06-22
 validated_request:
@@ -27,9 +27,9 @@ command:
     - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
     - materialize
     - --spec
-    - docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml
+    - docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
     - --out-dir
-    - docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized
+    - docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized
     - --render-format
     - png
     - --format
@@ -75,7 +75,7 @@ selected_sequence_sources:
       topology_status: supplied
 observed_output:
   output_policy: workbench_outputs_ignored_not_checked_in
-  output_dir: docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized
+  output_dir: docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized
   record_count: 9
   folding_status: ok
   catalog_sha256: c440d97c61cd46b09b5dfac7fe0be7cc7cac457d9c55e2842eef194b1eee3de9 # pragma: allowlist secret

@@ -28,6 +28,7 @@ class PwmTrimPanel:
     trim_5p_nt: int
     trim_3p_nt: int
     retained_information_fraction: float
+    requires_materialized_sequence: bool
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ def parse_pwm_trim_context(
             f"{sorted(unknown_trim_ids)}"
         )
     parent_sequence, motif_occurrences = _parse_parent_payload(design_set, payload_trims=payload_trims)
+    _validate_declared_motif_layers(pwm_family, motif_occurrences=motif_occurrences)
     validate_declared_trim_windows(
         panels,
         parent_length=len(parent_sequence),
@@ -88,6 +90,7 @@ def _parse_pwm_panel(raw: object, *, payload_trims: Mapping[str, Any]) -> PwmTri
         trim_5p_nt=int(trim.get("trim_5p_nt")),
         trim_3p_nt=int(trim.get("trim_3p_nt")),
         retained_information_fraction=float(trim.get("retained_information_fraction")),
+        requires_materialized_sequence=bool(panel.get("requires_materialized_sequence", True)),
     )
 
 
@@ -113,6 +116,39 @@ def _parse_parent_payload(
         for raw in _require_sequence(parent_payload.get("motif_occurrences"), "parent_payload motif_occurrences")
     )
     return parent_sequence, motif_occurrences
+
+
+def _validate_declared_motif_layers(
+    pwm_family: Mapping[str, Any],
+    *,
+    motif_occurrences: tuple[PwmMotifOccurrence, ...],
+) -> None:
+    layers = _require_sequence(pwm_family.get("motif_layers"), "PWM motif_layers")
+    declared = tuple(_motif_layer_key(_require_mapping(raw, "PWM motif_layer")) for raw in layers)
+    expected = tuple(
+        (
+            occurrence.motif_instance_id,
+            occurrence.start_0,
+            occurrence.end_0,
+            occurrence.strand,
+        )
+        for occurrence in motif_occurrences
+    )
+    if declared != expected:
+        raise RetronMsdCompilerError(
+            "Retron PWM motif_layers must match design-set parent_payload motif_occurrences; "
+            f"declared={declared}, expected={expected}"
+        )
+
+
+def _motif_layer_key(raw: Mapping[str, Any]) -> tuple[str, int, int, str]:
+    span = _require_mapping(raw.get("retained_parent_span_0"), "PWM motif_layer retained_parent_span_0")
+    return (
+        str(raw.get("motif_instance_id") or "").strip(),
+        int(span.get("start")),
+        int(span.get("end")),
+        str(raw.get("strand") or "").strip(),
+    )
 
 
 def _find_full_payload_trim(payload_trims: Mapping[str, Any]) -> Mapping[str, Any] | None:

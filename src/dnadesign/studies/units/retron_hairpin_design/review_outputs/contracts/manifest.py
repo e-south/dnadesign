@@ -55,6 +55,21 @@ def write_review_manifest(
             "svg": _relative_to(pwm_svg, review_root),
             "png": _relative_to(pwm_png, review_root),
             "payload_trim_ids": [panel.payload_trim_id for panel in plan.pwm_panels],
+            "materialized_payload_trim_ids": [
+                panel.payload_trim_id for panel in plan.pwm_panels if panel.requires_materialized_sequence
+            ],
+            "review_only_payload_trim_ids": [
+                panel.payload_trim_id for panel in plan.pwm_panels if not panel.requires_materialized_sequence
+            ],
+            "motif_occurrences": [
+                {
+                    "motif_instance_id": occurrence.motif_instance_id,
+                    "span_0": {"start": occurrence.start_0, "end": occurrence.end_0},
+                    "strand": occurrence.strand,
+                    "occurrence_rank": occurrence.occurrence_rank,
+                }
+                for occurrence in plan.motif_occurrences
+            ],
             "meme_pwm_source": _repo_relative(plan.meme_pwm_path, plan_root=plan.plan_path),
         },
         "sequence_montage": {
@@ -77,6 +92,7 @@ def write_review_manifest(
             "included_payload_trim_ids": list(plan.benchling_import.included_payload_trim_ids),
             "assigned_retron_ids": dict(plan.benchling_import.assigned_retron_ids),
             "source_precedent_ids": dict(plan.benchling_import.source_precedent_ids),
+            "descriptions": dict(plan.benchling_import.descriptions),
             "verified_count": len(benchling_import.files),
             "expected_count": plan.benchling_import.expected_count,
             "directory": _relative_to(benchling_import.directory, review_root),

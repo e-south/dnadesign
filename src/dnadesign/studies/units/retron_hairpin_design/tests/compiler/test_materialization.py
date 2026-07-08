@@ -21,6 +21,10 @@ import pytest
 from Bio import SeqIO
 from Bio.Seq import Seq
 
+from dnadesign.studies.units.retron_hairpin_design.artifact_contracts.primitive_visual_roles import (
+    PrimitiveVisualRole,
+    validate_primitive_visual_roles,
+)
 from dnadesign.studies.units.retron_hairpin_design.compiler.exceptions import RetronMsdCompilerError
 from dnadesign.studies.units.retron_hairpin_design.compiler.materialization import materialize_msd_design_artifacts
 from dnadesign.studies.units.retron_hairpin_design.compiler.references import compile_msd_design_catalog
@@ -30,6 +34,42 @@ from ..support.cli import RUNNER
 from ..support.compiler_fixtures import SNAPBACK_FOLDBACK, TETO_PAYLOAD
 from ..support.registry import write_minimal_retron_msd_registry
 from ..support.viennarna import install_fake_viennarna_python_api
+
+
+def test_primitive_visual_roles_reject_duplicate_or_low_contrast_strokes() -> None:
+    valid_role = PrimitiveVisualRole(
+        role_id="payload_primary",
+        display_label="Payload primary",
+        palette_token="payload.primary",
+        stroke_color="#D55E00",
+        fill_color="#F8C491",
+        priority=40,
+        applies_to=("backbone",),
+    )
+    duplicate_color_role = PrimitiveVisualRole(
+        role_id="payload_complement",
+        display_label="Payload complement",
+        palette_token="payload.complement",
+        stroke_color="#D55E00",
+        fill_color="#E9B9E3",
+        priority=40,
+        applies_to=("backbone",),
+    )
+    low_contrast_role = PrimitiveVisualRole(
+        role_id="snapback_cap",
+        display_label="Cap",
+        palette_token="cap.loop",
+        stroke_color="#F9FAFB",
+        fill_color="#F3F4F6",
+        priority=80,
+        applies_to=("backbone",),
+    )
+
+    validate_primitive_visual_roles((valid_role,))
+    with pytest.raises(ValueError, match="stroke colors must be unique"):
+        validate_primitive_visual_roles((valid_role, duplicate_color_role))
+    with pytest.raises(ValueError, match="contrast ratio"):
+        validate_primitive_visual_roles((valid_role, low_contrast_role))
 
 
 def test_retron_msd_materialize_requires_concrete_sequences(tmp_path: Path) -> None:
@@ -313,6 +353,12 @@ constructs:
         row["feature_id"] for row in feature_rows
     }
     visual_contract = json.loads((variant_dir / "manifest" / "visual" / "sequence_evidence_map_v1.json").read_text())
+    primitive_roles = visual_contract["meta"]["primitive_visual_roles"]
+    assert primitive_roles["stem_base_left"]["palette_token"] == "stem_base.left"
+    assert primitive_roles["stem_base_right"]["palette_token"] == "stem_base.right"
+    assert primitive_roles["payload_primary"]["palette_token"] == "payload.primary"
+    assert primitive_roles["snapback_foldback_geometry"]["palette_token"] == "foldback.geometry"
+    assert len({role["stroke_color"] for role in primitive_roles.values()}) == len(primitive_roles)
     labels_by_text = {label["text"]: label for label in visual_contract["meta"]["segment_labels"]}
     assert labels_by_text["Foldback"]["start"] == flank_5p_len + len(TETO_PAYLOAD)
     assert labels_by_text["Foldback"]["end"] == labels_by_text["Foldback"]["start"] + len("AGGC")
@@ -339,6 +385,11 @@ constructs:
     assert anchor_section["label"] == "Foldback"
     assert "snapback_foldback_geometry" in anchor_section["semantic_tokens"]
     assert anchor_section["section_kind"] == "cap_foldback"
+    sections_by_label = {section["label"]: section for section in annotation_manifest["section_annotations"]}
+    assert sections_by_label["Left Base"]["semantic_tokens"] == ["stem_base_left"]
+    assert sections_by_label["Left Base"]["hue"] == primitive_roles["stem_base_left"]["stroke_color"]
+    assert sections_by_label["Right Base"]["semantic_tokens"] == ["stem_base_right"]
+    assert sections_by_label["Right Base"]["hue"] == primitive_roles["stem_base_right"]["stroke_color"]
 
     annotated_svg = (
         variant_dir

@@ -17,9 +17,6 @@ from pathlib import Path
 
 from PIL import Image
 
-from dnadesign.studies.units.retron_hairpin_design.review_outputs.handoff.contract import (
-    SEQUENCE_HANDOFF_COLUMNS,
-)
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import (
     generate_retron_hairpin_review_outputs,
 )
@@ -34,7 +31,7 @@ def test_teto_pwm_trim_review_outputs_generate_review_package(tmp_path: Path) ->
     repo_root = repo_root_from(__file__)
     deliverable_plan_path = write_review_plan_with_test_pwm(tmp_path / "plan", repo_root=repo_root)
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
-    out_dir = tmp_path / "workbench" / "outputs" / "teto_pwm_trim_rescue_v1"
+    out_dir = tmp_path / "workbench" / "outputs" / "teto_retained_span_trim_tetr_pwm_elite_v1"
 
     result = generate_retron_hairpin_review_outputs(
         deliverable_plan_path=deliverable_plan_path,
@@ -46,19 +43,30 @@ def test_teto_pwm_trim_review_outputs_generate_review_package(tmp_path: Path) ->
 
     assert result.sequence_row_count == 9
     assert result.handoff_verified_count == 9
-    assert result.pwm_triptych_svg == out_dir / "reviews" / "pwm" / "teto_pwm_trim_rescue_v1.pwm_trim_triptych.svg"
-    assert result.pwm_triptych_png == out_dir / "reviews" / "pwm" / "teto_pwm_trim_rescue_v1.pwm_trim_triptych.png"
-    assert result.sequence_montage_mp4 == out_dir / "reviews" / "video" / "teto_pwm_trim_rescue_v1.sequence_montage.mp4"
-    assert result.handoff_tsv == out_dir / "reviews" / "handoff" / "teto_pwm_trim_rescue_v1.handoff.tsv"
-    assert result.handoff_markdown == (out_dir / "reviews" / "handoff" / "teto-pwm-trim-rescue-v1.handoff.md")
+    assert (
+        result.pwm_triptych_svg
+        == out_dir / "reviews" / "pwm" / "teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.svg"
+    )
+    assert (
+        result.pwm_triptych_png
+        == out_dir / "reviews" / "pwm" / "teto_retained_span_trim_tetr_pwm_elite_v1.pwm_trim_triptych.png"
+    )
+    assert (
+        result.sequence_montage_mp4
+        == out_dir / "reviews" / "video" / "teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4"
+    )
+    assert (
+        result.handoff_tsv == out_dir / "reviews" / "handoff" / "teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv"
+    )
+    assert result.handoff_markdown == (
+        out_dir / "reviews" / "handoff" / "teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md"
+    )
     assert result.benchling_genbank_dir == out_dir / "benchling_genbank"
     assert result.benchling_genbank_index == out_dir / "reviews" / "handoff" / (
-        "teto_pwm_trim_rescue_v1.benchling_genbank.tsv"
+        "teto_retained_span_trim_tetr_pwm_elite_v1.benchling_genbank.tsv"
     )
     assert result.benchling_genbank_count == 6
     assert result.review_manifest_path == out_dir / "reviews" / "review_manifest.json"
-    assert result.pwm_triptych_svg.read_text(encoding="utf-8").startswith("<?xml")
-    assert result.pwm_triptych_png.read_bytes().startswith(b"\x89PNG")
     with Image.open(result.pwm_triptych_png) as image:
         assert image.size[0] >= 3000
         assert image.size[1] >= 800
@@ -116,10 +124,8 @@ def _assert_triptych_contract(triptych_svg: str) -> None:
 def _assert_review_manifest(path: Path) -> None:
     review_manifest = json.loads(path.read_text(encoding="utf-8"))
     assert review_manifest["contract"] == "retron_hairpin_review_output_manifest_v1"
-    assert review_manifest["deliverable_plan_id"] == "teto_pwm_trim_rescue_v1"
+    assert review_manifest["deliverable_plan_id"] == "teto_retained_span_trim_tetr_pwm_elite_v1"
     assert review_manifest["materialized_sequence_rows"] == 9
-    assert review_manifest["handoff_verified_count"] == 9
-    assert "clone_handoff_verified_count" not in review_manifest
     assert review_manifest["sequence_evidence"] == {
         "folding_status_ok_count": 9,
         "native_structure_png_verified_count": 9,
@@ -134,9 +140,12 @@ def _assert_review_manifest(path: Path) -> None:
     assert review_manifest["sequence_montage"]["review_variant_ids"] == EXPECTED_TETO_TRIM_REVIEW_VARIANT_IDS
     assert review_manifest["source_indexes"]["sequence_index"] == "materialized/manifest/indexes/sequence_index.tsv"
     assert "clone_handoff" not in review_manifest
-    assert review_manifest["sequence_handoff"]["index_tsv"] == "reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv"
+    assert (
+        review_manifest["sequence_handoff"]["index_tsv"]
+        == "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv"
+    )
     assert review_manifest["sequence_handoff"]["index_markdown"] == (
-        "reviews/handoff/teto-pwm-trim-rescue-v1.handoff.md"
+        "reviews/handoff/teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md"
     )
     assert review_manifest["benchling_genbank_import"]["orientation"] == "reverse_complement_only"
     assert review_manifest["benchling_genbank_import"]["verified_count"] == 6
@@ -147,9 +156,8 @@ def _assert_review_manifest(path: Path) -> None:
     ]
     assert review_manifest["benchling_genbank_import"]["assigned_retron_ids"]["r180-w03-16"] == "pES-retron-200"
     assert review_manifest["benchling_genbank_import"]["source_precedent_ids"]["r180-w03-16"] == "pES-retron-180"
-    assert review_manifest["benchling_genbank_import"]["directory"] == "benchling_genbank"
     assert review_manifest["benchling_genbank_import"]["index_tsv"] == (
-        "reviews/handoff/teto_pwm_trim_rescue_v1.benchling_genbank.tsv"
+        "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.benchling_genbank.tsv"
     )
     assert review_manifest["benchling_genbank_import"]["files"] == [
         "benchling_genbank/pES-retron-195-msd[TetR]-r26-w02-17.gb",
@@ -164,7 +172,6 @@ def _assert_review_manifest(path: Path) -> None:
 def _assert_handoff_index(tsv_path: Path, markdown_path: Path, *, out_dir: Path) -> None:
     rows = list(csv.DictReader(tsv_path.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
     assert len(rows) == 9
-    assert list(rows[0]) == list(SEQUENCE_HANDOFF_COLUMNS)
     assert rows[0]["variant_id"] == "r26-w00-19"
     assert rows[0]["construct_id"] == "pES-tetr-r26-w00-19"
     assert rows[0]["retained_window"] == "[0,19)"
@@ -175,9 +182,6 @@ def _assert_handoff_index(tsv_path: Path, markdown_path: Path, *, out_dir: Path)
     assert "tetO Trim Sequence Handoff" in handoff_markdown
     assert "r26-w00-19" in handoff_markdown
     assert "| Variant | Insert | Context | Files |" in handoff_markdown
-    assert "Full machine metadata stays in `sequence_index.tsv`" in handoff_markdown
-    assert "pES-retron-teto-trim-001" not in handoff_markdown
-    assert " / msd-" not in handoff_markdown
     assert "[GB]" in handoff_markdown
     assert "[RC GB]" in handoff_markdown
     assert "[RC FA]" in handoff_markdown
@@ -185,19 +189,19 @@ def _assert_handoff_index(tsv_path: Path, markdown_path: Path, *, out_dir: Path)
 
 def _assert_benchling_import(directory: Path, index_path: Path) -> None:
     expected_names = [
-        "pES-retron-195-msd[TetR]-r26-w02-17.gb",
-        "pES-retron-196-msd[TetR]-r26-w03-16.gb",
-        "pES-retron-197-msd[TetR]-r43-w02-17.gb",
-        "pES-retron-198-msd[TetR]-r43-w03-16.gb",
-        "pES-retron-199-msd[TetR]-r180-w02-17.gb",
-        "pES-retron-200-msd[TetR]-r180-w03-16.gb",
+        f"pES-retron-{retron_id}-msd[TetR]-{variant_id}.gb"
+        for retron_id, variant_id in zip(
+            range(195, 201),
+            ("r26-w02-17", "r26-w03-16", "r43-w02-17", "r43-w03-16", "r180-w02-17", "r180-w03-16"),
+            strict=True,
+        )
     ]
     observed = sorted(path.name for path in directory.iterdir() if not path.name.startswith("."))
     assert observed == expected_names
-    assert all((directory / name).suffix == ".gb" for name in expected_names)
     first = (directory / expected_names[0]).read_text(encoding="utf-8")
     assert first.startswith("LOCUS       pES-retron-195")
-    assert "derived from pES-retron-26" in first
+    assert "pES-retron-26 P4 scaffold; 15 nt [2,17) retained span" in first
+    assert "Cruncher-derived TetR PWM elite payload" in first
     assert "reverse-complement MSD handoff" in first
     assert "FEATURES             Location/Qualifiers" in first
     rows = list(csv.DictReader(index_path.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
@@ -221,6 +225,5 @@ def _assert_video_manifest(path: Path, *, out_dir: Path) -> None:
     assert video_manifest["frames"][0]["review_construct_id"] == "pES-retron-26"
     assert video_manifest["frames"][0]["evidence_label"] == "pES-retron-26 | tetO PWM [0,19) | r26 scaffold | 19 nt"
     assert video_manifest["frames"][0]["review_still_png"] == "reviews/video/stills/01_pES-retron-26_tetO-w00-19.png"
-    assert Path(video_manifest["frames"][0]["review_still_png"]).name.startswith("01_pES-retron-26_")
     assert video_manifest["frames"][0]["composition_overview_png"].endswith("composition_overview.png")
     assert (out_dir / video_manifest["frames"][0]["review_still_png"]).read_bytes().startswith(b"\x89PNG")

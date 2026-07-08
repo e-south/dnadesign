@@ -18,6 +18,11 @@ from dnadesign.contracts.sequence import MsdDesignCatalogV1, MsdDesignReferenceV
 
 from ..compiler.exceptions import RetronMsdCompilerError
 from .layout import MSD_UNIT_REPEAT_COUNT, SNAPBACK_FOLDBACK_SEGMENT_ID
+from .primitive_visual_roles import (
+    primitive_component_hues,
+    primitive_component_styles,
+    primitive_visual_roles_payload,
+)
 
 
 def require_sequence_subcomponents(
@@ -222,27 +227,9 @@ def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) ->
             "right_base": record.scar_nick.right_base,
             "profile_s3s2s1s0": record.scar_nick.profile_s3s2s1s0,
         },
-        "component_hues": {
-            "flank_5p": "#2563EB",
-            "flank_3p": "#14B8A6",
-            "payload_primary": "#F97316",
-            "payload_complement": "#DC2626",
-            SNAPBACK_FOLDBACK_SEGMENT_ID: "#64748B",
-            "snapback_retained_stem": "#7C3AED",
-            "snapback_cap": "#16A34A",
-            "snapback_foldback_return": "#DB2777",
-            "stem_base_left": "#7C3AED",
-            "stem_base_right": "#A16207",
-        },
-        "component_styles": {
-            "flank_5p": {"fill": "#BFDBFE", "alpha": 0.72, "edge_color": "#2563EB"},
-            "payload_primary": {"fill": "#FDBA74", "alpha": 0.66, "edge_color": "#EA580C"},
-            "snapback_cap": {"fill": "#86EFAC", "alpha": 0.78, "edge_color": "#16A34A"},
-            "payload_complement": {"fill": "#FCA5A5", "alpha": 0.66, "edge_color": "#DC2626"},
-            "flank_3p": {"fill": "#5EEAD4", "alpha": 0.72, "edge_color": "#0D9488"},
-            "stem_base_left": {"fill": "#EDE9FE", "alpha": 0.76, "edge_color": "#7C3AED"},
-            "stem_base_right": {"fill": "#FEF3C7", "alpha": 0.76, "edge_color": "#A16207"},
-        },
+        "component_hues": primitive_component_hues(),
+        "component_styles": primitive_component_styles(),
+        "primitive_visual_roles": primitive_visual_roles_payload(),
     }
 
 

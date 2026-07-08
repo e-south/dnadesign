@@ -22,13 +22,13 @@ terms they test.
 - `scar_nick_profile_panel_v1.yaml`: pES-retron-177 through pES-retron-194,
   with expected MSD design ids, direction ids, effect tags, nickase posture, and
   rationale.
-- `teto_pwm_trim_rescue_v1.yaml`: nine-variant bidirectional TetR
+- `teto_retained_span_trim_tetr_pwm_elite_v1.yaml`: nine-variant bidirectional TetR
   cargo-shortening pilot across retron26 control, retron43 target scaffold,
   and the pES-retron-180 C172/AGTG/CATG/XWMM precedent under WT Eco1 RT.
-- `teto_payload_trim_retest_v1.yaml`: four-variant tetO payload-prior retest
+- `teto_retained_span_trim_ecoli_working_v1.yaml`: six-variant Eco1 tetO retained-span trim
   that keeps the 15 nt and 13 nt retained-span extents from the TetR PWM pilot,
-  but applies them to the retron26/retron43 tetO payload prior in retron26 and
-  retron180 scaffold contexts.
+  but applies them to the retron26/retron43 Eco1 tetO payload family in retron26,
+  retron43, and retron180 scaffold contexts.
 
 ### Boundary
 
