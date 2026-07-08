@@ -14,7 +14,12 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-DEFAULT_HAIRPIN_OUTPUT_DIR = Path("docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1")
+DEFAULT_HAIRPIN_OUTPUT_DIR = Path(
+    "docs/studies/retron_hairpin_design/workbench/outputs/reader_spop_msd_structure_panel_v1/materialized"
+)
+DEFAULT_MSD_REGION_RECORD_DIR = Path(
+    "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1"
+)
 DEFAULT_OUTPUT_DIR = Path(
     "docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1"
 )

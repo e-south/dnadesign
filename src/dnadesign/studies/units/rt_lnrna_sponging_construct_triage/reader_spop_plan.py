@@ -499,6 +499,8 @@ def _score_design(
     baseline_z, _baseline_n = values[zero_key]
     baseline_od, _baseline_od_n = values[zero_od_key]
     positive_z, _positive_n = values[(positive_atc, 0.0, spop_api.reporter_readout)]
+    positive_od_row = values.get((positive_atc, 0.0, spop_api.viability_readout))
+    positive_od = float(positive_od_row[0]) if positive_od_row is not None else None
     dose_values: list[object] = []
     resolved_qc_flags = set(qc_flags)
     for atc_n_m, iptg_u_m, _channel in dose_keys:
@@ -538,6 +540,11 @@ def _score_design(
     resolved_assay_metadata = {
         "baseline_condition": "0 nm aTc; 0 uM IPTG",
         "positive_control_condition": f"{positive_atc:g} nm aTc; 0 uM IPTG",
+        "baseline_od600": float(baseline_od),
+        "positive_control_od600": positive_od,
+        "positive_control_od600_relative_to_baseline": (
+            float(positive_od / baseline_od) if positive_od is not None else None
+        ),
         "lambda_viability": lambda_viability,
         "metric_definition_owner": "reader",
         "metric_family": spop_api.metric_family,

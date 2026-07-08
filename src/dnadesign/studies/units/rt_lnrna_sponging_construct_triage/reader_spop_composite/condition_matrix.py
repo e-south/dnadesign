@@ -141,7 +141,7 @@ def _condition_rows_for_observation(observation: ReaderSpopObservation) -> list[
             iptg_uM=0.0,
             normalized_derepression=0.0,
             rfp_over_od600=baseline,
-            viability_relative_to_baseline=None,
+            viability_relative_to_baseline=1.0,
             replicate_count=int(observation.replicate_count),
             construct_subject_id=observation.construct_subject_id,
             construct_subject_bridge_status=observation.construct_subject_bridge_status,
@@ -159,7 +159,7 @@ def _condition_rows_for_observation(observation: ReaderSpopObservation) -> list[
             iptg_uM=0.0,
             normalized_derepression=1.0,
             rfp_over_od600=positive,
-            viability_relative_to_baseline=None,
+            viability_relative_to_baseline=_positive_control_viability_relative_to_baseline(observation),
             replicate_count=int(observation.replicate_count),
             construct_subject_id=observation.construct_subject_id,
             construct_subject_bridge_status=observation.construct_subject_bridge_status,
@@ -195,6 +195,13 @@ def _condition_rows_for_observation(observation: ReaderSpopObservation) -> list[
             )
         )
     return rows
+
+
+def _positive_control_viability_relative_to_baseline(observation: ReaderSpopObservation) -> float | None:
+    value = observation.assay_metadata.get("positive_control_od600_relative_to_baseline")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _condition_columns(rows: Sequence[ReaderSpopConditionRow]) -> tuple[ReaderSpopConditionColumn, ...]:

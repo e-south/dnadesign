@@ -65,10 +65,10 @@ fi
 
 require_pattern "SPOP heatmap" "$SKILL_FILE" "positive trigger language present"
 require_pattern "condition-structure (matrix|matrices)" "$SKILL_FILE" "route language present"
-require_pattern "masked gray, not zero" "$SKILL_FILE" "missing-cell policy present"
+require_pattern "white masked cells, not zero" "$SKILL_FILE" "missing-cell policy present"
 require_pattern "normalized derepression" "$SKILL_FILE" "normalization policy present"
 require_pattern "square" "$SKILL_FILE" "square heatmap tile policy present"
-require_pattern "darker seagreen" "$SKILL_FILE" "palette policy present"
+require_pattern "pastel cold blue" "$SKILL_FILE" "palette policy present"
 require_pattern "margins trimmed" "$SKILL_FILE" "thumbnail crop policy present"
 require_pattern "retron-hairpin only when" "$SKILL_FILE" "hairpin route gate present"
 require_pattern "generic LatentDNA" "$SKILL_FILE" "generic LatentDNA route-away present"

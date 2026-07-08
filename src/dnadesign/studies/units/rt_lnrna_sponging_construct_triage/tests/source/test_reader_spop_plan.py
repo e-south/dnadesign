@@ -186,7 +186,7 @@ def score_spop_endpoint(
     # only proves dnadesign delegates to an API with the expected shape.
     scale = max(float(positive_control_rfp_over_od600), 1.0)
     y_values = tuple(float(row.rfp_over_od600) / scale for row in rows)
-    viability_values = tuple(1.0 for _ in rows)
+    viability_values = tuple(float(row.od600) / float(baseline_od600) for row in rows)
     flags = set()
     for row in rows:
         if row.rfp_over_od600 < baseline_rfp_over_od600:
@@ -361,6 +361,12 @@ def test_reader_spop_condition_matrix_uses_200nm_positive_control_and_preserves_
                 "0 nm aTc; 5 uM IPTG": 180.0,
                 "0 nm aTc; 500 uM IPTG": 460.0,
             },
+            od_by_treatment={
+                "0 nm aTc; 0 uM IPTG": 0.4,
+                "200 nm aTc; 0 uM IPTG": 0.36,
+                "0 nm aTc; 5 uM IPTG": 0.38,
+                "0 nm aTc; 500 uM IPTG": 0.32,
+            },
         ),
         *_ratio_rows(
             design_id="pES-retron-195; pBbS2c-rfp",
@@ -386,9 +392,16 @@ def test_reader_spop_condition_matrix_uses_200nm_positive_control_and_preserves_
     assert len(matrix.rows) == 7
     by_variant_condition = {(row.assay_subject_key, row.condition_key): row for row in matrix.rows}
     assert by_variant_condition[("retron26", "0 nm aTc; 0 uM IPTG")].normalized_derepression == 0.0
+    assert by_variant_condition[("retron26", "0 nm aTc; 0 uM IPTG")].viability_relative_to_baseline == 1.0
     assert by_variant_condition[("retron26", "200 nm aTc; 0 uM IPTG")].normalized_derepression == 1.0
+    assert by_variant_condition[("retron26", "200 nm aTc; 0 uM IPTG")].viability_relative_to_baseline == pytest.approx(
+        0.9
+    )
     assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].condition_role == "iptg_dose"
     assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].rfp_over_od600 == pytest.approx(244.0)
+    assert by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].viability_relative_to_baseline == pytest.approx(
+        0.95
+    )
     assert (
         by_variant_condition[("retron26", "0 nm aTc; 5 uM IPTG")].value_basis
         == "reader_spop_reconstructed_from_normalized_endpoint"

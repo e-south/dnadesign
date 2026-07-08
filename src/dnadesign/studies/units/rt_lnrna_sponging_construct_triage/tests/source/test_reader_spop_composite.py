@@ -32,13 +32,22 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_comp
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.render import (
     CompositeRenderError,
+    _deviating_structure_text_indices,
+    _structure_vector_data_size,
     render_spop_condition_structure_plot,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.row_categories import (
+    category_for_assay_subject,
+    category_spans_for_variants,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.structure_manifest import (
     RetronStructureManifestError,
     RetronStructureThumbnailRow,
     build_retron_structure_thumbnail_manifest,
     write_retron_structure_thumbnail_manifest,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.structure_svg import (
+    oriented_structure_geometry,
 )
 
 
@@ -54,16 +63,39 @@ def test_retron_structure_thumbnail_manifest_resolves_hairpin_195_200_assets() -
     repo_root = _repo_root()
     rows = build_retron_structure_thumbnail_manifest(
         repo_root=repo_root,
-        assay_subject_keys=("retron26", "retron195", "retron196", "retron197", "retron198", "retron199", "retron200"),
+        assay_subject_keys=(
+            "retron26",
+            "retron43",
+            "retron195",
+            "retron196",
+            "retron197",
+            "retron198",
+            "retron199",
+            "retron200",
+        ),
     )
     by_key = {row.assay_subject_key: row for row in rows}
 
     assert by_key["retron195"].display_variant_id == "pES-retron-195"
-    assert by_key["retron195"].source_precedent_id == "pES-retron-26"
+    assert by_key["retron195"].source_precedent_id == "pES-retron-195"
     assert by_key["retron195"].folding_status == "ok"
     assert by_key["retron195"].structure_png_path.endswith("plots/secondary_structure.native.png")
+    assert by_key["retron195"].structure_svg_path.endswith("manifest/visual/secondary_structure/native.svg")
     assert (repo_root / by_key["retron195"].structure_png_path).exists()
-    assert by_key["retron200"].source_precedent_id == "pES-retron-180"
+    assert (repo_root / by_key["retron195"].structure_svg_path).exists()
+    assert by_key["retron195"].left_base_sequence == "CGGG"
+    assert by_key["retron195"].right_base_sequence == "ACAG"
+    assert by_key["retron195"].stem_length_bp == 15
+    assert by_key["retron195"].foldback_sequence == "AGGC"
+    assert by_key["retron43"].stem_length_bp == 26
+    assert by_key["retron200"].source_precedent_id == "pES-retron-200"
+    assert by_key["retron200"].stem_length_bp == 16
+    assert by_key["retron200"].primitive_source_path.endswith("variants/pes-retron-200-msd-region.yaml")
+    assert by_key["retron197"].stem_length_bp == 22
+    assert by_key["retron197"].primitive_warning == ""
+    assert by_key["retron197"].payload_pairing_status == "canonical_wc"
+    assert by_key["retron197"].foldback_pairing_status == "canonical_wc"
+    assert by_key["retron198"].primitive_warning == ""
     assert by_key["retron200"].sequence_sha256
 
 
@@ -76,6 +108,59 @@ def test_retron_structure_thumbnail_manifest_writes_parquet(tmp_path: Path) -> N
     written = pq.read_table(path).to_pylist()
     assert written[0]["assay_subject_key"] == "retron195"
     assert written[0]["structure_status"] == "available"
+    assert written[0]["left_base_sequence"] == "CGGG"
+    assert written[0]["stem_length_bp"] == 15
+    assert written[0]["foldback_sequence"] == "AGGC"
+    assert written[0]["payload_pairing_status"] == "canonical_wc"
+
+
+def test_structure_svg_geometry_returns_horizontal_vector_elements() -> None:
+    repo_root = _repo_root()
+    rows = build_retron_structure_thumbnail_manifest(repo_root=repo_root, assay_subject_keys=("retron195",))
+    geometry = oriented_structure_geometry((repo_root / rows[0].structure_svg_path).as_posix())
+    min_x, max_x, min_y, max_y = geometry.bounds
+
+    assert len(geometry.lines) > 10
+    assert len(geometry.texts) > 40
+    assert max_x - min_x > max_y - min_y
+
+
+def test_structure_vector_data_size_preserves_svg_display_aspect() -> None:
+    width_data, height_data = _structure_vector_data_size(
+        source_width=400.0,
+        source_height=100.0,
+        x_pixels_per_data=1000.0,
+        y_pixels_per_data=100.0,
+        max_width_data=0.96,
+        max_height_data=0.84,
+    )
+
+    assert width_data <= 0.96
+    assert height_data <= 0.84
+    assert (width_data * 1000.0) / (height_data * 100.0) == pytest.approx(4.0)
+
+
+def test_structure_deviation_indices_align_against_retron26_reference() -> None:
+    assert _deviating_structure_text_indices(reference_sequence="ACGT", variant_sequence="ACGA") == (3,)
+    assert _deviating_structure_text_indices(reference_sequence="ACGT", variant_sequence="ACGTT") == (4,)
+
+
+def test_reader_spop_row_categories_map_variant_groups() -> None:
+    assert category_for_assay_subject("retron26").label == "GUU reference"
+    assert category_for_assay_subject("retron45").label == "Stem-base context"
+    assert category_for_assay_subject("retron47").label == "Sso7d-RT fusions"
+    assert category_for_assay_subject("retron49").label == "Evo2 RT mutants"
+    assert category_for_assay_subject("retron172").label == "Foldback cores"
+    assert category_for_assay_subject("retron177").label == "Stem/cap wobbles"
+    assert category_for_assay_subject("retron195").label == "tetO truncations"
+
+    spans = category_spans_for_variants(("retron26", "retron45", "retron46", "retron47"))
+
+    assert [(span.label, span.start_index, span.stop_index) for span in spans] == [
+        ("GUU reference", 0, 1),
+        ("Stem-base context", 1, 3),
+        ("Sso7d-RT fusions", 3, 4),
+    ]
 
 
 def test_retron_structure_thumbnail_manifest_reports_missing_handoff_file(tmp_path: Path) -> None:
@@ -98,11 +183,51 @@ def test_retron_structure_thumbnail_manifest_reports_missing_handoff_file(tmp_pa
 def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: Path) -> None:
     matrix = ReaderSpopConditionMatrix(
         rows=(
-            _row("retron26", BASELINE_CONDITION_KEY, BASELINE_ROLE, 0.0, 0.0, 100.0),
-            _row("retron26", condition_key_for_positive_control(20.0), POSITIVE_CONTROL_ROLE, 20.0, 0.0, 500.0),
-            _row("retron26", condition_key_for_iptg_dose(500.0), IPTG_DOSE_ROLE, 0.0, 500.0, 460.0),
-            _row("retron195", BASELINE_CONDITION_KEY, BASELINE_ROLE, 0.0, 0.0, 100.0),
-            _row("retron195", condition_key_for_positive_control(20.0), POSITIVE_CONTROL_ROLE, 20.0, 0.0, 500.0),
+            _row(
+                "retron26",
+                BASELINE_CONDITION_KEY,
+                BASELINE_ROLE,
+                0.0,
+                0.0,
+                100.0,
+                viability_relative_to_baseline=1.0,
+            ),
+            _row(
+                "retron26",
+                condition_key_for_positive_control(20.0),
+                POSITIVE_CONTROL_ROLE,
+                20.0,
+                0.0,
+                500.0,
+                viability_relative_to_baseline=0.88,
+            ),
+            _row(
+                "retron26",
+                condition_key_for_iptg_dose(500.0),
+                IPTG_DOSE_ROLE,
+                0.0,
+                500.0,
+                460.0,
+                viability_relative_to_baseline=0.92,
+            ),
+            _row(
+                "retron195",
+                BASELINE_CONDITION_KEY,
+                BASELINE_ROLE,
+                0.0,
+                0.0,
+                100.0,
+                viability_relative_to_baseline=1.0,
+            ),
+            _row(
+                "retron195",
+                condition_key_for_positive_control(20.0),
+                POSITIVE_CONTROL_ROLE,
+                20.0,
+                0.0,
+                500.0,
+                viability_relative_to_baseline=0.91,
+            ),
         ),
         condition_columns=(
             ReaderSpopConditionColumn(
@@ -141,20 +266,78 @@ def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: P
     assert Path(manifest.plot_png_path).exists()
     assert Path(manifest.plot_svg_path).exists()
     assert Path(manifest.plot_png_path).stat().st_size > 1000
+    svg_text = Path(manifest.plot_svg_path).read_text(encoding="utf-8")
+    assert svg_text.count("data:image/png;base64") <= 4
     assert manifest.variant_count == 2
     assert manifest.condition_count == 3
     assert manifest.missing_cell_count == 1
     payload = json.loads(Path(manifest.manifest_path).read_text(encoding="utf-8"))
     assert payload["contract"] == "rt_lnrna_spop_condition_structure_plot_manifest_v1"
-    assert payload["missing_cell_rendering"] == "masked_gray_not_zero"
+    assert payload["plot_premise"] == "Retron edits shift activation and growth"
+    assert not payload["plot_premise"].endswith(".")
+    assert payload["panel_order"] == [
+        "Experiment group",
+        "OD600 rel.",
+        "RFP/OD600 activation",
+        "MSD primitives",
+        "MSD structure",
+    ]
+    assert payload["row_category_band_position"] == "left_of_heatmaps"
+    assert payload["row_category_band_shape"] == "rounded_rectangles"
+    assert payload["row_category_count"] == 2
+    assert payload["row_category_spans"][0]["label"] == "GUU reference"
+    assert payload["row_category_spans"][0]["assay_subject_keys"] == ["retron26"]
+    assert payload["row_category_spans"][1]["label"] == "tetO truncations"
+    assert payload["row_category_spans"][1]["assay_subject_keys"] == ["retron195"]
+    assert payload["missing_cell_rendering"] == "white_not_zero"
+    assert payload["missing_tile_color"] == "#ffffff"
     assert payload["heatmap_tile_aspect"] == "square"
-    assert payload["value_palette"] == "white_to_darker_seagreen"
+    assert payload["condition_tick_label_style"] == "compact_aTc_IPTG"
+    assert payload["condition_tick_label_presence"] == "both_heatmaps"
+    assert payload["value_palette"] == "pastel_cold_to_warm_activation"
+    assert payload["zero_value_color"] != payload["missing_tile_color"]
     assert payload["x_axis_label"] == ""
     assert payload["y_axis_label"] == "lnRNA variants in retron Eco1 system"
     assert payload["structure_thumbnail_orientation"] == "rightward_horizontal_cap_right"
+    assert payload["structure_nucleotide_text_orientation"] == "upright"
+    assert payload["structure_thumbnail_horizontal_flip"] is True
     assert payload["structure_thumbnail_frame"] == "none"
     assert payload["structure_thumbnail_crop"] == "trim_white_margin"
-    assert payload["structure_thumbnail_zoom"] >= 0.12
+    assert payload["structure_thumbnail_crop_margin_px"] <= 2
+    assert payload["structure_thumbnail_interpolation"] == "lanczos"
+    assert 0.11 <= payload["structure_thumbnail_zoom"] <= 0.13
+    assert payload["structure_rendering_mode"] == "matplotlib_vector_primitives_from_viennarna_svg"
+    assert payload["structure_vector_aspect_policy"] == "preserve_native_svg_aspect_ratio"
+    assert payload["structure_deviation_reference_variant"] == "retron26"
+    assert payload["structure_deviation_highlight_mode"] == "variant_text_indices_from_pairwise_alignment"
+    assert payload["structure_deviation_legend_label"] == "amber bases differ from retron26"
+    assert payload["structure_deviation_marker_size"] >= 8.0
+    assert payload["structure_deviation_marker_alpha"] >= 0.88
+    assert payload["structure_vector_text_fontsize"] >= 2.6
+    assert payload["typography_profile"] == "publication_dense_v1"
+    assert payload["plot_title_fontsize"] >= 14.0
+    assert payload["panel_title_fontsize"] >= 10.5
+    assert payload["variant_label_fontsize"] >= 9.0
+    assert payload["primitive_text_fontsize"] >= 6.8
+    assert payload["plot_dpi"] >= 450
+    assert payload["colorbar_orientation"] == "horizontal_bottom"
+    assert payload["label_collision_policy"] == "tight_cbar_row_close_to_compact_condition_ticks"
+    assert payload["colorbar_height_ratio"] <= 0.006
+    assert payload["layout_density"] == "compact_adjacent_panels"
+    assert payload["primitive_column_order"] == [
+        "left_base_sequence",
+        "stem_length_bp",
+        "foldback_sequence",
+        "right_base_sequence",
+    ]
+    assert (
+        payload["primitive_column_source"] == "retron_hairpin_materialized_features_and_decomposed_msd_region_records"
+    )
+    assert payload["primitive_stem_length_basis"] == "payload_primary_interval_plus_snapback_foldback_return_bp"
+    assert payload["od600_panel_label"] == "OD600 rel."
+    assert payload["od600_panel_basis"] == "condition_aligned_viability_relative_to_baseline"
+    assert payload["od600_panel_palette"] == "pastel_cold_to_warm_growth"
+    assert payload["od600_panel_condition_count"] == 3
     assert payload["color_scale"] == {"vmin": 0.0, "vmax": 1.0, "clip": True}
     assert payload["normalization_scope"] == "within_reader_observation_not_cross_experiment_absolute"
     assert "baseline=0" in payload["normalization_basis"]
@@ -166,7 +349,7 @@ def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: P
         "missing_assay_subject_keys": [],
         "explanation": (
             "Rows marked missing are absent from the configured retron-hairpin "
-            "materialized review manifest, not silently plotted as zero."
+            "materialized structure source, not silently plotted as zero."
         ),
     }
 
@@ -218,6 +401,8 @@ def _row(
     atc_nM: float,
     iptg_uM: float,
     rfp_over_od600: float,
+    *,
+    viability_relative_to_baseline: float | None = None,
 ) -> ReaderSpopConditionRow:
     normalized = 0.0 if condition_role == BASELINE_ROLE else 1.0 if condition_role == POSITIVE_CONTROL_ROLE else 0.9
     return ReaderSpopConditionRow(
@@ -231,7 +416,7 @@ def _row(
         iptg_uM=iptg_uM,
         normalized_derepression=normalized,
         rfp_over_od600=rfp_over_od600,
-        viability_relative_to_baseline=None,
+        viability_relative_to_baseline=viability_relative_to_baseline,
         replicate_count=3,
         construct_subject_id=None,
         construct_subject_bridge_status="missing_construct_sequence_authority",

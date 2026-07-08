@@ -7,7 +7,7 @@ retrieval is not required for normal routing.
 | --- | --- | --- | --- |
 | `docs/studies/rt_lnrna_sponging_construct_triage/routes/reader-spop-condition-structure-matrix.md` | RT-lnRNA study | 2026-07-07 | First-hop route for this plot family. |
 | `docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md` | RT-lnRNA study | 2026-07-07 | Reader SPOP bridge semantics and positive-control policy. |
-| `docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/reviews/review_manifest.json` | Retron hairpin study | 2026-07-07 | MSD structure source manifest. |
+| `docs/studies/retron_hairpin_design/workbench/outputs/reader_spop_msd_structure_panel_v1/materialized/manifest/indexes/sequence_index.tsv` | Retron hairpin study | 2026-07-07 | Complete Reader SPOP MSD structure source index. |
 | `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/materialize.py` | RT-lnRNA study | 2026-07-07 | Materializer entrypoint. |
 | `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/conditions.py` | RT-lnRNA study | 2026-07-07 | Condition labels, role constants, and heatmap column order. |
 | `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/condition_matrix.py` | RT-lnRNA study | 2026-07-07 | Condition-long table builder. |

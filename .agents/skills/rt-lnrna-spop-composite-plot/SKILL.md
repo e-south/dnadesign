@@ -13,12 +13,8 @@ metadata:
 Route requests for the RT-lnRNA Reader SPOP condition-structure matrix artifact.
 ## Scope
 In scope:
-- Reader SPOP heatmaps.
-- Condition-long SPOP matrix tables.
-- Variant rows joined to MSD structure thumbnails.
-- Rebuilding the study-owned composite plot artifacts.
-- Checking missing condition tiles and missing thumbnail status.
-- Explaining the plot normalization basis and thumbnail materialization status.
+- Reader SPOP heatmaps, condition-long tables, category bands, MSD primitive columns, and variant rows joined to MSD structure thumbnails.
+- Rebuilding the study-owned artifacts, checking missing cells/thumbnails, and explaining normalization.
 Out of scope:
 - Generic LatentDNA plots.
 - Reader SPOP metric implementation.
@@ -30,28 +26,39 @@ Out of scope:
 2. Open the label contract only when condition semantics or positive-control
    handling matter:
    `docs/studies/rt_lnrna_sponging_construct_triage/contexts/reader-spop-label-contract.md`.
-3. Inspect `reader_spop_composite/conditions.py` only when treatment labels or
-   heatmap column order are in scope.
-4. Route to retron-hairpin only when
-   `retron_structure_thumbnail_manifest.parquet` reports missing thumbnail rows.
-   Missing rows mean the variant is absent from the configured hairpin
-   materialization manifest, not that the plotter should infer a structure.
-5. To rebuild the artifact, use:
+3. Inspect `conditions.py` for treatment labels or heatmap order; inspect
+   `row_categories.py` for row-family descriptors, colors, or assignments.
+4. Route to retron-hairpin only when `retron_structure_thumbnail_manifest.parquet` reports missing thumbnails or primitive/pairing fields need source inspection.
+5. Rebuild with:
    `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.materialize --reader-root ../reader --json`.
 6. Validate with the test matrix in `references/test-matrix.md`.
 ## Guardrails
-- Keep plot code inside
-  `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/`.
-- Missing condition cells remain missing and render as masked gray, not zero.
+- Keep plot code inside `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_spop_composite/`.
+- Missing condition cells render as white masked cells, not zero.
 - Positive-control columns preserve actual aTc dose.
 - Heatmap values are Reader SPOP normalized derepression values, not raw
   cross-experiment fluorescence magnitudes.
+- Row-family labels and pastel category fills come from `reader_spop_composite/row_categories.py`, not from renderer-local literals.
+- Category fills annotate contiguous row families and do not tint heatmap tiles.
 - Heatmap tiles are square, the x-axis title is blank, and the y-axis label
   names the lnRNA variants in the retron Eco1 system.
-- The color scale is white to darker seagreen with 0 to 1 clipping.
-- Structure thumbnails are source images with near-white margins trimmed, then
-  rotated 90 degrees clockwise in the composite so the cap points right. Do not
-  mutate the hairpin source images.
+- Low measured values are visually distinct from white missing cells; the
+  current scale moves from pastel cold blue through warm tones to orange.
+- Structure thumbnails prefer native ViennaRNA SVGs. The composite applies the
+  cap-right coordinate orientation and redraws backbone, base-pair, and
+  nucleotide-label geometry as aspect-preserving vector primitives with margins trimmed.
+- Poor structure resolution usually means the composite SVG contains embedded
+  PNG `<image>` blocks for structure rows; heatmaps/colorbars may be images.
+- Primitive columns come from retron-hairpin materialized feature CSVs and
+  decomposed MSD-region records, not from image parsing.
+- The primitive stem length comes from retron-hairpin `pairing_segments`:
+  optional stem-extension bp, payload-stem bp, and foldback-stem bp. It is not
+  the 4 bp stem-base length and not a payload-only length.
+- Pairing-status fields distinguish canonical Watson-Crick segments from
+  intentional wobble or mismatch segments. Narrow foldback annotations and
+  explicit complement arms are source notes unless they create unbalanced or
+  unresolved pairing segments.
+- Active MSD source GenBanks live one variant per file under retron-hairpin `source_inputs/variants/`; do not parse the retired monolithic MSD-region GenBank from this plot route.
 - Do not import RT-lnRNA plot semantics into generic LatentDNA modules.
 - Do not call retron-hairpin design generation from this route.
 - Treat stale available-thumbnail paths as contract errors.
@@ -59,6 +66,7 @@ Out of scope:
 - Route selected and source surfaces opened.
 - Output root and manifest path.
 - Matrix row count, condition count, variant count, and missing-cell count.
+- Row category count and any changed category labels.
 - Thumbnail availability or exact missing structure route.
 - Validation commands run or scoped reason they were not run.
 ## Trigger Tests

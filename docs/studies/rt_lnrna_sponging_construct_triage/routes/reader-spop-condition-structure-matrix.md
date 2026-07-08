@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-reader-spop-condition-structure-matrix-route
 surface: study-route-detail
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 status: materialized
 ---
 
@@ -22,9 +22,14 @@ Open surfaces in this order:
    positive-control semantics.
 3. `reader_spop_composite/conditions.py`, only when treatment labels, role
    order, or heatmap column order need inspection.
-4. `reader_spop_composite/structure_manifest.py`, only when thumbnail rows are
-   missing or retron-hairpin source tables fail contract checks.
-5. `docs/studies/retron_hairpin_design/...`, only to inspect existing
+4. `reader_spop_composite/row_categories.py`, only when row-family labels,
+   category colors, or variant-to-category assignments need inspection.
+5. `reader_spop_composite/structure_manifest.py`, only when thumbnail rows are
+   missing, primitive fields are blank, or retron-hairpin source tables fail
+   contract checks.
+6. `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`,
+   only when MSD primitive or pairing fields need inspection.
+7. `docs/studies/retron_hairpin_design/...`, only to inspect existing
    materialized structure assets. Do not start MSD design from this route.
 
 ### Ownership
@@ -33,10 +38,13 @@ Open surfaces in this order:
 | --- | --- | --- |
 | SPOP scoring | Reader | `reader.domains.plate_reader.analysis.spop.score_spop_endpoint` |
 | Condition ontology | RT-lnRNA study | `reader_spop_composite/conditions.py` |
+| Row category ontology | RT-lnRNA study | `reader_spop_composite/row_categories.py` |
 | Condition-long bridge | RT-lnRNA study | `reader_spop_composite/condition_matrix.py` |
 | Parquet table writer | RT-lnRNA study | `reader_spop_composite/tables.py` |
-| MSD structure assets | `retron_hairpin_design` study | `teto_pwm_trim_rescue_v1` materialized outputs |
+| MSD structure assets | `retron_hairpin_design` study | `reader_spop_msd_structure_panel_v1/materialized` outputs |
+| MSD source primitives and pairing facts | `retron_hairpin_design` study | `msd_region_records/reader_spop_msd_structure_panel_v1` |
 | Structure thumbnail manifest | RT-lnRNA study | `reader_spop_composite/structure_manifest.py` |
+| Structure SVG thumbnail renderer | RT-lnRNA study | `reader_spop_composite/structure_svg.py` |
 | Composite plot renderer | RT-lnRNA study | `reader_spop_composite/render.py` |
 | Materializer entrypoint | RT-lnRNA study | `reader_spop_composite/materialize.py` |
 
@@ -66,18 +74,62 @@ plots/manifest.json
 ### Plot Contract
 
 - Heatmap tiles are square, with one tile per variant-condition median.
-- The x-axis has condition tick labels and no x-axis title.
+- The plot title is the concise premise
+  `Retron edits shift activation and growth`.
+- Panel order is `Experiment group`, then `OD600 rel.`, then
+  `RFP/OD600 activation`, then `MSD primitives`, then `MSD structure`.
+- The `Experiment group` band sits left of the heatmaps and uses rounded
+  pastel category blocks for contiguous row families. Category labels include
+  `GUU reference`, `tetO HOP`, `Stem-base context`, `Sso7d-RT fusions`,
+  `Evo2 RT mutants`, `tetO site swaps`, `Foldback cores`,
+  `Stem/cap wobbles`, and `tetO truncations`.
+- Row-family colors are annotation only. They do not tint the OD600 or
+  activation heatmap tiles.
+- The `OD600 rel.` panel uses the same condition columns as the activation
+  heatmap: null, aTc positive control, and IPTG doses when those rows are
+  available. It shows Reader's OD600-derived
+  `viability_relative_to_baseline` values, so it is a growth proxy relative to
+  each observation baseline, not a raw OD600 measurement.
+- Both heatmaps show complete condition tick labels and no x-axis title.
 - The y-axis label is `lnRNA variants in retron Eco1 system`.
-- The value palette is white to darker seagreen. White is no activation,
-  darker seagreen is higher normalized activation, and missing cells are
-  masked gray.
+- The plot uses the `publication_dense_v1` typography profile: panel labels,
+  variant labels, primitive labels, and colorbar labels are enlarged within the
+  square-tile layout rather than by stretching heatmap cells.
+- The `MSD primitives` panel displays left base sequence, stem length,
+  foldback sequence, and right base sequence from retron-hairpin materialized
+  feature CSVs and decomposed MSD-region records. It does not infer these
+  values from the rendered image.
+- The stem-length column prefers retron-hairpin `pairing_segments`: optional
+  stem-extension bp, payload-stem bp, and foldback-stem bp. It is not the
+  4 bp stem-base length and not a payload-only length.
+- Pairing status fields in `retron_structure_thumbnail_manifest.parquet`
+  distinguish canonical Watson-Crick segments from intentional wobble or
+  mismatch segments. Noncanonical 170/171 payload pairing is annotation context,
+  not a missing-data condition.
+- If a pairing segment cannot be balanced or classified, the manifest records a
+  `primitive_warning` for review.
+- Missing tiles are white. Low or zero measured values are pastel cold blue,
+  while higher values move through warm pastel tones to orange. This separates
+  missing evidence from low activation.
+- Colorbars are skinny, horizontal, and placed in a compact bottom row below
+  their corresponding heatmap panels. Each colorbar width matches its heatmap
+  width.
+- Condition tick labels use compact `aTc` and `IPTG` text for readability; the
+  full dose-unit condition keys remain in the manifest and condition-column
+  table.
 - Values are clipped to the displayed color scale from 0 to 1. Values above
   the aTc positive-control response saturate at the darkest color rather than
   stretching the scale for every rebuild.
 - MSD structure thumbnails are rendered larger than the heatmap tiles, without
-  a border around the structure column. Near-white thumbnail margins are
-  trimmed at render time, then native ViennaRNA thumbnails are rotated 90
-  degrees clockwise so the cap faces right in the composite plot.
+  a border around the structure column. When native ViennaRNA SVGs are
+  available, the renderer applies the cap-right coordinate orientation, keeps
+  the native SVG aspect ratio, and redraws backbone, base-pair, and
+  nucleotide-label geometry as Matplotlib vector primitives. PNG thumbnails
+  are a fallback only.
+- Prominent amber nucleotide markers denote variant text positions that differ
+  from the pES-retron-26 structure sequence after pairwise alignment. Deletions
+  relative to pES-retron-26 cannot be marked on the variant structure because
+  no residue is present at that position.
 
 ### Normalization Basis
 
@@ -96,6 +148,13 @@ Use this plot for cross-experiment visual comparison of normalized activation
 patterns, not as evidence that absolute fluorescence magnitudes are directly
 comparable across experiments.
 
+The adjacent OD600 panel is also normalized within observation: `1.0` means the
+condition-level OD600-derived viability estimate matches that variant's own
+baseline. Baseline tiles are therefore `1.0`; aTc and IPTG tiles appear when the
+Reader artifact carried matching OD600 evidence for those treatments. Read this
+panel as compact growth/context evidence beside the SPOP heatmap, not as a
+substitute for inspecting raw plate-reader OD600 traces.
+
 ### Command
 
 ```bash
@@ -110,24 +169,30 @@ structure thumbnails from the retron-hairpin materialized sequence index, and
 writes the plot manifest.
 
 The output contract is file-name stable. Change condition naming, role order,
-or Parquet schema through `conditions.py` or `tables.py`; keep plot layout
-changes in `render.py`; keep source-asset joins in `structure_manifest.py`.
+or Parquet schema through `conditions.py` or `tables.py`; change row-family
+labels and assignments through `row_categories.py`; keep plot layout changes
+in `render.py`; keep source-asset joins in `structure_manifest.py`.
 
 ### Missing Data Policy
 
-- Missing condition tiles are rendered as masked gray cells, not zero.
+- Missing condition tiles are rendered as white masked cells, not zero.
 - Positive-control columns are dose-specific. The current curated Reader
   retron benchmark set has one positive-control dose: `200 nm aTc; 0 uM IPTG`.
 - If a variant lacks an MSD thumbnail, keep the row and mark
   `structure_status`, then route to
   `docs/studies/retron_hairpin_design/routes/README.md` only to materialize
   the missing structure asset.
+- If primitive fields look wrong, inspect the retron-hairpin source record
+  first. Active sources are one-variant GenBank files under
+  `source_inputs/variants/`, with `variant_sources.yaml` as the source manifest.
+  The retired monolithic GenBank is not an active ingest source.
 - Current `na` structure rows mean the assay subject is absent from the
-  configured retron-hairpin materialized `review_variant_ids` index. The
-  current `teto_pwm_trim_rescue_v1` hairpin output provides structures for
-  retron26, retron43, retron180, and retron195-200.
-- If a row claims `structure_status: available` but the PNG path is absent, the
-  renderer fails. Regenerate or repair the thumbnail manifest before plotting.
+  configured retron-hairpin materialized structure source. The default source
+  is `reader_spop_msd_structure_panel_v1/materialized`, which provides
+  sequence-indexed structures for the 36 Reader SPOP assay subjects.
+- If a row claims `structure_status: available` but the referenced PNG or SVG
+  path is absent, the renderer fails. Regenerate or repair the thumbnail
+  manifest before plotting.
 - Do not trigger new MSD design generation from this route.
 
 To make missing structures fetchable or materializable, clarify:
@@ -136,7 +201,8 @@ To make missing structures fetchable or materializable, clarify:
   window for each older variant;
 - whether older variants should resolve from the RT-lnRNA GenBank/Construct
   authority catalog or from a new retron-hairpin materialization cohort;
-- which cohort id and review manifest should be the structure source of record;
+- which cohort id and materialized sequence index should be the structure
+  source of record;
 - how to annotate base-stem-cap orientation for variants that were not produced
   by the current hairpin compiler.
 
@@ -144,6 +210,7 @@ To make missing structures fetchable or materializable, clarify:
 
 ```bash
 uv run pytest -q \
+  src/dnadesign/studies/units/retron_hairpin_design/tests/source_ingest/test_msd_region_genbank.py \
   src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py \
   src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_composite.py \
   src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
