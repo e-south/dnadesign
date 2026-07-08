@@ -11,6 +11,7 @@ direction_order:
   - mxmm_route_replicate
   - top_nick_comparator
   - teto_pwm_trim_rescue
+  - teto_payload_trim_retest
 directions:
   - id: cap_permissiveness
     label: Cap permissiveness
@@ -53,6 +54,17 @@ directions:
       - retron43_target
       - retron180_target
       - wt_eco1_only
+  - id: teto_payload_trim_retest
+    label: tetO payload trim retest
+    question: Does the same retained-span trim logic behave differently when applied to the working Eco1 tetO-like payload family instead of the Cruncher TetR PWM elite payload family?
+    effect_tags:
+      - teto_working_payload_family
+      - teto_mild_edge_trim_retest
+      - teto_stronger_edge_trim_retest
+      - payload_family_retest
+      - retron26_control
+      - retron180_target
+      - wt_eco1_only
 effect_tags:
   base_26_derived: 26-derived basal base context.
   base_43_like: 43-like basal base context.
@@ -81,5 +93,9 @@ effect_tags:
   teto_full_payload_control: Uses the full 19 nt bidirectional TetR motif payload.
   teto_flank_only_trim_control: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
   teto_mild_pwm_edge_trim: Uses the 15 nt mild dual-site TetR trim.
+  teto_mild_edge_trim_retest: Uses the 15 nt retained-span trim from a non-PWM-elite tetO-like payload parent.
   teto_stronger_pwm_edge_trim: Uses the 13 nt stronger dual-site TetR trim.
+  teto_stronger_edge_trim_retest: Uses the 13 nt retained-span trim from a non-PWM-elite tetO-like payload parent.
+  teto_working_payload_family: Uses a cataloged tetO-like payload family sourced from the working Eco1 retron26 scaffold.
+  payload_family_retest: Reuses a prior trim scaffold while changing payload family in a controlled way.
   wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from trim-effect classification.

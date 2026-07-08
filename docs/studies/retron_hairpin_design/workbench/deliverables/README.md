@@ -1,12 +1,22 @@
+---
+doc_id: study-retron-hairpin-design-workbench-deliverables
+surface: study-workbench-deliverables
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-07-08
+plane: handoff-plane
+surface_role: deliverable-contracts
+---
+
 ## Retron Workbench Deliverables
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-06-22
 
-This lane records hypothesis-specific review and handoff deliverables. It is
-not a generated-output directory. Use it to answer what a study cohort should
-emit, which source owns each artifact, and where a naive agent should look
-before running or interpreting output generation.
+Records hypothesis-specific review and handoff deliverables. It is not a
+generated-output directory. Use it to answer what a study cohort should emit,
+which source owns each artifact, and where a naive agent should look before
+running or interpreting output generation.
 
 ### Records
 
@@ -14,6 +24,9 @@ before running or interpreting output generation.
   bidirectional TetR PWM trim pilot. It links the design set, compiler spec,
   PWM provenance, materialized sequence bundle, PWM trim triptych, sequence
   montage video, review manifest, and GenBank handoff surfaces.
+- `teto_payload_trim_retest_v1.yaml`: deliverable plan for the four-design
+  tetO payload-prior retest. It assigns pES-retron-201 through pES-retron-204
+  and keeps the same retained-span extents as the 195-200 TetR PWM pilot.
 
 ### tetO Trim Review Outputs
 
@@ -58,6 +71,7 @@ Generate the review package after materializing the nine-design compiler spec:
 
 ```bash
 uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app review-outputs \
+  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml \
   --study-dir docs/studies/retron_hairpin_design \
   --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1/materialized \
   --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_pwm_trim_rescue_v1 \
@@ -91,6 +105,37 @@ Expected Benchling import files, all reverse-complement GenBank records:
 - `benchling_genbank/pES-retron-198-msd[TetR]-r43-w03-16.gb`
 - `benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb`
 - `benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb`
+
+### tetO Payload-Prior Retest Outputs
+
+Open the retest deliverable plan first:
+
+```text
+workbench/deliverables/teto_payload_trim_retest_v1.yaml
+```
+
+That plan assigns `pES-retron-201` through `pES-retron-204`, sets
+`filename_payload_label: tetO-retest`, and keeps the retained spans at
+`[2,17)` and `[3,16)`. The retest changes the payload prior, not the trim
+extent.
+
+Generate the review package after materializing
+`../../compiler/inputs/teto_payload_trim_retest_v1.spec.yaml`:
+
+```bash
+uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app review-outputs \
+  --deliverable-plan docs/studies/retron_hairpin_design/workbench/deliverables/teto_payload_trim_retest_v1.yaml \
+  --materialized-root docs/studies/retron_hairpin_design/workbench/outputs/teto_payload_trim_retest_v1/materialized \
+  --out-dir docs/studies/retron_hairpin_design/workbench/outputs/teto_payload_trim_retest_v1 \
+  --format json
+```
+
+Expected Benchling import files, all reverse-complement GenBank records:
+
+- `benchling_genbank/pES-retron-201-msd[tetO-retest]-r26-w02-17.gb`
+- `benchling_genbank/pES-retron-202-msd[tetO-retest]-r26-w03-16.gb`
+- `benchling_genbank/pES-retron-203-msd[tetO-retest]-r180-w02-17.gb`
+- `benchling_genbank/pES-retron-204-msd[tetO-retest]-r180-w03-16.gb`
 
 ### Visual Contract
 
@@ -144,6 +189,6 @@ facade instead of importing the individual renderer packages.
 ### Boundary
 
 Do not put GenBank files, PNG/SVG review panels, videos, or compiled catalogs
-in this directory. This lane holds durable contracts and reviewer-facing maps.
+in this directory. Durable contracts and reviewer-facing maps belong here.
 Actual files are emitted by the compiler/materializer or review renderer into
 explicit output roots.

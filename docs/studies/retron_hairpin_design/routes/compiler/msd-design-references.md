@@ -19,7 +19,7 @@ exit_artifact: msd_design_catalog_v1_or_msd_single_unit_sequence_bundle_v1
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-Use this route when the task starts from a lab-facing construct label and needs
+Use when the task starts from a lab-facing construct label and needs
 a frozen design reference, one MSD sequence unit, Reader joins, or persistent
 design-set provenance.
 

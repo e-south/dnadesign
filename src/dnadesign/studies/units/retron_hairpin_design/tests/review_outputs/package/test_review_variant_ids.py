@@ -18,7 +18,7 @@ import yaml
 
 from dnadesign.studies.units.retron_hairpin_design.compiler.exceptions import RetronMsdCompilerError
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import (
-    generate_teto_pwm_trim_rescue_review_outputs,
+    generate_retron_hairpin_review_outputs,
 )
 
 from ...support.paths import repo_root_from
@@ -36,7 +36,7 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_review_variant_id_drift(tmp_p
     plan_path.write_text(yaml.safe_dump(plan, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(RetronMsdCompilerError, match="must match Benchling assigned_retron_ids"):
-        generate_teto_pwm_trim_rescue_review_outputs(
+        generate_retron_hairpin_review_outputs(
             deliverable_plan_path=plan_path,
             materialized_root=materialized_root,
             out_dir=tmp_path / "outputs",

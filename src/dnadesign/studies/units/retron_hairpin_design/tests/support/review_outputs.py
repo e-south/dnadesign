@@ -17,7 +17,13 @@ from pathlib import Path
 import yaml
 
 
-def write_fake_materialized_bundle(root: Path, *, repo_root: Path, row_count: int = 9) -> Path:
+def write_fake_materialized_bundle(
+    root: Path,
+    *,
+    repo_root: Path,
+    row_count: int | None = None,
+    design_set_id: str = "teto_pwm_trim_rescue_v1",
+) -> Path:
     design_set = yaml.safe_load(
         (
             repo_root
@@ -26,11 +32,12 @@ def write_fake_materialized_bundle(root: Path, *, repo_root: Path, row_count: in
             / "retron_hairpin_design"
             / "workbench"
             / "design_sets"
-            / "teto_pwm_trim_rescue_v1.yaml"
+            / f"{design_set_id}.yaml"
         ).read_text(encoding="utf-8")
     )
     rows = []
-    for idx, design in enumerate(design_set["designs"][:row_count], start=1):
+    designs = design_set["designs"] if row_count is None else design_set["designs"][:row_count]
+    for idx, design in enumerate(designs, start=1):
         variant_dir = root / "variants" / f"{design['construct_id']}__{design['expected_msd_design_id']}"
         sequences_dir = variant_dir / "sequences"
         plots_dir = variant_dir / "plots"
@@ -84,7 +91,7 @@ def fake_video_writer(
     seconds_per_frame: int,
 ) -> None:
     _ = (frames, fps, seconds_per_frame)
-    assert len(still_paths) == 9
+    assert len(still_paths) > 0
     assert all(path.is_file() for path in still_paths)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(b"fake-mp4")
@@ -126,7 +133,7 @@ def _sequence_index_row(
     rel_variant = variant_dir.relative_to(root).as_posix()
     return {
         "construct_id": str(design["construct_id"]),
-        "construct_label": str(design["label"]),
+        "construct_label": str(design.get("label") or design["construct_id"]),
         "msd_design_id": str(design["expected_msd_design_id"]),
         "payload_trim_id": str(design["payload_trim_id"]),
         "payload_trim_class": str(design["payload_trim_id"]).replace("TetR_", ""),

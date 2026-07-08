@@ -10,6 +10,77 @@ msd_sequence_5to3: GTCAGAAAAAAAGTGCTATATCTGATATAGGAGAGACTCCTATATCAGATATAGCATGACA
 rna_sequence_5to3: GUCAGAAAAAAAGUGCUAUAUCUGAUAUAGGAGAGACUCCUAUAUCAGAUAUAGCAUGACAGUAACUCAGA
 annotation_status: mixed_typed_and_label_normalized
 annotation_warnings: []
+annotation_notes: []
+pairing_segments:
+- segment: payload_stem
+  left_role: payload_primary
+  right_role: payload_complement
+  left_sequence_5to3: CTATATCTGATATAG
+  right_sequence_5to3: CTATATCAGATATAG
+  length_bp: 15
+  watson_crick_bp: 15
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+- segment: foldback_stem
+  left_role: snapback_retained_stem
+  right_role: snapback_foldback_return
+  left_sequence_5to3: GAG
+  right_sequence_5to3: CTC
+  length_bp: 3
+  watson_crick_bp: 3
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Foldback stem/return segment between payload stem and snapback cap.
+payload_binding_sites:
+- segment: payload_stem
+  primary_sequence_5to3: CTATATCTGATATAG
+  complement_sequence_5to3: CTATATCAGATATAG
+  payload_length_nt: 15
+  payload_family_id: tetr_pwm_elite
+  parent_payload_id: TetR_w00_19
+  payload_member_id: TetR_w02_17
+  payload_class: catalog_trim_payload
+  retained_parent_span_0:
+    start: 2
+    end: 17
+  motif_alignments:
+  - motif_model_id: tetr_westmann
+    motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    motif_width_nt: 17
+    motif_span_0:
+      start: 2
+      end: 17
+    payload_window_0:
+      start: 0
+      end: 15
+    strand: +
+    sequence_5to3: CTATATCTGATATAG
+    consensus_sequence_5to3: CTATCGCCGATAGAG
+    score_bits: 11.134619
+    consensus_score_bits: 16.084373
+    consensus_score_fraction: 0.692263
+  reference_comparisons:
+  - reference_payload_id: tetO_ecoli_working_w00_19
+    reference_payload_family_id: tetO_ecoli_working
+    reference_span_0:
+      start: 2
+      end: 17
+    query_span_0:
+      start: 2
+      end: 17
+    query_sequence_5to3: CTATATCTGATATAG
+    reference_sequence_5to3: CTATCAGTGATAGAG
+    compared_nt: 15
+    mismatch_count: 4
+    identity_fraction: 0.733333
+    comparison_class: moderate_difference
 features:
 - role: msd_region
   source_role: null

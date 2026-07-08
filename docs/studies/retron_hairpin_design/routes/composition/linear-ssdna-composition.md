@@ -19,7 +19,7 @@ exit_artifact: linear_ssdna_composition_v1_bundle
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-Use this route when the Retron task shifts from solving Snapback or scar-nick
+Use when the Retron task shifts from solving Snapback or scar-nick
 primitives to composing a whole sequence artifact from selected parts.
 
 ### Route Contract

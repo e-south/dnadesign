@@ -19,7 +19,7 @@ exit_artifact: yiu_contrast_render_or_boundary_decision
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-Use this route only when the task needs a contrast surface for boundary
+Use only when the task needs a contrast surface for boundary
 language or a reminder of what YIU does and does not model.
 
 ### Route Contract

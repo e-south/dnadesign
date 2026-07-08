@@ -14,14 +14,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...compiler.exceptions import RetronMsdCompilerError
-from ..contracts.plan import TetoReviewPlan
+from ..contracts.plan import RetronReviewPlan
 from .logo import PwmLogoColumn, PwmLogoLayer, write_pwm_logo_triptych
 from .retention import PwmMotifOccurrence, load_meme_information_bits, load_meme_probability_matrix
 
 UNIFORM_ZERO_INFORMATION_ROW = [0.25, 0.25, 0.25, 0.25]
 
 
-def render_pwm_triptych(plan: TetoReviewPlan, *, out_dir: Path) -> tuple[Path, Path]:
+def render_pwm_triptych(plan: RetronReviewPlan, *, out_dir: Path) -> tuple[Path, Path]:
     matrix = load_meme_probability_matrix(plan.meme_pwm_path)
     motif_bits = load_meme_information_bits(plan.meme_pwm_path)
     for occurrence in plan.motif_occurrences:

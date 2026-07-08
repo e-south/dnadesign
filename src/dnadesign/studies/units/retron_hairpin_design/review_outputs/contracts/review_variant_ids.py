@@ -14,13 +14,10 @@ from __future__ import annotations
 from typing import Mapping
 
 from ...compiler.exceptions import RetronMsdCompilerError
-from .benchling_import import (
-    ASSIGNED_CONSTRUCT_ID_RE,
-    BENCHLING_VARIANT_ID_RE,
-    BenchlingGenbankImportPlan,
-)
+from .benchling_ids import ASSIGNED_CONSTRUCT_ID_RE, BENCHLING_VARIANT_ID_RE
+from .benchling_import import BenchlingGenbankImportPlan
 
-CONSTRUCT_PREFIX = "pES-tetr-"
+CONSTRUCT_PREFIXES = ("pES-tetr-", "pES-teto-")
 
 
 def parse_review_variant_ids(
@@ -73,9 +70,12 @@ def _expected_design_variant_ids(design_set: Mapping[str, object]) -> tuple[str,
 
 def _variant_id_from_design(design: Mapping[str, object]) -> str:
     construct_id = str(design.get("construct_id") or "").strip()
-    if not construct_id.startswith(CONSTRUCT_PREFIX):
-        raise RetronMsdCompilerError(f"Retron design construct_id must start with {CONSTRUCT_PREFIX}: {construct_id}")
-    variant_id = construct_id.removeprefix(CONSTRUCT_PREFIX)
+    prefix = next((candidate for candidate in CONSTRUCT_PREFIXES if construct_id.startswith(candidate)), None)
+    if prefix is None:
+        raise RetronMsdCompilerError(
+            f"Retron design construct_id must start with one of {CONSTRUCT_PREFIXES}: {construct_id}"
+        )
+    variant_id = construct_id.removeprefix(prefix)
     if BENCHLING_VARIANT_ID_RE.match(variant_id) is None:
         raise RetronMsdCompilerError(f"Retron design construct_id does not encode compact review id: {construct_id}")
     return variant_id

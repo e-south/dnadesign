@@ -1,0 +1,118 @@
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+allow_non_ligatable_s0: true
+
+# Literal compiler spec for the tetO payload-prior trim retest.
+# The payload family semantics live in workbench/ontology/payload_binding_sites.yaml;
+# this file is only the compiler-ready sequence materialization surface.
+designs:
+  - construct_id: pES-teto-r26-w02-17
+    payload_id: tetO_ecoli_working_w02_17
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    variant_role: control
+    scaffold_context: retron26
+    payload_trim_id: tetO_ecoli_working_w02_17
+    cap_selector_id: retron26_full_foldback_C26
+    stem_base_selector_id: retron26_CGGG_ACAG_MXMX
+    rt_mode: wt_eco1
+    decision_group: retron26_teto_payload_trim_retest
+    control_id: pES-retron-26
+    rationale: Mild retained-span trim from the tetO payload prior in the retron26 scaffold.
+  - construct_id: pES-teto-r26-w03-16
+    payload_id: tetO_ecoli_working_w03_16
+    cap_id: C26
+    left_base: CGGG
+    right_base: ACAG
+    variant_role: control
+    scaffold_context: retron26
+    payload_trim_id: tetO_ecoli_working_w03_16
+    cap_selector_id: retron26_full_foldback_C26
+    stem_base_selector_id: retron26_CGGG_ACAG_MXMX
+    rt_mode: wt_eco1
+    decision_group: retron26_teto_payload_trim_retest
+    control_id: pES-retron-26
+    rationale: Stronger retained-span trim from the tetO payload prior in the retron26 scaffold.
+  - construct_id: pES-teto-r180-w02-17
+    payload_id: tetO_ecoli_working_w02_17
+    cap_id: C172
+    left_base: AGTG
+    right_base: CATG
+    literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    variant_role: trim_candidate
+    scaffold_context: retron180
+    payload_trim_id: tetO_ecoli_working_w02_17
+    cap_selector_id: de033_snapback_C172_rank_1
+    stem_base_selector_id: retron180_scar_nick_AGTG_CATG_XWMM_bottom_NbBtsI
+    rt_mode: wt_eco1
+    decision_group: retron180_teto_payload_trim_retest
+    control_id: pES-retron-180
+    source_notes: Applies the 15 nt tetO payload-prior trim to the pES-retron-180 C172/AGTG/CATG/XWMM scaffold used by the prior TetR PWM elite trim pilot.
+    rationale: Retests the 199-style scaffold and retained-span logic with the tetO payload prior.
+  - construct_id: pES-teto-r180-w03-16
+    payload_id: tetO_ecoli_working_w03_16
+    cap_id: C172
+    left_base: AGTG
+    right_base: CATG
+    literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
+    nick_orientation: bottom
+    nickase: Nb.BtsI
+    variant_role: trim_candidate
+    scaffold_context: retron180
+    payload_trim_id: tetO_ecoli_working_w03_16
+    cap_selector_id: de033_snapback_C172_rank_1
+    stem_base_selector_id: retron180_scar_nick_AGTG_CATG_XWMM_bottom_NbBtsI
+    rt_mode: wt_eco1
+    decision_group: retron180_teto_payload_trim_retest
+    control_id: pES-retron-180
+    source_notes: Applies the 13 nt tetO payload-prior trim to the pES-retron-180 C172/AGTG/CATG/XWMM scaffold used by the prior TetR PWM elite trim pilot.
+    rationale: Retests the 200-style scaffold and retained-span logic with the tetO payload prior.
+
+payload_sequences:
+  tetO_ecoli_working_w02_17:
+    sequence: CCTATCAGTGATAGA
+    display_name: msd[tetO_working_w02_17]
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_trim_id: tetO_ecoli_working_w02_17
+    trim_class: mild
+    trim_5p_nt: 2
+    trim_3p_nt: 2
+    retained_parent_span_0: {start: 2, end: 17}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    retained_information_fraction: 0.973163
+    selection_basis: retained_span_from_teto_payload_prior
+    protected_positions_or_reason: Applies the previous 15 nt retained-span trim logic to the tetO payload-prior parent.
+  tetO_ecoli_working_w03_16:
+    sequence: CTATCAGTGATAG
+    display_name: msd[tetO_working_w03_16]
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_trim_id: tetO_ecoli_working_w03_16
+    trim_class: stronger
+    trim_5p_nt: 3
+    trim_3p_nt: 3
+    retained_parent_span_0: {start: 3, end: 16}
+    pwm_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    retained_information_fraction: 0.928737
+    selection_basis: retained_span_from_teto_payload_prior
+    protected_positions_or_reason: Applies the previous 13 nt retained-span trim logic to the tetO payload-prior parent.
+
+payload_complement_sequences:
+  tetO_ecoli_working_w02_17:
+    sequence: TCTATCACTGATAGG
+    display_name: msd[tetO_working_w02_17] complement
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_trim_id: tetO_ecoli_working_w02_17
+  tetO_ecoli_working_w03_16:
+    sequence: CTATCACTGATAG
+    display_name: msd[tetO_working_w03_16] complement
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_trim_id: tetO_ecoli_working_w03_16
+
+cap_sequences:
+  C26:
+    sequence: AGGC
+  C172:
+    sequence: GAGAGACTC

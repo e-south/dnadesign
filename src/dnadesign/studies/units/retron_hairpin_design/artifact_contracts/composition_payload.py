@@ -73,8 +73,28 @@ def _msd_unit_segments(
     flank_5p: str,
     flank_3p: str,
     payload_sequence: str,
+    payload_complement_sequence: str | None,
     cap_sequence: str,
 ) -> list[dict[str, object]]:
+    payload_complement_segment: dict[str, object]
+    if payload_complement_sequence is None:
+        payload_complement_segment = {
+            "segment_id": "payload_complement",
+            "role": "payload_complement",
+            "transform": {
+                "kind": "reverse_complement",
+                "source_segment_id": "payload_primary",
+                "assert_expected_sequence": True,
+            },
+            "source": {"kind": "derived", "from_segment_id": "payload_primary"},
+        }
+    else:
+        payload_complement_segment = {
+            "segment_id": "payload_complement",
+            "role": "payload_complement",
+            "sequence": payload_complement_sequence,
+            "source": {"kind": "literal", "label": f"{record.payload_or_target.id} complement override"},
+        }
     return [
         {
             "segment_id": "flank_5p",
@@ -98,16 +118,7 @@ def _msd_unit_segments(
             "sequence": cap_sequence,
             "source": {"kind": "literal", "label": f"{record.cap.id} override"},
         },
-        {
-            "segment_id": "payload_complement",
-            "role": "payload_complement",
-            "transform": {
-                "kind": "reverse_complement",
-                "source_segment_id": "payload_primary",
-                "assert_expected_sequence": True,
-            },
-            "source": {"kind": "derived", "from_segment_id": "payload_primary"},
-        },
+        payload_complement_segment,
         {
             "segment_id": "flank_3p",
             "role": "flank_3p",
@@ -241,6 +252,7 @@ def composition_config_payload(
     artifact_bundle: Path,
     payload_sequence: str,
     cap_sequence: str,
+    payload_complement_sequence: str | None = None,
     flank_5p_prefix: str,
     flank_3p_suffix: str,
     render_formats: Sequence[str],
@@ -272,6 +284,7 @@ def composition_config_payload(
                     flank_5p=flank_5p,
                     flank_3p=flank_3p,
                     payload_sequence=payload_sequence,
+                    payload_complement_sequence=payload_complement_sequence,
                     cap_sequence=cap_sequence,
                 ),
                 "annotations": _msd_unit_annotations(
@@ -280,7 +293,9 @@ def composition_config_payload(
                     right_base=right_base,
                     cap_topology=cap_topology,
                 ),
-                "assertions": [
+                "assertions": []
+                if payload_complement_sequence is not None
+                else [
                     {
                         "assertion_id": "payload_rc",
                         "kind": "reverse_complement",

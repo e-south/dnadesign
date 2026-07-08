@@ -18,7 +18,7 @@ from typing import Mapping
 
 from ...artifact_contracts.layout import MANIFEST_DIRNAME, MANIFEST_INDEXES_DIRNAME, SEQUENCE_INDEX_FILENAME
 from ...compiler.exceptions import RetronMsdCompilerError
-from ..contracts.plan import TetoReviewPlan
+from ..contracts.plan import RetronReviewPlan
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,11 @@ REQUIRED_ROW_ARTIFACT_FIELDS = (
 )
 
 
-def load_validated_sequence_frames(materialized_root: Path, *, plan: TetoReviewPlan) -> tuple[SequenceReviewFrame, ...]:
+def load_validated_sequence_frames(
+    materialized_root: Path,
+    *,
+    plan: RetronReviewPlan,
+) -> tuple[SequenceReviewFrame, ...]:
     root = materialized_root.expanduser().resolve()
     index_path = root / MANIFEST_DIRNAME / MANIFEST_INDEXES_DIRNAME / SEQUENCE_INDEX_FILENAME
     if not index_path.is_file():

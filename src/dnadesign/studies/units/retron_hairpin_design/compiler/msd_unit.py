@@ -61,6 +61,7 @@ def compile_msd_design_unit(
     *,
     payload_sequences: Mapping[str, str],
     cap_sequences: Mapping[str, str],
+    payload_complement_sequences: Mapping[str, str] | None = None,
     flank_5p_prefix: str = DEFAULT_FLANK_5P_PREFIX,
     flank_3p_suffix: str = DEFAULT_FLANK_3P_SUFFIX,
 ) -> MsdCompiledUnitV1:
@@ -78,6 +79,11 @@ def compile_msd_design_unit(
         raise RetronMsdCompilerError(f"cap_sequences is missing required cap id: {cap_id}.")
 
     payload_sequence = _dna(payload_sequences[payload_id], label=f"payload_sequences.{payload_id}")
+    payload_complement_sequence = _payload_complement_sequence(
+        payload_id,
+        payload_sequence=payload_sequence,
+        payload_complement_sequences=payload_complement_sequences or {},
+    )
     cap_sequence = _dna(cap_sequences[cap_id], label=f"cap_sequences.{cap_id}")
     _validate_cap_topology_length(record=record, cap_sequence=cap_sequence)
 
@@ -86,7 +92,7 @@ def compile_msd_design_unit(
         ("stem_base_left", _dna(record.scar_nick.left_base, label="stem_base_left")),
         ("payload_primary", payload_sequence),
         (SNAPBACK_FOLDBACK_SEGMENT_ID, cap_sequence),
-        ("payload_complement", reverse_complement(payload_sequence)),
+        ("payload_complement", payload_complement_sequence),
         ("stem_base_right", _dna(record.scar_nick.right_base, label="stem_base_right")),
         ("flank_3p_suffix", _dna(flank_3p_suffix, label="flank_3p_suffix")),
     )
@@ -104,6 +110,7 @@ def compile_msd_design_unit(
         "construct_label": record.construct_label,
         "msd_design_id": record.msd_design_id,
         "payload_id": payload_id,
+        "payload_complement_source": "explicit" if payload_id in (payload_complement_sequences or {}) else "derived",
         "cap_id": cap_id,
         "cap_source_construct": record.cap.source_construct,
         "snapback_topology_source": topology.source if topology is not None else None,
@@ -126,6 +133,20 @@ def compile_msd_design_unit(
 
 def reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1].upper()
+
+
+def _payload_complement_sequence(
+    payload_id: str,
+    *,
+    payload_sequence: str,
+    payload_complement_sequences: Mapping[str, str],
+) -> str:
+    if payload_id not in payload_complement_sequences:
+        return reverse_complement(payload_sequence)
+    return _dna(
+        payload_complement_sequences[payload_id],
+        label=f"payload_complement_sequences.{payload_id}",
+    )
 
 
 def _dna(value: str, *, label: str) -> str:

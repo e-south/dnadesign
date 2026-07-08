@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ..compiler.exceptions import RetronMsdCompilerError
 from .contracts.manifest import write_review_manifest
-from .contracts.plan import load_teto_review_plan
+from .contracts.plan import load_retron_review_plan
 from .handoff.benchling import write_benchling_genbank_import
 from .handoff.index import write_handoff_index
 from .pwm.triptych import render_pwm_triptych
@@ -27,6 +27,7 @@ from .video.montage import VideoWriter, write_sequence_montage
 
 @dataclass(frozen=True)
 class ReviewOutputResult:
+    deliverable_plan_id: str
     review_root: Path
     pwm_triptych_svg: Path
     pwm_triptych_png: Path
@@ -43,18 +44,20 @@ class ReviewOutputResult:
     reverse_complement_verified_count: int
 
 
-def generate_teto_pwm_trim_rescue_review_outputs(
+def generate_retron_hairpin_review_outputs(
     *,
     deliverable_plan_path: Path,
-    materialized_root: Path,
-    out_dir: Path,
+    materialized_root: Path | None = None,
+    out_dir: Path | None = None,
     repo_root: Path | None = None,
     video_writer: VideoWriter | None = None,
 ) -> ReviewOutputResult:
     resolved_repo_root = repo_root.resolve() if repo_root is not None else _find_repo_root(deliverable_plan_path)
-    plan = load_teto_review_plan(deliverable_plan_path, repo_root=resolved_repo_root)
-    resolved_root = materialized_root.expanduser().resolve()
-    review_root = out_dir.expanduser().resolve()
+    plan = load_retron_review_plan(deliverable_plan_path, repo_root=resolved_repo_root)
+    resolved_root = (
+        materialized_root.expanduser().resolve() if materialized_root is not None else plan.preferred_materialized_root
+    )
+    review_root = out_dir.expanduser().resolve() if out_dir is not None else plan.preferred_generated_root
     frames = load_validated_sequence_frames(resolved_root, plan=plan)
     sequence_evidence = verify_sequence_evidence(frames, materialized_root=resolved_root)
     handoff_index = write_handoff_index(
@@ -93,6 +96,7 @@ def generate_teto_pwm_trim_rescue_review_outputs(
         sequence_evidence=sequence_evidence,
     )
     return ReviewOutputResult(
+        deliverable_plan_id=plan.deliverable_plan_id,
         review_root=review_root,
         pwm_triptych_svg=pwm_svg,
         pwm_triptych_png=pwm_png,
@@ -118,4 +122,7 @@ def _find_repo_root(path: Path) -> Path:
     raise RetronMsdCompilerError(f"Could not resolve repository root from Retron review plan path: {path}")
 
 
-__all__ = ["ReviewOutputResult", "generate_teto_pwm_trim_rescue_review_outputs"]
+__all__ = [
+    "ReviewOutputResult",
+    "generate_retron_hairpin_review_outputs",
+]

@@ -20,7 +20,7 @@ entries:
         path_base: repo
     notes:
       - Use --study-dir only to pin docs/studies/retron_hairpin_design from outside the repo checkout.
-      - Use this route to recover Retron context and intent before opening workspaces or running Cruncher commands.
+      - Recover Retron context and intent before opening workspaces or running Cruncher commands.
   - status_kind: retron-hairpin-design-preflight
     owner_boundary: studies
     observes_plane: execution_readiness
@@ -51,5 +51,5 @@ entries:
         default: next
         choices: [next, full]
     notes:
-      - This route composes read-only command preflights. Use it after the cheaper `studies.retron-hairpin-design.status` snapshot when you need command-level blockers.
+      - Run read-only command preflights after the cheaper `studies.retron-hairpin-design.status` snapshot when command-level blockers matter.
       - Use --study-dir only to pin docs/studies/retron_hairpin_design from outside the repo checkout.

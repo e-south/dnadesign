@@ -21,6 +21,7 @@ def fake_review_output_result(**kwargs: object) -> object:
         pass
 
     result = Result()
+    result.deliverable_plan_id = "teto_pwm_trim_rescue_v1"
     result.review_root = out_dir
     result.pwm_triptych_svg = out_dir / "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.svg"
     result.pwm_triptych_png = out_dir / "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png"
@@ -39,17 +40,23 @@ def fake_review_output_result(**kwargs: object) -> object:
 
 def review_outputs_args(
     study_dir: Path,
-    materialized_root: Path,
     *,
+    deliverable_plan: Path | None = None,
+    materialized_root: Path | None = None,
+    out_dir: Path | None = None,
     output_format: str | None = None,
 ) -> list[str]:
     args = [
         "review-outputs",
         "--study-dir",
         study_dir.as_posix(),
-        "--materialized-root",
-        materialized_root.as_posix(),
     ]
+    if deliverable_plan is not None:
+        args.extend(["--deliverable-plan", deliverable_plan.as_posix()])
+    if materialized_root is not None:
+        args.extend(["--materialized-root", materialized_root.as_posix()])
+    if out_dir is not None:
+        args.extend(["--out-dir", out_dir.as_posix()])
     if output_format is not None:
         args.extend(["--format", output_format])
     return args

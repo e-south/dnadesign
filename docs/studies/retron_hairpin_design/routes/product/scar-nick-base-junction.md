@@ -19,7 +19,7 @@ exit_artifact: scar_nick_stem_base_primitives
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-Use this route when the task is base-junction scar feasibility, B26/B43 profile
+Use when the task is base-junction scar feasibility, B26/B43 profile
 calibration, profile-diverse `S0=M` scar analogs, top-versus-bottom nick
 flexibility, or schema work for the nick-disposal model.
 

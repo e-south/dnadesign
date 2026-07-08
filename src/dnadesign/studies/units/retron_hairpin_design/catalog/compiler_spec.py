@@ -104,6 +104,7 @@ class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
     labels: list[str] = Field(default_factory=list)
     designs: list[MsdDesignInputSpec] = Field(default_factory=list)
     payload_sequences: dict[str, LiteralSequenceInputSpec] = Field(default_factory=dict)
+    payload_complement_sequences: dict[str, LiteralSequenceInputSpec] = Field(default_factory=dict)
     cap_sequences: dict[str, CapSequenceInputSpec] = Field(default_factory=dict)
 
     @field_validator("labels")
@@ -114,7 +115,7 @@ class RetronMsdCompilerSpecV1(MsdCompilerSpecModel):
             raise ValueError("labels must not contain blank entries.")
         return labels
 
-    @field_validator("payload_sequences", mode="before")
+    @field_validator("payload_sequences", "payload_complement_sequences", mode="before")
     @classmethod
     def _coerce_payload_sequence_inputs(cls, value: Any) -> Any:
         if value is None:
@@ -157,6 +158,7 @@ class ResolvedMsdCompilerSpec:
     spec_path: Path
     catalog: MsdDesignCatalogV1
     payload_sequences: dict[str, str]
+    payload_complement_sequences: dict[str, str]
     cap_sequences: dict[str, str]
 
 
@@ -193,6 +195,10 @@ def resolve_msd_compiler_spec_payload(
     payload_sequences, payload_metadata = _resolve_literal_sequence_map(
         spec.payload_sequences,
         label="payload_sequences",
+    )
+    payload_complement_sequences, _ = _resolve_literal_sequence_map(
+        spec.payload_complement_sequences,
+        label="payload_complement_sequences",
     )
     records: list[MsdDesignReferenceV1] = []
     allow_s0_exception = allow_non_ligatable_s0 or spec.allow_non_ligatable_s0
@@ -235,6 +241,7 @@ def resolve_msd_compiler_spec_payload(
         spec_path=resolved_spec_path,
         catalog=MsdDesignCatalogV1(records=records),
         payload_sequences=payload_sequences,
+        payload_complement_sequences=payload_complement_sequences,
         cap_sequences=cap_sequences,
     )
 

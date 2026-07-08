@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from ...compiler.exceptions import RetronMsdCompilerError
 from .index import SequenceReviewFrame
 
-CONSTRUCT_PREFIX = "pES-tetr-"
-PAYLOAD_WINDOW_RE = re.compile(r"^TetR_w(?P<start>\d{2})_(?P<end>\d{2})$")
+CONSTRUCT_PREFIXES = ("pES-tetr-", "pES-teto-")
+PAYLOAD_WINDOW_RE = re.compile(r"(?:^|_)w(?P<start>\d{2})_(?P<end>\d{2})$")
 
 
 @dataclass(frozen=True)
@@ -46,17 +46,18 @@ def identity_for_frame(frame: SequenceReviewFrame) -> ReviewVariantIdentity:
 
 
 def variant_id(frame: SequenceReviewFrame) -> str:
-    if frame.construct_id.startswith(CONSTRUCT_PREFIX):
-        return frame.construct_id.removeprefix(CONSTRUCT_PREFIX)
+    for prefix in CONSTRUCT_PREFIXES:
+        if frame.construct_id.startswith(prefix):
+            return frame.construct_id.removeprefix(prefix)
     start, end = payload_window(frame.payload_trim_id)
     return f"{scaffold_label(frame.scaffold_context)}-w{start:02d}-{end:02d}"
 
 
 def payload_window(payload_trim_id: str) -> tuple[int, int]:
-    match = PAYLOAD_WINDOW_RE.match(payload_trim_id)
+    match = PAYLOAD_WINDOW_RE.search(payload_trim_id)
     if match is None:
         raise RetronMsdCompilerError(
-            f"Retron review payload_trim_id must use TetR_w00_19-style window form: {payload_trim_id}"
+            f"Retron review payload_trim_id must end with a retained-window token like _w02_17: {payload_trim_id}"
         )
     return int(match.group("start")), int(match.group("end"))
 

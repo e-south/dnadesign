@@ -10,6 +10,77 @@ msd_sequence_5to3: GTCAGAAAAAACAAGTATATCTGATATATCCTCAGCCCGCTGAGGATATATCAGATATACT
 rna_sequence_5to3: GUCAGAAAAAACAAGUAUAUCUGAUAUAUCCUCAGCCCGCUGAGGAUAUAUCAGAUAUACUCGACAGUAACUCAGA
 annotation_status: mixed_typed_and_label_normalized
 annotation_warnings: []
+annotation_notes: []
+pairing_segments:
+- segment: payload_stem
+  left_role: payload_primary
+  right_role: payload_complement
+  left_sequence_5to3: TATATCTGATATA
+  right_sequence_5to3: TATATCAGATATA
+  length_bp: 13
+  watson_crick_bp: 13
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+- segment: foldback_stem
+  left_role: snapback_retained_stem
+  right_role: snapback_foldback_return
+  left_sequence_5to3: TCCTCAG
+  right_sequence_5to3: CTGAGGA
+  length_bp: 7
+  watson_crick_bp: 7
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Foldback stem/return segment between payload stem and snapback cap.
+payload_binding_sites:
+- segment: payload_stem
+  primary_sequence_5to3: TATATCTGATATA
+  complement_sequence_5to3: TATATCAGATATA
+  payload_length_nt: 13
+  payload_family_id: tetr_pwm_elite
+  parent_payload_id: TetR_w00_19
+  payload_member_id: TetR_w03_16
+  payload_class: catalog_trim_payload
+  retained_parent_span_0:
+    start: 3
+    end: 16
+  motif_alignments:
+  - motif_model_id: tetr_westmann
+    motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    motif_width_nt: 17
+    motif_span_0:
+      start: 3
+      end: 16
+    payload_window_0:
+      start: 0
+      end: 13
+    strand: +
+    sequence_5to3: TATATCTGATATA
+    consensus_sequence_5to3: TATCGCCGATAGA
+    score_bits: 9.481631
+    consensus_score_bits: 14.431385
+    consensus_score_fraction: 0.657015
+  reference_comparisons:
+  - reference_payload_id: tetO_ecoli_working_w00_19
+    reference_payload_family_id: tetO_ecoli_working
+    reference_span_0:
+      start: 3
+      end: 16
+    query_span_0:
+      start: 3
+      end: 16
+    query_sequence_5to3: TATATCTGATATA
+    reference_sequence_5to3: TATCAGTGATAGA
+    compared_nt: 13
+    mismatch_count: 4
+    identity_fraction: 0.692308
+    comparison_class: moderate_difference
 features:
 - role: msd_region
   source_role: null
@@ -60,12 +131,12 @@ features:
   label: Foldback return
   feature_type: misc_feature
   source_start_0: 30
-  source_end_0: 38
+  source_end_0: 37
   source_strand: 1
-  display_start_0: 38
+  display_start_0: 39
   display_end_0: 46
   display_strand: -1
-  sequence_5to3: GCTGAGGA
+  sequence_5to3: CTGAGGA
 - role: snapback_foldback_geometry
   source_role: snapback_foldback_geometry
   label: Foldback
@@ -78,16 +149,16 @@ features:
   display_strand: -1
   sequence_5to3: TCCTCAGCCCGCTGAGGA
 - role: snapback_cap
-  source_role: snapback_cap
+  source_role: null
   label: Cap
   feature_type: misc_feature
-  source_start_0: 38
+  source_start_0: 37
   source_end_0: 41
   source_strand: 1
   display_start_0: 35
-  display_end_0: 38
+  display_end_0: 39
   display_strand: -1
-  sequence_5to3: CCC
+  sequence_5to3: CCCG
 - role: snapback_retained_stem
   source_role: snapback_retained_stem
   label: Foldback stem

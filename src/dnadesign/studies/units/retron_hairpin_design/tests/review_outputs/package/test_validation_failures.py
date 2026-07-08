@@ -18,7 +18,7 @@ import pytest
 
 from dnadesign.studies.units.retron_hairpin_design.compiler.exceptions import RetronMsdCompilerError
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import (
-    generate_teto_pwm_trim_rescue_review_outputs,
+    generate_retron_hairpin_review_outputs,
 )
 
 from ...support.paths import repo_root_from
@@ -81,7 +81,7 @@ def test_teto_pwm_trim_review_outputs_fail_fast_on_unexpected_benchling_trim_ord
 
 def _generate(*, repo_root: Path, materialized_root: Path, tmp_path: Path) -> None:
     deliverable_plan_path = write_review_plan_with_test_pwm(tmp_path / "plan", repo_root=repo_root)
-    generate_teto_pwm_trim_rescue_review_outputs(
+    generate_retron_hairpin_review_outputs(
         deliverable_plan_path=deliverable_plan_path,
         materialized_root=materialized_root,
         out_dir=tmp_path / "outputs",

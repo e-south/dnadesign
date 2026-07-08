@@ -21,7 +21,7 @@ from dnadesign.studies.units.retron_hairpin_design.review_outputs.handoff.contra
     SEQUENCE_HANDOFF_COLUMNS,
 )
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import (
-    generate_teto_pwm_trim_rescue_review_outputs,
+    generate_retron_hairpin_review_outputs,
 )
 
 from ...support.paths import repo_root_from
@@ -36,7 +36,7 @@ def test_teto_pwm_trim_review_outputs_generate_review_package(tmp_path: Path) ->
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
     out_dir = tmp_path / "workbench" / "outputs" / "teto_pwm_trim_rescue_v1"
 
-    result = generate_teto_pwm_trim_rescue_review_outputs(
+    result = generate_retron_hairpin_review_outputs(
         deliverable_plan_path=deliverable_plan_path,
         materialized_root=materialized_root,
         out_dir=out_dir,

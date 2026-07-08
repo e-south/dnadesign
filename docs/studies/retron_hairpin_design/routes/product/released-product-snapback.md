@@ -19,7 +19,7 @@ exit_artifact: snapback_released_product_primitives
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-05-18
 
-Use this route when the task is actual shortening construction or evaluation.
+Use when the task is actual shortening construction or evaluation.
 This is the cap/shortening primitive owner, not the Retron MSD compiler.
 
 ### Route Contract

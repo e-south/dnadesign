@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.24
+  version: 0.7.27
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -14,6 +14,7 @@ In scope:
 - Retron MSD shorthand IDs and explicit part sets.
 - Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal payloads or trim metadata, and selected public cap/stem-base primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
+- Reader SPOP MSD-region source ingest from one-variant GenBank files, plus decomposed primitive and pairing records under workbench provenance.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
@@ -32,24 +33,19 @@ Out of scope:
 - Compiler specs are parsed at the boundary, then compile from trusted part structures.
 - Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
 - Solved cap and stem-base primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
-- Sequence artifact output is one MSD unit per design: 5' flank + left base,
-  payload primary, user-selected cap/foldback segment, payload complement,
-  right base + 3' flank. Snapback subsection annotations are emitted only when
-  topology is supplied.
+- Sequence artifact output is one MSD unit per design: 5' flank + left base, payload primary, user-selected cap/foldback segment, payload complement, right base + 3' flank. Snapback subsection annotations are emitted only when topology is supplied.
 - Materialized variant directories use `<construct-id>__<msd-design-id>`, for example `pES-retron-177__msd-tetr-C172-LCGGG-RACAG-MXMX`.
-- Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or
-  "open in Finder" must run `materialize`; a reference catalog is not enough.
-- Materialized plot deliverables require ViennaRNA status `ok`; publish
-  `secondary_structure.native.png`, two-row `composition_overview.svg`, and
-  high-resolution `composition_overview.png`, not legacy composites.
-- tetO trim review packages run after materialization with `review-outputs`;
-  consume `sequence_index.tsv` and emit `reviews/pwm/`, 1920 x 1080 px pES-retron-titled stills, a 1920 x 1080 px montage MP4, `reviews/review_manifest.json`, and a flat six-file plan-owned `benchling_genbank/` import folder.
+- Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or "open in Finder" must run `materialize`; a reference catalog is not enough.
+- Materialized plot deliverables require ViennaRNA status `ok`; publish `secondary_structure.native.png`, two-row `composition_overview.svg`, and high-resolution `composition_overview.png`, not legacy composites.
+- Retron review packages run after materialization with `review-outputs` and an
+  explicit deliverable plan. The plan owns row counts, assigned pES-retron IDs,
+  PWM panel files, montage files, review manifest, and flat
+  `benchling_genbank/` import contents.
 - Secondary-structure subtitles must include the scar-nick mismatch profile
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
 - GenBank/CSV output uses display labels, keeps raw ids in machine qualifiers, and avoids duplicate full component spans as same-span annotations.
-- Persistent hypotheses/design-set meaning lives in `workbench/`; generated
-  outputs go to explicit transient or caller-owned directories.
+- Persistent hypotheses/design-set meaning lives in `workbench/`; generated outputs go to explicit transient or caller-owned directories.
 - Default `S0=M` is required. Profile drift, non-ligatable S0 labels without explicit control opt-in, unknown registry parts, and missing artifacts fail fast. Deliberate controls require `--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true`, and emitted references must carry `scar_nick.s0_match_required=false`.
 - Status/preflight commands are optional progress tools, not default answer posture.
 ## Workflow
@@ -57,9 +53,9 @@ Out of scope:
 - Complete MSD label or complete parts: use [msd-design-references.md](references/msd-design-references.md).
 - Complete MSD labels plus "outputs", "deliverables", "exports", "plots",
   "GenBank", or "open in Finder": materialize, not compile-only.
-- Existing tetO trim materialized bundle plus PWM panel, sequence montage,
-  review manifest, or review package request: run `review-outputs`, preferably
-  under `workbench/outputs/teto_pwm_trim_rescue_v1/`.
+- Existing materialized bundle plus PWM panel, sequence montage, review
+  manifest, or review package request: open `workbench/deliverables/`, then run
+  `review-outputs --deliverable-plan <plan.yaml>`.
 - Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
   and use `selector.mode=rank` for the preferred explicit primitive
   combination.
@@ -69,10 +65,9 @@ Out of scope:
   payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
 - Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
-- Missing cap, shortening, or stem/cap geometry: route to Snapback in
-  `docs/studies/retron_hairpin_design/routes/README.md`.
-- Missing left/right base feasibility, terminal-nick route, nickase, or
-  `S3/S2/S1/S0` profile: route to scar-nick.
+- Need Reader SPOP MSD source primitives, stem lengths, or pairing status: open `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`. Active GenBank sources are one file per variant under `source_inputs/variants/`; retired bulk source metadata is provenance only.
+- Missing cap, shortening, or stem/cap geometry: route to Snapback in `docs/studies/retron_hairpin_design/routes/README.md`.
+- Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile: route to scar-nick.
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
   topology engine.
 - Progress or blocker question: only then use
@@ -90,18 +85,12 @@ Out of scope:
 
 3. Execute or report the route.
 - For complete reference inputs, run `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint|compile`.
-- For GenBank/structure-review output, run the same module's `materialize` command with
-  `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
-- If the user asked to open outputs in Finder, do not stop after `compile`;
-  after `materialize`, open the root and verify `manifest/indexes/sequence_index.tsv`,
-  per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`,
-  `composition_overview.svg`, `composition_overview.png`, and a
-  secondary-structure subtitle containing the mismatch profile.
-- For tetO trim review packages, run `review-outputs` only after materialize has
-  produced the nine-row `sequence_index.tsv`; verify the logo-style PWM
-  triptych, nine pES-retron-named stills, montage MP4/manifest, review manifest,
-  six reverse-complement Benchling GenBanks, and reverse-complement/folding
-  evidence.
+- For GenBank/structure-review output, run the same module's `materialize` command with `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
+- If the user asked to open outputs in Finder, do not stop after `compile`; after `materialize`, open the root and verify `manifest/indexes/sequence_index.tsv`, per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`, `composition_overview.svg`, `composition_overview.png`, and a secondary-structure subtitle containing the mismatch profile.
+- For review packages, run `review-outputs` only after materialize has produced
+  the deliverable plan's expected `sequence_index.tsv`; verify the PWM
+  triptych, pES-retron stills, montage MP4/manifest, review manifest,
+  Benchling GenBank imports, and reverse-complement/folding evidence.
 - If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
   spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
@@ -133,6 +122,11 @@ Out of scope:
 - Folding has no workspace; it consumes producer bundles or explicit files.
 - BaseRender renders visual contracts; it does not run ViennaRNA.
 - Reader consumes frozen design catalogs, not live dnadesign workspaces.
+- Reader SPOP structure-panel source ingest must use per-variant GenBank files
+  or the materialized provenance records. Steady-state commands must not read
+  retired bulk source files.
+- Narrow foldback spans and explicit complement arms are annotation notes unless
+  they create unbalanced or unresolved pairing segments.
 - Do not say "snapshot posture" or lead with current phase unless the user
   asked for progress/status.
 
@@ -143,9 +137,10 @@ Out of scope:
 - Output directory/contract posture.
 - Deliverable verification for materialize requests: record count, bundle root,
   GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
-- Deliverable verification for tetO `review-outputs`: PWM triptych, semantic
-  pES-retron-named stills, montage MP4/manifest, review manifest, nine sequence rows, nine
-  verified sequence handoff rows, and six Benchling import GenBank files.
+- Deliverable verification for `review-outputs`: PWM triptych, semantic
+  pES-retron-named stills, montage MP4/manifest, review manifest, expected
+  sequence rows, verified sequence handoff rows, and expected Benchling import
+  GenBank files from the deliverable plan.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.

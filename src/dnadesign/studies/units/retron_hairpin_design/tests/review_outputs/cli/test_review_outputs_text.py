@@ -29,15 +29,25 @@ def test_review_outputs_cli_text_reports_sequence_handoff(
 ) -> None:
     repo_root = repo_root_from(__file__)
     study_dir = repo_root / "docs" / "studies" / "retron_hairpin_design"
+    deliverable_plan = study_dir / "workbench" / "deliverables" / "teto_pwm_trim_rescue_v1.yaml"
     materialized_root = tmp_path / "materialized"
+    out_dir = tmp_path / "review-outputs"
 
     monkeypatch.setattr(
         cli_review_outputs_module,
-        "generate_teto_pwm_trim_rescue_review_outputs",
+        "generate_retron_hairpin_review_outputs",
         fake_review_output_result,
     )
 
-    result = RUNNER.invoke(app, review_outputs_args(study_dir, materialized_root))
+    result = RUNNER.invoke(
+        app,
+        review_outputs_args(
+            study_dir,
+            deliverable_plan=deliverable_plan,
+            materialized_root=materialized_root,
+            out_dir=out_dir,
+        ),
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "handoff_tsv:" in result.stdout

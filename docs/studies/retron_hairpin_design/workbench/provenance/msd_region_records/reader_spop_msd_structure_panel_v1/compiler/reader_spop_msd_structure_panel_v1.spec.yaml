@@ -257,181 +257,198 @@ designs:
 payload_sequences:
   MSDRegion26_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-26 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-26 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion43_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-43 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-43 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion45_payload:
-    sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-45 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    sequence: TTTCCAAGTCCCTATCAGTGATAGAGA
+    display_name: pES-retron-45 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion46_payload:
-    sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-46 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    sequence: TTTCAGATCAAGTCCCTATCAGTGATAGAGA
+    display_name: pES-retron-46 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion47_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-47 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-47 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion48_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-48 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-48 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion49_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-49 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-49 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion50_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-50 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-50 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion51_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-51 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-51 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion52_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-52 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-52 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion53_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-53 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-53 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion54_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-54 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-54 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion55_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-55 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-55 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion56_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-56 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-56 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion170_payload:
     sequence: TCCCTATTAGTGATAGAGA
-    display_name: pES-retron-170 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-170 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion171_payload:
     sequence: CTCTATATTTGATATAGAG
-    display_name: pES-retron-171 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-171 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion172_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-172 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-172 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion173_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-173 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-173 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion174_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-174 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-174 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion175_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-175 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-175 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion177_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-177 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-177 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion178_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-178 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-178 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion179_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-179 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-179 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion180_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-180 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-180 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion181_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-181 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-181 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion182_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-182 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-182 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion183_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-183 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-183 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion184_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-184 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-184 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion185_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-185 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-185 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion186_payload:
     sequence: TCCCTATCAGTGATAGAGA
-    display_name: pES-retron-186 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-186 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion195_payload:
     sequence: CTATATCTGATATAG
-    display_name: pES-retron-195 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-195 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion196_payload:
     sequence: TATATCTGATATA
-    display_name: pES-retron-196 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-196 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion197_payload:
     sequence: CTATATCTGATATAG
-    display_name: pES-retron-197 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-197 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion198_payload:
     sequence: TATATCTGATATA
-    display_name: pES-retron-198 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-198 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion199_payload:
     sequence: CTATATCTGATATAG
-    display_name: pES-retron-199 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-199 source primary arm
+    selection_basis: msd_region_canonical_interval
   MSDRegion200_payload:
     sequence: TATATCTGATATA
-    display_name: pES-retron-200 payload_primary
-    selection_basis: msd_region_genbank_annotation
+    display_name: pES-retron-200 source primary arm
+    selection_basis: msd_region_canonical_interval
+payload_complement_sequences:
+  MSDRegion45_payload:
+    sequence: TCTCTATCACTGATAGGGACTCGGAAA
+    display_name: pES-retron-45 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion46_payload:
+    sequence: TCTCTATCACTGATAGGGACTCGAGATGAAA
+    display_name: pES-retron-46 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion170_payload:
+    sequence: TCTCTATCGCTGATAGGGA
+    display_name: pES-retron-170 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion171_payload:
+    sequence: CTCTATATTAGATATAGAG
+    display_name: pES-retron-171 source complement arm
+    selection_basis: msd_region_canonical_interval
 cap_sequences:
   C26_msd_region:
     sequence: AGGC
   C43_msd_region:
     sequence: TCCTCAGCCCGCTGAGGA
   C45_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C46_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C47_msd_region:
     sequence: AGGC
   C48_msd_region:
     sequence: AGGC
   C49_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C50_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C51_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C52_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C53_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C54_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C55_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C56_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C170_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C171_msd_region:
-    sequence: CCTCAGCCCGCTGAGG
+    sequence: TCCTCAGCCCGCTGAGGA
   C172_msd_region:
     sequence: GAGAGACTC
   C173_msd_region:

@@ -11,6 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from .service import ReviewOutputResult, generate_teto_pwm_trim_rescue_review_outputs
+from .service import (
+    ReviewOutputResult,
+    generate_retron_hairpin_review_outputs,
+)
 
-__all__ = ["ReviewOutputResult", "generate_teto_pwm_trim_rescue_review_outputs"]
+__all__ = [
+    "ReviewOutputResult",
+    "generate_retron_hairpin_review_outputs",
+]

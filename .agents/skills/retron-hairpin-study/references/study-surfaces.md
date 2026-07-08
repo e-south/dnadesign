@@ -25,18 +25,31 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`:
   authoritative cargo-shortening cohort for retron26 control, retron43 target,
   and the pES-retron-180 C172/AGTG/CATG/XWMM context
+- `docs/studies/retron_hairpin_design/workbench/design_sets/teto_payload_trim_retest_v1.yaml`:
+  tetO payload-prior retest cohort for pES-retron-201 through pES-retron-204;
+  it keeps the 15 nt and 13 nt retained-span extents from the 195-200 pilot
+  while changing the payload prior
 - `docs/studies/retron_hairpin_design/workbench/deliverables/`: persistent
   review and handoff deliverable contracts for study hypotheses
 - `docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml`:
   tetO trim deliverable plan for PWM triptych, nine sequence review stills,
   sequence montage video, review manifest, nine-row GenBank sequence handoff,
   six-file Benchling import folder, and future Reader outcome overlay routing
+- `docs/studies/retron_hairpin_design/workbench/deliverables/teto_payload_trim_retest_v1.yaml`:
+  tetO payload-prior retest deliverable plan for pES-retron-201 through
+  pES-retron-204, with plan-owned PWM review, sequence montage, handoff, and
+  four-file Benchling import expectations
 - `docs/studies/retron_hairpin_design/workbench/outputs/`: ignored generated
   output roots for local materialized bundles and review packages; preferred
   tetO trim root is `workbench/outputs/teto_pwm_trim_rescue_v1/`
 - `docs/studies/retron_hairpin_design/workbench/provenance/`: compiler-run and
   materialization records that cite workbench design sets without storing bulky
   generated artifacts
+- `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`:
+  active Reader SPOP MSD-region source records, with one-variant GenBank inputs
+  under `source_inputs/variants/`, a `variant_sources.yaml` source manifest,
+  decomposed variant YAML records, and pairing-segment facts. Retired bulk
+  source metadata is provenance only.
 - `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`: the
   base-junction context for B26/B43 profile logic, strict terminal nick policy,
   retained scar families, and scar-nick schema implications
@@ -58,6 +71,9 @@ base-junction scar-nick work.
   nine-design tetO PWM trim compiler spec with literal payload
   sequences, payload-trim metadata, WT Eco1-only variant metadata, and explicit
   cap/stem-base choices
+- `docs/studies/retron_hairpin_design/compiler/inputs/teto_payload_trim_retest_v1.spec.yaml`:
+  four-design tetO payload-prior retest compiler spec for pES-retron-201
+  through pES-retron-204 handoff generation
 - `docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml`: the exact command
   groups and automation bootstrap support when machine-readable detail is the
   real need
@@ -108,7 +124,7 @@ base-junction scar-nick work.
   typed compiler-spec support models for primitive selectors and optional
   payload-trim/variant-role metadata.
 - `src/dnadesign/studies/units/retron_hairpin_design/review_outputs/` owns the
-  tetO trim `review-outputs` service: deliverable-plan loading, materialized
+  plan-driven `review-outputs` service: deliverable-plan loading, materialized
   sequence-index validation, PWM logo triptych rendering, sequence evidence
   checks, semantic still rendering, sequence montage rendering, and
   `reviews/review_manifest.json`.
@@ -147,7 +163,19 @@ base-junction scar-nick work.
   output-bundle layout.
 - `src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/app.py` is the thin Typer
   command service for `msd_design_reference_v1` / `msd_design_catalog_v1`
-  records plus the `materialize` and `review-outputs` routes.
+  records plus the `materialize`, `review-outputs`, and MSD-region source-ingest routes.
+- `src/dnadesign/studies/units/retron_hairpin_design/source_ingest/` owns
+  GenBank source normalization, per-variant source-dir ingest, annotation notes,
+  review warnings, derived pairing segments, payload-binding-site semantics, and
+  bundle writing for MSD-region records. Start at `msd_region_genbank.py` for
+  the public API, then route by concern: `genbank_bundle.py` parses GenBank
+  inputs, `variant_sources.py` owns per-variant source manifests,
+  `record_normalization.py` assembles normalized records, `annotation_review.py`
+  owns benign boundary notes, `pairing_segments.py` derives stem/payload pairing
+  facts, `source_ingest/payload_catalog.py`,
+  `source_ingest/payload_motifs.py`, and `source_ingest/payload_sites.py` own
+  binding-site ontology, `comparison.py` compares older materialized outputs,
+  and `bundle_writer.py` writes generated record bundles.
 - `src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/review_outputs.py`
   owns the focused Typer command handler for review package generation.
 - `dnadesign.cruncher.snapback` and `dnadesign.cruncher.scar_nick` expose the
@@ -169,9 +197,9 @@ hypotheses/effects, open `workbench/README.md` and the relevant design set.
 When the next question asks where PWM plots, sequence stills, videos, GenBank
 exports, or future outcome overlays belong for a hypothesis, open
 `workbench/deliverables/README.md` and the relevant deliverable plan.
-When the materialized tetO trim bundle already exists and the next question is
-to generate the visual review package, run `review-outputs` into
-`workbench/outputs/teto_pwm_trim_rescue_v1/`.
+When a materialized review bundle already exists and the next question is to
+generate the visual review package, open `workbench/deliverables/` and run
+`review-outputs --deliverable-plan <plan.yaml>`.
 When the next question needs machine-readable command groups or bootstrap
 metadata, open `operations/runtime/command-groups/pipeline.yaml`.
 When the next question needs harness or contract hardening, leave the study

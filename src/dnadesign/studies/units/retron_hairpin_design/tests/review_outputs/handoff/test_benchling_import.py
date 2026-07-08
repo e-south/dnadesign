@@ -18,7 +18,7 @@ import yaml
 
 from dnadesign.studies.units.retron_hairpin_design.compiler.exceptions import RetronMsdCompilerError
 from dnadesign.studies.units.retron_hairpin_design.review_outputs.service import (
-    generate_teto_pwm_trim_rescue_review_outputs,
+    generate_retron_hairpin_review_outputs,
 )
 
 from ...support.paths import repo_root_from
@@ -38,7 +38,7 @@ def test_benchling_import_uses_deliverable_plan_assigned_ids(tmp_path: Path) -> 
     _write_plan(plan_path, plan)
 
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
-    result = generate_teto_pwm_trim_rescue_review_outputs(
+    result = generate_retron_hairpin_review_outputs(
         deliverable_plan_path=plan_path,
         materialized_root=materialized_root,
         out_dir=tmp_path / "outputs",
@@ -61,7 +61,7 @@ def test_benchling_import_fails_on_expected_file_drift(tmp_path: Path) -> None:
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
 
     with pytest.raises(RetronMsdCompilerError, match="expected_files must match assigned_retron_ids"):
-        generate_teto_pwm_trim_rescue_review_outputs(
+        generate_retron_hairpin_review_outputs(
             deliverable_plan_path=plan_path,
             materialized_root=materialized_root,
             out_dir=tmp_path / "outputs",
@@ -80,7 +80,7 @@ def test_benchling_import_fails_on_source_precedent_drift(tmp_path: Path) -> Non
     materialized_root = write_fake_materialized_bundle(tmp_path / "materialized", repo_root=repo_root)
 
     with pytest.raises(RetronMsdCompilerError, match="source_precedent_ids must match assigned_retron_ids"):
-        generate_teto_pwm_trim_rescue_review_outputs(
+        generate_retron_hairpin_review_outputs(
             deliverable_plan_path=plan_path,
             materialized_root=materialized_root,
             out_dir=tmp_path / "outputs",

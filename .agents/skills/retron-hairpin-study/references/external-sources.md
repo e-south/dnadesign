@@ -1,9 +1,8 @@
 # External Sources
 
-This skill is primarily grounded in repo-local study and Cruncher surfaces.
-Vendor pages are used only to ground canonical enzyme orientation in study
-reference notes. OpenAI Developers guidance is used only for agent-facing
-prompt-surface pressure tests.
+Primary evidence comes from repo-local study and Cruncher surfaces. Vendor
+pages ground canonical enzyme orientation in study reference notes.
+OpenAI Developers guidance supports agent-facing prompt-surface pressure tests.
 
 | Source | Retrieved | Mapped update |
 | --- | --- | --- |

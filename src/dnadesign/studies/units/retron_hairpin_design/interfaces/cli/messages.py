@@ -17,6 +17,11 @@ from typing import Any
 
 def next_step_for_error(exc: Exception) -> str:
     message = str(exc)
+    if "Provide --deliverable-plan" in message:
+        return (
+            "Run review-outputs with an explicit workbench/deliverables/*.yaml plan; the plan owns the materialized "
+            "root and review-output root when those options are omitted."
+        )
     if "provided profile" in message:
         return "Correct the declared -MWX profile or omit it so the compiler derives S3/S2/S1/S0 from the bases."
     if "S0" in message:
@@ -89,8 +94,8 @@ def next_step_for_error(exc: Exception) -> str:
         )
     if "Retron review" in message or "review output" in message or "sequence_index.tsv" in message:
         return (
-            "Rerun materialize into workbench/outputs/teto_pwm_trim_rescue_v1/materialized, then run "
-            "review-outputs with that materialized root and a workbench/outputs review root."
+            "Rerun materialize into the deliverable plan's materialized root, then run review-outputs with "
+            "--deliverable-plan, that materialized root, and the plan-owned review root."
         )
     return "Run lint on one complete MSD label first; route missing biological constraints before generating a catalog."
 
@@ -134,11 +139,11 @@ def materialize_next_step(out_dir: Path, *, warnings: list[str]) -> str:
     )
 
 
-def review_outputs_next_step(out_dir: Path) -> str:
+def review_outputs_next_step(out_dir: Path, *, deliverable_plan_id: str) -> str:
     return (
-        "Retron tetO trim review outputs emitted; inspect reviews/review_manifest.json, "
-        "reviews/pwm/teto_pwm_trim_rescue_v1.pwm_trim_triptych.png, and "
-        "reviews/video/teto_pwm_trim_rescue_v1.sequence_montage.mp4. "
+        "Retron hairpin review outputs emitted; inspect reviews/review_manifest.json, "
+        f"reviews/pwm/{deliverable_plan_id}.pwm_trim_triptych.png, and "
+        f"reviews/video/{deliverable_plan_id}.sequence_montage.mp4. "
         f"Benchling import GenBanks are in {out_dir.as_posix()}/benchling_genbank."
     )
 

@@ -76,6 +76,7 @@ def write_benchling_genbank_import(
             source=source,
             target=target,
             assigned_construct_id=assigned_construct_id,
+            payload_label=benchling_plan.filename_payload_label,
             variant_id=identity.variant_id,
             source_precedent_id=benchling_plan.source_precedent_id(identity.variant_id),
             source_construct_id=frame.construct_id,
@@ -102,6 +103,7 @@ def _write_relabelled_genbank(
     source: Path,
     target: Path,
     assigned_construct_id: str,
+    payload_label: str,
     variant_id: str,
     source_precedent_id: str,
     source_construct_id: str,
@@ -115,7 +117,7 @@ def _write_relabelled_genbank(
     except StopIteration as exc:
         raise RetronMsdCompilerError(f"Retron Benchling GenBank source has no FEATURES section: {source}") from exc
     definition = (
-        f"{assigned_construct_id}-msd[TetR]; {variant_id}; derived from "
+        f"{assigned_construct_id}-msd[{payload_label}]; {variant_id}; derived from "
         f"{source_precedent_id}; reverse-complement MSD handoff from {source_construct_id}."
     )
     header = [

@@ -10,6 +10,91 @@ msd_sequence_5to3: GTCAGAAAAAACAAGTCCCTATCAGTGATAGAGATCCTCAGCCCGCTGAGGATCTCTATCA
 rna_sequence_5to3: GUCAGAAAAAACAAGUCCCUAUCAGUGAUAGAGAUCCUCAGCCCGCUGAGGAUCUCUAUCACUGAUAGGGACUCGACAGUAACUCAGA
 annotation_status: label_only_normalized
 annotation_warnings: []
+annotation_notes:
+- kind: foldback_feature_boundary_granularity
+  role: snapback_foldback_geometry
+  label: Foldback
+  source_span_0:
+  - 37
+  - 53
+  display_span_0:
+  - 35
+  - 51
+  annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+  compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+  severity: info
+  note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+    geometry uses the full interval between payload_primary and payload_complement.
+pairing_segments:
+- segment: payload_stem
+  left_role: payload_primary
+  right_role: payload_complement
+  left_sequence_5to3: TCCCTATCAGTGATAGAGA
+  right_sequence_5to3: TCTCTATCACTGATAGGGA
+  length_bp: 19
+  watson_crick_bp: 19
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+- segment: foldback_stem
+  left_role: snapback_retained_stem
+  right_role: snapback_foldback_return
+  left_sequence_5to3: TCCTCAG
+  right_sequence_5to3: CTGAGGA
+  length_bp: 7
+  watson_crick_bp: 7
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Foldback stem/return segment between payload stem and snapback cap.
+payload_binding_sites:
+- segment: payload_stem
+  primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+  complement_sequence_5to3: TCTCTATCACTGATAGGGA
+  payload_length_nt: 19
+  payload_family_id: tetO_ecoli_working
+  parent_payload_id: tetO_ecoli_working_w00_19
+  payload_member_id: tetO_ecoli_working_w00_19
+  payload_class: catalog_parent_payload
+  retained_parent_span_0:
+    start: 0
+    end: 19
+  motif_alignments:
+  - motif_model_id: tetr_westmann
+    motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    motif_width_nt: 17
+    motif_span_0:
+      start: 0
+      end: 17
+    payload_window_0:
+      start: 1
+      end: 18
+    strand: +
+    sequence_5to3: CCCTATCAGTGATAGAG
+    consensus_sequence_5to3: CTCTATCGCCGATAGAG
+    score_bits: 16.70845
+    consensus_score_bits: 17.22639
+    consensus_score_fraction: 0.969933
+  reference_comparisons:
+  - reference_payload_id: tetO_ecoli_working_w00_19
+    reference_payload_family_id: tetO_ecoli_working
+    reference_span_0:
+      start: 0
+      end: 17
+    query_span_0:
+      start: 0
+      end: 17
+    query_sequence_5to3: CCCTATCAGTGATAGAG
+    reference_sequence_5to3: CCCTATCAGTGATAGAG
+    compared_nt: 17
+    mismatch_count: 0
+    identity_fraction: 1.0
+    comparison_class: identical
 features:
 - role: msd_region
   source_role: null

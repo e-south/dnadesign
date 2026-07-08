@@ -94,7 +94,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.24"
+    assert metadata["version"] == "0.7.27"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -435,7 +435,7 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "composition_overview.png" in pipeline
     assert "shallow output-bundle layout" in study_surfaces
     assert "single-unit sequence artifact generation" in study_surfaces
-    assert "records plus the `materialize` and `review-outputs` routes" in study_surfaces
+    assert "records plus the `materialize`, `review-outputs`, and MSD-region source-ingest routes" in study_surfaces
     assert "full component spans" in skill
     assert "same-span annotations" in skill
     assert "scar-nick route in `routes/README.md` / `routes/product/scar-nick-base-junction.md`" in route_matrix
@@ -587,8 +587,10 @@ def test_retron_hairpin_workbench_keeps_root_bounded_by_record_lanes() -> None:
     assert (workbench / "design_sets" / "README.md").exists()
     assert (workbench / "design_sets" / "scar_nick_profile_panel_v1.yaml").exists()
     assert (workbench / "design_sets" / "teto_pwm_trim_rescue_v1.yaml").exists()
+    assert (workbench / "design_sets" / "teto_payload_trim_retest_v1.yaml").exists()
     assert (workbench / "deliverables" / "README.md").exists()
     assert (workbench / "deliverables" / "teto_pwm_trim_rescue_v1.yaml").exists()
+    assert (workbench / "deliverables" / "teto_payload_trim_retest_v1.yaml").exists()
     assert (workbench / "provenance" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "README.md").exists()
     assert (workbench / "provenance" / "compiler_runs" / "2026-05-18-msd-177-194.compile.yaml").exists()

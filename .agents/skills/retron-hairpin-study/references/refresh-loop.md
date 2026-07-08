@@ -29,6 +29,7 @@ question is explicitly about progress, history, or blockers.
 | Which primitive should solve a missing part? | Snapback, scar-nick, or YIU route plus reason | the compiler tries to solve primitive search internally |
 | Why this variant set? | workbench design-set record plus direction/effect tags | rationale is inferred from generated output or registry notes alone |
 | Where did outputs go? | explicit out-dir and contract filenames | outputs are hidden in a new workspace |
+| Where do review package outputs belong? | deliverable plan plus `review-outputs --deliverable-plan <plan.yaml>` output | a cohort is selected implicitly |
 | What is the old study status? | status command output | progress posture is mixed into a compile answer |
 
 ## Pair-With Rules

@@ -18,3 +18,8 @@ experimental meaning belongs in `../../workbench/design_sets/`.
   sequences from the Cruncher monotypic TetR elite with trim metadata; durable
   experimental meaning stays in
   `../../workbench/design_sets/teto_pwm_trim_rescue_v1.yaml`.
+- `teto_payload_trim_retest_v1.spec.yaml`: four-design tetO payload-prior
+  retest spec for pES-retron-201 through pES-retron-204. It keeps the retained
+  spans used by the 195-200 TetR PWM pilot, but swaps in the retron26/retron43
+  tetO payload prior. Durable meaning stays in
+  `../../workbench/design_sets/teto_payload_trim_retest_v1.yaml`.

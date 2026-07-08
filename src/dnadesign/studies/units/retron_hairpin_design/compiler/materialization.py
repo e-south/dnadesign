@@ -79,6 +79,7 @@ def materialize_msd_design_artifacts(
     out_dir: str | Path,
     payload_sequences: Mapping[str, str],
     cap_sequences: Mapping[str, str],
+    payload_complement_sequences: Mapping[str, str] | None = None,
     flank_5p_prefix: str = DEFAULT_FLANK_5P_PREFIX,
     flank_3p_suffix: str = DEFAULT_FLANK_3P_SUFFIX,
     render_formats: Sequence[str] = ("png",),
@@ -86,6 +87,10 @@ def materialize_msd_design_artifacts(
 ) -> MsdSequenceBundleResult:
     formats = normalize_render_formats(render_formats)
     payload_sequences = _normalize_sequence_mapping(payload_sequences, label="payload_sequences")
+    payload_complement_sequences = _normalize_sequence_mapping(
+        payload_complement_sequences or {},
+        label="payload_complement_sequences",
+    )
     cap_sequences = _normalize_sequence_mapping(cap_sequences, label="cap_sequences")
     require_sequence_subcomponents(catalog, payload_sequences=payload_sequences, cap_sequences=cap_sequences)
 
@@ -121,6 +126,7 @@ def materialize_msd_design_artifacts(
             record,
             artifact_bundle=artifact_bundle,
             payload_sequence=payload_sequences[record.payload_or_target.id],
+            payload_complement_sequence=payload_complement_sequences.get(record.payload_or_target.id),
             cap_sequence=cap_sequences[record.cap.id],
             flank_5p_prefix=flank_5p_prefix,
             flank_3p_suffix=flank_3p_suffix,

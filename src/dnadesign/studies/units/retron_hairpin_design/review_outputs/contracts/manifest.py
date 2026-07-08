@@ -21,12 +21,12 @@ from ..handoff.contract import SEQUENCE_HANDOFF_MANIFEST_KEY, SEQUENCE_HANDOFF_R
 from ..handoff.index import HandoffIndex
 from ..sequence.evidence import SequenceEvidenceSummary
 from ..sequence.index import SequenceReviewFrame
-from .plan import TetoReviewPlan
+from .plan import RetronReviewPlan
 
 
 def write_review_manifest(
     *,
-    plan: TetoReviewPlan,
+    plan: RetronReviewPlan,
     review_root: Path,
     materialized_root: Path,
     frames: Sequence[SequenceReviewFrame],
@@ -73,6 +73,7 @@ def write_review_manifest(
         },
         "benchling_genbank_import": {
             "orientation": plan.benchling_import.orientation,
+            "filename_payload_label": plan.benchling_import.filename_payload_label,
             "included_payload_trim_ids": list(plan.benchling_import.included_payload_trim_ids),
             "assigned_retron_ids": dict(plan.benchling_import.assigned_retron_ids),
             "source_precedent_ids": dict(plan.benchling_import.source_precedent_ids),

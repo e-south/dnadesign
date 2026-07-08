@@ -8,6 +8,7 @@ SKILL_FILE="$ROOT_DIR/SKILL.md"
 REFERENCE_DIR="$ROOT_DIR/references"
 ROOT_AGENTS="$REPO_ROOT/AGENTS.md"
 CRUNCHER_AGENTS="$REPO_ROOT/src/dnadesign/cruncher/AGENTS.md"
+MSD_REGION_INGEST_CLI="$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/msd_region_ingest.py"
 OLD_SKILL_NAME="snapback""-hairpin-study"
 OLD_SKILL_DIR="$REPO_ROOT/.agents/skills/$OLD_SKILL_NAME"
 failures=0
@@ -127,14 +128,18 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/catalog/msd
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1.spec.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/teto_payload_trim_retest_v1.spec.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/payload_binding_sites.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/teto_pwm_trim_rescue_v1.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/teto_payload_trim_retest_v1.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/teto_pwm_trim_rescue_v1.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/deliverables/teto_payload_trim_retest_v1.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml"
@@ -174,6 +179,7 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/inter
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/inputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/io.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/messages.py"
+require_file "$MSD_REGION_INGEST_CLI"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/interfaces/cli/review_outputs.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/compiler_spec.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/catalog/specs/__init__.py"
@@ -204,6 +210,24 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/revie
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/frame_naming.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/montage.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/video/stills.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/annotation_review.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/bundle_writer.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/compiler_spec_payload.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/comparison.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/feature_roles.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/genbank_bundle.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/genbank_utils.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/models.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/msd_region_genbank.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/pairing_segments.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_binding.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_binding_models.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_binding_utils.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_catalog.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_motifs.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/payload_sites.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/record_normalization.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/source_ingest/variant_sources.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cap_sources.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_msd_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/test_cli_lint.py"
@@ -390,8 +414,15 @@ budgets = {
     "review_outputs/handoff/contract.py": 80,
     "review_outputs/handoff/index.py": 160,
     "review_outputs/pwm/logo.py": 200,
+    "review_outputs/pwm/baserender_record.py": 170,
+    "review_outputs/pwm/panel_labels.py": 50,
+    "review_outputs/pwm/panel_metadata.py": 100,
+    "review_outputs/pwm/retention.py": 240,
     "review_outputs/pwm/sequence_rows.py": 190,
+    "review_outputs/pwm/trim_annotations.py": 60,
     "review_outputs/pwm/triptych.py": 140,
+    "review_outputs/pwm/typography.py": 40,
+    "review_outputs/pwm/visual_layers.py": 80,
     "review_outputs/sequence/evidence.py": 120,
     "review_outputs/sequence/index.py": 140,
     "review_outputs/sequence/variant_identity.py": 100,
@@ -405,6 +436,24 @@ budgets = {
     "catalog/specs/primitive_sources.py": 90,
     "catalog/specs/variant_metadata.py": 140,
     "catalog/sequence_inputs.py": 120,
+    "source_ingest/annotation_review.py": 190,
+    "source_ingest/bundle_writer.py": 130,
+    "source_ingest/compiler_spec_payload.py": 100,
+    "source_ingest/comparison.py": 230,
+    "source_ingest/feature_roles.py": 110,
+    "source_ingest/genbank_bundle.py": 190,
+    "source_ingest/genbank_utils.py": 150,
+    "source_ingest/models.py": 280,
+    "source_ingest/msd_region_genbank.py": 50,
+    "source_ingest/pairing_segments.py": 190,
+    "source_ingest/payload_binding.py": 50,
+    "source_ingest/payload_binding_models.py": 90,
+    "source_ingest/payload_binding_utils.py": 110,
+    "source_ingest/payload_catalog.py": 180,
+    "source_ingest/payload_motifs.py": 150,
+    "source_ingest/payload_sites.py": 220,
+    "source_ingest/record_normalization.py": 270,
+    "source_ingest/variant_sources.py": 180,
 }
 
 def implementation_line_count(path: Path) -> int:
@@ -433,6 +482,8 @@ if list((source_root / "review_outputs").glob("sequence_*.py")):
     violations.append("review_outputs root contains flat sequence_*.py files")
 if (source_root / "review_outputs" / "clone_handoff_index.py").exists():
     violations.append("review_outputs/clone_handoff_index.py still exists")
+if (source_root / "source_ingest" / "source_ingest.py").exists():
+    violations.append("source_ingest/source_ingest.py should not collapse semantic modules")
 if violations:
     raise SystemExit("; ".join(violations))
 PY
@@ -466,6 +517,7 @@ budgets = {
     "review_outputs/pwm/test_retention.py": 100,
     "review_outputs/video/test_montage.py": 100,
     "review_outputs/video/test_review_still_quality.py": 110,
+    "source_ingest/test_msd_region_genbank.py": 560,
     "support/cli.py": 40,
     "support/compiler_fixtures.py": 80,
     "support/pwm_fixtures.py": 70,
@@ -513,11 +565,14 @@ require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_h
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec\.yaml' "skill references full cohort materialization spec"
 require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/teto_pwm_trim_rescue_v1\.spec\.yaml' "skill references tetO trim compiler spec"
 require_pattern 'teto_pwm_trim_rescue_v1\.yaml' "skill references tetO trim design set"
+require_pattern 'teto_payload_trim_retest_v1' "skill references tetO payload-prior retest"
+require_pattern 'payload_binding_sites\.yaml' "skill references payload binding ontology"
 require_pattern 'pwm_trim_triptych' "skill references tetO PWM trim review panel"
 require_pattern 'sequence_montage' "skill references tetO sequence review video"
 require_pattern 'reviews/video/stills|semantic still' "skill references tetO semantic review stills"
 require_pattern 'reverse-complement' "skill references review-output reverse-complement evidence"
 require_pattern 'sequence_handoff' "skill references tetO GenBank handoff bundle"
+require_pattern 'deliverable plan' "skill keeps review-output route plan-owned"
 require_pattern 'payload-trim metadata|payload_trim_id' "skill preserves payload-trim metadata routing"
 require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim lane"
 require_pattern 'docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md' "skill references linear ssDNA dev spec"
@@ -530,7 +585,18 @@ require_pattern 'output_guards\.py' "skill routes output guard source separately
 require_pattern 'materialized_outputs\.py' "skill routes artifact publication source separately"
 require_pattern 'manifests\.py' "skill routes manifest writer source separately"
 require_pattern 'review_outputs/service\.py' "skill routes review output service separately"
-require_pattern 'review-outputs' "skill records review-output command"
+require_pattern 'source_ingest/msd_region_genbank\.py' "skill routes source-ingest public boundary separately"
+require_pattern 'source_ingest/genbank_bundle\.py' "skill routes GenBank bundle parser separately"
+require_pattern 'source_ingest/variant_sources\.py' "skill routes per-variant source manifest separately"
+require_pattern 'source_ingest/annotation_review\.py' "skill routes annotation review notes separately"
+require_pattern 'source_ingest/pairing_segments\.py' "skill routes pairing segment derivation separately"
+require_pattern 'source_ingest/payload_catalog\.py' "skill routes payload catalog loading separately"
+require_pattern 'source_ingest/payload_motifs\.py' "skill routes payload motif scoring separately"
+require_pattern 'source_ingest/payload_sites\.py' "skill routes payload-site classification separately"
+require_pattern 'source-dir' "MSD-region ingest CLI exposes per-variant source directory" "$MSD_REGION_INGEST_CLI"
+reject_pattern 'source-genbank|replacement-genbank|write-variant-source-inputs' "MSD-region ingest CLI has no bulk migration options" "$MSD_REGION_INGEST_CLI"
+require_pattern 'retired bulk source' "skill records retired bulk source as provenance only"
+require_pattern 'review-outputs --deliverable-plan' "skill records explicit review-output command"
 require_pattern 'test_cli_lint\.py' "skill records compiler lint test lane"
 require_pattern 'test_materialization\.py' "skill records compiler materialization test lane"
 require_pattern 'tests/review_outputs' "skill records review-output test lane"
