@@ -1,13 +1,13 @@
-# OPAL campaign configuration: stress ethanol/ciprofloxacin ethanol factor
+# OPAL campaign configuration: SECG ciprofloxacin-responsive objective
 
 campaign:
-  name: "Stress ethanol/ciprofloxacin ethanol factor RF + SFXI + top_n"
-  slug: "stress_eth_cip_ethanol_rf_sfxi_topn"
-  description: "Stress ethanol/ciprofloxacin promoter campaign focused on the ethanol response factor under the SFXI active-learning objective."
+  name: "SECG ciprofloxacin-responsive RF + SFXI + top_n"
+  slug: "secg_cipro_rf_sfxi_topn"
+  description: "SECG promoter campaign focused on the ciprofloxacin response factor under the SFXI active-learning objective."
   workdir: "."
   metadata:
-    comparison_group: "Ethanol factor"
-    response_axis: "ethanol"
+    comparison_group: "Ciprofloxacin-responsive"
+    response_axis: "ciprofloxacin"
 
 plot_config: "plots.yaml"
 
@@ -23,7 +23,7 @@ data:
     path: "../../../usr/datasets"
     dataset: usr_prom_eth_cip_opal_candidates
   x_column_name: "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
-  y_column_name: "opal__stress_eth_cip_ethanol_rf_sfxi_topn__y"
+  y_column_name: "opal__secg_cipro_rf_sfxi_topn__y"
   y_expected_length: 8
 
 candidate_eligibility:
@@ -37,6 +37,11 @@ candidate_eligibility:
         right_flank: tgagggaattcgcga
         expected_core_length: 60
         min_remaining_candidates: 1000
+        exclude_rows_where:
+          - column: id
+            equals: 2fe51277935496ce8f02932e2866143258c80d55  # pragma: allowlist secret
+          - column: id
+            equals: 97b4ac8535ae8c1f67c079b0644e87777d29e1d1  # pragma: allowlist secret
         forbidden_sites:
           - enzyme: BamHI
             motif: GGATCC
@@ -99,7 +104,7 @@ model:
 objectives:
   - name: "sfxi_v1"
     params:
-      setpoint_vector: [0, 1, 0, 1]
+      setpoint_vector: [0, 0, 1, 1]
       logic_exponent_beta: 1.0
       intensity_exponent_gamma: 1.0
       intensity_log2_offset_delta: 0.0

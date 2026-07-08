@@ -14,15 +14,15 @@ from __future__ import annotations
 from pathlib import Path
 
 DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS: tuple[Path, ...] = (
-    Path("src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
-    Path("src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml"),
-    Path("src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml"),
+    Path("src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
+    Path("src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"),
+    Path("src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml"),
 )
 
 STRESS_OPAL_CAMPAIGN_ALIAS_CODES: dict[str, str] = {
-    "stress_eth_cip_ethanol_rf_sfxi_topn": "ETH",
-    "stress_eth_cip_cipro_rf_sfxi_topn": "CIP",
-    "stress_eth_cip_and_rf_sfxi_topn": "AND",
+    "secg_ethanol_rf_sfxi_topn": "ETH",
+    "secg_cipro_rf_sfxi_topn": "CIP",
+    "secg_and_rf_sfxi_topn": "AND",
 }
 STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX = "SECG"
 

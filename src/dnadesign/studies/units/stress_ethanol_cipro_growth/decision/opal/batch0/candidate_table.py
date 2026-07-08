@@ -47,7 +47,6 @@ REQUIRED_NON_NULL_CANDIDATE_PROVENANCE_COLUMNS: tuple[str, ...] = (
     "opal_candidate__x_source_view_id",
     "opal_candidate__source_class",
     "opal_candidate__design_family",
-    *DENSEGEN_KEY_COLUMNS,
 )
 
 
@@ -362,7 +361,7 @@ def _configured_allowed_source_classes(config: Mapping[str, Any]) -> tuple[str, 
     materialization = _candidate_table_config(config).get("materialization")
     if not isinstance(materialization, Mapping):
         return None
-    values = materialization.get("include_source_class")
+    values = materialization.get("validation_allowed_source_classes", materialization.get("include_source_class"))
     if values is None:
         return None
     return tuple(_normal_text(value) for value in values if _normal_text(value))
@@ -372,7 +371,7 @@ def _configured_allowed_design_families(config: Mapping[str, Any]) -> tuple[str,
     materialization = _candidate_table_config(config).get("materialization")
     if not isinstance(materialization, Mapping):
         return None
-    values = materialization.get("allowed_design_families")
+    values = materialization.get("validation_allowed_design_families", materialization.get("allowed_design_families"))
     if values is None:
         return None
     return tuple(_normal_text(value) for value in values if _normal_text(value))
@@ -382,6 +381,12 @@ def _configured_required_null_provenance_columns(config: Mapping[str, Any]) -> t
     materialization = _candidate_table_config(config).get("materialization")
     if not isinstance(materialization, Mapping):
         return ()
+    if "validation_required_null_provenance_columns" in materialization:
+        return tuple(
+            f"opal_candidate__{_normal_text(column)}"
+            for column in materialization.get("validation_required_null_provenance_columns") or ()
+            if _normal_text(column)
+        )
     return tuple(
         f"opal_candidate__{_normal_text(column)}"
         for column in materialization.get("exclude_non_null_columns") or ()
@@ -446,7 +451,17 @@ def validate_configured_candidate_feature_table(config: Mapping[str, Any], *, re
     )
 
 
-def _mask_candidate_population(view_rows: pd.DataFrame, materialization: Mapping[str, Any]) -> pd.Series:
+def _manual_include_ids(materialization: Mapping[str, Any]) -> set[str]:
+    values = materialization.get("manual_include_view_row_ids") or ()
+    return {_normal_text(value) for value in values if _normal_text(value)}
+
+
+def _mask_candidate_population(
+    view_rows: pd.DataFrame,
+    materialization: Mapping[str, Any],
+    *,
+    view_row_id_column: str,
+) -> pd.Series:
     mask = pd.Series(True, index=view_rows.index)
     source_classes = list(materialization.get("include_source_class") or [])
     if source_classes:
@@ -465,6 +480,16 @@ def _mask_candidate_population(view_rows: pd.DataFrame, materialization: Mapping
         if column_name not in view_rows.columns:
             raise ValueError(f"candidate materialization filter requires {column_name!r} in LatentDNA view rows")
         mask &= view_rows[column_name].isna()
+
+    manual_ids = _manual_include_ids(materialization)
+    if manual_ids:
+        if view_row_id_column not in view_rows.columns:
+            raise ValueError(f"candidate materialization manual includes require {view_row_id_column!r}")
+        view_ids = view_rows[view_row_id_column].astype(str)
+        missing = sorted(manual_ids - set(view_ids.tolist()))
+        if missing:
+            raise ValueError(f"candidate materialization manual include ids missing from view rows: {missing[:5]}")
+        mask |= view_ids.isin(manual_ids)
     return mask
 
 
@@ -498,6 +523,7 @@ def _densegen_sidecar_table_for_ids(
     sidecar_path: Path,
     ids: Sequence[str],
     columns: Sequence[str],
+    allow_missing_ids: set[str] | None = None,
 ) -> pa.Table:
     if not sidecar_path.exists():
         raise ValueError(f"candidate DenseGen sidecar not found: {sidecar_path}")
@@ -505,8 +531,8 @@ def _densegen_sidecar_table_for_ids(
     missing_columns = [column for column in ("id", *columns) if column not in schema_names]
     if missing_columns:
         raise ValueError(f"candidate DenseGen sidecar missing required column(s): {missing_columns}")
-    sidecar = pq.read_table(sidecar_path, columns=["id", *columns])
-    sidecar_ids = [str(value) for value in sidecar["id"].to_pylist()]
+    sidecar = pq.read_table(sidecar_path, columns=["id", *columns]).to_pandas()
+    sidecar_ids = sidecar["id"].astype(str).tolist()
     seen_ids: set[str] = set()
     duplicate_ids: set[str] = set()
     for row_id in sidecar_ids:
@@ -516,15 +542,28 @@ def _densegen_sidecar_table_for_ids(
     if duplicate_ids:
         raise ValueError(f"candidate DenseGen sidecar contains duplicate ids (sample={sorted(duplicate_ids)[:5]})")
     sidecar_index = {row_id: idx for idx, row_id in enumerate(sidecar_ids)}
-    missing = [row_id for row_id in ids if row_id not in sidecar_index]
+    allowed_missing = allow_missing_ids or set()
+    missing = [row_id for row_id in ids if row_id not in sidecar_index and row_id not in allowed_missing]
     if missing:
         raise ValueError(f"candidate ids are missing from DenseGen sidecar (sample={missing[:5]})")
 
-    aligned = sidecar.take(pa.array([sidecar_index[row_id] for row_id in ids], type=pa.int64()))
-    null_columns = [column for column in columns if aligned[column].null_count]
-    if null_columns:
-        raise ValueError(f"candidate DenseGen sidecar has null required column(s): {null_columns}")
-    return aligned
+    aligned: dict[str, list[Any]] = {"id": [str(row_id) for row_id in ids]}
+    null_problems: dict[str, list[str]] = {}
+    for column in columns:
+        values: list[Any] = []
+        for row_id in ids:
+            if row_id in sidecar_index:
+                value = sidecar.iloc[sidecar_index[row_id]][column]
+                if _is_missing(value) and row_id not in allowed_missing:
+                    null_problems.setdefault(column, []).append(row_id)
+                values.append(value)
+            else:
+                values.append(None)
+        aligned[column] = values
+    if null_problems:
+        sample = {column: row_ids[:5] for column, row_ids in null_problems.items()}
+        raise ValueError(f"candidate DenseGen sidecar has null required column(s): {sample}")
+    return pa.Table.from_pandas(pd.DataFrame(aligned), preserve_index=False)
 
 
 def _replace_columns(table: pa.Table, replacement: pa.Table, *, columns: Sequence[str]) -> pa.Table:
@@ -646,7 +685,7 @@ def materialize_configured_candidate_feature_table(
             f"matrix={matrix.shape[0]} view_rows={len(view_rows)}"
         )
 
-    mask = _mask_candidate_population(view_rows, materialization)
+    mask = _mask_candidate_population(view_rows, materialization, view_row_id_column=view_row_id_column)
     positions = np.flatnonzero(mask.to_numpy())
     selected_view_rows = view_rows.iloc[positions].reset_index(drop=True)
     candidate_ids = selected_view_rows[view_row_id_column].astype(str).tolist()
@@ -654,10 +693,20 @@ def materialize_configured_candidate_feature_table(
         raise ValueError("candidate materialization filter selected zero rows")
     base_table = _source_table_for_ids(source_records_path, candidate_ids)
     if densegen_sidecar_path is not None:
+        allow_missing_ids: set[str] = set()
+        if bool(materialization.get("allow_missing_densegen_sidecar_for_non_densegen")):
+            allow_missing_ids = set(
+                selected_view_rows.loc[
+                    ~selected_view_rows["source_class"].astype(str).eq("densegen"), view_row_id_column
+                ]
+                .astype(str)
+                .tolist()
+            )
         densegen_sidecar = _densegen_sidecar_table_for_ids(
             sidecar_path=densegen_sidecar_path,
             ids=candidate_ids,
             columns=densegen_sidecar_columns,
+            allow_missing_ids=allow_missing_ids,
         )
         base_table = _replace_columns(base_table, densegen_sidecar, columns=densegen_sidecar_columns)
     base_table = _append_constant_column(
@@ -705,6 +754,7 @@ def materialize_configured_candidate_feature_table(
             "include_source_class": list(materialization.get("include_source_class") or []),
             "allowed_design_families": list(materialization.get("allowed_design_families") or []),
             "exclude_non_null_columns": list(materialization.get("exclude_non_null_columns") or []),
+            "manual_include_view_row_ids": sorted(_manual_include_ids(materialization)),
         },
     }
     if write:

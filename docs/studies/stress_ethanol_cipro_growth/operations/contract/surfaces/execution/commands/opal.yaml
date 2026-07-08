@@ -89,7 +89,7 @@ opal_campaign_progress_json:
   - opal
   - progress
   - -c
-  - src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml
   - --round
   - latest
   - --json
@@ -102,7 +102,7 @@ opal_campaign_review_json:
   - opal
   - review
   - -c
-  - src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml
   - --round
   - latest
   - --json

@@ -218,11 +218,11 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 Default generated output paths:
 
 - ethanol:
-  `src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+  `src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
 - ciprofloxacin:
-  `src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+  `src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
 - AND:
-  `src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+  `src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
 
 Each campaign folder contains campaign-explicit files whose names remain
 identifiable if detached from the folder:

@@ -8,7 +8,7 @@ candidate_feature_table:
   dataset_id: usr_prom_eth_cip_opal_candidates
   role: opal_candidate_feature_table
   records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet
-  expected_rows: 157160
+  expected_rows: 157185
   required_columns: ["id", "bio_type", "sequence", "alphabet"]
   x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
   x_source:
@@ -28,7 +28,37 @@ candidate_feature_table:
     include_source_class: ["densegen"]
     allowed_design_families: ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"]
     exclude_non_null_columns: ["sfxi_ref__collection_id"]
-    expected_rows_note: roughly 157k current generated promoter rows; excludes reference, native, archive SFXI, and control rows in the broader LatentDNA view
+    manual_include_view_row_ids:
+      - 09b59d2365b6a6cb71fd44e155a40d92ae2a88f0 # pDual-10-ES19p
+      - 0f87f1782ff87562775ede346ba2d70038b678ec # pDual-10-ES12p
+      - 1ab35c09c138033fcaa5f8e262a08864319c6be5 # pDual-10-ES18p
+      - 21cdfcb087bc27adb5a7ca856c82bf489993dc2c # pDual-10-ES15p
+      - 2fe51277935496ce8f02932e2866143258c80d55 # pDual-10-sulAp
+      - 435c9049d7a0b9df2aedb3724cff0c7f8486992d # pDual-10-ES25p
+      - 44628e31125e1322a7d64c5ae60e7260eb512de1 # pDual-10-ES20p
+      - 4aefb5bf64c8c5a1afd64ee269ea8172779167f8 # pDual-10-ES27p
+      - 4bb63c6c63c4b14720f12751a4f8101228a46c42 # pDual-10-ES4p
+      - 53a22effaf67926c919918bec9313e8ef9e60304 # pDual-10-ES13p
+      - 687595af953278a6262ce4098d265489e9aec9be # pDual-10-ES10p
+      - 7871958259f60506b8ffedfeff6683b53c5c688b # pDual-10-ES22p
+      - 7d19c4330b78ea3eebeaaaaede6a7f4be72f3412 # pDual-10-ES26p
+      - 8771ea1f730687244d5e91829580ebc228a80b2e # pDual-10-ES2p
+      - 8d5364fd4d59531967f2aed6eb09be00de0728a1 # pDual-10-ES7p
+      - 97b4ac8535ae8c1f67c079b0644e87777d29e1d1 # pDual-10-spyp
+      - a89764830326f815bf69c816024fb5250b0e2934 # pDual-10-ES23p
+      - b9ccc2fb6cb43829ce5275b3ea238ec2e7770086 # pDual-10-ES1p
+      - c33e022ac822d1ca608940a561e4fb76802faa74 # pDual-10-ES28p
+      - c986c251d60dc4a33ef4caaafc40e38093db17bb # pDual-10-ES29p
+      - ce82dd440bd35d6dc43feaaf3d74c8927c6c4a85 # pDual-10-ES6p
+      - d48422cfa6b4d8b25235cf2c1840dcfb1d92662f # pDual-10-ES16p
+      - e038f01044323e4b7d58b134a6cd158721140c8f # pDual-10-ES17p
+      - e0cdedf311d28b733f95ccd8fe0a10b0280f8978 # pDual-10-ES30p
+      - f110905871ae1d944fbb83d6535de7da889f7375 # pDual-10-ES3p
+    allow_missing_densegen_sidecar_for_non_densegen: true
+    validation_allowed_source_classes: ["densegen", "construct_derived"]
+    validation_allowed_design_families: ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin", "control"]
+    validation_required_null_provenance_columns: []
+    expected_rows_note: 157160 generated promoter rows plus 23 measured pDual-10 SFXI reference rows and 2 measured pDual-10 control promoter rows already present in the selected LatentDNA view
 
 provenance:
   densegen_source_records_path: src/dnadesign/usr/datasets/densegen_prom_eth_cip_source/records.parquet
@@ -78,8 +108,8 @@ outputs:
   review_parquet: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/outputs/batch0_review.parquet
 
 campaigns:
-  - slug: stress_eth_cip_ethanol_rf_sfxi_topn
-    name: Stress ethanol/ciprofloxacin ethanol-factor RF SFXI top-n
+  - slug: secg_ethanol_rf_sfxi_topn
+    name: SECG ethanol-responsive RF SFXI top-n
     objective: ethanol_factor
     setpoint_vector: [0, 1, 0, 1]
     target_margin_column: synthetic_margin_ethanol_vs_background
@@ -178,8 +208,8 @@ campaigns:
         geometry_hypothesis: activator_position_comparator
         interpretation_limit: "CpxR rows preserve comparator value but do not make ethanol a balanced BaeR-vs-CpxR DOE."
 
-  - slug: stress_eth_cip_cipro_rf_sfxi_topn
-    name: Stress ethanol/ciprofloxacin cipro-factor RF SFXI top-n
+  - slug: secg_cipro_rf_sfxi_topn
+    name: SECG ciprofloxacin-responsive RF SFXI top-n
     objective: cipro_factor
     setpoint_vector: [0, 0, 1, 1]
     target_margin_column: synthetic_margin_cipro_vs_background
@@ -278,8 +308,8 @@ campaigns:
         geometry_hypothesis: derepression_threshold_probe
         interpretation_limit: "Exploratory row probes threshold sensitivity and should not be treated as a strong-control design."
 
-  - slug: stress_eth_cip_and_rf_sfxi_topn
-    name: Stress ethanol/ciprofloxacin AND RF SFXI top-n
+  - slug: secg_and_rf_sfxi_topn
+    name: SECG AND-responsive RF SFXI top-n
     objective: and
     setpoint_vector: [0, 0, 0, 1]
     target_margin_column: synthetic_margin_dual_vs_background

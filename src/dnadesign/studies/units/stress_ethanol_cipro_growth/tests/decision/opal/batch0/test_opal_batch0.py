@@ -494,9 +494,9 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
 
     assert set(REQUIRED_REVIEW_COLUMNS).issubset(selected.columns)
     assert selected.groupby("campaign").size().to_dict() == {
-        "stress_eth_cip_and_rf_sfxi_topn": 6,
-        "stress_eth_cip_cipro_rf_sfxi_topn": 6,
-        "stress_eth_cip_ethanol_rf_sfxi_topn": 6,
+        "secg_and_rf_sfxi_topn": 6,
+        "secg_cipro_rf_sfxi_topn": 6,
+        "secg_ethanol_rf_sfxi_topn": 6,
     }
     assert not selected["id"].duplicated().any()
     assert "negative_prior" not in set(selected["id"])
@@ -505,7 +505,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
     assert "none" not in set(selected["tfbs_summary"])
     assert selected["spacer_length"].isin([16, 17, 18, 19]).all()
 
-    ethanol = selected[selected["campaign"] == "stress_eth_cip_ethanol_rf_sfxi_topn"]
+    ethanol = selected[selected["campaign"] == "secg_ethanol_rf_sfxi_topn"]
     assert ethanol["setpoint"].map(tuple).unique().tolist() == [(0, 1, 0, 1)]
     assert ethanol["canonical_densegen_plan"].value_counts().to_dict() == {
         "ethanol": 6,
@@ -523,7 +523,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         "ethanol_cpxr_upstream_only",
     ]
 
-    cipro = selected[selected["campaign"] == "stress_eth_cip_cipro_rf_sfxi_topn"]
+    cipro = selected[selected["campaign"] == "secg_cipro_rf_sfxi_topn"]
     assert cipro["setpoint"].map(tuple).unique().tolist() == [(0, 0, 1, 1)]
     assert cipro["canonical_densegen_plan"].value_counts().to_dict() == {
         "ciprofloxacin": 6,
@@ -540,7 +540,7 @@ def test_select_batch0_enforces_setpoints_and_campaign_slot_splits() -> None:
         "cipro_lexa_exploratory_single",
     ]
 
-    and_gate = selected[selected["campaign"] == "stress_eth_cip_and_rf_sfxi_topn"]
+    and_gate = selected[selected["campaign"] == "secg_and_rf_sfxi_topn"]
     assert and_gate["setpoint"].map(tuple).unique().tolist() == [(0, 0, 0, 1)]
     assert and_gate["canonical_densegen_plan"].unique().tolist() == ["ethanol_ciprofloxacin"]
     assert and_gate["regulator_composition"].value_counts().to_dict() == {
@@ -568,7 +568,7 @@ def test_select_batch0_supports_exact_slot_patterns_and_signal_tfbs_count() -> N
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "slug": "secg_ethanol_rf_sfxi_topn",
                 "setpoint_vector": [0, 1, 0, 1],
                 "target_margin_column": "synthetic_margin_ethanol_vs_background",
                 "slots": [
@@ -621,7 +621,7 @@ def test_select_batch0_compares_slot_patterns_as_scalar_tuples() -> None:
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "slug": "secg_ethanol_rf_sfxi_topn",
                 "setpoint_vector": [0, 1, 0, 1],
                 "target_margin_column": "synthetic_margin_ethanol_vs_background",
                 "slots": [
@@ -678,7 +678,7 @@ def test_select_batch0_supports_slot_level_spacer_constraints_and_metadata() -> 
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "slug": "secg_ethanol_rf_sfxi_topn",
                 "setpoint_vector": [0, 1, 0, 1],
                 "target_margin_column": "synthetic_margin_ethanol_vs_background",
                 "slots": [
@@ -735,7 +735,7 @@ def test_select_batch0_fails_when_slot_level_spacer_constraint_exhausts_pool() -
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_ethanol_rf_sfxi_topn",
+                "slug": "secg_ethanol_rf_sfxi_topn",
                 "setpoint_vector": [0, 1, 0, 1],
                 "target_margin_column": "synthetic_margin_ethanol_vs_background",
                 "slots": [
@@ -773,7 +773,7 @@ def test_select_batch0_applies_off_target_margin_constraints() -> None:
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_and_rf_sfxi_topn",
+                "slug": "secg_and_rf_sfxi_topn",
                 "setpoint_vector": [0, 0, 0, 1],
                 "target_margin_column": "synthetic_margin_dual_vs_background",
                 "off_target_margin_columns": [
@@ -826,7 +826,7 @@ def test_select_batch0_applies_campaign_target_margin_minimum() -> None:
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_and_rf_sfxi_topn",
+                "slug": "secg_and_rf_sfxi_topn",
                 "setpoint_vector": [0, 0, 0, 1],
                 "target_margin_column": "synthetic_margin_dual_vs_background",
                 "target_margin_min": 0.2,
@@ -863,7 +863,7 @@ def test_select_batch0_fails_fast_when_slot_predicate_cannot_parse_densegen_deta
         "allow_duplicate_ids": False,
         "campaigns": [
             {
-                "slug": "stress_eth_cip_cipro_rf_sfxi_topn",
+                "slug": "secg_cipro_rf_sfxi_topn",
                 "setpoint_vector": [0, 0, 1, 1],
                 "target_margin_column": "synthetic_margin_cipro_vs_background",
                 "slots": [
@@ -1255,11 +1255,11 @@ def test_candidate_feature_table_validation_requires_study_provenance_columns(tm
         validate_candidate_feature_table(records_path=records, x_column=x_col)
 
 
-def test_candidate_feature_table_validation_rejects_blank_densegen_provenance(tmp_path: Path) -> None:
+def test_candidate_feature_table_validation_rejects_blank_core_provenance(tmp_path: Path) -> None:
     records = tmp_path / "records.parquet"
     x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
     provenance = _candidate_provenance(1)
-    provenance["densegen__sampling_library_hash"] = [""]
+    provenance["opal_candidate__source_class"] = [""]
     _write_fixed_x_records(
         records,
         {
@@ -1273,7 +1273,7 @@ def test_candidate_feature_table_validation_rejects_blank_densegen_provenance(tm
         x_col=x_col,
     )
 
-    with pytest.raises(ValueError, match="densegen__sampling_library_hash"):
+    with pytest.raises(ValueError, match="opal_candidate__source_class"):
         validate_candidate_feature_table(records_path=records, x_column=x_col)
 
 
@@ -1447,6 +1447,92 @@ def test_candidate_table_materializer_filters_dense_plan_subset_and_writes_x(tmp
     assert records["opal_candidate__source_class"].tolist() == ["densegen", "densegen"]
     assert records["opal_candidate__design_family"].tolist() == ["ethanol", "ciprofloxacin"]
     assert records["opal_candidate__sfxi_ref__collection_id"].isna().all()
+
+
+def test_candidate_table_materializer_manual_includes_measured_reader_rows(tmp_path: Path) -> None:
+    rows_path = tmp_path / "view_rows.parquet"
+    matrix_path = tmp_path / "matrix.npy"
+    source_path = tmp_path / "anchor" / "records.parquet"
+    densegen_sidecar_path = tmp_path / "anchor" / "_derived" / "densegen.parquet"
+    records_path = tmp_path / "opal" / "records.parquet"
+    x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+
+    pd.DataFrame(
+        {
+            "construct__anchor_id": ["dense-a", "sfxi-b", "control-c"],
+            "source_class": ["densegen", "densegen", "construct_derived"],
+            "design_family": ["ethanol", "ethanol_ciprofloxacin", "control"],
+            "sfxi_ref__collection_id": [None, "reader_sfxi_pdual10_latest", None],
+        }
+    ).to_parquet(rows_path)
+    np.save(matrix_path, np.asarray([[1, 2], [3, 4], [5, 6]], dtype=np.float32))
+    source_path.parent.mkdir()
+    pd.DataFrame(
+        {
+            "id": ["dense-a", "sfxi-b", "control-c"],
+            "bio_type": ["dna"] * 3,
+            "sequence": ["AAAA", "CCCC", "GGGG"],
+            "alphabet": ["dna_4"] * 3,
+            "densegen__plan": ["ethanol", None, None],
+            "densegen__run_id": ["run-a", None, None],
+            "densegen__sampling_library_hash": ["hash-a", None, None],
+        }
+    ).to_parquet(source_path, index=False)
+    densegen_sidecar_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "id": ["dense-a", "sfxi-b"],
+            "densegen__plan": ["ethanol", "ethanol_ciprofloxacin"],
+            "densegen__run_id": ["run-a", "reader_sfxi_archive"],
+            "densegen__sampling_library_hash": ["hash-a", "archive-hash"],
+        }
+    ).to_parquet(densegen_sidecar_path, index=False)
+    config = {
+        "candidate_feature_table": {
+            "dataset_id": "demo_opal_candidates",
+            "role": "opal_candidate_feature_table",
+            "records_path": "opal/records.parquet",
+            "expected_rows": 3,
+            "x_column": x_col,
+            "x_source": {
+                "view_id": "bidir_context",
+                "rows_path": "view_rows.parquet",
+                "matrix_path": "matrix.npy",
+            },
+            "materialization": {
+                "source_records_path": "anchor/records.parquet",
+                "densegen_sidecar_path": "anchor/_derived/densegen.parquet",
+                "densegen_sidecar_columns": [
+                    "densegen__plan",
+                    "densegen__run_id",
+                    "densegen__sampling_library_hash",
+                ],
+                "view_row_id_column": "construct__anchor_id",
+                "include_source_class": ["densegen"],
+                "allowed_design_families": ["ethanol"],
+                "exclude_non_null_columns": ["sfxi_ref__collection_id"],
+                "manual_include_view_row_ids": ["sfxi-b", "control-c"],
+                "allow_missing_densegen_sidecar_for_non_densegen": True,
+                "validation_allowed_source_classes": ["densegen", "construct_derived"],
+                "validation_allowed_design_families": ["ethanol", "ethanol_ciprofloxacin", "control"],
+                "validation_required_null_provenance_columns": [],
+            },
+        }
+    }
+
+    report = materialize_configured_candidate_feature_table(config, repo_root=tmp_path, write=True)
+
+    assert report["row_count"] == 3
+    assert report["validation"] == {"row_count": 3, "x_dim": 2}
+    records = pd.read_parquet(records_path)
+    assert records["id"].tolist() == ["dense-a", "sfxi-b", "control-c"]
+    assert records[x_col].map(list).tolist() == [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+    assert records["densegen__plan"].iloc[:2].tolist() == ["ethanol", "ethanol_ciprofloxacin"]
+    assert pd.isna(records["densegen__plan"].iloc[2])
+    assert records["opal_candidate__source_class"].tolist() == ["densegen", "densegen", "construct_derived"]
+    assert pd.isna(records["opal_candidate__sfxi_ref__collection_id"].iloc[0])
+    assert records["opal_candidate__sfxi_ref__collection_id"].iloc[1] == "reader_sfxi_pdual10_latest"
+    assert pd.isna(records["opal_candidate__sfxi_ref__collection_id"].iloc[2])
 
 
 def test_candidate_table_write_reuses_configured_validation_guards(tmp_path: Path) -> None:
@@ -1655,9 +1741,9 @@ def test_selected_ids_must_exist_in_candidate_feature_table(tmp_path: Path) -> N
 
 def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     expected = {
-        "stress_eth_cip_ethanol_rf_sfxi_topn": [0, 1, 0, 1],
-        "stress_eth_cip_cipro_rf_sfxi_topn": [0, 0, 1, 1],
-        "stress_eth_cip_and_rf_sfxi_topn": [0, 0, 0, 1],
+        "secg_ethanol_rf_sfxi_topn": [0, 1, 0, 1],
+        "secg_cipro_rf_sfxi_topn": [0, 0, 1, 1],
+        "secg_and_rf_sfxi_topn": [0, 0, 0, 1],
     }
     x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
 

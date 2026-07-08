@@ -294,7 +294,7 @@ Recent targeted validation:
 - `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source batch0 --json`
   passed, reporting 18 rows, 6 per campaign, and the three default
   campaign-local output directories.
-- `uv run opal selection-set show -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round 0 --json`
+- `uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --round 0 --json`
   exits 2 with a structured `opal.cli_error.v1` missing-ledger payload, which
   is expected in the current pre-assay state.
 - `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round 0 --json`

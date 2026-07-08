@@ -6,6 +6,9 @@ Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
 
 - [Candidate table](candidate-table.md): shared USR candidate-table and label
   source contract.
+- [Measured reader vec8 batch0 staging](measured-reader-vec8-batch0.md):
+  campaign-local round-0 label inputs built from measured reader SFXI `vec8`
+  records, with a separate gate for shared observed-label sidecar writes.
 - [DenseGen TFBS learnability probe v1](densegen-tfbs-learnability-probe-v1.md):
   retained v1 contract for scalar TF family content and slot-position
   synthetic-control campaigns. Current realized profile boundaries live in the

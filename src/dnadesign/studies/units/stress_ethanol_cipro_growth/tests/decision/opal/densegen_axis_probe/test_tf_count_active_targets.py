@@ -61,7 +61,7 @@ def test_make_training_input_for_tf_count_materializes_compact_objectives(tmp_pa
 
 
 def test_write_campaign_config_uses_generic_vector_contract_for_tf_count(tmp_path: Path) -> None:
-    source_config = tmp_path / "src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml"
+    source_config = tmp_path / "src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"
     source_config.parent.mkdir(parents=True)
     source_config.write_text(yaml.safe_dump(_minimal_source_config(), sort_keys=False), encoding="utf-8")
     run_root = tmp_path / "probe"

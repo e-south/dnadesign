@@ -53,17 +53,17 @@ AXIS_CLASS_TO_DENSEGEN_PLAN_CLASS: dict[str, str] = {
 
 CAMPAIGNS: dict[str, dict[str, Any]] = {
     "cipro": {
-        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml",
+        "source_config": "src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml",
         "target_class": "cipro_only",
         "target_logic4": [0, 0, 1, 1],
     },
     "ethanol": {
-        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml",
+        "source_config": "src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml",
         "target_class": "ethanol_only",
         "target_logic4": [0, 1, 0, 1],
     },
     "dual": {
-        "source_config": "src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml",
+        "source_config": "src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml",
         "target_class": "dual_axis_and",
         "target_logic4": [0, 0, 0, 1],
     },

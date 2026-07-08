@@ -7,9 +7,9 @@ operation.
 
 ### Campaign Configs
 
-- Ethanol factor: `src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
-- Ciprofloxacin factor: `src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml`
-- AND objective: `src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml`
+- Ethanol factor: `src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+- Ciprofloxacin factor: `src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml`
+- AND objective: `src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml`
 
 ### Commands
 
@@ -18,21 +18,21 @@ operation.
 - Candidate provenance audit: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.batch0.provenance --config src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml`
 - Per-ID provenance trace: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.batch0.provenance --config src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml --id <candidate_id>`
 - Campaign config validation, all current objectives:
-  - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --json`
-  - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml --json`
-  - `uv run opal validate -c src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml --json`
+  - `uv run opal validate -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --json`
+  - `uv run opal validate -c src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml --json`
+  - `uv run opal validate -c src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml --json`
   - The JSON report must include `candidate_eligibility` with the
     `restriction_site_exclusion` rule, filtered-row count, min-remaining guard,
     and violation preview.
-- Pre-run campaign viewer generation: `uv run opal notebook generate -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force`
-- Campaign notebook run: `uv run opal notebook run -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+- Pre-run campaign viewer generation: `uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force`
+- Campaign notebook run: `uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml`
 - Label ingest for a measured assay round: `uv run opal ingest-y -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <observed_round> --in <labels.parquet-or-csv> --unknown-sequences error --apply --json`
 - OPAL round run after ingest: `uv run opal run -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json`
 - OPAL selection artifact check: `uv run opal verify-outputs -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json`
 - OPAL selected-set inspection: `uv run opal selection-set show -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json`
 - OPAL selected-set export: `uv run opal selection-set export -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --out <selection-set.csv> --format csv --json`
-- Post-run status command: `uv run opal status -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml --with-ledger --json`
-- Post-run plot command: `uv run opal plot -c src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml`
+- Post-run status command: `uv run opal status -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --with-ledger --json`
+- Post-run plot command: `uv run opal plot -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml`
 - Batch-0 physical synthesis handoff: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json`
 - Measured-round physical synthesis handoff: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --write --json`
 

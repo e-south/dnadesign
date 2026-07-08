@@ -123,9 +123,9 @@ record or in tests:
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
   --source opal-round \
   --round <as_of_round> \
-  --run-id stress_eth_cip_ethanol_rf_sfxi_topn=<run_id> \
-  --run-id stress_eth_cip_cipro_rf_sfxi_topn=<run_id> \
-  --run-id stress_eth_cip_and_rf_sfxi_topn=<run_id> \
+  --run-id secg_ethanol_rf_sfxi_topn=<run_id> \
+  --run-id secg_cipro_rf_sfxi_topn=<run_id> \
+  --run-id secg_and_rf_sfxi_topn=<run_id> \
   --write \
   --json
 ```
@@ -141,9 +141,9 @@ work:
 
 Default campaign-local output folders:
 
-- `src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
-- `src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
-- `src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+- `src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+- `src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
+- `src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/`
 
 Measured-round folders use `stress-opal-r<round>-sfxi-v1` unless an explicit
 `--batch-id` is provided.

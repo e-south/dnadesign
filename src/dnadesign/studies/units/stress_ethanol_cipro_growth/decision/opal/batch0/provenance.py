@@ -416,7 +416,11 @@ def audit_candidate_lineage(config: Mapping[str, Any], *, repo_root: str | Path)
     if anchor_sequence_mismatch:
         failures.append(f"{anchor_sequence_mismatch} OPAL sequences differ from anchor records")
 
-    mask = _mask_candidate_population(latent_rows, materialization)
+    mask = _mask_candidate_population(
+        latent_rows,
+        materialization,
+        view_row_id_column=view_row_id_column,
+    )
     latent_selected_ids = latent_rows.loc[mask, view_row_id_column].astype(str).tolist()
     if opal_ids != latent_selected_ids:
         failures.append("OPAL candidate id order does not match the configured LatentDNA selected-X subset")

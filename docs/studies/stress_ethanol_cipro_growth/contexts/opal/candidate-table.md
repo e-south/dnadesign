@@ -1,20 +1,39 @@
+---
+id: stress-ethanol-cipro-growth-opal-candidate-table
+title: OPAL candidate table
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-08
+audience:
+  - operator
+  - agent
+---
+
 ## OPAL Candidate Table Context
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-17
-
 Use one shared USR `opal_candidate_feature_table` for the three current OPAL
-campaigns. Its materialized universe is the dense generated promoter subset
-from the LatentDNA view: `source_class=densegen` and `design_family` in
-`background_only`, `ethanol`, `ciprofloxacin`, or `ethanol_ciprofloxacin`.
-Archive SFXI, native, reference, and control rows remain review context.
+campaigns. Its materialized universe starts with the dense generated promoter
+subset from the LatentDNA view and includes measured-reader batch0 additions
+that already exist in the same selected LatentDNA view.
+
+Current materialized rows:
+
+- 157160 generated promoter candidates.
+- 23 measured pDual-10 SFXI reference rows with reader vec8 labels.
+- 2 measured pDual-10 control promoter rows: `pDual-10-spyp` and
+  `pDual-10-sulAp`.
+
+Native and unrelated reference rows remain review context unless they are
+explicitly added to the materialization contract.
 
 The table carries `opal_candidate__source_class`,
 `opal_candidate__design_family`, and `opal_candidate__sfxi_ref__collection_id`
 so selection filters remain auditable without joining back to LatentDNA.
 DenseGen plan/run/hash provenance is normalized from
 `usr_prom_eth_cip_anchor/_derived/densegen.parquet` during table
-materialization; missing, duplicate, or null sidecar rows are hard failures.
+materialization. Missing, duplicate, or null DenseGen sidecar rows remain hard
+failures for DenseGen candidates. The two control rows are not DenseGen
+records, so their DenseGen sidecar fields are null by contract.
 
 ### Campaign Boundary
 
@@ -30,6 +49,8 @@ materialization; missing, duplicate, or null sidecar rows are hard failures.
   writing prediction history into the shared `records.parquet`.
 - Shared `ingest-y` rejects unknown IDs unless explicitly dropped; it does not
   create candidate rows.
+- Measured controls are valid observed-label rows but are excluded from
+  synthesis-candidate eligibility by exact ID before restriction-site scanning.
 - Do not mint one USR dataset per campaign unless a campaign needs a distinct
   candidate universe, a distinct `X`, or a distinct data-validation contract.
 - LatentDNA owns the completed evidence for selecting `X`; the study owns

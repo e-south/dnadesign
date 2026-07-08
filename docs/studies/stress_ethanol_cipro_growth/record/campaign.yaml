@@ -7,16 +7,16 @@ steps:
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
       dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_ethanol_rf_sfxi_topn/configs/campaign.yaml
+      opal_config: repo:src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
   - label: opal-candidate-feature-table-cipro
     registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
       dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_cipro_rf_sfxi_topn/configs/campaign.yaml
+      opal_config: repo:src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml
   - label: opal-candidate-feature-table-and
     registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
       dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/stress_eth_cip_and_rf_sfxi_topn/configs/campaign.yaml
+      opal_config: repo:src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml
