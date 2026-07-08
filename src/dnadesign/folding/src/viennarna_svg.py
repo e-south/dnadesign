@@ -314,8 +314,12 @@ def _section_annotations(
         section_nodes = surface.nucleotide_nodes[start:end]
         anchor_x, anchor_y = _centroid([_nucleotide_structure_point(surface, node) for node in section_nodes])
         owner_ids = _owner_ids_for_span(visual_contract, start=start, end=end)
-        semantic_tokens = tuple(dict.fromkeys(component_token((owner_id,)) for owner_id in owner_ids))
         section_semantic = _section_semantic(text)
+        semantic_tokens = (
+            (section_semantic,)
+            if section_semantic
+            else tuple(dict.fromkeys(component_token((owner_id,)) for owner_id in owner_ids))
+        )
         stem_metric = _stem_metric_for_section(
             label=text,
             start=start,
@@ -898,6 +902,10 @@ def _section_kind(label: str) -> str:
 
 def _section_semantic(label: str) -> str:
     lowered = str(label).strip().lower()
+    if lowered == "left base":
+        return "stem_base_left"
+    if lowered == "right base":
+        return "stem_base_right"
     if lowered == "foldback":
         return "snapback_foldback_geometry"
     if lowered == "cap":

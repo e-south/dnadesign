@@ -47,6 +47,7 @@ class RetronStructureThumbnailRow:
     source_bundle_path: str
     review_manifest_path: str
     structure_svg_path: str = ""
+    structure_annotation_manifest_path: str = ""
     left_base_sequence: str = ""
     stem_length_bp: int | None = None
     foldback_sequence: str = ""
@@ -86,7 +87,7 @@ def build_retron_structure_thumbnail_manifest(
     source_precedent_by_hairpin_variant = dict(
         review_manifest.get("benchling_genbank_import", {}).get("source_precedent_ids", {})
     )
-    handoff_path = hairpin_root / "reviews/handoff/teto_pwm_trim_rescue_v1.handoff.tsv"
+    handoff_path = hairpin_root / "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv"
     handoff_by_variant = _load_tsv_by_key(
         handoff_path,
         key="variant_id",
@@ -123,6 +124,7 @@ def build_retron_structure_thumbnail_manifest(
                     structure_status="missing_hairpin_materialization",
                     structure_png_path="",
                     structure_svg_path="",
+                    structure_annotation_manifest_path="",
                     composition_png_path="",
                     source_bundle_path="",
                     review_manifest_path=relative_path(review_manifest_path, root),
@@ -151,6 +153,11 @@ def build_retron_structure_thumbnail_manifest(
             source=sequence_index_path,
         )
         structure_svg_path = _native_structure_svg_path(
+            sequence=sequence,
+            materialized_root=materialized_root,
+            root=root,
+        )
+        structure_annotation_manifest_path = _structure_annotation_manifest_path(
             sequence=sequence,
             materialized_root=materialized_root,
             root=root,
@@ -189,6 +196,7 @@ def build_retron_structure_thumbnail_manifest(
                 structure_status="available" if structure_path.exists() else "missing_thumbnail_path",
                 structure_png_path=relative_path(structure_path, root),
                 structure_svg_path=structure_svg_path,
+                structure_annotation_manifest_path=structure_annotation_manifest_path,
                 composition_png_path=relative_path(composition_path, root),
                 source_bundle_path=relative_path(source_bundle_path, root),
                 review_manifest_path=relative_path(review_manifest_path, root),
@@ -235,6 +243,7 @@ def _build_manifest_from_sequence_index(
                     structure_status="missing_hairpin_materialization",
                     structure_png_path="",
                     structure_svg_path="",
+                    structure_annotation_manifest_path="",
                     composition_png_path="",
                     source_bundle_path="",
                     review_manifest_path=relative_path(sequence_index_path, root),
@@ -261,6 +270,11 @@ def _build_manifest_from_sequence_index(
             source=sequence_index_path,
         )
         structure_svg_path = _native_structure_svg_path(
+            sequence=sequence,
+            materialized_root=materialized_root,
+            root=root,
+        )
+        structure_annotation_manifest_path = _structure_annotation_manifest_path(
             sequence=sequence,
             materialized_root=materialized_root,
             root=root,
@@ -296,6 +310,7 @@ def _build_manifest_from_sequence_index(
                 structure_status="available" if structure_path.exists() else "missing_thumbnail_path",
                 structure_png_path=relative_path(structure_path, root),
                 structure_svg_path=structure_svg_path,
+                structure_annotation_manifest_path=structure_annotation_manifest_path,
                 composition_png_path=relative_path(composition_path, root),
                 source_bundle_path=relative_path(source_bundle_path, root),
                 review_manifest_path=relative_path(sequence_index_path, root),
@@ -396,6 +411,27 @@ def _native_structure_svg_path(
     candidates = (
         bundle_root / "manifest/visual/secondary_structure/native.svg",
         bundle_root / "runtime/construct/visual/viennarna_secondary_structure/secondary_structure.native.svg",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return relative_path(candidate, root)
+    return ""
+
+
+def _structure_annotation_manifest_path(
+    *,
+    sequence: dict[str, str],
+    materialized_root: Path,
+    root: Path,
+) -> str:
+    artifact_bundle = sequence.get("artifact_bundle")
+    if not artifact_bundle:
+        return ""
+    bundle_root = materialized_root / artifact_bundle
+    candidates = (
+        bundle_root / "manifest/visual/secondary_structure/annotation_manifest.json",
+        bundle_root
+        / "runtime/construct/visual/viennarna_secondary_structure/secondary_structure.annotation_manifest.json",
     )
     for candidate in candidates:
         if candidate.exists():
@@ -648,6 +684,7 @@ def _thumbnail_schema() -> pa.Schema:
             pa.field("structure_status", pa.string()),
             pa.field("structure_png_path", pa.string()),
             pa.field("structure_svg_path", pa.string()),
+            pa.field("structure_annotation_manifest_path", pa.string()),
             pa.field("composition_png_path", pa.string()),
             pa.field("source_bundle_path", pa.string()),
             pa.field("review_manifest_path", pa.string()),

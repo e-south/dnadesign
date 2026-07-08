@@ -2167,7 +2167,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-195; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-195-msd-tetr-r26-w02-17.gb#msd_record
@@ -2227,7 +2227,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-196; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-196-msd-tetr-r26-w03-16.gb#msd_record
@@ -2287,7 +2287,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-197; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-43, retained payload window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-197-msd-tetr-r43-w02-17.gb#msd_record
@@ -2347,7 +2347,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-198; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-43, retained payload window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-198-msd-tetr-r43-w03-16.gb#msd_record
@@ -2407,7 +2407,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-199; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-199-msd-tetr-r180-w02-17.gb#msd_record
@@ -2466,7 +2466,7 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-200; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
       GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-200-msd-tetr-r180-w03-16.gb#msd_record

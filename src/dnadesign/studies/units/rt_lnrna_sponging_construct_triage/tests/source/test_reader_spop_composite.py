@@ -81,8 +81,12 @@ def test_retron_structure_thumbnail_manifest_resolves_hairpin_195_200_assets() -
     assert by_key["retron195"].folding_status == "ok"
     assert by_key["retron195"].structure_png_path.endswith("plots/secondary_structure.native.png")
     assert by_key["retron195"].structure_svg_path.endswith("manifest/visual/secondary_structure/native.svg")
+    assert by_key["retron195"].structure_annotation_manifest_path.endswith(
+        "manifest/visual/secondary_structure/annotation_manifest.json"
+    )
     assert (repo_root / by_key["retron195"].structure_png_path).exists()
     assert (repo_root / by_key["retron195"].structure_svg_path).exists()
+    assert (repo_root / by_key["retron195"].structure_annotation_manifest_path).exists()
     assert by_key["retron195"].left_base_sequence == "CGGG"
     assert by_key["retron195"].right_base_sequence == "ACAG"
     assert by_key["retron195"].stem_length_bp == 15
@@ -117,12 +121,24 @@ def test_retron_structure_thumbnail_manifest_writes_parquet(tmp_path: Path) -> N
 def test_structure_svg_geometry_returns_horizontal_vector_elements() -> None:
     repo_root = _repo_root()
     rows = build_retron_structure_thumbnail_manifest(repo_root=repo_root, assay_subject_keys=("retron195",))
-    geometry = oriented_structure_geometry((repo_root / rows[0].structure_svg_path).as_posix())
+    geometry = oriented_structure_geometry(
+        (repo_root / rows[0].structure_svg_path).as_posix(),
+        annotation_manifest_path=(repo_root / rows[0].structure_annotation_manifest_path).as_posix(),
+    )
     min_x, max_x, min_y, max_y = geometry.bounds
 
     assert len(geometry.lines) > 10
     assert len(geometry.texts) > 40
     assert max_x - min_x > max_y - min_y
+    semantic_colors = {line.semantic: line.color for line in geometry.lines if line.semantic}
+    line_kinds = {line.kind for line in geometry.lines}
+    assert {"backbone", "basepair"} <= line_kinds
+    assert semantic_colors["stem_base_left"] != semantic_colors["flank_5p"]
+    assert semantic_colors["stem_base_right"] != semantic_colors["flank_3p"]
+    assert "payload_primary" in semantic_colors
+    assert "payload_complement" in semantic_colors
+    semantic_texts = {text.semantic: text.color for text in geometry.texts if text.semantic}
+    assert semantic_texts["payload_primary"] == semantic_colors["payload_primary"]
 
 
 def test_structure_vector_data_size_preserves_svg_display_aspect() -> None:
@@ -309,11 +325,24 @@ def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: P
     assert payload["structure_rendering_mode"] == "matplotlib_vector_primitives_from_viennarna_svg"
     assert payload["structure_vector_aspect_policy"] == "preserve_native_svg_aspect_ratio"
     assert payload["structure_deviation_reference_variant"] == "retron26"
-    assert payload["structure_deviation_highlight_mode"] == "variant_text_indices_from_pairwise_alignment"
-    assert payload["structure_deviation_legend_label"] == "amber bases differ from retron26"
+    assert payload["structure_deviation_highlight_mode"] == "variant_text_indices_with_primitive_hue_fill"
+    assert payload["structure_deviation_legend_label"] == "Differs from retron 26"
+    assert payload["structure_deviation_legend_label_align"] == "center"
     assert payload["structure_deviation_marker_size"] >= 8.0
-    assert payload["structure_deviation_marker_alpha"] >= 0.88
+    assert 0.3 <= payload["structure_deviation_marker_alpha"] <= 0.5
+    assert payload["structure_deviation_marker_edge_alpha"] >= 0.85
+    assert payload["structure_deviation_legend_fontsize"] == pytest.approx(7.0)
+    assert payload["structure_deviation_legend_items"][0] == ["stem_base_left", "Stem"]
+    assert 0.27 <= payload["structure_panel_content_center_x"] <= 0.35
+    assert payload["structure_panel_separator_xmax"] <= 0.72
+    assert payload["structure_deviation_legend_label_x"] == pytest.approx(payload["structure_panel_content_center_x"])
+    assert payload["structure_deviation_legend_fontsize"] >= 6.6
+    assert payload["structure_deviation_legend_item_positions"][0] <= 0.08
+    assert payload["structure_deviation_legend_item_positions"][-1] <= 0.62
     assert payload["structure_vector_text_fontsize"] >= 2.6
+    assert payload["structure_vector_line_width_mode"] == "semantic_backbone_with_quiet_inset_basepair_edges"
+    assert payload["structure_vector_basepair_line_width_scale"] < payload["structure_vector_backbone_line_width_scale"]
+    assert 0.08 <= payload["structure_vector_basepair_endpoint_inset"] <= 0.14
     assert payload["typography_profile"] == "publication_dense_v1"
     assert payload["plot_title_fontsize"] >= 14.0
     assert payload["panel_title_fontsize"] >= 10.5

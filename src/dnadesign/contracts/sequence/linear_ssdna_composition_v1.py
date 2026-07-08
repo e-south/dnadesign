@@ -328,6 +328,39 @@ class LinearSsdnaVisualStyleConfigV1(SequenceContractModel):
         return _not_blank(value, label="visual.display_profile style field")
 
 
+PrimitiveVisualAppliesToV1 = Literal["backbone", "basepair", "nucleotide_text", "section_label", "section_fill"]
+
+
+class LinearSsdnaPrimitiveVisualRoleV1(SequenceContractModel):
+    role_id: str
+    display_label: str
+    palette_token: str
+    stroke_color: str
+    fill_color: str
+    priority: int = Field(ge=0)
+    applies_to: list[PrimitiveVisualAppliesToV1] = Field(default_factory=list)
+
+    @field_validator("role_id", "display_label", "palette_token")
+    @classmethod
+    def _text_not_blank(cls, value: str) -> str:
+        return _not_blank(value, label="visual.display_profile.primitive_visual_roles field")
+
+    @field_validator("stroke_color", "fill_color")
+    @classmethod
+    def _hex_color(cls, value: str) -> str:
+        color = _not_blank(value, label="visual.display_profile.primitive_visual_roles color")
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
+            raise ValueError("primitive visual role colors must be #RRGGBB hex values.")
+        return color
+
+    @field_validator("applies_to")
+    @classmethod
+    def _applies_to_unique(cls, value: list[PrimitiveVisualAppliesToV1]) -> list[PrimitiveVisualAppliesToV1]:
+        if len(set(value)) != len(value):
+            raise ValueError("primitive visual role applies_to entries must be unique.")
+        return value
+
+
 class LinearSsdnaScarNickDisplayMetadataV1(SequenceContractModel):
     left_base: str
     right_base: str
@@ -353,6 +386,7 @@ class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
     annotation_labels: dict[str, str] = Field(default_factory=dict)
     component_hues: dict[str, str] = Field(default_factory=dict)
     component_styles: dict[str, LinearSsdnaVisualStyleConfigV1] = Field(default_factory=dict)
+    primitive_visual_roles: dict[str, LinearSsdnaPrimitiveVisualRoleV1] = Field(default_factory=dict)
     scar_nick: LinearSsdnaScarNickDisplayMetadataV1 | None = None
     base_highlight_color: str | None = None
 
@@ -372,6 +406,22 @@ class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
                 item,
                 label="visual.display_profile mapping value",
             )
+        return normalized
+
+    @field_validator("primitive_visual_roles")
+    @classmethod
+    def _primitive_role_keys_match_ids(
+        cls, value: dict[str, LinearSsdnaPrimitiveVisualRoleV1]
+    ) -> dict[str, LinearSsdnaPrimitiveVisualRoleV1]:
+        normalized: dict[str, LinearSsdnaPrimitiveVisualRoleV1] = {}
+        for raw_key, role in value.items():
+            key = _not_blank(raw_key, label="visual.display_profile.primitive_visual_roles key")
+            if key != role.role_id:
+                raise ValueError(
+                    "visual.display_profile.primitive_visual_roles keys must match each role_id "
+                    f"({key!r} != {role.role_id!r})."
+                )
+            normalized[key] = role
         return normalized
 
 
@@ -473,6 +523,7 @@ __all__ = [
     "LinearSsdnaAnnotationV1",
     "LinearSsdnaAssertionV1",
     "LinearSsdnaVisualDisplayProfileV1",
+    "LinearSsdnaPrimitiveVisualRoleV1",
     "LinearSsdnaScarNickDisplayMetadataV1",
     "LinearSsdnaVisualStyleConfigV1",
 ]

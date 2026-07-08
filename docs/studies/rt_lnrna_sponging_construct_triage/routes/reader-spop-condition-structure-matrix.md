@@ -43,6 +43,7 @@ Open surfaces in this order:
 | Parquet table writer | RT-lnRNA study | `reader_spop_composite/tables.py` |
 | MSD structure assets | `retron_hairpin_design` study | `reader_spop_msd_structure_panel_v1/materialized` outputs |
 | MSD source primitives and pairing facts | `retron_hairpin_design` study | `msd_region_records/reader_spop_msd_structure_panel_v1` |
+| MSD primitive visual roles | `retron_hairpin_design` study | `artifact_contracts/primitive_visual_roles.py` |
 | Structure thumbnail manifest | RT-lnRNA study | `reader_spop_composite/structure_manifest.py` |
 | Structure SVG thumbnail renderer | RT-lnRNA study | `reader_spop_composite/structure_svg.py` |
 | Composite plot renderer | RT-lnRNA study | `reader_spop_composite/render.py` |
@@ -85,6 +86,9 @@ plots/manifest.json
   `Stem/cap wobbles`, and `tetO truncations`.
 - Row-family colors are annotation only. They do not tint the OD600 or
   activation heatmap tiles.
+- MSD structure edge colors come from the retron-hairpin primitive visual-role
+  contract through each materialized `annotation_manifest.json`. The RT plot
+  does not define cap, payload, foldback, or stem-base colors locally.
 - The `OD600 rel.` panel uses the same condition columns as the activation
   heatmap: null, aTc positive control, and IPTG doses when those rows are
   available. It shows Reader's OD600-derived
@@ -124,8 +128,9 @@ plots/manifest.json
   a border around the structure column. When native ViennaRNA SVGs are
   available, the renderer applies the cap-right coordinate orientation, keeps
   the native SVG aspect ratio, and redraws backbone, base-pair, and
-  nucleotide-label geometry as Matplotlib vector primitives. PNG thumbnails
-  are a fallback only.
+  nucleotide-label geometry as Matplotlib vector primitives. Structure edge
+  colors are resolved from nucleotide spans and basepair roles in the
+  retron-hairpin annotation manifest. PNG thumbnails are a fallback only.
 - Prominent amber nucleotide markers denote variant text positions that differ
   from the pES-retron-26 structure sequence after pairwise alignment. Deletions
   relative to pES-retron-26 cannot be marked on the variant structure because

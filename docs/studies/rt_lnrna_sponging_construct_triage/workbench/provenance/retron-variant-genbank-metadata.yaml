@@ -343,7 +343,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
   - variant_id: retron196
     retron_number: 196
     plasmid_name: pES-retron-196
@@ -356,7 +356,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
   - variant_id: retron197
     retron_number: 197
     plasmid_name: pES-retron-197
@@ -369,7 +369,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [2,17).
   - variant_id: retron198
     retron_number: 198
     plasmid_name: pES-retron-198
@@ -382,7 +382,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-43, retained payload window [3,16).
   - variant_id: retron199
     retron_number: 199
     plasmid_name: pES-retron-199
@@ -395,7 +395,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
   - variant_id: retron200
     retron_number: 200
     plasmid_name: pES-retron-200
@@ -408,7 +408,7 @@ records:
     rt_reference_source_file: retron-eco1-rt.gb
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
-    comment: Promoted from retron_hairpin_design teto_pwm_trim_rescue_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
   - variant_id: msrmsdwt_bl21
     retron_number: 0
     plasmid_name: msr/msd(wt)_BL21

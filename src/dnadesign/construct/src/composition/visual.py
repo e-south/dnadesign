@@ -204,6 +204,7 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
         "base_highlights": {"primary": [], "complement": []},
         "structure_title": title,
         "component_palette": dict(display_profile.component_hues),
+        "primitive_visual_roles": _primitive_visual_roles_meta(display_profile),
         "display_profile": _display_profile_meta(display_profile, title=title),
         "segment_label_gap_px": 6.0,
         "segment_label_tier_gap_px": 10.0,
@@ -434,11 +435,20 @@ def _display_profile_meta(display_profile: Any, *, title: str) -> dict[str, obje
         "component_labels": dict(display_profile.component_labels),
         "annotation_labels": dict(display_profile.annotation_labels),
         "component_hues": dict(display_profile.component_hues),
+        "primitive_visual_roles": _primitive_visual_roles_meta(display_profile),
     }
     scar_nick = _display_profile_scar_nick_meta(display_profile)
     if scar_nick:
         meta["scar_nick"] = scar_nick
     return meta
+
+
+def _primitive_visual_roles_meta(display_profile: Any) -> dict[str, object]:
+    roles = getattr(display_profile, "primitive_visual_roles", {})
+    payload: dict[str, object] = {}
+    for role_id, role in dict(roles).items():
+        payload[str(role_id)] = role.model_dump(mode="json") if hasattr(role, "model_dump") else dict(role)
+    return payload
 
 
 def _display_profile_scar_nick_meta(display_profile: Any) -> dict[str, object]:

@@ -91,13 +91,29 @@ STRUCTURE_NUCLEOTIDE_TEXT_ORIENTATION = "upright"
 STRUCTURE_RENDERING_MODE = "matplotlib_vector_primitives_from_viennarna_svg"
 STRUCTURE_VECTOR_ASPECT_POLICY = "preserve_native_svg_aspect_ratio"
 STRUCTURE_DEVIATION_REFERENCE_VARIANT = "retron26"
-STRUCTURE_DEVIATION_HIGHLIGHT_MODE = "variant_text_indices_from_pairwise_alignment"
-STRUCTURE_DEVIATION_LEGEND_LABEL = "amber bases differ from retron26"
-STRUCTURE_DEVIATION_MARKER_COLOR = "#fde68a"
-STRUCTURE_DEVIATION_MARKER_EDGE_COLOR = "#d97706"
-STRUCTURE_DEVIATION_TEXT_COLOR = "#7c2d12"
+STRUCTURE_DEVIATION_HIGHLIGHT_MODE = "variant_text_indices_with_primitive_hue_fill"
+STRUCTURE_DEVIATION_LEGEND_LABEL = "Differs from retron 26"
+STRUCTURE_DEVIATION_LEGEND_LABEL_ALIGN = "center"
+STRUCTURE_DEVIATION_MARKER_COLOR = "#9ca3af"
+STRUCTURE_DEVIATION_MARKER_EDGE_COLOR = "#4b5563"
+STRUCTURE_DEVIATION_TEXT_COLOR = "#111827"
 STRUCTURE_DEVIATION_MARKER_SIZE = 9.0
-STRUCTURE_DEVIATION_MARKER_ALPHA = 0.92
+STRUCTURE_DEVIATION_MARKER_ALPHA = 0.42
+STRUCTURE_DEVIATION_MARKER_EDGE_ALPHA = 0.92
+STRUCTURE_DEVIATION_MARKER_LIGHTEN_FRACTION = 0.36
+STRUCTURE_DEVIATION_LEGEND_FONTSIZE = 7.0
+STRUCTURE_PANEL_CONTENT_CENTER_X = 0.32
+STRUCTURE_PANEL_SEPARATOR_XMAX = 0.70
+STRUCTURE_DEVIATION_LEGEND_MARKER_X = 0.125
+STRUCTURE_DEVIATION_LEGEND_LABEL_X = STRUCTURE_PANEL_CONTENT_CENTER_X
+STRUCTURE_DEVIATION_LEGEND_ITEM_Y_OFFSET = 0.30
+STRUCTURE_DEVIATION_LEGEND_ITEM_POSITIONS = (0.065, 0.215, 0.385, 0.615)
+STRUCTURE_DEVIATION_LEGEND_ITEMS = (
+    ("stem_base_left", "Stem"),
+    ("payload_primary", "Payload"),
+    ("snapback_retained_stem", "Foldback"),
+    ("snapback_cap", "Cap"),
+)
 STRUCTURE_THUMBNAIL_FRAME = "none"
 STRUCTURE_THUMBNAIL_CROP = "trim_white_margin"
 STRUCTURE_THUMBNAIL_CROP_MARGIN_PX = 2
@@ -107,7 +123,28 @@ STRUCTURE_THUMBNAIL_ROTATION_QUARTER_TURNS = -1
 STRUCTURE_THUMBNAIL_HORIZONTAL_FLIP = True
 STRUCTURE_VECTOR_ROW_HALF_HEIGHT = 0.42
 STRUCTURE_VECTOR_MAX_WIDTH = 0.98
-STRUCTURE_VECTOR_TEXT_FONTSIZE = 2.7
+STRUCTURE_VECTOR_TEXT_FONTSIZE = 2.95
+STRUCTURE_VECTOR_LINE_WIDTH_MODE = "semantic_backbone_with_quiet_inset_basepair_edges"
+STRUCTURE_VECTOR_BACKBONE_LINE_WIDTH_SCALE = 0.28
+STRUCTURE_VECTOR_BASEPAIR_LINE_WIDTH_SCALE = 0.12
+STRUCTURE_VECTOR_MIN_BACKBONE_LINE_WIDTH = 0.24
+STRUCTURE_VECTOR_MIN_BASEPAIR_LINE_WIDTH = 0.16
+STRUCTURE_VECTOR_BASEPAIR_ENDPOINT_INSET = 0.11
+STRUCTURE_VECTOR_LINE_ALPHA = 0.86
+STRUCTURE_VECTOR_LINE_ZORDER = 2.1
+STRUCTURE_VECTOR_SEMANTIC_WIDTH_MULTIPLIERS = {
+    "stem_base_left": 1.25,
+    "stem_base_right": 1.25,
+    "stem_extension_left": 1.25,
+    "stem_extension_right": 1.25,
+    "payload_primary": 1.22,
+    "payload_complement": 1.22,
+    "snapback_retained_stem": 1.18,
+    "snapback_foldback_return": 1.18,
+    "snapback_cap": 1.35,
+    "flank_5p": 0.72,
+    "flank_3p": 0.72,
+}
 COLOR_SCALE = {"vmin": 0.0, "vmax": 1.0, "clip": True}
 OD600_COLOR_SCALE = {"vmin": 0.0, "vmax": 1.2, "clip": True}
 COLORBAR_ORIENTATION = "horizontal_bottom"
@@ -230,9 +267,20 @@ def render_spop_condition_structure_plot(
         "structure_deviation_reference_variant": STRUCTURE_DEVIATION_REFERENCE_VARIANT,
         "structure_deviation_highlight_mode": STRUCTURE_DEVIATION_HIGHLIGHT_MODE,
         "structure_deviation_legend_label": STRUCTURE_DEVIATION_LEGEND_LABEL,
+        "structure_deviation_legend_label_align": STRUCTURE_DEVIATION_LEGEND_LABEL_ALIGN,
         "structure_deviation_marker_color": STRUCTURE_DEVIATION_MARKER_COLOR,
         "structure_deviation_marker_size": STRUCTURE_DEVIATION_MARKER_SIZE,
         "structure_deviation_marker_alpha": STRUCTURE_DEVIATION_MARKER_ALPHA,
+        "structure_deviation_marker_edge_alpha": STRUCTURE_DEVIATION_MARKER_EDGE_ALPHA,
+        "structure_deviation_marker_lighten_fraction": STRUCTURE_DEVIATION_MARKER_LIGHTEN_FRACTION,
+        "structure_deviation_legend_fontsize": STRUCTURE_DEVIATION_LEGEND_FONTSIZE,
+        "structure_panel_content_center_x": STRUCTURE_PANEL_CONTENT_CENTER_X,
+        "structure_panel_separator_xmax": STRUCTURE_PANEL_SEPARATOR_XMAX,
+        "structure_deviation_legend_marker_x": STRUCTURE_DEVIATION_LEGEND_MARKER_X,
+        "structure_deviation_legend_label_x": STRUCTURE_DEVIATION_LEGEND_LABEL_X,
+        "structure_deviation_legend_item_y_offset": STRUCTURE_DEVIATION_LEGEND_ITEM_Y_OFFSET,
+        "structure_deviation_legend_item_positions": list(STRUCTURE_DEVIATION_LEGEND_ITEM_POSITIONS),
+        "structure_deviation_legend_items": list(STRUCTURE_DEVIATION_LEGEND_ITEMS),
         "structure_thumbnail_horizontal_flip": STRUCTURE_THUMBNAIL_HORIZONTAL_FLIP,
         "structure_thumbnail_frame": STRUCTURE_THUMBNAIL_FRAME,
         "structure_thumbnail_crop": STRUCTURE_THUMBNAIL_CROP,
@@ -241,6 +289,13 @@ def render_spop_condition_structure_plot(
         "structure_thumbnail_zoom": STRUCTURE_THUMBNAIL_ZOOM,
         "structure_vector_row_half_height": STRUCTURE_VECTOR_ROW_HALF_HEIGHT,
         "structure_vector_text_fontsize": STRUCTURE_VECTOR_TEXT_FONTSIZE,
+        "structure_vector_line_width_mode": STRUCTURE_VECTOR_LINE_WIDTH_MODE,
+        "structure_vector_backbone_line_width_scale": STRUCTURE_VECTOR_BACKBONE_LINE_WIDTH_SCALE,
+        "structure_vector_basepair_line_width_scale": STRUCTURE_VECTOR_BASEPAIR_LINE_WIDTH_SCALE,
+        "structure_vector_min_backbone_line_width": STRUCTURE_VECTOR_MIN_BACKBONE_LINE_WIDTH,
+        "structure_vector_min_basepair_line_width": STRUCTURE_VECTOR_MIN_BASEPAIR_LINE_WIDTH,
+        "structure_vector_basepair_endpoint_inset": STRUCTURE_VECTOR_BASEPAIR_ENDPOINT_INSET,
+        "structure_vector_line_alpha": STRUCTURE_VECTOR_LINE_ALPHA,
         "missing_structure_summary": _missing_structure_summary(thumbnail_rows),
         "source_reader_experiment_ids": list(condition_matrix.source_reader_experiment_ids),
         "plot_png": plot_png_path.name,
@@ -424,29 +479,12 @@ def _render_heatmap(
     thumb_ax.set_anchor("W")
     thumb_ax.set_xticks([])
     thumb_ax.set_yticks([])
-    thumb_ax.set_title("MSD structure", fontsize=PANEL_TITLE_FONTSIZE, pad=5)
-    legend_y = len(variants) + 0.38
-    thumb_ax.scatter(
-        [0.02],
-        [legend_y],
-        s=STRUCTURE_DEVIATION_MARKER_SIZE,
-        marker="o",
-        color=STRUCTURE_DEVIATION_MARKER_COLOR,
-        edgecolors=STRUCTURE_DEVIATION_MARKER_EDGE_COLOR,
-        linewidths=0.22,
-        alpha=STRUCTURE_DEVIATION_MARKER_ALPHA,
-        clip_on=False,
-        zorder=4,
-    )
-    thumb_ax.text(
-        0.055,
-        legend_y,
-        STRUCTURE_DEVIATION_LEGEND_LABEL,
-        ha="left",
-        va="center",
-        fontsize=7.4,
-        color=STRUCTURE_DEVIATION_TEXT_COLOR,
-        clip_on=False,
+    title = thumb_ax.set_title("MSD structure", fontsize=PANEL_TITLE_FONTSIZE, pad=5)
+    title.set_x(STRUCTURE_PANEL_CONTENT_CENTER_X)
+    _draw_structure_deviation_legend(
+        thumb_ax,
+        y=len(variants) + 0.38,
+        palette=_structure_legend_palette(thumbnail_by_variant, root=root),
     )
     thumb_ax.set_frame_on(False)
     thumb_ax.patch.set_alpha(0)
@@ -461,6 +499,7 @@ def _render_heatmap(
                 LineCollection,
                 thumb_ax,
                 svg_path=structure_svg_path,
+                annotation_manifest_path=_thumbnail_annotation_manifest_path(row, root=root),
                 row_index=index,
                 reference_sequence=reference_sequence,
             )
@@ -484,7 +523,11 @@ def _render_heatmap(
             )
             continue
         thumb_ax.text(0.02, index, "na", ha="left", va="center", fontsize=6, color="#6b7280")
-    _draw_category_separators(thumb_ax, row_category_spans=row_category_spans)
+    _draw_category_separators(
+        thumb_ax,
+        row_category_spans=row_category_spans,
+        xmax=STRUCTURE_PANEL_SEPARATOR_XMAX,
+    )
     colorbar = fig.colorbar(image, cax=heatmap_colorbar_ax, orientation="horizontal")
     colorbar.set_ticks([0.0, 0.5, 1.0])
     colorbar.set_ticklabels(["0", ".5", "1"])
@@ -545,9 +588,15 @@ def _draw_category_band(
         )
 
 
-def _draw_category_separators(ax, *, row_category_spans: Sequence[RetronRowCategorySpan]) -> None:
+def _draw_category_separators(
+    ax,
+    *,
+    row_category_spans: Sequence[RetronRowCategorySpan],
+    xmin: float = 0.0,
+    xmax: float = 1.0,
+) -> None:
     for span in row_category_spans[:-1]:
-        ax.axhline(span.stop_index - 0.5, color="#d1d5db", linewidth=0.55, zorder=5)
+        ax.axhline(span.stop_index - 0.5, xmin=xmin, xmax=xmax, color="#d1d5db", linewidth=0.55, zorder=5)
 
 
 def _thumbnail_image_path(row: RetronStructureThumbnailRow | None, *, root: Path) -> Path | None:
@@ -574,6 +623,34 @@ def _thumbnail_svg_path(row: RetronStructureThumbnailRow | None, *, root: Path) 
     return svg_path
 
 
+def _thumbnail_annotation_manifest_path(row: RetronStructureThumbnailRow | None, *, root: Path) -> Path | None:
+    if row is None or row.structure_status != "available" or not row.structure_annotation_manifest_path:
+        return None
+    manifest_path = root / row.structure_annotation_manifest_path
+    if not manifest_path.exists():
+        raise CompositeRenderError(
+            f"{row.assay_subject_key}: structure_annotation_manifest_path is set but manifest is missing: "
+            f"{row.structure_annotation_manifest_path}"
+        )
+    return manifest_path
+
+
+def _structure_legend_palette(
+    thumbnail_by_variant: Mapping[str, RetronStructureThumbnailRow],
+    *,
+    root: Path,
+) -> dict[str, str]:
+    for row in thumbnail_by_variant.values():
+        manifest_path = _thumbnail_annotation_manifest_path(row, root=root)
+        if manifest_path is None:
+            continue
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        palette = payload.get("palette")
+        if isinstance(palette, dict):
+            return {str(key): str(value) for key, value in palette.items()}
+    return {}
+
+
 def _thumbnail_image_data(row: RetronStructureThumbnailRow | None, *, root: Path, mpimg) -> np.ndarray | None:
     image_path = _thumbnail_image_path(row, root=root)
     if image_path is not None:
@@ -586,10 +663,14 @@ def _draw_vector_structure(
     ax,
     *,
     svg_path: Path,
+    annotation_manifest_path: Path | None,
     row_index: int,
     reference_sequence: str,
 ) -> None:
-    geometry = oriented_structure_geometry(svg_path.as_posix())
+    geometry = oriented_structure_geometry(
+        svg_path.as_posix(),
+        annotation_manifest_path=None if annotation_manifest_path is None else annotation_manifest_path.as_posix(),
+    )
     min_x, max_x, min_y, max_y = geometry.bounds
     x_span = max(1.0, max_x - min_x)
     y_span = max(1.0, max_y - min_y)
@@ -618,31 +699,32 @@ def _draw_vector_structure(
             y_center + (y - y_mid) / y_span * height_data,
         )
 
-    segments = [tuple(map_point(point) for point in line.points) for line in geometry.lines]
+    segments = [_mapped_structure_line(line, map_point=map_point) for line in geometry.lines]
     colors = [line.color for line in geometry.lines]
-    widths = [max(0.16, line.width * 0.12) for line in geometry.lines]
+    widths = [_structure_line_width(line) for line in geometry.lines]
     collection = line_collection_cls(
         segments,
         colors=colors,
         linewidths=widths,
+        alpha=STRUCTURE_VECTOR_LINE_ALPHA,
         capstyle="round",
         joinstyle="round",
-        zorder=3,
+        zorder=STRUCTURE_VECTOR_LINE_ZORDER,
     )
     ax.add_collection(collection)
     for text_index, text in enumerate(geometry.texts):
         x, y = map_point(text.point)
         is_deviation = text_index in deviation_indices
         if is_deviation:
+            facecolor, edgecolor = _deviation_marker_colors(text.color)
             ax.scatter(
                 [x],
                 [y],
                 s=STRUCTURE_DEVIATION_MARKER_SIZE,
                 marker="o",
-                color=STRUCTURE_DEVIATION_MARKER_COLOR,
-                edgecolors=STRUCTURE_DEVIATION_MARKER_EDGE_COLOR,
+                facecolors=[facecolor],
+                edgecolors=[edgecolor],
                 linewidths=0.22,
-                alpha=STRUCTURE_DEVIATION_MARKER_ALPHA,
                 zorder=3.6,
             )
         ax.text(
@@ -656,6 +738,130 @@ def _draw_vector_structure(
             color=STRUCTURE_DEVIATION_TEXT_COLOR if is_deviation else "#111827",
             zorder=4,
         )
+
+
+def _draw_structure_deviation_legend(ax, *, y: float, palette: Mapping[str, str]) -> None:
+    facecolor, edgecolor = _deviation_marker_colors(STRUCTURE_DEVIATION_MARKER_COLOR)
+    ax.scatter(
+        [STRUCTURE_DEVIATION_LEGEND_MARKER_X],
+        [y],
+        s=STRUCTURE_DEVIATION_MARKER_SIZE,
+        marker="o",
+        facecolors=[facecolor],
+        edgecolors=[edgecolor],
+        linewidths=0.22,
+        clip_on=False,
+        zorder=4,
+    )
+    ax.text(
+        STRUCTURE_DEVIATION_LEGEND_LABEL_X,
+        y,
+        STRUCTURE_DEVIATION_LEGEND_LABEL,
+        ha=STRUCTURE_DEVIATION_LEGEND_LABEL_ALIGN,
+        va="center",
+        fontsize=STRUCTURE_DEVIATION_LEGEND_FONTSIZE,
+        color=STRUCTURE_DEVIATION_TEXT_COLOR,
+        clip_on=False,
+    )
+    item_y = y + STRUCTURE_DEVIATION_LEGEND_ITEM_Y_OFFSET
+    for index, (role, label) in enumerate(STRUCTURE_DEVIATION_LEGEND_ITEMS):
+        x = STRUCTURE_DEVIATION_LEGEND_ITEM_POSITIONS[index]
+        item_facecolor, item_edgecolor = _deviation_marker_colors(palette.get(role, ""))
+        ax.scatter(
+            [x],
+            [item_y],
+            s=STRUCTURE_DEVIATION_MARKER_SIZE * 0.82,
+            marker="o",
+            facecolors=[item_facecolor],
+            edgecolors=[item_edgecolor],
+            linewidths=0.2,
+            clip_on=False,
+            zorder=4,
+        )
+        ax.text(
+            x + 0.025,
+            item_y,
+            label,
+            ha="left",
+            va="center",
+            fontsize=STRUCTURE_DEVIATION_LEGEND_FONTSIZE,
+            color="#374151",
+            clip_on=False,
+        )
+
+
+def _deviation_marker_colors(color: str) -> tuple[tuple[float, float, float, float], tuple[float, float, float, float]]:
+    source = color if color and color.startswith("#") else STRUCTURE_DEVIATION_MARKER_COLOR
+    face_rgb = _blend_hex_with_white(source, STRUCTURE_DEVIATION_MARKER_LIGHTEN_FRACTION)
+    edge_rgb = _hex_to_rgb(source)
+    return (
+        (*face_rgb, STRUCTURE_DEVIATION_MARKER_ALPHA),
+        (*edge_rgb, STRUCTURE_DEVIATION_MARKER_EDGE_ALPHA),
+    )
+
+
+def _blend_hex_with_white(color: str, fraction: float) -> tuple[float, float, float]:
+    r, g, b = _hex_to_rgb(color)
+    bounded_fraction = min(1.0, max(0.0, fraction))
+    return (
+        r + (1.0 - r) * bounded_fraction,
+        g + (1.0 - g) * bounded_fraction,
+        b + (1.0 - b) * bounded_fraction,
+    )
+
+
+def _hex_to_rgb(color: str) -> tuple[float, float, float]:
+    text = color.strip().removeprefix("#")
+    if len(text) != 6:
+        text = STRUCTURE_DEVIATION_MARKER_COLOR.removeprefix("#")
+    try:
+        return (
+            int(text[0:2], 16) / 255.0,
+            int(text[2:4], 16) / 255.0,
+            int(text[4:6], 16) / 255.0,
+        )
+    except ValueError:
+        fallback = STRUCTURE_DEVIATION_MARKER_COLOR.removeprefix("#")
+        return (
+            int(fallback[0:2], 16) / 255.0,
+            int(fallback[2:4], 16) / 255.0,
+            int(fallback[4:6], 16) / 255.0,
+        )
+
+
+def _structure_line_width(line) -> float:
+    multiplier = STRUCTURE_VECTOR_SEMANTIC_WIDTH_MULTIPLIERS.get(line.semantic, 1.0)
+    if line.kind == "basepair":
+        return max(
+            STRUCTURE_VECTOR_MIN_BASEPAIR_LINE_WIDTH,
+            line.width * STRUCTURE_VECTOR_BASEPAIR_LINE_WIDTH_SCALE * min(1.08, multiplier),
+        )
+    return max(
+        STRUCTURE_VECTOR_MIN_BACKBONE_LINE_WIDTH,
+        line.width * STRUCTURE_VECTOR_BACKBONE_LINE_WIDTH_SCALE * multiplier,
+    )
+
+
+def _mapped_structure_line(line, *, map_point) -> tuple[tuple[float, float], ...]:
+    points = tuple(map_point(point) for point in line.points)
+    if line.kind != "basepair" or len(points) != 2:
+        return points
+    return _inset_line_segment(points[0], points[1], fraction=STRUCTURE_VECTOR_BASEPAIR_ENDPOINT_INSET)
+
+
+def _inset_line_segment(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    *,
+    fraction: float,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    bounded_fraction = min(0.45, max(0.0, fraction))
+    sx, sy = start
+    ex, ey = end
+    return (
+        (sx + (ex - sx) * bounded_fraction, sy + (ey - sy) * bounded_fraction),
+        (ex + (sx - ex) * bounded_fraction, ey + (sy - ey) * bounded_fraction),
+    )
 
 
 def _axis_pixels_per_data(ax) -> tuple[float, float]:

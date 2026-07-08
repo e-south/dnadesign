@@ -363,7 +363,8 @@ def _nucleotide_annotations(
     annotations: list[dict[str, object]] = []
     for index, base in enumerate(assembled.sequence):
         owners = tuple(owner_ids[index])
-        hue = hue_for_owners(owners, palette=component_palette)
+        tags = tuple(dict.fromkeys(effect_tags[index]))
+        hue = _hue_for_nucleotide(owners=owners, effect_tags=tags, component_palette=component_palette)
         annotations.append(
             {
                 "index_0": index,
@@ -371,12 +372,25 @@ def _nucleotide_annotations(
                 "base_dna": base,
                 "base_submitted": submitted_sequence[index],
                 "owner_ids": list(owners),
-                "effect_tags": list(dict.fromkeys(effect_tags[index])),
+                "effect_tags": list(tags),
                 "hue": hue,
                 "css_class": f"dnadesign-component-{component_token(owners)}",
             }
         )
     return annotations
+
+
+def _hue_for_nucleotide(
+    *,
+    owners: tuple[str, ...],
+    effect_tags: tuple[str, ...],
+    component_palette: dict[str, str],
+) -> str:
+    for tag in effect_tags:
+        color = component_palette.get(tag)
+        if color:
+            return color
+    return hue_for_owners(owners, palette=component_palette)
 
 
 def _stem_base_tags_from_segment_labels(visual_contract: SequenceEvidenceMapV1) -> list[dict[str, int | str]]:
