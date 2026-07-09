@@ -11,9 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import importlib.util
-import subprocess
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -22,7 +19,6 @@ import typer
 from ...analysis.campaign import CampaignAnalysis
 from ...analysis.notebook_set_template import render_campaign_set_notebook
 from ...analysis.notebook_template import render_campaign_notebook
-from ...core.pretty import console_out
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.campaign_set_artifacts import materialize_campaign_set_collection_visuals
@@ -36,197 +32,20 @@ from .notebook_generation import (
     notebook_generate_payload,
     resolve_generation_run_scope,
 )
+from .notebook_support import (
+    launch_marimo_notebook,
+    list_notebooks,
+    notebook_rows,
+    parse_notebook_round_selector,
+    print_rich,
+    resolve_notebook_name,
+    resolve_notebook_path,
+    rich_kv_table,
+    rich_list_table,
+)
 
 notebook_app = typer.Typer(no_args_is_help=False, help="Notebook workflows (marimo).")
 cli_group("notebook", help="Notebook workflows (marimo).")(notebook_app)
-
-
-def _list_notebooks(notebooks_dir: Path) -> list[Path]:
-    if not notebooks_dir.exists():
-        return []
-    return sorted([p for p in notebooks_dir.glob("*.py") if p.is_file()])
-
-
-def _notebook_rows(paths: list[Path]) -> list[str]:
-    return [f"{idx}: {path.name}" for idx, path in enumerate(paths)]
-
-
-def _format_notebook_choices(paths: list[Path]) -> str:
-    return "\n".join(_notebook_rows(paths))
-
-
-def _print_rich(obj: object) -> bool:
-    console = console_out()
-    if console is None:
-        return False
-    console.print(obj)
-    return True
-
-
-def _rich_kv_table(title: str, items: dict[str, object]):
-    from rich import box
-    from rich.table import Table
-
-    table = Table(
-        title=title,
-        show_header=False,
-        box=box.ROUNDED,
-        border_style="cyan",
-        title_style="bold cyan",
-    )
-    table.add_column("Key", style="bold", no_wrap=True)
-    table.add_column("Value", overflow="fold")
-    for key, value in items.items():
-        table.add_row(str(key), "" if value is None else str(value))
-    return table
-
-
-def _rich_list_table(title: str, rows: list[str]):
-    from rich import box
-    from rich.table import Table
-
-    table = Table(
-        title=title,
-        show_header=False,
-        box=box.ROUNDED,
-        border_style="cyan",
-        title_style="bold cyan",
-    )
-    table.add_column("Item", overflow="fold")
-    if not rows:
-        table.add_row("(none)")
-    else:
-        for row in rows:
-            table.add_row(str(row))
-    return table
-
-
-def _pick_notebook_interactive(paths: list[Path]) -> Path:
-    if not sys.stdin.isatty():
-        msg = "Multiple notebooks found but no TTY available. Re-run with --path to select one."
-        raise OpalError(msg, ExitCodes.BAD_ARGS)
-    rows = _notebook_rows(paths)
-    if tui_enabled():
-        table = _rich_list_table("Notebooks", rows)
-        if _print_rich(table):
-            pass
-        else:
-            print_stdout("Multiple notebooks found:\n" + "\n".join(rows))
-    else:
-        print_stdout("Multiple notebooks found:\n" + "\n".join(rows))
-    resp = input("Select notebook index: ").strip()
-    try:
-        idx = int(resp)
-    except Exception as e:
-        raise OpalError("Invalid notebook index; expected an integer.", ExitCodes.BAD_ARGS) from e
-    if idx < 0 or idx >= len(paths):
-        raise OpalError("Notebook index out of range.", ExitCodes.BAD_ARGS)
-    return paths[idx]
-
-
-def _resolve_notebook_path(analysis: CampaignAnalysis, path: Path | None) -> Path:
-    ws = analysis.workspace
-    notebooks_dir = ws.workdir / "notebooks"
-    if path is None:
-        notebooks = _list_notebooks(notebooks_dir)
-        if not notebooks:
-            raise OpalError(
-                (
-                    f"No notebooks found in {notebooks_dir}. "
-                    f"Run `uv run opal notebook generate -c {analysis.config_path}` first."
-                ),
-                ExitCodes.BAD_ARGS,
-            )
-        if len(notebooks) == 1:
-            return notebooks[0]
-        if sys.stdin.isatty():
-            return _pick_notebook_interactive(notebooks)
-        msg = "Multiple notebooks found:\n" + _format_notebook_choices(notebooks) + "\nUse --path to select one."
-        raise OpalError(msg, ExitCodes.BAD_ARGS)
-
-    nb_path = Path(path)
-    if not nb_path.is_absolute():
-        nb_path = (Path.cwd() / nb_path).resolve()
-    if not nb_path.exists():
-        raise OpalError(
-            f"Notebook not found: {nb_path}. Run `uv run opal notebook generate -c <campaign.yaml>` first.",
-            ExitCodes.BAD_ARGS,
-        )
-    return nb_path
-
-
-def _marimo_command(
-    *,
-    mode: str,
-    notebook_path: Path,
-    host: str | None,
-    port: int | None,
-    headless: bool,
-) -> list[str]:
-    if mode not in {"run", "edit"}:
-        raise ValueError(f"Unsupported marimo notebook mode: {mode}")
-    command = ["marimo", mode, str(notebook_path)]
-    if host is not None:
-        command.extend(["--host", str(host)])
-    if port is not None:
-        command.extend(["--port", str(port)])
-    if headless:
-        command.append("--headless")
-    return command
-
-
-def _launch_marimo_notebook(
-    *,
-    mode: str,
-    notebook_path: Path,
-    host: str | None,
-    port: int | None,
-    headless: bool,
-) -> None:
-    if importlib.util.find_spec("marimo") is None:
-        command_hint = "run" if mode == "run" else "edit"
-        raise OpalError(
-            f"marimo is not installed. Install with `uv sync --locked` or use `uv run marimo {command_hint} ...`.",
-            ExitCodes.BAD_ARGS,
-        )
-    subprocess.run(
-        _marimo_command(
-            mode=mode,
-            notebook_path=notebook_path,
-            host=host,
-            port=port,
-            headless=headless,
-        ),
-        check=True,
-    )
-
-
-def _resolve_notebook_name(name: Optional[str], default_name: str) -> str:
-    if not name:
-        return default_name
-    raw = str(name).strip()
-    if not raw:
-        return default_name
-    if Path(raw).name != raw:
-        raise OpalError("--name must be a file name, not a path.", ExitCodes.BAD_ARGS)
-    suffix = Path(raw).suffix
-    if suffix and suffix != ".py":
-        raise OpalError("--name must end with .py (or omit the extension).", ExitCodes.BAD_ARGS)
-    return raw if suffix else f"{raw}.py"
-
-
-def _parse_notebook_round_selector(round_value: str | None, *, allow_all: bool) -> str:
-    raw = (round_value or "latest").strip().lower()
-    if raw in ("", "latest"):
-        return "latest"
-    if allow_all and raw == "all":
-        return "all"
-    try:
-        round_index = int(raw)
-    except Exception as exc:
-        accepted = "an integer, 'latest', or 'all'" if allow_all else "an integer or 'latest'"
-        raise OpalError(f"Invalid --round: must be {accepted}.", ExitCodes.BAD_ARGS) from exc
-    return str(round_index)
 
 
 @notebook_app.callback(invoke_without_command=True)
@@ -246,10 +65,10 @@ def notebook_root(
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
         ws = analysis.workspace
         notebooks_dir = ws.workdir / "notebooks"
-        notebooks = _list_notebooks(notebooks_dir)
+        notebooks = list_notebooks(notebooks_dir)
         if not notebooks:
             if tui_enabled():
-                table = _rich_kv_table(
+                table = rich_kv_table(
                     "Notebook",
                     {
                         "Status": "No notebooks found",
@@ -257,7 +76,7 @@ def notebook_root(
                         "Tip": "use --name to customize the notebook filename",
                     },
                 )
-                if _print_rich(table):
+                if print_rich(table):
                     return
             print_stdout(
                 "No notebooks found. Generate one with:\n"
@@ -267,14 +86,14 @@ def notebook_root(
             return
         if len(notebooks) == 1:
             if tui_enabled():
-                table = _rich_kv_table(
+                table = rich_kv_table(
                     "Notebook",
                     {
                         "Notebook": notebooks[0].name,
                         "Run": f"uv run opal notebook run -c {analysis.config_path}",
                     },
                 )
-                if _print_rich(table):
+                if print_rich(table):
                     return
             print_stdout(
                 "Notebook available:\n"
@@ -283,18 +102,18 @@ def notebook_root(
                 f"  uv run opal notebook run -c {analysis.config_path}"
             )
             return
-        rows = _notebook_rows(notebooks)
+        rows = notebook_rows(notebooks)
         if tui_enabled():
-            table = _rich_list_table("Notebooks", rows)
-            if _print_rich(table):
-                hint = _rich_kv_table(
+            table = rich_list_table("Notebooks", rows)
+            if print_rich(table):
+                hint = rich_kv_table(
                     "Next steps",
                     {
                         "Run": f"uv run opal notebook run -c {analysis.config_path}",
                         "Pick": "Or specify a file with --path",
                     },
                 )
-                _print_rich(hint)
+                print_rich(hint)
                 return
         print_stdout(
             "Multiple notebooks found:\n" + "\n".join(rows) + "\nRun with:\n"
@@ -410,7 +229,7 @@ def cmd_notebook_generate(
         if out is not None and name is not None:
             raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
 
-        round_sel = _parse_notebook_round_selector(round, allow_all=False)
+        round_sel = parse_notebook_round_selector(round, allow_all=False)
 
         if run_id is not None:
             round_sel, resolved_run_id = resolve_generation_run_scope(
@@ -427,7 +246,7 @@ def cmd_notebook_generate(
             resolve_round_index_from_runs(runs_df, round_sel)
 
         default_name = f"opal_{cfg.campaign.slug}_analysis.py"
-        notebook_name = _resolve_notebook_name(name, default_name)
+        notebook_name = resolve_notebook_name(name, default_name)
         default_out = ws.workdir / "notebooks" / notebook_name
         out_path = Path(out) if out is not None else default_out
         overwritten = out_path.exists()
@@ -477,7 +296,7 @@ def cmd_notebook_generate(
             return
 
         if tui_enabled():
-            table = _rich_kv_table(
+            table = rich_kv_table(
                 "Notebook Generated",
                 {
                     "Config": analysis.config_path,
@@ -486,12 +305,12 @@ def cmd_notebook_generate(
                     "Run ID": resolved_run_id or "",
                 },
             )
-            if _print_rich(table):
-                hint = _rich_list_table(
+            if print_rich(table):
+                hint = rich_list_table(
                     "Next steps",
                     [f"uv run opal notebook run -c {analysis.config_path}"],
                 )
-                _print_rich(hint)
+                print_rich(hint)
             else:
                 print_config_context(analysis.config_path, cfg=cfg)
                 print_stdout(f"Notebook written: {out_path}")
@@ -545,7 +364,7 @@ def _generate_campaign_set_notebook(
             )
 
     analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
-    round_sel = _parse_notebook_round_selector(round, allow_all=True)
+    round_sel = parse_notebook_round_selector(round, allow_all=True)
 
     for analysis in analyses:
         store = analysis.records_store()
@@ -555,7 +374,7 @@ def _generate_campaign_set_notebook(
             resolve_round_index_from_runs(analysis.read_runs(), round_sel)
 
     default_name = "opal_campaign_set_analysis.py"
-    notebook_name = _resolve_notebook_name(name, default_name)
+    notebook_name = resolve_notebook_name(name, default_name)
     default_out = analyses[0].workspace.workdir / "notebooks" / notebook_name
     out_path = Path(out) if out is not None else default_out
     overwritten = out_path.exists()
@@ -629,7 +448,7 @@ def _generate_campaign_set_notebook(
         return
 
     if tui_enabled():
-        table = _rich_kv_table(
+        table = rich_kv_table(
             "Campaign Set Notebook Generated",
             {
                 "Campaigns": len(analyses),
@@ -639,7 +458,7 @@ def _generate_campaign_set_notebook(
                 "Collection visuals": collection_visual_index_path or "",
             },
         )
-        if _print_rich(table):
+        if print_rich(table):
             return
     print_stdout(f"Campaign-set notebook written: {out_path}")
 
@@ -660,9 +479,9 @@ def cmd_notebook_run(
 ) -> None:
     try:
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
-        nb_path = _resolve_notebook_path(analysis, path)
+        nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo app: {nb_path}")
-        _launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
     except OpalError as e:
         opal_error("notebook.run", e)
         raise typer.Exit(code=e.exit_code)
@@ -693,9 +512,9 @@ def cmd_notebook_edit(
 ) -> None:
     try:
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
-        nb_path = _resolve_notebook_path(analysis, path)
+        nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo editor: {nb_path}")
-        _launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)
     except OpalError as e:
         opal_error("notebook.edit", e)
         raise typer.Exit(code=e.exit_code)

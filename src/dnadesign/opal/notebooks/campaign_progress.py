@@ -2,7 +2,7 @@ import marimo
 
 __generated_with = "0.19.4"
 
-app = marimo.App(width="full")
+app = marimo.App(width="medium")
 
 
 @app.cell
@@ -24,6 +24,7 @@ def _():
         build_notebook_collection_set_choices,
         build_notebook_collection_visual_card_rows,
         build_notebook_collection_visual_choices,
+        build_notebook_collection_visual_description,
         build_notebook_evidence_rows,
         build_notebook_metric_definition_rows,
         build_notebook_plot_card_rows,
@@ -38,8 +39,13 @@ def _():
         render_notebook_reader_evidence_artifact_visual,
         render_notebook_reader_evidence_panel,
         render_notebook_reader_evidence_plot_type_control,
+        render_notebook_reader_evidence_time_control,
+        render_notebook_visual_panel,
         select_notebook_plot_scope,
     )
+
+    def opal_table(data, *, page_size):
+        return mo.ui.table(data, page_size=page_size, show_column_summaries=False)
 
     return (
         Path,
@@ -54,6 +60,7 @@ def _():
         build_notebook_collection_set_choices,
         build_notebook_collection_visual_card_rows,
         build_notebook_collection_visual_choices,
+        build_notebook_collection_visual_description,
         build_notebook_evidence_rows,
         build_notebook_metric_definition_rows,
         build_notebook_plot_card_rows,
@@ -64,12 +71,15 @@ def _():
         find_notebook_repo_root,
         list_notebook_campaign_paths,
         mo,
+        opal_table,
         pl,
         render_notebook_plot_choice_image,
         render_notebook_reader_evidence_artifact_control,
         render_notebook_reader_evidence_artifact_visual,
         render_notebook_reader_evidence_panel,
         render_notebook_reader_evidence_plot_type_control,
+        render_notebook_reader_evidence_time_control,
+        render_notebook_visual_panel,
         select_notebook_plot_scope,
     )
 
@@ -334,67 +344,34 @@ def _(active_view_mode, build_notebook_plot_scope_options, mo, selected_visual_c
 def _(
     active_view_mode,
     build_notebook_collection_visual_card_rows,
+    build_notebook_collection_visual_description,
     build_notebook_plot_card_rows,
     build_notebook_plot_method_sections,
     mo,
+    opal_table,
     pl,
     plot_scope_ui,
     plot_ui,
     render_notebook_plot_choice_image,
+    render_notebook_visual_panel,
     select_notebook_plot_scope,
     selected_visual_choice,
 ):
-    _control_items = []
-    if plot_ui is not None:
-        _control_items.append(plot_ui)
-    if plot_scope_ui is not None:
-        _control_items.append(plot_scope_ui)
-    _controls = (
-        mo.hstack(_control_items, justify="start", align="end", wrap=True, gap=0.35) if _control_items else mo.md("")
+    plot_panel = render_notebook_visual_panel(
+        active_view_mode=active_view_mode,
+        build_notebook_collection_visual_card_rows=build_notebook_collection_visual_card_rows,
+        build_notebook_plot_card_rows=build_notebook_plot_card_rows,
+        build_notebook_plot_method_sections=build_notebook_plot_method_sections,
+        collection_visual_description=build_notebook_collection_visual_description,
+        mo=mo,
+        opal_table=opal_table,
+        pl=pl,
+        plot_scope_ui=plot_scope_ui,
+        plot_ui=plot_ui,
+        render_notebook_plot_choice_image=render_notebook_plot_choice_image,
+        selected_visual_choice=selected_visual_choice,
+        select_notebook_plot_scope=select_notebook_plot_scope,
     )
-
-    if selected_visual_choice is None:
-        if active_view_mode == "Campaign set":
-            _lines = ["No campaign-set comparison visuals are available."]
-        else:
-            _lines = ["No plot deliverables are available for this campaign."]
-        plot_panel = mo.vstack([_controls, mo.md("\n".join(_lines))], gap=0.45)
-    elif active_view_mode == "Campaign set":
-        _visual = render_notebook_plot_choice_image(selected_visual_choice, mo=mo)
-        _details = {
-            "Collection plot evidence": mo.vstack(
-                [
-                    mo.ui.table(
-                        pl.DataFrame(build_notebook_collection_visual_card_rows(selected_visual_choice)),
-                        page_size=12,
-                        show_column_summaries=False,
-                    ),
-                ],
-                gap=0.35,
-            )
-        }
-        plot_panel = mo.vstack([_controls, _visual, mo.accordion(_details, multiple=True)], gap=0.45)
-    else:
-        _choice = select_notebook_plot_scope(
-            selected_visual_choice,
-            str(plot_scope_ui.value) if plot_scope_ui is not None else None,
-        )
-        _visual = render_notebook_plot_choice_image(_choice, mo=mo)
-        _method_sections = build_notebook_plot_method_sections(_choice)
-        _details = {
-            "Plot evidence": mo.vstack(
-                [
-                    *[mo.md(text) for text in _method_sections.values()],
-                    mo.ui.table(
-                        pl.DataFrame(build_notebook_plot_card_rows(_choice)),
-                        page_size=12,
-                        show_column_summaries=False,
-                    ),
-                ],
-                gap=0.35,
-            ),
-        }
-        plot_panel = mo.vstack([_controls, _visual, mo.accordion(_details, multiple=True)], gap=0.45)
     return plot_panel
 
 
@@ -540,15 +517,38 @@ def _(
     mo,
     reader_evidence_artifact_ui,
     reader_evidence_surface,
+    render_notebook_reader_evidence_time_control,
+    selected_reader_evidence_plot_type_label,
+):
+    _selected_artifact_label = None if reader_evidence_artifact_ui is None else str(reader_evidence_artifact_ui.value)
+    reader_evidence_time_ui = render_notebook_reader_evidence_time_control(
+        reader_evidence_surface,
+        selected_plot_type_label=selected_reader_evidence_plot_type_label,
+        selected_artifact_label=_selected_artifact_label,
+        mo=mo,
+    )
+    return reader_evidence_time_ui
+
+
+@app.cell
+def _(
+    mo,
+    reader_evidence_artifact_ui,
+    reader_evidence_surface,
+    reader_evidence_time_ui,
     render_notebook_reader_evidence_artifact_visual,
     selected_reader_evidence_plot_type_label,
 ):
     _selected_artifact_label = None if reader_evidence_artifact_ui is None else str(reader_evidence_artifact_ui.value)
+    _selected_time_h = None
+    if reader_evidence_time_ui is not None and hasattr(reader_evidence_time_ui, "value"):
+        _selected_time_h = float(reader_evidence_time_ui.value)
     reader_evidence_visual = render_notebook_reader_evidence_artifact_visual(
         reader_evidence_surface,
         selected_plot_type_label=selected_reader_evidence_plot_type_label,
         selected_artifact_label=_selected_artifact_label,
         mo=mo,
+        selected_time_h=_selected_time_h,
     )
     return reader_evidence_visual
 
@@ -569,8 +569,10 @@ def _(
     reader_evidence_artifact_ui,
     reader_evidence_panel,
     reader_evidence_plot_type_ui,
+    reader_evidence_time_ui,
     reader_evidence_visual,
     selected_campaign_brief_md,
+    selected_visual_choice,
     selected_overview_panel,
     selected_validity_md,
     view_mode_ui,
@@ -585,23 +587,28 @@ def _(
     else:
         _top_control_items = [item for item in [view_mode_ui] if item is not None]
     if _top_control_items:
-        _items.append(mo.vstack(_top_control_items, gap=0.20))
+        _items.append(mo.hstack(_top_control_items, justify="start", align="end", wrap=True, gap=0.35))
     if active_view_mode != "Campaign set":
         _items.append(selected_campaign_brief_md)
-    _plot_items = [plot_panel]
+    _reader_plot_panel = None
     if reader_evidence_plot_type_ui is not None:
         _reader_controls = [reader_evidence_plot_type_ui]
         if reader_evidence_artifact_ui is not None:
             _reader_controls.append(reader_evidence_artifact_ui)
-        _plot_items.append(
-            mo.vstack(
-                [
-                    mo.hstack(_reader_controls, justify="start", align="end", wrap=True, gap=0.35),
-                    reader_evidence_visual,
-                ],
-                gap=0.35,
-            )
+        if reader_evidence_time_ui is not None:
+            _reader_controls.append(reader_evidence_time_ui)
+        _reader_plot_panel = mo.vstack(
+            [
+                mo.hstack(_reader_controls, justify="start", align="end", wrap=True, gap=0.35),
+                reader_evidence_visual,
+            ],
+            gap=0.35,
         )
+    _plot_items = []
+    if selected_visual_choice is not None or _reader_plot_panel is None:
+        _plot_items.append(plot_panel)
+    if _reader_plot_panel is not None:
+        _plot_items.append(_reader_plot_panel)
     _items.append(mo.vstack(_plot_items, gap=0.55))
     _accordion_items = {
         "Campaigns at a glance": mo.ui.table(
@@ -611,14 +618,14 @@ def _(
         ),
     }
     if active_view_mode != "Campaign set":
-        _status_panel = mo.vstack([selected_overview_panel, selected_validity_md, changes_panel], gap=0.35)
-        _data_panel = mo.vstack([metric_definitions_panel, artifact_garden_panel], gap=0.35)
+        _status_panel = mo.vstack(
+            [selected_overview_panel, selected_validity_md, changes_panel, evidence_panel], gap=0.35
+        )
+        _data_panel = mo.vstack([reader_evidence_panel, metric_definitions_panel, artifact_garden_panel], gap=0.35)
         _accordion_items.update(
             {
                 "Campaign status": _status_panel,
-                "Reader evidence records": reader_evidence_panel,
-                "Data inputs and artifacts": _data_panel,
-                "Warnings and stale artifacts": evidence_panel,
+                "Data and evidence records": _data_panel,
             }
         )
     _items.extend(

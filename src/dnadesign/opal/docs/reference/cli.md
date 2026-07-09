@@ -12,6 +12,9 @@ entrypoints:
   cli: uv run opal
 ---
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-07-08
+
 ## OPAL Command Line Interface
 
 

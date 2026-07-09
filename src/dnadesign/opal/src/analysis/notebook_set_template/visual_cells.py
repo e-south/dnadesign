@@ -133,7 +133,8 @@ def _visual_selector_cell() -> str:
                         label="Plot deliverable",
                         on_change=set_visual_label_memory,
                     )
-            else: plot_ui = None
+            else:
+                plot_ui = None
             return plot_ui
         """
     )

@@ -28,9 +28,12 @@ def _selected_record_ids_cell() -> str:
     return block(
         """
         @app.cell
-        def _(baserender_run_ui, selected_baserender_round, """
-        "build_notebook_selected_baserender_record_ids, selected_campaign_analysis):"
-        """
+        def _(
+            baserender_run_ui,
+            build_notebook_selected_baserender_record_ids,
+            selected_baserender_round,
+            selected_campaign_analysis,
+        ):
             _run_id = str(baserender_run_ui.value) if baserender_run_ui is not None else None
             selected_baserender_ids, selected_baserender_status_rows = (
                 build_notebook_selected_baserender_record_ids(

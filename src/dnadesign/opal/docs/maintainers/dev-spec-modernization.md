@@ -15,6 +15,9 @@ scope:
   - generated-marimo-notebooks
 ---
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-07-08
+
 # OPAL Modernization Development Specification
 
 OPAL maintainer plans live in the tool-local docs tree. Public operator contracts live in reference docs, CLI JSON schemas, checked-in tests, and manifest-backed artifacts.
@@ -703,7 +706,7 @@ SFXI may configure semantic labels for channels, but the primitive remains vecto
 | --- | --- |
 | Problem | The generated single-campaign notebook is useful and manifest-backed. Reusable helper panels now live in the semantic `notebook_components/` package, generated source wiring is split under `notebook_template/`, and campaign-set generation exists as a separate overview notebook. Remaining UX risk is future drift away from reusable panel primitives and weak live marimo interaction evidence. |
 | Proposed change | Continue refactoring generated marimo notebooks into thin composition files built from reusable public OPAL primitives. Single-campaign and campaign-set notebooks should use the same component vocabulary; campaign-set behavior is a generic campaign selector plus the same plot-deliverable surface, status panels, and raw artifact panels, not a probe-specific notebook. Extend campaign-set review from repeated config paths toward an optional manifest/index input when the contract stabilizes. |
-| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `plot_deliverable_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_evidence`, `visual_surface_model`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: `Plot deliverable`, `Campaign status`, `Evidence`, `Data inputs and artifacts`, `Distrust and limitations`, `Raw tables`. |
+| Contract shape | `NotebookViewModel` plus `NotebookCampaignSetViewModel`. Public render primitives: `campaign_selector`, `plot_deliverable_selector`, `at_a_glance_panel`, `validity_panel`, `changes_panel`, `metric_definitions_panel`, `plot_evidence`, `visual_surface_model`, `records_panel`, `labels_predictions_panel`, `artifact_garden_panel`, `distrust_panel`, and `raw_artifacts_panel`. Sections: selected plot deliverables first, then `Campaign status` and `Data and evidence records` as compact progressive-disclosure panels. |
 | Affected modules | `src/dnadesign/opal/src/analysis/notebook_template/`, `src/dnadesign/opal/src/reporting/notebook.py`, public notebook API, tests, CLI notebook command. |
 | Migration notes | Preserve current ability to generate before first run. In that state, the view model reports `not_started` and missing manifest states explicitly. Keep the single-campaign path as the default; add campaign-set mode only when the user supplies a campaign index, run-root manifest, or explicit repeated `--campaign` values. |
 | Acceptance criteria | First viewport shows campaign selector when multiple campaigns exist, plot-deliverable controls, the selected plot artifact, campaign status, run scope, X column, label source, latest run_id, selected count, stale warnings, and missing artifacts. Heavy supporting tables are inside `mo.accordion(..., multiple=True)` sections; lazy loading is limited to static panels that do not contain reactive widgets or media previews. The generated notebook should be mostly wiring; reusable component/view-model code should be importable and unit-tested outside marimo. |

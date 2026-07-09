@@ -46,7 +46,8 @@ def _view_mode_cell() -> str:
         def _(collection_set_choices, mo):
             if collection_set_choices:
                 view_mode_ui = mo.ui.dropdown(["Campaign", "Campaign set"], value="Campaign", label="View")
-            else: view_mode_ui = None
+            else:
+                view_mode_ui = None
             return view_mode_ui
         """
     )
@@ -74,7 +75,8 @@ def _collection_set_selector_cell() -> str:
                     value=collection_set_choices[0]["label"],
                     label="Campaign set",
                 )
-            else: collection_set_ui = None
+            else:
+                collection_set_ui = None
             return collection_set_ui
         """
     )

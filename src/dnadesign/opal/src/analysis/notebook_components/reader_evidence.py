@@ -16,16 +16,17 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ._support import compact_path, mapping, sequence
+from .reader_evidence_media import (
+    dedupe_reader_media_labels,
+    filter_reader_media_rows,
+    is_reader_media_artifact,
+    reader_media_plot_type_labels,
+    semantic_kind_label,
+    time_selected_label,
+)
+from .reader_evidence_visual import render_notebook_reader_evidence_artifact_visual
 
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_evidence.v1"
-READER_EVIDENCE_PDF_HEIGHT = "52vh"
-READER_EVIDENCE_IMAGE_MAX_HEIGHT = "min(56vh, 640px)"
-
-_SEMANTIC_KIND_LABELS = {
-    "raw_kinetics": "Plate-reader time series",
-    "sfxi_vec8_heatmap": "SFXI vec8 heatmap",
-    "vec8_heatmap": "SFXI vec8 heatmap",
-}
 
 
 def discover_reader_evidence_manifests(workdir: str | Path) -> list[dict[str, Any]]:
@@ -56,14 +57,14 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                 design_id = str(item.get("design_id") or "")
                 reader_experiment_id = str(item.get("reader_experiment_id") or "")
                 round_label = str(payload.get("round") or _round_label(manifest_path))
-                plot_type_label = _semantic_kind_label(semantic_kind)
+                plot_type_label = semantic_kind_label(semantic_kind)
                 artifact_label = " | ".join(
                     part
                     for part in (
                         round_label,
                         reader_experiment_id,
                         design_id,
-                        _time_selected_label(item.get("time_selected_h")),
+                        time_selected_label(item.get("time_selected_h")),
                     )
                     if part
                 )
@@ -74,9 +75,14 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                         "id": str(item.get("id") or ""),
                         "design_id": design_id,
                         "reader_experiment_id": reader_experiment_id,
+                        "reader_config_path": str(item.get("reader_config_path") or ""),
+                        "reader_record_id": str(item.get("reader_record_id") or ""),
                         "time_selected_h": item.get("time_selected_h"),
+                        "sequence": item.get("sequence") or "",
+                        "synthesis_name": item.get("synthesis_name") or "",
                         "semantic_kind": semantic_kind,
                         "plot_type_label": plot_type_label,
+                        "artifact_record_id": str(artifact_item.get("record_id") or ""),
                         "path": str(path or ""),
                         "path_label": compact_path(path, max_parts=5),
                         "exists": bool(artifact_item.get("exists")),
@@ -124,9 +130,14 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
                 "id": item.get("id") or "",
                 "design_id": item.get("design_id") or "",
                 "reader_experiment_id": item.get("reader_experiment_id") or "",
+                "reader_config_path": item.get("reader_config_path") or "",
+                "reader_record_id": item.get("reader_record_id") or "",
                 "time_selected_h": item.get("time_selected_h") or "",
+                "sequence": item.get("sequence") or "",
+                "synthesis_name": item.get("synthesis_name") or "",
                 "semantic_kind": item.get("semantic_kind") or "",
-                "plot_type_label": item.get("plot_type_label") or _semantic_kind_label(item.get("semantic_kind")),
+                "plot_type_label": item.get("plot_type_label") or semantic_kind_label(item.get("semantic_kind")),
+                "artifact_record_id": item.get("artifact_record_id") or "",
                 "exists": bool(item.get("exists")),
                 "media_type": item.get("media_type") or "",
                 "path": item.get("path") or "",
@@ -141,13 +152,13 @@ def build_notebook_reader_evidence_surface(view_model: Mapping[str, Any]) -> dic
 
     rows = build_notebook_reader_evidence_rows(view_model)
     artifact_rows = build_notebook_reader_evidence_artifact_rows(view_model)
-    media_rows = _dedupe_reader_media_labels([row for row in artifact_rows if _is_reader_media_artifact(row)])
+    media_rows = dedupe_reader_media_labels([row for row in artifact_rows if is_reader_media_artifact(row)])
     return {
         "rows": rows,
         "artifact_rows": artifact_rows,
         "media_rows": media_rows,
         "media_labels": [str(row["label"]) for row in media_rows],
-        "media_plot_type_labels": _reader_media_plot_type_labels(media_rows),
+        "media_plot_type_labels": reader_media_plot_type_labels(media_rows),
     }
 
 
@@ -164,17 +175,17 @@ def build_notebook_reader_evidence_artifact_options(
 ) -> list[str]:
     """Return artifact dropdown labels scoped to the selected Reader plot type."""
 
-    media_rows = _filter_reader_media_rows(surface, selected_plot_type_label=selected_plot_type_label)
+    media_rows = filter_reader_media_rows(surface, selected_plot_type_label=selected_plot_type_label)
     return [str(row.get("label") or "") for row in media_rows if str(row.get("label") or "").strip()]
 
 
 def render_notebook_reader_evidence_plot_type_control(surface: Mapping[str, Any], *, mo: Any) -> Any | None:
-    """Render the Reader plot-type dropdown for generated notebooks."""
+    """Render the plot-type dropdown for generated notebooks."""
 
     options = build_notebook_reader_evidence_plot_type_options(surface)
     if not options:
         return None
-    return mo.ui.dropdown(options, value=options[0], label="Reader plot type", full_width=True)
+    return mo.ui.dropdown(options, value=options[0], label="Plot type", full_width=True)
 
 
 def render_notebook_reader_evidence_artifact_control(
@@ -183,7 +194,7 @@ def render_notebook_reader_evidence_artifact_control(
     selected_plot_type_label: str | None,
     mo: Any,
 ) -> Any | None:
-    """Render the Reader artifact dropdown scoped to a plot type."""
+    """Render the plot-instance dropdown scoped to a plot type."""
 
     options = build_notebook_reader_evidence_artifact_options(
         surface,
@@ -191,7 +202,7 @@ def render_notebook_reader_evidence_artifact_control(
     )
     if not options:
         return None
-    return mo.ui.dropdown(options, value=options[0], label="Reader plot instance", searchable=True, full_width=True)
+    return mo.ui.dropdown(options, value=options[0], label="Plot instance", searchable=True, full_width=True)
 
 
 def render_notebook_reader_evidence_panel(
@@ -218,52 +229,6 @@ def render_notebook_reader_evidence_panel(
         "panel": mo.vstack([evidence_panel, artifact_table], gap=0.35),
         "surface": surface,
     }
-
-
-def render_notebook_reader_evidence_artifact_visual(
-    surface: Mapping[str, Any],
-    *,
-    selected_plot_type_label: str | None,
-    selected_artifact_label: str | None,
-    mo: Any,
-) -> Any:
-    """Render the selected Reader PDF or image artifact for generated notebooks."""
-
-    if not selected_plot_type_label:
-        return mo.md("No Reader plot type selected.")
-    if not selected_artifact_label:
-        return mo.md("No Reader artifact selected.")
-    selected = _select_reader_media_artifact(
-        surface,
-        selected_plot_type_label=selected_plot_type_label,
-        selected_artifact_label=selected_artifact_label,
-    )
-    if selected is None:
-        return mo.md("Selected Reader artifact is no longer available.")
-    path = Path(str(selected.get("path") or ""))
-    media_type = str(selected.get("media_type") or "")
-    if not path.exists():
-        return mo.md(f"Reader artifact missing: `{path}`")
-    if media_type == "application/pdf" or path.suffix.lower() == ".pdf":
-        return mo.pdf(path, width="100%", height=READER_EVIDENCE_PDF_HEIGHT)
-    if media_type.startswith("image/") or path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-        return mo.image(
-            path.read_bytes(),
-            alt=str(selected.get("label") or "Reader artifact"),
-            caption=str(selected.get("label") or ""),
-            rounded=True,
-            style={
-                "width": "auto",
-                "max-height": READER_EVIDENCE_IMAGE_MAX_HEIGHT,
-                "max-width": "100%",
-                "height": "auto",
-                "object-fit": "contain",
-                "margin": "0 auto",
-                "display": "block",
-                "background": "white",
-            },
-        )
-    return mo.md(f"Reader artifact: `{path}`")
 
 
 def _reader_evidence_manifest_row(path: Path, *, workdir: Path) -> dict[str, Any]:
@@ -298,90 +263,6 @@ def _reader_evidence_manifest_row(path: Path, *, workdir: Path) -> dict[str, Any
     if row["rows"] == 0:
         row["status"] = "empty"
     return row
-
-
-def _is_reader_media_artifact(row: Mapping[str, Any]) -> bool:
-    if not row.get("exists"):
-        return False
-    media_type = str(row.get("media_type") or "")
-    suffix = Path(str(row.get("path") or "")).suffix.lower()
-    return (
-        media_type == "application/pdf"
-        or media_type.startswith("image/")
-        or suffix in {".pdf", ".png", ".jpg", ".jpeg"}
-    )
-
-
-def _select_reader_media_artifact(
-    surface: Mapping[str, Any],
-    *,
-    selected_plot_type_label: str,
-    selected_artifact_label: str,
-) -> Mapping[str, Any] | None:
-    for row in _filter_reader_media_rows(surface, selected_plot_type_label=selected_plot_type_label):
-        item = mapping(row)
-        if str(item.get("label") or "") == selected_artifact_label:
-            return item
-    return None
-
-
-def _filter_reader_media_rows(
-    surface: Mapping[str, Any],
-    *,
-    selected_plot_type_label: str | None,
-) -> list[Mapping[str, Any]]:
-    requested = str(selected_plot_type_label or "").strip()
-    rows = [mapping(row) for row in sequence(surface.get("media_rows"))]
-    if not requested:
-        return rows
-    return [row for row in rows if str(row.get("plot_type_label") or "") == requested]
-
-
-def _reader_media_plot_type_labels(media_rows: list[dict[str, Any]]) -> list[str]:
-    labels: list[str] = []
-    seen: set[str] = set()
-    for row in media_rows:
-        label = str(row.get("plot_type_label") or _semantic_kind_label(row.get("semantic_kind"))).strip()
-        if label and label not in seen:
-            labels.append(label)
-            seen.add(label)
-    return labels
-
-
-def _dedupe_reader_media_labels(media_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    counts: dict[tuple[str, str], int] = {}
-    label_keys = [
-        (str(row.get("plot_type_label") or "").strip(), str(row.get("label") or "").strip()) for row in media_rows
-    ]
-    duplicated = {key for key in label_keys if key[1] and label_keys.count(key) > 1}
-    out: list[dict[str, Any]] = []
-    for row in media_rows:
-        item = dict(row)
-        label = str(item.get("label") or "").strip() or str(item.get("path_label") or item.get("path") or "artifact")
-        label_key = (str(item.get("plot_type_label") or "").strip(), label)
-        if label_key in duplicated:
-            counts[label_key] = counts.get(label_key, 0) + 1
-            suffix = str(item.get("path_label") or item.get("path") or counts[label_key])
-            label = f"{label} | {suffix}"
-        item["label"] = label
-        out.append(item)
-    return out
-
-
-def _semantic_kind_label(value: Any) -> str:
-    semantic_kind = str(value or "artifact").strip()
-    if semantic_kind in _SEMANTIC_KIND_LABELS:
-        return _SEMANTIC_KIND_LABELS[semantic_kind]
-    return semantic_kind.replace("_", " ").strip().title() or "Reader artifact"
-
-
-def _time_selected_label(value: Any) -> str:
-    if value is None or value == "":
-        return ""
-    try:
-        return f"{float(value):.2f} h"
-    except (TypeError, ValueError):
-        return str(value)
 
 
 def _read_payload(path: Path) -> dict[str, Any] | None:

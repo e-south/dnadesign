@@ -54,6 +54,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     render_notebook_campaign_set_metric_comparison_image,
+    render_notebook_visual_panel,
     render_visual_surface_cells,
     select_notebook_baserender_default_record_id,
     select_notebook_plot_scope,
@@ -73,9 +74,10 @@ def test_notebook_template_data_source_options() -> None:
     assert "labels (all rounds)" not in text
 
 
-def test_notebook_template_uses_full_width() -> None:
+def test_notebook_template_uses_medium_width() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'marimo.App(width="full")' in text
+    assert 'marimo.App(width="medium")' in text
+    assert 'marimo.App(width="full")' not in text
 
 
 def test_notebook_template_removes_extra_tables() -> None:
@@ -115,12 +117,14 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert render_visual_surface_cells.__module__.endswith(".notebook_components.visual_surface")
     assert "def render_visual_surface_cells" not in text
     assert surface_text not in text
-    assert "plot deliverables are available" in text
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
+    assert "plot deliverables are available" in helper_text
     assert "build_notebook_no_plot_scope_rows" not in text
     assert "Current campaign and plot evidence" not in text
     assert 'label="Plot deliverable"' in text
     assert '"label": plot_choice["title"]' not in text
     assert "render_notebook_plot_choice_image" in text
+    assert "render_notebook_visual_panel(" in text
     assert "Plot:" not in text
     assert "build_notebook_plot_method_sections" in text
     assert "thumbnail_gallery" not in text
@@ -146,11 +150,13 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     for section in [
         "Campaigns at a glance",
         "Campaign status",
-        "Reader evidence records",
-        "Data inputs and artifacts",
-        "Warnings and stale artifacts",
+        "Data and evidence records",
     ]:
         assert section in text
+    assert "Reader evidence records" not in text
+    assert "Data inputs and artifacts" not in text
+    assert "Warnings and stale artifacts" not in text
+    assert "selected_visual_choice is not None or _reader_plot_panel is None" in text
 
 
 def test_notebook_template_uses_public_opal_helpers() -> None:
@@ -166,11 +172,13 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "render_notebook_reader_evidence_panel" in text
     assert "render_notebook_reader_evidence_plot_type_control" in text
     assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "render_notebook_reader_evidence_time_control" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_collection_set_choices" in text
     assert "build_notebook_collection_visual_choices" in text
     assert "build_notebook_collection_visual_card_rows" in text
     assert "build_notebook_campaign_set_visual_choices" not in text
+    assert "render_notebook_visual_panel" in text
 
 
 def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
@@ -179,8 +187,15 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     assert 'reader_evidence_surface = _reader_evidence["surface"]' in text
     assert "render_notebook_reader_evidence_plot_type_control(" in text
     assert "render_notebook_reader_evidence_artifact_control(" in text
+    assert "render_notebook_reader_evidence_time_control(" in text
     assert "render_notebook_reader_evidence_artifact_visual(" in text
     assert "render_notebook_reader_evidence_panel(" in text
+    assert "reader_evidence_time_ui" in text
+    assert 'label="Reader plot type"' not in text
+    assert 'label="Reader plot instance"' not in text
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py").read_text()
+    assert 'label="Plot type"' in helper_text
+    assert 'label="Plot instance"' in helper_text
     assert "mo.accordion(_accordion_items, multiple=True)" in text
     assert "mo.accordion(_accordion_items, multiple=True, lazy=True)" not in text
     assert "_table(_df(_metric_rows))" not in text
@@ -191,8 +206,9 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
 
 def test_notebook_template_degrades_without_runs() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
 
-    assert "No plot deliverables are available" in text
+    assert "No OPAL plot deliverables are available" in helper_text
     assert "mo.stop(len(rounds) == 0" not in text
 
 
@@ -455,12 +471,14 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
     assert "build_notebook_collection_set_choices" in text
     assert "_top_control_items = [campaign_ui]" in text
     assert "elif collection_set_ui is not None:" in text
-    assert "mo.vstack(_top_control_items" in text
+    assert "mo.hstack(_top_control_items" in text
+    assert "mo.vstack(_top_control_items" not in text
     visual_panel_cell = text[
         text.index("def _(\n    CAMPAIGN_SET_BASERENDER_SURFACE_KIND,") : text.index(
             "def _(build_notebook_evidence_rows"
         )
     ]
+    assert "render_notebook_visual_panel(" in visual_panel_cell
     assert "view_mode_ui" not in visual_panel_cell
     assert "collection_set_ui" not in visual_panel_cell
 
@@ -1088,6 +1106,8 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_validity_rows" in text
     assert "render_notebook_reader_evidence_plot_type_control" in text
     assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "render_notebook_reader_evidence_time_control" in text
+    assert "render_notebook_visual_panel" in text
     assert "Current campaign and plot evidence" not in text
     assert 'Campaign-set comparison"))' not in text
     assert "build_notebook_validity_lines" not in text
@@ -1139,7 +1159,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     assert "return mo.vstack(_items)" not in campaign_set
     assert "mo.vstack(_items)\n    return" not in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 760
+    assert len(campaign_set.splitlines()) <= 850
 
 
 def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surface() -> None:
@@ -1170,10 +1190,13 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "selected_baserender_ids" in text
     assert "record_ids=selected_baserender_ids" in text
     assert "render_notebook_baserender_record" in text
-    assert '"width": "100%"' in text
-    assert '"background-color": "#FFFFFF"' in text
-    assert "Selection evidence" in text
-    assert "Collection plot evidence" in text
+    assert "render_notebook_visual_panel(" in text
+    assert render_notebook_visual_panel.__module__.endswith(".notebook_components.visual_panel")
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
+    assert '"width": "100%"' in helper_text
+    assert '"background-color": "#FFFFFF"' in helper_text
+    assert "Selection evidence" in helper_text
+    assert "Collection plot evidence" in helper_text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
 

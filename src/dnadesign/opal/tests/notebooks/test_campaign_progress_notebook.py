@@ -20,6 +20,12 @@ def test_campaign_progress_has_no_load_button() -> None:
     assert "Click **Load**" not in text
 
 
+def test_campaign_progress_uses_medium_width() -> None:
+    text = NOTEBOOK_PATH.read_text()
+    assert 'marimo.App(width="medium")' in text
+    assert 'marimo.App(width="full")' not in text
+
+
 def test_campaign_progress_uses_semantic_dashboard_api_imports() -> None:
     text = NOTEBOOK_PATH.read_text()
     assert "from dnadesign.opal.notebooks.api.generated import" in text
@@ -38,7 +44,13 @@ def test_campaign_progress_is_not_atlas() -> None:
     assert "mo.ui.table" in text
     assert "Campaigns at a glance" in text
     assert "Campaign status" in text
+    assert "Data and evidence records" in text
+    assert "Reader evidence records" not in text
+    assert "Warnings and stale artifacts" not in text
     assert "Plot deliverable" in text
+    assert "render_notebook_visual_panel" in text
+    assert "mo.hstack(_top_control_items" in text
+    assert "mo.vstack(_top_control_items" not in text
 
 
 def test_campaign_progress_uses_tables_for_contract_and_record_status() -> None:
@@ -72,6 +84,11 @@ def test_campaign_progress_uses_canonical_campaign_set_view_model() -> None:
     assert "build_notebook_campaign_set_visual_choices" not in text
     assert "render_notebook_reader_evidence_plot_type_control" in text
     assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "render_notebook_reader_evidence_time_control" in text
+    assert "reader_evidence_time_ui" in text
+    assert 'label="Reader plot type"' not in text
+    assert 'label="Reader plot instance"' not in text
+    assert "render_notebook_visual_panel" in text
 
 
 def test_campaign_progress_keeps_lateral_tools_out_of_opal_surface() -> None:

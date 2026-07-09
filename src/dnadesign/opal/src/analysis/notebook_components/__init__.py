@@ -100,6 +100,7 @@ from .reader_evidence import (
     render_notebook_reader_evidence_panel,
     render_notebook_reader_evidence_plot_type_control,
 )
+from .reader_evidence_triptych import render_notebook_reader_evidence_time_control
 from .runs import (
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -109,7 +110,9 @@ from .runs import (
     build_notebook_run_summary_lines,
     resolve_notebook_round_default,
 )
+from .visual_panel import render_notebook_visual_panel
 from .visual_surface import render_visual_surface_cells
+from .zoomable_visual import render_notebook_zoomable_image
 
 __all__ = [
     "build_notebook_artifact_garden_lines",
@@ -179,6 +182,9 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_visual",
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
+    "render_notebook_reader_evidence_time_control",
+    "render_notebook_visual_panel",
+    "render_notebook_zoomable_image",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_baserender_default_record_id",

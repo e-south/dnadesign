@@ -70,8 +70,14 @@ def _selected_overview_cell() -> str:
         ):
             _header_lines = build_notebook_campaign_header_lines(selected_campaign_model, heading_level=2)
             selected_campaign_brief_md = mo.md(_header_lines[2] if len(_header_lines) > 2 else "")
-            selected_overview_panel = opal_table(pl.DataFrame(build_notebook_at_a_glance_rows(selected_campaign_model)), page_size=14)
-            selected_validity_md = opal_table(pl.DataFrame(build_notebook_validity_rows(selected_campaign_model)), page_size=14)
+            selected_overview_panel = opal_table(
+                pl.DataFrame(build_notebook_at_a_glance_rows(selected_campaign_model)),
+                page_size=14,
+            )
+            selected_validity_md = opal_table(
+                pl.DataFrame(build_notebook_validity_rows(selected_campaign_model)),
+                page_size=14,
+            )
             return selected_campaign_brief_md, selected_overview_panel, selected_validity_md
         """
     )

@@ -11,9 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
-import subprocess
 from pathlib import Path
 
 import yaml
@@ -26,6 +26,16 @@ from dnadesign.opal.tests._cli_helpers import (
     write_ledger_labels,
     write_records,
 )
+
+
+def _literal_assignment_value(text: str, name: str) -> object:
+    tree = ast.parse(text)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"Generated notebook did not assign {name!r}.")
 
 
 def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
@@ -77,7 +87,8 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
     assert "opal" in txt.lower()
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
-    assert 'marimo.App(width="full")' in txt
+    assert 'marimo.App(width="medium")' in txt
+    assert 'marimo.App(width="full")' not in txt
 
     # Optional import check if marimo is installed
     if importlib.util.find_spec("marimo") is not None:
@@ -161,8 +172,9 @@ def test_notebook_generate_allows_pre_run_campaign_by_default(tmp_path: Path) ->
     out_path = workdir / "notebooks" / "opal_demo_analysis.py"
     assert out_path.exists()
     text = out_path.read_text()
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
     assert "build_campaign_set_notebook_view_model" in text
-    assert "No plot deliverables are available" in text
+    assert "No OPAL plot deliverables are available" in helper_text
 
 
 def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:
@@ -423,7 +435,7 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
 
     assert res.exit_code == 0, res.output
     text = out_path.read_text()
-    assert f"collection_manifest_path = {str(collection_path)!r}" in text
+    assert _literal_assignment_value(text, "collection_manifest_path") == str(collection_path)
     assert 'label="View"' in text
     assert "view_mode_ui = mo.ui.dropdown(" in text
     assert "collection_visual_index_path" in text
@@ -515,7 +527,7 @@ def test_notebook_generate_campaign_set_accepts_existing_collection_visual_index
 
     assert res.exit_code == 0, res.output
     text = out_path.read_text()
-    assert f"collection_visual_index_path = {str(visual_index_path)!r}" in text
+    assert _literal_assignment_value(text, "collection_visual_index_path") == str(visual_index_path)
     assert visual_index_path.exists()
     assert not (out_path.parent / "collection_visuals" / "collection_visual_manifest.json").exists()
 
@@ -752,15 +764,12 @@ def test_notebook_run_selects_single_notebook(tmp_path: Path, monkeypatch) -> No
 
     import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
 
-    monkeypatch.setattr(notebook_cmd.importlib.util, "find_spec", lambda name: object())
-    calls: list[list[str]] = []
+    calls: list[dict[str, object]] = []
 
-    def _fake_run(args, check):
-        _unused = check
-        calls.append(list(args))
-        return subprocess.CompletedProcess(args, 0)
+    def _fake_launch(**kwargs):
+        calls.append(dict(kwargs))
 
-    monkeypatch.setattr(notebook_cmd.subprocess, "run", _fake_run)
+    monkeypatch.setattr(notebook_cmd, "launch_marimo_notebook", _fake_launch)
 
     app = _build()
     runner = CliRunner()
@@ -780,16 +789,14 @@ def test_notebook_run_selects_single_notebook(tmp_path: Path, monkeypatch) -> No
         ],
     )
     assert res.exit_code == 0, res.stdout
-    assert calls
-    assert calls[0] == [
-        "marimo",
-        "run",
-        str(nb_path),
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "28510",
-        "--headless",
+    assert calls == [
+        {
+            "mode": "run",
+            "notebook_path": nb_path,
+            "host": "127.0.0.1",
+            "port": 28510,
+            "headless": True,
+        }
     ]
 
 
@@ -811,15 +818,12 @@ def test_notebook_edit_selects_single_notebook(tmp_path: Path, monkeypatch) -> N
 
     import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
 
-    monkeypatch.setattr(notebook_cmd.importlib.util, "find_spec", lambda name: object())
-    calls: list[list[str]] = []
+    calls: list[dict[str, object]] = []
 
-    def _fake_run(args, check):
-        _unused = check
-        calls.append(list(args))
-        return subprocess.CompletedProcess(args, 0)
+    def _fake_launch(**kwargs):
+        calls.append(dict(kwargs))
 
-    monkeypatch.setattr(notebook_cmd.subprocess, "run", _fake_run)
+    monkeypatch.setattr(notebook_cmd, "launch_marimo_notebook", _fake_launch)
 
     app = _build()
     runner = CliRunner()
@@ -834,9 +838,15 @@ def test_notebook_edit_selects_single_notebook(tmp_path: Path, monkeypatch) -> N
         ],
     )
     assert res.exit_code == 0, res.stdout
-    assert calls
-    assert calls[0][:2] == ["marimo", "edit"]
-    assert str(nb_path) in calls[0]
+    assert calls == [
+        {
+            "mode": "edit",
+            "notebook_path": nb_path,
+            "host": None,
+            "port": None,
+            "headless": False,
+        }
+    ]
 
 
 def test_notebook_run_requires_notebook(tmp_path: Path) -> None:
@@ -958,7 +968,7 @@ def test_notebook_root_rich_output(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(notebook_cmd, "tui_enabled", lambda: True)
     monkeypatch.setattr(
         notebook_cmd,
-        "_print_rich",
+        "print_rich",
         lambda obj: calls.append(obj) or True,
     )
 
@@ -980,10 +990,10 @@ def test_notebook_root_rich_output(tmp_path: Path, monkeypatch) -> None:
 def test_notebook_rich_tables_use_rounded_box() -> None:
     from rich import box
 
-    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+    import dnadesign.opal.src.cli.commands.notebook_support as notebook_support
 
-    kv_table = notebook_cmd._rich_kv_table("Notebook", {"Key": "Value"})
-    list_table = notebook_cmd._rich_list_table("Notebooks", ["0: one.py"])
+    kv_table = notebook_support.rich_kv_table("Notebook", {"Key": "Value"})
+    list_table = notebook_support.rich_list_table("Notebooks", ["0: one.py"])
 
     assert kv_table.box == box.ROUNDED
     assert list_table.box == box.ROUNDED

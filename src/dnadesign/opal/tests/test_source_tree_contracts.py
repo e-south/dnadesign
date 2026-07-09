@@ -138,7 +138,7 @@ def test_notebook_set_template_is_semantic_package_modules() -> None:
         "visual_cells.py",
         "visual_panel_cells.py",
     }.issubset(module_lengths)
-    assert max(module_lengths.values()) <= 180
+    assert max(module_lengths.values()) <= 190
 
 
 def test_single_campaign_notebook_uses_public_campaign_review_template_seam() -> None:

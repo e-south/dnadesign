@@ -13,6 +13,9 @@ entrypoints:
   api: dnadesign.opal.notebooks.api.generated
 ---
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-07-08
+
 ## OPAL Notebooks
 
 
@@ -81,7 +84,7 @@ Generated notebooks import public helpers from
 `dnadesign.opal.notebooks.api.generated`. The canonical generated surface is the
 campaign-set template, and a single-campaign notebook is the same template with
 one campaign config. Generated notebooks embed
-`__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v3"` so
+`__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v4"` so
 non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
@@ -112,7 +115,7 @@ and fails fast on duplicates. `--run-id` pinning is supported only when the
 surface has exactly one campaign, because a single run ID is not portable across
 a campaign set.
 
-The generated notebook renders the view model with progressive disclosure:
+The generated notebook renders the view model as an app-mode review surface:
 
 - campaign state as a compact table;
 - validity state for progress, review, plot, warning, and artifact-garden
@@ -133,17 +136,21 @@ The generated notebook renders the view model with progressive disclosure:
 - a plot-scope selector when the active plot has multiple manifest-backed
   scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
   `round_variants`;
-- selected OPAL plot artifacts and selected Reader plot artifacts before
+- selected OPAL plot artifacts and selected Reader plot artifacts above
   secondary tables, so app-mode review can iterate plots through dropdowns
-  without opening detail sections;
+  without opening detail sections. When a campaign has Reader evidence but no
+  OPAL plot manifest, the Reader plot controls are shown directly instead of a
+  misleading empty OPAL plot panel;
 - plot metric/data-shape definitions from plot-manifest metadata;
 - plot-local method, math, failure-mode, and evidence tables in a compact
   progressively disclosed evidence section;
 - Reader evidence manifests, artifact tables, and renderable Reader plot
-  artifacts when a campaign stages measured Reader evidence;
+  artifacts when a campaign stages measured Reader evidence. Reader SFXI
+  time-series plus snapshot plots expose a time slider for the displayed
+  triptych snapshot; the staged Vec8 snapshot time remains shown separately;
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
-- limitations and evidence rows.
+- limitations and evidence rows in the campaign status detail section.
 
 `campaign_collection.v2` is a semantic manifest, not a plot file. It declares
 collection dimensions, relationship lenses, and explicit `comparison_views`.
@@ -182,10 +189,12 @@ inspection remain CLI/API concerns unless they are promoted through a
 manifest-backed OPAL plot or another public notebook component. This keeps the
 single-campaign and multi-campaign surfaces from drifting.
 
-Heavy secondary sections should use marimo accordions for progressive
-disclosure, but selected plot deliverables belong above those sections. Use lazy
-loading only for static sections; do not wrap nested widgets or media previews
-in lazy accordions when their values must update in app mode. Reusable
+Heavy secondary sections should use a small number of marimo accordions for
+progressive disclosure, but selected plot deliverables belong above those
+sections. The campaign-set notebook keeps secondary content to campaign status
+and data/evidence records rather than separate accordions for every table. Use
+lazy loading only for static sections; do not wrap nested widgets or media
+previews in lazy accordions when their values must update in app mode. Reusable
 generated-cell builders and public component primitives live in
 `src/analysis/notebook_components/`. Current reusable primitives cover
 campaign summary rows, at-a-glance rows, validity lines, change summary lines
