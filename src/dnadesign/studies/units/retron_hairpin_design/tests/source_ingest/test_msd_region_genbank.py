@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from Bio.SeqRecord import SeqRecord
 from dnadesign.studies.units.retron_hairpin_design.catalog.compiler_spec import resolve_msd_compiler_spec_payload
 from dnadesign.studies.units.retron_hairpin_design.compiler.msd_unit import compile_msd_design_unit
 from dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app import app
+from dnadesign.studies.units.retron_hairpin_design.interfaces.cli.msd_region_ingest import ingest_msd_regions_command
 from dnadesign.studies.units.retron_hairpin_design.source_ingest.msd_region_genbank import (
     compare_records_to_existing_sources,
     compiler_spec_payload_from_records,
@@ -144,13 +146,11 @@ def test_ingest_msd_regions_cli_uses_only_variant_source_dir_inputs(tmp_path: Pa
     _write_genbank(source_dir / "pes-retron-170.gb", [_record("msd-retron-170", display_sequence)])
     out_dir = tmp_path / "bundle"
 
-    help_result = RUNNER.invoke(app, ["ingest-msd-regions", "--help"])
-
-    assert help_result.exit_code == 0, help_result.stdout
-    assert "--source-dir" in help_result.stdout
-    assert "--source-genbank" not in help_result.stdout
-    assert "--replacement-genbank" not in help_result.stdout
-    assert "--write-variant-source-inputs" not in help_result.stdout
+    command_parameters = inspect.signature(ingest_msd_regions_command).parameters
+    assert "source_dir" in command_parameters
+    assert "source_genbank" not in command_parameters
+    assert "replacement_genbank" not in command_parameters
+    assert "write_variant_source_inputs" not in command_parameters
 
     result = RUNNER.invoke(
         app,
