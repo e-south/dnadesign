@@ -93,6 +93,7 @@ from .reader_evidence import (
     build_notebook_reader_evidence_plot_type_options,
     build_notebook_reader_evidence_rows,
     build_notebook_reader_evidence_surface,
+    build_notebook_reader_evidence_visual_choices,
     discover_reader_evidence_artifacts,
     discover_reader_evidence_manifests,
     render_notebook_reader_evidence_artifact_control,
@@ -101,6 +102,7 @@ from .reader_evidence import (
     render_notebook_reader_evidence_plot_type_control,
 )
 from .reader_evidence_triptych import render_notebook_reader_evidence_time_control
+from .review_controls import render_notebook_review_control_surface
 from .runs import (
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -110,11 +112,25 @@ from .runs import (
     build_notebook_run_summary_lines,
     resolve_notebook_round_default,
 )
+from .selection_overlap import (
+    CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND,
+    build_notebook_campaign_set_selection_overlap_card_rows,
+    build_notebook_campaign_set_selection_overlap_choice,
+    build_notebook_campaign_set_selection_overlap_rows,
+    render_notebook_campaign_set_selection_overlap_image,
+)
+from .visual_hierarchy import (
+    annotate_notebook_visual_choices,
+    build_notebook_visual_group_options,
+    filter_notebook_visual_choices_by_group,
+)
 from .visual_panel import render_notebook_visual_panel
 from .visual_surface import render_visual_surface_cells
 from .zoomable_visual import render_notebook_zoomable_image
 
 __all__ = [
+    "CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND",
+    "annotate_notebook_visual_choices",
     "build_notebook_artifact_garden_lines",
     "build_notebook_artifact_garden_rows",
     "build_notebook_artifact_garden_summary_rows",
@@ -141,6 +157,9 @@ __all__ = [
     "build_notebook_change_lines",
     "build_notebook_change_rows",
     "build_notebook_change_summary_rows",
+    "build_notebook_campaign_set_selection_overlap_card_rows",
+    "build_notebook_campaign_set_selection_overlap_choice",
+    "build_notebook_campaign_set_selection_overlap_rows",
     "build_notebook_distrust_lines",
     "build_notebook_distrust_rows",
     "build_notebook_evidence_rows",
@@ -158,7 +177,9 @@ __all__ = [
     "build_notebook_reader_evidence_plot_type_options",
     "build_notebook_reader_evidence_rows",
     "build_notebook_reader_evidence_surface",
+    "build_notebook_reader_evidence_visual_choices",
     "build_notebook_visual_surface_model",
+    "build_notebook_visual_group_options",
     "build_notebook_run_options",
     "build_notebook_run_summary_lines",
     "build_notebook_status_line",
@@ -172,6 +193,7 @@ __all__ = [
     "discover_reader_evidence_manifests",
     "render_notebook_reader_evidence_artifact_control",
     "find_notebook_repo_root",
+    "filter_notebook_visual_choices_by_group",
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
@@ -183,6 +205,8 @@ __all__ = [
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
     "render_notebook_reader_evidence_time_control",
+    "render_notebook_review_control_surface",
+    "render_notebook_campaign_set_selection_overlap_image",
     "render_notebook_visual_panel",
     "render_notebook_zoomable_image",
     "render_visual_surface_cells",

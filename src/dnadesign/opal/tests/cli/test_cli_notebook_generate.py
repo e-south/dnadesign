@@ -293,7 +293,7 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert "# OPAL Review Notebook" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
-    assert 'label="Plot deliverable"' in text
+    assert 'label="Deliverable"' in text
 
 
 def test_notebook_generate_campaign_set_accepts_all_round_scope(tmp_path: Path, monkeypatch) -> None:

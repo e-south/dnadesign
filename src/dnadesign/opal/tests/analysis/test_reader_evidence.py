@@ -18,6 +18,7 @@ from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
     build_notebook_reader_evidence_plot_type_options,
     build_notebook_reader_evidence_surface,
+    build_notebook_reader_evidence_visual_choices,
     discover_reader_evidence_artifacts,
     discover_reader_evidence_manifests,
     render_notebook_reader_evidence_artifact_control,
@@ -104,7 +105,26 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     ) == ["r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h"]
 
 
-def test_reader_evidence_controls_use_generic_plot_labels() -> None:
+def test_reader_evidence_visual_choices_join_deliverable_universe() -> None:
+    surface = {"media_plot_type_labels": ["Plate-reader time series", "Time series + snapshot"]}
+
+    assert build_notebook_reader_evidence_visual_choices(surface) == [
+        {
+            "label": "Reader evidence | Plate-reader time series",
+            "title": "Plate-reader time series",
+            "surface_kind": "reader_evidence",
+            "reader_plot_type_label": "Plate-reader time series",
+        },
+        {
+            "label": "Reader evidence | Time series + snapshot",
+            "title": "Time series + snapshot",
+            "surface_kind": "reader_evidence",
+            "reader_plot_type_label": "Time series + snapshot",
+        },
+    ]
+
+
+def test_reader_evidence_controls_use_reader_scoped_plot_labels() -> None:
     surface = {
         "media_plot_type_labels": ["Time series + snapshot"],
         "media_rows": [
@@ -127,8 +147,8 @@ def test_reader_evidence_controls_use_generic_plot_labels() -> None:
         mo=mo,
     )
 
-    assert plot_ui["label"] == "Plot type"
-    assert artifact_ui["label"] == "Plot instance"
+    assert plot_ui["label"] == "Reader plot type"
+    assert artifact_ui["label"] == "Reader plot instance"
 
 
 def test_reader_evidence_time_control_uses_triptych_metadata(monkeypatch) -> None:
@@ -158,7 +178,7 @@ def test_reader_evidence_time_control_uses_triptych_metadata(monkeypatch) -> Non
     )
 
     assert rendered["kind"] == "slider"
-    assert rendered["label"] == "Time (h)"
+    assert rendered["label"] == "Reader time (h)"
     assert rendered["value"] == 12.0
 
 

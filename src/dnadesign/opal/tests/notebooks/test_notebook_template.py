@@ -21,6 +21,8 @@ import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.opal.src.analysis.notebook_components import (
+    CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND,
+    annotate_notebook_visual_choices,
     build_notebook_artifact_garden_lines,
     build_notebook_artifact_garden_rows,
     build_notebook_at_a_glance_rows,
@@ -32,6 +34,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_baserender_record_options,
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_metric_comparison_rows,
+    build_notebook_campaign_set_selection_overlap_card_rows,
+    build_notebook_campaign_set_selection_overlap_choice,
     build_notebook_campaign_summary_row,
     build_notebook_change_lines,
     build_notebook_change_rows,
@@ -51,10 +55,14 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_run_summary_lines,
     build_notebook_selected_baserender_record_ids,
     build_notebook_validity_lines,
+    build_notebook_visual_group_options,
     build_notebook_visual_surface_model,
+    filter_notebook_visual_choices_by_group,
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     render_notebook_campaign_set_metric_comparison_image,
+    render_notebook_campaign_set_selection_overlap_image,
+    render_notebook_review_control_surface,
     render_notebook_visual_panel,
     render_visual_surface_cells,
     select_notebook_baserender_default_record_id,
@@ -65,6 +73,14 @@ from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_se
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, list_plot_kinds
+
+
+class _ControlSurfaceFakeMo:
+    def hstack(self, items: list[object], **_: object) -> dict[str, object]:
+        return {"kind": "hstack", "items": items}
+
+    def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
+        return {"kind": "vstack", "items": items, "gap": gap}
 
 
 def test_notebook_template_data_source_options() -> None:
@@ -92,7 +108,8 @@ def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert 'label="View"' in text
     assert "view_mode_ui = None" in text
-    assert 'label="Plot deliverable"' in text
+    assert 'label="Review section"' in text
+    assert 'label="Deliverable"' in text
     assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
@@ -122,7 +139,7 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert "plot deliverables are available" in helper_text
     assert "build_notebook_no_plot_scope_rows" not in text
     assert "Current campaign and plot evidence" not in text
-    assert 'label="Plot deliverable"' in text
+    assert 'label="Deliverable"' in text
     assert '"label": plot_choice["title"]' not in text
     assert "render_notebook_plot_choice_image" in text
     assert "render_notebook_visual_panel(" in text
@@ -131,6 +148,203 @@ def test_notebook_template_uses_visual_surface_component() -> None:
     assert "thumbnail_gallery" not in text
     assert "plot_scope_controls" not in text
     assert "selected_visual_choice" in text
+
+
+def test_notebook_template_centralizes_visual_control_surface() -> None:
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="latest",
+    )
+    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py").read_text()
+
+    assert "render_notebook_review_control_surface(" in text
+    assert "review_control_surface = render_notebook_review_control_surface(" in text
+    assert "if review_control_surface is not None:" in text
+    assert "visual_group_ui=visual_group_ui" in text
+    assert 'label="Review section"' in text
+    assert "_review_control_rows = []" not in text
+    assert "_primary_control_items" not in text
+    assert "_visual_control_items" not in text
+    assert "_reader_control_items" not in text
+    assert 'control_surface="external"' in text
+    assert "_reader_plot_panel" not in text
+    assert "_plot_items" not in text
+    assert "_items.append(plot_panel)" in text
+    assert "mo.hstack(_reader_controls" not in text
+    assert "build_notebook_reader_evidence_visual_choices(" in text
+    assert "render_notebook_reader_evidence_plot_type_control(" not in text
+    assert 'label="Reader plot type"' not in text
+    assert 'label="Reader plot instance"' in helper_text
+
+
+def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> None:
+    mo = _ControlSurfaceFakeMo()
+    rendered = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        campaign_ui="campaign",
+        view_mode_ui="view",
+        visual_group_ui="section",
+        plot_ui="plot",
+        plot_scope_ui="plot-scope",
+        reader_evidence_artifact_ui="reader-artifact",
+        reader_evidence_time_ui="reader-time",
+        selected_visual_choice={"surface_kind": "plot"},
+        mo=mo,
+    )
+
+    assert rendered == {
+        "kind": "vstack",
+        "gap": 0.35,
+        "items": [
+            {"kind": "hstack", "items": ["campaign", "view"]},
+            {"kind": "hstack", "items": ["section", "plot", "plot-scope"]},
+        ],
+    }
+
+
+def test_notebook_review_control_surface_groups_reader_controls_with_deliverable() -> None:
+    mo = _ControlSurfaceFakeMo()
+    rendered = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        campaign_ui="campaign",
+        view_mode_ui="view",
+        visual_group_ui="section",
+        plot_ui="deliverable",
+        reader_evidence_artifact_ui="reader-artifact",
+        reader_evidence_time_ui="reader-time",
+        selected_visual_choice={"surface_kind": "reader_evidence"},
+        mo=mo,
+    )
+
+    assert rendered == {
+        "kind": "vstack",
+        "gap": 0.35,
+        "items": [
+            {"kind": "hstack", "items": ["campaign", "view"]},
+            {"kind": "hstack", "items": ["section", "deliverable", "reader-artifact", "reader-time"]},
+        ],
+    }
+
+
+def test_notebook_review_control_surface_rejects_unknown_view_mode() -> None:
+    with pytest.raises(ValueError, match="active_view_mode must be 'Campaign' or 'Campaign set'"):
+        render_notebook_review_control_surface(
+            active_view_mode="Legacy",
+            campaign_ui="campaign",
+            mo=_ControlSurfaceFakeMo(),
+        )
+
+
+def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
+    choices = annotate_notebook_visual_choices(
+        [
+            {"label": "Feature importance", "kind": "feature_importance_bars", "name": "feature_importance_bars"},
+            {"label": "Reader time series", "surface_kind": "reader_evidence"},
+            {"label": "Selected vector", "kind": "sfxi_vector_summary", "name": "selected_vec8_summary"},
+            {"label": "Sequence render", "surface_kind": "baserender"},
+            {
+                "label": "Effect scaled vs logic fidelity",
+                "kind": "fold_change_vs_logic_fidelity",
+                "name": "effect_scaled_vs_logic_fidelity_latest",
+            },
+            {"label": "Setpoint sweep", "kind": "sfxi_setpoint_sweep", "name": "sfxi_setpoint_sweep_latest"},
+        ]
+    )
+
+    assert build_notebook_visual_group_options(choices) == [
+        "Decision review",
+        "Assay evidence",
+        "EDA comparisons",
+        "Model diagnostics",
+        "Method diagnostics",
+        "Handoff",
+    ]
+    assert [choice["label"] for choice in filter_notebook_visual_choices_by_group(choices, "Decision review")] == [
+        "Selected vector"
+    ]
+    assert [choice["label"] for choice in filter_notebook_visual_choices_by_group(choices, "EDA comparisons")] == [
+        "Effect scaled vs logic fidelity"
+    ]
+    assert sum(
+        len(filter_notebook_visual_choices_by_group(choices, group))
+        for group in build_notebook_visual_group_options(choices)
+    ) == len(choices)
+    with pytest.raises(ValueError, match="Unknown review section"):
+        filter_notebook_visual_choices_by_group(choices, "Legacy bucket")
+
+
+def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path) -> None:
+    def _campaign(slug: str, rows: list[tuple[str, int, float]]) -> dict[str, object]:
+        workdir = tmp_path / slug
+        selection_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
+        selection_dir.mkdir(parents=True)
+        selection_path = selection_dir / "selection_top_k.csv"
+        selection_path.write_text(
+            "id,as_of_round,run_id,sel__rank_competition,pred__score_selected,pred__score_ref,sequence\n"
+            + "\n".join(
+                f"{candidate_id},0,r0,{rank},{score},sfxi,{candidate_id}ACGT" for candidate_id, rank, score in rows
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return {
+            "campaign": {
+                "slug": slug,
+                "name": f"SECG {slug} RF + SFXI",
+                "workdir": str(workdir),
+            }
+        }
+
+    campaigns = [
+        _campaign("ethanol", [("candidate_A_full", 1, 0.9), ("candidate_B_full", 2, 0.7)]),
+        _campaign("cipro", [("candidate_C_full", 1, 0.8), ("candidate_A_full", 2, 0.75)]),
+        _campaign("and", [("candidate_A_full", 1, 0.82), ("candidate_D_full", 2, 0.6)]),
+    ]
+
+    choice = build_notebook_campaign_set_selection_overlap_choice(campaigns, round_selector="latest")
+
+    assert choice is not None
+    assert choice["surface_kind"] == CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND
+    assert choice["review_group"] == "EDA comparisons"
+    assert choice["summary"] == {
+        "campaign_count": 3,
+        "slot_count": 6,
+        "unique_candidate_count": 4,
+        "shared_all_count": 1,
+        "max_overlap": 3,
+    }
+    payload = render_notebook_campaign_set_selection_overlap_image(choice)
+    assert payload is not None
+    assert payload["image_bytes"].startswith(b"\x89PNG")
+    assert "4 unique selected candidates" in payload["alt_text"]
+    assert "1 candidates are selected by every campaign" in payload["alt_text"]
+    assert build_notebook_campaign_set_selection_overlap_card_rows(choice) == [
+        {"field": "campaigns", "value": 3},
+        {"field": "selected slots", "value": 6},
+        {"field": "unique candidates", "value": 4},
+        {"field": "selected by every campaign", "value": 1},
+        {"field": "max campaign overlap", "value": 3},
+        {
+            "field": "claim boundary",
+            "value": "Overlap is a selection-policy diagnostic, not measured biological validation.",
+        },
+    ]
+
+
+def test_notebook_visual_panel_rejects_unknown_control_surface() -> None:
+    with pytest.raises(ValueError, match="control_surface must be 'inline' or 'external'"):
+        render_notebook_visual_panel(
+            active_view_mode="Campaign",
+            build_notebook_plot_card_rows=lambda _: [],
+            build_notebook_plot_method_sections=lambda _: {},
+            mo=object(),
+            opal_table=lambda *_, **__: None,
+            pl=object(),
+            render_notebook_plot_choice_image=lambda *_, **__: None,
+            selected_visual_choice=None,
+            select_notebook_plot_scope=lambda *_, **__: {},
+            control_surface="legacy",
+        )
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -157,7 +371,8 @@ def test_notebook_template_is_campaign_specific_accordion_surface() -> None:
     assert "Reader evidence records" not in text
     assert "Data inputs and artifacts" not in text
     assert "Warnings and stale artifacts" not in text
-    assert "selected_visual_choice is not None or _reader_plot_panel is None" in text
+    assert "_items.append(plot_panel)" in text
+    assert "_reader_plot_panel" not in text
 
 
 def test_notebook_template_uses_public_opal_helpers() -> None:
@@ -171,13 +386,19 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_notebook_label_staging_rows" in text
     assert "render_notebook_reader_evidence_artifact_visual" in text
     assert "render_notebook_reader_evidence_panel" in text
-    assert "render_notebook_reader_evidence_plot_type_control" in text
+    assert "build_notebook_reader_evidence_visual_choices" in text
+    assert "render_notebook_reader_evidence_plot_type_control" not in text
     assert "render_notebook_reader_evidence_artifact_control" in text
     assert "render_notebook_reader_evidence_time_control" in text
+    assert "render_notebook_review_control_surface" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_collection_set_choices" in text
     assert "build_notebook_collection_visual_choices" in text
     assert "build_notebook_collection_visual_card_rows" in text
+    assert "build_notebook_visual_group_options" in text
+    assert "filter_notebook_visual_choices_by_group" in text
+    assert "build_notebook_campaign_set_selection_overlap_card_rows" in text
+    assert "render_notebook_campaign_set_selection_overlap_image" in text
     assert "build_notebook_campaign_set_visual_choices" not in text
     assert "render_notebook_visual_panel" in text
 
@@ -186,7 +407,8 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
     assert 'reader_evidence_surface = _reader_evidence["surface"]' in text
-    assert "render_notebook_reader_evidence_plot_type_control(" in text
+    assert 'selected_visual_choice.get("surface_kind") == "reader_evidence"' in text
+    assert "render_notebook_reader_evidence_plot_type_control(" not in text
     assert "render_notebook_reader_evidence_artifact_control(" in text
     assert "render_notebook_reader_evidence_time_control(" in text
     assert "render_notebook_reader_evidence_artifact_visual(" in text
@@ -195,8 +417,8 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     assert 'label="Reader plot type"' not in text
     assert 'label="Reader plot instance"' not in text
     helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py").read_text()
-    assert 'label="Plot type"' in helper_text
-    assert 'label="Plot instance"' in helper_text
+    assert 'label="Reader plot type"' in helper_text
+    assert 'label="Reader plot instance"' in helper_text
     assert "mo.accordion(_accordion_items, multiple=True)" in text
     assert "mo.accordion(_accordion_items, multiple=True, lazy=True)" not in text
     assert "_table(_df(_metric_rows))" not in text
@@ -468,12 +690,15 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
     assert 'active_view_mode = str(view_mode_ui.value) if view_mode_ui is not None else "Campaign"' in text
     assert 'label="Campaign set"' in text
     assert 'label="Campaign"' in text
-    assert 'label="Collection plot"' in text
+    assert 'label="Review section"' in text
+    assert 'label="Deliverable"' in text
     assert "build_notebook_collection_set_choices" in text
-    assert "_top_control_items = [campaign_ui]" in text
-    assert "elif collection_set_ui is not None:" in text
-    assert "mo.hstack(_top_control_items" in text
-    assert "mo.vstack(_top_control_items" not in text
+    assert "review_control_surface = render_notebook_review_control_surface(" in text
+    assert "collection_set_ui=collection_set_ui" in text
+    assert "visual_group_ui=visual_group_ui" in text
+    assert "_primary_control_items = [campaign_ui]" not in text
+    assert "_review_control_rows.append(" not in text
+    assert "mo.vstack(_primary_control_items" not in text
     visual_panel_cell = text[
         text.index("def _(\n    CAMPAIGN_SET_BASERENDER_SURFACE_KIND,") : text.index(
             "def _(build_notebook_evidence_rows"
@@ -1090,8 +1315,11 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert 'label="Campaign"' in text
     assert "campaign_labels = [f\"{index + 1}. {row['label']}\"" in text
     assert "selected_index = campaign_labels.index(selected_label)" in text
-    assert 'label="Plot deliverable"' in text
+    assert 'label="Review section"' in text
+    assert 'label="Deliverable"' in text
+    assert "visual_group_label_memory, set_visual_group_label_memory = mo.state(None)" in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
+    assert "on_change=set_visual_group_label_memory" in text
     assert "_preferred_visual_label = visual_label_memory()" in text
     assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
@@ -1105,9 +1333,11 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_plot_method_sections" in text
     assert "build_notebook_no_plot_scope_rows" not in text
     assert "build_notebook_validity_rows" in text
-    assert "render_notebook_reader_evidence_plot_type_control" in text
+    assert "build_notebook_reader_evidence_visual_choices" in text
+    assert "render_notebook_reader_evidence_plot_type_control" not in text
     assert "render_notebook_reader_evidence_artifact_control" in text
     assert "render_notebook_reader_evidence_time_control" in text
+    assert "render_notebook_review_control_surface" in text
     assert "render_notebook_visual_panel" in text
     assert "Current campaign and plot evidence" not in text
     assert 'Campaign-set comparison"))' not in text

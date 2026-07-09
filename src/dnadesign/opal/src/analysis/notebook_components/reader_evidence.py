@@ -172,6 +172,20 @@ def build_notebook_reader_evidence_plot_type_options(surface: Mapping[str, Any])
     return [str(label) for label in sequence(surface.get("media_plot_type_labels")) if str(label).strip()]
 
 
+def build_notebook_reader_evidence_visual_choices(surface: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Return Reader media plot types as first-class notebook deliverable choices."""
+
+    return [
+        {
+            "label": f"Reader evidence | {label}",
+            "title": label,
+            "surface_kind": "reader_evidence",
+            "reader_plot_type_label": label,
+        }
+        for label in build_notebook_reader_evidence_plot_type_options(surface)
+    ]
+
+
 def build_notebook_reader_evidence_artifact_options(
     surface: Mapping[str, Any],
     *,
@@ -189,7 +203,7 @@ def render_notebook_reader_evidence_plot_type_control(surface: Mapping[str, Any]
     options = build_notebook_reader_evidence_plot_type_options(surface)
     if not options:
         return None
-    return mo.ui.dropdown(options, value=options[0], label="Plot type", full_width=True)
+    return mo.ui.dropdown(options, value=options[0], label="Reader plot type", full_width=True)
 
 
 def render_notebook_reader_evidence_artifact_control(
@@ -206,7 +220,7 @@ def render_notebook_reader_evidence_artifact_control(
     )
     if not options:
         return None
-    return mo.ui.dropdown(options, value=options[0], label="Plot instance", searchable=True, full_width=True)
+    return mo.ui.dropdown(options, value=options[0], label="Reader plot instance", searchable=True, full_width=True)
 
 
 def render_notebook_reader_evidence_panel(
@@ -288,6 +302,7 @@ __all__ = [
     "build_notebook_reader_evidence_plot_type_options",
     "build_notebook_reader_evidence_rows",
     "build_notebook_reader_evidence_surface",
+    "build_notebook_reader_evidence_visual_choices",
     "discover_reader_evidence_artifacts",
     "discover_reader_evidence_manifests",
     "render_notebook_reader_evidence_artifact_visual",

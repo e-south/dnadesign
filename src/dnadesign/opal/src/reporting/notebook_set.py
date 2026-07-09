@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable
 
+from ..analysis.notebook_components import build_notebook_campaign_set_selection_overlap_choice
 from ..core.utils import ExitCodes, OpalError, now_iso
 from .campaign_collection import load_campaign_collection_manifest
 from .collection_visual_index import load_collection_visual_manifest_index
@@ -71,6 +72,12 @@ def build_campaign_set_notebook_view_model(
         if collection_visual_index is not None and collection_visual_index_path is not None
         else []
     )
+    selection_overlap = build_notebook_campaign_set_selection_overlap_choice(
+        campaigns,
+        round_selector=round_selector or "latest",
+    )
+    if selection_overlap is not None:
+        collection_visuals.append(selection_overlap)
     return {
         "schema_version": NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION,
         "generated_at": now_iso(),

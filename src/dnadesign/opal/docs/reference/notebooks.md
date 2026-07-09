@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-08
+**Last verified:** 2026-07-09
 
 ## OPAL Notebooks
 
@@ -128,19 +128,27 @@ The generated notebook renders the view model as an app-mode review surface:
 - a top-level `Review scope` control only when there is a real campaign versus
   campaign-set choice: `Campaign` for one selected campaign's plot deliverables,
   and `Campaign set` for manifest-backed collection comparison visuals;
-- a top-level plot deliverable selector for manifest-backed campaign plots;
 - a campaign-set selector for explicit matched sets, such as one positive/null
   control pair for a target/family/split;
-- a collection-plot selector for materialized comparison artifacts within the
-  selected campaign set;
-- a plot-scope selector when the active plot has multiple manifest-backed
-  scopes, such as `all rounds`, `latest`, or per-round artifacts emitted by
-  `round_variants`;
-- selected OPAL plot artifacts and selected Reader plot artifacts above
-  secondary tables, so app-mode review can iterate plots through dropdowns
-  without opening detail sections. When a campaign has Reader evidence but no
-  OPAL plot manifest, the Reader plot controls are shown directly instead of a
-  misleading empty OPAL plot panel;
+- a consolidated top control surface that groups review scope, review section,
+  and deliverable scope before any selected media. `Review section` is the
+  stable progressive-disclosure layer: `Decision review`, `Assay evidence`,
+  `EDA comparisons`, `Model diagnostics`, `Method diagnostics`, and `Handoff`.
+  The deliverable selector owns OPAL plot artifacts, selected-sequence renders,
+  collection comparison visuals, and Reader evidence plot types within the
+  active section. Follow-on controls are scoped to the selected deliverable:
+  plot scope for OPAL plots, selection round/run/sequence for selected-sequence
+  renders, and Reader plot instance or time controls for Reader deliverables;
+- one selected media viewport above secondary tables, so app-mode review can
+  iterate OPAL and Reader deliverables through one selector without opening
+  detail sections. When a campaign has Reader evidence but no OPAL plot
+  manifest, the media region shows Reader evidence without a misleading empty
+  OPAL plot panel;
+- an EDA comparison section for value-reference views such as effect-scaled
+  response versus logic fidelity, fold-change response versus logic fidelity,
+  and pooled campaign-set selection overlap. These views support review of
+  selection behavior and pooled-build pressure; they do not claim measured
+  stress response before follow-up labels exist;
 - plot metric/data-shape definitions from plot-manifest metadata;
 - plot-local method, math, failure-mode, and evidence tables in a compact
   progressively disclosed evidence section;
@@ -190,22 +198,24 @@ manifest-backed OPAL plot or another public notebook component. This keeps the
 single-campaign and multi-campaign surfaces from drifting.
 
 Heavy secondary sections should use a small number of marimo accordions for
-progressive disclosure, but selected plot deliverables belong above those
-sections. The campaign-set notebook keeps secondary content to campaign status
-and data/evidence records rather than separate accordions for every table. Use
-lazy loading only for static sections; do not wrap nested widgets or media
-previews in lazy accordions when their values must update in app mode. Reusable
-generated-cell builders and public component primitives live in
+progressive disclosure, but review and deliverable controls belong in the top
+control surface, followed by one selected deliverable viewport above those
+sections. The campaign-set notebook keeps secondary content to campaign
+status and data/evidence records rather than separate accordions for every
+table. Use lazy loading only for static sections; do not wrap nested widgets or
+media previews in lazy accordions when their values must update in app mode.
+Reusable generated-cell builders and public component primitives live in
 `src/analysis/notebook_components/`. Current reusable primitives cover
 campaign summary rows, at-a-glance rows, validity lines, change summary lines
 and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
 metric definition rows, artifact garden rows, manifest-backed visual-surface
-models, compact path labels, plot detail rows, plot method rows, and optional
-BaseRender record-render contracts. Keep the generated
-source renderer in `src/analysis/notebook_template/` as thin composition over
-small semantic cell fragment modules. The reusable component surface lives in the
-`src/analysis/notebook_components/` package; add new notebook UX as small
-semantic modules there instead of growing a single component file.
+models, centralized review control surfaces, compact path labels, plot detail
+rows, plot method rows, and optional BaseRender record-render contracts. Keep
+the generated source renderer in `src/analysis/notebook_template/` as thin
+composition over small semantic cell fragment modules. The reusable component
+surface lives in the `src/analysis/notebook_components/` package; add new
+notebook UX as small semantic modules there instead of growing a single
+component file.
 Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
 

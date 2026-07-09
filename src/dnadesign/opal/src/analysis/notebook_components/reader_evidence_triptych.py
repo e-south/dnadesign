@@ -59,7 +59,7 @@ def render_notebook_reader_evidence_time_control(
         step=metadata["step"],
         debounce=True,
         show_value=True,
-        label="Time (h)",
+        label="Reader time (h)",
         full_width=True,
     )
 

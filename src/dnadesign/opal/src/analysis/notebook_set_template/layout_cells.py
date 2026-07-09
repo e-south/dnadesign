@@ -29,6 +29,10 @@ def _layout_cell() -> str:
         def _(
             active_view_mode,
             artifact_garden_panel,
+            baserender_record_selector,
+            baserender_role_ui,
+            baserender_round_ui,
+            baserender_run_ui,
             campaign_summary_df,
             collection_set_ui,
             campaign_ui,
@@ -41,50 +45,42 @@ def _layout_cell() -> str:
             mo,
             opal_table,
             plot_panel,
+            plot_scope_ui,
+            plot_ui,
             reader_evidence_artifact_ui,
             reader_evidence_panel,
-            reader_evidence_plot_type_ui,
             reader_evidence_time_ui,
-            reader_evidence_visual,
+            render_notebook_review_control_surface,
             selected_campaign_brief_md,
             selected_visual_choice,
             selected_overview_panel,
             selected_validity_md,
+            visual_group_ui,
             view_mode_ui,
         ):
             _items = [header_md]
-            if active_view_mode != "Campaign set":
-                _top_control_items = [campaign_ui]
-                if view_mode_ui is not None:
-                    _top_control_items.append(view_mode_ui)
-            elif collection_set_ui is not None:
-                _top_control_items = [view_mode_ui, collection_set_ui] if view_mode_ui is not None else [collection_set_ui]
-            else:
-                _top_control_items = [item for item in [view_mode_ui] if item is not None]
-            if _top_control_items:
-                _items.append(mo.hstack(_top_control_items, justify="start", align="end", wrap=True, gap=0.35))
+            review_control_surface = render_notebook_review_control_surface(
+                active_view_mode=active_view_mode,
+                baserender_record_selector=baserender_record_selector,
+                baserender_role_ui=baserender_role_ui,
+                baserender_round_ui=baserender_round_ui,
+                baserender_run_ui=baserender_run_ui,
+                campaign_ui=campaign_ui,
+                collection_set_ui=collection_set_ui,
+                mo=mo,
+                plot_scope_ui=plot_scope_ui,
+                plot_ui=plot_ui,
+                reader_evidence_artifact_ui=reader_evidence_artifact_ui,
+                reader_evidence_time_ui=reader_evidence_time_ui,
+                selected_visual_choice=selected_visual_choice,
+                visual_group_ui=visual_group_ui,
+                view_mode_ui=view_mode_ui,
+            )
+            if review_control_surface is not None:
+                _items.append(review_control_surface)
             if active_view_mode != "Campaign set":
                 _items.append(selected_campaign_brief_md)
-            _reader_plot_panel = None
-            if reader_evidence_plot_type_ui is not None:
-                _reader_controls = [reader_evidence_plot_type_ui]
-                if reader_evidence_artifact_ui is not None:
-                    _reader_controls.append(reader_evidence_artifact_ui)
-                if reader_evidence_time_ui is not None:
-                    _reader_controls.append(reader_evidence_time_ui)
-                _reader_plot_panel = mo.vstack(
-                    [
-                        mo.hstack(_reader_controls, justify="start", align="end", wrap=True, gap=0.35),
-                        reader_evidence_visual,
-                    ],
-                    gap=0.35,
-                )
-            _plot_items = []
-            if selected_visual_choice is not None or _reader_plot_panel is None:
-                _plot_items.append(plot_panel)
-            if _reader_plot_panel is not None:
-                _plot_items.append(_reader_plot_panel)
-            _items.append(mo.vstack(_plot_items, gap=0.55))
+            _items.append(plot_panel)
             _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "Campaigns at a glance"
             _accordion_items = {
                 _campaign_inventory_label: opal_table(campaign_summary_df, page_size=12),
