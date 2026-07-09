@@ -20,11 +20,13 @@ from ...compiler.exceptions import RetronMsdCompilerError
 from ..contracts.benchling_import import BENCHLING_GENBANK_DIRNAME, BenchlingGenbankImportPlan
 from ..sequence.index import SequenceReviewFrame
 from ..sequence.variant_identity import identity_for_frame
+from .genbank_features import rewrite_reverse_complement_features
 
 BENCHLING_INDEX_COLUMNS = (
     "order",
     "variant_id",
     "assigned_construct_id",
+    "record_id",
     "filename",
     "description",
     "source_construct_id",
@@ -70,6 +72,7 @@ def write_benchling_genbank_import(
     for frame in selected:
         identity = identity_for_frame(frame)
         assigned_construct_id = benchling_plan.assigned_construct_id(identity.variant_id)
+        record_id = benchling_plan.record_id_for(identity.variant_id)
         filename = benchling_plan.filename_for(identity.variant_id)
         description = benchling_plan.description_for(identity.variant_id)
         source = materialized_root / frame.row["reverse_complement_genbank"]
@@ -77,8 +80,7 @@ def write_benchling_genbank_import(
         _write_relabelled_genbank(
             source=source,
             target=target,
-            assigned_construct_id=assigned_construct_id,
-            payload_label=benchling_plan.filename_payload_label,
+            record_id=record_id,
             description=description,
             source_construct_id=frame.construct_id,
             sequence_length=int(frame.row["sequence_length"]),
@@ -89,6 +91,7 @@ def write_benchling_genbank_import(
                 "order": str(frame.order),
                 "variant_id": identity.variant_id,
                 "assigned_construct_id": assigned_construct_id,
+                "record_id": record_id,
                 "filename": filename,
                 "description": description,
                 "source_construct_id": frame.construct_id,
@@ -104,8 +107,7 @@ def _write_relabelled_genbank(
     *,
     source: Path,
     target: Path,
-    assigned_construct_id: str,
-    payload_label: str,
+    record_id: str,
     description: str,
     source_construct_id: str,
     sequence_length: int,
@@ -117,16 +119,18 @@ def _write_relabelled_genbank(
         features_index = next(index for index, line in enumerate(lines) if line.startswith("FEATURES"))
     except StopIteration as exc:
         raise RetronMsdCompilerError(f"Retron Benchling GenBank source has no FEATURES section: {source}") from exc
-    definition = (
-        f"{assigned_construct_id}-msd[{payload_label}]; {description}; "
-        f"reverse-complement MSD handoff from {source_construct_id}."
-    )
+    try:
+        origin_index = next(index for index, line in enumerate(lines) if line.startswith("ORIGIN"))
+    except StopIteration as exc:
+        raise RetronMsdCompilerError(f"Retron Benchling GenBank source has no ORIGIN section: {source}") from exc
+    definition = f"{record_id}; {description}; reverse-complement MSD handoff from {source_construct_id}."
     header = [
-        f"LOCUS       {assigned_construct_id:<16}{sequence_length:>11} bp ss-DNA linear SYN",
+        f"LOCUS       {record_id:<16}{sequence_length:>11} bp ss-DNA linear SYN",
         f"DEFINITION  {definition}",
-        f"ACCESSION   {assigned_construct_id}",
+        f"ACCESSION   {record_id}",
     ]
-    target.write_text("\n".join([*header, *lines[features_index:]]) + "\n", encoding="utf-8")
+    features = rewrite_reverse_complement_features(lines[features_index:origin_index])
+    target.write_text("\n".join([*header, *features, *lines[origin_index:]]) + "\n", encoding="utf-8")
 
 
 def _clear_existing_genbanks(target_dir: Path) -> None:

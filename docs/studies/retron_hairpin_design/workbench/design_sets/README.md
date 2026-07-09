@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-workbench-design-sets
 surface: study-workbench-design-sets
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 plane: intent-plane
 surface_role: durable-study-cohorts
 ---
@@ -11,7 +11,7 @@ surface_role: durable-study-cohorts
 ## Retron Workbench Design Sets
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-22
+**Last verified:** 2026-07-09
 
 Stores durable study cohorts. A design set is the authoritative answer for
 which variants belong to an experimental effort and which workbench ontology

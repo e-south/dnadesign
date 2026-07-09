@@ -87,6 +87,14 @@ def test_teto_retained_span_trim_tetr_pwm_elite_deliverable_plan_maps_review_and
         "r180-w02-17": "pES-retron-199",
         "r180-w03-16": "pES-retron-200",
     }
+    assert families["benchling_genbank_import"]["record_ids"] == {
+        "r26-w02-17": "msd-retron-195",
+        "r26-w03-16": "msd-retron-196",
+        "r43-w02-17": "msd-retron-197",
+        "r43-w03-16": "msd-retron-198",
+        "r180-w02-17": "msd-retron-199",
+        "r180-w03-16": "msd-retron-200",
+    }
     assert families["benchling_genbank_import"]["source_precedent_ids"] == {
         "r26-w02-17": "pES-retron-26",
         "r26-w03-16": "pES-retron-26",
@@ -95,11 +103,9 @@ def test_teto_retained_span_trim_tetr_pwm_elite_deliverable_plan_maps_review_and
         "r180-w02-17": "pES-retron-180",
         "r180-w03-16": "pES-retron-180",
     }
-    assert (
-        "benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb"
-        in (families["benchling_genbank_import"]["expected_files"])
-    )
+    assert "benchling_genbank/msd-retron-199.gb" in (families["benchling_genbank_import"]["expected_files"])
     assert any("assigned_retron_ids" in item for item in families["benchling_genbank_import"]["invariants"])
+    assert any("record_ids" in item for item in families["benchling_genbank_import"]["invariants"])
     assert any("source_precedent_ids" in item for item in families["benchling_genbank_import"]["invariants"])
     assert families["sequence_handoff"]["review_indexes"] == [
         "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv",

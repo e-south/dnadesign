@@ -17,7 +17,7 @@ source_refs:
   previous_trim_design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
   retron180_context_selection: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml#retron180_context_selection
 non_goals:
-  final_plasmid_number_assignment: excluded_until_benchling_handoff
+  final_plasmid_number_assignment: deliverable_plan_owned_not_design_set_owned
   reader_score_interpretation: excluded_until_wet_lab_data_exists
   changing_reader_spop_math: excluded
 selection_basis:

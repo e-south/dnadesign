@@ -45,4 +45,12 @@ def write_review_plan_fixture(root: Path, *, repo_root: Path, deliverable_plan_i
     return plan_path
 
 
-__all__ = ["write_review_plan_fixture", "write_review_plan_with_test_pwm"]
+def read_review_plan(path: Path) -> dict[str, object]:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def write_review_plan(path: Path, plan: dict[str, object]) -> None:
+    path.write_text(yaml.safe_dump(plan, sort_keys=False), encoding="utf-8")
+
+
+__all__ = ["read_review_plan", "write_review_plan", "write_review_plan_fixture", "write_review_plan_with_test_pwm"]

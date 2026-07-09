@@ -1,0 +1,74 @@
+contract: retron_msd_feature_role_ontology_v1
+schema_version: 1
+study_id: retron_hairpin_design
+title: Retron MSD feature roles and Benchling annotation directions
+role_order:
+  - flank_3p
+  - stem_base_right
+  - payload_complement
+  - snapback_foldback_return
+  - foldback_return
+  - snapback_cap
+  - snapback_foldback_geometry
+  - foldback
+  - foldback_stem
+  - snapback_retained_stem
+  - payload_primary
+  - stem_base_left
+  - flank_5p
+roles:
+  flank_3p:
+    label: 3' flanking
+    annotation_direction_on_reverse_complement_record: forward
+    primitive_family: flank
+  stem_base_right:
+    label: Right base
+    annotation_direction_on_reverse_complement_record: forward
+    primitive_family: stem_base
+  payload_complement:
+    label: Payload complement
+    annotation_direction_on_reverse_complement_record: forward
+    primitive_family: payload
+  snapback_foldback_return:
+    label: Foldback return
+    annotation_direction_on_reverse_complement_record: forward
+    primitive_family: foldback
+  foldback_return:
+    label: Foldback return
+    annotation_direction_on_reverse_complement_record: forward
+    primitive_family: foldback
+  snapback_cap:
+    label: Cap
+    annotation_direction_on_reverse_complement_record: undirected
+    primitive_family: cap
+  snapback_foldback_geometry:
+    label: Foldback geometry
+    annotation_direction_on_reverse_complement_record: undirected
+    primitive_family: foldback
+  foldback:
+    label: Foldback
+    annotation_direction_on_reverse_complement_record: undirected
+    primitive_family: foldback
+  foldback_stem:
+    label: Foldback stem
+    annotation_direction_on_reverse_complement_record: reverse
+    primitive_family: foldback
+  snapback_retained_stem:
+    label: Retained foldback stem
+    annotation_direction_on_reverse_complement_record: reverse
+    primitive_family: foldback
+  payload_primary:
+    label: Payload primary
+    annotation_direction_on_reverse_complement_record: reverse
+    primitive_family: payload
+  stem_base_left:
+    label: Left base
+    annotation_direction_on_reverse_complement_record: reverse
+    primitive_family: stem_base
+  flank_5p:
+    label: 5' flanking
+    annotation_direction_on_reverse_complement_record: reverse
+    primitive_family: flank
+notes:
+  - Benchling imports use reverse-complement MSD records. Directions here describe annotation strand on that import record, not biological strand in the source GenBank.
+  - Cap and foldback geometry annotations are undirected because their labels describe loop or interval geometry rather than a directional coding strand.

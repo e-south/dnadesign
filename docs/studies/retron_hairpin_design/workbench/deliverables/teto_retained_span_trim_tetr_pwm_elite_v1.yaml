@@ -180,6 +180,13 @@ artifact_families:
       r43-w03-16: pES-retron-198
       r180-w02-17: pES-retron-199
       r180-w03-16: pES-retron-200
+    record_ids:
+      r26-w02-17: msd-retron-195
+      r26-w03-16: msd-retron-196
+      r43-w02-17: msd-retron-197
+      r43-w03-16: msd-retron-198
+      r180-w02-17: msd-retron-199
+      r180-w03-16: msd-retron-200
     source_precedent_ids:
       r26-w02-17: pES-retron-26
       r26-w03-16: pES-retron-26
@@ -195,15 +202,15 @@ artifact_families:
       r180-w02-17: pES-retron-180 P4 scaffold; 15 nt [2,17) retained span from the Cruncher-derived TetR PWM elite payload
       r180-w03-16: pES-retron-180 P4 scaffold; 13 nt [3,16) retained span from the Cruncher-derived TetR PWM elite payload
     expected_files:
-      - benchling_genbank/pES-retron-195-msd[TetR]-r26-w02-17.gb
-      - benchling_genbank/pES-retron-196-msd[TetR]-r26-w03-16.gb
-      - benchling_genbank/pES-retron-197-msd[TetR]-r43-w02-17.gb
-      - benchling_genbank/pES-retron-198-msd[TetR]-r43-w03-16.gb
-      - benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb
-      - benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb
+      - benchling_genbank/msd-retron-195.gb
+      - benchling_genbank/msd-retron-196.gb
+      - benchling_genbank/msd-retron-197.gb
+      - benchling_genbank/msd-retron-198.gb
+      - benchling_genbank/msd-retron-199.gb
+      - benchling_genbank/msd-retron-200.gb
     invariants:
       - The import folder contains only the six .gb files listed above; no TSV, Markdown, FASTA, forward GenBank, or sidecar files live there.
-      - assigned_retron_ids, source_precedent_ids, descriptions, and included_payload_trim_ids in this deliverable plan are the source of truth for import selection, filenames, and GenBank header provenance.
+      - assigned_retron_ids, record_ids, source_precedent_ids, descriptions, and included_payload_trim_ids in this deliverable plan are the source of truth for import selection, MSD-only filenames, and GenBank header provenance.
       - Full parent payload rows are excluded because pES-retron-26, pES-retron-43, and the pES-retron-180 precedent already cover the non-trim controls.
       - Each imported record keeps complete MSD-unit annotations from the materialized reverse-complement GenBank source.
       - Metadata for verification stays in reviews/handoff/ and reviews/review_manifest.json.

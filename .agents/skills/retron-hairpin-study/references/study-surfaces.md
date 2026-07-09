@@ -20,6 +20,9 @@ base-junction scar-nick work.
   materialization provenance
 - `docs/studies/retron_hairpin_design/workbench/ontology/`: controlled
   direction and effect-tag vocabulary for workbench records
+- `docs/studies/retron_hairpin_design/workbench/ontology/feature_roles.yaml`:
+  feature-role vocabulary and reverse-complement GenBank annotation directions
+  for Benchling import records
 - `docs/studies/retron_hairpin_design/workbench/design_sets/`: authoritative
   persistent design cohorts for experimental meaning
 - `docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml`:
@@ -34,11 +37,11 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_tetr_pwm_elite_v1.yaml`:
   tetO trim deliverable plan for PWM triptych, nine sequence review stills,
   sequence montage video, review manifest, nine-row GenBank sequence handoff,
-  six-file Benchling import folder, and future Reader outcome overlay routing
+  six-file MSD-only Benchling import folder, and future Reader outcome overlay routing
 - `docs/studies/retron_hairpin_design/workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml`:
   Eco1 tetO retained-span deliverable plan for pES-retron-201 through
   pES-retron-206, with plan-owned PWM review, sequence montage, handoff, and
-  six-file Benchling import expectations
+  six-file `msd-retron-*` Benchling import expectations
 - `docs/studies/retron_hairpin_design/workbench/outputs/`: ignored generated
   output roots for local materialized bundles and review packages; preferred
   tetO trim root is `workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/`
@@ -136,8 +139,11 @@ base-junction scar-nick work.
   `sequence/` validates materialized sequence evidence, `video/` writes stills
   and montage video, and `handoff/` writes sequence-handoff indexes plus
   Benchling import GenBanks. The deliverable contract owns
-  `review_variant_ids`, and the Benchling import plan owns
-  `assigned_retron_ids`, `source_precedent_ids`, included trim ids, and
+  `review_variant_ids`, `contracts/record_ids.py` owns MSD-only record id
+  validation, `contracts/feature_directions.py` owns typed feature direction
+  terms, and `handoff/genbank_features.py` applies those terms while rewriting
+  reverse-complement GenBank features. The Benchling import plan owns `assigned_retron_ids`,
+  `record_ids`, `source_precedent_ids`, included trim ids, and
   reverse-complement-only orientation. Do not add root-level `pwm_*.py`,
   `sequence_*.py`, or sequence-handoff helper files.
 - `src/dnadesign/studies/units/retron_hairpin_design/tests/compiler/` keeps
@@ -148,9 +154,12 @@ base-junction scar-nick work.
   `tests/compiler/specs/`; shared fixtures live under `tests/support/`.
 - `src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/`
   mirrors the review-output semantic lanes: `cli/`, `handoff/`, `package/`,
-  `pwm/`, and `video/`. Keep shared review-output fixtures in
-  `tests/support/`; do not add broad root-level `tests/review_outputs/test_*.py`
-  files.
+  `pwm/`, and `video/`. GenBank feature-direction tests live in
+  `review_outputs/handoff/test_genbank_features.py`. Keep shared review-output
+  fixtures in `tests/support/`; do not add broad root-level
+  `tests/review_outputs/test_*.py` files.
+- `src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_workbench_ia_contracts.py`
+  keeps frontmatter dates and feature-role ontology contracts aligned.
 - `src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/composition_payload.py`
   owns single-unit sequence artifact generation intent as linear-ssDNA
   composition payload construction.

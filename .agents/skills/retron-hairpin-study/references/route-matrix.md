@@ -11,7 +11,7 @@ study-phase reporting.
 | "Here is a tetO trim spec." | `workbench/design_sets/`, then `lint --spec` | Payload trimming is source-backed design-set meaning; the compiler consumes literal sequences and typed metadata. |
 | "Why are these variants in the experiment?" | `docs/studies/retron_hairpin_design/workbench/` | Persistent hypotheses, effect tags, and design-set membership live in the workbench, not generated compiler output. |
 | "Where do the tetO PWM panel, sequence stills, video, and GenBank handoff outputs belong?" | `workbench/deliverables/`, then materialize and `review-outputs` | Deliverable expectations are persistent study contracts; bulky renders and exports remain generated output. |
-| "Generate the tetO trim PWM triptych and sequence montage." | `workbench/deliverables/`, then `review-outputs --deliverable-plan <plan.yaml>` | The deliverable plan owns expected rows and handoff filenames; the renderer consumes `sequence_index.tsv` and does not scan generated directories ad hoc. |
+| "Generate the tetO trim PWM triptych and sequence montage." | `workbench/deliverables/`, then `review-outputs --deliverable-plan <plan.yaml>` | The deliverable plan owns expected rows, pES review ids, and MSD-only `record_ids`; the renderer consumes `sequence_index.tsv` and does not scan generated directories ad hoc. |
 | "I have left/right bases but no profile." | compiler parser | The profile is derived from bases and fails fast if `S0` is not `M`. |
 | "I have a profile but not bases." | scar-nick route in `routes/README.md` / `routes/product/scar-nick-base-junction.md` | Base feasibility is a primitive search problem. |
 | "I need a cap or shortening geometry." | released-product Snapback route in `routes/README.md` / `routes/product/released-product-snapback.md` | Cap/shortening is solved by Snapback, not the compiler. |
@@ -37,8 +37,8 @@ study-phase reporting.
 - If a review package is requested after materialization, run `review-outputs`
   with the relevant deliverable plan and verify `reviews/review_manifest.json`,
   the logo-style PWM triptych, semantic still PNGs, the montage MP4, the
-  montage manifest, the plan-owned `benchling_genbank/` import folder, and
-  reverse-complement plus folding evidence.
+  montage manifest, the plan-owned `benchling_genbank/` import folder with
+  `msd-retron-*.gb` files, and reverse-complement plus folding evidence.
 - If primitive sources select multiple ranks, fail fast unless a future
   expansion contract is explicit; the preferred product surface is one selected
   cap rank plus one selected stem-base rank per design.

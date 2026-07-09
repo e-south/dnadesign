@@ -66,12 +66,12 @@ def test_teto_ecoli_working_review_outputs_generate_review_package(tmp_path: Pat
     )
     assert result.benchling_genbank_count == 6
     assert sorted(path.name for path in result.benchling_genbank_dir.iterdir() if not path.name.startswith(".")) == [
-        "pES-retron-201-msd[TetR]-r26-w02-17.gb",
-        "pES-retron-202-msd[TetR]-r26-w03-16.gb",
-        "pES-retron-203-msd[TetR]-r180-w02-17.gb",
-        "pES-retron-204-msd[TetR]-r180-w03-16.gb",
-        "pES-retron-205-msd[TetR]-r43-w02-17.gb",
-        "pES-retron-206-msd[TetR]-r43-w03-16.gb",
+        "msd-retron-201.gb",
+        "msd-retron-202.gb",
+        "msd-retron-203.gb",
+        "msd-retron-204.gb",
+        "msd-retron-205.gb",
+        "msd-retron-206.gb",
     ]
 
     review_manifest = json.loads(result.review_manifest_path.read_text(encoding="utf-8"))
@@ -112,28 +112,73 @@ def test_teto_ecoli_working_review_outputs_generate_review_package(tmp_path: Pat
         "r180-w02-17": "pES-retron-203",
         "r180-w03-16": "pES-retron-204",
     }
+    assert review_manifest["benchling_genbank_import"]["record_ids"] == {
+        "r26-w02-17": "msd-retron-201",
+        "r26-w03-16": "msd-retron-202",
+        "r43-w02-17": "msd-retron-205",
+        "r43-w03-16": "msd-retron-206",
+        "r180-w02-17": "msd-retron-203",
+        "r180-w03-16": "msd-retron-204",
+    }
     assert review_manifest["benchling_genbank_import"]["descriptions"]["r180-w03-16"] == (
         "pES-retron-180 P4 scaffold; 13 nt [3,16) retained span from the tetO payload used by pES-retron-26"
     )
     assert review_manifest["benchling_genbank_import"]["files"] == [
-        "benchling_genbank/pES-retron-201-msd[TetR]-r26-w02-17.gb",
-        "benchling_genbank/pES-retron-202-msd[TetR]-r26-w03-16.gb",
-        "benchling_genbank/pES-retron-205-msd[TetR]-r43-w02-17.gb",
-        "benchling_genbank/pES-retron-206-msd[TetR]-r43-w03-16.gb",
-        "benchling_genbank/pES-retron-203-msd[TetR]-r180-w02-17.gb",
-        "benchling_genbank/pES-retron-204-msd[TetR]-r180-w03-16.gb",
+        "benchling_genbank/msd-retron-201.gb",
+        "benchling_genbank/msd-retron-202.gb",
+        "benchling_genbank/msd-retron-205.gb",
+        "benchling_genbank/msd-retron-206.gb",
+        "benchling_genbank/msd-retron-203.gb",
+        "benchling_genbank/msd-retron-204.gb",
     ]
     benchling_rows = list(
         csv.DictReader(result.benchling_genbank_index.read_text(encoding="utf-8").splitlines(), delimiter="\t")
     )
+    assert benchling_rows[0]["record_id"] == "msd-retron-201"
     assert benchling_rows[0]["description"] == (
         "pES-retron-26 P4 scaffold; 15 nt [2,17) retained span from the tetO payload used by pES-retron-26"
     )
-    genbank = (result.benchling_genbank_dir / "pES-retron-201-msd[TetR]-r26-w02-17.gb").read_text(encoding="utf-8")
+    genbank = (result.benchling_genbank_dir / "msd-retron-201.gb").read_text(encoding="utf-8")
     assert (
-        "DEFINITION  pES-retron-201-msd[TetR]; pES-retron-26 P4 scaffold; 15 nt [2,17) retained span "
+        "DEFINITION  msd-retron-201; pES-retron-26 P4 scaffold; 15 nt [2,17) retained span "
         "from the tetO payload used by pES-retron-26; reverse-complement MSD handoff from pES-teto-r26-w02-17."
     ) in genbank
+    assert _feature_block(genbank, "3' Flanking").startswith("     misc_feature    1..17")
+    assert '/strand="1"' in _feature_block(genbank, "3' Flanking")
+    assert _feature_block(genbank, "Right Base").startswith("     misc_feature    14..17")
+    assert '/strand="1"' in _feature_block(genbank, "Right Base")
+    assert _feature_block(genbank, "msd[tetO_ecoli_working_w02_17] complement").startswith(
+        "     misc_feature    18..32"
+    )
+    assert '/strand="1"' in _feature_block(genbank, "msd[tetO_ecoli_working_w02_17] complement")
+    assert _feature_block(genbank, "Foldback").startswith("     misc_feature    33..36")
+    assert "/strand=" not in _feature_block(genbank, "Foldback")
+    assert _feature_block(genbank, "Cap").startswith("     misc_feature    33..36")
+    assert "/strand=" not in _feature_block(genbank, "Cap")
+    assert _feature_block(genbank, "msd[tetO_ecoli_working_w02_17]").startswith(
+        "     misc_feature    complement(37..51)"
+    )
+    assert '/strand="-1"' in _feature_block(genbank, "msd[tetO_ecoli_working_w02_17]")
+    assert _feature_block(genbank, "Left Base").startswith("     misc_feature    complement(52..55)")
+    assert '/strand="-1"' in _feature_block(genbank, "Left Base")
+    assert _feature_block(genbank, "5' Flanking").startswith("     misc_feature    complement(52..66)")
+    assert '/strand="-1"' in _feature_block(genbank, "5' Flanking")
     video_manifest = json.loads(result.sequence_montage_manifest.read_text(encoding="utf-8"))
     assert video_manifest["frames"][0]["variant_id"] == "r26-w02-17"
     assert video_manifest["frames"][0]["evidence_label"] == ("pES-retron-201 | tetO PWM [2,17) | r26 scaffold | 15 nt")
+
+
+def _feature_block(genbank: str, label: str) -> str:
+    marker = f'/label="{label}"'
+    lines = genbank.splitlines()
+    label_index = next(index for index, line in enumerate(lines) if marker in line)
+    start = max(index for index in range(label_index + 1) if lines[index].startswith("     misc_feature"))
+    end = next(
+        (
+            index
+            for index in range(label_index + 1, len(lines))
+            if lines[index].startswith("     misc_feature") or lines[index].startswith("ORIGIN")
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])

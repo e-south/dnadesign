@@ -25,6 +25,7 @@ def test_teto_retained_span_trim_ecoli_working_design_set_is_payload_family_base
     spec_path = study_dir / "compiler" / "inputs" / "teto_retained_span_trim_ecoli_working_v1.spec.yaml"
 
     design_set = yaml.safe_load(design_set_path.read_text(encoding="utf-8"))
+    directions = yaml.safe_load((study_dir / "workbench" / "ontology" / "directions.yaml").read_text(encoding="utf-8"))
     spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     resolved = load_msd_compiler_spec(spec_path, study_dir=study_dir)
 
@@ -34,6 +35,7 @@ def test_teto_retained_span_trim_ecoli_working_design_set_is_payload_family_base
     assert design_set["source_refs"]["payload_binding_catalog"].endswith(
         "workbench/ontology/payload_binding_sites.yaml"
     )
+    assert design_set["non_goals"]["final_plasmid_number_assignment"] == "deliverable_plan_owned_not_design_set_owned"
     assert design_set["parent_payload"]["payload_family_id"] == "tetO_ecoli_working"
     assert design_set["parent_payload"]["parent_payload_id"] == "tetO_ecoli_working_w00_19"
     assert design_set["parent_payload"]["motif_occurrences"] == [
@@ -57,6 +59,10 @@ def test_teto_retained_span_trim_ecoli_working_design_set_is_payload_family_base
         "pES-retron-180",
     }
     assert {design["scaffold_context"] for design in design_set["designs"]} == {"retron26", "retron43", "retron180"}
+    ecoli_direction = {direction["id"]: direction for direction in directions["directions"]}[
+        "teto_retained_span_trim_ecoli_working"
+    ]
+    assert {"retron26_control", "retron43_target", "retron180_target"} <= set(ecoli_direction["effect_tags"])
     assert {design["construct_id"] for design in design_set["designs"]} == {
         "pES-teto-r26-w02-17",
         "pES-teto-r26-w03-16",

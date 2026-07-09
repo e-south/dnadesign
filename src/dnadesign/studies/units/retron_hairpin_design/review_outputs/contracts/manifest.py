@@ -88,9 +88,9 @@ def write_review_manifest(
         },
         "benchling_genbank_import": {
             "orientation": plan.benchling_import.orientation,
-            "filename_payload_label": plan.benchling_import.filename_payload_label,
             "included_payload_trim_ids": list(plan.benchling_import.included_payload_trim_ids),
             "assigned_retron_ids": dict(plan.benchling_import.assigned_retron_ids),
+            "record_ids": dict(plan.benchling_import.record_ids),
             "source_precedent_ids": dict(plan.benchling_import.source_precedent_ids),
             "descriptions": dict(plan.benchling_import.descriptions),
             "verified_count": len(benchling_import.files),

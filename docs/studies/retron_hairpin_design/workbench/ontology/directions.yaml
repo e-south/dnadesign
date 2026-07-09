@@ -63,6 +63,7 @@ directions:
       - teto_ecoli_working_stronger_retained_span_trim
       - payload_family_contrast
       - retron26_control
+      - retron43_target
       - retron180_target
       - wt_eco1_only
 effect_tags:

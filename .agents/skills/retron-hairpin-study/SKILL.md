@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.27
+  version: 0.7.29
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -39,8 +39,10 @@ Out of scope:
 - Materialized plot deliverables require ViennaRNA status `ok`; publish `secondary_structure.native.png`, two-row `composition_overview.svg`, and high-resolution `composition_overview.png`, not legacy composites.
 - Retron review packages run after materialization with `review-outputs` and an
   explicit deliverable plan. The plan owns row counts, assigned pES-retron IDs,
-  PWM panel files, montage files, review manifest, and flat
-  `benchling_genbank/` import contents.
+  MSD-only `record_ids`, PWM panel files, montage files, review manifest, and
+  flat `benchling_genbank/` import contents.
+- Reverse-complement GenBank import directions come from the feature-role
+  ontology and the `feature_directions.py` contract, not local renderer prose.
 - Secondary-structure subtitles must include the scar-nick mismatch profile
   from the selected MSD design, for example `mismatch profile MXMM`.
 - No user-facing repeat count; do not chain complete MSD units together.
@@ -90,7 +92,7 @@ Out of scope:
 - For review packages, run `review-outputs` only after materialize has produced
   the deliverable plan's expected `sequence_index.tsv`; verify the PWM
   triptych, pES-retron stills, montage MP4/manifest, review manifest,
-  Benchling GenBank imports, and reverse-complement/folding evidence.
+  MSD-only Benchling GenBank imports, and reverse-complement/folding evidence.
 - If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
   spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
   do not present catalog JSONs as the requested deliverables.
@@ -140,7 +142,7 @@ Out of scope:
 - Deliverable verification for `review-outputs`: PWM triptych, semantic
   pES-retron-named stills, montage MP4/manifest, review manifest, expected
   sequence rows, verified sequence handoff rows, and expected Benchling import
-  GenBank files from the deliverable plan.
+  GenBank files from the deliverable plan's `record_ids`.
 - Fail-fast checks that apply.
 - Primitive source selector posture when a spec references solver outputs.
 - Residual unknowns or handoff route.

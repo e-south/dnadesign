@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from .fake_genbank_features import fake_reverse_complement_msd_features
+
 
 def write_fake_materialized_bundle(
     root: Path,
@@ -45,7 +47,7 @@ def write_fake_materialized_bundle(
         sequences_dir.mkdir(parents=True, exist_ok=True)
         plots_dir.mkdir(parents=True, exist_ok=True)
         manifest_dir.mkdir(parents=True, exist_ok=True)
-        forward_sequence = ("ATGCGTACCTAGGCTAAGTC" + "G" * idx).upper()
+        forward_sequence = ("ATGCGTACCTAGGCTAAGTC" + "G" * idx).upper().ljust(66, "A")
         reverse_complement_sequence = _reverse_complement(forward_sequence)
         for filename in _FAKE_ARTIFACT_FILENAMES:
             target_dir = sequences_dir if filename.endswith((".gb", ".fa", ".csv")) else plots_dir
@@ -64,6 +66,8 @@ def write_fake_materialized_bundle(
                     target_dir / filename,
                     record_id=f"fake-{idx}",
                     sequence=sequence,
+                    payload_trim_id=str(design["payload_trim_id"]),
+                    include_msd_features=filename == "reverse_complement.gb",
                 )
             else:
                 (target_dir / filename).write_text(f"{filename}\n", encoding="utf-8")
@@ -181,7 +185,15 @@ def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1].upper()
 
 
-def _write_fake_genbank(path: Path, *, record_id: str, sequence: str) -> None:
+def _write_fake_genbank(
+    path: Path,
+    *,
+    record_id: str,
+    sequence: str,
+    payload_trim_id: str,
+    include_msd_features: bool,
+) -> None:
+    msd_features = fake_reverse_complement_msd_features(payload_trim_id) if include_msd_features else []
     body = "\n".join(
         [
             f"LOCUS       {record_id:<16}{len(sequence):>11} bp ss-DNA linear SYN",
@@ -191,6 +203,7 @@ def _write_fake_genbank(path: Path, *, record_id: str, sequence: str) -> None:
             f"     source          1..{len(sequence)}",
             '                     /mol_type="other DNA"',
             '                     /organism="synthetic construct"',
+            *msd_features,
             "ORIGIN",
             f"        1 {sequence.lower()}",
             "//",

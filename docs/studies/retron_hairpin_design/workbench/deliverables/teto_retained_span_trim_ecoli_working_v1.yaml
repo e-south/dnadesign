@@ -110,7 +110,6 @@ artifact_families:
     expected_count: 6
     source_index: manifest/indexes/sequence_index.tsv
     orientation: reverse_complement_only
-    filename_payload_label: TetR
     included_payload_trim_ids:
       - tetO_ecoli_working_w02_17
       - tetO_ecoli_working_w03_16
@@ -121,6 +120,13 @@ artifact_families:
       r43-w03-16: pES-retron-206
       r180-w02-17: pES-retron-203
       r180-w03-16: pES-retron-204
+    record_ids:
+      r26-w02-17: msd-retron-201
+      r26-w03-16: msd-retron-202
+      r43-w02-17: msd-retron-205
+      r43-w03-16: msd-retron-206
+      r180-w02-17: msd-retron-203
+      r180-w03-16: msd-retron-204
     source_precedent_ids:
       r26-w02-17: pES-retron-26
       r26-w03-16: pES-retron-26
@@ -136,15 +142,15 @@ artifact_families:
       r180-w02-17: pES-retron-180 P4 scaffold; 15 nt [2,17) retained span from the tetO payload used by pES-retron-26
       r180-w03-16: pES-retron-180 P4 scaffold; 13 nt [3,16) retained span from the tetO payload used by pES-retron-26
     expected_files:
-      - benchling_genbank/pES-retron-201-msd[TetR]-r26-w02-17.gb
-      - benchling_genbank/pES-retron-202-msd[TetR]-r26-w03-16.gb
-      - benchling_genbank/pES-retron-205-msd[TetR]-r43-w02-17.gb
-      - benchling_genbank/pES-retron-206-msd[TetR]-r43-w03-16.gb
-      - benchling_genbank/pES-retron-203-msd[TetR]-r180-w02-17.gb
-      - benchling_genbank/pES-retron-204-msd[TetR]-r180-w03-16.gb
+      - benchling_genbank/msd-retron-201.gb
+      - benchling_genbank/msd-retron-202.gb
+      - benchling_genbank/msd-retron-205.gb
+      - benchling_genbank/msd-retron-206.gb
+      - benchling_genbank/msd-retron-203.gb
+      - benchling_genbank/msd-retron-204.gb
     invariants:
       - The import folder contains only the six .gb files listed above.
-      - assigned_retron_ids, source_precedent_ids, descriptions, included_payload_trim_ids, and filename_payload_label are the source of truth for import selection, naming, and GenBank definitions.
+      - assigned_retron_ids, record_ids, source_precedent_ids, descriptions, and included_payload_trim_ids are the source of truth for import selection, MSD-only filenames, and GenBank definitions.
       - The full 0-19 Eco1 tetO payload panel is excluded from Benchling import because this cohort only assigns the retained-span constructs pES-retron-201 through pES-retron-206.
       - Metadata for verification stays in reviews/handoff/ and reviews/review_manifest.json.
   review_package_manifest:
@@ -159,4 +165,4 @@ quality_gates:
   - Materialized sequence_index.tsv has 6 rows and no missing row-referenced files.
   - All materialized rows report folding_status == ok before plot deliverables are complete.
   - The PWM review panel uses the same retained spans as the 195-200 trim pilot and renders both motif orientations.
-  - review-outputs writes exactly 6 reverse-complement Benchling import GenBanks named pES-retron-201 through pES-retron-206.
+  - review-outputs writes exactly 6 reverse-complement Benchling import GenBanks named msd-retron-201 through msd-retron-206.

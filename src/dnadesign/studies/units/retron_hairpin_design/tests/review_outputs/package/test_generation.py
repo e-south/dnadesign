@@ -155,17 +155,18 @@ def _assert_review_manifest(path: Path) -> None:
         "TetR_w03_16",
     ]
     assert review_manifest["benchling_genbank_import"]["assigned_retron_ids"]["r180-w03-16"] == "pES-retron-200"
+    assert review_manifest["benchling_genbank_import"]["record_ids"]["r180-w03-16"] == "msd-retron-200"
     assert review_manifest["benchling_genbank_import"]["source_precedent_ids"]["r180-w03-16"] == "pES-retron-180"
     assert review_manifest["benchling_genbank_import"]["index_tsv"] == (
         "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.benchling_genbank.tsv"
     )
     assert review_manifest["benchling_genbank_import"]["files"] == [
-        "benchling_genbank/pES-retron-195-msd[TetR]-r26-w02-17.gb",
-        "benchling_genbank/pES-retron-196-msd[TetR]-r26-w03-16.gb",
-        "benchling_genbank/pES-retron-197-msd[TetR]-r43-w02-17.gb",
-        "benchling_genbank/pES-retron-198-msd[TetR]-r43-w03-16.gb",
-        "benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb",
-        "benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb",
+        "benchling_genbank/msd-retron-195.gb",
+        "benchling_genbank/msd-retron-196.gb",
+        "benchling_genbank/msd-retron-197.gb",
+        "benchling_genbank/msd-retron-198.gb",
+        "benchling_genbank/msd-retron-199.gb",
+        "benchling_genbank/msd-retron-200.gb",
     ]
 
 
@@ -188,24 +189,18 @@ def _assert_handoff_index(tsv_path: Path, markdown_path: Path, *, out_dir: Path)
 
 
 def _assert_benchling_import(directory: Path, index_path: Path) -> None:
-    expected_names = [
-        f"pES-retron-{retron_id}-msd[TetR]-{variant_id}.gb"
-        for retron_id, variant_id in zip(
-            range(195, 201),
-            ("r26-w02-17", "r26-w03-16", "r43-w02-17", "r43-w03-16", "r180-w02-17", "r180-w03-16"),
-            strict=True,
-        )
-    ]
+    expected_names = [f"msd-retron-{retron_id}.gb" for retron_id in range(195, 201)]
     observed = sorted(path.name for path in directory.iterdir() if not path.name.startswith("."))
     assert observed == expected_names
     first = (directory / expected_names[0]).read_text(encoding="utf-8")
-    assert first.startswith("LOCUS       pES-retron-195")
+    assert first.startswith("LOCUS       msd-retron-195")
     assert "pES-retron-26 P4 scaffold; 15 nt [2,17) retained span" in first
     assert "Cruncher-derived TetR PWM elite payload" in first
     assert "reverse-complement MSD handoff" in first
     assert "FEATURES             Location/Qualifiers" in first
     rows = list(csv.DictReader(index_path.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
     assert [row["assigned_construct_id"] for row in rows] == [f"pES-retron-{idx}" for idx in range(195, 201)]
+    assert [row["record_id"] for row in rows] == [f"msd-retron-{idx}" for idx in range(195, 201)]
     assert rows[4]["variant_id"] == "r180-w02-17"
 
 

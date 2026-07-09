@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-workbench-ontology
 surface: study-workbench-ontology
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 plane: knowledge-plane
 surface_role: controlled-vocabulary
 ---
@@ -11,7 +11,7 @@ surface_role: controlled-vocabulary
 ## Retron Workbench Ontology
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-07-09
 
 Stores controlled vocabulary for workbench records. Hypotheses, directions, and
 effect tags live here so design sets can cite stable identifiers instead of
@@ -24,6 +24,8 @@ repeating local prose.
 - `payload_binding_sites.yaml`: reusable payload families, motif models,
   retained-span members, and reference payloads used to derive binding-site
   semantics from MSD records.
+- `feature_roles.yaml`: feature-role vocabulary and Benchling import annotation
+  directions for reverse-complement MSD GenBank records.
 
 ### Boundary
 

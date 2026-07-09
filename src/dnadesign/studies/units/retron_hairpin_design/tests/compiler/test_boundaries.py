@@ -66,10 +66,8 @@ def test_checked_in_registry_compiles_planned_scar_nick_hits(tmp_path: Path) -> 
         if line.strip() and not line.lstrip().startswith("#")
     ]
     assert selected_labels == SCAR_NICK_HIT_LABELS
-    top_nick_ids = {
-        record["construct_id"] for record in payload["records"] if record["scar_nick"]["nick_orientation"] == "top"
-    }
-    assert top_nick_ids == {"pES-retron-193", "pES-retron-194"}
+    top_nick = [record for record in payload["records"] if record["scar_nick"]["nick_orientation"] == "top"]
+    assert {record["construct_id"] for record in top_nick} == {"pES-retron-193", "pES-retron-194"}
 
 
 def test_retron_msd_compiler_is_not_exposed_as_top_level_project_script() -> None:
@@ -144,10 +142,13 @@ def test_retron_msd_compiler_source_is_decomposed_by_responsibility() -> None:
         "artifact_contracts/manifests.py": 450,
         "review_outputs/contracts/manifest.py": 140,
         "review_outputs/contracts/benchling_import.py": 140,
+        "review_outputs/contracts/feature_directions.py": 80,
         "review_outputs/contracts/plan.py": 180,
+        "review_outputs/contracts/record_ids.py": 60,
         "review_outputs/contracts/review_variant_ids.py": 130,
         "review_outputs/handoff/benchling.py": 190,
         "review_outputs/handoff/contract.py": 80,
+        "review_outputs/handoff/genbank_features.py": 140,
         "review_outputs/handoff/index.py": 160,
         "review_outputs/pwm/baserender_record.py": 160,
         "review_outputs/pwm/logo.py": 200,
@@ -192,12 +193,13 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         "compiler/test_msd_unit.py": 120,
         "compiler/test_cli_compile.py": 280,
         "compiler/test_materialization.py": 900,
-        "compiler/test_boundaries.py": 245,
+        "compiler/test_boundaries.py": 246,
         "compiler/specs/test_teto_trim_metadata.py": 140,
         "review_outputs/cli/fixtures.py": 70,
         "review_outputs/cli/test_review_outputs.py": 90,
         "review_outputs/cli/test_review_outputs_text.py": 70,
         "review_outputs/handoff/test_benchling_import.py": 110,
+        "review_outputs/handoff/test_genbank_features.py": 60,
         "review_outputs/package/test_generation.py": 230,
         "review_outputs/package/test_review_variant_ids.py": 70,
         "review_outputs/package/test_validation_failures.py": 110,
@@ -206,12 +208,14 @@ def test_retron_msd_compiler_tests_are_decomposed_by_responsibility() -> None:
         "review_outputs/video/test_review_still_quality.py": 110,
         "support/cli.py": 40,
         "support/compiler_fixtures.py": 80,
+        "support/fake_genbank_features.py": 60,
         "support/pwm_fixtures.py": 70,
         "support/registry.py": 80,
         "support/review_ids.py": 40,
         "support/review_plans.py": 60,
         "support/review_outputs.py": 220,
         "support/viennarna.py": 100,
+        "workbench/test_workbench_ia_contracts.py": 80,
     }
 
     for filename, max_lines in budgets.items():

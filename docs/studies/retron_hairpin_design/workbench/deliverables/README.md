@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-workbench-deliverables
 surface: study-workbench-deliverables
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 plane: handoff-plane
 surface_role: deliverable-contracts
 ---
@@ -11,7 +11,7 @@ surface_role: deliverable-contracts
 ## Retron Workbench Deliverables
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-22
+**Last verified:** 2026-07-09
 
 Records hypothesis-specific review and handoff deliverables. It is not a
 generated-output directory. Use it to answer what a study cohort should emit,
@@ -23,7 +23,9 @@ running or interpreting output generation.
 - `teto_retained_span_trim_tetr_pwm_elite_v1.yaml`: deliverable plan for the nine-design
   bidirectional TetR PWM trim pilot. It links the design set, compiler spec,
   PWM provenance, materialized sequence bundle, PWM trim triptych, sequence
-  montage video, review manifest, and GenBank handoff surfaces.
+  montage video, review manifest, and GenBank handoff surfaces. Its Benchling
+  import records are MSD-only files named by `record_ids`, not whole-plasmid
+  pES records.
 - `teto_retained_span_trim_ecoli_working_v1.yaml`: deliverable plan for the six-design
   Eco1 tetO retained-span trim cohort. It assigns pES-retron-201 through pES-retron-206
   and keeps the same retained-span extents as the 195-200 TetR PWM pilot. Its
@@ -50,10 +52,10 @@ benchling_genbank/
 ```
 
 That folder is intentionally flat: six reverse-complement GenBank files for
-new trim variants `pES-retron-195` through `pES-retron-200`. The full parent
-rows remain in the review bundle and are not copied into the import folder.
-The assigned pES-retron ids, source precedent ids, and included trim rows are
-declared in the deliverable plan, then consumed by the review renderer.
+new trim variants. Filenames and LOCUS/ACCESSION values use `msd-retron-*`
+record ids from the deliverable plan. Assigned `pES-retron-*` ids remain review
+metadata. The full parent rows remain in the review bundle and are not copied
+into the import folder.
 
 ### Generate
 
@@ -101,12 +103,12 @@ Expected review files:
 
 Expected Benchling import files, all reverse-complement GenBank records:
 
-- `benchling_genbank/pES-retron-195-msd[TetR]-r26-w02-17.gb`
-- `benchling_genbank/pES-retron-196-msd[TetR]-r26-w03-16.gb`
-- `benchling_genbank/pES-retron-197-msd[TetR]-r43-w02-17.gb`
-- `benchling_genbank/pES-retron-198-msd[TetR]-r43-w03-16.gb`
-- `benchling_genbank/pES-retron-199-msd[TetR]-r180-w02-17.gb`
-- `benchling_genbank/pES-retron-200-msd[TetR]-r180-w03-16.gb`
+- `benchling_genbank/msd-retron-195.gb`
+- `benchling_genbank/msd-retron-196.gb`
+- `benchling_genbank/msd-retron-197.gb`
+- `benchling_genbank/msd-retron-198.gb`
+- `benchling_genbank/msd-retron-199.gb`
+- `benchling_genbank/msd-retron-200.gb`
 
 ### Eco1 tetO Retained-Span Trim Outputs
 
@@ -116,13 +118,14 @@ Open the Eco1 retained-span deliverable plan first:
 workbench/deliverables/teto_retained_span_trim_ecoli_working_v1.yaml
 ```
 
-That plan assigns `pES-retron-201` through `pES-retron-206`, sets
-`filename_payload_label: TetR`, and keeps the retained spans at
-`[2,17)` and `[3,16)`. This cohort changes the payload family, not the trim
-extent. The PWM triptych has three panels: full Eco1 tetO parent payload, 15 nt trim,
-and 13 nt trim. The full panel is a review baseline and is not copied into the
-Benchling import folder. The `benchling_genbank_import.descriptions` mapping
-is the source for the concise GenBank definition text and Benchling index prose.
+That plan assigns `pES-retron-201` through `pES-retron-206` for review
+metadata and declares separate `record_ids` for the MSD-only GenBank records.
+It keeps the retained spans at `[2,17)` and `[3,16)`. This cohort changes the
+payload family, not the trim extent. The PWM triptych has three panels: full
+Eco1 tetO parent payload, 15 nt trim, and 13 nt trim. The full panel is a review
+baseline and is not copied into the Benchling import folder. The
+`benchling_genbank_import.descriptions` mapping is the source for the concise
+GenBank definition text and Benchling index prose.
 
 Generate the review package after materializing
 `../../compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml`:
@@ -137,12 +140,12 @@ uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.ap
 
 Expected Benchling import files, all reverse-complement GenBank records:
 
-- `benchling_genbank/pES-retron-201-msd[TetR]-r26-w02-17.gb`
-- `benchling_genbank/pES-retron-202-msd[TetR]-r26-w03-16.gb`
-- `benchling_genbank/pES-retron-205-msd[TetR]-r43-w02-17.gb`
-- `benchling_genbank/pES-retron-206-msd[TetR]-r43-w03-16.gb`
-- `benchling_genbank/pES-retron-203-msd[TetR]-r180-w02-17.gb`
-- `benchling_genbank/pES-retron-204-msd[TetR]-r180-w03-16.gb`
+- `benchling_genbank/msd-retron-201.gb`
+- `benchling_genbank/msd-retron-202.gb`
+- `benchling_genbank/msd-retron-205.gb`
+- `benchling_genbank/msd-retron-206.gb`
+- `benchling_genbank/msd-retron-203.gb`
+- `benchling_genbank/msd-retron-204.gb`
 
 Expected PWM review files:
 
@@ -182,7 +185,12 @@ Implementation ownership mirrors these artifact families:
   `dnadesign.baserender` API.
 - `review_outputs/sequence/`: materialized sequence-index and evidence checks.
 - `review_outputs/video/`: `pES-retron`-named stills and montage video.
-- `review_outputs/handoff/`: sequence-handoff TSV and Markdown indexes.
+- `review_outputs/contracts/record_ids.py`: MSD-only Benchling record-id
+  validation.
+- `review_outputs/handoff/`: sequence-handoff TSV/Markdown indexes and
+  Benchling GenBank import writing.
+- `review_outputs/handoff/genbank_features.py`: reverse-complement GenBank
+  feature-direction normalization.
 
 The public facade remains `review_outputs/service.py`; the CLI calls that
 facade instead of importing the individual renderer packages.

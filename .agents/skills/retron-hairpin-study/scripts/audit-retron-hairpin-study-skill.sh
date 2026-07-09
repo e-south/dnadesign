@@ -132,6 +132,7 @@ require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/compiler/inputs/teto
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/directions.yaml"
+require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/feature_roles.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/ontology/payload_binding_sites.yaml"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/README.md"
 require_file "$REPO_ROOT/docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
@@ -195,10 +196,13 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artif
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/artifact_contracts/layout.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/manifest.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/benchling_import.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/feature_directions.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/plan.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/record_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/contracts/review_variant_ids.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/benchling.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/contract.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/genbank_features.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/handoff/index.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/logo.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/review_outputs/pwm/sequence_rows.py"
@@ -244,10 +248,13 @@ require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/package/test_validation_failures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/pwm/test_retention.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/handoff/test_benchling_import.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/handoff/test_genbank_features.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_montage.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/review_outputs/video/test_review_still_quality.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/workbench/test_workbench_ia_contracts.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/cli.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/compiler_fixtures.py"
+require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/fake_genbank_features.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/pwm_fixtures.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/registry.py"
 require_file "$REPO_ROOT/src/dnadesign/studies/units/retron_hairpin_design/tests/support/review_ids.py"
@@ -408,10 +415,13 @@ budgets = {
     "artifact_contracts/manifests.py": 450,
     "review_outputs/contracts/manifest.py": 140,
     "review_outputs/contracts/benchling_import.py": 140,
+    "review_outputs/contracts/feature_directions.py": 80,
     "review_outputs/contracts/plan.py": 180,
+    "review_outputs/contracts/record_ids.py": 60,
     "review_outputs/contracts/review_variant_ids.py": 130,
     "review_outputs/handoff/benchling.py": 190,
     "review_outputs/handoff/contract.py": 80,
+    "review_outputs/handoff/genbank_features.py": 140,
     "review_outputs/handoff/index.py": 160,
     "review_outputs/pwm/logo.py": 200,
     "review_outputs/pwm/baserender_record.py": 170,
@@ -505,12 +515,13 @@ budgets = {
     "compiler/test_msd_unit.py": 120,
     "compiler/test_cli_compile.py": 280,
     "compiler/test_materialization.py": 900,
-    "compiler/test_boundaries.py": 245,
+    "compiler/test_boundaries.py": 246,
     "compiler/specs/test_teto_trim_metadata.py": 140,
     "review_outputs/cli/fixtures.py": 70,
     "review_outputs/cli/test_review_outputs.py": 90,
     "review_outputs/cli/test_review_outputs_text.py": 70,
     "review_outputs/handoff/test_benchling_import.py": 110,
+    "review_outputs/handoff/test_genbank_features.py": 60,
     "review_outputs/package/test_generation.py": 230,
     "review_outputs/package/test_review_variant_ids.py": 70,
     "review_outputs/package/test_validation_failures.py": 110,
@@ -518,8 +529,10 @@ budgets = {
     "review_outputs/video/test_montage.py": 100,
     "review_outputs/video/test_review_still_quality.py": 110,
     "source_ingest/test_msd_region_genbank.py": 560,
+    "workbench/test_workbench_ia_contracts.py": 80,
     "support/cli.py": 40,
     "support/compiler_fixtures.py": 80,
+    "support/fake_genbank_features.py": 60,
     "support/pwm_fixtures.py": 70,
     "support/registry.py": 80,
     "support/review_ids.py": 40,
@@ -567,11 +580,16 @@ require_pattern 'docs/studies/retron_hairpin_design/compiler/inputs/teto_retaine
 require_pattern 'teto_retained_span_trim_tetr_pwm_elite_v1\.yaml' "skill references tetO trim design set"
 require_pattern 'teto_retained_span_trim_ecoli_working_v1' "skill references Eco1 tetO retained-span trim"
 require_pattern 'payload_binding_sites\.yaml' "skill references payload binding ontology"
+require_pattern 'feature_roles\.yaml' "skill references feature-role ontology"
 require_pattern 'pwm_trim_triptych' "skill references tetO PWM trim review panel"
 require_pattern 'sequence_montage' "skill references tetO sequence review video"
 require_pattern 'reviews/video/stills|semantic still' "skill references tetO semantic review stills"
 require_pattern 'reverse-complement' "skill references review-output reverse-complement evidence"
 require_pattern 'sequence_handoff' "skill references tetO GenBank handoff bundle"
+require_pattern 'record_ids' "skill references MSD-only Benchling record ids"
+require_pattern 'record_ids\.py' "skill routes MSD-only record id contract separately"
+require_pattern 'feature_directions\.py' "skill routes feature-direction contract separately"
+require_pattern 'genbank_features\.py' "skill routes GenBank feature-direction contract separately"
 require_pattern 'deliverable plan' "skill keeps review-output route plan-owned"
 require_pattern 'payload-trim metadata|payload_trim_id' "skill preserves payload-trim metadata routing"
 require_pattern 'WT Eco1' "skill preserves WT Eco1-only trim lane"
@@ -600,6 +618,8 @@ require_pattern 'review-outputs --deliverable-plan' "skill records explicit revi
 require_pattern 'test_cli_lint\.py' "skill records compiler lint test lane"
 require_pattern 'test_materialization\.py' "skill records compiler materialization test lane"
 require_pattern 'tests/review_outputs' "skill records review-output test lane"
+require_pattern 'test_genbank_features\.py' "skill records GenBank feature-direction test lane"
+require_pattern 'test_workbench_ia_contracts\.py' "skill records workbench IA contract test lane"
 require_pattern 'tests/support' "skill records shared compiler test fixtures"
 require_pattern 'developers\.openai\.com/api/docs/guides/prompt-engineering#coding' "skill records OpenAI Developers prompt-surface source"
 require_pattern 'Start with input completeness, not study phase' "skill uses compiler-first routing"
@@ -650,6 +670,8 @@ require_pattern 'Pair with `harness-engineering`' "skill explains harness pairin
 require_pattern 'Pair with `code-change-discipline`' "skill explains code-change pairing" "$SKILL_FILE"
 require_pattern 'Fresh/naive agent' "test matrix covers naive-agent discovery"
 require_pattern 'Biopython reads the GenBank' "test matrix covers GenBank and reverse-complement handoff"
+require_pattern 'GenBank feature roles' "test matrix covers GenBank feature-role direction semantics"
+require_pattern 'msd-retron-\*\.gb' "test matrix covers MSD-only Benchling import names"
 
 if [[ $failures -eq 0 ]]; then
   printf 'Audit finished with no failures.\n'

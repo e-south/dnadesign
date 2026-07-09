@@ -1,7 +1,17 @@
+---
+doc_id: study-retron-hairpin-design-workbench
+surface: study-workbench
+study_id: retron_hairpin_design
+owner: dnadesign-maintainers
+last_verified: 2026-07-09
+plane: intent-plane
+surface_role: study-workbench-router
+---
+
 ## Retron Experimental Workbench
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-09
 
 This workbench is the persistent record for Retron experimental intent. It sits
 between the one-hop study router and transient compiler outputs.
@@ -28,6 +38,8 @@ Do not use it for:
 workbench/
   ontology/
     directions.yaml
+    feature_roles.yaml
+    payload_binding_sites.yaml
   design_sets/
     scar_nick_profile_panel_v1.yaml
     teto_retained_span_trim_tetr_pwm_elite_v1.yaml
@@ -47,7 +59,7 @@ workbench/
 
 | Need | Open |
 | --- | --- |
-| Direction and effect vocabulary | [ontology/](ontology/README.md) |
+| Direction, payload, and feature-role vocabulary | [ontology/](ontology/README.md) |
 | Authoritative cohort membership | [design_sets/](design_sets/README.md) |
 | Hypothesis-specific review and handoff deliverables | [deliverables/](deliverables/README.md) |
 | Compiler and materialization run records | [provenance/](provenance/README.md) |
