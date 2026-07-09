@@ -21,10 +21,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
     materialize_design_class_requests,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.cli import main
+from dnadesign.studies.units.eco1_rt_repack.tests._helpers import require_ec86kit_source_artifacts
 from dnadesign.thread.candidates import write_candidate_table
 
 
 def test_design_class_requests_materialize_named_mask_policies(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     result = materialize_design_class_requests(repo_root=Path.cwd(), output_root=tmp_path)
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
@@ -51,6 +53,7 @@ def test_design_class_requests_materialize_named_mask_policies(tmp_path: Path) -
 
 
 def test_candidate_pool_deduplicates_sequence_hashes_across_classes(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     result = materialize_design_class_requests(repo_root=Path.cwd(), output_root=tmp_path)
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     by_id = {row["design_class_id"]: row for row in manifest["design_classes"]}
@@ -98,6 +101,7 @@ def test_candidate_pool_deduplicates_sequence_hashes_across_classes(tmp_path: Pa
 
 
 def test_foldcheck_request_cli_reports_baseline_only_pool_without_traceback(tmp_path: Path, capsys) -> None:
+    require_ec86kit_source_artifacts()
     materialize_design_class_requests(repo_root=Path.cwd(), output_root=tmp_path)
     materialize_design_class_candidate_pool(repo_root=Path.cwd(), output_root=tmp_path)
 
