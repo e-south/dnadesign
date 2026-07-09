@@ -38,6 +38,7 @@ from dnadesign.studies.units.retron_hairpin_design.source_ingest.msd_region_genb
 )
 
 from ..support.cli import RUNNER
+from ..support.pwm_fixtures import write_test_tetr_meme_pwm
 
 
 def test_parse_msd_region_genbank_filters_unresolved_copy_records_and_reverse_complements(tmp_path: Path) -> None:
@@ -451,10 +452,7 @@ def _record_with_payload_stem(record_id: str, payload_primary: str) -> SeqRecord
 
 def _payload_binding_catalog_path(tmp_path: Path) -> Path:
     path = tmp_path / "payload_binding_sites.yaml"
-    meme_path = (
-        "src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/outputs/artifacts/meme/"
-        "tetR__westmann_tetr_mitomi__tetR.meme"
-    )
+    meme_path = write_test_tetr_meme_pwm(tmp_path / "fixtures/tetR__westmann_tetr_mitomi__tetR.meme")
     path.write_text(
         """
 contract: retron_payload_binding_site_catalog_v1
@@ -480,7 +478,7 @@ payload_families:
       TetR_w02_17: {retained_parent_span_0: {start: 2, end: 17}}
 reference_payloads:
   - reference_payload_id: tetO_ecoli_working_w00_19
-""".replace("__MEME_PATH__", meme_path).strip()
+""".replace("__MEME_PATH__", meme_path.as_posix()).strip()
         + "\n",
         encoding="utf-8",
     )
