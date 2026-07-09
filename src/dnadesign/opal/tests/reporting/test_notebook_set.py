@@ -668,15 +668,16 @@ def test_materialized_collection_visuals_do_not_cross_join_duplicate_seed_slugs(
     assert len({pair["left"] for pair in pairs}) == 2
     assert len({pair["right"] for pair in pairs}) == 2
 
+    output_dir = tmp_path / "collection_visuals"
     index = materialize_campaign_set_collection_visuals(
         campaigns,
         collection=collection,
-        output_dir=tmp_path / "collection_visuals",
+        output_dir=output_dir,
     )
 
     visual = index["visuals"][0]
     assert visual["row_count"] == 4
-    with Path(visual["tidy_csv"]).open("r", encoding="utf-8", newline="") as handle:
+    with (output_dir / visual["tidy_csv"]).open("r", encoding="utf-8", newline="") as handle:
         tidy_rows = list(csv.DictReader(handle))
     observed = {
         (row["replicate_key"], row["group"]): float(row["value"])
