@@ -142,6 +142,8 @@ def test_variant_genbank_source_dir_is_steady_state_authority(tmp_path: Path) ->
 def test_ingest_msd_regions_cli_uses_only_variant_source_dir_inputs(tmp_path: Path) -> None:
     source_dir = tmp_path / "variants"
     source_dir.mkdir()
+    study_dir = tmp_path / "study"
+    study_dir.mkdir()
     display_sequence = "GTCAGAAAAAACGGGTCCCTATCAGTGATAGAGAAGGCTCTCTATCACTGATAGGGAACAGACAGTAACTCAGA"
     _write_genbank(source_dir / "pes-retron-170.gb", [_record("msd-retron-170", display_sequence)])
     out_dir = tmp_path / "bundle"
@@ -158,6 +160,8 @@ def test_ingest_msd_regions_cli_uses_only_variant_source_dir_inputs(tmp_path: Pa
             "ingest-msd-regions",
             "--source-dir",
             source_dir.as_posix(),
+            "--study-dir",
+            study_dir.as_posix(),
             "--out-dir",
             out_dir.as_posix(),
             "--format",
