@@ -330,6 +330,26 @@ def test_public_adapter_helpers_adapt_in_memory_contract_rows() -> None:
     assert [item.id for item in records] == ["assembled_payload", "assembled_payload"]
 
 
+def test_public_sequence_evidence_adapter_rejects_unequal_complement_length() -> None:
+    row = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "assembled_payload",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCAT",
+        "owners": [],
+        "effect_tags": [],
+        "boundaries": [],
+        "pairings": [],
+        "display": {"title": "Assembled payload"},
+        "meta": {},
+    }
+
+    with pytest.raises(baserender.SchemaError, match="complement_sequence length must match primary_sequence"):
+        baserender.adapt_record(row, adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
+
+
 def test_public_adapter_helpers_reject_unknown_adapter_columns() -> None:
     row = {"sequence": "ACGT", "features": []}
 

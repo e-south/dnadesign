@@ -392,6 +392,14 @@ class SequenceEvidenceMapV1Adapter:
         except Exception as exc:
             raise SchemaError(f"Invalid sequence_evidence_map_v1 contract at row {row_index}: {exc}") from exc
 
+        if contract.complement_sequence is not None and len(contract.complement_sequence) != len(
+            contract.primary_sequence
+        ):
+            raise SchemaError(
+                "sequence_evidence_map_v1 complement_sequence length must match primary_sequence length "
+                "for baserender two-row rendering"
+            )
+
         meta = dict(contract.meta)
         if "boundary_marker_style" in meta:
             raise SchemaError(

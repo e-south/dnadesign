@@ -1068,7 +1068,7 @@ def test_sequence_evidence_map_adapter_bounds_segment_labels_by_row() -> None:
             "state_id": "longer-complement-label",
             "topology_kind": "linear_dsdna",
             "alphabet": "iupac_dna",
-            "primary_sequence": "ACGT",
+            "primary_sequence": "ACGTACGT",
             "complement_sequence": "TGCATGCA",
             "owners": [],
             "effect_tags": [],
