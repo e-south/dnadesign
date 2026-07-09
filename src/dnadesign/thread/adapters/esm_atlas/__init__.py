@@ -9,7 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.thread.adapters.esm_atlas.client import AtlasClient, AtlasRequestError
+from dnadesign.thread.adapters.esm_atlas.client import AtlasClient, AtlasRequestError, validate_atlas_api_base_url
 from dnadesign.thread.adapters.esm_atlas.hashes import (
     atlas_query_hash,
     atlas_request_hash,
@@ -39,5 +39,6 @@ __all__ = [
     "raw_response_hash",
     "sequence_md5",
     "validate_atlas_semantic_artifacts",
+    "validate_atlas_api_base_url",
     "write_atlas_semantic_artifacts",
 ]

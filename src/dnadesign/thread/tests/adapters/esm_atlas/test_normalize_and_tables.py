@@ -22,9 +22,11 @@ from dnadesign.thread.adapters.esm_atlas import (
     build_atlas_structure_prediction_row,
     normalize_protein_lookup_response,
     sequence_md5,
+    validate_atlas_api_base_url,
     validate_atlas_semantic_artifacts,
     write_atlas_semantic_artifacts,
 )
+from dnadesign.thread.adapters.esm_atlas import client as atlas_client_module
 from dnadesign.thread.adapters.esm_atlas.client import AtlasClient
 from dnadesign.thread.foldcheck import sequence_hash
 from dnadesign.thread.structure_predictions import (
@@ -248,6 +250,37 @@ def test_client_rejects_unbounded_feature_request() -> None:
 
     with pytest.raises(ValueError, match="topk_features"):
         client.protein_lookup_by_hash(sequence_md5("ACDE"), topk_features=101)
+
+
+def test_validate_atlas_api_base_url_accepts_public_hosts() -> None:
+    assert validate_atlas_api_base_url("https://biohub.ai/") == "https://biohub.ai"
+    assert validate_atlas_api_base_url("https://www.biohub.ai") == "https://www.biohub.ai"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://biohub.ai",
+        "https://biohub.ai.example.org",
+        "https://biohub.ai:8443",
+        "https://biohub.ai/esm/protein/api/v1alpha1",
+        "https://token@biohub.ai",
+        "https://biohub.ai?redirect=https://example.org",
+    ],
+)
+def test_validate_atlas_api_base_url_rejects_untrusted_or_ambiguous_urls(base_url: str) -> None:
+    with pytest.raises(ValueError, match="Atlas API base URL"):
+        validate_atlas_api_base_url(base_url)
+
+
+def test_atlas_client_rejects_untrusted_base_url_before_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_urlopen(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("Atlas client should reject the base URL before opening a request")
+
+    monkeypatch.setattr(atlas_client_module, "urlopen", fail_urlopen)
+
+    with pytest.raises(ValueError, match="Atlas API base URL"):
+        AtlasClient(base_url="https://example.org").protein_lookup_by_hash(sequence_md5("ACDE"))
 
 
 def _request_hash(candidate_ids: tuple[str, ...]) -> str:

@@ -18,6 +18,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from dnadesign.thread.adapters.biohub_urls import validate_biohub_api_base_url
 from dnadesign.thread.adapters.esm_atlas.hashes import sequence_md5
 
 DEFAULT_BASE_URL = "https://biohub.ai"
@@ -36,6 +37,9 @@ class AtlasClient:
     base_url: str = DEFAULT_BASE_URL
     timeout_seconds: float = 30.0
     user_agent: str = DEFAULT_USER_AGENT
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "base_url", validate_atlas_api_base_url(self.base_url))
 
     def protein_lookup_by_sequence(
         self,
@@ -130,6 +134,12 @@ def _normalize_sequence(sequence: str) -> str:
     if not normalized:
         raise ValueError("sequence must be non-empty")
     return normalized
+
+
+def validate_atlas_api_base_url(base_url: str) -> str:
+    """Return a normalized Atlas API base URL after enforcing the public Biohub endpoint."""
+
+    return validate_biohub_api_base_url(base_url, service_label="Atlas API")
 
 
 def _require_range(value: int, field: str, *, minimum: int, maximum: int) -> None:

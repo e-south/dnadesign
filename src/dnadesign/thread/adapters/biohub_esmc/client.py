@@ -16,15 +16,14 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from dnadesign.thread.adapters.biohub_esmc.auth import BiohubCredential
+from dnadesign.thread.adapters.biohub_urls import validate_biohub_api_base_url
 
 DEFAULT_BASE_URL = "https://biohub.ai"
 DEFAULT_USER_AGENT = "dnadesign-thread-biohub-esmc/0.1"
 BIOHUB_API_VERSION = "v1"
-TRUSTED_BIOHUB_API_HOSTS = frozenset({"biohub.ai", "www.biohub.ai"})
 ENCODE_PATH = "/api/v1/encode"
 LOGITS_PATH = "/api/v1/logits"
 DEFAULT_ESMC_MODEL = "esmc-6b-2024-12"
@@ -234,26 +233,6 @@ def extract_sequence_tokens(response: dict[str, Any]) -> list[int]:
             raise BiohubEsmcRequestError("Biohub encode response sequence tokens must be integers")
         tokens.append(int(token))
     return tokens
-
-
-def validate_biohub_api_base_url(base_url: str) -> str:
-    """Return a normalized Biohub API base URL after enforcing the public endpoint."""
-
-    parsed = urlsplit(str(base_url))
-    host = parsed.hostname.lower() if parsed.hostname else ""
-    if (
-        parsed.scheme != "https"
-        or host not in TRUSTED_BIOHUB_API_HOSTS
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.port is not None
-        or parsed.path not in {"", "/"}
-        or bool(parsed.query)
-        or bool(parsed.fragment)
-    ):
-        message = "Biohub API base URL must be https://biohub.ai or https://www.biohub.ai"
-        raise ValueError(message)
-    return f"https://{host}"
 
 
 def _single_residue_token(tokens: list[int], *, residue: str) -> int:
