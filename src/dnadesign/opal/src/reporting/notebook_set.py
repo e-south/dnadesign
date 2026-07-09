@@ -66,6 +66,11 @@ def build_campaign_set_notebook_view_model(
         if collection_visual_index_path is not None
         else None
     )
+    collection_visuals = (
+        _notebook_collection_visuals(collection_visual_index, index_path=Path(collection_visual_index_path))
+        if collection_visual_index is not None and collection_visual_index_path is not None
+        else []
+    )
     return {
         "schema_version": NOTEBOOK_CAMPAIGN_SET_VIEW_MODEL_SCHEMA_VERSION,
         "generated_at": now_iso(),
@@ -74,7 +79,7 @@ def build_campaign_set_notebook_view_model(
         "campaigns": campaigns,
         "collection": collection,
         "collection_visual_index": collection_visual_index,
-        "collection_visuals": list(collection_visual_index.get("visuals") or []) if collection_visual_index else [],
+        "collection_visuals": collection_visuals,
         "warnings": warnings,
     }
 
@@ -123,3 +128,22 @@ def _validated_campaign_set_paths(config_paths: Iterable[str | Path]) -> list[Pa
             ExitCodes.BAD_ARGS,
         )
     return paths
+
+
+def _notebook_collection_visuals(index: dict[str, Any], *, index_path: Path) -> list[dict[str, Any]]:
+    base_path = index_path.expanduser().resolve().parent
+    visuals: list[dict[str, Any]] = []
+    for raw in index.get("visuals") or []:
+        visual = dict(raw)
+        for key in ("path", "tidy_csv", "manifest_path"):
+            if visual.get(key) not in (None, ""):
+                visual[key] = str(_resolve_index_relative_path(visual[key], base_path=base_path))
+        visuals.append(visual)
+    return visuals
+
+
+def _resolve_index_relative_path(value: object, *, base_path: Path) -> Path:
+    path = Path(str(value))
+    if not path.is_absolute():
+        path = base_path / path
+    return path.resolve(strict=False)

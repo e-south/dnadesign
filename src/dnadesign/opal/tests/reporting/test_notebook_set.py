@@ -1105,6 +1105,49 @@ def test_collection_visual_manifest_index_validates_loaded_study_surfaces(tmp_pa
         )
 
 
+def test_campaign_set_notebook_view_model_resolves_collection_visual_paths(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign_a"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path, slug="campaign_a")
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug="campaign_a")
+    collection_path = tmp_path / "campaign_collection.yaml"
+    collection_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign_collection.v2",
+                "collection_id": "fixture_collection",
+                "dimensions": [{"id": "target"}],
+                "relationships": [],
+                "comparison_views": [],
+                "collection_visual_surface_kinds": ["study_realized_label_review"],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    index_path = _write_collection_visual_index_fixture(
+        tmp_path / "collection_visuals",
+        visual_overrides={
+            "path": "visual.png",
+            "tidy_csv": "visual.csv",
+            "manifest_path": "visual.manifest.json",
+        },
+    )
+
+    payload = build_campaign_set_notebook_view_model(
+        [config_path],
+        collection_manifest_path=collection_path,
+        collection_visual_index_path=index_path,
+    )
+
+    visual = payload["collection_visuals"][0]
+    assert visual["path"] == str((index_path.parent / "visual.png").resolve())
+    assert visual["tidy_csv"] == str((index_path.parent / "visual.csv").resolve())
+    assert visual["manifest_path"] == str((index_path.parent / "visual.manifest.json").resolve())
+
+
 def test_collection_visual_manifest_index_rejects_undeclared_or_stale_entries(tmp_path: Path) -> None:
     undeclared_path = _write_collection_visual_index_fixture(
         tmp_path / "undeclared",
