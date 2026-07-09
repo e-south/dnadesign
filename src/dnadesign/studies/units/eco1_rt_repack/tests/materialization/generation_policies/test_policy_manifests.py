@@ -25,6 +25,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     validate_generation_policy_config,
 )
 
+from ._candidate_tables import write_generation_policy_source_inputs
+
 
 def test_generation_policy_config_rejects_legacy_design_class_ids() -> None:
     config = build_default_generation_policy_config()
@@ -45,7 +47,9 @@ def test_default_generation_policy_config_accepts_only_primary_policy_ids() -> N
 
 
 def test_generation_policy_manifest_materializes_v2_boundary(tmp_path: Path) -> None:
-    result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    source_root = tmp_path / "source"
+    write_generation_policy_source_inputs(source_root)
+    result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     positions = pq.read_table(result.positions_path).to_pylist()
@@ -73,7 +77,9 @@ def test_generation_policy_manifest_materializes_v2_boundary(tmp_path: Path) -> 
 
 
 def test_combined_policy_open_set_is_union_of_distal_and_near(tmp_path: Path) -> None:
-    result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    source_root = tmp_path / "source"
+    write_generation_policy_source_inputs(source_root)
+    result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
     rows = pq.read_table(result.positions_path).to_pylist()
     open_by_policy = {
         policy_id: {

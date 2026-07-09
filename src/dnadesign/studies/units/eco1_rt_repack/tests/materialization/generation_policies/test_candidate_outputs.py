@@ -23,28 +23,30 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     materialize_generation_policy_foldcheck_request,
 )
 
-from ._candidate_tables import candidate_row, write_candidate_table
+from ._candidate_tables import candidate_row, write_candidate_table, write_generation_policy_source_inputs
 
 
 def test_generation_policy_candidate_pool_aggregates_complete_policy_outputs(tmp_path: Path) -> None:
-    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    source_root = tmp_path / "source"
+    write_generation_policy_source_inputs(source_root)
+    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
     write_candidate_table(
         tmp_path / "distal_scaffold_repack_v1" / "candidate_table.parquet",
         [
-            candidate_row("thread_candidate_a", "sha256:a", ["M20I"], 1),
-            candidate_row("thread_candidate_shared", "sha256:shared", ["M20I", "D25S"], 2),
+            candidate_row("thread_candidate_a", "sha256:a", ["A20I"], 1),
+            candidate_row("thread_candidate_shared", "sha256:shared", ["A20I", "A25S"], 2),
         ],
     )
     write_candidate_table(
         tmp_path / "near_dna_rna_acid_free_v1" / "candidate_table.parquet",
         [
-            candidate_row("thread_candidate_b", "sha256:b", ["N21R"], 1),
-            candidate_row("thread_candidate_shared", "sha256:shared", ["M20I", "D25S"], 2),
+            candidate_row("thread_candidate_b", "sha256:b", ["A21R"], 1),
+            candidate_row("thread_candidate_shared", "sha256:shared", ["A20I", "A25S"], 2),
         ],
     )
     write_candidate_table(
         tmp_path / "combined_near_acid_free_plus_distal_v1" / "candidate_table.parquet",
-        [candidate_row("thread_candidate_c", "sha256:c", ["M20I", "N21R"], 1)],
+        [candidate_row("thread_candidate_c", "sha256:c", ["A20I", "A21R"], 1)],
     )
 
     result = materialize_generation_policy_candidate_pool(repo_root=Path.cwd(), generation_policy_root=tmp_path)
@@ -63,21 +65,27 @@ def test_generation_policy_candidate_pool_aggregates_complete_policy_outputs(tmp
 
 
 def test_generation_policy_foldcheck_request_writes_v2_fasta(tmp_path: Path) -> None:
-    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
+    source_root = tmp_path / "source"
+    write_generation_policy_source_inputs(source_root)
+    materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
     write_candidate_table(
         tmp_path / "distal_scaffold_repack_v1" / "candidate_table.parquet",
-        [candidate_row("thread_candidate_a", "sha256:a", ["M20I"], 1)],
+        [candidate_row("thread_candidate_a", "sha256:a", ["A20I"], 1)],
     )
     write_candidate_table(
         tmp_path / "near_dna_rna_acid_free_v1" / "candidate_table.parquet",
-        [candidate_row("thread_candidate_b", "sha256:b", ["N21R"], 1)],
+        [candidate_row("thread_candidate_b", "sha256:b", ["A21R"], 1)],
     )
     write_candidate_table(
         tmp_path / "combined_near_acid_free_plus_distal_v1" / "candidate_table.parquet",
-        [candidate_row("thread_candidate_c", "sha256:c", ["M20I", "N21R"], 1)],
+        [candidate_row("thread_candidate_c", "sha256:c", ["A20I", "A21R"], 1)],
     )
 
-    result = materialize_generation_policy_foldcheck_request(repo_root=Path.cwd(), generation_policy_root=tmp_path)
+    result = materialize_generation_policy_foldcheck_request(
+        repo_root=Path.cwd(),
+        generation_policy_root=tmp_path,
+        source_output_root=source_root,
+    )
     manifest = yaml.safe_load(result.request_manifest_path.read_text(encoding="utf-8"))
     fasta = result.input_fasta_path.read_text(encoding="utf-8")
 

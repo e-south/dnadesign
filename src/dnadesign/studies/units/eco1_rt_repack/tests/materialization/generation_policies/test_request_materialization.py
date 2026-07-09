@@ -27,10 +27,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.cli import (
     main as generation_policy_main,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests._helpers import require_ec86kit_source_artifacts
 from dnadesign.thread.adapters.proteinmpnn import validate_request_manifest
 
 
 def test_generation_policy_requests_materialize_one_request_per_complete_policy(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     policy_result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path)
     request_result = materialize_generation_policy_requests(repo_root=Path.cwd(), generation_policy_root=tmp_path)
     positions = pq.read_table(policy_result.positions_path).to_pylist()
@@ -103,6 +105,7 @@ def test_generation_policy_request_materializer_does_not_import_design_class_spe
 
 
 def test_generation_policy_cli_materializes_policy_and_request_roots(tmp_path: Path) -> None:
+    require_ec86kit_source_artifacts()
     exit_code = generation_policy_main(["--repo-root", str(Path.cwd()), "--output-root", str(tmp_path), "all"])
 
     assert exit_code == 0
