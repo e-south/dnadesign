@@ -50,6 +50,8 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_comp
     oriented_structure_geometry,
 )
 
+from .hairpin_structure_fixtures import write_hairpin_structure_fixture
+
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -59,10 +61,11 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def test_retron_structure_thumbnail_manifest_resolves_hairpin_195_200_assets() -> None:
-    repo_root = _repo_root()
+def test_retron_structure_thumbnail_manifest_resolves_hairpin_195_200_assets(tmp_path: Path) -> None:
+    repo_root, hairpin_output_dir = write_hairpin_structure_fixture(tmp_path)
     rows = build_retron_structure_thumbnail_manifest(
         repo_root=repo_root,
+        hairpin_output_dir=hairpin_output_dir,
         assay_subject_keys=(
             "retron26",
             "retron43",
@@ -104,8 +107,12 @@ def test_retron_structure_thumbnail_manifest_resolves_hairpin_195_200_assets() -
 
 
 def test_retron_structure_thumbnail_manifest_writes_parquet(tmp_path: Path) -> None:
-    repo_root = _repo_root()
-    rows = build_retron_structure_thumbnail_manifest(repo_root=repo_root, assay_subject_keys=("retron195",))
+    repo_root, hairpin_output_dir = write_hairpin_structure_fixture(tmp_path / "fixture")
+    rows = build_retron_structure_thumbnail_manifest(
+        repo_root=repo_root,
+        hairpin_output_dir=hairpin_output_dir,
+        assay_subject_keys=("retron195",),
+    )
 
     path = write_retron_structure_thumbnail_manifest(rows, output_dir=tmp_path)
 
@@ -118,9 +125,13 @@ def test_retron_structure_thumbnail_manifest_writes_parquet(tmp_path: Path) -> N
     assert written[0]["payload_pairing_status"] == "canonical_wc"
 
 
-def test_structure_svg_geometry_returns_horizontal_vector_elements() -> None:
-    repo_root = _repo_root()
-    rows = build_retron_structure_thumbnail_manifest(repo_root=repo_root, assay_subject_keys=("retron195",))
+def test_structure_svg_geometry_returns_horizontal_vector_elements(tmp_path: Path) -> None:
+    repo_root, hairpin_output_dir = write_hairpin_structure_fixture(tmp_path)
+    rows = build_retron_structure_thumbnail_manifest(
+        repo_root=repo_root,
+        hairpin_output_dir=hairpin_output_dir,
+        assay_subject_keys=("retron195",),
+    )
     geometry = oriented_structure_geometry(
         (repo_root / rows[0].structure_svg_path).as_posix(),
         annotation_manifest_path=(repo_root / rows[0].structure_annotation_manifest_path).as_posix(),
@@ -268,8 +279,10 @@ def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: P
         missing_cell_count=1,
         source_reader_experiment_ids=("demo_reader_experiment",),
     )
+    repo_root, hairpin_output_dir = write_hairpin_structure_fixture(tmp_path / "fixture")
     thumbnail_rows = build_retron_structure_thumbnail_manifest(
-        repo_root=_repo_root(),
+        repo_root=repo_root,
+        hairpin_output_dir=hairpin_output_dir,
         assay_subject_keys=("retron26", "retron195"),
     )
 
@@ -277,6 +290,7 @@ def test_reader_spop_composite_smoke_renders_missing_condition_cells(tmp_path: P
         condition_matrix=matrix,
         thumbnail_rows=thumbnail_rows,
         output_dir=tmp_path,
+        repo_root=repo_root,
     )
 
     assert Path(manifest.plot_png_path).exists()
