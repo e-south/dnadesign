@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
@@ -22,6 +23,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
     materialize_design_class_requests,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.cli import main
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._source_fixtures import (
+    write_selection_source_inputs,
+)
 from dnadesign.thread.candidates import write_candidate_table
 
 
@@ -29,7 +33,7 @@ def test_downstream_inputs_stage_shared_review_inputs_without_root_mask(tmp_path
     source_root = tmp_path / "source"
     output_root = tmp_path / "classes"
     _write_shared_downstream_inputs(source_root)
-    materialize_design_class_requests(repo_root=Path.cwd(), output_root=output_root)
+    materialize_design_class_requests(repo_root=Path.cwd(), output_root=output_root, source_output_root=source_root)
     baseline_root = tmp_path / "baseline"
     _write_candidate_table(
         baseline_root / "candidate_table.parquet",
@@ -51,7 +55,7 @@ def test_downstream_inputs_stage_shared_review_inputs_without_root_mask(tmp_path
 
     assert result.candidate_table_path.exists()
     assert pq.read_table(result.candidate_table_path).num_rows == 1
-    assert (output_root / "residue_map.parquet").read_text(encoding="utf-8") == "residue-map\n"
+    assert pq.read_table(output_root / "residue_map.parquet").num_rows > 0
     assert (output_root / "proteinmpnn_request/chain_a_backbone.pdb").read_text(encoding="utf-8") == "pdb\n"
     assert (output_root / "biohub_esmc/mutation_scoring/wt_mutation_scoring_manifest.yaml").exists()
     assert not (output_root / "mask_set.yaml").exists()
@@ -62,7 +66,7 @@ def test_downstream_inputs_cli_reports_paths(tmp_path: Path, capsys) -> None:
     source_root = tmp_path / "source"
     output_root = tmp_path / "classes"
     _write_shared_downstream_inputs(source_root)
-    materialize_design_class_requests(repo_root=Path.cwd(), output_root=output_root)
+    materialize_design_class_requests(repo_root=Path.cwd(), output_root=output_root, source_output_root=source_root)
     baseline_root = tmp_path / "baseline"
     _write_candidate_table(
         baseline_root / "candidate_table.parquet",
@@ -98,12 +102,14 @@ def _write_candidate_table(path: Path, rows: list[dict[str, object]]) -> None:
 
 
 def _write_shared_downstream_inputs(source_root: Path) -> None:
+    write_selection_source_inputs(source_root)
+    _add_structure_columns_to_residue_map(source_root / "residue_map.parquet")
+    _neutralize_conservation_support(source_root / "conservation_profile.parquet")
     files = {
-        "residue_map.parquet": "residue-map\n",
-        "conservation_profile.parquet": "conservation\n",
+        "backbone_bundle.yaml": "chains: []\n",
+        "manual_mask_authority.yaml": "residues: []\ncandidate_prior_residues: []\nfeatures: []\n",
         "proteinmpnn_request/chain_a_backbone.pdb": "pdb\n",
         "proteinmpnn_request/request_manifest.yaml": "request: ok\n",
-        "conservation_alignments/ec86_clade9_conservation_v1.aligned.fasta": ">a\nAA\n",
         "conservation_sources/ec86_clade9_conservation_v1.source_manifest.yaml": "source: ok\n",
         "biohub_esmc/mutation_scoring/wt_mutation_scoring_manifest.yaml": "model: esmc-300m-2024-12\n",
         "biohub_esmc/mutation_scoring/wt_substitution_llr.parquet": "llr\n",
@@ -112,6 +118,26 @@ def _write_shared_downstream_inputs(source_root: Path) -> None:
         path = source_root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+
+
+def _add_structure_columns_to_residue_map(path: Path) -> None:
+    rows = pq.read_table(path).to_pylist()
+    for row in rows:
+        position = int(row["canonical_position"])
+        row["structure_chain_id"] = "A"
+        row["structure_residue_id"] = position
+        row["design_position"] = position
+        row["mapping_status"] = "mapped" if 3 <= position <= 311 else "unresolved_structure"
+    pq.write_table(pa.Table.from_pylist(rows), path)
+
+
+def _neutralize_conservation_support(path: Path) -> None:
+    rows = pq.read_table(path).to_pylist()
+    for row in rows:
+        row["wt_frequency"] = 0.0
+        row["wt_is_plurality"] = False
+        row["passes_conservation_mask"] = False
+    pq.write_table(pa.Table.from_pylist(rows), path)
 
 
 def _candidate(candidate_id: str, sequence_hash: str, *, rank: int) -> dict[str, object]:
