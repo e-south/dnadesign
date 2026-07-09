@@ -364,6 +364,9 @@ printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
     assert prediction.result.dot_bracket == "(())"
     assert prediction.result.pair_map[0].left == 0
     assert (tmp_path / "folding" / "RNAfold.stdout.txt").is_file()
+    assert prediction.artifacts.stdout == "RNAfold.stdout.txt"
+    assert prediction.artifacts.stderr == "RNAfold.stderr.txt"
+    assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
 
 
 def test_run_prediction_request_uses_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -400,6 +403,9 @@ class fold_compound:
     assert prediction.dna_policy.submitted_alphabet == "rna_surrogate"
     assert prediction.result is not None
     assert prediction.result.dot_bracket == "(())"
+    assert prediction.artifacts.stdout == "ViennaRNA.python_api.stdout.txt"
+    assert prediction.artifacts.stderr == "ViennaRNA.python_api.stderr.txt"
+    assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
 
 
 def test_publish_viennarna_structure_svg_annotates_native_svg(

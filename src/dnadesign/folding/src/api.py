@@ -328,7 +328,7 @@ def run_prediction_request(
             ),
             result=result,
             qa=SecondaryStructureQaV1(length_matches_input=True),
-            artifacts=_artifact_refs(output_path, interface=request.backend.interface),
+            artifacts=_artifact_refs(interface=request.backend.interface),
         )
     except FoldingError as exc:
         prediction = _error_prediction(
@@ -428,7 +428,7 @@ def _run_python_api_prediction_request(
             ),
             result=result,
             qa=SecondaryStructureQaV1(length_matches_input=True),
-            artifacts=_artifact_refs(output_path, interface=request.backend.interface),
+            artifacts=_artifact_refs(interface=request.backend.interface),
         )
     except FoldingError as exc:
         prediction = _error_prediction(
@@ -526,7 +526,7 @@ def _error_prediction(
             coordinates_mapped_to=request.backend.dna_policy.output_coordinates,
         ),
         qa=SecondaryStructureQaV1(length_matches_input=None, errors=[error]),
-        artifacts=_artifact_refs(preflight.output_dir, interface=preflight.interface),
+        artifacts=_artifact_refs(interface=preflight.interface),
     )
 
 
@@ -591,18 +591,17 @@ def _prediction_input(
     )
 
 
-def _artifact_refs(output_dir: Path, *, interface: str):
+def _artifact_refs(*, interface: str):
     from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructureArtifactsV1
 
-    prefix = output_dir.name
     if interface == "python_api":
         return SecondaryStructureArtifactsV1(
-            stdout=f"{prefix}/{_PYTHON_API_STDOUT_FILENAME}",
-            stderr=f"{prefix}/{_PYTHON_API_STDERR_FILENAME}",
+            stdout=_PYTHON_API_STDOUT_FILENAME,
+            stderr=_PYTHON_API_STDERR_FILENAME,
         )
     return SecondaryStructureArtifactsV1(
-        stdout=f"{prefix}/{_STDOUT_FILENAME}",
-        stderr=f"{prefix}/{_STDERR_FILENAME}",
+        stdout=_STDOUT_FILENAME,
+        stderr=_STDERR_FILENAME,
     )
 
 

@@ -201,12 +201,26 @@ def test_proteinmpnn_request_hash_changes_for_executable_fields(tmp_path: Path) 
 
 
 def test_proteinmpnn_run_commands_use_requested_chain_id() -> None:
-    commands = proteinmpnn_run_commands(seed_set=[101], temperatures=[0.1], chain_id="B")
+    commands = proteinmpnn_run_commands(seed_set=[101], temperatures=[0.1], chain_id="B", fixed_positions=[2, 4])
 
     assign_command = next(command for command in commands if command["name"] == "assign_fixed_chains")
+    fixed_command = next(command for command in commands if command["name"] == "make_fixed_positions")
+    run_command = next(command for command in commands if command["name"] == "protein_mpnn_run_seed_101")
 
     chain_arg_index = assign_command["argv"].index("--chain_list") + 1
     assert assign_command["argv"][chain_arg_index] == "B"
+    assert fixed_command["argv"][1] == "helper_scripts/make_fixed_positions_dict.py"
+    assert (
+        fixed_command["argv"][fixed_command["argv"].index("--input_path") + 1]
+        == "proteinmpnn_request/parsed_pdbs.jsonl"
+    )
+    assert (
+        fixed_command["argv"][fixed_command["argv"].index("--output_path") + 1]
+        == "proteinmpnn_request/fixed_positions.jsonl"
+    )
+    assert fixed_command["argv"][fixed_command["argv"].index("--chain_list") + 1] == "B"
+    assert fixed_command["argv"][fixed_command["argv"].index("--position_list") + 1] == "2 4"
+    assert commands.index(fixed_command) < commands.index(run_command)
 
 
 def _minimal_request_manifest(tmp_path: Path) -> dict[str, object]:

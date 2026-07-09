@@ -117,6 +117,7 @@ def build_request_manifest(
             seed_set=seed_set,
             temperatures=temperatures,
             chain_id=chain_id,
+            fixed_positions=fixed_positions,
             num_seq_per_target=num_seq_per_target,
             batch_size=batch_size,
         ),
@@ -128,6 +129,7 @@ def proteinmpnn_run_commands(
     seed_set: Sequence[int],
     temperatures: Sequence[float],
     chain_id: str,
+    fixed_positions: Sequence[int],
     num_seq_per_target: int = 1,
     batch_size: int = 1,
 ) -> list[dict[str, Any]]:
@@ -157,6 +159,21 @@ def proteinmpnn_run_commands(
                 "proteinmpnn_request/assigned_chains.jsonl",
                 "--chain_list",
                 chain_id,
+            ],
+        },
+        {
+            "name": "make_fixed_positions",
+            "argv": [
+                "python",
+                "helper_scripts/make_fixed_positions_dict.py",
+                "--input_path",
+                "proteinmpnn_request/parsed_pdbs.jsonl",
+                "--output_path",
+                "proteinmpnn_request/fixed_positions.jsonl",
+                "--chain_list",
+                chain_id,
+                "--position_list",
+                " ".join(str(position) for position in fixed_positions),
             ],
         },
     ]
