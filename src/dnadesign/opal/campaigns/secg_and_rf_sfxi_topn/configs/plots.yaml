@@ -96,6 +96,19 @@ plots:
       rasterize_at: 20000
       title: "AND objective: SFXI score vs logic fidelity by round"
 
+  - name: effect_scaled_vs_logic_fidelity_latest
+    kind: fold_change_vs_logic_fidelity
+    round_selector: latest
+    round_variants: each
+    tags: [sfxi, selection, overlay, single-round, eda]
+    params:
+      y_axis: effect_scaled
+      hue: score
+      size_by: score
+      alpha: 0.35
+      rasterize_at: 20000
+      title: "AND objective: SFXI effect scaled vs logic fidelity by round"
+
   - name: sfxi_observed_logic_closeness_over_rounds
     kind: sfxi_logic_fidelity_closeness
     round_selector: all
