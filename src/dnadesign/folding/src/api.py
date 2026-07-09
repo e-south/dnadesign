@@ -263,7 +263,7 @@ def run_prediction_request(
         if request.policy.required and raise_on_required_failure:
             raise FoldingExecutionError(prediction.qa.errors[0])
         return prediction
-    command = [preflight.resolved_executable.as_posix(), "--noPS"]
+    command = _rnafold_cli_command(preflight.resolved_executable, parameters=request.backend.parameters)
     stdout_path = output_path / _STDOUT_FILENAME
     stderr_path = output_path / _STDERR_FILENAME
     try:
@@ -344,6 +344,14 @@ def run_prediction_request(
             raise
     _write_prediction(output_path, prediction)
     return prediction
+
+
+def _rnafold_cli_command(executable: Path, *, parameters: dict[str, Any]) -> list[str]:
+    command = [executable.as_posix(), "--noPS"]
+    temperature_c = parameters.get("temperature_c")
+    if temperature_c is not None:
+        command.extend(["--temp", f"{float(temperature_c):g}"])
+    return command
 
 
 def _run_python_api_prediction_request(

@@ -87,6 +87,15 @@ sha256_file() {
   shasum -a 256 "$1" | awk '{print $1}'
 }
 
+validate_cxc_text() {
+  local label="$1"
+  local value="$2"
+  if [[ "$value" == *'"'* || "$value" == *';'* || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+    printf 'FAIL: %s must not contain quotes, semicolons, or newlines for ChimeraX startup commands\n' "$label" >&2
+    exit 1
+  fi
+}
+
 START_SCRIPT="$OUTPUT_DIR/start_session.cxc"
 CHIMERAX_LOG="$OUTPUT_DIR/chimerax.log"
 SESSION_MANIFEST="$OUTPUT_DIR/control_session.yaml"
@@ -98,6 +107,10 @@ import sys
 print(Path(sys.argv[1]).expanduser().resolve())
 PY
 )"
+validate_cxc_text "--structure path" "$ABS_STRUCTURE"
+if [[ -n "$TITLE" ]]; then
+  validate_cxc_text "--title" "$TITLE"
+fi
 : > "$COMMAND_LOG"
 
 cat > "$START_SCRIPT" <<CXC

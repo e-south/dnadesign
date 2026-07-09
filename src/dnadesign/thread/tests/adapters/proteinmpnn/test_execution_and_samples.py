@@ -169,6 +169,10 @@ def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
         "fixed_positions_jsonl": fixed_payload,
         "seed_set": [101],
         "temperature_schedule": [0.1],
+        "batch_id": "portable",
+        "num_seq_per_target": 4,
+        "batch_size": 2,
+        "expected_sample_count": 4,
     }
     manifest_path = request_dir / "request_manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
@@ -191,7 +195,6 @@ def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
         request_manifest_path=manifest_path,
         proteinmpnn_root=proteinmpnn_root,
         output_dir=tmp_path / "proteinmpnn_outputs",
-        execution_config=ProteinMpnnExecutionConfig(batch_id="portable", num_seq_per_target=1, batch_size=1),
     )
 
     assert len(observed_run_commands) == 1
@@ -199,6 +202,14 @@ def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
     assert command[command.index("--jsonl_path") + 1] == str(parsed_path)
     assert command[command.index("--chain_id_jsonl") + 1] == str(assigned_path)
     assert command[command.index("--fixed_positions_jsonl") + 1] == str(fixed_path)
+    assert command[command.index("--num_seq_per_target") + 1] == "4"
+    assert command[command.index("--batch_size") + 1] == "2"
+    backend_manifest = yaml.safe_load(
+        (tmp_path / "proteinmpnn_outputs" / "batches" / "portable" / "backend_run_manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert backend_manifest["expected_sample_count"] == 4
 
 
 def _write_fake_proteinmpnn_root(root: Path) -> Path:

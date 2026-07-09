@@ -149,7 +149,15 @@ def _normalize_dna_regions(seq_len: int, raw: tuple[tuple[int, int], ...]) -> tu
         if not (0 <= start < end <= seq_len):
             raise ValueError(f"DNA region out of bounds for length {seq_len}: {region!r}")
         regions.append((start, end))
+    _reject_overlapping_dna_regions(regions)
     return tuple(regions)
+
+
+def _reject_overlapping_dna_regions(regions: list[tuple[int, int]]) -> None:
+    ordered = sorted(regions)
+    for previous, current in zip(ordered, ordered[1:], strict=False):
+        if current[0] < previous[1]:
+            raise ValueError(f"Overlapping DNA regions are not allowed: {previous!r} and {current!r}")
 
 
 def _assert_protein(sequence: str) -> None:

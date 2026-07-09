@@ -70,7 +70,6 @@ def run_official_proteinmpnn_request(
 ) -> dict[str, Any]:
     """Run official ProteinMPNN scripts for one validated request manifest."""
 
-    config = execution_config or ProteinMpnnExecutionConfig(batch_id="smoke_n6")
     root = resolve_proteinmpnn_root(proteinmpnn_root)
     issues = validate_proteinmpnn_root(root)
     if issues:
@@ -78,6 +77,7 @@ def run_official_proteinmpnn_request(
         raise FileNotFoundError(messages)
 
     manifest = _load_yaml(request_manifest_path)
+    config = execution_config or _execution_config_from_manifest(manifest)
     request_hash = str(manifest["request_hash"])
     target_name = str(manifest["proteinmpnn_name"])
     chain_id = str(manifest["proteinmpnn_design_chain"])
@@ -260,6 +260,14 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {path}")
     return loaded
+
+
+def _execution_config_from_manifest(manifest: Mapping[str, Any]) -> ProteinMpnnExecutionConfig:
+    return ProteinMpnnExecutionConfig(
+        batch_id=str(manifest["batch_id"]),
+        num_seq_per_target=int(manifest["num_seq_per_target"]),
+        batch_size=int(manifest["batch_size"]),
+    )
 
 
 def _load_jsonl_record(path: Path) -> dict[str, Any]:

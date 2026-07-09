@@ -120,6 +120,7 @@ def _materialize_visual(
     media_path.write_bytes(rendered["image_bytes"])
     inputs = [_file_entry(path, role="source") for path in input_paths]
     outputs = [_file_entry(media_path, role="media"), _file_entry(tidy_path, role="tidy_csv")]
+    index_root = (output_dir / "collection_visual_manifest.json").resolve(strict=False).parent
     manifest = {
         "schema_version": COLLECTION_VISUAL_ARTIFACT_SCHEMA_VERSION,
         "generated_at": now_iso(),
@@ -160,9 +161,9 @@ def _materialize_visual(
         "group_count": rendered.get("group_count"),
         "inputs": inputs,
         "outputs": outputs,
-        "tidy_csv": str(tidy_path),
-        "path": str(media_path),
-        "manifest_path": str(manifest_path),
+        "tidy_csv": _path_relative_to_index(tidy_path, index_root=index_root),
+        "path": _path_relative_to_index(media_path, index_root=index_root),
+        "manifest_path": _path_relative_to_index(manifest_path, index_root=index_root),
         "freshness": _freshness_entry(inputs=inputs, outputs=outputs),
         "interval": rendered.get("interval"),
         "caption": rendered.get("caption"),
@@ -212,6 +213,14 @@ def _write_rows_csv(rows: list[Mapping[str, Any]], path: Path) -> None:
 
 def _artifact_stem(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._") or "collection_visual"
+
+
+def _path_relative_to_index(path: Path, *, index_root: Path) -> str:
+    resolved = path.resolve(strict=False)
+    try:
+        return resolved.relative_to(index_root).as_posix()
+    except ValueError:
+        return resolved.as_posix()
 
 
 def _file_entry(path: str | Path, *, role: str) -> dict[str, Any]:

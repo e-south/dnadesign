@@ -27,6 +27,22 @@ INT_RE = re.compile(r"^-?[0-9]+$")
 FLOAT_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?$")
 SAFE_SELECTION_CHARS_RE = re.compile(r"^[A-Za-z0-9#/:@&.,_+*?\-\s]+$")
 SAFE_COLOR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 -]{0,40}$")
+EXECUTABLE_OPEN_SUFFIXES = {".cxc", ".cmd", ".py", ".pyc", ".sh", ".bash", ".zsh", ".command"}
+ALLOWED_OPEN_SUFFIXES = {
+    ".bild",
+    ".cif",
+    ".cxs",
+    ".dx",
+    ".map",
+    ".mae",
+    ".mol2",
+    ".mrc",
+    ".mtz",
+    ".pdb",
+    ".pdbqt",
+    ".sdf",
+    ".xyz",
+}
 
 
 def _safe_selection(text: str) -> bool:
@@ -36,6 +52,13 @@ def _safe_selection(text: str) -> bool:
 def _is_local_existing_path(path_text: str) -> bool:
     path = Path(path_text).expanduser()
     return path.exists() and "://" not in path_text
+
+
+def _is_allowed_open_path(path_text: str) -> bool:
+    if not _is_local_existing_path(path_text):
+        return False
+    suffix = Path(path_text).suffix.lower()
+    return suffix in ALLOWED_OPEN_SUFFIXES and suffix not in EXECUTABLE_OPEN_SUFFIXES
 
 
 def _read_simple_manifest(path: Path) -> dict[str, str]:
@@ -195,7 +218,7 @@ def _allowed(command: str) -> bool:
     if parts[0] == "save":
         return _allowed_save(parts)
     if parts[0] == "open" and len(parts) == 2:
-        return _is_local_existing_path(parts[1])
+        return _is_allowed_open_path(parts[1])
     if parts == ["close", "session"]:
         return True
     if parts[0] in {"show", "hide"}:

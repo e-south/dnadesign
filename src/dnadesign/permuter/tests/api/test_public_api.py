@@ -91,6 +91,17 @@ def test_public_api_fails_fast_on_invalid_dna_sequence() -> None:
         generate_variants(NucleotideDmsRequest(ref_name="bad", sequence="AX"))
 
 
+def test_public_api_rejects_overlapping_nucleotide_dms_regions() -> None:
+    with pytest.raises(ValueError, match="Overlapping DNA regions"):
+        generate_variants(
+            NucleotideDmsRequest(
+                ref_name="overlap",
+                sequence="ACGT",
+                regions=((0, 2), (1, 3)),
+            )
+        )
+
+
 def test_public_api_generates_coding_dna_dms_with_explicit_codon_policy(tmp_path) -> None:
     table = tmp_path / "codons.csv"
     table.write_text(CODON_CSV, encoding="utf-8")

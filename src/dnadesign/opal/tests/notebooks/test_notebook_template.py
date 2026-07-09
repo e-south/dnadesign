@@ -47,6 +47,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_plot_method_rows,
     build_notebook_plot_method_sections,
     build_notebook_plot_scope_options,
+    build_notebook_reader_evidence_artifact_rows,
     build_notebook_run_summary_lines,
     build_notebook_selected_baserender_record_ids,
     build_notebook_validity_lines,
@@ -1142,6 +1143,49 @@ def test_campaign_set_notebook_render_fails_without_distinct_campaign_configs() 
             [Path("campaign.yaml"), Path("campaign.yaml")],
             round_selector="latest",
         )
+
+
+def test_campaign_set_template_embeds_absolute_collection_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml")],
+        round_selector="latest",
+        collection_manifest_path=Path("campaign_collection.yaml"),
+        collection_visual_index_path=Path("collection_visuals/collection_visual_manifest.json"),
+    )
+
+    assigned_paths = {
+        target.id: ast.literal_eval(node.value)
+        for node in ast.walk(ast.parse(text))
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and target.id in {"collection_manifest_path", "collection_visual_index_path"}
+    }
+    assert assigned_paths["collection_manifest_path"] == str(Path("campaign_collection.yaml").resolve())
+    assert assigned_paths["collection_visual_index_path"] == str(
+        Path("collection_visuals/collection_visual_manifest.json").resolve()
+    )
+
+
+def test_reader_evidence_artifact_rows_preserve_zero_hour_snapshot() -> None:
+    rows = build_notebook_reader_evidence_artifact_rows(
+        {
+            "reader_evidence_artifacts": [
+                {
+                    "label": "baseline",
+                    "time_selected_h": 0.0,
+                    "semantic_kind": "reader.sfxi_triptych",
+                    "path": "baseline.png",
+                    "exists": True,
+                }
+            ]
+        }
+    )
+
+    assert rows[0]["time_selected_h"] == 0.0
 
 
 def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:

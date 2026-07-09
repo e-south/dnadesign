@@ -147,6 +147,47 @@ else
   fail "python helper scripts parse"
 fi
 
+tmp_open_dir="$(mktemp -d)"
+touch "$tmp_open_dir/model.pdb" "$tmp_open_dir/unsafe.cxc"
+if python3 - "$SCRIPT_DIR/chimerax-send-command.py" "$SCRIPT_DIR/chimerax-capture-pose.py" "$tmp_open_dir" <<'PY'
+import datetime
+import importlib.util
+from pathlib import Path
+import sys
+
+send_path = Path(sys.argv[1])
+capture_path = Path(sys.argv[2])
+tmp_open_dir = Path(sys.argv[3])
+if not hasattr(datetime, "UTC"):
+    datetime.UTC = datetime.timezone.utc
+
+send_spec = importlib.util.spec_from_file_location("chimerax_send_command", send_path)
+send_module = importlib.util.module_from_spec(send_spec)
+assert send_spec.loader is not None
+send_spec.loader.exec_module(send_module)
+
+capture_spec = importlib.util.spec_from_file_location("chimerax_capture_pose", capture_path)
+capture_module = importlib.util.module_from_spec(capture_spec)
+assert capture_spec.loader is not None
+capture_spec.loader.exec_module(capture_module)
+
+assert send_module._allowed(f"open {tmp_open_dir / 'model.pdb'}")
+assert not send_module._allowed(f"open {tmp_open_dir / 'unsafe.cxc'}")
+assert capture_module._cxc_quoted_path(tmp_open_dir / "pose.png", label="image") == f'"{tmp_open_dir / "pose.png"}"'
+try:
+    capture_module._cxc_quoted_path(tmp_open_dir / 'bad"name.png', label="image")
+except ValueError:
+    pass
+else:
+    raise AssertionError("quoted ChimeraX output path was accepted")
+PY
+then
+  pass "ChimeraX helper allowlists reject executable open paths and unsafe CXC path text"
+else
+  fail "ChimeraX helper allowlists reject executable open paths and unsafe CXC path text"
+fi
+rm -rf "$tmp_open_dir"
+
 for rejected_command in \
   'open https://example.org/1abc.pdb' \
   'remotecontrol rest stop; exit' \

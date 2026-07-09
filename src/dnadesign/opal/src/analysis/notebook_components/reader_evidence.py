@@ -132,7 +132,7 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
                 "reader_experiment_id": item.get("reader_experiment_id") or "",
                 "reader_config_path": item.get("reader_config_path") or "",
                 "reader_record_id": item.get("reader_record_id") or "",
-                "time_selected_h": item.get("time_selected_h") or "",
+                "time_selected_h": _blank_if_none(item.get("time_selected_h")),
                 "sequence": item.get("sequence") or "",
                 "synthesis_name": item.get("synthesis_name") or "",
                 "semantic_kind": item.get("semantic_kind") or "",
@@ -145,6 +145,10 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
             }
         )
     return rows
+
+
+def _blank_if_none(value: object) -> object:
+    return "" if value is None else value
 
 
 def build_notebook_reader_evidence_surface(view_model: Mapping[str, Any]) -> dict[str, Any]:

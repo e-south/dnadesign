@@ -340,6 +340,10 @@ if [ "$1" = "--version" ]; then
   printf "RNAfold 2.7.0\\n"
   exit 0
 fi
+if [ "$1" != "--noPS" ] || [ "$2" != "--temp" ] || [ "$3" != "37" ]; then
+  printf "unexpected argv: %s\\n" "$*" >&2
+  exit 9
+fi
 cat >/dev/null
 printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
 """,
@@ -353,6 +357,7 @@ printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
     assert prediction.status == "ok"
     assert prediction.backend is not None
     assert prediction.backend.version == "RNAfold 2.7.0"
+    assert prediction.backend.command[-2:] == ["--temp", "37"]
     assert prediction.dna_policy is not None
     assert prediction.dna_policy.submitted_alphabet == "rna_surrogate"
     assert prediction.result is not None

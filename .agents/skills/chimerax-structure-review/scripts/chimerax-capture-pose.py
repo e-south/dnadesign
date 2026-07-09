@@ -68,10 +68,23 @@ def _validate_capture_options(args: argparse.Namespace, parser: argparse.Argumen
         parser.error("--background-color must be a named color or #RRGGBB value")
     if _has_command_separator(args.title):
         parser.error("--title must not contain ChimeraX command separators")
+    if _has_cxc_quote_boundary(args.title):
+        parser.error("--title must not contain double quotes")
 
 
 def _has_command_separator(value: str) -> bool:
     return any(token in value for token in (";", "\n", "\r"))
+
+
+def _has_cxc_quote_boundary(value: str) -> bool:
+    return '"' in value
+
+
+def _cxc_quoted_path(path: Path, *, label: str) -> str:
+    text = str(path)
+    if _has_command_separator(text) or _has_cxc_quote_boundary(text):
+        raise ValueError(f"{label} must not contain quotes, semicolons, or newlines")
+    return f'"{text}"'
 
 
 def _send(*, port: int, command: str, timeout_seconds: float) -> dict[str, Any]:
@@ -183,6 +196,11 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     session_path = args.output_dir / f"{args.pose_id}.cxs"
     image_path = args.output_dir / f"{args.pose_id}.png"
+    try:
+        quoted_session_path = _cxc_quoted_path(session_path, label="session output path")
+        quoted_image_path = _cxc_quoted_path(image_path, label="image output path")
+    except ValueError as exc:
+        parser.error(str(exc))
     command_log_path = args.output_dir / f"{args.pose_id}.commands.jsonl"
     manifest_path = args.output_dir / f"{args.pose_id}.pose_manifest.yaml"
     captured_at_utc = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -193,21 +211,20 @@ def main() -> int:
         {"key": "name_view", "command": f"view name {args.pose_id}"},
     ]
     if args.title:
-        escaped_title = args.title.replace('"', '\\"')
         command_entries.append({"key": "title_label_cleanup", "command": "2dlabels delete all"})
         command_entries.append(
             {
                 "key": "title_label",
-                "command": f'2dlabels text "{escaped_title}" xpos 0.035 ypos 0.89 size 30 color black bgColor none',
+                "command": f'2dlabels text "{args.title}" xpos 0.035 ypos 0.89 size 30 color black bgColor none',
             }
         )
     command_entries.extend(
         [
-            {"key": "save_session", "command": f'save "{session_path}"'},
+            {"key": "save_session", "command": f"save {quoted_session_path}"},
             {
                 "key": "save_image",
                 "command": (
-                    f'save "{image_path}" width {args.width} height {args.height} supersample {args.supersample}'
+                    f"save {quoted_image_path} width {args.width} height {args.height} supersample {args.supersample}"
                 ),
             },
         ]

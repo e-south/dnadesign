@@ -70,7 +70,7 @@ def _campaign_review_config_path_literals(config_paths: list[Path]) -> str:
 def _optional_path_literal(path: str | Path | None) -> str:
     if path is None:
         return "None"
-    return _wrapped_string_expression(str(Path(path)))
+    return _wrapped_string_expression(str(Path(path).expanduser().resolve()))
 
 
 def _wrapped_string_item(value: str) -> str:

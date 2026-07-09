@@ -995,8 +995,19 @@ def test_materialize_campaign_set_collection_visuals_writes_manifest_backed_outp
     assert "configured objective scale" in visual["caption"]
     assert "Score = -MSE(y_hat, [0, 0, 1, 1])" in visual["alt_text"]
     assert Path(visual["outputs"][0]["path"]).exists()
-    assert Path(visual["tidy_csv"]).exists()
-    assert Path(visual["manifest_path"]).exists()
+    assert Path(visual["tidy_csv"]).name == visual["tidy_csv"]
+    assert Path(visual["path"]).name == visual["path"]
+    assert Path(visual["manifest_path"]).name == visual["manifest_path"]
+    assert (output_dir / visual["tidy_csv"]).exists()
+    assert (output_dir / visual["path"]).exists()
+    assert (output_dir / visual["manifest_path"]).exists()
+    assert (
+        load_collection_visual_manifest_index(
+            output_dir / "collection_visual_manifest.json",
+            expected_collection_id="fixture",
+        )["visual_count"]
+        == 3
+    )
     mse_visual = next(row for row in index["visuals"] if row["visual_id"] == "selected_vector_reference_mse")
     assert mse_visual["surface_kind"] == "campaign_set_vector_reference_mse_comparison"
     assert mse_visual["metric"] == "reference_mse"
@@ -1004,7 +1015,7 @@ def test_materialize_campaign_set_collection_visuals_writes_manifest_backed_outp
     assert mse_visual["axis_scale"]["reference_lines"] == []
     assert "mean vector" in mse_visual["caption"]
     assert "mean vector" in mse_visual["alt_text"]
-    assert Path(mse_visual["path"]).exists()
+    assert (output_dir / mse_visual["path"]).exists()
     heatmap_visual = next(row for row in index["visuals"] if row["visual_id"] == "selected_vector_heatmap")
     assert heatmap_visual["surface_kind"] == "campaign_set_vector_heatmap_comparison"
     assert heatmap_visual["row_count"] == 12
@@ -1024,7 +1035,7 @@ def test_materialize_campaign_set_collection_visuals_writes_manifest_backed_outp
     assert "shared color scale" in heatmap_visual["caption"]
     assert "Positive" in heatmap_visual["alt_text"]
     assert "Null" in heatmap_visual["alt_text"]
-    assert Path(heatmap_visual["path"]).exists()
+    assert (output_dir / heatmap_visual["path"]).exists()
 
 
 def test_materialize_campaign_set_collection_visuals_rejects_artifact_stem_collisions(tmp_path: Path) -> None:
