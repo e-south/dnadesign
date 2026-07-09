@@ -64,7 +64,7 @@ def test_generation_policy_candidate_pool_aggregates_complete_policy_outputs(tmp
     assert shared["primary_policy_id"] == "distal_scaffold_repack_v1"
 
 
-def test_generation_policy_foldcheck_request_writes_v2_fasta(tmp_path: Path) -> None:
+def test_generation_policy_foldcheck_request_writes_v3_fasta(tmp_path: Path) -> None:
     source_root = tmp_path / "source"
     write_generation_policy_source_inputs(source_root)
     materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
@@ -91,7 +91,7 @@ def test_generation_policy_foldcheck_request_writes_v2_fasta(tmp_path: Path) -> 
 
     assert result.candidate_pool_path == tmp_path / "candidate_pool.parquet"
     assert manifest["schema_id"] == "thread.foldcheck_request"
-    assert manifest["artifact_id"] == "eco1_rt_generation_policies_v2.foldcheck_request"
+    assert manifest["artifact_id"] == "eco1_rt_generation_policies_v3.foldcheck_request"
     assert manifest["sequence_count"] == 4
     assert manifest["storage_policy"]["preferred_runtime_locus"] == "local_julius_colabfold"
     assert ">wild_type" in fasta

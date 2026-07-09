@@ -76,6 +76,9 @@ def build_request_manifest(
 
     serialized_sidecar_paths = {name: str(path) for name, path in sidecar_paths.items()}
     sidecar_hashes = {name: sha256_uri(path) for name, path in sidecar_paths.items()}
+    omit_aa_jsonl_path = None
+    if "omit_AA_jsonl" in sidecar_paths:
+        omit_aa_jsonl_path = f"proteinmpnn_request/{Path(sidecar_paths['omit_AA_jsonl']).name}"
     fixed_payload = fixed_positions_payload(
         target_name=target_name,
         chain_id=chain_id,
@@ -120,6 +123,7 @@ def build_request_manifest(
             fixed_positions=fixed_positions,
             num_seq_per_target=num_seq_per_target,
             batch_size=batch_size,
+            omit_aa_jsonl_path=omit_aa_jsonl_path,
         ),
     }
 
@@ -132,6 +136,7 @@ def proteinmpnn_run_commands(
     fixed_positions: Sequence[int],
     num_seq_per_target: int = 1,
     batch_size: int = 1,
+    omit_aa_jsonl_path: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the official ProteinMPNN helper/run command shape without executing it."""
 
@@ -178,33 +183,36 @@ def proteinmpnn_run_commands(
         },
     ]
     for seed in seed_set:
+        argv = [
+            "python",
+            "protein_mpnn_run.py",
+            "--jsonl_path",
+            "proteinmpnn_request/parsed_pdbs.jsonl",
+            "--chain_id_jsonl",
+            "proteinmpnn_request/assigned_chains.jsonl",
+            "--fixed_positions_jsonl",
+            "proteinmpnn_request/fixed_positions.jsonl",
+            "--out_folder",
+            "proteinmpnn_outputs",
+            "--num_seq_per_target",
+            str(num_seq_per_target),
+            "--sampling_temp",
+            temp_text,
+            "--seed",
+            str(seed),
+            "--batch_size",
+            str(batch_size),
+            "--omit_AAs",
+            "C",
+            "--save_score",
+            "1",
+        ]
+        if omit_aa_jsonl_path is not None:
+            argv.extend(["--omit_AA_jsonl", omit_aa_jsonl_path])
         commands.append(
             {
                 "name": f"protein_mpnn_run_seed_{seed}",
-                "argv": [
-                    "python",
-                    "protein_mpnn_run.py",
-                    "--jsonl_path",
-                    "proteinmpnn_request/parsed_pdbs.jsonl",
-                    "--chain_id_jsonl",
-                    "proteinmpnn_request/assigned_chains.jsonl",
-                    "--fixed_positions_jsonl",
-                    "proteinmpnn_request/fixed_positions.jsonl",
-                    "--out_folder",
-                    "proteinmpnn_outputs",
-                    "--num_seq_per_target",
-                    str(num_seq_per_target),
-                    "--sampling_temp",
-                    temp_text,
-                    "--seed",
-                    str(seed),
-                    "--batch_size",
-                    str(batch_size),
-                    "--omit_AAs",
-                    "C",
-                    "--save_score",
-                    "1",
-                ],
+                "argv": argv,
             }
         )
     return commands

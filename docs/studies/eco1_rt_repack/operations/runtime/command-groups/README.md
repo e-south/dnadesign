@@ -125,81 +125,9 @@ for full ChimeraX viewing while preserving SCC source paths in the manifest. The
 review plots include alt text and interpretation limits; they summarize model
 metrics and SAE coverage for inspection, not candidate acceptance.
 
-### Design-Class Expansion
+### Generation-Policy V2 Lane
 
-The 5 A class remains the baseline. The design-class materializer adds request
-surfaces for five additional classes without overwriting the baseline artifacts:
-clade 9 p25 contact 6/8/10 A, clade 9 p50 contact 5 A, and II-A3/`42_1` p50
-contact 5 A.
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . requests
-```
-
-Each generated class gets its own `mask_set.yaml`, `thread_plan.yaml`, and
-ProteinMPNN request sidecars under `outputs/thread/design_classes/<class-id>/`.
-Run ProteinMPNN for those classes on BU SCC through the submit-ready job
-template in `docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub`. Submit one
-class first, then the remaining array after the smoke writes its per-class
-`candidate_table.parquet`:
-
-```bash
-qsub -t 1 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-qsub -t 2-5 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-```
-
-The current local workspace already has the five generated class candidate
-tables. To refresh them after reruns, rebuild the nonredundant pool:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
-```
-
-The pool keeps one row per `sequence_hash` and records duplicate class
-provenance. The current expanded pool contains 576 nonredundant synthetic
-candidates. Only after the pool includes at least one generated class should the
-expanded fold-check request be written:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . foldcheck-request
-```
-
-The expanded fold-check, ColabFold normalization, Biohub ESMC SAE profile, and
-ESMC additive LLR review use the `design_classes/` output root so the new
-variants carry the same feature families as the baseline. After the expanded
-ColabFold report is normalized, stage the shared non-mask inputs that downstream
-fold-review and ESMC lanes need:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . downstream-inputs
-```
-
-This writes `design_classes/candidate_table.parquet` from the nonredundant
-candidate pool and copies shared residue-map, backbone, MSA, source-manifest,
-and WT ESMC mutation-scoring inputs. It does not write a root-level
-`mask_set.yaml`: the expanded pool contains multiple `mask_policy_id` values,
-so mask-specific review must read the per-class mask sets instead of treating
-one mask as the whole pool.
-
-After `foldcheck_review` is materialized against the `design_classes/` root,
-derive expanded 300M and 6B additive ESMC candidate-preference outputs without
-new Biohub requests:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . esmc-sequence-preference
-```
-
-These outputs are WT-context masked-marginal additive LLR review tables. They
-are not whole-protein likelihoods, assay measurements, or panel-selection
-inputs.
-
-### Generation-Policy V2 Request Lane
-
-The planned v2 cleanup uses complete generation policies rather than the nested
+The active v2 cleanup uses complete generation policies rather than the nested
 distance-mask design classes. The request lane writes
 `generation_policies_v2/generation_policy_manifest.yaml`, position and alphabet
 manifests, and one `proteinmpnn_request/request_manifest.yaml` per policy:
@@ -232,7 +160,8 @@ rsync -avz \
 ```
 
 ProteinMPNN generation ends at the per-policy sample and candidate tables. It
-does not run fold checks, selection, or review deliverable regeneration.
+does not by itself run fold checks, selection, or review deliverable
+regeneration.
 
 After `generation_policies_v2/` has been pulled back to the local clone,
 aggregate complete generated sequences by policy and write a local ColabFold
@@ -274,15 +203,13 @@ colabfold_batch --num-models 1 \
   src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs
 ```
 
-The active accepted study record remains the v1 design-class bundle until the
-v2 ProteinMPNN outputs, candidate pool, fold checks, selection, and review
-bundle are regenerated and accepted.
+The active study record is the v2 generation-policy selection root.
 
 ### Protein Review Panel Preparation
 
-The next local summaries prepare the expanded candidate pool for a six-variant
+The next local summaries prepare the active v2 candidate pool for a six-variant
 protein review panel. They explain computational feasibility, local structure,
-local SAE changes, and selection-readiness evidence; they do not predict strand
+charge sensitivity, and selection-readiness evidence; they do not predict strand
 displacement.
 
 The SAE window summary uses existing Biohub ESMC sparse tables and does not make
@@ -292,22 +219,27 @@ new Biohub requests:
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.sae_window_summary --repo-root .
 ```
 
-`review_deliverables` builds the first broader manuscript/review bundle from
-existing artifacts. It writes `review_deliverable_manifest.yaml`, a
-Mestre-derived clade 9 scaffold/mask-evidence panel, 25% and 50% conservation
-threshold cues, subtype row marking in the clade 9 MSA, a design-class mask
-overview, baseline ProteinMPNN SVGs, a baseline sequence-difference map, an
-expanded design-class ProteinMPNN/ColabFold fold-validation SVG, a ChimeraX
-mask-context script, WT ESMC model-check SVGs, exact-dictionary Biohub ESMC SAE
-review plots, interactive py3Dmol-backed structure-browser manifests, and a
-scoped marimo notebook organized by progressive analysis sections. The notebook
-presents constraint evidence for the design mask, baseline ProteinMPNN audit
-views, expanded-pool fold and panel-selection evidence, and ESMC/SAE checks when
-those manifests exist. The expanded panel-selection tables are materialized
-separately under `outputs/thread/design_classes/selection/`; the review notebook
-links the twelve selection-readiness SVGs from that manifest, including local
-RMSD threshold audits, C-terminal primer-RNA recognition review axes, and
-region-wise MSA support. WT ESMC
+Run v2 selection readiness explicitly against the v2 root:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness \
+  --repo-root . \
+  --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
+```
+
+`review_deliverables` builds the manuscript/review bundle from existing
+artifacts. It writes `review_deliverable_manifest.yaml`, a Mestre-derived clade
+9 scaffold/mask-evidence panel, fold-review links, WT ESMC model-check SVGs,
+exact-dictionary Biohub ESMC SAE review plots when present, interactive
+py3Dmol-backed structure-browser manifests, and a scoped marimo notebook
+organized by progressive analysis sections. The notebook presents constraint
+evidence for the design mask, active v2 fold and panel-selection evidence, and
+ESMC/SAE checks when those manifests exist.
+The active panel-selection tables are materialized under
+`outputs/thread/generation_policies_v2/selection/`; the review notebook links
+the selection-readiness SVGs from that manifest, including local RMSD threshold
+audits, C-terminal primer-RNA recognition review axes, near-region charge
+sensitivity, and region-wise MSA support. WT ESMC
 masked-marginal scoring is shown with the constraint
 evidence as a model check, not as a mask input.
 Static plots and interactive structure views are selected through the same
@@ -324,6 +256,14 @@ does not launch ChimeraX unless an operator passes the explicit render flag. It
 does not rerun ProteinMPNN, ColabFold, Biohub, Atlas, or candidate selection.
 The review notebook does not compute selection; it reads the selection manifest
 and pre-rendered SVGs.
+
+Use the active v2 selection root when regenerating review deliverables:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables \
+  --repo-root . \
+  --selection-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection
+```
 
 `atlas_semantic_profile` queries ESM Atlas with `fold_on_miss=false` unless an
 operator explicitly opts into on-demand folding. Use `--selection-manifest` for

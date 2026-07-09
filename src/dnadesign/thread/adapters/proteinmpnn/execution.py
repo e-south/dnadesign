@@ -132,6 +132,8 @@ def run_official_proteinmpnn_request(
             "--suppress_print",
             "1",
         ]
+        if "omit_AA_jsonl" in sidecar_paths:
+            command.extend(["--omit_AA_jsonl", str(sidecar_paths["omit_AA_jsonl"])])
         started = time.perf_counter()
         completed = subprocess.run(command, cwd=root, text=True, capture_output=True, check=False)
         elapsed = time.perf_counter() - started

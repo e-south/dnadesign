@@ -28,7 +28,7 @@ class GenerationPolicySpec:
 
 @dataclass(frozen=True)
 class GenerationPolicyConfig:
-    """Validated v2 generation-policy configuration."""
+    """Validated v3 generation-policy configuration."""
 
     generation_policy_version: int
     generation_total_target_raw: int
@@ -46,7 +46,7 @@ class MaterializedGenerationPolicies:
 
 @dataclass(frozen=True)
 class MaterializedGenerationPolicyRequests:
-    """Paths emitted by v2 per-policy ProteinMPNN request materialization."""
+    """Paths emitted by v3 per-policy ProteinMPNN request materialization."""
 
     policy_manifest_path: Path
     positions_path: Path
@@ -56,7 +56,7 @@ class MaterializedGenerationPolicyRequests:
 
 @dataclass(frozen=True)
 class MaterializedGenerationPolicyCandidatePool:
-    """Paths emitted by v2 candidate-pool aggregation."""
+    """Paths emitted by v3 candidate-pool aggregation."""
 
     policy_manifest_path: Path
     candidate_pool_path: Path
@@ -65,7 +65,7 @@ class MaterializedGenerationPolicyCandidatePool:
 
 @dataclass(frozen=True)
 class MaterializedGenerationPolicyFoldCheckRequest:
-    """Paths emitted by v2 fold-check request materialization."""
+    """Paths emitted by v3 fold-check request materialization."""
 
     candidate_pool_path: Path
     candidate_pool_manifest_path: Path

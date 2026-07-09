@@ -2,7 +2,7 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-06-25
+last_verified: 2026-07-09
 ---
 
 ## BU SCC job templates
@@ -13,7 +13,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `eco1-proteinmpnn-design-class.qsub`: Eco1 ProteinMPNN design-class array run
-- `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v2 generation-policy array run
+- `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v3 generation-policy array run
 - `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
@@ -200,14 +200,14 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 
 ### Eco1 ProteinMPNN generation-policy submissions
 
-The Eco1 generation-policy template is the forward v2 lane. It consumes request
+The Eco1 generation-policy template is the forward v3 lane. It consumes request
 roots under:
 
 ```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
 ```
 
-It maps SGE task ids to the three complete v2 policies:
+It maps SGE task ids to the three complete v3 policies:
 `distal_scaffold_repack_v1`, `near_dna_rna_acid_free_v1`, and
 `combined_near_acid_free_plus_distal_v1`. Each task runs one complete
 ProteinMPNN policy. The template does not combine mutations across policy
@@ -250,7 +250,7 @@ import polars as pl
 
 root = Path(
     "src/dnadesign/studies/units/eco1_rt_repack/workspaces/"
-    "eco1_rt_conservative_v1/outputs/thread/generation_policies_v2"
+    "eco1_rt_conservative_v1/outputs/thread/generation_policies_v3"
 )
 for policy_id in (
     "distal_scaffold_repack_v1",
@@ -266,24 +266,24 @@ for policy_id in (
 PY
 ```
 
-To continue the study on a local workstation, pull the generated v2 policy
+To continue the study on a local workstation, pull the generated v3 policy
 bundle back into the same ignored output path. This is a generated-artifact
 transfer, not a USR dataset sync:
 
 ```bash
 rsync -avz \
-  esouth@scc1.bu.edu:/project/dunlop/esouth/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/ \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+  esouth@scc1.bu.edu:/project/dunlop/esouth/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/ \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
 
-mkdir -p src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/sge_logs
+mkdir -p src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs
 rsync -avz \
   esouth@scc1.bu.edu:/project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs/ \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/sge_logs/
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs/
 ```
 
 This ProteinMPNN generation lane stops after per-policy `sample_table.parquet`
 and `candidate_table.parquet` materialization. It does not automatically run
-ColabFold. After local pull-back, regenerate the v2 candidate-pool/fold-check
+ColabFold. After local pull-back, regenerate the v3 candidate-pool/fold-check
 inputs from the policy-provenance tables, then run the local ColabFold path.
 
 ```bash
@@ -295,22 +295,22 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   foldcheck-request
 ```
 
-For a bounded local smoke run, create a six-record FASTA from the v2 request
+For a bounded local smoke run, create a six-record FASTA from the v3 request
 before running `colabfold_batch`:
 
 ```bash
 uv run python -m dnadesign.thread.foldcheck.subset \
-  --request-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_request/foldcheck_request_manifest.yaml \
+  --request-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml \
   --sequence-limit 6 \
   --sequence-start 1 \
-  --input-fasta src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
-  --run-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_run_manifest.yaml \
-  --output-dir src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs \
+  --input-fasta src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  --run-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_run_manifest.yaml \
+  --output-dir src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_outputs \
   --schema-id eco1_rt.colabfold_local_run_manifest \
   --execution-status planned_local_colabfold_cli
 colabfold_batch --num-models 1 \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/input_sequences.fasta \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/foldcheck_local_runs/smoke_6/colabfold_outputs
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/input_sequences.fasta \
+  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_outputs
 ```
 
 ### Eco1 ColabFold fold-check submissions

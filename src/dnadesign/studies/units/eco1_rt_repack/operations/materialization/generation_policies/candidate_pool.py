@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/candidate_pool.py
 
-Aggregate Eco1 RT v2 policy-specific ProteinMPNN candidates.
+Aggregate Eco1 RT v3 policy-specific ProteinMPNN candidates.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ def materialize_generation_policy_candidate_pool(
     generation_policy_root: Path | None = None,
     created_at: str = DEFAULT_CREATED_AT,
 ) -> MaterializedGenerationPolicyCandidatePool:
-    """Aggregate accepted v2 candidate tables into one deduplicated pool."""
+    """Aggregate accepted v3 candidate tables into one deduplicated pool."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     policy_root = _resolve_path(root, generation_policy_root or DEFAULT_GENERATION_POLICIES_ROOT)
@@ -59,7 +59,7 @@ def materialize_generation_policy_candidate_pool(
     input_tables = _load_policy_candidate_tables(policy_root=policy_root, policy_ids=policy_ids)
     pool_rows, duplicate_count = _deduplicate_rows(input_tables=input_tables, policy_ids=policy_ids)
     if not pool_rows:
-        raise ValueError("v2 generation-policy candidate pool requires accepted candidate rows")
+        raise ValueError("generation-policy candidate pool requires accepted candidate rows")
 
     candidate_pool_path = policy_root / _OUTPUT_TABLE_NAME
     pq.write_table(pa.Table.from_pylist(pool_rows), candidate_pool_path)

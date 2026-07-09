@@ -625,14 +625,12 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
     status: materialized_script_png
     description: >-
-      Design-class mask context deliverable. The SVG matrix compares the six
-      design-class masks against motif, Wang/EC86 prior, WT-plurality, and
-      DNA/RNA proximity evidence rows. The
-      ChimeraX `.cxc` script is written for an off-white EC86 RT structure with
-      categorical overlays for baseline fixed residues and mutable ProteinMPNN
-      positions. The PNG render is opt-in; normal materialization records a
-      skipped optional-render status unless an existing render is being
-      retained.
+      Active mask-evidence context deliverable. The ChimeraX `.cxc` script is
+      written for an off-white EC86 RT structure with categorical overlays for
+      protected residues, motif anchors, Wang/Ec86 substrate-contact priors,
+      retained DNA/RNA 5 A contacts, and clade 9 p25 WT-plurality residues.
+      The PNG render is opt-in; normal materialization records a skipped
+      optional-render status unless an existing render is being retained.
   - id: eco1_rt_mask_structure_browser_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -647,20 +645,6 @@ datasets:
       mutable ProteinMPNN positions. It uses the generic
       `dnadesign.thread.structure_views` residue-selection contract and is
       review context only.
-  - id: eco1_rt_proteinmpnn_candidate_diversity_visuals
-    owner: eco1_rt_repack
-    kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/proteinmpnn_candidate_diversity/
-    status: materialized_foundation
-    description: >-
-      ProteinMPNN candidate-diversity visuals for score/global score, sequence
-      recovery to WT, mutation count, sampling temperature, and mutation density.
-      The directory also contains the expanded design-class fold-validation plot
-      that joins the 576-candidate pool to ColabFold RMSD/pLDDT metrics and
-      outlines the selected panel rows.
-      In the review notebook these live with ColabFold fold-triage artifacts as
-      the ProteinMPNN designs and fold-triage section. Sequence recovery is
-      descriptive and not an acceptance criterion.
   - id: eco1_rt_colabfold_structure_review_panels
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -670,10 +654,8 @@ datasets:
       Existing foldcheck_review visual bundle is linked into
       review_deliverable_manifest.yaml instead of duplicated. It includes
       fold-review class counts, ColabFold metric scatter, cryoEM/reference RMSD
-      comparison, and Biohub ESMC coverage. A new all-97 contact sheet remains
-      optional-heavy and should reuse cached thumbnails if added later. In the
-      review notebook these rows live with ProteinMPNN proposal visuals under
-      the combined design-and-fold triage section.
+      comparison, and Biohub ESMC coverage. In the review notebook these rows
+      are supporting fold and model-check context, not panel-selection gates.
   - id: eco1_rt_interactive_structure_browser_manifest
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -693,43 +675,10 @@ datasets:
       pLDDT, RMSD, sequence identity, and mutation burden. This is review
       context only; ChimeraX remains the publication still-render and
       pose-capture path.
-  - id: eco1_rt_selection_premise_alignment
-    owner: eco1_rt_repack
-    kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_premise_alignment.svg
-    status: materialized_selection_readiness_visual
-    description: >-
-      Compact review visual showing the selected primary panel against the panel premise:
-      catalytic/direct-contact edits, near retained DNA/RNA edits, thumb-track
-      edits, distal edits, near retained DNA/RNA chemistry warnings, fold gate status,
-      and local-structure gate status. ESMC and SAE stay in model/method
-      checks rather than this core checklist. It is a review visual, not
-      activity evidence.
-  - id: eco1_rt_selection_design_class_gate_counts
-    owner: eco1_rt_repack
-    kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_gate_counts.svg
-    status: materialized_selection_readiness_visual
-    description: >-
-      Compact review visual showing candidates that pass the protein gate,
-      blocked candidates, and rows missing gate inputs for each design class.
-      It supports panel review but does not measure RT activity or handoff
-      acceptance.
-  - id: eco1_rt_selection_design_class_contrast
-    owner: eco1_rt_repack
-    kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_contrast.svg
-    status: materialized_selection_readiness_visual
-    description: >-
-      Compact review visual showing the declared MSA set, conservation
-      threshold, retained-DNA/RNA contact shell, gate-pass count, selected row,
-      near retained DNA/RNA edits, and thumb-track edits for each design class.
-      It explains mask-policy contrasts without treating design class as a
-      primary-panel quota.
   - id: eco1_rt_selection_local_structure_stratification
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_stratification.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_stratification.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing local C-alpha RMSD distributions by
@@ -739,7 +688,7 @@ datasets:
   - id: eco1_rt_selection_local_structure_threshold_sensitivity
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_threshold_sensitivity.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_threshold_sensitivity.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing local C-alpha RMSD gate failures under
@@ -748,7 +697,7 @@ datasets:
   - id: eco1_rt_selection_primary_panel_sankey
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_primary_panel_sankey.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_primary_panel_sankey.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing accepted candidates, preservation-contract
@@ -758,7 +707,7 @@ datasets:
   - id: eco1_rt_selection_six_sequence_distance
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_six_sequence_distance.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_six_sequence_distance.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing pairwise mutation-position and
@@ -768,7 +717,7 @@ datasets:
   - id: eco1_rt_selection_selected_substitutions_across_rt
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_selected_substitutions_across_rt.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_selected_substitutions_across_rt.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing where selected substitutions fall across
@@ -777,7 +726,7 @@ datasets:
   - id: eco1_rt_selection_regional_mutation_burden
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regional_mutation_burden.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regional_mutation_burden.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual summarizing selected substitutions by catalytic or
@@ -788,7 +737,7 @@ datasets:
   - id: eco1_rt_selection_local_structure_by_region
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_by_region.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_by_region.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing selected-candidate local C-alpha RMSD after
@@ -800,17 +749,26 @@ datasets:
   - id: eco1_rt_selection_na_facing_chemistry_balance
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_na_facing_chemistry_balance.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_na_facing_chemistry_balance.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual separating chemistry changes near retained DNA/RNA
       or thumb-track positions into charge change, basic gain, basic loss, acidic
       gain, and proline/glycine gain. It treats chemistry as review risk and
       context, not as a positive activity predictor.
+  - id: eco1_rt_selection_near_region_charge_sensitivity
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_near_region_charge_sensitivity.svg
+    status: materialized_selection_readiness_visual
+    description: >-
+      Compact review visual comparing the strict acid-free selected panel with
+      relaxed near-region charge-sensitivity rows. It is an audit of the current
+      chemistry gate and does not override the primary-panel selection rule.
   - id: eco1_rt_selection_regionwise_msa_support
     owner: eco1_rt_repack
     kind: generated_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regionwise_msa_support.svg
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regionwise_msa_support.svg
     status: materialized_selection_readiness_visual
     description: >-
       Compact review visual showing whether selected substitutions are observed
@@ -858,33 +816,32 @@ datasets:
   - id: eco1_rt_feasibility_report
     owner: eco1_rt_repack
     kind: materialized_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
-    status: materialized_expanded_576_rows
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/feasibility_report.parquet
+    status: materialized_generation_policy_v2_1007_rows
     description: >-
-      Study-owned computational feasibility report for the expanded
-      nonredundant candidate pool. It records mutation windows, parent
+      Study-owned computational feasibility report for the active v2
+      generation-policy candidate pool. It records mutation windows, parent
       distance, synthesis tier, blockers, and feasibility status. It is not a
       synthesis quote or wet-lab assembly plan.
   - id: eco1_rt_candidate_triage_table
     owner: eco1_rt_repack
     kind: materialized_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
-    status: materialized_expanded_576_rows
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_triage_table.parquet
+    status: materialized_generation_policy_v2_1007_rows
     description: >-
-      Study-owned table for the expanded nonredundant candidate pool. It joins
-      fold-review classes, MSA support, mutation geography,
-      near retained DNA/RNA, thumb-track, and C-terminal primer-RNA recognition review
-      fields, local chemistry, mutation-set dissimilarity fields, ESMC additive
-      LLR fields, three-window SAE WT-delta fields, feasibility status, and
-      local-structure gate fields. It is a triage surface, not a combined-score
-      table. Canonical mutation tokens are parsed strictly before mutation
-      geography is used for hard-gate status, and local-structure metric
-      availability plus local RMSD threshold status are enforced before panel
-      eligibility.
+      Study-owned table for the active v2 generation-policy candidate pool. It
+      joins fold-review classes, policy provenance, MSA support, mutation
+      geography, near retained DNA/RNA, thumb-track, and C-terminal primer-RNA
+      recognition review fields, local chemistry, mutation-set dissimilarity
+      fields, feasibility status, and local-structure gate fields. It is a
+      triage surface, not a combined-score table. Canonical mutation tokens are
+      parsed strictly before mutation geography is used for hard-gate status,
+      and local-structure metric availability plus local RMSD threshold status
+      are enforced before panel eligibility.
   - id: eco1_rt_local_structure_region_metrics
     owner: eco1_rt_repack
     kind: materialized_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/local_structure_region_metrics.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/local_structure_region_metrics.parquet
     status: materialized_review_metric
     description: >-
       Study-owned derived metric table with one row per candidate and local RT
@@ -897,24 +854,43 @@ datasets:
       structure region. Metric availability and per-region RMSD threshold pass
       status are selection-readiness gates; RMSD values are structural review
       metrics, not activity metrics.
+  - id: eco1_rt_near_region_charge_sensitivity
+    owner: eco1_rt_repack
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/near_region_charge_sensitivity.parquet
+    status: materialized_review_metric
+    description: >-
+      Non-selector audit table for near retained DNA/RNA charge changes in the
+      active v2 candidate pool. It distinguishes strict acid-free primary-panel
+      rows from relaxed charge-sensitivity rows and records why proximal rows
+      fail preservation, proximal-support, or charge-review checks.
+  - id: eco1_rt_charge_sensitivity_shortlist
+    owner: eco1_rt_repack
+    kind: materialized_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/charge_sensitivity_shortlist.parquet
+    status: materialized_review_metric
+    description: >-
+      Compact non-selector comparison of the strict selected panel and relaxed
+      near-region charge-sensitivity rows. Use it to review whether a future
+      chemistry rule should change; do not use it to override the current
+      primary-panel gate.
   - id: eco1_rt_candidate_selection_panel
     owner: eco1_rt_repack
     kind: materialized_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_selection_panel.parquet
     status: materialized_primary_panel
     description: >-
       Study-owned primary-panel table built from the candidate triage table.
       It selects primary conservative rows globally after protein contracts,
-      stricter C-terminal/thumb local RMSD review, and minimum directional
-      chemistry checks near retained DNA/RNA. Design class is retained as
-      context rather than as a quota. Proximal MSA support, mutation geography,
-      local chemistry, mutation-set dissimilarity, local/global fold metrics,
-      and deterministic tie-break fields explain the panel choices. ESMC and
-      SAE are recorded but not used for selection.
+      local RMSD review, and chemistry/support checks near retained DNA/RNA.
+      Generation policy is retained as context rather than as a quota. Proximal
+      MSA support, mutation geography, local chemistry, safe mutation coverage,
+      local/global fold metrics, and deterministic tie-break fields explain the
+      panel choices. ESMC and SAE are not used for v2 selection.
   - id: eco1_rt_candidate_handoff_sequences
     owner: eco1_rt_repack
     kind: materialized_artifact
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_handoff_sequences.csv
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_handoff_sequences.csv
     status: materialized_six_row_sequence_export
     description: >-
       Flat reviewer-facing RT protein sequence table for the selected primary

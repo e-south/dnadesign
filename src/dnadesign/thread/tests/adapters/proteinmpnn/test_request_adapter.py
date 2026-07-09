@@ -223,6 +223,22 @@ def test_proteinmpnn_run_commands_use_requested_chain_id() -> None:
     assert commands.index(fixed_command) < commands.index(run_command)
 
 
+def test_proteinmpnn_run_commands_include_optional_omit_aa_jsonl() -> None:
+    commands = proteinmpnn_run_commands(
+        seed_set=[101],
+        temperatures=[0.1],
+        chain_id="A",
+        fixed_positions=[1],
+        omit_aa_jsonl_path="proteinmpnn_request/omit_AA.jsonl",
+    )
+
+    run_command = next(command for command in commands if command["name"] == "protein_mpnn_run_seed_101")
+
+    assert run_command["argv"][run_command["argv"].index("--omit_AA_jsonl") + 1] == (
+        "proteinmpnn_request/omit_AA.jsonl"
+    )
+
+
 def _minimal_request_manifest(tmp_path: Path) -> dict[str, object]:
     parsed_path = tmp_path / "parsed_pdbs.jsonl"
     assigned_path = tmp_path / "assigned_chains.jsonl"

@@ -48,7 +48,7 @@ _POLICY_TEMPLATES: dict[str, dict[str, str]] = {
 
 
 def build_default_generation_policy_config() -> dict[str, Any]:
-    """Return the default v2 generation-policy config as a plain mapping."""
+    """Return the default v3 generation-policy config as a plain mapping."""
 
     return {
         "generation_policy_version": GENERATION_POLICY_VERSION,
@@ -64,7 +64,7 @@ def build_default_generation_policy_config() -> dict[str, Any]:
 
 
 def validate_generation_policy_config(payload: Mapping[str, Any]) -> GenerationPolicyConfig:
-    """Validate the v2 config and reject old design-class identifiers."""
+    """Validate the v3 config and reject old design-class identifiers."""
 
     version = payload.get("generation_policy_version")
     if version != GENERATION_POLICY_VERSION:

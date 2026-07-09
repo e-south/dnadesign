@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -68,8 +69,40 @@ def test_generation_policy_requests_materialize_one_request_per_complete_policy(
 
         if policy_id == "distal_scaffold_repack_v1":
             assert manifest["alphabet_enforcement_modes"] == ["upstream_omit_AAs_C"]
+            assert "omit_AA_jsonl" not in manifest["sidecar_paths"]
         else:
-            assert "post_generation_filter" in manifest["alphabet_enforcement_modes"]
+            assert "upstream_omit_AA_jsonl" in manifest["alphabet_enforcement_modes"]
+            assert "omit_AA_jsonl" in manifest["sidecar_paths"]
+            omit_path = manifest_path.parent / Path(manifest["sidecar_paths"]["omit_AA_jsonl"]).name
+            omit_payload = json.loads(omit_path.read_text(encoding="utf-8"))
+            assert set(omit_payload) == {"chain_a_backbone"}
+            assert set(omit_payload["chain_a_backbone"]) == {"A"}
+            omit_groups = omit_payload["chain_a_backbone"]["A"]
+            assert omit_groups
+            omitted_by_position = {
+                int(position): set(aa_text) for positions, aa_text in omit_groups for position in positions
+            }
+            near_open_positions = {
+                int(row["eco1_position"])
+                for row in positions
+                if row["policy_id"] == policy_id and row["is_open_position"] and row["is_near_region_gt5_le10a"]
+            }
+            near_open_wt_by_position = {
+                int(row["eco1_position"]): str(row["wt_aa"])
+                for row in positions
+                if row["policy_id"] == policy_id and row["is_open_position"] and row["is_near_region_gt5_le10a"]
+            }
+            near_open_mpnn_positions = {
+                int(manifest["canonical_to_proteinmpnn_position"][str(position)]) for position in near_open_positions
+            }
+            assert near_open_mpnn_positions
+            assert near_open_mpnn_positions <= set(omitted_by_position)
+            for canonical_position, wt_aa in near_open_wt_by_position.items():
+                mpnn_position = int(manifest["canonical_to_proteinmpnn_position"][str(canonical_position)])
+                assert {"D", "E"} - {wt_aa} <= omitted_by_position[mpnn_position]
+            for command in manifest["run_commands"]:
+                if command["name"].startswith("protein_mpnn_run_seed_"):
+                    assert "--omit_AA_jsonl" in command["argv"]
 
 
 def test_generation_policy_request_materialization_rejects_legacy_manifest_policy_id(tmp_path: Path) -> None:
@@ -121,7 +154,7 @@ def test_bu_scc_generation_policy_job_template_is_policy_first() -> None:
 
     assert "ECO1_GENERATION_POLICIES_ROOT" in text
     assert "GENERATION_POLICY_ID" in text
-    assert "generation_policies_v2" in text
+    assert "generation_policies_v3" in text
     assert "materialization.generation_policies" in text
     assert "design_classes" not in text
     assert "DESIGN_CLASS_ID" not in text

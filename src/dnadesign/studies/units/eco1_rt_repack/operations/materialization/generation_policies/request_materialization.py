@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/request_materialization.py
 
-Materialize ProteinMPNN request sidecars from Eco1 RT v2 generation policies.
+Materialize ProteinMPNN request sidecars from Eco1 RT v3 generation policies.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
     DEFAULT_SOURCE_OUTPUT_ROOT,
     GENERATION_POLICY_VERSION,
     POLICY_INPUT_DIR_NAME,
+    PROTEINMPNN_ALPHABET,
     PROTEINMPNN_BATCH_SIZE,
     PROTEINMPNN_CHAIN_ID,
     PROTEINMPNN_NAME,
@@ -73,7 +74,7 @@ def materialize_generation_policy_requests(
     temperatures: Sequence[float] = PROTEINMPNN_TEMPERATURES,
     batch_size: int = PROTEINMPNN_BATCH_SIZE,
 ) -> MaterializedGenerationPolicyRequests:
-    """Materialize one ProteinMPNN request subtree for each complete v2 policy."""
+    """Materialize one ProteinMPNN request subtree for each complete v3 policy."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     policy_root = _resolve_path(root, generation_policy_root or DEFAULT_GENERATION_POLICIES_ROOT)
@@ -212,19 +213,29 @@ def _materialize_one_policy_request(
     )
 
     alphabet_modes = sorted({str(row["alphabet_enforcement_mode"]) for row in alphabet_rows})
+    sidecar_paths = {
+        "chain_a_backbone_pdb": chain_pdb_path,
+        "parsed_pdbs_jsonl": parsed_pdbs_path,
+        "assigned_chains_jsonl": assigned_chains_path,
+        "fixed_positions_jsonl": fixed_positions_path,
+    }
+    omit_aa_payload = _omit_aa_payload(
+        alphabet_rows=alphabet_rows,
+        canonical_to_proteinmpnn_position=export.canonical_to_proteinmpnn_position,
+    )
+    if omit_aa_payload is not None:
+        omit_aa_path = request_root / "omit_AA.jsonl"
+        write_jsonl(omit_aa_path, omit_aa_payload)
+        sidecar_paths["omit_AA_jsonl"] = omit_aa_path
+
     manifest_without_hash = build_request_manifest(
-        artifact_id=f"eco1_rt_generation_policies_v2.{policy_id}.proteinmpnn_request",
+        artifact_id=f"eco1_rt_generation_policies_v3.{policy_id}.proteinmpnn_request",
         created_by=REQUEST_CREATED_BY,
         profile_id="eco1_rt_v1",
         mask_policy_id=None,
         target_name=PROTEINMPNN_NAME,
         chain_id=PROTEINMPNN_CHAIN_ID,
-        sidecar_paths={
-            "chain_a_backbone_pdb": chain_pdb_path,
-            "parsed_pdbs_jsonl": parsed_pdbs_path,
-            "assigned_chains_jsonl": assigned_chains_path,
-            "fixed_positions_jsonl": fixed_positions_path,
-        },
+        sidecar_paths=sidecar_paths,
         upstream_artifact_hashes={
             "generation_policy_manifest": sha256_uri(policy_manifest_path),
             "generation_policy_positions": sha256_uri(positions_path),
@@ -247,7 +258,7 @@ def _materialize_one_policy_request(
         excluded_positions=excluded_positions,
         seed_set=list(seed_set),
         temperatures=list(temperatures),
-        batch_id=f"eco1_rt_v2_{policy_id}_n{requested_variants}",
+        batch_id=f"eco1_rt_v3_{policy_id}_n{requested_variants}",
         num_seq_per_target=num_seq_per_target,
         batch_size=batch_size,
         expected_sample_count=requested_variants,
@@ -290,6 +301,37 @@ def _copy_policy_inputs(
         shutil.copyfile(source, input_root / source.name)
 
 
+def _omit_aa_payload(
+    *,
+    alphabet_rows: list[dict[str, Any]],
+    canonical_to_proteinmpnn_position: Mapping[int, int],
+) -> dict[str, dict[str, list[list[Any]]]] | None:
+    grouped_positions: dict[str, list[int]] = {}
+    for row in alphabet_rows:
+        if row.get("alphabet_enforcement_mode") != "upstream_omit_AA_jsonl":
+            continue
+        position = int(row["eco1_position"])
+        disallowed = _ordered_disallowed_amino_acids(row.get("disallowed_amino_acids"))
+        if not disallowed:
+            continue
+        proteinmpnn_position = canonical_to_proteinmpnn_position[position]
+        grouped_positions.setdefault("".join(disallowed), []).append(proteinmpnn_position)
+    if not grouped_positions:
+        return None
+    groups = [
+        [sorted(positions), aa_text]
+        for aa_text, positions in sorted(grouped_positions.items(), key=lambda item: min(item[1]))
+    ]
+    return {PROTEINMPNN_NAME: {PROTEINMPNN_CHAIN_ID: groups}}
+
+
+def _ordered_disallowed_amino_acids(value: Any) -> list[str]:
+    if not isinstance(value, list | tuple):
+        raise ValueError("disallowed_amino_acids must be a list for upstream omit_AA_jsonl rows")
+    disallowed = {str(aa) for aa in value}
+    return [aa for aa in PROTEINMPNN_ALPHABET if aa in disallowed]
+
+
 def _canonical_open_positions(position_rows: list[dict[str, Any]]) -> list[int]:
     return sorted(int(row["eco1_position"]) for row in position_rows if row["is_open_position"])
 
@@ -317,10 +359,10 @@ def _num_seq_per_target(
 
 
 def _alphabet_enforcement_note(modes: Sequence[str]) -> str:
-    if "post_generation_filter" in modes:
+    if "upstream_omit_AA_jsonl" in modes:
         return (
-            "Near retained DNA/RNA acid-free and MSA-support rules are recorded for downstream hard filtering; "
-            "this request uses the public ProteinMPNN omit_AAs sidecar for cysteine only."
+            "This request uses public ProteinMPNN omit_AA_jsonl sidecars for residue-specific near-region "
+            "alphabet constraints and omit_AAs for the no-new-cysteine policy."
         )
     return "This request uses the public ProteinMPNN omit_AAs sidecar for the no-new-cysteine policy."
 

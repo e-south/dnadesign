@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/manifest_io.py
 
-Shared manifest helpers for Eco1 RT v2 generation-policy materialization.
+Shared manifest helpers for Eco1 RT v3 generation-policy materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
 
 
 def load_valid_generation_policy_manifest(path: Path) -> dict[str, Any]:
-    """Load a v2 generation-policy manifest and reject legacy design-class ids."""
+    """Load a v3 generation-policy manifest and reject legacy design-class ids."""
 
     if not path.exists():
         raise FileNotFoundError(path)
@@ -45,7 +45,7 @@ def load_valid_generation_policy_manifest(path: Path) -> dict[str, Any]:
         policy_map = require_mapping(policy, "generation_policies[]")
         policy_id = require_text(policy_map, "policy_id")
         if looks_like_legacy_design_class_id(policy_id):
-            raise ValueError(f"legacy design-class id {policy_id!r} is not valid for v2 materialization")
+            raise ValueError(f"legacy design-class id {policy_id!r} is not valid for generation-policy materialization")
         if policy_id not in PRIMARY_POLICY_IDS:
             raise ValueError(f"unknown generation policy id {policy_id!r}")
     observed_hash = manifest.get("policy_manifest_hash")

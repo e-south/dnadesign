@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/foldcheck.py
 
-Materialize Eco1 RT v2 generation-policy fold-check inputs.
+Materialize Eco1 RT v3 generation-policy fold-check inputs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
 from dnadesign.thread.adapters.proteinmpnn.hashing import sha256_uri
 from dnadesign.thread.foldcheck import build_foldcheck_request_manifest, write_foldcheck_fasta
 
-_ARTIFACT_ID = "eco1_rt_generation_policies_v2.foldcheck_request"
+_ARTIFACT_ID = "eco1_rt_generation_policies_v3.foldcheck_request"
 _CREATED_BY = "dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.foldcheck"
 _LOCAL_STORAGE_POLICY = {
     "raw_fold_outputs": "local_runtime_storage",
@@ -63,7 +63,7 @@ def materialize_generation_policy_foldcheck_request(
     source_output_root: Path | None = None,
     created_at: str = DEFAULT_CREATED_AT,
 ) -> MaterializedGenerationPolicyFoldCheckRequest:
-    """Materialize a ColabFold-ready FASTA and request manifest for v2 candidates."""
+    """Materialize a ColabFold-ready FASTA and request manifest for v3 candidates."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     policy_root = _resolve_path(root, generation_policy_root or DEFAULT_GENERATION_POLICIES_ROOT)

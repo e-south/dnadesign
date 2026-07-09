@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/__main__.py
 
-Module entrypoint for Eco1 RT v2 generation-policy materialization.
+Module entrypoint for Eco1 RT v3 generation-policy materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -304,8 +304,8 @@ lanes:
         - requests
   - id: generation_policy_requests
     owner: eco1_rt_repack
-    status: ready_to_materialize_v2
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/generation_policy_manifest.yaml
+    status: planned_v3_policy_requests
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_manifest.yaml
     command:
       argv:
         - uv
@@ -318,8 +318,8 @@ lanes:
         - all
   - id: generation_policy_proteinmpnn_scc_smoke
     owner: bu_scc_runtime
-    status: ready_for_scc_smoke
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+    status: planned_v3_smoke
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
     command:
       argv:
         - qsub
@@ -330,8 +330,8 @@ lanes:
         - docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
   - id: generation_policy_proteinmpnn_scc_array
     owner: bu_scc_runtime
-    status: pending_smoke
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/
+    status: planned_v3_array
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
     command:
       argv:
         - qsub
@@ -753,20 +753,21 @@ lanes:
         - .
   - id: assembly_feasibility
     owner: eco1_rt_repack
-    status: materialized_expanded_576_rows
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
+    status: materialized_generation_policy_v2_1007_rows
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/feasibility_report.parquet
     secondary_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/selection_readiness_manifest.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/local_structure_region_metrics.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_gate_counts.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_primary_panel_sankey.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_stratification.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_by_region.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_premise_alignment.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_selected_substitutions_across_rt.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regional_mutation_burden.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_na_facing_chemistry_balance.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_six_sequence_distance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/selection_readiness_manifest.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/local_structure_region_metrics.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/near_region_charge_sensitivity.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/charge_sensitivity_shortlist.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_primary_panel_sankey.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_stratification.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_by_region.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_selected_substitutions_across_rt.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regional_mutation_burden.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_na_facing_chemistry_balance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_near_region_charge_sensitivity.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_six_sequence_distance.svg
     command:
       argv:
         - uv
@@ -776,10 +777,12 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
         - --repo-root
         - .
+        - --output-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
   - id: candidate_triage_table
     owner: eco1_rt_repack
-    status: materialized_expanded_576_rows
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
+    status: materialized_generation_policy_v2_1007_rows
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_triage_table.parquet
     command:
       argv:
         - uv
@@ -789,10 +792,12 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
         - --repo-root
         - .
+        - --output-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
   - id: candidate_selection_panel
     owner: eco1_rt_repack
     status: materialized_six_row_panel
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_selection_panel.parquet
     command:
       argv:
         - uv
@@ -802,6 +807,8 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
         - --repo-root
         - .
+        - --output-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
   - id: review_deliverables
     owner: eco1_rt_repack
     status: materialized_with_selection_links
@@ -809,24 +816,24 @@ lanes:
     secondary_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/proteinmpnn_candidate_diversity/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_check/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_sae_interpretation/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/mask_structure_browser_manifest.yaml
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/interactive_structure_browser_manifest.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_handoff_sequences.csv
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/local_structure_region_metrics.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_design_class_gate_counts.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_primary_panel_sankey.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_stratification.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_local_structure_by_region.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_premise_alignment.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_selected_substitutions_across_rt.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_regional_mutation_burden.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_na_facing_chemistry_balance.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/plots/selection_six_sequence_distance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_handoff_sequences.csv
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/local_structure_region_metrics.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/near_region_charge_sensitivity.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/charge_sensitivity_shortlist.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_primary_panel_sankey.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_stratification.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_by_region.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_selected_substitutions_across_rt.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regional_mutation_burden.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_na_facing_chemistry_balance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_near_region_charge_sensitivity.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_six_sequence_distance.svg
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
     planned_follow_on_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
@@ -839,6 +846,8 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables
         - --repo-root
         - .
+        - --selection-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection
     runtime_policy:
       launches_gui_by_default: false
       gui_opt_in_flag: --render-chimerax-png

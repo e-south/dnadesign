@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/cli.py
 
-CLI for Eco1 RT v2 generation-policy materialization.
+CLI for Eco1 RT v3 generation-policy materialization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ from .request_materialization import materialize_generation_policy_requests
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Materialize Eco1 RT v2 generation-policy manifests and ProteinMPNN request sidecars."
+        description="Materialize Eco1 RT v3 generation-policy manifests and ProteinMPNN request sidecars."
     )
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--output-root", type=Path, default=None)
@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("policies", help="Write generation policy manifests only.")
     subparsers.add_parser("requests", help="Write per-policy ProteinMPNN request sidecars from an existing manifest.")
     subparsers.add_parser("candidate-pool", help="Aggregate completed per-policy candidate tables.")
-    subparsers.add_parser("foldcheck-request", help="Write a v2 ColabFold-ready FASTA and fold-check manifest.")
+    subparsers.add_parser("foldcheck-request", help="Write a v3 ColabFold-ready FASTA and fold-check manifest.")
     subparsers.add_parser("all", help="Write policy manifests and per-policy ProteinMPNN request sidecars.")
     return parser
 

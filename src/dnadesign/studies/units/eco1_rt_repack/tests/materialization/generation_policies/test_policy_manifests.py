@@ -65,6 +65,7 @@ def test_generation_policy_manifest_materializes_v2_boundary(tmp_path: Path) -> 
 
     assert {row["policy_id"] for row in positions} == set(PRIMARY_POLICY_IDS)
     assert {row["policy_id"] for row in alphabets} == set(PRIMARY_POLICY_IDS)
+    assert "post_generation_filter" not in {row["alphabet_enforcement_mode"] for row in alphabets}
     for row in positions:
         if row["is_open_position"]:
             assert row["protected_reason_codes"] == []
@@ -74,6 +75,37 @@ def test_generation_policy_manifest_materializes_v2_boundary(tmp_path: Path) -> 
         if row["is_c_terminal_thumb_context"]:
             assert row["protected_reason_codes"]
             assert not row["is_open_position"]
+
+
+def test_near_policy_alphabet_is_position_specific_and_upstream_enforced(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    write_generation_policy_source_inputs(source_root)
+    result = materialize_generation_policies(repo_root=Path.cwd(), output_root=tmp_path, source_output_root=source_root)
+    rows = pq.read_table(result.alphabets_path).to_pylist()
+
+    near_rows = [
+        row
+        for row in rows
+        if row["policy_id"] == "near_dna_rna_acid_free_v1"
+        and row["alphabet_scope"] == "near_dna_rna_gt5_le10_excluding_protected"
+    ]
+    combined_near_rows = [
+        row
+        for row in rows
+        if row["policy_id"] == "combined_near_acid_free_plus_distal_v1"
+        and row["alphabet_scope"] == "near_dna_rna_gt5_le10_excluding_protected"
+    ]
+
+    assert near_rows
+    assert combined_near_rows
+    assert {row["alphabet_enforcement_mode"] for row in near_rows} == {"upstream_omit_AA_jsonl"}
+    assert {row["alphabet_enforcement_mode"] for row in combined_near_rows} == {"upstream_omit_AA_jsonl"}
+    for row in near_rows + combined_near_rows:
+        assert isinstance(row["eco1_position"], int)
+        assert row["wt_aa"] in row["allowed_amino_acids"]
+        assert "D" in row["disallowed_amino_acids"]
+        assert "E" in row["disallowed_amino_acids"]
+        assert set(row["allowed_amino_acids"]).isdisjoint(set(row["disallowed_amino_acids"]))
 
 
 def test_combined_policy_open_set_is_union_of_distal_and_near(tmp_path: Path) -> None:

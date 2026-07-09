@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # Eco1 ProteinMPNN generation-policy runtime lane.
-# This job consumes one complete v2 policy request at a time. Combined proximal
+# This job consumes one complete v3 policy request at a time. Combined proximal
 # plus distal hypotheses must come from the combined upstream policy, not from
 # mutation merging after generation.
 
@@ -21,7 +21,7 @@ export OMP_NUM_THREADS="${NSLOTS:-1}"
 repo_root="${DNADESIGN_REPO:-$PWD}"
 cd "$repo_root"
 
-generation_policies_root="${ECO1_GENERATION_POLICIES_ROOT:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2}"
+generation_policies_root="${ECO1_GENERATION_POLICIES_ROOT:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3}"
 policy_ids_csv="${ECO1_GENERATION_POLICY_IDS:-distal_scaffold_repack_v1,near_dna_rna_acid_free_v1,combined_near_acid_free_plus_distal_v1}"
 proteinmpnn_root="${PROTEINMPNN_ROOT:-.var/tools/proteinmpnn}"
 
@@ -46,7 +46,7 @@ fi
 case "$policy_id" in
   distal_scaffold_repack_v1|near_dna_rna_acid_free_v1|combined_near_acid_free_plus_distal_v1) ;;
   *)
-    echo "Unknown Eco1 v2 generation policy: $policy_id" >&2
+    echo "Unknown Eco1 v3 generation policy: $policy_id" >&2
     exit 2
     ;;
 esac
