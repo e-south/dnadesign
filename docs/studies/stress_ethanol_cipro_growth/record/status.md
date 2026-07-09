@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-06-17
+- Last verified: 2026-07-09
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -23,8 +23,9 @@
 - RegulonDB native promoter source: `usr_regulondb_native_promoters` (`present`, 3182 rows; regulatory-interaction sidecar populated with 3426 rows; BioCyc GO sidecars populated for 203/205 interacting regulators)
 - RegulonDB native core60 source: `usr_regulondb_native_promoter_core60` (`present`, 3181 sequence rows; 3180 unambiguous parent-resolved rows feed the TF-axis audit after one duplicate core60 sequence collapses two NhaR-only native parents)
 - OPAL candidate feature table: `usr_prom_eth_cip_opal_candidates`
-  (`present`, 157160 rows; role `opal_candidate_feature_table`; dense
-  generated promoter subset from the broader 160460-row LatentDNA view)
+  (`present`, 157185 rows; role `opal_candidate_feature_table`; dense
+  generated promoter subset plus measured pDual-10 SFXI/control round-0 rows
+  from the broader 160460-row LatentDNA view)
 - Logical reference feature entry: `infer_prom_eth_cip_reference_views_7b` (`planned`, not separately materialized; current payloads live in dataset-local `_derived/infer/` sidecars)
 
 ### Current Phase
@@ -83,6 +84,12 @@ Completed 7B sidecar lanes:
   exist for ethanol factor, ciprofloxacin factor, and AND objectives, and the
   shared candidate feature table is materialized. The observed-label sidecar
   and campaign state remain absent until round-0 assay labels are ingested.
+- Reader round-0 label pool: measured Reader vec8 staging currently contributes
+  a deduplicated 35-row observed-label input set shared across the three OPAL
+  campaigns: 10 measured synthesis-manifest rows, 23 historical pDual-10 SFXI
+  rows, and 2 pDual-10 control rows. The physical 18-row batch-0 synthesis seed
+  remains provenance for the pre-assay order, not a row-count constraint on
+  round-0 label ingestion.
 - Synthesis handoff: `generated_pending_acceptance` scaffold exists in
   `synthesis_handoffs.yaml`; batch zero is the granular single-axis/AND
   pre-assay seed order with actual parsed TFBS regulator and slot-pattern
@@ -101,9 +108,9 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
 - Validate the three OPAL campaign configs against
   `usr_prom_eth_cip_opal_candidates`, then ingest round-0 SFXI labels into the
   shared `_opal/observed_labels.parquet` sidecar once assay data exist. The
-  candidate table is already materialized as the dense generated promoter
-  subset from `background_only`, `ethanol`, `ciprofloxacin`, and
-  `ethanol_ciprofloxacin`, excluding archive SFXI/reference/control rows, with
+  candidate table is already materialized as 157160 generated promoter rows
+  from `background_only`, `ethanol`, `ciprofloxacin`, and
+  `ethanol_ciprofloxacin` plus 25 measured pDual-10 Reader rows, with
   `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its fixed-length X.
 - Use the candidate-X scorecard as the current pre-assay representation triage surface: bidirectional context-anchor mean is the working `X`, anchor-source insert mean is the DenseGen-plan baseline, and forward context anchor mean is the strength-standard lens.
 - Keep reference-to-plan behavior as a landmark sanity check, not a phenotype claim.

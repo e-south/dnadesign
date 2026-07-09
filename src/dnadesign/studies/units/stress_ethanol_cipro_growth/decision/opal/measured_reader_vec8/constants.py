@@ -18,6 +18,9 @@ STRESS_CAMPAIGN_SLUGS: tuple[str, ...] = (
 )
 
 BATCH0_HANDOFF_ID = "stress-opal-batch0-sfxi-v1"
+ROUND0_OBSERVED_LABEL_POOL_ID = "measured_reader_vec8_round0"
+ROUND0_OBSERVED_LABEL_ROLE = "round0_observed_label_row"
+POST_LABEL_ACTIVE_SELECTION_TOP_K_PER_CAMPAIGN = 6
 READER_VEC8_RECORD_ID = "sfxi_vec8/vec8"
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_evidence.v1"
 READER_EVIDENCE_FILENAME = "reader_evidence_manifest.json"

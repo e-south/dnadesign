@@ -229,11 +229,11 @@ datasets:
     notes: >-
       Materialized shared OPAL candidate feature table for the three current
       OPAL campaign configs. This is a USR `records.parquet` candidate universe
-      with 157160 stable promoter rows, sequence, audit/provenance metadata,
-      and the dense generated promoter rows from the four current DenseGen plans:
-      `background_only`, `ethanol`, `ciprofloxacin`, and
-      `ethanol_ciprofloxacin`. It excludes reference, native-audit, archive
-      SFXI, and control rows that remain in LatentDNA review surfaces. The
+      with 157185 rows: 157160 generated promoter rows from the four current
+      DenseGen plans (`background_only`, `ethanol`, `ciprofloxacin`, and
+      `ethanol_ciprofloxacin`), 23 measured pDual-10 historical SFXI rows, and
+      2 measured pDual-10 control rows. Native/reference audit rows remain
+      LatentDNA review context unless explicitly added to this contract. The
       materializer resolves DenseGen plan/run/hash fields from
       `usr_prom_eth_cip_anchor/_derived/densegen.parquet` by stable `id` so the
       generated OPAL table is self-contained for candidate provenance. The

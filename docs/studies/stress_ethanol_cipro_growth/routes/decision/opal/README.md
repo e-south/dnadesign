@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-06-17
+last_verified: 2026-07-09
 parent_route: ../../README.md
 type: route
 plane: control-plane
@@ -42,13 +42,21 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Dataset id: `usr_prom_eth_cip_opal_candidates`
 - Role: `opal_candidate_feature_table`
-- Candidate universe: dense generated promoters only; archive SFXI, native,
-  reference, and control rows remain review context.
+- Candidate universe: 157160 dense generated promoter rows plus 25 measured
+  pDual-10 Reader rows already present in the selected LatentDNA view: 23
+  historical SFXI rows and 2 control promoter rows. Native/reference audit rows
+  remain review context unless explicitly added to this materialization
+  contract.
 - X column: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
 - X-selection state: LatentDNA selected this pre-assay X; RegulonDB/native
   appendix visualizations do not gate OPAL campaign readiness.
 - Shared labels: `_opal/observed_labels.parquet` under the candidate table
   dataset.
+- Round-0 label input: measured Reader vec8 staging builds a deduplicated
+  campaign-shared observed-label pool. This pool is not constrained to the
+  18-row physical batch-0 synthesis seed.
+- Post-label selection: campaign `top_k: 6` controls future model-scored active
+  selection after labels exist, not round-0 label onboarding.
 - Candidate eligibility: stress configs apply OPAL's generic
   `restriction_site_exclusion`; the study SFXI strategy allows BamHI only in the
   5 prime flank and EcoRI only in the 3 prime flank of the final insert.

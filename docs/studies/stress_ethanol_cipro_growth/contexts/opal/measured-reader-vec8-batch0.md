@@ -1,9 +1,9 @@
 ---
 id: stress-ethanol-cipro-growth-opal-measured-reader-vec8-batch0
-title: Measured reader vec8 batch0 staging
+title: Measured reader vec8 round-0 label staging
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 audience:
   - operator
   - agent
@@ -12,12 +12,18 @@ entrypoints:
   cli: python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.measured_reader_vec8
 ---
 
-## Measured Reader Vec8 Batch0 Staging
+## Measured Reader Vec8 Round-0 Label Staging
 
 This surface builds campaign-local round-0 label inputs from measured reader
 SFXI `vec8` records. It does not recompute reader math and it does not write
 OPAL observed-label sidecars unless the operator separately runs
 `opal ingest-y --apply`.
+
+`batch0` remains in a few path names for compatibility with the original
+physical synthesis handoff. Semantically, this surface owns the
+`round0_observed_label_pool`: the observed Reader rows available now for OPAL
+label ingestion. The 18-row `batch0_synthesis_seed` remains pre-assay order
+provenance and does not constrain this measured-label pool.
 
 ### Inputs
 
@@ -57,7 +63,7 @@ observed labels.
 
 ### Current Scope
 
-The current measured reader batch0 set has 35 rows:
+The current measured Reader round-0 observed-label pool has 35 rows:
 
 - 3 ethanol-responsive candidates from `20260706_sfxi_sensor-panel-m9-glu-secg`.
 - 2 ciprofloxacin-responsive candidates from `20260706_sfxi_sensor-panel-m9-glu-secg`.
@@ -68,7 +74,9 @@ The current measured reader batch0 set has 35 rows:
   `pDual-10-sulAp`.
 
 The remaining eight SECG synthesis-manifest candidates have sequence and X in
-the candidate table, but they do not yet have reader `vec8` measurements.
+the candidate table, but they do not yet have reader `vec8` measurements. They
+remain part of the physical batch-0 synthesis seed, not the current observed
+round-0 label pool.
 
 `pDual-10` remains the reference anchor and is not emitted as a vec8 label row.
 The two control promoter rows are observed-label rows but are excluded from

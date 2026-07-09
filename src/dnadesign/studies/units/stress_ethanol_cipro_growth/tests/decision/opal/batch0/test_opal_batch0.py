@@ -1807,6 +1807,33 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "raw Infer vector concat" in docs
 
 
+def test_opal_candidate_table_contract_tracks_round0_augmented_materialization() -> None:
+    artifacts = yaml.safe_load(
+        (STUDY_DOCS / "operations" / "contract" / "surfaces" / "artifacts.yaml").read_text(encoding="utf-8")
+    )
+    readiness = yaml.safe_load(
+        (
+            STUDY_DOCS / "operations" / "contract" / "readiness" / "checks" / "opal_candidate_table_pre_assay.yaml"
+        ).read_text(encoding="utf-8")
+    )
+
+    artifact = artifacts["opal_candidate_feature_table"]
+    check = readiness["checks"]["opal_candidate_table_pre_assay"][0]
+
+    assert artifact["row_count"] == 157185
+    assert artifact["composition"] == {
+        "generated_promoter_candidates": 157160,
+        "measured_pdual10_sfxi_reference_rows": 23,
+        "measured_pdual10_control_rows": 2,
+    }
+    assert artifact["source_population"] == "dense_generated_promoters_plus_measured_reader_round0_rows"
+    assert artifact["round0_observed_label_pool_state"] == "staged_via_measured_reader_vec8"
+    assert "archive_sfxi_reference_control_rows" not in artifact.get("excludes", "")
+    assert check["target_rows"] == artifact["row_count"]
+    assert check["row_count_mode"] == "exact"
+    assert "measured Reader round-0 rows" in check["summary"]
+
+
 def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None:
     routes = (STUDY_DOCS / "routes" / "README.md").read_text(encoding="utf-8")
     opal_route = (STUDY_DOCS / "routes" / "decision" / "opal" / "README.md").read_text(encoding="utf-8")

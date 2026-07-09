@@ -14,14 +14,17 @@ campaign setup rules. After measured labels exist, ingest them with
 OPAL reads the USR dataset
 `src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet`.
 That dataset is one shared candidate feature table for the three current OPAL
-campaign configs, not one dataset per campaign and not just a matrix. It is the
-dense generated promoter subset from the current LatentDNA view: rows whose
-`source_class` is `densegen` and whose `design_family` is one of
-`background_only`, `ethanol`, `ciprofloxacin`, or `ethanol_ciprofloxacin`.
-Reference, native-audit, archive SFXI, and control rows stay in LatentDNA
-review surfaces but do not enter the first OPAL candidate universe. Each
-promoter row must carry stable identity, sequence, audit/provenance metadata,
-and one fixed-length vector-valued X column:
+campaign configs, not one dataset per campaign and not just a matrix. It starts
+from the dense generated promoter subset in the current LatentDNA view: rows
+whose `source_class` is `densegen` and whose `design_family` is one of
+`background_only`, `ethanol`, `ciprofloxacin`, or `ethanol_ciprofloxacin`. The
+materialized table also includes measured pDual-10 Reader round-0 rows that
+already have stable candidate IDs, exact sequence parity, and the selected X:
+23 historical SFXI rows plus 2 control promoter rows. Native/reference audit
+rows stay in LatentDNA review surfaces unless explicitly added to this OPAL
+candidate-table contract. Each candidate row must carry stable identity,
+sequence, audit/provenance metadata, and one fixed-length vector-valued X
+column:
 
 `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
 

@@ -10,5 +10,6 @@ rules in the sibling `scope.yaml`, `group-bindings.yaml`, and `next-scope.yaml`
 files.
 
 `opal_candidate_table_pre_assay.yaml` is the current main-path readiness gate:
-it validates the densegen-only OPAL candidate table and selected fixed-length X
-column without coupling OPAL readiness to LatentDNA appendix visualizations.
+it validates the OPAL candidate table row contract, including measured Reader
+round-0 rows that already have candidate IDs, sequence parity, and selected X,
+without coupling OPAL readiness to LatentDNA appendix visualizations.

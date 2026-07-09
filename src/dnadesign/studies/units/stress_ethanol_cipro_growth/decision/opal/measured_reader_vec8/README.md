@@ -23,7 +23,12 @@ It does not import reader internals, recompute SFXI math, or apply OPAL labels.
 Applying labels remains an explicit `opal ingest-y --apply` operator action
 because the current campaigns share the USR observed-label sidecar.
 
-The current batch0 CSVs contain 35 rows: 10 measured SECG synthesis-manifest
+`batch0` remains in the CSV filenames for compatibility with the original
+physical synthesis handoff. The staged data product is the
+`round0_observed_label_pool`, and it is not constrained to the 18-row
+`batch0_synthesis_seed`.
+
+The current round-0 CSVs contain 35 rows: 10 measured SECG synthesis-manifest
 rows, 23 historical pDual-10 ES rows, and the `pDual-10-spyp` /
 `pDual-10-sulAp` measured controls. `pDual-10` is the same-plate reference
 anchor and is not emitted as a label row.

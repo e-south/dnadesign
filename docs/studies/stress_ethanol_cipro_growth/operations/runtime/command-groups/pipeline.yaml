@@ -276,14 +276,20 @@ study_pipeline:
       role: opal_candidate_feature_table
       x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
       x_source: intermediate_embedding_7b_context_anchor_mean_bidir_concat
-      source_population: dense_generated_promoters_only
-      allowed_design_families:
+      source_population: dense_generated_promoters_plus_measured_reader_round0_rows
+      row_count: 157185
+      composition:
+        generated_promoter_candidates: 157160
+        measured_pdual10_sfxi_reference_rows: 23
+        measured_pdual10_control_rows: 2
+      densegen_subset_allowed_design_families:
         - background_only
         - ethanol
         - ciprofloxacin
         - ethanol_ciprofloxacin
-      exclude_non_null_columns:
+      densegen_subset_exclude_non_null_columns:
         - sfxi_ref__collection_id
+      manual_include_scope: measured_pdual10_reader_round0_rows_with_existing_x
     config: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
     configs:
       ethanol_factor: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml

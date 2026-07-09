@@ -20,11 +20,15 @@ import numpy as np
 import pandas as pd
 
 from .constants import (
+    BATCH0_HANDOFF_ID,
     OPAL_INGEST_COLUMNS,
+    POST_LABEL_ACTIVE_SELECTION_TOP_K_PER_CAMPAIGN,
     READER_EVIDENCE_FILENAME,
     READER_EVIDENCE_PLOT_LABELS,
     READER_EVIDENCE_SCHEMA_VERSION,
     READER_VEC8_RECORD_ID,
+    ROUND0_OBSERVED_LABEL_POOL_ID,
+    ROUND0_OBSERVED_LABEL_ROLE,
     STRESS_CAMPAIGN_SLUGS,
     TARGET_TIME_H,
     X_COLUMN,
@@ -84,7 +88,7 @@ def build_measured_reader_vec8_staging(*, repo_root: Path, reader_root: Path) ->
     resolved = _assign_candidate_identity(resolved, candidate_records)
     resolved["campaign_role"] = _campaign_role(resolved)
 
-    candidate_rows = resolved.loc[resolved["campaign_role"].eq("measured_batch0_candidate")].copy()
+    candidate_rows = resolved.loc[resolved["campaign_role"].eq(ROUND0_OBSERVED_LABEL_ROLE)].copy()
     _validate_candidate_rows(candidate_rows, candidate_records)
     measured, duplicates = _deduplicate_candidate_rows(candidate_rows)
     return MeasuredReaderVec8Staging(
@@ -131,7 +135,7 @@ def _assign_candidate_identity(frame: pd.DataFrame, candidate_records: pd.DataFr
         "reader:" + resolved.loc[source_candidate_mask & resolved["synthesis_name"].isna(), "design_id"].astype(str)
     )
     resolved.loc[source_candidate_mask & resolved["campaign_slug"].isna(), "campaign_slug"] = (
-        "shared_reader_vec8_batch0"
+        "shared_reader_vec8_round0"
     )
 
     candidate_mask = resolved["candidate_id"].notna()
@@ -234,10 +238,10 @@ def _campaign_role(frame: pd.DataFrame) -> pd.Series:
         & frame["x_scope"].eq("current_candidate_table")
         & frame["reference_design_id"].astype(str).eq("pDual-10")
     )
-    roles.loc[candidate_mask] = "measured_batch0_candidate"
+    roles.loc[candidate_mask] = ROUND0_OBSERVED_LABEL_ROLE
     roles.loc[frame["sequence_source"].eq("usr_promoter_references")] = "control_reference"
     roles.loc[frame["sequence_source"].eq("usr_sfxi_pdual10_densegen_promoters")] = "historical_reference"
-    roles.loc[candidate_mask] = "measured_batch0_candidate"
+    roles.loc[candidate_mask] = ROUND0_OBSERVED_LABEL_ROLE
     roles.loc[frame["design_id"].astype(str).isin(EXCLUDED_READER_DESIGNS)] = "reader_only_excluded"
     return roles
 
@@ -488,6 +492,24 @@ def _manifest_payload(
         "campaign_inputs": {slug: str(path) for slug, path in sorted(campaign_inputs.items())},
         "campaign_evidence_manifests": {slug: str(path) for slug, path in sorted(campaign_evidence_manifests.items())},
         "measured_rows_per_campaign_input": {slug: measured_count for slug in sorted(campaign_inputs)},
+        "round0_observed_label_pool": {
+            "id": ROUND0_OBSERVED_LABEL_POOL_ID,
+            "role": "campaign_shared_observed_label_input",
+            "rows_per_campaign_input": measured_count,
+            "campaign_inputs_are_identical": True,
+            "requires_existing_candidate_id_sequence_and_x": True,
+            "reference_anchor_design_id": "pDual-10",
+        },
+        "batch0_synthesis_seed": {
+            "handoff_id": BATCH0_HANDOFF_ID,
+            "role": "physical_pre_assay_seed_order",
+            "does_not_constrain_round0_observed_label_pool": True,
+        },
+        "post_label_active_selection": {
+            "role": "future_model_scored_active_learning_selection",
+            "top_k_per_campaign": POST_LABEL_ACTIVE_SELECTION_TOP_K_PER_CAMPAIGN,
+            "pooled_campaign_count": len(campaign_inputs),
+        },
         "source_rows_by_campaign_slug": {
             str(key): int(value)
             for key, value in staging.measured_frame.groupby("campaign_slug").size().to_dict().items()

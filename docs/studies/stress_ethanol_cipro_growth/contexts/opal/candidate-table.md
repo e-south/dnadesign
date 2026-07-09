@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-candidate-table
 title: OPAL candidate table
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 audience:
   - operator
   - agent

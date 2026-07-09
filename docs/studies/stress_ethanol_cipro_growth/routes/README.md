@@ -49,7 +49,7 @@ Use this page after the checked-in study status tells you where the record stand
   the whole contribution.
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
 - OPAL campaigns are downstream objectives: ethanol factor, ciprofloxacin factor, and AND. AND is not a synonym for every `ethanol_ciprofloxacin` DenseGen row.
-- OPAL reads an `opal_candidate_feature_table`, not just a matrix. The materialized table is the dense generated promoter subset in `usr_prom_eth_cip_opal_candidates` with X column `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.
+- OPAL reads an `opal_candidate_feature_table`, not just a matrix. The materialized table is the dense generated promoter subset plus measured pDual-10 Reader round-0 rows in `usr_prom_eth_cip_opal_candidates` with X column `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.
 - SFXI state order for these campaigns is `[00, 10, 01, 11]`.
 - Study lifecycle phases are record-plane state labels such as the current `opal_candidate_table_pre_assay`; they are not DenseGen generation plans.
 - Infer lanes are model-family and dataset-target configs such as `anchor_only_20b` or `anchor_plus_template_7b`; they are not lifecycle phases.

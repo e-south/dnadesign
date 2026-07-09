@@ -40,7 +40,7 @@ def test_measured_reader_vec8_staging_maps_reader_designs_to_campaign_candidates
     measured = staging.measured_frame.set_index("design_id")
     assert measured.loc["pDual-10-SECG-B0-ETH-01", "candidate_id"] == "candidate-eth-01"
     assert measured.loc["pDual-10-SECG-B0-ETH-01", "reader_experiment_id"] == "20260706_sfxi"
-    assert measured.loc["pDual-10-SECG-B0-ETH-01", "campaign_role"] == "measured_batch0_candidate"
+    assert measured.loc["pDual-10-SECG-B0-ETH-01", "campaign_role"] == "round0_observed_label_row"
     assert measured.loc["pDual-10-ES1p", "candidate_id"] == "seq-es1"
     assert measured.loc["pDual-10-spyp", "candidate_id"] == "seq-spyp"
 
@@ -73,6 +73,24 @@ def test_write_measured_reader_vec8_batch0_writes_campaign_ingest_csv(tmp_path: 
         "secg_and_rf_sfxi_topn": 3,
         "secg_cipro_rf_sfxi_topn": 3,
         "secg_ethanol_rf_sfxi_topn": 3,
+    }
+    assert manifest["round0_observed_label_pool"] == {
+        "id": "measured_reader_vec8_round0",
+        "role": "campaign_shared_observed_label_input",
+        "rows_per_campaign_input": 3,
+        "campaign_inputs_are_identical": True,
+        "requires_existing_candidate_id_sequence_and_x": True,
+        "reference_anchor_design_id": "pDual-10",
+    }
+    assert manifest["batch0_synthesis_seed"] == {
+        "handoff_id": "stress-opal-batch0-sfxi-v1",
+        "role": "physical_pre_assay_seed_order",
+        "does_not_constrain_round0_observed_label_pool": True,
+    }
+    assert manifest["post_label_active_selection"] == {
+        "role": "future_model_scored_active_learning_selection",
+        "top_k_per_campaign": 6,
+        "pooled_campaign_count": 3,
     }
 
 
