@@ -15,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.contracts.sampling import validate_sampling_artifacts
 from dnadesign.studies.units.eco1_rt_repack.operations.contracts.suite import validate_checked_in_contracts
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact import materialize_contact_profile
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.structure import (
@@ -40,11 +41,14 @@ def test_phase0_checked_in_contracts_pass_as_scaffold() -> None:
     assert report.issue_count == 0
 
 
-def test_phase4_requires_materialized_rt_only_candidate_handoff() -> None:
-    report = validate_checked_in_contracts(repo_root=repo_root(), phase="phase4_downstream_promotion")
+def test_phase4_sampling_gate_requires_materialized_rt_only_candidate_handoff(tmp_path: Path) -> None:
+    issues = validate_sampling_artifacts(
+        repo_root=repo_root(),
+        structure_root=tmp_path,
+        phase="phase4_downstream_promotion",
+    )
 
-    assert report.passed is False
-    check_ids = {issue.check_id for issue in report.issues}
+    check_ids = {issue.check_id for issue in issues}
     assert "eco1_rt.handoff.candidate_handoff_not_materialized" in check_ids
 
 
