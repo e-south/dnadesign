@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import random
-import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -304,7 +303,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
     assert produced <= loaded.root.densegen.runtime.max_accepted_per_library
 
 
-def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
+def test_stall_detected_with_no_solutions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
@@ -377,6 +376,15 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
     cfg_path = run_dir / "config.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
     loaded = load_config(cfg_path)
+    monotonic_time = {"value": 0.0}
+
+    def _fake_monotonic() -> float:
+        return monotonic_time["value"]
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_callbacks.time.monotonic",
+        _fake_monotonic,
+    )
 
     class _EmptyAdapter:
         def probe_solver(self, backend: str, *, test_length: int = 10) -> None:
@@ -402,7 +410,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
             opt = _DummyOpt()
 
             def _gen():
-                time.sleep(1.1)
+                monotonic_time["value"] += 1.1
                 if False:
                     yield None
 
@@ -699,7 +707,7 @@ def test_stall_guard_checks_after_candidate_processing(tmp_path: Path, monkeypat
         assert not any(event.get("event") == "STALL_DETECTED" for event in events)
 
 
-def test_no_solution_attempt_records_solver_diagnostics(tmp_path: Path) -> None:
+def test_no_solution_attempt_records_solver_diagnostics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
@@ -764,6 +772,15 @@ def test_no_solution_attempt_records_solver_diagnostics(tmp_path: Path) -> None:
     cfg_path = run_dir / "config.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
     loaded = load_config(cfg_path)
+    monotonic_time = {"value": 0.0}
+
+    def _fake_monotonic() -> float:
+        return monotonic_time["value"]
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_callbacks.time.monotonic",
+        _fake_monotonic,
+    )
 
     class _NoSolutionAdapter:
         def probe_solver(self, backend: str, *, test_length: int = 10) -> None:
@@ -803,7 +820,7 @@ def test_no_solution_attempt_records_solver_diagnostics(tmp_path: Path) -> None:
             opt = _DummyOpt()
 
             def _gen():
-                time.sleep(0.05)
+                monotonic_time["value"] += 0.05
                 if False:
                     yield _DummySol(sequence="AAA", library=library)
 
