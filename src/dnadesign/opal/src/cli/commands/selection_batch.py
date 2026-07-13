@@ -1,4 +1,13 @@
-"""CLI for the deduplicated logical union of OPAL selection views."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/cli/commands/selection_batch.py
+
+CLI for the deduplicated logical union of OPAL selection views.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Public Response-Magnitude Feasibility mathematics API."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/api/response_magnitude_feasibility.py
+
+Public Response-Magnitude Feasibility mathematics API.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

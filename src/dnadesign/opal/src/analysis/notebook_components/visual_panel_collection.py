@@ -1,4 +1,13 @@
-"""Campaign-set visual panels for generated OPAL notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/visual_panel_collection.py
+
+Campaign-set visual panels for generated OPAL notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

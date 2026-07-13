@@ -1,4 +1,13 @@
-"""Inspect one selection view's objective metadata and prediction diagnostics."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/cli/commands/objective_meta.py
+
+Inspect one selection view's objective metadata and prediction diagnostics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

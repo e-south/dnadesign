@@ -1,4 +1,13 @@
-"""Notebook presentation contract for a campaign selection batch."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/selection_batch.py
+
+Notebook presentation contract for a campaign selection batch.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

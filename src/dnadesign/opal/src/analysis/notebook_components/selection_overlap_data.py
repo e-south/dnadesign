@@ -1,4 +1,13 @@
-"""Canonical selection-artifact loading for notebook overlap views."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/selection_overlap_data.py
+
+Canonical selection-artifact loading for notebook overlap views.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

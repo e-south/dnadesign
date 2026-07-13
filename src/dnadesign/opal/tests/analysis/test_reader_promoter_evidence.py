@@ -1,4 +1,13 @@
-"""Tests static OPAL display of Reader promoter-response evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/analysis/test_reader_promoter_evidence.py
+
+Tests static OPAL display of Reader promoter-response evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

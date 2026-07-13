@@ -1,4 +1,13 @@
-"""Shared molecular rendering constants for structure-view backends."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/structure_views/styles.py
+
+Shared molecular rendering constants for structure-view backends.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

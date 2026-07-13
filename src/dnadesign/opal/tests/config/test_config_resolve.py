@@ -1,4 +1,13 @@
-"""Strict campaign config path-resolution tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/config/test_config_resolve.py
+
+Strict campaign config path-resolution tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

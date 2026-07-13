@@ -1,4 +1,13 @@
-"""Pure mathematics for Response-Magnitude Feasibility (RMF)."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/objectives/response_magnitude_feasibility_math.py
+
+Pure mathematics for Response-Magnitude Feasibility (RMF).
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Operative plots for Response-Magnitude Feasibility."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/response_magnitude_feasibility.py
+
+Operative plots for Response-Magnitude Feasibility.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

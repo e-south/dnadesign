@@ -1,4 +1,13 @@
-"""Typed results for selection views and logical selection batches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/runtime/round/stages/selection_types.py
+
+Typed results for selection views and logical selection batches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

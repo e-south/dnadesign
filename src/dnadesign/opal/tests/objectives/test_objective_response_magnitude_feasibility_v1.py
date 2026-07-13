@@ -1,4 +1,13 @@
-"""Contract and adversarial tests for Response-Magnitude Feasibility."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/objectives/test_objective_response_magnitude_feasibility_v1.py
+
+Contract and adversarial tests for Response-Magnitude Feasibility.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

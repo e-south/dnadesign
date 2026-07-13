@@ -1,4 +1,13 @@
-"""Ledger contract for Response-Magnitude Feasibility decision plots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/response_magnitude_feasibility_data.py
+
+Ledger contract for Response-Magnitude Feasibility decision plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Campaign v3 selection-view configuration contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/config/test_config_selection_views_v3.py
+
+Campaign v3 selection-view configuration contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

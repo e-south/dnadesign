@@ -1,4 +1,13 @@
-"""Render the campaign-level selection batch in the notebook viewport."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/selection_batch_panel.py
+
+Render the campaign-level selection batch in the notebook viewport.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

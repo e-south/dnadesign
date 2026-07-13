@@ -1,4 +1,13 @@
-"""Selection-view setpoint joins from ledger v2.0 metadata."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/analysis/test_analysis_ledger_setpoint.py
+
+Selection-view setpoint joins from ledger v2.0 metadata.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

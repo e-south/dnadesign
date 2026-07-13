@@ -1,4 +1,13 @@
-"""Public selection-view and logical selection-batch contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/reporting/selection_set.py
+
+Public selection-view and logical selection-batch contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Ledger v2.0 selection-view dataset contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/storage/test_ledger_dataset_writes.py
+
+Ledger v2.0 selection-view dataset contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

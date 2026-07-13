@@ -1,4 +1,13 @@
-"""Contract and rendering tests for response-separation decision plots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/plots/test_response_magnitude_feasibility_plots.py
+
+Contract and rendering tests for response-separation decision plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

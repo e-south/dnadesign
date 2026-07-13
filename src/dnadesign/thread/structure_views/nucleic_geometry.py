@@ -1,4 +1,13 @@
-"""Coordinate-derived geometry for browser nucleic-acid ribbons."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/structure_views/nucleic_geometry.py
+
+Coordinate-derived geometry for browser nucleic-acid ribbons.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Column, row, round, and run scoping for prediction-ledger reads."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/ledger/prediction_scope.py
+
+Column, row, round, and run scoping for prediction-ledger reads.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

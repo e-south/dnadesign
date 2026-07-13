@@ -1,4 +1,13 @@
-"""Render-time integrity checks for static Reader promoter evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/reader_promoter_evidence.py
+
+Render-time integrity checks for static Reader promoter evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

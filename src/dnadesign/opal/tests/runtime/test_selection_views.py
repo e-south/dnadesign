@@ -1,4 +1,13 @@
-"""Runtime contracts for one-fit, multi-view campaign rounds."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/runtime/test_selection_views.py
+
+Runtime contracts for one-fit, multi-view campaign rounds.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Hardening tests for SFXI objective uncertainty semantics."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/objectives/test_sfxi_uncertainty_hardening.py
+
+Hardening tests for SFXI objective uncertainty semantics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

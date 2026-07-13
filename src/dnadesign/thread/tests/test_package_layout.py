@@ -60,7 +60,13 @@ _ESM_ATLAS_FILES = {
 }
 _FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "request.py", "subset.py"}
 _STRUCTURE_PREDICTION_FILES = {"__init__.py", "hashes.py", "models.py", "registry.py"}
-_STRUCTURE_VIEW_FILES = {"__init__.py", "html.py", "models.py"}
+_STRUCTURE_VIEW_FILES = {
+    "__init__.py",
+    "html.py",
+    "models.py",
+    "nucleic_geometry.py",
+    "styles.py",
+}
 
 
 def test_thread_root_is_small_public_tool_surface() -> None:

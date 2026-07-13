@@ -1,4 +1,13 @@
-"""Generated Marimo cells for visual group and deliverable selection."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_set_template/visual_selector_cells.py
+
+Generated Marimo cells for visual group and deliverable selection.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

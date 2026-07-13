@@ -1,4 +1,13 @@
-"""Selection-view verification against shared OPAL prediction ledgers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/cli/test_verify_outputs.py
+
+Selection-view verification against shared OPAL prediction ledgers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Selection-channel resolution and plugin execution for one OPAL round."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/runtime/round/stages/selection.py
+
+Selection-channel resolution and plugin execution for one OPAL round.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

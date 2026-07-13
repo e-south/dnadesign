@@ -1,4 +1,13 @@
-"""Non-compensatory Response-Magnitude Feasibility objective."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/objectives/response_magnitude_feasibility_v1.py
+
+Non-compensatory Response-Magnitude Feasibility objective.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

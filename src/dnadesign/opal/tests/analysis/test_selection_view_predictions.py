@@ -1,4 +1,13 @@
-"""Explicit selection-view projection from shared prediction ledgers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/analysis/test_selection_view_predictions.py
+
+Explicit selection-view projection from shared prediction ledgers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

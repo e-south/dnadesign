@@ -1,4 +1,13 @@
-"""Public selection-view and selection-batch inspection contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/cli/test_cli_selection_set.py
+
+Public selection-view and selection-batch inspection contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
