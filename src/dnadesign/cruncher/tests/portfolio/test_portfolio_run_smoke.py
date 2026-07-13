@@ -887,6 +887,7 @@ def test_run_portfolio_writes_handoff_tables_and_payload(tmp_path: Path) -> None
                     "name": "pairwise_handoff",
                     "execution": {"mode": "aggregate_only"},
                     "artifacts": {"table_format": "parquet", "write_csv": True},
+                    "plots": {"elite_showcase": {"top_n_per_source": 1}},
                     "sources": [
                         {
                             "id": "pairwise_cpxr_baer",
