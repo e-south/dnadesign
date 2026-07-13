@@ -359,6 +359,58 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert summary_after.get("analysis_id")
 
 
+def test_analyze_rejects_non_finite_trajectory_scores_without_publishing(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_non_finite"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_non_finite")
+    lock_dir = catalog_root / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=2,
+        tune=1,
+    )
+    sequence_file = sequences_path(run_dir)
+    sequences = pd.read_parquet(sequence_file)
+    sequences.loc[1, "score_lexA"] = float("nan")
+    sequences.to_parquet(sequence_file, engine="fastparquet")
+
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="non-finite values"):
+        run_analyze(cfg, config_path)
+
+    analysis_dir = analysis_root(run_dir)
+    assert not summary_path(analysis_dir).exists()
+    assert not plot_manifest_path(analysis_dir).exists()
+
+
 def test_analyze_fails_fast_when_run_lock_exists(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
