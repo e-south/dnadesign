@@ -147,6 +147,13 @@ def test_ci_jobs_install_only_the_locked_dependency_groups_they_use() -> None:
         assert install_step["run"] == expected
 
 
+def test_coverage_jobs_use_python_sysmon_core() -> None:
+    workflow = _workflow()
+
+    for job_name in ("core-lint-test-build", "external-integration"):
+        assert workflow["jobs"][job_name]["env"]["COVERAGE_CORE"] == "sysmon"
+
+
 def test_scheduled_entropy_is_isolated_from_full_ci() -> None:
     ci_workflow = _workflow()
     entropy_workflow = _workflow("quality-entropy.yaml")

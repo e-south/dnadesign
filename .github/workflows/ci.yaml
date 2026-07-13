@@ -93,6 +93,7 @@ jobs:
       contents: read
       id-token: write
     env:
+      COVERAGE_CORE: sysmon
       MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
@@ -272,6 +273,7 @@ jobs:
       contents: read
       id-token: write
     env:
+      COVERAGE_CORE: sysmon
       MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
