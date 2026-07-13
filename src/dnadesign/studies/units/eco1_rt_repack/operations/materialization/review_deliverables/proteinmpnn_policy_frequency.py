@@ -1,4 +1,13 @@
-"""ProteinMPNN residue-frequency views for active generation policies."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/proteinmpnn_policy_frequency.py
+
+ProteinMPNN residue-frequency views for active generation policies.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

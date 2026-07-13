@@ -1,4 +1,13 @@
-"""Quantitative candidate-flow plot for Eco1 RT panel selection."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/sankey_plot.py
+
+Quantitative candidate-flow plot for Eco1 RT panel selection.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""No-dead-end contracts for every Eco1 review-notebook dropdown."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/test_notebook_dropdown_runtime.py
+
+No-dead-end contracts for every Eco1 review-notebook dropdown.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

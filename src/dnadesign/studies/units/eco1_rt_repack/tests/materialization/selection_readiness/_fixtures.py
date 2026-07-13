@@ -1,4 +1,13 @@
-"""Panel-selection test fixtures for Eco1 RT repack."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/selection_readiness/_fixtures.py
+
+Panel-selection test fixtures for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

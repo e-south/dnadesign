@@ -1,4 +1,13 @@
-"""Materialize the study-owned Eco1 RT full-CDS Twist handoff."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/twist_handoff/pipeline.py
+
+Materialize the study-owned Eco1 RT full-CDS Twist handoff.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

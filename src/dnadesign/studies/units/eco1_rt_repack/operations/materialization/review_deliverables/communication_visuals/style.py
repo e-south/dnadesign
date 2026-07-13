@@ -1,4 +1,13 @@
-"""Shared visual grammar for Eco1 communication figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/style.py
+
+Shared visual grammar for Eco1 communication figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

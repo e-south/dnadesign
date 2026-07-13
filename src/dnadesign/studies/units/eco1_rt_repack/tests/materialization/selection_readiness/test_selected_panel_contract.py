@@ -1,4 +1,13 @@
-"""Selected-panel contract tests for Eco1 RT selection readiness."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/selection_readiness/test_selected_panel_contract.py
+
+Selected-panel contract tests for Eco1 RT selection readiness.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

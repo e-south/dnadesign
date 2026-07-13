@@ -1,4 +1,13 @@
-"""Protein and provenance validation for the Eco1 Twist handoff."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/twist_handoff/sequence_contract.py
+
+Protein and provenance validation for the Eco1 Twist handoff.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

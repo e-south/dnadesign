@@ -1,4 +1,13 @@
-"""Authoritative allocation contract for the selected Eco1 RT panel."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/panel_contract.py
+
+Authoritative allocation contract for the selected Eco1 RT panel.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

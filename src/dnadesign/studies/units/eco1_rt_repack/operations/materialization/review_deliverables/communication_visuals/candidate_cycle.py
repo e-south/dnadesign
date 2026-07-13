@@ -1,4 +1,13 @@
-"""ChimeraX movie comparing WT and selected ColabFold surface models."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/candidate_cycle.py
+
+ChimeraX movie comparing WT and selected ColabFold surface models.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

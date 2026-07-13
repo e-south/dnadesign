@@ -1,4 +1,13 @@
-"""Candidate-pool and structure fixtures for Eco1 review-deliverable tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/candidate_pool_fixtures.py
+
+Candidate-pool and structure fixtures for Eco1 review-deliverable tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

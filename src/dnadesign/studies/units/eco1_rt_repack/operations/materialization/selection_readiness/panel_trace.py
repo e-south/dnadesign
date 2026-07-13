@@ -1,4 +1,13 @@
-"""Reviewer-facing candidate flow for Eco1 RT panel selection."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/panel_trace.py
+
+Reviewer-facing candidate flow for Eco1 RT panel selection.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

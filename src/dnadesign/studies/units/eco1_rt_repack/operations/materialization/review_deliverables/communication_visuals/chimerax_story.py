@@ -1,4 +1,13 @@
-"""ChimeraX script generation and optional render materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/chimerax_story.py
+
+ChimeraX script generation and optional render materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

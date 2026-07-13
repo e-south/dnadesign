@@ -1,4 +1,13 @@
-"""Orchestrate communication-facing Eco1 review visuals from materialized evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/pipeline.py
+
+Orchestrate communication-facing Eco1 review visuals from materialized evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

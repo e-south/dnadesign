@@ -1,4 +1,13 @@
-"""Policy-defined selected-panel orchestration and validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/panel.py
+
+Policy-defined selected-panel orchestration and validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Compact selected-panel flow and mutation map for communication."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/selected_panel.py
+
+Compact selected-panel flow and mutation map for communication.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

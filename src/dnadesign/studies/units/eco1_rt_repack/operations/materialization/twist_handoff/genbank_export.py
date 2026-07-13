@@ -1,4 +1,13 @@
-"""Annotated GenBank records for the Eco1 RT synthesis handoff."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/twist_handoff/genbank_export.py
+
+Annotated GenBank records for the Eco1 RT synthesis handoff.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

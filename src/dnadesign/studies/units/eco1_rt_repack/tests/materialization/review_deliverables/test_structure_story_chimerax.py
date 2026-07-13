@@ -1,4 +1,13 @@
-"""ChimeraX structure-story script and render tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/test_structure_story_chimerax.py
+
+ChimeraX structure-story script and render tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

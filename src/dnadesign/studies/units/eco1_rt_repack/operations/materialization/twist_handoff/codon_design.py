@@ -1,4 +1,13 @@
-"""Deterministic codon design and sequence QC for Eco1 RT fragments."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/twist_handoff/codon_design.py
+
+Deterministic codon design and sequence QC for Eco1 RT fragments.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

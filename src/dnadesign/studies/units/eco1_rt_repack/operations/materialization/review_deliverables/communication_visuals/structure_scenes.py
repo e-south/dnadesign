@@ -1,4 +1,13 @@
-"""Residue-set scenes shared by browser and ChimeraX structure stories."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/structure_scenes.py
+
+Residue-set scenes shared by browser and ChimeraX structure stories.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Browser-scene contract tests for Eco1 communication visuals."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/test_structure_story_browser.py
+
+Browser-scene contract tests for Eco1 communication visuals.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

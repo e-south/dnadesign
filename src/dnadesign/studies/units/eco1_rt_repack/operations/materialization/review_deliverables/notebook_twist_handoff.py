@@ -1,4 +1,13 @@
-"""Twist handoff rendering for the Eco1 review notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_twist_handoff.py
+
+Twist handoff rendering for the Eco1 review notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

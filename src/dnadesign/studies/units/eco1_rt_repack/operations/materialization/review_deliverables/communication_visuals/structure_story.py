@@ -1,4 +1,13 @@
-"""Materialize the browser and ChimeraX Eco1 structure-story artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/structure_story.py
+
+Materialize the browser and ChimeraX Eco1 structure-story artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

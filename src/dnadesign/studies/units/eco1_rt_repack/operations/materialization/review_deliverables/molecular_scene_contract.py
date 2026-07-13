@@ -1,4 +1,13 @@
-"""Study-wide molecular-scene contract for Eco1 review deliverables."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/molecular_scene_contract.py
+
+Study-wide molecular-scene contract for Eco1 review deliverables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

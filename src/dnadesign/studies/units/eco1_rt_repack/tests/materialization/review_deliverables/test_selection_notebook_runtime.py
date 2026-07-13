@@ -1,4 +1,13 @@
-"""Selection and handoff rendering tests for the Eco1 review notebook."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/test_selection_notebook_runtime.py
+
+Selection and handoff rendering tests for the Eco1 review notebook.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Browser-manifest materialization for the Eco1 structure story."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/structure_browser_story.py
+
+Browser-manifest materialization for the Eco1 structure story.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

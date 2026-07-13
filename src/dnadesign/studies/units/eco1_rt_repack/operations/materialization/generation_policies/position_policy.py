@@ -1,4 +1,13 @@
-"""Position protection and open-set rules for Eco1 RT generation policies."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/position_policy.py
+
+Position protection and open-set rules for Eco1 RT generation policies.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

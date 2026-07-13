@@ -1,4 +1,13 @@
-"""Landscape structural-screen figure for scientific communication."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/communication_visuals/structural_screen.py
+
+Landscape structural-screen figure for scientific communication.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
