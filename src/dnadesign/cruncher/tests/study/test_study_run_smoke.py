@@ -137,29 +137,12 @@ def test_study_run_smoke_parallel_trials(tmp_path: Path) -> None:
     assert all(item.run_dir for item in manifest.trial_runs)
 
 
-def test_study_run_parallel_logs_progress(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_study_run_parallel_reports_progress_to_logs_and_events(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     write_workspace_config(tmp_path)
     spec_path = tmp_path / "parallel_progress.study.yaml"
-    write_study_spec(
-        spec_path,
-        profile="analysis_ready",
-        mmr_enabled=False,
-        seeds=[11],
-        trials=[
-            {"id": "L6", "factors": {"sample.sequence_length": 6}},
-            {"id": "L7", "factors": {"sample.sequence_length": 7}},
-        ],
-        parallelism=2,
-    )
-
-    caplog.set_level("INFO", logger="dnadesign.cruncher.app.study_workflow")
-    run_study(spec_path, progress_bar=False, quiet_logs=True)
-    assert any("Study trial progress:" in record.message for record in caplog.records)
-
-
-def test_study_run_parallel_emits_progress_events(tmp_path: Path) -> None:
-    write_workspace_config(tmp_path)
-    spec_path = tmp_path / "parallel_events.study.yaml"
     write_study_spec(
         spec_path,
         profile="analysis_ready",
@@ -177,8 +160,10 @@ def test_study_run_parallel_emits_progress_events(tmp_path: Path) -> None:
     def _on_event(name: str, payload: dict[str, object]) -> None:
         events.append((name, payload))
 
+    caplog.set_level("INFO", logger="dnadesign.cruncher.app.study_workflow")
     run_study(spec_path, progress_bar=False, quiet_logs=True, on_event=_on_event)
 
+    assert any("Study trial progress:" in record.message for record in caplog.records)
     names = [name for name, _ in events]
     assert "study_started" in names
     assert "study_trial_phase_started" in names
