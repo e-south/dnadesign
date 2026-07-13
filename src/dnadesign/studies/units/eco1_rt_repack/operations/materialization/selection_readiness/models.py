@@ -19,12 +19,11 @@ from pathlib import Path
 class MaterializedSelectionReadiness:
     """Paths emitted by panel-selection materialization."""
 
-    feasibility_report_path: Path
     candidate_triage_table_path: Path
     local_structure_region_metrics_path: Path
     local_structure_threshold_sensitivity_path: Path
     region_msa_support_path: Path
-    primary_panel_selection_trace_path: Path
+    hypothesis_panel_selection_trace_path: Path
     candidate_selection_panel_path: Path
     candidate_handoff_sequence_csv_path: Path
     plots_root: Path

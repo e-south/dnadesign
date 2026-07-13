@@ -11,30 +11,32 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel import (
-    PRIMARY_PANEL_SIZE,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+    DISTAL_SCAFFOLD_POLICY_ID,
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
 )
 
-PRIMARY_CLASS = "eco1_rt_clade9_plurality25_contact10a_v1"
-BOUNDARY_CLASS = "eco1_rt_clade9_plurality25_contact5a_v1"
+PRIMARY_POLICY = COMBINED_NEAR_PLUS_DISTAL_POLICY_ID
+COMPARISON_POLICY = NEAR_DNA_RNA_ACID_FREE_POLICY_ID
 
 
-def panel_rows(classes: list[str]) -> list[dict[str, object]]:
+def panel_rows(policy_ids: list[str]) -> list[dict[str, object]]:
     return [
         {
             "candidate_id": f"candidate_{index}",
-            "design_class_id": design_class_id,
-            "selection_candidate_tier": "primary_panel_candidate",
+            "policy_id": policy_id,
+            "selection_contract_pass": True,
+            "nucleic_acid_facing_mutation_count": 1,
         }
-        for index, design_class_id in enumerate(classes, start=1)
+        for index, policy_id in enumerate(policy_ids, start=1)
     ]
 
 
 def candidate_row(
     candidate_id: str,
     *,
-    design_class_id: str = PRIMARY_CLASS,
-    tier: str = "primary_panel_candidate",
+    policy_id: str = PRIMARY_POLICY,
     na_facing_mutation_count: int,
     proximal_unobserved_mutation_count: int = 0,
     proximal_rare_or_unobserved_mutation_count: int = 0,
@@ -46,19 +48,21 @@ def candidate_row(
     chemistry_warning_count: int = 0,
     mutation_count_total: int = 100,
     c_terminal_rmsd: float = 1.0,
+    wang_alpha1_mutation_count: int = 0,
 ) -> dict[str, object]:
     return {
         "candidate_id": candidate_id,
         "sequence_hash": f"sha256:{candidate_id:0<64}"[:71],
-        "design_class_id": design_class_id,
-        "selection_candidate_tier": tier,
-        "primary_panel_candidate": tier == "primary_panel_candidate",
-        "primary_panel_failure_reasons_json": "[]"
-        if tier == "primary_panel_candidate"
-        else '["near_retained_dna_rna_acidic_gain"]',
+        "policy_id": policy_id,
+        "primary_policy_id": policy_id,
+        "source_policy_ids": [policy_id],
+        "selection_contract_pass": True,
+        "selection_contract_failure_reasons_json": "[]",
+        "wang_alpha1_r13_mutation_count": 0,
+        "wang_alpha1_r13_review_status": "retained_wt",
+        "wang_alpha1_mutation_count": wang_alpha1_mutation_count,
         "fold_review_class": "strong_fold_preserved",
         "hard_gate_status": "eligible",
-        "feasibility_status": "feasible",
         "proximal_review_unobserved_mutation_count": proximal_unobserved_mutation_count,
         "proximal_review_rare_or_unobserved_mutation_count": proximal_rare_or_unobserved_mutation_count,
         "selection_support_profile_id": "ec86_clade9_conservation_v1",
@@ -72,8 +76,6 @@ def candidate_row(
         "nucleic_acid_facing_basic_loss_count": basic_loss_count,
         "nucleic_acid_facing_proline_glycine_gain_count": proline_glycine_gain_count,
         "nucleic_acid_facing_chemistry_warning_count": chemistry_warning_count,
-        "nucleic_acid_facing_chemistry_compatible": True,
-        "nucleic_acid_facing_chemistry_gate_status": "passed",
         "near_retained_dna_rna_acidic_gain_review_status": "passed",
         "proximal_msa_support_review_status": "passed",
         "catalytic_or_direct_contact_mutation_count": 0,
@@ -83,7 +85,8 @@ def candidate_row(
         "local_structure_gate_status": "passed",
         "local_structure_threshold_policy_id": "fixture_threshold_policy",
         "local_structure_threshold_failed_region_count": 0,
-        "local_structure_max_ca_rmsd_angstrom": c_terminal_rmsd,
+        "local_structure_max_gated_ca_rmsd_angstrom": c_terminal_rmsd,
+        "local_structure_max_all_region_ca_rmsd_angstrom": c_terminal_rmsd,
         "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": 1.0,
         "local_structure_thumb_contact_track_context_ca_rmsd_angstrom": 1.0,
         "local_structure_c_terminal_primer_rna_recognition_context_ca_rmsd_angstrom": c_terminal_rmsd,
@@ -96,14 +99,48 @@ def candidate_row(
     }
 
 
-def primary_candidate_rows(count: int = PRIMARY_PANEL_SIZE) -> list[dict[str, object]]:
-    return [
-        candidate_row(
-            f"primary_{index}",
-            design_class_id=PRIMARY_CLASS,
-            na_facing_mutation_count=10 + index,
-            chemistry_warning_count=1,
-            mutation_count_total=30 + index,
-        )
-        for index in range(count)
-    ]
+def comparison_candidates() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Return three contract-pass candidates for each comparison policy."""
+
+    policy_specs = (
+        (DISTAL_SCAFFOLD_POLICY_ID, "distal", 0),
+        (NEAR_DNA_RNA_ACID_FREE_POLICY_ID, "near", 8),
+        (COMBINED_NEAR_PLUS_DISTAL_POLICY_ID, "combined", 8),
+    )
+    triage_rows: list[dict[str, object]] = []
+    candidate_rows: list[dict[str, object]] = []
+    mutation_position = 10
+    for policy_id, prefix, peripheral_count in policy_specs:
+        for index in range(1, 4):
+            candidate_id = f"{prefix}_{index}"
+            triage_rows.append(
+                candidate_row(
+                    candidate_id,
+                    policy_id=policy_id,
+                    na_facing_mutation_count=peripheral_count,
+                    mutation_count_total=20 + index,
+                )
+            )
+            candidate_rows.append(
+                {
+                    "candidate_id": candidate_id,
+                    "policy_id": policy_id,
+                    "sequence": "A" * (63 - index) + "C" * index,
+                    "canonical_mutations": [
+                        f"A{mutation_position}G",
+                        f"L{mutation_position + 1}V",
+                    ],
+                }
+            )
+            mutation_position += 2
+    return triage_rows, candidate_rows
+
+
+def comparison_input_hashes() -> dict[str, str | None]:
+    """Return deterministic input hashes for selected-panel tests."""
+
+    return {
+        "candidate_triage_table": "sha256:triage",
+        "foldcheck_review": "sha256:fold",
+        "sae_window_summary": None,
+    }

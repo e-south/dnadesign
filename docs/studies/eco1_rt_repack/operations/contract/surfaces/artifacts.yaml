@@ -14,8 +14,6 @@ residue_mask_policy:
   ref: repo:docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md
 fold_validation_policy:
   ref: repo:docs/studies/eco1_rt_repack/contexts/fold-validation-policy.md
-synthesis_feasibility_policy:
-  ref: repo:docs/studies/eco1_rt_repack/contexts/synthesis-feasibility-policy.md
 eco1_rt_profile_fixture:
   ref: repo:docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml
 conservative_mask_cases:
@@ -89,25 +87,22 @@ planned_foldcheck_input_fasta:
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
 planned_foldcheck_report:
   status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
-  coverage: full WT plus 96-candidate ColabFold report materialized.
-biohub_esmc_sae_feature_window_summary:
-  status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
-feasibility_report:
-  status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/feasibility_report.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_report.parquet
+  coverage: full WT plus 1007-candidate v3 ColabFold report materialized.
 candidate_triage_table:
   status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_triage_table.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_triage_table.parquet
 candidate_selection_panel:
   status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_selection_panel.parquet
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_selection_panel.parquet
 candidate_handoff_sequences:
   status: materialized
-  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/selection/candidate_handoff_sequences.csv
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_handoff_sequences.csv
+twist_full_cds_handoff:
+  status: materialized_quote_and_upload_ready
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/twist_handoff_manifest.yaml
 review_deliverable_manifest:
-  status: materialized_foundation
+  status: materialized
   ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
 planned_candidate_handoff:
   status: planned

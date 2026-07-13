@@ -43,7 +43,29 @@ def write_pdb(
 
 def write_mmcif_all_atom_reference(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["data_ec86_fixture", "#", "loop_"]
+    lines = [
+        "data_ec86_fixture",
+        "#",
+        "loop_",
+        "_atom_site.group_PDB",
+        "_atom_site.id",
+        "_atom_site.type_symbol",
+        "_atom_site.label_atom_id",
+        "_atom_site.label_alt_id",
+        "_atom_site.label_comp_id",
+        "_atom_site.label_asym_id",
+        "_atom_site.label_entity_id",
+        "_atom_site.label_seq_id",
+        "_atom_site.Cartn_x",
+        "_atom_site.Cartn_y",
+        "_atom_site.Cartn_z",
+        "_atom_site.auth_asym_id",
+        "_atom_site.auth_seq_id",
+        "_atom_site.pdbx_PDB_ins_code",
+        "_atom_site.occupancy",
+        "_atom_site.B_iso_or_equiv",
+        "_atom_site.pdbx_PDB_model_num",
+    ]
     atom_index = 1
     for residue_index in range(1, 310):
         x_coord = float(residue_index)
@@ -73,6 +95,42 @@ def write_mmcif_all_atom_reference(path: Path) -> None:
                 )
             )
             atom_index += 1
-    lines.append(f"HETATM {atom_index} P P . DA D 2 1 0.000 0.000 0.000 D 1 ? 1.00 80.00 1")
+    for chain_id, residue_name, y_offset in (("D", "DA", 0.0), ("E", "U", 6.0), ("F", "U", 12.0)):
+        for residue_index in range(1, 4):
+            x_coord = float(residue_index) * 3.0
+            for atom_name, element, dx, dy in (
+                ("P", "P", 0.0, 0.0),
+                ("O5'", "O", 0.6, 0.2),
+                ("C5'", "C", 1.1, 0.3),
+                ("C4'", "C", 1.5, 0.8),
+                ("C3'", "C", 2.0, 0.4),
+                ("O3'", "O", 2.5, 0.1),
+                ("N1", "N", 1.5, 1.8),
+            ):
+                lines.append(
+                    " ".join(
+                        [
+                            "HETATM",
+                            str(atom_index),
+                            element,
+                            atom_name,
+                            ".",
+                            residue_name,
+                            chain_id,
+                            "2",
+                            str(residue_index),
+                            f"{x_coord + dx:.3f}",
+                            f"{y_offset + dy:.3f}",
+                            "0.000",
+                            chain_id,
+                            str(residue_index),
+                            "?",
+                            "1.00",
+                            "80.00",
+                            "1",
+                        ]
+                    )
+                )
+                atom_index += 1
     lines.append("#")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

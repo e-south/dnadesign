@@ -17,16 +17,22 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_CONSTRAINT_EVIDENCE,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
     make_deliverable_row,
+    sha256,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.mask_rows import (
     read_mask_residues,
 )
+
+from .molecular_scene_contract import chimerax_reference_complex_style_commands, molecular_visual_contract
+from .structure_browser_common import reference_residue_number_by_canonical
 
 _CHIMERAX_COLOR_ORDER = (
     ("protected", "#d9d2c3", "baseline fixed residues (clade 9 p25 + 5 A)"),
@@ -52,7 +58,8 @@ def write_mask_structure_context(
     *,
     panel_root: Path,
     mask_set_path: Path,
-    reference_backbone_path: Path,
+    reference_structure_path: Path,
+    reference_structure_format: str,
     mask_residues: list[dict[str, Any]] | None = None,
     render_png: bool = True,
 ) -> list[dict[str, Any]]:
@@ -62,18 +69,26 @@ def write_mask_structure_context(
     script_path = panel_root / "mask_structure_context.cxc"
     orientation_template_path = panel_root / "mask_structure_context_orientation_template.cxc"
     png_path = panel_root / "mask_structure_context.png"
+    render_manifest_path = panel_root / "mask_structure_context_render_manifest.yaml"
+    reference_number_by_canonical = reference_residue_number_by_canonical(
+        residues,
+        reference_structure_format=reference_structure_format,
+    )
     _write_chimerax_script(
         script_path,
         residues=residues,
-        reference_backbone_path=reference_backbone_path,
+        reference_structure_path=reference_structure_path,
+        reference_number_by_canonical=reference_number_by_canonical,
         png_path=png_path,
     )
     _write_orientation_template_script(
         orientation_template_path,
         residues=residues,
-        reference_backbone_path=reference_backbone_path,
+        reference_structure_path=reference_structure_path,
+        reference_number_by_canonical=reference_number_by_canonical,
     )
-    input_hashes = file_hashes({"mask_set": mask_set_path, "reference_backbone": reference_backbone_path})
+    input_hashes = file_hashes({"mask_set": mask_set_path, "reference_structure": reference_structure_path})
+    source_tables = ["mask_set.yaml", reference_structure_path.name]
     rows = [
         make_deliverable_row(
             deliverable_id="mask_structure_context_script",
@@ -81,7 +96,7 @@ def write_mask_structure_context(
             artifact_kind="chimerax_script",
             status="rendered",
             path=script_path,
-            source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
+            source_tables=source_tables,
             input_hashes=input_hashes,
             alt_text=(
                 "ChimeraX script that colors the Ec86 RT backbone by current Eco1 "
@@ -103,7 +118,7 @@ def write_mask_structure_context(
             artifact_kind="chimerax_script",
             status="rendered",
             path=orientation_template_path,
-            source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
+            source_tables=source_tables,
             input_hashes=input_hashes,
             alt_text=(
                 "Interactive ChimeraX script for manually tuning the Eco1 RT structure orientation "
@@ -122,21 +137,46 @@ def write_mask_structure_context(
         ),
     ]
     if not render_png:
-        if png_path.exists():
+        had_existing_render_artifact = png_path.exists() or render_manifest_path.exists()
+        if _existing_render_is_current(
+            render_manifest_path=render_manifest_path,
+            script_path=script_path,
+            reference_structure_path=reference_structure_path,
+            png_path=png_path,
+        ):
             status = "reused_existing_optional_render"
             skip_reason = "Reusing an existing ChimeraX PNG; rendering was disabled for this materialization run."
         else:
-            status = "skipped_optional_render_disabled"
-            skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."
+            png_path.unlink(missing_ok=True)
+            render_manifest_path.unlink(missing_ok=True)
+            if had_existing_render_artifact:
+                status = "skipped_stale_optional_render_removed"
+                skip_reason = (
+                    "A stale ChimeraX PNG or render manifest did not match the current recipe and was removed."
+                )
+            else:
+                status = "skipped_optional_render_disabled"
+                skip_reason = "ChimeraX PNG rendering was disabled for this materialization run."
     else:
         executable = _find_chimerax()
         if executable:
+            png_path.unlink(missing_ok=True)
+            render_manifest_path.unlink(missing_ok=True)
             chimerax_completed = _run_chimerax(executable=executable, script_path=script_path)
             status = "rendered" if chimerax_completed and png_path.exists() else "skipped_runtime_failed"
+            if status == "rendered":
+                _write_render_manifest(
+                    render_manifest_path=render_manifest_path,
+                    script_path=script_path,
+                    reference_structure_path=reference_structure_path,
+                    png_path=png_path,
+                )
             skip_reason = (
                 "" if status == "rendered" else "ChimeraX was found, but the command did not write the expected PNG."
             )
         else:
+            png_path.unlink(missing_ok=True)
+            render_manifest_path.unlink(missing_ok=True)
             status = "skipped_missing_runtime"
             skip_reason = "ChimeraX executable was not found on PATH or at the standard macOS app path."
     rows.append(
@@ -146,7 +186,7 @@ def write_mask_structure_context(
             artifact_kind="png",
             status=status,
             path=png_path,
-            source_tables=["mask_set.yaml", "proteinmpnn_request/chain_a_backbone.pdb"],
+            source_tables=source_tables,
             input_hashes=input_hashes,
             alt_text="Optional ChimeraX render of the Eco1 RT mask structure context.",
             description="Rendered ChimeraX PNG showing the Ec86 reference protein colored by mask category.",
@@ -163,18 +203,24 @@ def _write_chimerax_script(
     path: Path,
     *,
     residues: list[dict[str, Any]],
-    reference_backbone_path: Path,
+    reference_structure_path: Path,
+    reference_number_by_canonical: dict[int, int],
     png_path: Path,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# Eco1 RT repack mask context",
-        "# mask_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1",
+        "# mask_policy_id: active_eco1_rt_protected_residue_mask",
         f"# orientation_preset_id: {_CHIMERAX_ORIENTATION_PRESET_ID}",
         "# Paths are relative to this script directory.",
-        *_chimerax_scene_setup_lines(reference_backbone_path=reference_backbone_path, script_path=path),
+        *_chimerax_scene_setup_lines(reference_structure_path=reference_structure_path, script_path=path),
     ]
-    lines.extend(_chimerax_mask_color_lines(residues))
+    lines.extend(
+        _chimerax_mask_color_lines(
+            residues,
+            reference_number_by_canonical=reference_number_by_canonical,
+        )
+    )
     lines.extend(
         [
             *_CHIMERAX_VIEW_COMMANDS,
@@ -190,7 +236,8 @@ def _write_orientation_template_script(
     path: Path,
     *,
     residues: list[dict[str, Any]],
-    reference_backbone_path: Path,
+    reference_structure_path: Path,
+    reference_number_by_canonical: dict[int, int],
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -203,12 +250,17 @@ def _write_orientation_template_script(
         "#    save mask_structure_context_orientation.cxs",
         "# 4. Send the saved .cxs session or a screenshot; the pose can then be promoted into code.",
         "# This script intentionally leaves the ChimeraX window open for manual tuning.",
-        "# mask_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1",
+        "# mask_policy_id: active_eco1_rt_protected_residue_mask",
         f"# orientation_preset_id: {_CHIMERAX_ORIENTATION_PRESET_ID}",
         "# Paths are relative to this script directory.",
-        *_chimerax_scene_setup_lines(reference_backbone_path=reference_backbone_path, script_path=path),
+        *_chimerax_scene_setup_lines(reference_structure_path=reference_structure_path, script_path=path),
     ]
-    lines.extend(_chimerax_mask_color_lines(residues))
+    lines.extend(
+        _chimerax_mask_color_lines(
+            residues,
+            reference_number_by_canonical=reference_number_by_canonical,
+        )
+    )
     lines.extend(
         [
             *_CHIMERAX_VIEW_COMMANDS,
@@ -219,27 +271,42 @@ def _write_orientation_template_script(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _chimerax_scene_setup_lines(*, reference_backbone_path: Path, script_path: Path) -> list[str]:
+def _chimerax_scene_setup_lines(*, reference_structure_path: Path, script_path: Path) -> list[str]:
     return [
         "set bgColor white",
         "camera ortho",
         "lighting soft",
         "graphics silhouettes true",
-        f"open {_relative_chimerax_path(reference_backbone_path, script_path=script_path)}",
-        "color #1 #efece3",
-        "cartoon #1",
+        f"open {_relative_chimerax_path(reference_structure_path, script_path=script_path)}",
+        *chimerax_reference_complex_style_commands(),
         "cartoon style width 1.4 thick 0.22",
     ]
 
 
-def _chimerax_mask_color_lines(residues: list[dict[str, Any]]) -> list[str]:
+def _chimerax_mask_color_lines(
+    residues: list[dict[str, Any]],
+    *,
+    reference_number_by_canonical: dict[int, int],
+) -> list[str]:
     lines: list[str] = []
     for field, color, label in _CHIMERAX_COLOR_ORDER:
-        positions = [int(row["canonical_position"]) for row in residues if bool(row.get(field))]
+        positions = [
+            reference_number_by_canonical[int(row["canonical_position"])]
+            for row in residues
+            if bool(row.get(field)) and int(row["canonical_position"]) in reference_number_by_canonical
+        ]
         selector = _selector_for_positions(positions)
         if selector:
             lines.append(f"# {label}")
-            lines.append(f"color #1/A:{selector} {color}")
+            selection = f"#1/A:{selector}"
+            lines.extend(
+                (
+                    f"color {selection} {color} target s",
+                    f"show {selection} atoms",
+                    f"style {selection} stick",
+                    f"color {selection} {color} target a",
+                )
+            )
     return lines
 
 
@@ -297,3 +364,60 @@ def _run_chimerax(*, executable: str, script_path: Path) -> bool:
     except (OSError, subprocess.TimeoutExpired):
         return False
     return completed.returncode == 0
+
+
+def _write_render_manifest(
+    *,
+    render_manifest_path: Path,
+    script_path: Path,
+    reference_structure_path: Path,
+    png_path: Path,
+) -> None:
+    """Record the exact script and all-atom source behind a ChimeraX still."""
+
+    payload = {
+        "schema_id": "eco1_rt.mask_structure_context_render",
+        "schema_version": 1,
+        "status": "rendered",
+        "script_hash": sha256(script_path),
+        "reference_structure_hash": sha256(reference_structure_path),
+        "output": {
+            "path": png_path.name,
+            "sha256": sha256(png_path),
+        },
+        "visual_contract": molecular_visual_contract(),
+    }
+    render_manifest_path.write_text(
+        yaml.safe_dump(payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _existing_render_is_current(
+    *,
+    render_manifest_path: Path,
+    script_path: Path,
+    reference_structure_path: Path,
+    png_path: Path,
+) -> bool:
+    """Return whether an optional still matches the current recipe and source."""
+
+    if not all(path.exists() for path in (render_manifest_path, script_path, reference_structure_path, png_path)):
+        return False
+    try:
+        payload = yaml.safe_load(render_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    output = payload.get("output")
+    if not isinstance(output, dict):
+        return False
+    return (
+        payload.get("schema_id") == "eco1_rt.mask_structure_context_render"
+        and payload.get("script_hash") == sha256(script_path)
+        and payload.get("reference_structure_hash") == sha256(reference_structure_path)
+        and payload.get("visual_contract") == molecular_visual_contract()
+        and output.get("path") == png_path.name
+        and output.get("sha256") == sha256(png_path)
+    )

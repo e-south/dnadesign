@@ -50,7 +50,7 @@ _CLASS_COLORS = {
     _MOTIF_ANCHOR_CLASS: OKABE_ITO["purple"],
     "Retained DNA/RNA <=5 A": OKABE_ITO["blue"],
     "Clade 9 >=25% WT plurality": OKABE_ITO["green"],
-    "Other fixed-mask residues": OKABE_ITO["orange"],
+    "Other protected residues": OKABE_ITO["orange"],
     "ProteinMPNN-designable residues": "#9aa1a8",
 }
 
@@ -427,7 +427,7 @@ def _constraint_class(row: dict[str, Any]) -> str:
     if bool(row.get("evolutionarily_conserved_clade9_25pct_plurality")):
         return "Clade 9 >=25% WT plurality"
     if bool(row.get("protected")):
-        return "Other fixed-mask residues"
+        return "Other protected residues"
     return "ProteinMPNN-designable residues"
 
 

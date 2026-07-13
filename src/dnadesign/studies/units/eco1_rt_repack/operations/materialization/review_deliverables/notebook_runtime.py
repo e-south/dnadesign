@@ -21,7 +21,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     SECTION_CONSTRAINT_EVIDENCE,
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
     SECTION_ESMC_FEATURE_REVIEW,
-    SECTION_FEASIBILITY_AND_HANDOFF,
+    SECTION_PANEL_SELECTION,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
@@ -33,19 +33,24 @@ from .notebook_selection_summary import (
     render_selection_funnel_summary,
 )
 from .notebook_sequences import handoff_sequence_list_html
-from .notebook_visuals import render_image
+from .notebook_twist_handoff import render_twist_handoff
+from .notebook_visuals import render_image, render_video
 
 _NOTEBOOK_HIDDEN_DELIVERABLE_IDS = {
+    "biohub_esmc_sae_structure_browser_manifest",
     "foldcheck_review_structure_overlay_panel",
     "foldcheck_review_structure_overlay_skipped",
     "mask_structure_context_png",
+    "communication_structure_story_browser",
 }
 _NOTEBOOK_LANE_ROLES = {
-    "main_review": {"manuscript_facing", "interactive_review"},
+    "main_review": {"manuscript_facing", "interactive_review", "communication_facing"},
+    "communication": {"communication_facing"},
     "audit_supplement": {"review_only", "operator_review", "optional_heavy"},
 }
 _NOTEBOOK_LANE_LABELS = {
     "main_review": "Core evidence",
+    "communication": "Communication visuals",
     "audit_supplement": "Model and method checks",
 }
 _NOTEBOOK_EVIDENCE_ARTIFACT_KINDS = {
@@ -53,14 +58,22 @@ _NOTEBOOK_EVIDENCE_ARTIFACT_KINDS = {
     "selection_panel_table",
     "candidate_handoff_sequence_csv",
     "handoff_readiness",
+    "twist_handoff_manifest",
+}
+_NOTEBOOK_FILE_BACKED_ARTIFACT_KINDS = {
+    *_NOTEBOOK_EVIDENCE_ARTIFACT_KINDS,
+    "sae_feature_heatmap_manifest",
+    "structure_browser_manifest",
+    "video",
 }
 _SECTION_DELIVERABLE_ORDER = {
-    SECTION_FEASIBILITY_AND_HANDOFF: (
+    SECTION_PANEL_SELECTION: (
         *CURRENT_SELECTION_PLOT_IDS,
         "selected_panel_structure_browser_manifest",
         "selection_funnel_summary",
         "selection_panel_table",
         "selection_handoff_sequences",
+        "twist_full_cds_handoff",
         "selection_handoff_readiness",
     )
 }
@@ -72,38 +85,46 @@ def load_review_manifest(notebook_file: str) -> tuple[dict[str, Any], list[dict[
     manifest_path = Path(notebook_file).resolve().parents[1] / "review_deliverable_manifest.yaml"
     manifest_root = manifest_path.parent
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    return manifest, list(manifest["deliverables"]), manifest_path, manifest_root
+    deliverables = _annotate_notebook_artifact_state(
+        list(manifest["deliverables"]),
+        manifest_root=manifest_root,
+    )
+    return manifest, deliverables, manifest_path, manifest_root
 
 
 def render_intro(mo: Any) -> Any:
-    """Render the study premise without code-self-referential copy."""
+    """Render the study premise and evidence order in plain language."""
 
     intro_lead = (
-        "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported RNA/DNA-bound scaffold. "
-        "The study asks whether fixed-backbone sequence proposals can be reduced to a small protein-only "
-        "review panel that preserves known catalytic, retron-initiation, direct-contact, thumb-track, and "
-        "local structural contexts. The computational deliverable is a bounded set of protein sequence "
-        "candidates for review, not an activity claim."
+        "This study compares WT Eco1 RT with complete ProteinMPNN-designed sequences that either repack distal "
+        "scaffold positions, redesign a non-acidifying, MSA-supported peripheral nucleic-acid-facing shell, or do "
+        "both, while keeping declared catalytic, direct-contact, Wang thumb-track, and mapped residues 255-311 "
+        "fixed and requiring preserved predicted local backbone geometry."
     )
-    intro_flow = (
-        "Evidence order: cryoEM scaffold, Tao-style mask evidence, ProteinMPNN sequence proposals, "
-        "ColabFold fold checks, local preservation and chemistry/support gates, global panel selection, "
-        "and sequence export. "
-        "The active design classes vary homolog-conservation "
-        "and retained-DNA/RNA proximity thresholds while always protecting catalytic anchors and Wang/Ec86 "
-        "direct-contact priors. The active mask uses catalytic anchors, Wang/Ec86 direct-contact priors, "
-        "retained-substrate proximity, and Mestre-derived clade 9 plurality at the 25% threshold. "
-        "ProteinMPNN proposes variants at unprotected residues to repack the remaining designable residues, "
-        "ColabFold removes poor "
-        "fold predictions, and the remaining pool is filtered by preservation checks, no acidic gains near "
-        "retained DNA/RNA, and no unobserved proximal substitutions. Final selection then uses basic-loss and "
-        "Pro/Gly penalties, simple mutation-set dissimilarity, regional MSA support, local RMSD values inside "
-        "the gate, and fold metrics. "
-        "WT ESMC masked-marginal scores "
-        "and Biohub ESMC "
-        "SAE features annotate the review set; they are not mask inputs or acceptance gates. The selected protein "
-        "sequences are exported as a flat CSV for RT-only handoff planning. The panel is not a processivity, "
-        "strand-displacement, or direct thumb-track tuning claim."
+    stage_items = (
+        "Generate each complete sequence under one distal, near DNA/RNA, or combined near DNA/RNA plus distal "
+        "policy. Each ProteinMPNN output is one complete sequence; mutations are never combined across policies.",
+        "Fit each ColabFold model once to the mapped 7V9U-backed reference and require every non-distal review "
+        "region to remain at or below the declared 2.5 A local C-alpha RMSD cutoff.",
+        "Keep passing sequences in distal, peripheral, or combined design groups. The distal group is an "
+        "N-terminal-enriched distant-repacking control, not a direct strand-displacement hypothesis; the peripheral "
+        "and combined groups test nucleic-acid-facing redesign. These are experimental comparisons, not quality tiers.",
+        "Select eight sequences: two distal, three peripheral, and three combined. Within each group, minimize "
+        "overlap in mutated positions first and exact substitutions second; use chemistry, MSA, and structure "
+        "evidence only for later ties.",
+    )
+    stage_html = "".join(f"<li style='margin:0 0 0.24rem 0;'>{item}</li>" for item in stage_items)
+    generation_note = (
+        "ProteinMPNN fixed motif neighborhoods 99-115, 189-204, and 237-251; their exact NAxxH, YADD, and VTG "
+        "anchors are 105-109, 195-198, and 243-245. The extra flanks are precautionary study choices. Mapped "
+        "residues 255-311 are fixed, while 230-254 remain designable and are reported separately. Recurrent C233 "
+        "changes and alpha-1/R13 states remain visible in the evidence tables; neither is treated as an activity score."
+    )
+    claim_limit = (
+        "Charge shifts, MSA support, fold metrics, and local RMSD are review evidence, not activity scores. ESMC and "
+        "SAE are optional model checks and do not select candidates. The sequence instances are not biological "
+        "replicates, and the panel does not establish improved activity, affinity, processivity, strand displacement, "
+        "or safety."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "
@@ -116,10 +137,13 @@ def render_intro(mo: Any) -> Any:
           <h1 style="margin:0 0 0.42rem 0; font-size:2.15rem; line-height:1.12;
                      font-family:ui-serif, Georgia, 'Times New Roman', serif;
                      font-weight:650; letter-spacing:0;">
-            Repacking Eco1 reverse transcriptase for structured-template assays
+            Eco1 reverse transcriptase sequence hypotheses
           </h1>
           <p style="{paragraph_style}">{intro_lead}</p>
-          <p style="{paragraph_style}; margin-top:0.5rem;">{intro_flow}</p>
+          <ol style="margin:0.55rem 0 0.45rem 1.25rem; padding:0; width:100%;
+                     max-width:none; font-size:0.98rem; line-height:1.45;">{stage_html}</ol>
+          <p style="{paragraph_style}; margin-top:0.35rem;">{generation_note}</p>
+          <p style="{paragraph_style}; margin-top:0.35rem;">{claim_limit}</p>
         </section>
         """
     )
@@ -130,6 +154,59 @@ def resolve_manifest_path(manifest_root: Path, value: str) -> Path:
 
     candidate = Path(str(value))
     return candidate if candidate.is_absolute() else manifest_root / candidate
+
+
+def is_policy_residue_frequency_deliverable(row: dict[str, Any] | None) -> bool:
+    """Return whether a row owns selectable policy-frequency SVG views."""
+
+    return bool(row) and str(row.get("artifact_kind") or "") == "proteinmpnn_policy_residue_frequency_bundle"
+
+
+def policy_frequency_view_lookup(row: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Return policy-frequency views keyed by their displayed label."""
+
+    if not is_policy_residue_frequency_deliverable(row):
+        return {}
+    views = list(dict(row.get("evidence_summary") or {}).get("policy_views") or [])
+    return {str(view.get("label") or ""): dict(view) for view in views if str(view.get("label") or "").strip()}
+
+
+def select_policy_frequency_view(
+    *,
+    selected_label: str,
+    lookup: dict[str, dict[str, Any]],
+    options: list[str],
+) -> dict[str, Any] | None:
+    """Resolve one policy-frequency view with a deterministic first-view fallback."""
+
+    if selected_label not in lookup and options:
+        selected_label = options[0]
+    return lookup.get(selected_label) if selected_label else None
+
+
+def render_policy_frequency_bundle(
+    row: dict[str, Any],
+    *,
+    mo: Any,
+    manifest_root: Path,
+    selected_view: dict[str, Any] | None,
+) -> Any:
+    """Render one selected generation-policy frequency SVG."""
+
+    lookup = policy_frequency_view_lookup(row)
+    options = list(lookup)
+    view = selected_view or select_policy_frequency_view(
+        selected_label=options[0] if options else "",
+        lookup=lookup,
+        options=options,
+    )
+    if view is None:
+        return mo.md("No generation-policy residue-frequency view is available.")
+    media_path = resolve_manifest_path(manifest_root, str(view.get("path") or row.get("path") or ""))
+    selected_row = dict(row)
+    selected_row["path"] = str(media_path)
+    selected_row["title"] = f"{row.get('title')} | {view.get('label')}"
+    return render_image(selected_row, mo=mo, media_path=media_path)
 
 
 def review_lane_lookup(deliverables: list[dict[str, Any]]) -> dict[str, str]:
@@ -175,6 +252,7 @@ def evidence_deliverables(
         for row in deliverables
         if str(row.get("role") or "manuscript_facing") in allowed_roles
         and str(row.get("artifact_kind") or "") in _NOTEBOOK_EVIDENCE_ARTIFACT_KINDS
+        and _is_notebook_artifact_available(row)
     ]
 
 
@@ -236,12 +314,14 @@ def render_deliverable_artifact(row: dict[str, Any], *, mo: Any, manifest_root: 
         return render_selection_panel_table(row, mo=mo, table_path=media_path)
     if artifact_kind == "candidate_handoff_sequence_csv":
         return _render_handoff_sequence_csv(row, mo=mo, table_path=media_path)
-    if artifact_kind == "proteinmpnn_residue_frequency_bundle":
-        return render_residue_frequency_bundle(row, mo=mo, manifest_root=manifest_root)
     if artifact_kind == "handoff_readiness":
         return render_handoff_readiness(row, mo=mo, manifest_path=media_path)
+    if artifact_kind == "twist_handoff_manifest":
+        return render_twist_handoff(row, mo=mo, manifest_path=media_path)
     if media_path.exists() and suffix in {".svg", ".png"}:
         return render_image(row, mo=mo, media_path=media_path)
+    if media_path.exists() and suffix == ".mp4":
+        return render_video(row, mo=mo, media_path=media_path)
     artifact_path = str(row.get("path") or "")
     if media_path.exists():
         return mo.md(f"Artifact file: `{artifact_path}`")
@@ -298,43 +378,12 @@ def is_interactive_structure_deliverable(row: dict[str, Any] | None) -> bool:
     return artifact_kind == "structure_browser_manifest" and status == "rendered"
 
 
-def is_residue_frequency_bundle_deliverable(row: dict[str, Any] | None) -> bool:
-    """Return whether a manifest row owns a ProteinMPNN residue-frequency bundle."""
-
-    if row is None:
-        return False
-    return str(row.get("artifact_kind") or "") == "proteinmpnn_residue_frequency_bundle"
-
-
-def residue_frequency_view_lookup(row: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """Map residue-frequency view labels to design-class view rows."""
-
-    if not is_residue_frequency_bundle_deliverable(row):
-        return {}
-    evidence_summary = row.get("evidence_summary") or {}
-    view_rows = list(dict(evidence_summary).get("design_class_views") or [])
-    return {str(view.get("label") or ""): dict(view) for view in view_rows if view.get("label")}
-
-
-def select_residue_frequency_view(
-    *,
-    selected_label: str,
-    lookup: dict[str, dict[str, Any]],
-    options: list[str],
-) -> dict[str, Any] | None:
-    """Resolve the selected ProteinMPNN design-class view."""
-
-    if selected_label not in lookup and options:
-        selected_label = str(options[0])
-    return lookup.get(selected_label) if selected_label else None
-
-
 def format_section_label(section: str) -> str:
     labels = {
         SECTION_CONSTRAINT_EVIDENCE: "Mask basis",
         SECTION_DESIGNS_AND_FOLD_TRIAGE: "Sequence proposals and fold checks",
         SECTION_ESMC_FEATURE_REVIEW: "ESMC and SAE checks",
-        SECTION_FEASIBILITY_AND_HANDOFF: "Panel selection",
+        SECTION_PANEL_SELECTION: "Panel selection",
     }
     return labels.get(str(section), str(section).replace("_", " ").title())
 
@@ -352,6 +401,8 @@ def format_deliverable_label(row: dict[str, Any] | str) -> str:
 def _is_publication_visual(row: dict[str, Any]) -> bool:
     if str(row.get("deliverable_id") or "") in _NOTEBOOK_HIDDEN_DELIVERABLE_IDS:
         return False
+    if not _is_notebook_artifact_available(row):
+        return False
     if str(row.get("artifact_kind") or "") in {
         "selection_funnel_summary",
         "selection_panel_table",
@@ -364,11 +415,45 @@ def _is_publication_visual(row: dict[str, Any]) -> bool:
     if is_interactive_structure_deliverable(row):
         return True
     suffix = Path(str(row.get("path") or "")).suffix.lower()
-    return suffix in {".svg", ".png"} and str(row.get("status") or "") in {
+    return suffix in {".svg", ".png", ".mp4"} and str(row.get("status") or "") in {
         "rendered",
         "linked_existing",
         "reused_existing_optional_render",
     }
+
+
+def _annotate_notebook_artifact_state(
+    deliverables: list[dict[str, Any]],
+    *,
+    manifest_root: Path,
+) -> list[dict[str, Any]]:
+    """Add notebook-local file availability fields without changing manifest data."""
+
+    annotated: list[dict[str, Any]] = []
+    for row in deliverables:
+        row_copy = dict(row)
+        artifact_path = str(row_copy.get("path") or "")
+        if artifact_path:
+            resolved_path = resolve_manifest_path(manifest_root, artifact_path)
+            row_copy["_notebook_artifact_exists"] = resolved_path.exists()
+            row_copy["_notebook_artifact_path"] = str(resolved_path)
+        else:
+            row_copy["_notebook_artifact_exists"] = False
+            row_copy["_notebook_artifact_path"] = ""
+        annotated.append(row_copy)
+    return annotated
+
+
+def _is_notebook_artifact_available(row: dict[str, Any]) -> bool:
+    """Return whether a row can be selected without reaching a missing artifact path."""
+
+    if "_notebook_artifact_exists" not in row:
+        return True
+    artifact_kind = str(row.get("artifact_kind") or "")
+    suffix = Path(str(row.get("path") or "")).suffix.lower()
+    if artifact_kind in _NOTEBOOK_FILE_BACKED_ARTIFACT_KINDS or suffix in {".svg", ".png", ".mp4"}:
+        return bool(row.get("_notebook_artifact_exists"))
+    return True
 
 
 def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Path) -> Any:
@@ -382,45 +467,5 @@ def _render_handoff_sequence_csv(row: dict[str, Any], *, mo: Any, table_path: Pa
             mo.Html(handoff_sequence_list_html(rows)),
             mo.ui.table(rows, page_size=10),
         ],
-        gap=0.25,
-    )
-
-
-def render_residue_frequency_bundle(
-    row: dict[str, Any],
-    *,
-    mo: Any,
-    manifest_root: Path,
-    selected_view: dict[str, Any] | None = None,
-    design_class_ui: Any | None = None,
-) -> Any:
-    """Render a residue-frequency design-class view with notebook-owned controls."""
-
-    view_lookup = residue_frequency_view_lookup(row)
-    if not view_lookup:
-        media_path = resolve_manifest_path(manifest_root, str(row["path"]))
-        return render_image(row, mo=mo, media_path=media_path)
-    options = list(view_lookup)
-    selected_view = selected_view or select_residue_frequency_view(
-        selected_label=options[0] if options else "",
-        lookup=view_lookup,
-        options=options,
-    )
-    selected_view = selected_view or {}
-    selected_label = str(selected_view.get("label") or "")
-    selected_path = resolve_manifest_path(manifest_root, str(selected_view.get("path") or row["path"]))
-    selected_row = dict(row)
-    selected_row["path"] = str(selected_path)
-    selected_row["title"] = f"{row.get('title')} | {selected_label}" if selected_label else str(row.get("title") or "")
-    selected_row["alt_text"] = (
-        f"{row.get('alt_text')} Selected design class: {selected_label}."
-        if selected_label
-        else str(row.get("alt_text") or "")
-    )
-    rendered_items = [render_image(selected_row, mo=mo, media_path=selected_path)]
-    if design_class_ui is not None:
-        rendered_items.insert(0, design_class_ui)
-    return mo.vstack(
-        rendered_items,
         gap=0.25,
     )

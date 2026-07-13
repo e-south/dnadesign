@@ -55,7 +55,6 @@ def _handoff_payload() -> dict[str, object]:
             "candidate_table": "candidate_table.parquet",
             "foldcheck_report": "foldcheck_report.parquet",
             "foldcheck_review": "foldcheck_review/foldcheck_candidate_ranking.parquet",
-            "feasibility_report": "selection/feasibility_report.parquet",
             "candidate_triage_table": "selection/candidate_triage_table.parquet",
             "candidate_selection_panel": "selection/candidate_selection_panel.parquet",
             "candidate_handoff_sequences": "selection/candidate_handoff_sequences.csv",
@@ -69,7 +68,6 @@ def _handoff_payload() -> dict[str, object]:
                 "candidate_handoff_sequence_csv_hash": "sha256:" + "b" * 64,
                 "eligible_for_handoff": True,
                 "foldcheck_status": "accepted",
-                "feasibility_status": "feasible",
                 "selection_slot": 1,
             }
         ],

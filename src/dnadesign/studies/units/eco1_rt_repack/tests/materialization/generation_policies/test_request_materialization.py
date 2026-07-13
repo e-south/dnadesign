@@ -19,7 +19,10 @@ import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+    DISTAL_SCAFFOLD_POLICY_ID,
     GENERATION_POLICY_VERSION,
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
     PRIMARY_POLICY_IDS,
     materialize_generation_policies,
     materialize_generation_policy_requests,
@@ -59,6 +62,7 @@ def test_generation_policy_requests_materialize_one_request_per_complete_policy(
         assert manifest["policy_manifest_hash"].startswith("sha256:")
         assert manifest["requested_variants"] == 336
         assert manifest["expected_sample_count"] == 336
+        assert manifest["omit_aas"] == ["C"]
         assert manifest["mask_policy_id"] is None
         assert "design_class_id" not in manifest
         assert manifest["canonical_open_positions"] == sorted(open_positions)
@@ -67,11 +71,15 @@ def test_generation_policy_requests_materialize_one_request_per_complete_policy(
         assert manifest["mutable_position_count"] == len(open_positions)
         assert validate_request_manifest(manifest_path) == []
 
-        if policy_id == "distal_scaffold_repack_v1":
-            assert manifest["alphabet_enforcement_modes"] == ["upstream_omit_AAs_C"]
+        expected_modes = {
+            DISTAL_SCAFFOLD_POLICY_ID: ["upstream_omit_AAs_C"],
+            NEAR_DNA_RNA_ACID_FREE_POLICY_ID: ["upstream_omit_AA_jsonl"],
+            COMBINED_NEAR_PLUS_DISTAL_POLICY_ID: ["upstream_omit_AA_jsonl", "upstream_omit_AAs_C"],
+        }
+        assert manifest["alphabet_enforcement_modes"] == expected_modes[policy_id]
+        if policy_id == DISTAL_SCAFFOLD_POLICY_ID:
             assert "omit_AA_jsonl" not in manifest["sidecar_paths"]
         else:
-            assert "upstream_omit_AA_jsonl" in manifest["alphabet_enforcement_modes"]
             assert "omit_AA_jsonl" in manifest["sidecar_paths"]
             omit_path = manifest_path.parent / Path(manifest["sidecar_paths"]["omit_AA_jsonl"]).name
             omit_payload = json.loads(omit_path.read_text(encoding="utf-8"))
@@ -80,28 +88,25 @@ def test_generation_policy_requests_materialize_one_request_per_complete_policy(
             omit_groups = omit_payload["chain_a_backbone"]["A"]
             assert omit_groups
             omitted_by_position = {
-                int(position): set(aa_text) for positions, aa_text in omit_groups for position in positions
+                int(position): set(aa_text) for group_positions, aa_text in omit_groups for position in group_positions
             }
-            near_open_positions = {
-                int(row["eco1_position"])
+            near_rows = [
+                row
                 for row in positions
                 if row["policy_id"] == policy_id and row["is_open_position"] and row["is_near_region_gt5_le10a"]
-            }
-            near_open_wt_by_position = {
-                int(row["eco1_position"]): str(row["wt_aa"])
-                for row in positions
-                if row["policy_id"] == policy_id and row["is_open_position"] and row["is_near_region_gt5_le10a"]
-            }
-            near_open_mpnn_positions = {
-                int(manifest["canonical_to_proteinmpnn_position"][str(position)]) for position in near_open_positions
-            }
-            assert near_open_mpnn_positions
-            assert near_open_mpnn_positions <= set(omitted_by_position)
-            for canonical_position, wt_aa in near_open_wt_by_position.items():
+            ]
+            for position_row in near_rows:
+                canonical_position = int(position_row["eco1_position"])
+                wt_aa = str(position_row["wt_aa"])
                 mpnn_position = int(manifest["canonical_to_proteinmpnn_position"][str(canonical_position)])
+                assert "C" in omitted_by_position[mpnn_position]
                 assert {"D", "E"} - {wt_aa} <= omitted_by_position[mpnn_position]
-            for command in manifest["run_commands"]:
-                if command["name"].startswith("protein_mpnn_run_seed_"):
+        for command in manifest["run_commands"]:
+            if command["name"].startswith("protein_mpnn_run_seed_"):
+                assert command["argv"][command["argv"].index("--omit_AAs") + 1] == "C"
+                if policy_id == DISTAL_SCAFFOLD_POLICY_ID:
+                    assert "--omit_AA_jsonl" not in command["argv"]
+                else:
                     assert "--omit_AA_jsonl" in command["argv"]
 
 
@@ -155,6 +160,8 @@ def test_bu_scc_generation_policy_job_template_is_policy_first() -> None:
     assert "ECO1_GENERATION_POLICIES_ROOT" in text
     assert "GENERATION_POLICY_ID" in text
     assert "generation_policies_v3" in text
+    assert NEAR_DNA_RNA_ACID_FREE_POLICY_ID in text
+    assert COMBINED_NEAR_PLUS_DISTAL_POLICY_ID in text
     assert "materialization.generation_policies" in text
     assert "design_classes" not in text
     assert "DESIGN_CLASS_ID" not in text

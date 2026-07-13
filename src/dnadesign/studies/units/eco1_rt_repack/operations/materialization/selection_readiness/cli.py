@@ -53,7 +53,6 @@ def main(argv: list[str] | None = None) -> int:
     print(
         json.dumps(
             {
-                "feasibility_report_path": str(result.feasibility_report_path),
                 "candidate_triage_table_path": str(result.candidate_triage_table_path),
                 "local_structure_region_metrics_path": str(result.local_structure_region_metrics_path),
                 "local_structure_threshold_sensitivity_path": str(result.local_structure_threshold_sensitivity_path),

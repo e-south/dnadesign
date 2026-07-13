@@ -12,7 +12,6 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
-- `eco1-proteinmpnn-design-class.qsub`: Eco1 ProteinMPNN design-class array run
 - `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v3 generation-policy array run
 - `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
@@ -35,9 +34,6 @@ qsub -P <project> \
 qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
-qsub -t 1 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
 qsub -t 1 \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
@@ -152,55 +148,9 @@ Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
 - [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
-### Eco1 ProteinMPNN design-class submissions
-
-The Eco1 design-class template consumes the materialized request roots under:
-
-```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/
-```
-
-It maps SGE task ids to the five generated classes: clade 9 p25 contact
-6/8/10 A, clade 9 p50 contact 5 A, and II-A3/`42_1` p50 contact 5 A. It runs
-the official ProteinMPNN checkout through the study `proteinmpnn_sample_ingest`
-wrapper, then writes the per-class `candidate_table.parquet`.
-
-If ProteinMPNN is checked out inside the repo-local `.var` directory, use:
-
-```bash
-PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn
-```
-
-Use a one-task smoke first:
-
-```bash
-mkdir -p /project/dunlop/esouth/proteinmpnn/eco1_rt_design_classes/sge_logs
-qsub -t 1 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-```
-
-After the smoke writes `candidate_table.parquet` for the first class, run the
-remaining class array:
-
-```bash
-qsub -t 2-5 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-```
-
-Use `qsub -t 1-5` only when no class has already been materialized or when
-`ECO1_PROTEINMPNN_OVERWRITE=1` is intentional. Then rebuild
-`candidate_pool_manifest.yaml` and the expanded fold-check request:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . candidate-pool
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes --repo-root . foldcheck-request
-```
-
 ### Eco1 ProteinMPNN generation-policy submissions
 
-The Eco1 generation-policy template is the forward v3 lane. It consumes request
+The Eco1 generation-policy template is the v3 lane. It consumes request
 roots under:
 
 ```text

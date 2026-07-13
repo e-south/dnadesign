@@ -42,7 +42,6 @@ field_contract:
       - candidate_table
       - foldcheck_report
       - foldcheck_review
-      - feasibility_report
       - candidate_triage_table
       - candidate_selection_panel
       - candidate_handoff_sequences
@@ -60,7 +59,6 @@ field_contract:
       - candidate_handoff_sequence_csv_hash
       - eligible_for_handoff
       - foldcheck_status
-      - feasibility_status
       - selection_slot
   candidate_table:
     required_columns:
@@ -95,52 +93,22 @@ field_contract:
       - status
       - rejection_reason
       - missing_metric_reason
-  feasibility_report:
-    required_columns:
-      - candidate_id
-      - sequence_hash
-      - parent_sequence_id
-      - parent_sequence_hash
-      - mutation_count_total
-      - mutation_count_mutable_region
-      - mutation_count_protected_region
-      - protected_mutation_violation_count
-      - protected_mutation_violations_json
-      - mutation_windows_json
-      - max_mutation_window_length
-      - max_mutation_window_mutation_count
-      - mutation_window_density_max
-      - nearest_parent_id
-      - nearest_parent_distance_aa
-      - nearest_parent_distance_fraction
-      - parent_haplotype_id
-      - parent_haplotype_distance_aa
-      - synthesis_tier
-      - synthesis_blockers_json
-      - codon_policy_id
-      - sequence_complexity_flags_json
-      - feasibility_status
-      - feasibility_reason
-      - feasibility_policy_id
-      - input_candidate_table_hash
-      - input_mask_policy_hash
-      - input_foldcheck_report_hash
-      - created_at_utc
-      - created_by
   candidate_triage_table:
     required_columns:
       - candidate_id
       - sequence_hash
-      - design_class_id
+      - policy_id
       - fold_review_class
-      - feasibility_status
       - hard_gate_status
   candidate_selection_panel:
     required_columns:
       - candidate_id
       - sequence_hash
+      - policy_id
       - selection_slot
-      - selected_for_panel
+      - selection_rank
+      - design_group_id
+      - within_group_rank
       - eligible_for_handoff
       - selection_reason
       - input_candidate_triage_table_hash
@@ -148,26 +116,34 @@ field_contract:
     required_columns:
       - candidate_id
       - selection_slot
-      - design_class_id
+      - selection_rank
+      - policy_id
+      - design_group_id
+      - within_group_rank
       - protein_sequence
+      - mapped_protein_sequence
       - sequence_hash
       - amino_acid_length
+      - protein_sequence_sha256
+      - mapped_protein_sequence_sha256
+      - canonical_sequence_status
+      - canonical_sequence_sha256
+      - canonical_mutations
       - fold_review_class
-      - feasibility_status
       - eligible_for_handoff
       - codon_policy_id
       - dna_design_status
       - restriction_site_screen_status
+      - source_foldcheck_input_sequences_sha256
 invariants:
   - candidates_must_exist_in_candidate_table
   - candidates_must_have_zero_mask_violations
   - candidates_must_have_nonfixture_foldcheck_acceptance
-  - candidates_must_have_feasible_rows
   - candidates_must_exist_in_candidate_selection_panel
   - candidates_must_exist_in_candidate_handoff_sequences
   - candidate_handoff_sequences_must_match_candidate_sequence_hashes
   - candidate_handoff_sequences_must_be_protein_only_until_downstream_acceptance
-  - upstream_artifact_hashes_must_cover_profile_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_feasibility_triage_selection
+  - upstream_artifact_hashes_must_cover_profile_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_triage_selection
   - handoff_kind_must_be_rt_only_candidate_handoff
   - construct_subject_created_must_be_false_before_downstream_acceptance
   - downstream_acceptance_must_reference_rt_lnrna_candidate_acceptance_schema_or_successor

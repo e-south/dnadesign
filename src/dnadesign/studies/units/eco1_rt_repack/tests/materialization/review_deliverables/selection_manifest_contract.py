@@ -14,43 +14,41 @@ from __future__ import annotations
 SELECTION_FUNNEL_STAGES = [
     {
         "stage_id": "candidate_pool",
-        "stage_label": "Accepted candidate pool",
+        "stage_label": "Complete ProteinMPNN sequences",
         "selector_role": "input_pool",
-        "filter_rule": "Accepted ProteinMPNN candidate rows before protein-level selection checks.",
+        "method": "Accepted complete ProteinMPNN sequences.",
         "input_count": 2,
         "removed_count": 0,
         "remaining_count": 2,
         "is_hard_gate": False,
     },
     {
-        "stage_id": "preservation_gate",
-        "stage_label": "Preservation gate",
+        "stage_id": "local_geometry_screen",
+        "stage_label": "Local geometry retained",
         "selector_role": "hard_gate",
-        "filter_rule": "Keep rows passing protein preservation checks.",
+        "method": "Keep fold models at or below 2.5 A in every non-distal review region.",
         "input_count": 2,
         "removed_count": 0,
         "remaining_count": 2,
         "is_hard_gate": True,
     },
     {
-        "stage_id": "chemistry_support_gate",
-        "stage_label": "Chemistry and support gate",
-        "selector_role": "hard_gate",
-        "filter_rule": (
-            "Keep rows with zero acidic gains near retained DNA/RNA and zero unobserved proximal substitutions."
-        ),
+        "stage_id": "design_groups",
+        "stage_label": "Distal, peripheral, and combined groups",
+        "selector_role": "experimental_design",
+        "method": "Keep each passing sequence in its ProteinMPNN generation group.",
         "input_count": 2,
         "removed_count": 0,
         "remaining_count": 2,
         "is_hard_gate": False,
     },
     {
-        "stage_id": "global_conservative_diverse_selection",
-        "stage_label": "Conservative-diverse six-row selection",
-        "selector_role": "global_rank",
-        "filter_rule": (
-            "Select primary-panel candidates globally by conservative rank fields and mutation-set "
-            "dissimilarity; design class is context, not a quota."
+        "stage_id": "selected_panel",
+        "stage_label": "Eight selected sequences",
+        "selector_role": "within_group_mutation_set_selection",
+        "method": (
+            "Choose mutation-set-diverse rows within each policy by mutated-position Jaccard distance, then "
+            "exact-substitution Jaccard distance; use chemistry, MSA, structure, and fold metrics as later ties."
         ),
         "input_count": 2,
         "removed_count": 0,
@@ -60,14 +58,14 @@ SELECTION_FUNNEL_STAGES = [
 ]
 
 PANEL_TIE_BREAK_ORDER = [
-    "fewest proximal unsupported substitutions",
-    "fewest acidic gains near retained DNA/RNA or thumb-track",
-    "fewest basic losses near retained DNA/RNA or thumb-track",
-    "fewest Pro/Gly gains near retained DNA/RNA or thumb-track",
-    "largest nearest selected mutation-position Jaccard distance",
-    "largest nearest selected exact-substitution Jaccard distance",
-    "lowest C-terminal primer-RNA recognition-region C-alpha RMSD",
-    "lowest substrate-relevant local C-alpha RMSD",
+    "first pair: largest within-group mutated-position Jaccard distance",
+    "first pair: largest within-group exact-substitution Jaccard distance",
+    "third row: largest minimum mutated-position Jaccard distance from the within-group pair",
+    "third row: largest minimum exact-substitution Jaccard distance from the within-group pair",
+    "fewest basic losses near retained DNA/RNA",
+    "fewest Pro/Gly gains near retained DNA/RNA",
+    "region-wise MSA support",
+    "local RMSD values inside declared gates",
     "fold metrics",
     "sequence hash",
 ]
@@ -76,12 +74,12 @@ PANEL_TIE_BREAK_ORDER = [
 def selection_trace_rows() -> list[dict[str, object]]:
     return [
         {
-            "selection_policy_id": "eco1_rt_primary_conservative_panel_v1",
+            "selection_policy_id": "eco1_rt_selected_panel_v3",
             "stage_order": index,
             "stage_id": stage["stage_id"],
             "stage_label": stage["stage_label"],
             "selector_role": stage["selector_role"],
-            "filter_rule": "Fixture primary-panel funnel stage.",
+            "method": stage["method"],
             "input_count": stage["input_count"],
             "removed_count": stage["removed_count"],
             "remaining_count": stage["remaining_count"],

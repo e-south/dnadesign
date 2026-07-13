@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Materialize Eco1 fold-check review ranking and panel artifacts.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--output-root", type=Path, default=None)
+    parser.add_argument("--source-output-root", type=Path, default=None)
     parser.add_argument(
         "--render-chimerax-overlay",
         action="store_true",
@@ -36,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     result = materialize_foldcheck_review(
         repo_root=args.repo_root,
         output_root=args.output_root,
+        source_output_root=args.source_output_root,
         render_chimerax_overlay=args.render_chimerax_overlay,
     )
     print(result.ranking_path)

@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     NA_FACING_CHEMISTRY_METRICS,
@@ -23,11 +23,14 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.chemistry_balance import (
     build_na_facing_chemistry_balance_matrix,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.premise_alignment import (
-    build_premise_alignment_matrix,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
+    SELECTED_PANEL_SIZE,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.regional_plots import (
     build_regional_mutation_burden_matrix,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
+    CURRENT_SELECTION_PLOTS,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._plot_rows import (
     candidate_sequence_rows,
@@ -36,15 +39,15 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_read
 )
 
 
-def test_selected_primary_panel_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
+def test_selected_hypothesis_panel_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     labels, matrix = mutation_distance_plot.build_selected_sequence_distance_matrix(
         panel_rows=selected_panel_rows(),
         candidate_rows=candidate_sequence_rows(),
     )
 
-    assert labels == [f"candidate_{index}" for index in range(1, len(ALL_SPECS) + 1)]
-    assert len(matrix) == len(ALL_SPECS)
-    assert all(len(row) == len(ALL_SPECS) for row in matrix)
+    assert labels == [f"candidate_{index}" for index in range(1, SELECTED_PANEL_SIZE + 1)]
+    assert len(matrix) == SELECTED_PANEL_SIZE
+    assert all(len(row) == SELECTED_PANEL_SIZE for row in matrix)
     assert all(matrix[index][index] == 0 for index in range(len(matrix)))
     assert matrix == [list(row) for row in zip(*matrix, strict=True)]
 
@@ -55,38 +58,16 @@ def test_selected_mutation_dissimilarity_matrices_are_symmetric_with_zero_diagon
         candidate_rows=candidate_sequence_rows(),
     )
 
-    assert labels == [f"candidate_{index}" for index in range(1, len(ALL_SPECS) + 1)]
-    assert len(position_matrix) == len(ALL_SPECS)
-    assert len(token_matrix) == len(ALL_SPECS)
+    assert labels == [f"candidate_{index}" for index in range(1, SELECTED_PANEL_SIZE + 1)]
+    assert len(position_matrix) == SELECTED_PANEL_SIZE
+    assert len(token_matrix) == SELECTED_PANEL_SIZE
     assert all(position_matrix[index][index] == 0 for index in range(len(position_matrix)))
     assert all(token_matrix[index][index] == 0 for index in range(len(token_matrix)))
     assert position_matrix == [list(row) for row in zip(*position_matrix, strict=True)]
     assert token_matrix == [list(row) for row in zip(*token_matrix, strict=True)]
 
 
-def test_premise_alignment_matrix_shows_review_contract_for_selected_rows() -> None:
-    column_labels, row_labels, matrix = build_premise_alignment_matrix(
-        panel_rows=selected_panel_rows(),
-        triage_rows=selected_triage_rows(),
-    )
-
-    assert column_labels == [
-        "Core/direct edits",
-        "Near retained DNA/RNA edits",
-        "Thumb-track edits",
-        "Distal edits",
-        "Chemistry warnings",
-        "Fold gate",
-        "Local structure",
-    ]
-    assert len(row_labels) == len(ALL_SPECS)
-    assert len(matrix) == len(ALL_SPECS)
-    assert matrix[0][0].text == "0"
-    assert matrix[0][5].text == "strong"
-    assert matrix[0][6].text == "1.25"
-
-
-def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
+def test_regional_mutation_burden_matrix_handles_eight_selected_rows() -> None:
     region_labels, row_labels, matrix = build_regional_mutation_burden_matrix(
         panel_rows=selected_panel_rows(),
         candidate_rows=candidate_sequence_rows(),
@@ -108,11 +89,12 @@ def test_regional_mutation_burden_matrix_handles_six_selected_rows() -> None:
         "Catalytic or direct contact",
         "Near retained DNA/RNA region",
         "Thumb-contact track",
-        "C-terminal primer-RNA recognition region",
+        "Designable C-terminal boundary 230-254",
+        "Fixed C-terminal context 255-311",
         "Distal scaffold",
     ]
-    assert len(row_labels) == len(ALL_SPECS)
-    assert len(matrix) == len(ALL_SPECS)
+    assert len(row_labels) == SELECTED_PANEL_SIZE
+    assert len(matrix) == SELECTED_PANEL_SIZE
     assert all(len(row) == len(region_labels) for row in matrix)
 
 
@@ -121,7 +103,7 @@ def test_regional_mutation_burden_fallback_does_not_treat_conservation_as_contac
         panel_rows=[
             {
                 "candidate_id": "candidate_1",
-                "design_class_id": ALL_SPECS[0].design_class_id,
+                "policy_id": COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
             }
         ],
         candidate_rows=[
@@ -150,7 +132,7 @@ def test_regional_mutation_burden_fallback_does_not_treat_conservation_as_contac
         ],
     )
 
-    assert matrix == [[0, 1, 0, 0, 1]]
+    assert matrix == [[0, 1, 0, 0, 0, 1]]
 
 
 def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
@@ -159,10 +141,10 @@ def test_na_facing_chemistry_balance_matrix_uses_selected_triage_rows() -> None:
         triage_rows=selected_triage_rows(),
     )
 
-    assert len(row_labels) == len(ALL_SPECS)
-    assert charge_delta == [-2, -1, 0, 1, 2, 3]
+    assert len(row_labels) == SELECTED_PANEL_SIZE
+    assert charge_delta == [-2, -1, 0, 1, 2, 3, 4, 5]
     assert metric_labels == [metric.label for metric in NA_FACING_CHEMISTRY_METRICS]
-    assert len(matrix) == len(ALL_SPECS)
+    assert len(matrix) == SELECTED_PANEL_SIZE
     assert matrix[0] == [1, 5, 1, 1]
 
 
@@ -177,3 +159,11 @@ def test_na_facing_chemistry_balance_matrix_fails_on_missing_selected_field() ->
     message = str(error.value)
     assert "candidate_1" in message
     assert "nucleic_acid_facing_basic_loss_count" in message
+
+
+def test_selection_plot_funnel_stage_ids_use_public_trace_ontology() -> None:
+    assert {plot.funnel_stage_id for plot in CURRENT_SELECTION_PLOTS} <= {
+        "",
+        "local_geometry_screen",
+        "selected_panel",
+    }

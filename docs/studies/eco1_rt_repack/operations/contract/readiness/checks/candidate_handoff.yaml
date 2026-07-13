@@ -13,12 +13,6 @@ checks:
       required: true
       artifact: thread_artifact_chain_schema
     - kind: path_exists
-      check_id: eco1_rt.thread.synthesis_feasibility_policy
-      check_group: candidate_handoff
-      summary: Synthesis feasibility policy is present before candidate handoff decisions.
-      required: true
-      artifact: synthesis_feasibility_policy
-    - kind: path_exists
       check_id: eco1_rt.thread.fold_validation_policy
       check_group: candidate_handoff
       summary: Fold-validation policy is present before candidate selection.
@@ -38,7 +32,7 @@ checks:
     - kind: path_exists
       check_id: eco1_rt.thread.materialized_candidate_handoff
       check_group: candidate_handoff
-      summary: Real backend ingest requires RT-only candidate_handoff.yaml after feasibility and selection-panel review.
+      summary: Real backend ingest requires RT-only candidate_handoff.yaml after fold and selection-panel review.
       required: true
       artifact: planned_candidate_handoff
       validator_intent:
@@ -66,8 +60,6 @@ checks:
           - planned_sample_table
           - planned_candidate_table
           - planned_foldcheck_report
-          - feasibility_report
-          - biohub_esmc_sae_feature_window_summary
           - candidate_triage_table
           - candidate_selection_panel
           - candidate_handoff_sequences

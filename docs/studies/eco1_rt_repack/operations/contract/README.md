@@ -28,8 +28,7 @@ selection-readiness checks also have executable providers under
 | `mask_contract` | Holds residue-map, conservation, contact, and mask-set contract expectations. |
 | `sampling_plan` | Requires explicit backend, seed, temperature, fixed-position, and no-fallback policy. |
 | `foldcheck_runtime` | Requires fold-validation semantics and nonfixture coverage for real handoffs. |
-| `assembly_feasibility` | Requires full-gene/window feasibility evidence before synthesis-oriented handoff. |
-| `candidate_handoff` | Requires selected candidates, upstream hash closure, fold QA, and feasibility. |
+| `candidate_handoff` | Requires selected candidates, upstream hash closure, fold QA, and an RT-only sequence export. |
 | `downstream_rt_lnrna_handoff` | Routes RT-only candidates to the downstream study without claiming construct ownership. |
 
 Current readiness files intentionally use supported study preflight kinds. Some

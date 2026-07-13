@@ -50,34 +50,7 @@ def assert_mask_and_msa_content(manifest_path: Path, deliverables: dict[str, dic
     assert "Baseline fixed residues (clade 9 p25 + 5 A)" in subtype_text
     assert "linear_mask_tracks" not in deliverables
 
-    design_class_mask_text = _read_deliverable(manifest_path, deliverables, "design_class_mask_overview")
-    assert "Fixed residues combine motif, conservation, and substrate rules" in design_class_mask_text
-    assert "WT amino acid" not in design_class_mask_text
-    assert "Residue position" in design_class_mask_text
-    assert "EC86 canonical residue position" not in design_class_mask_text
-    assert "EC86 per-residue ruler" not in design_class_mask_text
-    assert "Mask evidence and design-class policy" not in design_class_mask_text
-    assert "Clade 9 25% + 5 A | 4 fixed" in design_class_mask_text
-    assert "Clade 9 25% + 6 A" in design_class_mask_text
-    assert "Clade 9 25% + 8 A" in design_class_mask_text
-    assert "Clade 9 25% + 10 A" in design_class_mask_text
-    assert "Clade 9 50% + 5 A" in design_class_mask_text
-    assert "II-A3/42_1 50% + 5 A" in design_class_mask_text
-    assert "Clade 9: &gt;=25% WT plurality" in design_class_mask_text
-    assert "Clade 9: &gt;=50% WT plurality" in design_class_mask_text
-    assert "II-A3/42_1: &gt;=50% WT plurality" in design_class_mask_text
-    assert "Wang/EC86 substrate-contact priors" in design_class_mask_text
-    assert "Wang/Ec86" not in design_class_mask_text
-    assert "DNA/RNA within 10 A" in design_class_mask_text
-    assert "Conservation threshold" not in design_class_mask_text
-    assert "DNA/RNA contact threshold" not in design_class_mask_text
-    assert "Fixed by design-class policy" not in design_class_mask_text
-    assert "Designable by design-class policy" not in design_class_mask_text
-    assert "editable" not in design_class_mask_text
-    assert "#009e73" not in design_class_mask_text.lower()
-    assert "Fixed-residue union" not in design_class_mask_text
-    assert "Protected union" not in design_class_mask_text
-    assert "current baseline only" not in design_class_mask_text.lower()
+    assert "design_class_mask_overview" not in deliverables
 
     _assert_premise_titles(deliverables)
 
@@ -120,9 +93,9 @@ def assert_linked_fold_and_esmc_content(manifest_path: Path, deliverables: dict[
 
 def assert_selection_content(deliverables: dict[str, dict[str, object]]) -> None:
     funnel = deliverables["selection_funnel_summary"]
-    assert funnel["path"].endswith("design_classes/selection/selection_readiness_manifest.yaml")
-    assert "preservation" in str(funnel["description"])
-    assert "chemistry/support" in str(funnel["description"])
+    assert funnel["path"].endswith("generation_policies_v3/selection/selection_readiness_manifest.yaml")
+    assert "local-geometry screen" in str(funnel["description"])
+    assert "distal, peripheral, and combined groups" in str(funnel["description"])
     assert "ESMC and SAE are review annotations, not panel-selection evidence" in str(funnel["interpretation_limit"])
     assert "backend" not in str(funnel).lower()
     assert "generated" not in str(funnel).lower()

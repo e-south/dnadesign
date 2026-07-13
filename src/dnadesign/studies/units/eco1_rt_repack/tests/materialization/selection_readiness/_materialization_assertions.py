@@ -11,22 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
-)
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
-    LOCAL_STRUCTURE_REGION_IDS,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
     SELECTION_PLOT_METADATA,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._svg_assertions import (
-    assert_heatmap_cells_are_square,
-    assert_svg_has_square_panel,
+    assert_svg_aspect_ratio_at_least,
+    assert_svg_aspect_ratio_at_most,
 )
 
 
@@ -34,7 +27,6 @@ def assert_selection_plot_contract(
     *,
     result: Any,
     manifest: dict[str, Any],
-    retired_plot: Path,
 ) -> None:
     assert [plot["plot_id"] for plot in manifest["plots"]] == list(CURRENT_SELECTION_PLOT_IDS)
     plot_text_by_id: dict[str, str] = {}
@@ -54,49 +46,42 @@ def assert_selection_plot_contract(
         expected_metadata = SELECTION_PLOT_METADATA[str(plot["plot_id"])]
         assert plot["selection_role"] == expected_metadata["selection_role"]
         assert plot["notebook_group"] == expected_metadata["notebook_group"]
+        assert "design_classes/selection" not in " ".join(str(source) for source in plot["data_sources"])
         if expected_metadata["not_a_selector_reason"]:
             assert plot["not_a_selector_reason"] == expected_metadata["not_a_selector_reason"]
 
-    premise_text = plot_text_by_id["selection_premise_alignment"]
-    assert "Core/direct edits" in premise_text
-    assert "Near retained DNA/RNA edits" in premise_text
-    assert "Local structure" in premise_text
-    assert "ESMC/SAE" not in premise_text
-    assert_heatmap_cells_are_square(premise_text, row_count=len(ALL_SPECS), column_count=7)
-
-    gate_count_text = plot_text_by_id["selection_design_class_gate_counts"]
-    assert "Passes protein gate" in gate_count_text
-    assert "Blocked by gate" in gate_count_text
-    assert "Missing gate input" in gate_count_text
-    assert "Fold-review reserve" not in gate_count_text
-    assert "Manual reserve" not in gate_count_text
-    assert "Excluded" not in gate_count_text
-    assert_svg_has_square_panel(gate_count_text)
-
-    primary_sankey_text = plot_text_by_id["selection_primary_panel_sankey"]
-    assert "Preservation" in primary_sankey_text
-    assert "Chemistry and" in primary_sankey_text
-    assert "Selected primary" in primary_sankey_text
-    assert "design-class quota" in primary_sankey_text
-    assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_regional_mutation_burden"],
-        row_count=len(ALL_SPECS),
-        column_count=5,
-    )
-    assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_local_structure_by_region"],
-        row_count=len(ALL_SPECS),
-        column_count=len(LOCAL_STRUCTURE_REGION_IDS),
-    )
+    hypothesis_flow_text = plot_text_by_id["selection_hypothesis_panel_flow"]
+    assert "Sequence generation and structural review produce the selected panel" in hypothesis_flow_text
+    assert "ColabFold" in hypothesis_flow_text
+    assert "local Cα RMSD ≤2.5 Å" in hypothesis_flow_text
+    assert "Generation" in hypothesis_flow_text
+    assert "policy" in hypothesis_flow_text
+    assert "WT R13" not in hypothesis_flow_text
+    assert "First order" not in hypothesis_flow_text
+    assert "Distal scaffold" in hypothesis_flow_text
+    assert "Peripheral shell" in hypothesis_flow_text
+    assert "Combined" in hypothesis_flow_text
+    assert "panel" in hypothesis_flow_text
+    assert "ProteinMPNN" in hypothesis_flow_text
+    assert "ColabFold" in hypothesis_flow_text
+    assert "not selected" in hypothesis_flow_text
+    for plot_id in ("selection_local_structure_by_region", "selection_regionwise_msa_support"):
+        assert_svg_aspect_ratio_at_most(plot_text_by_id[plot_id], maximum=1.05)
+    assert_svg_aspect_ratio_at_most(plot_text_by_id["selection_regional_mutation_burden"], maximum=1.15)
+    selected_substitutions_text = plot_text_by_id["selection_selected_substitutions_across_rt"]
+    assert_svg_aspect_ratio_at_least(selected_substitutions_text, minimum=2.2)
+    assert selected_substitutions_text.count("Eco1 RT residue position") == 1
+    mutation_distance_text = plot_text_by_id["selection_mutation_set_dissimilarity"]
+    assert "All same-group candidate pairs" in mutation_distance_text
+    assert "Selected same-group pairs" in mutation_distance_text
+    assert "d_J" in mutation_distance_text
     assert "selection_local_structure_stratification" in plot_text_by_id
     local_structure_stratification_text = plot_text_by_id["selection_local_structure_stratification"]
-    assert "Threshold" in local_structure_stratification_text
+    assert "review cutoff" in local_structure_stratification_text
     assert "Selected rows" in local_structure_stratification_text
     assert "selection_local_structure_threshold_sensitivity" in plot_text_by_id
     assert "selection_regionwise_msa_support" in plot_text_by_id
-    assert_heatmap_cells_are_square(
-        plot_text_by_id["selection_regionwise_msa_support"],
-        row_count=len(ALL_SPECS),
-        column_count=5,
-    )
-    assert not retired_plot.exists()
+    assert "selection_near_region_charge_sensitivity" not in plot_text_by_id
+    assert "selection_design_class_contrast" not in plot_text_by_id
+    assert "selection_design_class_gate_counts" not in plot_text_by_id
+    assert "selection_premise_alignment" not in plot_text_by_id

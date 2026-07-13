@@ -16,9 +16,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+    DISTAL_SCAFFOLD_POLICY_ID,
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
 )
+
+_GENERATION_POLICY_LABELS = {
+    DISTAL_SCAFFOLD_POLICY_ID: "distal scaffold",
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID: "near DNA/RNA",
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID: "near DNA/RNA plus distal",
+}
 
 
 def plot_row(
@@ -31,6 +39,7 @@ def plot_row(
     description: str,
     interpretation_limit: str,
     render_mode: str,
+    role: str = "manuscript_facing",
 ) -> dict[str, Any]:
     return {
         "plot_id": plot_id,
@@ -39,15 +48,14 @@ def plot_row(
         "status": "rendered",
         "path": str(path),
         "data_sources": [
-            "design_classes/selection/feasibility_report.parquet",
-            "design_classes/selection/candidate_triage_table.parquet",
-            "design_classes/selection/candidate_selection_panel.parquet",
+            "selection/candidate_triage_table.parquet",
+            "selection/candidate_selection_panel.parquet",
         ],
         "input_hashes": {key: value for key, value in input_hashes.items() if value is not None},
         "alt_text": alt_text,
         "description": description,
         "interpretation_limit": interpretation_limit,
-        "role": "manuscript_facing",
+        "role": role,
         "render_mode": render_mode,
     }
 
@@ -63,9 +71,9 @@ def ordered_panel_rows(panel_rows: list[dict[str, object]]) -> list[dict[str, ob
     return sorted(
         panel_rows,
         key=lambda row: (
-            int(row.get("slot_rank") or 9999),
+            int(row.get("selection_rank") or 9999),
             str(row.get("selection_slot") or ""),
-            str(row["design_class_id"]),
+            str(row["policy_id"]),
             str(row["candidate_id"]),
         ),
     )
@@ -123,14 +131,11 @@ def position_tick_indices(position_count: int) -> list[int]:
     return ticks
 
 
-def class_label(class_id: str) -> str:
-    for spec in ALL_SPECS:
-        if spec.design_class_id == class_id:
-            denominator = "clade 9" if spec.conservation_profile_id.endswith("clade9_conservation_v1") else "subtype"
-            threshold = int(round(spec.conservation_threshold * 100))
-            contact = int(round(spec.contact_threshold_angstrom))
-            return f"{denominator} p{threshold}, {contact} A"
-    raise ValueError(f"Unknown Eco1 design class id for plot label: {class_id}")
+def policy_label(policy_id: str) -> str:
+    try:
+        return _GENERATION_POLICY_LABELS[policy_id]
+    except KeyError as exc:
+        raise ValueError(f"Unknown Eco1 generation policy id for plot label: {policy_id}") from exc
 
 
 def legend_sizes(values: list[int]) -> list[int]:
@@ -151,13 +156,13 @@ def matrix_text_color(value: float, *, max_value: float) -> str:
 
 __all__ = [
     "canonical_mutations",
-    "class_label",
     "legend_sizes",
     "matrix_text_color",
     "mutation_category",
     "ordered_panel_rows",
     "parse_mutation",
     "plot_row",
+    "policy_label",
     "position_tick_indices",
     "short_candidate",
     "tie_break_trace",

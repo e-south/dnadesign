@@ -18,15 +18,16 @@ import matplotlib
 import numpy as np
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
+    LOCAL_STRUCTURE_GATE_REGION_IDS,
     LOCAL_STRUCTURE_REGION_IDS,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
     LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
-    class_label,
     matrix_text_color,
     ordered_panel_rows,
     plot_row,
+    policy_label,
     short_candidate,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
@@ -67,7 +68,7 @@ def build_selected_local_structure_matrix(
     status_matrix: list[list[str]] = []
     for panel_row in ordered_panel_rows(panel_rows):
         candidate_id = str(panel_row["candidate_id"])
-        row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
         values: list[float | None] = []
         statuses: list[str] = []
         for region_id in LOCAL_STRUCTURE_REGION_IDS:
@@ -88,6 +89,8 @@ def build_selected_local_structure_matrix(
 
 def _region_label_with_threshold(*, region_id: str, label: str) -> str:
     threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+    if threshold is None:
+        return f"{label}\nreview only"
     return f"{label}\n<= {threshold:.2f} A"
 
 
@@ -113,10 +116,10 @@ def write_local_structure_by_region_plot(
     max_value = max(numeric_values, default=1.0)
     plot_values = np.asarray([[np.nan if value is None else value for value in row] for row in matrix], dtype=float)
     masked_values = np.ma.masked_invalid(plot_values)
-    fig, ax = plt.subplots(figsize=(9.4, 7.2))
+    fig, ax = plt.subplots(figsize=(9.0, 12.5))
     cmap = plt.get_cmap("YlGnBu").copy()
     cmap.set_bad("#d0d7de")
-    image = ax.imshow(masked_values, aspect="equal", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=max_value)
+    ax.imshow(masked_values, aspect="auto", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=max_value)
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(region_labels))))
@@ -134,16 +137,14 @@ def write_local_structure_by_region_plot(
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.02)
-    cbar.set_label("Local C-alpha RMSD (A)", fontsize=11)
-    cbar.ax.tick_params(labelsize=10)
-    fig.subplots_adjust(left=0.3, right=0.94, top=0.88, bottom=0.28)
+    fig.subplots_adjust(left=0.3, right=0.96, top=0.90, bottom=0.29)
     path = plot_root / "selection_local_structure_by_region.svg"
     unavailable_statuses = sorted({status for row in status_matrix for status in row if status != "available"})
     alt = (
         "Heatmap of selected Eco1 RT candidates by local C-alpha RMSD in motif, thumb-track, C-terminal "
         "primer-RNA recognition, near retained DNA/RNA, and distal regions after one global mapped C-alpha fit. "
-        "Column labels include the local RMSD threshold. Unavailable cells are labeled NA."
+        "Non-distal columns show the single 2.5 A cutoff; the distal column is review only. Unavailable cells are "
+        "labeled NA."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -154,8 +155,8 @@ def write_local_structure_by_region_plot(
         alt_text=alt,
         description=(
             "Shows local backbone shifts by RT review region after a single global mapped C-alpha alignment. "
-            "Every selected row must have all declared local-structure metrics and stay within the local RMSD "
-            "threshold shown for each region. "
+            "Every selected row must have all declared local-structure metrics and stay at or below 2.5 A in "
+            "every non-distal region. Distal RMSD is reported but does not gate selection. "
             f"Unavailable statuses: {', '.join(unavailable_statuses) if unavailable_statuses else 'none'}."
         ),
         interpretation_limit=(
@@ -208,10 +209,14 @@ def write_local_structure_stratification_plot(
     region_labels = [
         labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_REGION_IDS
     ]
-    fig, ax = plt.subplots(figsize=(12.4, 7.8))
+    fig, ax = plt.subplots(figsize=(9.2, 9.8))
     y_positions = np.arange(len(LOCAL_STRUCTURE_REGION_IDS), dtype=float)
     max_x = max(
-        [LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id] for region_id in LOCAL_STRUCTURE_REGION_IDS]
+        [
+            threshold
+            for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS
+            if (threshold := LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]) is not None
+        ]
         + [
             value
             for region_values in values_by_region.values()
@@ -248,20 +253,23 @@ def write_local_structure_stratification_plot(
                 label="Selected rows" if y_index == 0 else None,
                 zorder=5,
             )
-        ax.plot(
-            [threshold, threshold],
-            [y_positions[y_index] - 0.35, y_positions[y_index] + 0.35],
-            color="#d55e00",
-            linewidth=2.2,
-            solid_capstyle="butt",
-            label="Threshold" if y_index == 0 else None,
-            zorder=4,
-        )
-        failed = sum(value > threshold for value, *_rest in region_values)
+        if threshold is not None:
+            ax.plot(
+                [threshold, threshold],
+                [y_positions[y_index] - 0.35, y_positions[y_index] + 0.35],
+                color="#d55e00",
+                linewidth=2.2,
+                solid_capstyle="butt",
+                label="2.5 A review cutoff" if y_index == 0 else None,
+                zorder=4,
+            )
+            annotation = f">{threshold:.2f} A: {sum(value > threshold for value, *_rest in region_values)} fail"
+        else:
+            annotation = "review only"
         ax.text(
             threshold_label_x,
             y_positions[y_index],
-            f">{threshold:.2f} A: {failed} fail",
+            annotation,
             ha="left",
             va="center",
             fontsize=9.2,
@@ -288,11 +296,12 @@ def write_local_structure_stratification_plot(
     ax.grid(axis="y", visible=False)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    fig.subplots_adjust(left=0.29, right=0.94, top=0.88, bottom=0.2)
+    fig.subplots_adjust(left=0.40, right=0.90, top=0.90, bottom=0.18)
     path = plot_root / "selection_local_structure_stratification.svg"
     alt = (
         "Population stratification plot for local C-alpha RMSD by RT review region. Gray points are nonselected "
-        "candidates, blue points are selected panel rows, and orange markers show declared per-region thresholds."
+        "candidates, blue points are selected panel rows, and orange markers show the single declared 2.5 A "
+        "cutoff for non-distal regions. Distal RMSD is review only."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -302,8 +311,9 @@ def write_local_structure_stratification_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Shows each local-structure threshold relative to the candidate population. Rows exceeding a "
-            f"region threshold fail the local-structure gate under {LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID}."
+            "Shows the single local-geometry cutoff relative to the candidate population. Rows exceeding 2.5 A "
+            f"in any non-distal region fail under {LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID}; distal RMSD is shown "
+            "for review only."
         ),
         interpretation_limit=(
             "These thresholds are structural preservation gates for review readiness. They do not measure RT activity, "
@@ -331,12 +341,12 @@ def write_local_structure_threshold_sensitivity_plot(
         str(row["region_id"]): str(row.get("region_label") or row["region_id"]) for row in threshold_sensitivity_rows
     }
     region_labels = [
-        labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_REGION_IDS
+        labels_by_region.get(region_id, region_id.replace("_", " ")) for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS
     ]
     scenario_labels = [scenario.label for scenario in LOCAL_STRUCTURE_THRESHOLD_SCENARIOS]
     matrix: list[list[int]] = []
     selected_failures: list[list[int]] = []
-    for region_id in LOCAL_STRUCTURE_REGION_IDS:
+    for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS:
         row_values: list[int] = []
         selected_values: list[int] = []
         for scenario in LOCAL_STRUCTURE_THRESHOLD_SCENARIOS:
@@ -405,6 +415,7 @@ def write_local_structure_threshold_sensitivity_plot(
             "assay readiness."
         ),
         render_mode="wide_visual",
+        role="review_only",
     )
 
 

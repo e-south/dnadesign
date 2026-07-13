@@ -24,7 +24,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     CURRENT_SELECTION_PLOT_IDS,
-    RETIRED_SELECTION_PLOT_IDS,
     SELECTION_PLOT_METADATA,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
@@ -45,19 +44,33 @@ def test_review_notebook_routes_only_visual_artifacts_to_figure_selectors(tmp_pa
     assert "mask_structure_browser_manifest" in visual_ids
     assert "interactive_structure_browser_manifest" in visual_ids
     assert "selected_panel_structure_browser_manifest" in visual_ids
-    assert "design_class_mask_overview" in visual_ids
-    assert "expanded_proteinmpnn_fold_validation" in visual_ids
-    assert "foldcheck_review_review_class_counts" in visual_ids
-    assert "proteinmpnn_residue_frequency_heatmap" in visual_ids
-    assert set(CURRENT_SELECTION_PLOT_IDS).issubset(visual_ids)
-    assert set(RETIRED_SELECTION_PLOT_IDS).isdisjoint(visual_ids)
+    assert "design_class_mask_overview" not in visual_ids
+    assert "expanded_proteinmpnn_fold_validation" not in visual_ids
+    assert "foldcheck_review_review_class_counts" not in visual_ids
+    assert "proteinmpnn_policy_proposal_spread" in visual_ids
+    assert "proteinmpnn_policy_residue_frequency" in visual_ids
+    assert {
+        "communication_design_space_map",
+        "communication_structural_screen",
+        "communication_selected_panel",
+    }.issubset(visual_ids)
+    assert "communication_structure_story_browser" not in visual_ids
+    main_selection_ids = {
+        plot_id for plot_id in CURRENT_SELECTION_PLOT_IDS if SELECTION_PLOT_METADATA[plot_id]["role"] != "review_only"
+    }
+    supplemental_selection_ids = {
+        plot_id for plot_id in CURRENT_SELECTION_PLOT_IDS if SELECTION_PLOT_METADATA[plot_id]["role"] == "review_only"
+    }
+    assert main_selection_ids.issubset(visual_ids)
+    assert supplemental_selection_ids.isdisjoint(visual_ids)
+    assert supplemental_selection_ids.issubset(audit_visual_ids)
 
     assert "selection_funnel_summary" not in visual_ids
     assert "selection_panel_table" not in visual_ids
     assert "selection_handoff_sequences" not in visual_ids
     assert "selection_handoff_readiness" not in visual_ids
     assert "selection_handoff_boundary" not in visual_ids
-    assert "feasibility_and_handoff_planned" not in visual_ids
+    assert "panel_selection_planned" not in visual_ids
     assert "linear_mask_tracks" not in visual_ids
     assert "mask_structure_context_png" not in visual_ids
     assert "foldcheck_review_structure_overlay_panel" not in visual_ids
@@ -73,19 +86,25 @@ def test_review_notebook_routes_only_visual_artifacts_to_figure_selectors(tmp_pa
     assert "biohub_esmc_sae_fold_llr_comparison" not in visual_ids
 
     assert "wt_esmc_entropy_by_position" in audit_visual_ids
-    assert "proteinmpnn_score_mutation_burden" in audit_visual_ids
+    assert "proteinmpnn_score_mutation_burden" not in audit_visual_ids
     assert "biohub_esmc_candidate_preference_vs_wt" in audit_visual_ids
     assert "biohub_esmc_sae_feature_activation_heatmap" in audit_visual_ids
     assert "biohub_esmc_sae_delta_umap" not in audit_visual_ids
-    assert "biohub_esmc_sae_structure_browser_manifest" in audit_visual_ids
+    assert "biohub_esmc_sae_structure_browser_manifest" not in audit_visual_ids
+    assert "design_class_mask_overview" not in audit_visual_ids
+    assert "expanded_proteinmpnn_fold_validation" not in audit_visual_ids
+    assert "foldcheck_review_review_class_counts" not in audit_visual_ids
+    assert "proteinmpnn_residue_frequency_heatmap" not in audit_visual_ids
+    assert "proteinmpnn_policy_residue_frequency" not in audit_visual_ids
 
     deliverables = {entry["deliverable_id"]: entry for entry in manifest["deliverables"]}
     for plot_id, expected_metadata in SELECTION_PLOT_METADATA.items():
         row = deliverables[plot_id]
         assert row["selection_role"] == expected_metadata["selection_role"]
         assert row["notebook_group"] == expected_metadata["notebook_group"]
-    assert deliverables["selection_design_class_contrast"]["notebook_group_label"] == "Funnel"
-    assert deliverables["selection_design_class_gate_counts"]["not_a_selector_reason"]
+    assert "selection_design_class_contrast" not in deliverables
+    assert "selection_design_class_gate_counts" not in deliverables
+    assert "selection_premise_alignment" not in deliverables
 
 
 def test_review_notebook_routes_evidence_exports_outside_figure_selector(tmp_path: Path) -> None:

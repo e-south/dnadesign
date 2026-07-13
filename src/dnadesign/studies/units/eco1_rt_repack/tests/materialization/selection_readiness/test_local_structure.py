@@ -15,7 +15,11 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.local_structure import (
+    LOCAL_STRUCTURE_GATE_REGION_IDS,
     LOCAL_STRUCTURE_REGION_IDS,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
     LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
@@ -23,12 +27,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 
 
-def test_wang_thumb_contact_track_uses_stricter_local_rmsd_gate() -> None:
-    thumb_threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["thumb_contact_track_context"]
-    near_region_threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["near_retained_dna_rna_annulus"]
-
-    assert thumb_threshold == 2.5
-    assert thumb_threshold < near_region_threshold
+def test_local_structure_gate_uses_one_declared_cutoff_and_keeps_distal_rmsd_for_review() -> None:
+    assert {LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id] for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS} == {
+        2.5
+    }
+    assert LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["distal_scaffold_control"] is None
 
 
 def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) -> None:
@@ -47,7 +50,7 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
         fold_review_rows=[
             {
                 "candidate_id": "candidate_a",
-                "design_class_id": "class_a",
+                "policy_id": COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
                 "model_artifact_path": "candidate_a.pdb",
             }
         ],
@@ -67,7 +70,13 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
     assert all(str(row["region_position_source"]) for row in rows)
     assert all(str(row["region_source_basis_ids_json"]) for row in rows)
     assert all(row["local_ca_rmsd_threshold_policy_id"] == LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID for row in rows)
-    assert all(row["local_ca_rmsd_threshold_status"] == "passed" for row in rows)
+    assert all(
+        row["local_ca_rmsd_threshold_status"] == "passed"
+        for row in rows
+        if row["region_id"] in LOCAL_STRUCTURE_GATE_REGION_IDS
+    )
+    distal = next(row for row in rows if row["region_id"] == "distal_scaffold_control")
+    assert distal["local_ca_rmsd_threshold_status"] == "review_only"
     catalytic = next(row for row in rows if row["region_id"] == "catalytic_initiation_context")
     c_terminal = next(row for row in rows if row["region_id"] == "c_terminal_primer_rna_recognition_context")
     assert catalytic["region_position_spec"] == "189-204"
@@ -78,7 +87,7 @@ def test_local_structure_region_rows_use_one_global_alignment(tmp_path: Path) ->
         == LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM["catalytic_initiation_context"]
     )
     assert c_terminal["region_position_spec"] == "255-311"
-    assert "primer-RNA recognition" in str(c_terminal["region_position_source"])
+    assert "primer-template recognition" in str(c_terminal["region_position_source"])
     assert "inouye_et_al_2004_ec86_thumb_primer_rna_binding" in str(c_terminal["region_source_basis_ids_json"])
 
 
@@ -98,7 +107,7 @@ def test_local_structure_region_rows_do_not_refit_each_region(tmp_path: Path) ->
         fold_review_rows=[
             {
                 "candidate_id": "candidate_local_shift",
-                "design_class_id": "class_a",
+                "policy_id": COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
                 "model_artifact_path": "candidate_local_shift.pdb",
             }
         ],
@@ -126,7 +135,7 @@ def test_local_structure_region_rows_report_missing_models(tmp_path: Path) -> No
         fold_review_rows=[
             {
                 "candidate_id": "candidate_missing",
-                "design_class_id": "class_a",
+                "policy_id": COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
                 "model_artifact_path": "candidate_missing.pdb",
             }
         ],
@@ -154,7 +163,7 @@ def test_local_structure_region_rows_report_insufficient_overlap(tmp_path: Path)
         fold_review_rows=[
             {
                 "candidate_id": "candidate_short",
-                "design_class_id": "class_a",
+                "policy_id": COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
                 "model_artifact_path": "candidate_short.pdb",
             }
         ],

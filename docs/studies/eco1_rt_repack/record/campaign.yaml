@@ -2,133 +2,55 @@ version: 1
 path_base: repo
 campaign_id: eco1_rt_repack
 steps:
-  - label: refine-dev-spec
-    kind: documentation
-    path: docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md
   - label: select-structure-authority
     kind: study-record
+    status: selected
     path: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
-  - label: select-residue-numbering-policy
-    kind: study-record
-    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
-  - label: audit-residue-numbering
-    kind: study-record
-    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-audit.md
-  - label: define-conservative-mask
-    kind: study-record
-    path: docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md
-  - label: materialize-backbone-bundle
-    kind: generated-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
-  - label: materialize-residue-map
+  - label: materialize-structure-and-residue-map
     kind: generated-runtime
     status: materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
-  - label: materialize-structure-preprocessing
-    kind: generated-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
-  - label: materialize-evidence-profiles
+  - label: materialize-conservation-evidence
     kind: generated-runtime
     status: materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
-  - label: materialize-contact-profile
-    kind: generated-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
   - label: materialize-contact-geometry
     kind: generated-runtime
     status: materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
-  - label: discover-conservation-sources
-    kind: study-record
-    status: source_discovery
-    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
-  - label: select-conservation-source-authority
-    kind: study-record
-    status: selected
-    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml
-  - label: document-msa-method
-    kind: study-context
-    status: documented
-    path: docs/studies/eco1_rt_repack/contexts/msa-method.md
-  - label: materialize-conservation-source-sequences
+  - label: materialize-generation-policies
     kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
-  - label: materialize-conservation-alignments
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_manifest.yaml
+  - label: generate-proteinmpnn-candidates
     kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/
-  - label: materialize-conservation-visualizations
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/candidate_pool.parquet
+  - label: materialize-foldcheck-request
     kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
-  - label: materialize-manual-mask-authority
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml
+  - label: fold-candidates
+    kind: external-runtime
+    status: materialized
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_report.parquet
+  - label: materialize-fold-review
     kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
-  - label: materialize-thread-artifact-chain
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
-  - label: materialize-contact-risk-profile
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_candidate_ranking.parquet
+  - label: materialize-candidate-triage
     kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
-  - label: build-sampling-plan
-    kind: planned-runtime
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_triage_table.parquet
+  - label: select-protein-hypothesis-panel
+    kind: generated-runtime
     status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
-  - label: build-proteinmpnn-request
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
-  - label: ingest-thread-samples
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
-  - label: build-candidate-table
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
-  - label: build-foldcheck-request
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
-  - label: foldcheck-selected-candidates
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
-  - label: review-foldcheck-candidates
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
-  - label: materialize-biohub-esmc-sae-profile
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_sae_profile.parquet
-  - label: summarize-biohub-esmc-sae-feature-windows
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
-  - label: assess-assembly-feasibility
-    kind: planned-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/feasibility_report.parquet
-  - label: build-candidate-triage-table
-    kind: materialized-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_triage_table.parquet
-  - label: build-candidate-selection-panel
-    kind: materialized-runtime
-    status: materialized
-    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_selection_panel.parquet
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_selection_panel.parquet
   - label: render-review-deliverables
-    kind: materialized-runtime
-    status: materialized_foundation
+    kind: generated-runtime
+    status: materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
-  - label: tracer-bullet-thread
+  - label: emit-rt-only-candidate-handoff
     kind: planned-runtime
+    status: not_materialized
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml

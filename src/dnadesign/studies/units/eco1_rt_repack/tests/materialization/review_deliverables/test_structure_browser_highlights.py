@@ -55,7 +55,7 @@ def test_candidate_structure_browser_can_overlay_reference_mask_highlights(tmp_p
     highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
 
     assert "No residue highlight" in highlight_lookup
-    selected_highlight = highlight_lookup["Fixed mask: Clade 9 p25 + 5 A | 4 residues"]
+    selected_highlight = highlight_lookup["Protected residues | 4 residues"]
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
         selected_row=selected,
@@ -69,7 +69,7 @@ def test_candidate_structure_browser_can_overlay_reference_mask_highlights(tmp_p
 
     assert "<residue-highlight-dropdown>" in rendered_text
     assert "Selected residue highlight" in rendered_text
-    assert "Fixed mask: Clade 9 p25 + 5 A" in rendered_text
+    assert "Protected residues" in rendered_text
     assert "Selected SAE feature" not in rendered_text
     assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
         unescaped_rendered

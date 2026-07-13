@@ -11,11 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     region_msa_support_plot,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
+    SELECTED_PANEL_SIZE,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._plot_rows import (
     selected_panel_rows,
@@ -55,7 +55,7 @@ def test_regionwise_msa_support_matrix_keeps_thumb_track_separate_when_zero() ->
         "C-terminal primer-RNA recognition region",
         "Distal scaffold",
     ]
-    assert len(row_labels) == len(ALL_SPECS)
+    assert len(row_labels) == SELECTED_PANEL_SIZE
     assert all(len(row) == 5 for row in matrix)
     assert all(row[2] is None for row in matrix)
     assert all(row[2] == 0 for row in unobserved)

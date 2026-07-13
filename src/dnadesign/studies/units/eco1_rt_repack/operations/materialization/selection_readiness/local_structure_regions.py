@@ -22,20 +22,28 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     WANG_THUMB_CONTACT_TRACK_POSITIONS,
 )
 
-LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_structure_rmsd_gate_v1"
+LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID = "eco1_rt_local_geometry_review_cutoff_v2"
 LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE = (
-    "Declared local C-alpha RMSD limits are enforced as selection-readiness preservation gates, not activity "
-    "evidence. The Wang thumb-contact track and C-terminal primer-RNA recognition region use stricter limits than "
-    "the generic near retained DNA/RNA region because those positions are tracked as thumb/RNA recognition context."
+    "One declared 2.5 A local C-alpha RMSD cutoff is applied to every non-distal review region after one global "
+    "mapped C-alpha fit. Distal RMSD is reported but does not gate selection. The cutoff is a review choice, not "
+    "a literature-calibrated functional boundary or activity measurement."
 )
-LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM = {
-    "catalytic_initiation_context": 1.50,
-    "retron_x_naxxh_context": 1.25,
-    "retron_y_vtg_context": 1.60,
+LOCAL_STRUCTURE_GATE_REGION_IDS = (
+    "catalytic_initiation_context",
+    "retron_x_naxxh_context",
+    "retron_y_vtg_context",
+    "thumb_contact_track_context",
+    "c_terminal_primer_rna_recognition_context",
+    "near_retained_dna_rna_annulus",
+)
+LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM: dict[str, float | None] = {
+    "catalytic_initiation_context": 2.50,
+    "retron_x_naxxh_context": 2.50,
+    "retron_y_vtg_context": 2.50,
     "thumb_contact_track_context": 2.50,
     "c_terminal_primer_rna_recognition_context": 2.50,
-    "near_retained_dna_rna_annulus": 3.00,
-    "distal_scaffold_control": 4.75,
+    "near_retained_dna_rna_annulus": 2.50,
+    "distal_scaffold_control": None,
 }
 
 
@@ -100,8 +108,9 @@ _STATIC_REGION_SPECS = (
         role="c_terminal_primer_rna_recognition_review",
         positions=tuple(sorted(C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS)),
         position_source=(
-            "explicit mapped Eco1 residues 255-311 from the RT-Ec86 C-terminal primer-RNA recognition "
-            "context; canonical residues 312-320 are missing backbone in the current 7V9U-backed scope"
+            "explicit mapped Eco1 residues 255-311 from the RT-Ec86 C-terminal primer-template recognition and "
+            "primer-RNA recognition context; canonical residues 312-320 lack backbone in the current 7V9U-backed "
+            "scope"
         ),
         source_basis_ids=(
             "inouye_et_al_1999_ec86_primer_template_recognition",
@@ -230,6 +239,7 @@ def _format_range(start: int, end: int) -> str:
 
 
 __all__ = [
+    "LOCAL_STRUCTURE_GATE_REGION_IDS",
     "LOCAL_STRUCTURE_REGION_IDS",
     "LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID",
     "LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE",

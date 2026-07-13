@@ -23,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.re
     save_accessible_svg,
 )
 
-from .plot_support import class_label, matrix_text_color, ordered_panel_rows, plot_row, short_candidate
+from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_candidate
 from .review_axis_contracts import (
     NA_FACING_CHARGE_FIELD,
     NA_FACING_CHEMISTRY_METRICS,
@@ -53,7 +53,7 @@ def build_na_facing_chemistry_balance_matrix(
         if triage_row is None:
             raise ValueError(f"Selection panel references missing triage row: {candidate_id}")
         _require_na_facing_chemistry_fields(candidate_id=candidate_id, triage_row=triage_row)
-        row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
         charge_delta.append(int(triage_row[NA_FACING_CHARGE_FIELD]))
         matrix.append([int(triage_row[metric.field]) for metric in NA_FACING_CHEMISTRY_METRICS])
     return row_labels, charge_delta, [metric.label for metric in NA_FACING_CHEMISTRY_METRICS], matrix
@@ -73,15 +73,17 @@ def write_na_facing_chemistry_balance_plot(
     )
     if not matrix:
         raise ValueError("near retained DNA/RNA chemistry-balance plot requires selected candidates")
-    fig = plt.figure(figsize=(7.8, 7.2))
-    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 4.2], wspace=0.1)
+    fig = plt.figure(figsize=(7.25, 7.2))
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.0, 4.2], wspace=0.025)
     ax_charge = fig.add_subplot(grid[0, 0])
     ax_counts = fig.add_subplot(grid[0, 1], sharey=ax_charge)
+    ax_charge.set_anchor("E")
+    ax_counts.set_anchor("W")
 
     max_abs_charge = max(max((abs(value) for value in charge_delta), default=0), 1)
     ax_charge.imshow(
         [[value] for value in charge_delta],
-        aspect="equal",
+        aspect="auto",
         interpolation="nearest",
         cmap="coolwarm",
         norm=TwoSlopeNorm(vmin=-max_abs_charge, vcenter=0, vmax=max_abs_charge),
@@ -89,7 +91,7 @@ def write_na_facing_chemistry_balance_plot(
     count_max = max((max(values) for values in matrix), default=0)
     count_image = ax_counts.imshow(
         matrix,
-        aspect="equal",
+        aspect="auto",
         interpolation="nearest",
         cmap="YlGnBu",
         vmin=0,
@@ -126,7 +128,7 @@ def write_na_facing_chemistry_balance_plot(
                 color=matrix_text_color(float(value), max_value=float(max(count_max, 1))),
             )
 
-    ax_charge.set_title(title, fontsize=TITLE_SIZE, pad=12, loc="left")
+    fig.suptitle(title, fontsize=TITLE_SIZE, y=0.97)
     for axis in (ax_charge, ax_counts):
         axis.tick_params(axis="both", length=0)
         for spine in axis.spines.values():
@@ -134,7 +136,7 @@ def write_na_facing_chemistry_balance_plot(
     count_bar = fig.colorbar(count_image, ax=ax_counts, shrink=0.72, pad=0.02)
     count_bar.set_label("Substitution count", fontsize=10.5)
     count_bar.ax.tick_params(labelsize=9.5)
-    fig.subplots_adjust(left=0.32, right=0.94, top=0.88, bottom=0.26)
+    fig.subplots_adjust(left=0.34, right=0.94, top=0.87, bottom=0.26)
 
     path = plot_root / "selection_na_facing_chemistry_balance.svg"
     alt = (
@@ -149,13 +151,13 @@ def write_na_facing_chemistry_balance_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Separates the near retained DNA/RNA or thumb-track chemistry fields into charge change, basic gain, "
-            "basic loss, acidic gain, and proline/glycine gain for the selected panel. Zero acidic gains near "
-            "retained DNA/RNA is part of the chemistry/support gate."
+            "Separates charge and residue-class events near retained DNA/RNA or the thumb track into net charge "
+            "change, basic gain, basic loss, acidic gain, and proline/glycine gain for the selected panel. The v3 "
+            "peripheral alphabet excludes new acidic residues upstream."
         ),
         interpretation_limit=(
-            "The no-acidic-gain rule is a conservative screen. The remaining chemistry fields are review context "
-            "and do not establish activity, processivity, strand displacement, or assay readiness."
+            "These counts describe the designed charge contrast. They do not establish chemical compatibility, "
+            "activity, processivity, strand displacement, or assay readiness."
         ),
         render_mode="wide_visual",
     )

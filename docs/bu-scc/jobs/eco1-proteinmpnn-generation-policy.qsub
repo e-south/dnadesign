@@ -10,9 +10,9 @@
 set -euo pipefail
 
 # Eco1 ProteinMPNN generation-policy runtime lane.
-# This job consumes one complete v3 policy request at a time. Combined proximal
-# plus distal hypotheses must come from the combined upstream policy, not from
-# mutation merging after generation.
+# This job consumes one complete policy request at a time. Peripheral and
+# distal substitutions are sampled together by ProteinMPNN, never merged after
+# generation.
 
 module purge
 
@@ -46,7 +46,7 @@ fi
 case "$policy_id" in
   distal_scaffold_repack_v1|near_dna_rna_acid_free_v1|combined_near_acid_free_plus_distal_v1) ;;
   *)
-    echo "Unknown Eco1 v3 generation policy: $policy_id" >&2
+    echo "Unknown Eco1 generation policy: $policy_id" >&2
     exit 2
     ;;
 esac

@@ -93,20 +93,22 @@ def test_foldcheck_review_materializes_ranking_panel_and_atlas_subset(tmp_path: 
     assert "separate ChimeraX-fitted panels" in overlay_row["description"]
     assert "Reference-fitted" in overlay_row["title"]
     assert "mapped C-alpha RMSD" in overlay_row["description"]
-    assert "sequence identity" in overlay_row["description"]
+    assert "full-sequence identity" in overlay_row["description"]
+    assert "design-position recovery" in overlay_row["description"]
 
     fold_metric_row = next(plot for plot in visual_manifest["plots"] if plot["plot_id"] == "fold_metric_scatter")
     fold_metric_text = _resolve_manifest_path(result.visual_manifest_path, fold_metric_row["path"]).read_text(
         encoding="utf-8"
     )
-    assert "Sequence identity to Ec86 WT" in fold_metric_text
+    assert "ProteinMPNN design-position recovery" in fold_metric_text
     assert "RMSD and pLDDT show fold quality" in fold_metric_text
 
     overlay_index_text = _resolve_manifest_path(result.visual_manifest_path, overlay_row["path"]).with_suffix(".cxc")
     structure_overlay_index = result.visual_manifest_path.parent / "chimerax" / "ec86_structure_overlay_panel.cxc"
     structure_overlay_text = structure_overlay_index.read_text(encoding="utf-8")
     assert "ProteinMPNN variant rank" in structure_overlay_text
-    assert "sequence_identity_percent" in structure_overlay_text
+    assert "full_sequence_identity_percent" in structure_overlay_text
+    assert "design_position_recovery_percent" in structure_overlay_text
     assert "mapped_c_alpha_rmsd" in structure_overlay_text
     assert overlay_index_text.suffix == ".cxc"
     for plot in visual_manifest["plots"]:

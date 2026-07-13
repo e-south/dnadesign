@@ -35,7 +35,8 @@ def structure_metric_rows(
         "plddt",
         "wt_runtime_ca_rmsd",
         "cryoem_mapped_ca_rmsd",
-        "sequence_identity_percent",
+        "full_sequence_identity_percent",
+        "design_position_recovery_percent",
         "mutation_count",
         "canonical_mutations",
         "mutation_residue_numbers",
@@ -127,7 +128,6 @@ def structure_summary_rows(
     show_sidechains: bool,
     show_dna: bool,
     show_rna: bool,
-    highlight_protein: bool,
     highlight_dna: bool,
     highlight_rna: bool,
 ) -> list[dict[str, str]]:
@@ -151,7 +151,6 @@ def structure_summary_rows(
             show_sidechains=show_sidechains,
             show_dna=show_dna,
             show_rna=show_rna,
-            highlight_protein=highlight_protein,
             highlight_dna=highlight_dna,
             highlight_rna=highlight_rna,
         )
@@ -231,12 +230,16 @@ def _candidate_summary_rows(row: dict[str, Any]) -> list[dict[str, str]]:
             "value": format_float(row.get("cryoem_mapped_ca_rmsd"), decimals=2, suffix=" A"),
         },
         {
-            "metric": "Sequence identity",
-            "value": format_float(row.get("sequence_identity_percent"), decimals=1, suffix="%"),
+            "metric": "Full-sequence identity",
+            "value": format_float(row.get("full_sequence_identity_percent"), decimals=1, suffix="%"),
+        },
+        {
+            "metric": "Design-position recovery",
+            "value": format_float(row.get("design_position_recovery_percent"), decimals=1, suffix="%"),
         },
         {"metric": "Protein sequence length", "value": format_int(row.get("protein_sequence_length"))},
         {"metric": "Mutation count", "value": format_int(row.get("mutation_count"))},
-        {"metric": "Panel slot", "value": str(row.get("selection_slot") or "")},
+        {"metric": "Selection rank", "value": format_int(row.get("selection_rank"))},
         {"metric": "Nearest selected distance", "value": format_int(row.get("nearest_selected_distance_aa"))},
         {
             "metric": "MSA observed fraction",
@@ -329,7 +332,6 @@ def _browser_summary_rows(
     show_sidechains: bool,
     show_dna: bool,
     show_rna: bool,
-    highlight_protein: bool,
     highlight_dna: bool,
     highlight_rna: bool,
 ) -> list[dict[str, str]]:
@@ -360,7 +362,6 @@ def _browser_summary_rows(
         {
             "metric": "Molecule colors",
             "value": molecule_color_summary_value(
-                highlight_protein=highlight_protein,
                 highlight_dna=highlight_dna,
                 highlight_rna=highlight_rna,
             ),
@@ -417,21 +418,17 @@ def sidechain_display_message(
     show_sidechains: bool,
 ) -> str:
     if not show_sidechains:
-        return "Side-chain sticks are toggled off for this view."
+        return "Highlighted side chains are toggled off for this view."
     if str(row.get("structure_view_mode") or "") == "reference_selection":
         if reference_atom_content.has_sidechain_atoms:
-            return "Reference side-chain atoms are present and rendered as sticks."
+            return "Side chains are shown only for the highlighted reference residues."
         return "The selected reference file is backbone-only, so side-chain sticks cannot be rendered for this view."
     query_message = (
-        "Candidate side-chain atoms are present and rendered as sticks."
+        "Side chains are shown only for highlighted candidate residues."
         if query_atom_content is not None and query_atom_content.has_sidechain_atoms
         else "The selected candidate PDB has no side-chain atoms, so candidate sticks are not rendered."
     )
-    reference_message = (
-        "The reference background includes protein side-chain atoms rendered as sticks."
-        if reference_atom_content.has_sidechain_atoms
-        else "The reference background is backbone-only."
-    )
+    reference_message = "The reference background remains cartoon-only."
     return f"{query_message} {reference_message}"
 
 
@@ -451,14 +448,12 @@ def browser_alignment_note(
 
 def molecule_color_summary_value(
     *,
-    highlight_protein: bool,
     highlight_dna: bool,
     highlight_rna: bool,
 ) -> str:
     enabled = [
         label
         for label, is_enabled in (
-            ("Protein", highlight_protein),
             ("DNA", highlight_dna),
             ("RNA", highlight_rna),
         )

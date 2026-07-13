@@ -25,6 +25,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     make_deliverable_row,
 )
 
+from .molecular_scene_contract import (
+    REFERENCE_MODEL_ID,
+    molecular_visual_contract,
+    reference_complex_molecule_styles,
+)
 from .structure_browser_common import (
     CANDIDATE_PASS_COLOR,
     PROTEIN_CLASS_COLOR,
@@ -111,6 +116,8 @@ def write_sae_structure_browser_manifest(
         "viewer_contract": "dnadesign.thread.structure_views",
         "backend_kind": "browser_structure_view",
         "default_backend": "py3dmol",
+        "visual_contract": molecular_visual_contract(),
+        "protein_surface_default": False,
         "path_policy": "paths_relative_to_this_manifest",
         "source_tables": [
             repo_relative_hint(top_feature_table_path),
@@ -119,7 +126,7 @@ def write_sae_structure_browser_manifest(
             repo_relative_hint(reference_structure_path),
         ],
         "reference": {
-            "model_id": "ec86kit_7v9u_reference",
+            "model_id": REFERENCE_MODEL_ID,
             "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
             "local_path": relative_path(reference_structure_path, manifest_path.parent),
             "structure_format": reference_structure_format,
@@ -272,7 +279,7 @@ def _sae_activation_rows(
         if not sequence_positions:
             continue
         is_reference = candidate_id == "wild_type"
-        model_id = "ec86kit_7v9u_reference" if is_reference else candidate_id
+        model_id = REFERENCE_MODEL_ID if is_reference else candidate_id
         residue_numbers = (
             sequence_positions if is_reference else [position + query_offset for position in sequence_positions]
         )
@@ -288,6 +295,7 @@ def _sae_activation_rows(
                 "color": PROTEIN_CLASS_COLOR if is_reference else CANDIDATE_PASS_COLOR,
                 "structure_view_mode": "reference_selection" if is_reference else "sae_activation",
                 "description": _sae_structure_description(top_row),
+                "molecule_styles": reference_complex_molecule_styles(include_protein_surface=False),
                 "selection_styles": [
                     {
                         "selection_id": f"sae_feature_{feature_index}",

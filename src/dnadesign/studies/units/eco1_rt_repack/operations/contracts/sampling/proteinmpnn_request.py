@@ -28,7 +28,8 @@ _PROTEINMPNN_NAME = "chain_a_backbone"
 _CHAIN_ID = "A"
 _THREAD_TO_ECO1_ISSUES = {
     "thread.proteinmpnn.request_metadata_mismatch": "eco1_rt.sampling.proteinmpnn_request_metadata_mismatch",
-    "thread.proteinmpnn.omit_aas_mismatch": "eco1_rt.sampling.proteinmpnn_omit_aas_mismatch",
+    "thread.proteinmpnn.invalid_omit_aas": "eco1_rt.sampling.proteinmpnn_invalid_omit_aas",
+    "thread.proteinmpnn.invalid_omit_aa_jsonl": "eco1_rt.sampling.proteinmpnn_invalid_omit_aa_jsonl",
     "thread.proteinmpnn.missing_sidecar_hashes": "eco1_rt.sampling.proteinmpnn_missing_sidecar_hashes",
     "thread.proteinmpnn.sidecar_missing": "eco1_rt.sampling.proteinmpnn_sidecar_missing",
     "thread.proteinmpnn.sidecar_hash_mismatch": "eco1_rt.sampling.proteinmpnn_sidecar_hash_mismatch",

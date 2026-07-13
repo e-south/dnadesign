@@ -1,8 +1,8 @@
 ---
 name: eco1-rt-repack-status
-description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, thread spec, mask/fold/synthesis policy, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
+description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, generation policy, fold/selection review, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.18
+  version: 0.1.22
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -14,18 +14,29 @@ metadata:
 Answer `where is eco1_rt_repack now?` from the checked-in study record and
 route follow-up work to the current study and `thread` surfaces.
 
+## Study Premise
+
+This study asks whether complete ProteinMPNN-designed Eco1/Ec86 RT sequences
+can keep declared catalytic, direct-contact, Wang thumb-track, and mapped
+residues 255-311 fixed, preserve local C-alpha backbone geometry, and introduce
+MSA-observed, non-acidifying substitutions in the declared peripheral
+nucleic-acid-facing shell for a diversity-seeking experimental panel.
+
+The study does not claim improved activity, affinity, processivity, strand
+displacement, or safety.
+
 ## Scope
 
 In scope:
 - `docs/studies/eco1_rt_repack/`
 - `docs/dev/plans/cross-tool/thread/2026-06-19-eco1-rt-repack-thread.md`
-- Eco1 RT profile, residue-mask, fold-validation, synthesis-feasibility, and
+- Eco1 RT profile, residue-mask, fold-validation, panel-selection, and
   downstream RT-lnRNA handoff planning
 - Eco1 RT MSA/conservation source authority and method routing
 - implementation-roadmap and RT-only downstream acceptance planning
 - record-only readiness from `operations/contract/readiness/`, including
   structure authority, mask contract, sampling plan, fold-check runtime,
-  assembly feasibility, candidate handoff, and downstream handoff gates
+  candidate handoff and downstream handoff gates
 
 Out of scope:
 - generic `thread` package expansion beyond the implemented Eco1 tracer-bullet
@@ -42,17 +53,14 @@ Out of scope:
   `record/campaign.yaml`, and `operations/ops.study.yaml`.
 - Status answers describe the scientific flow directly: Eco1/Ec86 source
   authority, conservation/MSA evidence, protected-residue mask, ProteinMPNN
-  proposals, ColabFold fold review, ESMC/SAE annotation, synthesis
-  feasibility, MSA/geography/chemistry triage, six-variant panel selection,
-  and RT-only handoff.
-- The answer distinguishes materialized evidence from missing decision records:
-  the baseline WT-plus-96 and expanded WT-plus-576 fold/ESMC/SAE evidence are
-  available; computational feasibility, candidate triage, compact
-  panel-selection plots, and a primary conservative panel are materialized
-  under the expanded design-class selection root and linked into the review
-  notebook when the selection manifest is present. The selected protein
-  sequence CSV is materialized for review, but RT-only `candidate_handoff.yaml`
-  and downstream RT-lnRNA acceptance are not materialized.
+  proposals, ColabFold fold review, MSA/geography/charge review, an eight-row
+  selected panel, optional ESMC/SAE annotation, and RT-only handoff.
+- The answer reports the materialized v3 path: 1008 requested sequences across
+  distal, peripheral, and combined peripheral-plus-distal policies; 1007 unique
+  candidates; 738 local-geometry-pass rows; policy pools of 335 distal, 226
+  peripheral, and 177 combined rows; and an eight-row selected panel containing
+  two distal, three peripheral, and three combined sequences. All active rows
+  carry the v3 policy hash.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,
@@ -63,21 +71,22 @@ Out of scope:
   authenticated Biohub ESMC query-time SAE mechanics route through
   `dnadesign.thread.adapters.biohub_esmc`. Reusable
   model-predicted-structure provenance routes through
-  `dnadesign.thread.structure_predictions`. Fold-model execution, feasibility,
-  and handoff tooling remain planned.
+  `dnadesign.thread.structure_predictions`. Reusable remote-execution
+  orchestration and downstream acceptance tooling remain separate from the
+  current protein-panel selection.
 - RT-lnRNA collaboration is treated as a downstream handoff, not as ownership of
   this study's repacking policy.
 - Report ESMC LLR and SAE windows as review evidence only. They do not select
   panel rows, do not define candidate acceptance, and do not show improved
   strand displacement. Current panel eligibility also requires local-structure
-  metrics to pass declared regional C-alpha RMSD thresholds after one global
-  mapped C-alpha fit. Current panel tie-breaks use MSA support, mutation
-  geography, near retained DNA/RNA chemistry, C-terminal primer-RNA recognition
-  context, and sequence nonredundancy after feasibility, fold, and
-  local-structure gates. Current panel tie-breaks favor lower near retained
-  DNA/RNA chemistry risk, mutation-set dissimilarity, regional MSA support,
-  local RMSD values inside the declared gate, and fold metrics. Design classes
-  are input-mask context, not final-panel quotas. Whole-protein ESMC
+  metrics to stay at or below the declared 2.5 A review cutoff in every
+  non-distal region after one global mapped C-alpha fit. Distal RMSD is review
+  context. Within each policy, the first pair is chosen by exhaustive
+  mutated-position Jaccard distance and then exact-substitution distance; each
+  additional peripheral or combined row maximizes minimum distance from its
+  policy pair. Charge counts, regional MSA support, local RMSD, fold metrics,
+  and sequence hash are later tie-breaks. Policy counts define experimental
+  contrasts rather than quality tiers. Whole-protein ESMC
   pseudo-likelihood and computational stability prediction stay deferred unless
   a later task explicitly reopens those paths.
 - Missing or mismatched `study_id` fails visibly.
@@ -95,15 +104,13 @@ Out of scope:
    `contexts/residue-mask-policy.md`,
    `contexts/fold-validation-policy.md`, or
    `contexts/selection-hardening-dev-spec.md` for panel-selection semantics,
-   claim boundaries, and plot-role wording, or
-   `contexts/synthesis-feasibility-policy.md`.
+   claim boundaries, and plot-role wording.
 4. For current contract scaffolding, inspect
    `operations/contract/readiness/`, `operations/contract/fixtures/thread/`,
    and `operations/contract/schemas/`.
 5. For gate-specific blockers, select exactly one readiness group first:
    `structure_authority`, `mask_contract`, `sampling_plan`,
-   `foldcheck_runtime`, `assembly_feasibility`, `candidate_handoff`, or
-   `downstream_rt_lnrna_handoff`.
+   `foldcheck_runtime`, `candidate_handoff`, or `downstream_rt_lnrna_handoff`.
 6. For downstream collaboration, route through
    `operations/contract/readiness/checks/downstream_rt_lnrna_handoff.yaml`
    and then the RT-lnRNA study route map only after that handoff is the actual
@@ -138,28 +145,32 @@ Out of scope:
   `operations/materialization/manual_mask_authority/`; route shared mask-row
   composition through `operations/masking/`; `rt-annotation-tracks.yaml` remains
   visualization/context unless a separate mask-authority record names the same
-  positions. Use `eco1_rt_clade9_plurality25_direct_contact5a_v1` for the
-  current mask rule: protect NAxxH, YADD, VTG, Wang/Ec86 direct
-  substrate-contact priors, Ec86 clade 9 >=25% WT-plurality conservation calls,
-  or mapped residues within 5 A of retained DNA/RNA. RT1-RT7 spans are
-  annotation/review labels and do not blanket hard-fix residues. Terminal
-  residues 1, 2, and 312-320 are `non_fixed_missing_backbone`: unprotected, but
-  not directly fixed-backbone ProteinMPNN mutable until coordinates exist.
-  Treat mapped residues 255-311 as the current C-terminal primer-RNA
-  recognition review context, and treat direct Wang thumb-contact-track
-  substitutions as outside ordinary-panel eligibility. The Wang thumb-contact
-  track also uses a stricter local RMSD preservation gate than the generic near
-  retained DNA/RNA region.
+  positions. Active generation policies protect NAxxH, YADD, VTG, direct
+  retained DNA/RNA contacts at or below 5 A, Wang thumb-track positions, mapped
+  residues 255-311, and declared conserved/core positions. RT1-RT7 spans are
+  annotation labels, not blanket protection rules. Terminal residues 1, 2, and
+  312-320 lack mapped backbone coordinates and are not fixed-backbone
+  ProteinMPNN design positions. Peripheral residues have an explicit
+  `omit_AA_jsonl` alphabet, and v3 uses global `--omit_AAs C`. Peripheral
+  alternatives must be MSA-observed and introduce no new D/E, P, or G. C233 is
+  open and therefore forced to change under the no-cysteine rule; report that
+  recurrence as generation bias, not a protected-position violation. Do not
+  compose mutations across policies.
   `contact_risk_profile.yaml` is an evidence review; it does not decide which
   residues are protected unless a future task explicitly reopens the mask rule.
 - Do not infer MSA source authority from review figures, prose, or public
   Eco1 accessions that disagree with the ec86kit target sequence hash.
 - Do not route inverse-folding design into `permuter`; `permuter` may consume
   explicit candidate intent later through a public handoff contract.
-- Treat whole-protein ESMC pseudo-likelihood as outside the current v1
+- Treat whole-protein ESMC pseudo-likelihood as outside the current
   panel-selection path.
 - Do not promote candidates into RT-lnRNA construct subjects without the
   downstream study's explicit acceptance contract.
+- Route renderer-neutral molecule roles and py3Dmol behavior through
+  `molecular-structure-visualization`; route ChimeraX GUI, REST, pose, and
+  capture work through `chimerax-structure-review`. Eco1 complex views use gold
+  DNA and salmon RNA for both backbone and nucleotide representations, and
+  protein-only surfaces start off in the notebook and use `0.65` alpha (`35%` ChimeraX transparency) when shown.
 
 ## Required Deliverables
 
@@ -168,7 +179,7 @@ Out of scope:
   the dev spec path for broader thread work
 - declared dataset/artifact roots and whether they are planned or materialized
 - next readiness blockers from the checked-in readiness checks
-- selected route for residue masks, fold validation, synthesis feasibility, or
+- selected route for residue masks, fold validation, panel selection, or
   RT-lnRNA handoff
 - exact missing-record or mismatch errors when the scaffold is incomplete
 

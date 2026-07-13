@@ -135,7 +135,7 @@ def write_structure_overlay_plot_row(
             "Shows representative ColabFold structures as separate ChimeraX-fitted panels after C-alpha "
             "alignment of full-length model residues 3-311 to ec86kit/7V9U reference residues 1-309. "
             "Each panel compares one selected structure against the same reference, reports mapped C-alpha RMSD, "
-            "and includes sequence identity to the Ec86 WT sequence when available."
+            "and includes full-sequence identity plus ProteinMPNN design-position recovery when available."
         ),
         "interpretation_limit": (
             "This overlay is a visual structure-review aid. It does not measure activity, "
@@ -236,7 +236,8 @@ def _write_single_panel_script(
         f"# orientation_preset_id: {_ORIENTATION_PRESET_ID}",
         f"# panel_label: {display_label}",
         f"# candidate_id: {entry.candidate_id}",
-        f"# sequence_identity_percent: {_format_optional_float(entry.sequence_identity_percent)}",
+        f"# full_sequence_identity_percent: {_format_optional_float(entry.full_sequence_identity_percent)}",
+        f"# design_position_recovery_percent: {_format_optional_float(entry.design_position_recovery_percent)}",
         f"# mapped_c_alpha_rmsd: {aligned_entry.mapped_ca_rmsd:.3f}",
         f"# wt_runtime_c_alpha_rmsd: {_format_optional_float(entry.wt_runtime_ca_rmsd)}",
         "set bgColor white",
@@ -286,7 +287,8 @@ def _write_overlay_index_script(
         lines.append(
             "# "
             f"{display_label}: {entry.candidate_id}; "
-            f"sequence_identity_percent={_format_optional_float(entry.sequence_identity_percent)}; "
+            f"full_sequence_identity_percent={_format_optional_float(entry.full_sequence_identity_percent)}; "
+            f"design_position_recovery_percent={_format_optional_float(entry.design_position_recovery_percent)}; "
             f"mapped_c_alpha_rmsd={aligned_entry.mapped_ca_rmsd:.3f} A; "
             f"wt_runtime_c_alpha_rmsd={_format_optional_float(entry.wt_runtime_ca_rmsd)}"
         )
@@ -378,9 +380,9 @@ def _overlay_legend_handles(entries: list[_AlignedOverlayEntry]) -> list[Patch]:
 
 
 def _identity_title_text(entry: PanelEntry) -> str:
-    if entry.sequence_identity_percent is None:
+    if entry.full_sequence_identity_percent is None:
         return "not available"
-    return f"{entry.sequence_identity_percent:.1f}%"
+    return f"{entry.full_sequence_identity_percent:.1f}%"
 
 
 def _format_optional_float(value: float | None) -> str:

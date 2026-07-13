@@ -27,18 +27,20 @@ def write_handoff_sequence_csv(path: Path, panel_rows: list[dict[str, object]]) 
             fieldnames=[
                 "candidate_id",
                 "selection_slot",
-                "design_class_id",
+                "policy_id",
                 "protein_sequence",
+                "mapped_protein_sequence",
                 "sequence_hash",
                 "sequence_scope",
                 "amino_acid_length",
                 "protein_sequence_sha256",
+                "mapped_protein_sequence_sha256",
                 "mapped_rt_chain_length",
                 "canonical_rt_length",
                 "canonical_sequence_status",
                 "canonical_sequence_sha256",
+                "canonical_mutations",
                 "fold_review_class",
-                "feasibility_status",
                 "eligible_for_handoff",
                 "codon_policy_id",
                 "dna_design_status",
@@ -48,27 +50,32 @@ def write_handoff_sequence_csv(path: Path, panel_rows: list[dict[str, object]]) 
                 "handoff_scope_note",
                 "source_candidate_pool_sha256",
                 "source_panel_sha256",
+                "source_foldcheck_input_sequences_sha256",
             ],
         )
         writer.writeheader()
         for row in panel_rows:
-            sequence = sequences[str(row["candidate_id"])]
+            mapped_sequence = sequences[str(row["candidate_id"])] + "A" * 303
+            sequence = "AA" + mapped_sequence + "A" * 9
             writer.writerow(
                 {
                     "candidate_id": row["candidate_id"],
                     "selection_slot": row["selection_slot"],
-                    "design_class_id": row["design_class_id"],
+                    "policy_id": row["policy_id"],
                     "protein_sequence": sequence,
+                    "mapped_protein_sequence": mapped_sequence,
                     "sequence_hash": f"fixture-{row['candidate_id']}",
-                    "sequence_scope": "mapped_rt_chain_protein",
+                    "sequence_scope": "canonical_rt_protein",
                     "amino_acid_length": len(sequence),
                     "protein_sequence_sha256": "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
-                    "mapped_rt_chain_length": len(sequence),
+                    "mapped_protein_sequence_sha256": "sha256:"
+                    + hashlib.sha256(mapped_sequence.encode("utf-8")).hexdigest(),
+                    "mapped_rt_chain_length": len(mapped_sequence),
                     "canonical_rt_length": 320,
-                    "canonical_sequence_status": "not_exported_in_this_slice",
-                    "canonical_sequence_sha256": "",
+                    "canonical_sequence_status": "materialized",
+                    "canonical_sequence_sha256": "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
+                    "canonical_mutations": "A3G",
                     "fold_review_class": row["fold_review_class"],
-                    "feasibility_status": row["feasibility_status"],
                     "eligible_for_handoff": "true",
                     "codon_policy_id": "protein_sequence_only_no_codon_design_v1",
                     "dna_design_status": "not_materialized",
@@ -78,6 +85,7 @@ def write_handoff_sequence_csv(path: Path, panel_rows: list[dict[str, object]]) 
                     "handoff_scope_note": "RT protein sequence only; not DNA, codon, restriction, or construct ready.",
                     "source_candidate_pool_sha256": "sha256:" + "a" * 64,
                     "source_panel_sha256": "sha256:" + "b" * 64,
+                    "source_foldcheck_input_sequences_sha256": "sha256:" + "c" * 64,
                 }
             )
 

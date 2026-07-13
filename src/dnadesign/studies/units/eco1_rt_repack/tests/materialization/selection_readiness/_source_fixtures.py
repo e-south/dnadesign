@@ -76,13 +76,19 @@ def _profile_rows(profile_id: str) -> list[dict[str, object]]:
 
 
 def _contact_geometry_rows() -> list[dict[str, object]]:
-    return [
-        {
-            "canonical_position": position,
-            "nearest_context_atom_distance_angstrom": 8.0 if position < 30 else 15.0,
-        }
-        for position in range(1, _RT_LENGTH + 1)
-    ]
+    rows: list[dict[str, object]] = []
+    for position in range(1, _RT_LENGTH + 1):
+        is_near = position < 30
+        dna_nearest = position % 2 == 0
+        rows.append(
+            {
+                "canonical_position": position,
+                "nearest_context_atom_distance_angstrom": 8.0 if is_near else 15.0,
+                "nearest_dna_distance_angstrom": 8.0 if is_near and dna_nearest else 12.0,
+                "nearest_rna_distance_angstrom": 8.0 if is_near and not dna_nearest else 12.0,
+            }
+        )
+    return rows
 
 
 def _mask_set_yaml() -> str:

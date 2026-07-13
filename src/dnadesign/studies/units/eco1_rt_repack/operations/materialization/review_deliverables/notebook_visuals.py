@@ -64,6 +64,31 @@ def render_image(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
     )
 
 
+def render_video(row: dict[str, Any], *, mo: Any, media_path: Path) -> Any:
+    """Render one local MP4 only after its manifest-backed dropdown option is selected."""
+
+    caption = _format_deliverable_label(row)
+    video = mo.video(
+        media_path.read_bytes(),
+        controls=True,
+        muted=True,
+        autoplay=False,
+        loop=True,
+        width="min(100%, 960px)",
+        height="auto",
+    )
+    return mo.vstack(
+        [
+            mo.hstack([video], justify="center"),
+            mo.Html(
+                f"<figcaption style='font-size:0.92rem; color:#57606a; margin-top:0.2rem;'>"
+                f"{html.escape(caption)}</figcaption>"
+            ),
+        ],
+        gap=0.15,
+    )
+
+
 def render_zoom_frame(*, mo: Any, frame_html: str, title: str, height_css: str, min_height_css: str = "520px") -> Any:
     safe_srcdoc = html.escape(frame_html, quote=True)
     safe_title = html.escape(title, quote=True)

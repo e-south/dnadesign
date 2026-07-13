@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from .notebook_structure_dashboard import format_float
+
+_MASK_STRUCTURE_BROWSER_DELIVERABLE_ID = "mask_structure_browser_manifest"
+_SAE_STRUCTURE_BROWSER_DELIVERABLE_ID = "biohub_esmc_sae_structure_browser_manifest"
+_SAE_HIGHLIGHT_SOURCE_DELIVERABLE_IDS = frozenset({"interactive_structure_browser_manifest"})
 
 
 def load_structure_browser_rows(
@@ -42,8 +47,13 @@ def load_structure_browser_rows(
         manifest_path = resolve_manifest_path(manifest_root, str(manifest_row["path"]))
         if not manifest_path.exists():
             continue
-        payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
+        stat = manifest_path.stat()
+        payload = _load_manifest_mapping(
+            str(manifest_path),
+            modified_time_ns=stat.st_mtime_ns,
+            size_bytes=stat.st_size,
+        )
+        if not payload:
             continue
         rows.extend(
             _enriched_structure_rows(
@@ -55,6 +65,20 @@ def load_structure_browser_rows(
             )
         )
     return rows
+
+
+@lru_cache(maxsize=16)
+def _load_manifest_mapping(
+    path: str,
+    *,
+    modified_time_ns: int,
+    size_bytes: int,
+) -> dict[str, Any]:
+    """Parse a structure manifest once per observed file revision."""
+
+    del modified_time_ns, size_bytes
+    payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else {}
 
 
 def load_structure_highlight_rows(
@@ -70,19 +94,21 @@ def load_structure_highlight_rows(
     candidate_id = str(selected_row.get("source_candidate_id") or selected_row.get("candidate_id") or "")
     if not candidate_id:
         return []
-    return [
-        *load_structure_browser_rows(
-            manifest_root=manifest_root,
-            deliverables=deliverables,
-            selected_deliverable_id="mask_structure_browser_manifest",
-        ),
-        *load_structure_browser_rows(
-            manifest_root=manifest_root,
-            deliverables=deliverables,
-            selected_deliverable_id="biohub_esmc_sae_structure_browser_manifest",
-            source_candidate_id=candidate_id,
-        ),
-    ]
+    rows = load_structure_browser_rows(
+        manifest_root=manifest_root,
+        deliverables=deliverables,
+        selected_deliverable_id=_MASK_STRUCTURE_BROWSER_DELIVERABLE_ID,
+    )
+    if _supports_sae_highlights(selected_row):
+        rows.extend(
+            load_structure_browser_rows(
+                manifest_root=manifest_root,
+                deliverables=deliverables,
+                selected_deliverable_id=_SAE_STRUCTURE_BROWSER_DELIVERABLE_ID,
+                source_candidate_id=candidate_id,
+            )
+        )
+    return rows
 
 
 def structure_browser_lookup(
@@ -119,7 +145,7 @@ def structure_group_lookup(
             continue
         group = str(row.get("group") or "Ungrouped structures")
         groups.setdefault(group, group)
-    return groups
+    return {group: groups[group] for group in sorted(groups, key=_structure_group_sort_key)}
 
 
 def structure_highlight_lookup(
@@ -136,13 +162,13 @@ def structure_highlight_lookup(
         return {}
     options: dict[str, dict[str, Any] | None] = {"No residue highlight": None}
     for row in rows:
-        if str(row.get("_deliverable_id") or "") != "mask_structure_browser_manifest":
+        if str(row.get("_deliverable_id") or "") != _MASK_STRUCTURE_BROWSER_DELIVERABLE_ID:
             continue
         if str(row.get("structure_view_mode") or "") != "reference_selection":
             continue
         options[_structure_browser_label(row)] = row
     for row in rows:
-        if str(row.get("_deliverable_id") or "") != "biohub_esmc_sae_structure_browser_manifest":
+        if str(row.get("_deliverable_id") or "") != _SAE_STRUCTURE_BROWSER_DELIVERABLE_ID:
             continue
         if str(row.get("source_candidate_id") or row.get("candidate_id") or "") != candidate_id:
             continue
@@ -150,6 +176,15 @@ def structure_highlight_lookup(
             continue
         options[_structure_highlight_label(row)] = row
     return options
+
+
+def _supports_sae_highlights(selected_row: dict[str, Any]) -> bool:
+    return str(selected_row.get("_deliverable_id") or "") in _SAE_HIGHLIGHT_SOURCE_DELIVERABLE_IDS
+
+
+def _structure_group_sort_key(group: str) -> tuple[int, str]:
+    prefix = group.partition(" ")[0]
+    return (int(prefix), group) if prefix.isdigit() else (10_000, group)
 
 
 def _enriched_structure_rows(

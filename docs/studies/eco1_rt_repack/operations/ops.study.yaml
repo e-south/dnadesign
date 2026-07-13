@@ -27,5 +27,4 @@ parts:
     - contract/readiness/checks/sampling_plan.yaml
     - contract/readiness/checks/candidate_handoff.yaml
     - contract/readiness/checks/foldcheck_runtime.yaml
-    - contract/readiness/checks/assembly_feasibility.yaml
     - contract/readiness/checks/downstream_rt_lnrna_handoff.yaml

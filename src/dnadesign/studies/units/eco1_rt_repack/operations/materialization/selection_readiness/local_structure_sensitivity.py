@@ -15,7 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from .local_structure import (
-    LOCAL_STRUCTURE_REGION_IDS,
+    LOCAL_STRUCTURE_GATE_REGION_IDS,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
     LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM,
 )
@@ -45,7 +45,9 @@ def build_local_structure_threshold_sensitivity_rows(
     """Summarize pass/fail counts under tighter, declared, and looser local RMSD thresholds."""
 
     selected = {str(candidate_id) for candidate_id in selected_candidate_ids}
-    rows_by_region: dict[str, list[Mapping[str, object]]] = {region_id: [] for region_id in LOCAL_STRUCTURE_REGION_IDS}
+    rows_by_region: dict[str, list[Mapping[str, object]]] = {
+        region_id: [] for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS
+    }
     labels_by_region: dict[str, str] = {}
     for row in local_structure_rows:
         region_id = str(row.get("region_id") or "")
@@ -55,7 +57,7 @@ def build_local_structure_threshold_sensitivity_rows(
         labels_by_region.setdefault(region_id, str(row.get("region_label") or region_id.replace("_", " ")))
 
     rows: list[dict[str, object]] = []
-    for region_id in LOCAL_STRUCTURE_REGION_IDS:
+    for region_id in LOCAL_STRUCTURE_GATE_REGION_IDS:
         region_rows = rows_by_region[region_id]
         available_rows = [
             row
@@ -63,7 +65,10 @@ def build_local_structure_threshold_sensitivity_rows(
             if str(row.get("status") or "") == "available" and row.get("local_ca_rmsd_angstrom") is not None
         ]
         for scenario in LOCAL_STRUCTURE_THRESHOLD_SCENARIOS:
-            threshold = round(LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id] * scenario.multiplier, 3)
+            declared_threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+            if declared_threshold is None:
+                raise ValueError(f"missing gate threshold for {region_id}")
+            threshold = round(declared_threshold * scenario.multiplier, 3)
             failed = [row for row in available_rows if float(row["local_ca_rmsd_angstrom"]) > threshold]
             selected_failed = [row for row in failed if str(row.get("candidate_id") or "") in selected]
             rows.append(

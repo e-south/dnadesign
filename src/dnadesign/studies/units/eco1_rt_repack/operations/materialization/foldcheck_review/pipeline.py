@@ -61,32 +61,44 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.visuals import (
     write_review_visuals,
 )
+from dnadesign.studies.units.eco1_rt_repack.paths import DEFAULT_THREAD_OUTPUT_ROOT
 
 
 def materialize_foldcheck_review(
     *,
     repo_root: Path | None = None,
     output_root: Path | None = None,
+    source_output_root: Path | None = None,
     render_chimerax_overlay: bool = False,
 ) -> MaterializedFoldCheckReviewArtifacts:
     """Materialize ranking, structure-panel, ChimeraX, and Atlas-subset review artifacts."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
+    source_root = resolve_output_root(root, source_output_root or DEFAULT_THREAD_OUTPUT_ROOT)
     review_root = out_root / REVIEW_DIR_NAME
     review_root.mkdir(parents=True, exist_ok=True)
 
     request_manifest_path = out_root / FOLDCHECK_REQUEST_MANIFEST_RELATIVE_PATH
-    candidate_table_path = out_root / CANDIDATE_TABLE_FILE_NAME
+    candidate_table_path = _first_existing_path(
+        out_root / CANDIDATE_TABLE_FILE_NAME,
+        out_root / "candidate_pool.parquet",
+        description="fold-check review candidate table",
+    )
     foldcheck_report_path = out_root / FOLDCHECK_REPORT_FILE_NAME
-    residue_map_path = out_root / RESIDUE_MAP_FILE_NAME
-    reference_backbone_path = out_root / REFERENCE_BACKBONE_RELATIVE_PATH
+    residue_map_path = _first_existing_path(
+        out_root / RESIDUE_MAP_FILE_NAME,
+        source_root / RESIDUE_MAP_FILE_NAME,
+        description="residue map",
+    )
+    reference_backbone_path = _first_existing_path(
+        out_root / REFERENCE_BACKBONE_RELATIVE_PATH,
+        source_root / REFERENCE_BACKBONE_RELATIVE_PATH,
+        description="reference backbone",
+    )
     for required_path in (
         request_manifest_path,
-        candidate_table_path,
         foldcheck_report_path,
-        residue_map_path,
-        reference_backbone_path,
     ):
         if not required_path.exists():
             raise FileNotFoundError(required_path)
@@ -200,3 +212,11 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {path}")
     return loaded
+
+
+def _first_existing_path(*paths: Path, description: str) -> Path:
+    for path in paths:
+        if path.exists():
+            return path
+    formatted = ", ".join(str(path) for path in paths)
+    raise FileNotFoundError(f"{description} not found at any expected path: {formatted}")

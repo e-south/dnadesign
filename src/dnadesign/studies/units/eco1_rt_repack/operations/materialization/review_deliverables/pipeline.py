@@ -11,15 +11,19 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
     find_repo_root,
     resolve_output_root,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    DEFAULT_GENERATION_POLICIES_ROOT,
 )
 
 from ..shared.rt_annotation_context import (
@@ -34,6 +38,8 @@ from .biohub_esmc_sequence_preference import (
     write_biohub_esmc_sequence_preference_deliverables,
 )
 from .biohub_esmc_sequence_preference_model_agreement import write_biohub_esmc_model_agreement_deliverables
+from .communication_visuals import write_communication_visuals
+from .communication_visuals.catalog import COMMUNICATION_VISUALS_DIR_NAME
 from .constants import (
     ALIGNED_FASTA_RELATIVE_PATH,
     BIOHUB_ESMC_6B_MUTATION_SCORING_RELATIVE_PATH,
@@ -62,7 +68,7 @@ from .constants import (
     MSA_PANEL_DIR_NAME,
     NOTEBOOK_FILE_NAME,
     NOTEBOOKS_DIR_NAME,
-    PROTEINMPNN_DIR_NAME,
+    PROTEINMPNN_POLICY_DIR_NAME,
     REFERENCE_BACKBONE_RELATIVE_PATH,
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
     SECTION_ESMC_FEATURE_REVIEW,
@@ -71,7 +77,6 @@ from .constants import (
     SUBTYPE_CONSERVATION_SOURCE_MANIFEST_RELATIVE_PATH,
     WT_MODEL_CHECK_DIR_NAME,
 )
-from .design_class_masks import write_design_class_mask_overview
 from .esmc_model_check import write_esmc_model_check_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
@@ -82,11 +87,7 @@ from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, write_msa_plurality_
 from .msa_panel_data import source_manifest_accessions
 from .notebook import write_review_deliverables_notebook
 from .plain_titles import apply_plain_titles
-from .proteinmpnn_diversity import write_proteinmpnn_diversity_panels
-from .proteinmpnn_fold_validation import (
-    write_design_class_fold_bin_counts,
-    write_expanded_design_class_fold_validation,
-)
+from .proteinmpnn_policy_sampling import write_proteinmpnn_policy_sampling
 from .sae_structure_browser import write_sae_structure_browser_manifest
 from .selection_readiness import linked_selection_readiness_rows
 from .structure_browser import (
@@ -100,15 +101,17 @@ def materialize_review_deliverables(
     *,
     repo_root: Path | None = None,
     output_root: Path | None = None,
+    selection_root: Path | None = None,
     render_chimerax_png: bool = False,
+    render_communication_chimerax: bool = False,
 ) -> MaterializedReviewDeliverables:
     """Materialize the first Eco1 manuscript/review deliverable bundle."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     out_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
+    resolved_selection_root = _resolve_optional_path(root, selection_root) if selection_root is not None else None
     deliverable_root = out_root / DELIVERABLE_DIR_NAME
     deliverable_root.mkdir(parents=True, exist_ok=True)
-    _remove_retired_deliverables(deliverable_root)
 
     aligned_fasta_path = out_root / ALIGNED_FASTA_RELATIVE_PATH
     subtype_aligned_fasta_path = out_root / SUBTYPE_ALIGNED_FASTA_RELATIVE_PATH
@@ -134,6 +137,9 @@ def materialize_review_deliverables(
         clade_source_manifest_path=conservation_source_manifest_path,
         subtype_source_manifest_path=subtype_conservation_source_manifest_path,
     )
+    selected_source = _selected_panel_source(out_root=out_root, selection_root=resolved_selection_root)
+    policy_positions_path = selected_source.candidate_root / "generation_policy_positions.parquet"
+    policy_position_rows = [dict(row) for row in pq.read_table(policy_positions_path).to_pylist()]
 
     mask_residues = read_mask_residues(mask_set_path)
     rt_annotation_context = load_rt_annotation_context(
@@ -146,6 +152,8 @@ def materialize_review_deliverables(
         repo_root=root,
         reference_backbone_path=foldcheck_reference_backbone_path,
     )
+    communication_reference_path = browser_reference.local_path
+    communication_reference_format = browser_reference.structure_format
     deliverables: list[dict[str, Any]] = [
         write_msa_plurality_mask_panel(
             panel_root=deliverable_root / MSA_PANEL_DIR_NAME,
@@ -168,18 +176,13 @@ def materialize_review_deliverables(
             mask_residues=mask_residues,
             rt_annotation_context=rt_annotation_context,
         ),
-        write_design_class_mask_overview(
-            panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
-            baseline_mask_set_path=mask_set_path,
-            design_classes_root=out_root / "design_classes",
-            rt_annotation_context=rt_annotation_context,
-        ),
     ]
     deliverables.extend(
         write_mask_structure_context(
             panel_root=deliverable_root / MASK_CONTEXT_DIR_NAME,
             mask_set_path=mask_set_path,
-            reference_backbone_path=reference_backbone_path,
+            reference_structure_path=browser_reference.local_path,
+            reference_structure_format=browser_reference.structure_format,
             mask_residues=mask_residues,
             render_png=render_chimerax_png,
         )
@@ -188,41 +191,12 @@ def materialize_review_deliverables(
         write_mask_structure_browser_manifest(
             panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
             mask_set_path=mask_set_path,
-            design_classes_root=out_root / "design_classes",
             reference_structure_path=browser_reference.local_path,
             reference_structure_format=browser_reference.structure_format,
             mask_residues=mask_residues,
             rt_annotation_context=rt_annotation_context,
-        )
-    )
-    deliverables.extend(
-        write_proteinmpnn_diversity_panels(
-            panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
-            candidate_table_path=candidate_table_path,
-            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
-            design_classes_root=out_root / "design_classes",
-            mask_set_path=mask_set_path,
-        )
-    )
-    deliverables.append(
-        write_expanded_design_class_fold_validation(
-            panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
-            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
-            foldcheck_ranking_path=out_root
-            / "design_classes"
-            / "foldcheck_review"
-            / "foldcheck_candidate_ranking.parquet",
-            selection_panel_table_path=out_root / "design_classes" / "selection" / "candidate_selection_panel.parquet",
-        )
-    )
-    deliverables.append(
-        write_design_class_fold_bin_counts(
-            panel_root=deliverable_root / PROTEINMPNN_DIR_NAME,
-            candidate_pool_path=out_root / "design_classes" / "candidate_pool.parquet",
-            foldcheck_ranking_path=out_root
-            / "design_classes"
-            / "foldcheck_review"
-            / "foldcheck_candidate_ranking.parquet",
+            policy_position_rows=policy_position_rows,
+            policy_positions_path=policy_positions_path,
         )
     )
     deliverables.extend(_linked_foldcheck_review_rows(out_root / FOLDCHECK_REVIEW_MANIFEST_RELATIVE_PATH))
@@ -285,32 +259,49 @@ def materialize_review_deliverables(
             candidate_preference_table_path=candidate_preference_table_path,
         )
     )
-    design_class_foldcheck_root = out_root / "design_classes" / "foldcheck_review"
-    selected_panel_table_path = out_root / "design_classes" / "selection" / "candidate_selection_panel.parquet"
-    candidate_triage_table_path = out_root / "design_classes" / "selection" / "candidate_triage_table.parquet"
-    candidate_pool_path = out_root / "design_classes" / "candidate_pool.parquet"
-    selected_alignment_reference_path = design_class_foldcheck_root / REFERENCE_STRUCTURE_RELATIVE_PATH
-    if selected_panel_table_path.exists() and candidate_pool_path.exists():
+    deliverables.extend(
+        write_proteinmpnn_policy_sampling(
+            panel_root=deliverable_root / PROTEINMPNN_POLICY_DIR_NAME,
+            candidate_pool_path=selected_source.candidate_pool_path,
+            policy_positions_path=policy_positions_path,
+        )
+    )
+    if selected_source.selection_panel_path.exists() and selected_source.candidate_pool_path.exists():
         deliverables.append(
             write_selected_panel_structure_browser_manifest(
                 panel_root=deliverable_root / STRUCTURE_BROWSER_DIR_NAME,
-                full_structure_set_path=design_class_foldcheck_root / "foldcheck_full_structure_set.yaml",
-                foldcheck_ranking_path=design_class_foldcheck_root / "foldcheck_candidate_ranking.parquet",
+                full_structure_set_path=selected_source.foldcheck_root / "foldcheck_full_structure_set.yaml",
+                foldcheck_ranking_path=selected_source.foldcheck_root / "foldcheck_candidate_ranking.parquet",
                 reference_structure_path=browser_reference.local_path,
                 reference_structure_format=browser_reference.structure_format,
-                alignment_reference_path=selected_alignment_reference_path,
-                candidate_table_path=candidate_pool_path,
-                selection_panel_table_path=selected_panel_table_path,
-                triage_table_path=candidate_triage_table_path,
-                foldcheck_fasta_path=out_root / "design_classes" / "foldcheck_request" / "input_sequences.fasta",
-                candidate_preference_table_path=out_root
-                / "design_classes"
+                alignment_reference_path=selected_source.foldcheck_root / REFERENCE_STRUCTURE_RELATIVE_PATH,
+                candidate_table_path=selected_source.candidate_pool_path,
+                selection_panel_table_path=selected_source.selection_panel_path,
+                triage_table_path=selected_source.triage_table_path,
+                foldcheck_fasta_path=selected_source.candidate_root / "foldcheck_request" / "input_sequences.fasta",
+                candidate_preference_table_path=selected_source.candidate_root
                 / "review_deliverables"
                 / BIOHUB_ESMC_SEQUENCE_SCORING_DIR_NAME
                 / "esmc_6b_2024_12"
                 / VARIANT_LLR_FILE_NAME,
+                source_table_prefix=selected_source.foldcheck_source_prefix,
             )
         )
+    deliverables.extend(
+        write_communication_visuals(
+            panel_root=deliverable_root / COMMUNICATION_VISUALS_DIR_NAME,
+            mask_set_path=mask_set_path,
+            conservation_profile_path=conservation_profile_path,
+            policy_positions_path=policy_positions_path,
+            triage_table_path=selected_source.triage_table_path,
+            selection_panel_path=selected_source.selection_panel_path,
+            foldcheck_full_structure_set_path=selected_source.foldcheck_root / "foldcheck_full_structure_set.yaml",
+            reference_structure_path=communication_reference_path,
+            reference_structure_format=communication_reference_format,
+            mask_residues=mask_residues,
+            render_chimerax=render_communication_chimerax,
+        )
+    )
     deliverables.extend(
         write_esmc_model_check_panels(
             panel_root=deliverable_root / WT_MODEL_CHECK_DIR_NAME,
@@ -343,7 +334,7 @@ def materialize_review_deliverables(
             alignment_reference_path=foldcheck_reference_backbone_path,
         )
     )
-    deliverables.extend(linked_selection_readiness_rows(out_root))
+    deliverables.extend(linked_selection_readiness_rows(out_root, selection_root=resolved_selection_root))
 
     notebook_path = deliverable_root / NOTEBOOKS_DIR_NAME / NOTEBOOK_FILE_NAME
     write_review_deliverables_notebook(notebook_path)
@@ -357,23 +348,39 @@ def materialize_review_deliverables(
     )
 
 
-def _remove_retired_deliverables(deliverable_root: Path) -> None:
-    """Remove generated artifacts retired by renamed review deliverables."""
+@dataclass(frozen=True)
+class _SelectedPanelSource:
+    """Active candidate/foldcheck roots for selected-panel browser rows."""
 
-    for dirname in ("wt_model_constraint_audit",):
-        retired = deliverable_root / dirname
-        if retired.is_dir():
-            shutil.rmtree(retired)
-    for relative_path in (
-        Path(MASK_CONTEXT_DIR_NAME) / "linear_mask_tracks.svg",
-        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_mutation_density.svg",
-        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_tao_style_fold_validation.svg",
-        Path(PROTEINMPNN_DIR_NAME) / "proteinmpnn_variant_similarity_heatmap.svg",
-        Path("feasibility_and_handoff") / "planned.md",
-    ):
-        retired_file = deliverable_root / relative_path
-        if retired_file.is_file():
-            retired_file.unlink()
+    selection_root: Path
+    candidate_root: Path
+    foldcheck_root: Path
+    candidate_pool_path: Path
+    selection_panel_path: Path
+    triage_table_path: Path
+    foldcheck_source_prefix: str
+
+
+def _selected_panel_source(*, out_root: Path, selection_root: Path | None) -> _SelectedPanelSource:
+    active_selection_root = selection_root or out_root / DEFAULT_GENERATION_POLICIES_ROOT.name / "selection"
+    candidate_root = active_selection_root.parent
+    foldcheck_root = candidate_root / "foldcheck_review"
+    return _SelectedPanelSource(
+        selection_root=active_selection_root,
+        candidate_root=candidate_root,
+        foldcheck_root=foldcheck_root,
+        candidate_pool_path=candidate_root / "candidate_pool.parquet",
+        selection_panel_path=active_selection_root / "candidate_selection_panel.parquet",
+        triage_table_path=active_selection_root / "candidate_triage_table.parquet",
+        foldcheck_source_prefix=f"{candidate_root.name}/foldcheck_review",
+    )
+
+
+def _resolve_optional_path(root: Path, path: Path) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+    return (root / expanded).resolve()
 
 
 def _validate_subtype_source_subset(*, clade_source_manifest_path: Path, subtype_source_manifest_path: Path) -> None:

@@ -72,6 +72,10 @@ class FakeMo:
         return {"kind": "iframe", "value": value, "kwargs": kwargs}
 
     @staticmethod
+    def video(value: bytes, **kwargs: Any) -> dict[str, Any]:
+        return {"kind": "video", "value_size": len(value), "kwargs": kwargs}
+
+    @staticmethod
     def hstack(items: list[Any], **kwargs: Any) -> dict[str, Any]:
         return {"kind": "hstack", "items": items, "kwargs": kwargs}
 

@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fixed-backbone-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 ---
 
 ## Fixed-Backbone Method
@@ -13,12 +13,13 @@ sponging workflows. The method is computational and contract-first:
 
 1. Choose one structure authority and chain policy.
 2. Map every designable residue into a canonical Eco1 RT numbering system.
-3. Compose conservative fixed/mutable masks from structure contacts,
-   conservation, catalytic policy, and explicit missing-backbone handling.
+3. Define complete generation policies from protected positions, open
+   positions, residue-specific alphabets, and explicit missing-backbone handling.
 4. Generate fixed-backbone sequence samples with a declared MPNN backend.
-5. Deduplicate candidates and triage them with explicit review axes.
-6. Validate structural fidelity with declared fold-check metrics.
-7. Emit a candidate handoff only when every upstream artifact is present and
+5. Normalize and deduplicate complete candidate sequences.
+6. Review fold and local backbone geometry with declared metrics.
+7. Select a mutation-set-diverse panel from rows that pass the declared checks.
+8. Emit a candidate handoff only when every upstream artifact is present and
    hash-linked.
 
 The motivating source method is Tao et al., Nature Biotechnology 2026,
@@ -82,31 +83,37 @@ canonical Eco1 positions to ProteinMPNN chain positions before writing fixed
 positions. Terminal Eco1 positions without 7V9U backbone coordinates are not
 sent as mutable fixed-backbone positions.
 
-The active Eco1 batch used official ProteinMPNN commit
-`8907e6671bfbfc92303b5f79c4b5e6ce47cdef57`, an explicit local
-`--proteinmpnn-root`, seeds `101`, `202`, and `303`, sampling temperatures
-`0.1` and `0.3`, `num_seq_per_target: 16`, and `--omit_AAs C`. The output is a
-sequence-proposal table. It is not a stability measurement, fold check, or
-functional assay.
+The active v3 request uses official ProteinMPNN commit
+`8907e6671bfbfc92303b5f79c4b5e6ce47cdef57`, an explicit tool root, seeds
+`101`, `202`, and `303`, sampling temperatures `0.1` and `0.3`, and
+`num_seq_per_target: 56` for 336 requested sequences per policy. Peripheral
+residues use the public `--omit_AA_jsonl` input, and v3 uses global
+`--omit_AAs C`. An open WT cysteine can therefore be forced to change. The
+output is a sequence-proposal table, not a stability measurement, fold check,
+or functional assay.
 
 Methods-ready wording:
 
 > ProteinMPNN was run as a fixed-backbone inverse-folding sampler on the
-> selected Ec86 RT backbone. Protected residues were defined before sampling
-> from catalytic motifs, Wang/Ec86 substrate-contact priors, Ec86 clade 9
-> conservation, and direct retained DNA/RNA contacts. The protein-only backbone
-> was converted to ProteinMPNN helper-compatible JSONL input, fixed positions
-> were supplied in chain-local 1-indexed ProteinMPNN coordinates, cysteine was
-> omitted during sampling, and sequences were generated with declared seeds,
-> sampling temperatures, and `num_seq_per_target`. ProteinMPNN outputs were
-> treated as sequence proposals and were later deduplicated, mask-audited, and
-> passed to fold checking.
+> selected Ec86 RT backbone. NAxxH, YADD, and VTG contexts, direct
+> retained DNA/RNA contacts, Wang thumb-track positions, mapped residues
+> 255-311, and declared conserved/core positions were fixed before sampling.
+> Open positions and residue-specific allowed alphabets were supplied in
+> chain-local 1-indexed ProteinMPNN coordinates. New cysteine was omitted; an
+> open WT cysteine could therefore be forced to change; and peripheral
+> alternatives were limited to MSA-observed residues without new D/E, P, or G.
+> Complete sequences were
+> generated with declared seeds, sampling temperatures, and sample counts, then
+> deduplicated and passed to fold checking.
 
-The conservative Eco1 pass asks a narrow question:
+The study premise is:
 
 ```text
-Can distal, nonprotected Eco1 RT scaffold positions be repacked while preserving
-the mapped catalytic and nucleic-acid-recognition machine?
+This study compares WT Eco1 RT with complete ProteinMPNN-designed sequences
+that either repack distal scaffold positions, redesign a non-acidifying,
+MSA-supported peripheral nucleic-acid-facing shell, or do both, while keeping
+declared catalytic, direct-contact, Wang thumb-track, and mapped residues
+255-311 fixed and requiring preserved predicted local backbone geometry.
 ```
 
 The first pass should not jointly redesign the RT and lnRNA/pretroDNA substrate.
@@ -119,12 +126,12 @@ understood.
 | --- | --- | --- | --- |
 | Structure authority | Selected PDB/mmCIF, chain policy, reference sequence hash. | `BackboneBundle`, `ResidueMap`. | study then `thread` |
 | Evidence profiles | Residue map plus MSA/contact source declarations. | `ConservationProfile`, `ContactProfile`. | study policy, `thread` normalization |
-| Mask algebra | Evidence profiles plus manual study masks. | `ResidueMaskSet`. | `thread` mechanics, study policy |
-| Sampling | Mask set plus backend request. | `ThreadPlan`, `ThreadSample` rows. | `thread` contracts; `infer` optional execution provider |
-| Candidate selection | Sample rows plus ranking policy. | `ThreadCandidate` table. | `thread` mechanics, study ranking |
-| Fold QA | Candidate table plus fold runtime declaration. | `FoldCheckReport`. | `thread` normalization; `infer` optional execution provider |
-| Synthesis feasibility | Accepted full-sequence candidates. | `AssemblyFeasibilityReport`. | `thread` mutation-window QA plus study policy |
-| Downstream handoff | Accepted candidates and hashes. | `CandidateHandoff`. | `thread` bundle, study selection policy, then RT-lnRNA acceptance |
+| Generation policy | Evidence profiles plus study protection and alphabet rules. | Fixed positions, open positions, per-residue alphabets, and policy hash. | study policy with generic ProteinMPNN request mechanics |
+| Sampling | One complete generation policy plus backend request. | Complete ProteinMPNN sequence rows with one policy id. | `thread` contracts; `infer` optional execution provider |
+| Candidate pool | Sample rows plus policy provenance. | Deduplicated complete-sequence table. | `thread` mechanics, study provenance checks |
+| Fold QA | Candidate table plus fold runtime declaration. | `FoldCheckReport` and normalized model set. | `thread` normalization; SCC runtime |
+| Local geometry and selection | Candidate and fold rows plus named regions and selected-panel policy. | Local-RMSD table and one eight-row selected panel. | study selection policy |
+| Downstream handoff | Selected protein rows and hashes. | `CandidateHandoff`. | `thread` bundle, then RT-lnRNA acceptance |
 
 Every stage accepts only the previous stage's declared artifact, never an
 ad-hoc reconstruction from filenames or transient notebook state.
@@ -140,11 +147,10 @@ they are free of Eco1 biology and have their own contract tests.
 
 Do not hide model execution behind an implicit run-all framework. Eco1 can call
 the generic ProteinMPNN adapter with an explicit tool root and request manifest,
-then call generic candidate-table construction after sample ingest. Fold
-checking is now materialized for WT plus the 96 accepted candidates; feasibility
-analysis and primary-panel selection are now materialized for the expanded
-design-class pool; RT-only candidate handoff remains an explicit later gate.
+then call generic candidate-table construction after sample ingest. The v3
+policy, ProteinMPNN, candidate-pool, ColabFold, fold-review, and selection
+artifacts are materialized and keyed to the v3 policy hash.
 
-Use `implementation-roadmap.md` for the exact implementation slice order. That
-page is the current owner of code-home, input/output, and negative-path
-decisions for the transition from scaffold to executable contracts.
+Use `implementation-roadmap.md` for the active runtime order. That
+page owns stage order, owner boundaries, canonical commands, and fail-fast
+conditions.

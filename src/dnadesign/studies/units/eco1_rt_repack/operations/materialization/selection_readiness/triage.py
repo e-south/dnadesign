@@ -15,9 +15,15 @@ import json
 from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
-    ALLOWED_FOLD_CLASSES,
     SAE_WINDOW_SELECTION_THRESHOLD,
+    WANG_ALPHA1_INTERFACE_POSITION,
+    WANG_ALPHA1_INTERFACE_POSITIONS,
 )
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.mutation_distance import (
+    canonical_mutation_positions,
+)
+
+from .selection_policy_context import resolve_selection_policy_context
 
 _PROXIMAL_REGION_MSA_SUPPORT_IDS = frozenset(
     {
@@ -33,7 +39,6 @@ def build_triage_rows(
     *,
     candidate_rows: Sequence[dict[str, object]],
     fold_review_rows: Sequence[dict[str, object]],
-    feasibility_rows: Sequence[dict[str, object]],
     llr_300m_rows: Sequence[dict[str, object]],
     llr_6b_rows: Sequence[dict[str, object]],
     sae_window_rows: Sequence[dict[str, object]],
@@ -45,7 +50,6 @@ def build_triage_rows(
     """Build the flat reviewer-facing triage table."""
 
     fold_by_id = {str(row["candidate_id"]): row for row in fold_review_rows}
-    feasibility_by_id = {str(row["candidate_id"]): row for row in feasibility_rows}
     llr300_by_id = _llr_by_candidate(llr_300m_rows)
     llr6b_by_id = _llr_by_candidate(llr_6b_rows)
     sae_by_id = _sae_by_candidate(sae_window_rows)
@@ -56,26 +60,33 @@ def build_triage_rows(
             continue
         candidate_id = str(candidate["candidate_id"])
         fold = fold_by_id.get(candidate_id)
-        feasibility = feasibility_by_id.get(candidate_id)
         sae = sae_by_id.get(candidate_id)
         if candidate_id not in review_axis_by_candidate:
             raise ValueError(f"Missing Eco1 selection review axes for candidate: {candidate_id}")
         review_axes = review_axis_by_candidate[candidate_id]
         local_structure_review = local_structure_review_by_candidate.get(candidate_id)
+        policy_id = str(candidate.get("policy_id") or candidate.get("primary_policy_id") or "")
+        primary_policy_id = str(candidate.get("primary_policy_id") or policy_id)
+        policy_context = resolve_selection_policy_context(candidate)
         hard_gate_status, reasons = _hard_gate_status(
             candidate=candidate,
             fold=fold,
-            feasibility=feasibility,
             review_axes=review_axes,
             local_structure_review=local_structure_review,
         )
+        mutation_positions = canonical_mutation_positions(candidate.get("canonical_mutations"))
         row = {
             "candidate_id": candidate_id,
             "sequence_hash": str(candidate["sequence_hash"]),
-            "design_class_id": str(candidate["design_class_id"]),
-            "mask_policy_id": str(candidate.get("mask_policy_id") or candidate["design_class_id"]),
+            "policy_id": policy_id,
+            "primary_policy_id": primary_policy_id,
+            "selection_support_policy_id": policy_context.policy_id,
+            "selection_support_policy_source": policy_context.source_field,
+            "source_policy_ids": candidate.get("source_policy_ids") or [],
             "mutation_count_total": int(candidate.get("mutation_count") or 0),
             "sequence_distance_to_wt": int(candidate.get("mutation_count") or 0),
+            "wang_alpha1_r13_mutation_count": int(WANG_ALPHA1_INTERFACE_POSITION in mutation_positions),
+            "wang_alpha1_mutation_count": len(mutation_positions & WANG_ALPHA1_INTERFACE_POSITIONS),
             "nearest_selected_distance_aa": None,
             "fold_review_class": str((fold or {}).get("review_class") or ""),
             "mean_plddt": _float_or_none((fold or {}).get("plddt")),
@@ -89,7 +100,6 @@ def build_triage_rows(
             **_review_axis_fields(review_axes),
             **_proximal_region_support_fields(proximal_support_by_id.get(candidate_id)),
             **_local_structure_fields(local_structure_review),
-            "feasibility_status": str((feasibility or {}).get("feasibility_status") or ""),
             "hard_gate_status": hard_gate_status,
             "hard_gate_failure_reasons_json": json.dumps(reasons, sort_keys=True),
             "slot_candidate_status": _slot_candidate_status(hard_gate_status),
@@ -97,14 +107,13 @@ def build_triage_rows(
             "temperature": _float_or_none(candidate.get("temperature")),
             "input_candidate_pool_hash": input_hashes["candidate_pool"],
             "input_foldcheck_review_hash": input_hashes["foldcheck_review"],
-            "input_feasibility_report_hash": input_hashes["feasibility_report"],
             "input_sae_window_summary_hash": input_hashes.get("sae_window_summary"),
             "input_conservation_profile_hash": input_hashes["conservation_profile"],
             "input_clade9_alignment_hash": input_hashes["clade9_alignment"],
             "input_subtype_alignment_hash": input_hashes["subtype_alignment"],
             "input_contact_geometry_profile_hash": input_hashes["contact_geometry_profile"],
         }
-        row.update(_primary_panel_candidate_fields(row))
+        row.update(_selection_candidate_fields(row))
         rows.append(row)
     return rows
 
@@ -113,7 +122,6 @@ def _hard_gate_status(
     *,
     candidate: dict[str, object],
     fold: dict[str, object] | None,
-    feasibility: dict[str, object] | None,
     review_axes: dict[str, object] | None = None,
     local_structure_review: dict[str, object] | None = None,
 ) -> tuple[str, list[str]]:
@@ -130,10 +138,6 @@ def _hard_gate_status(
         reasons.append("missing_fold_review_row")
     elif str(fold.get("foldcheck_status")) != "accepted":
         reasons.append("foldcheck_status_not_accepted")
-    if feasibility is None:
-        reasons.append("missing_feasibility_row")
-    elif str(feasibility.get("feasibility_status")) != "feasible":
-        reasons.append("feasibility_not_feasible")
     if local_structure_review is None:
         reasons.append("missing_local_structure_review")
     else:
@@ -144,9 +148,6 @@ def _hard_gate_status(
             reasons.append("local_structure_threshold_exceeded")
         elif local_structure_status != "passed":
             reasons.append("local_structure_gate_not_passed")
-    review_class = str((fold or {}).get("review_class") or "")
-    if review_class and review_class not in ALLOWED_FOLD_CLASSES:
-        reasons.append("fold_review_class_not_allowed")
     if any(reason.startswith("missing_") for reason in reasons) or "local_structure_gate_unavailable" in reasons:
         return "missing_inputs", sorted(reasons)
     if reasons:
@@ -160,10 +161,16 @@ def _slot_candidate_status(hard_gate_status: str) -> str:
     return "not_panel_eligible"
 
 
-def _primary_panel_candidate_fields(row: dict[str, object]) -> dict[str, object]:
+def _selection_candidate_fields(row: dict[str, object]) -> dict[str, object]:
     reasons: list[str] = []
     if str(row.get("hard_gate_status") or "") != "eligible":
         reasons.append("preservation_contract_not_met")
+
+    r13_mutation_count = int(row.get("wang_alpha1_r13_mutation_count") or 0)
+    if r13_mutation_count:
+        r13_status = "substituted"
+    else:
+        r13_status = "retained_wt"
 
     acidic_gain_count = int(row.get("nucleic_acid_facing_acidic_gain_count") or 0)
     if acidic_gain_count:
@@ -182,15 +189,10 @@ def _primary_panel_candidate_fields(row: dict[str, object]) -> dict[str, object]
     else:
         support_status = "passed"
 
-    primary = not reasons
-    if primary:
-        tier = "primary_panel_candidate"
-    else:
-        tier = "not_panel_candidate"
     return {
-        "primary_panel_candidate": primary,
-        "selection_candidate_tier": tier,
-        "primary_panel_failure_reasons_json": json.dumps(sorted(reasons), sort_keys=True),
+        "selection_contract_pass": not reasons,
+        "selection_contract_failure_reasons_json": json.dumps(sorted(reasons), sort_keys=True),
+        "wang_alpha1_r13_review_status": r13_status,
         "near_retained_dna_rna_acidic_gain_review_status": chemistry_status,
         "proximal_msa_support_review_status": support_status,
     }
@@ -227,6 +229,8 @@ def _review_axis_fields(values: dict[str, object]) -> dict[str, object]:
         "subtype_unobserved_mutation_count": None,
         "subtype_rare_or_unobserved_mutation_count": None,
         "selection_support_profile_id": "",
+        "selection_support_policy_id": "",
+        "selection_support_policy_source": "",
         "selection_support_alt_observed_fraction": None,
         "selection_support_alt_frequency_mean": None,
         "selection_support_unobserved_mutation_count": None,
@@ -241,8 +245,6 @@ def _review_axis_fields(values: dict[str, object]) -> dict[str, object]:
         "nucleic_acid_facing_acidic_gain_count": None,
         "nucleic_acid_facing_proline_glycine_gain_count": None,
         "nucleic_acid_facing_chemistry_warning_count": None,
-        "nucleic_acid_facing_chemistry_compatible": None,
-        "nucleic_acid_facing_chemistry_gate_status": None,
     }
     fields.update({key: values.get(key) for key in fields if key in values})
     return fields
@@ -257,7 +259,8 @@ def _local_structure_fields(values: dict[str, object] | None) -> dict[str, objec
         "local_structure_unavailable_region_count": None,
         "local_structure_threshold_failed_region_count": None,
         "local_structure_threshold_policy_id": "",
-        "local_structure_max_ca_rmsd_angstrom": None,
+        "local_structure_max_gated_ca_rmsd_angstrom": None,
+        "local_structure_max_all_region_ca_rmsd_angstrom": None,
         "local_structure_mean_ca_rmsd_angstrom": None,
         "local_structure_catalytic_initiation_context_ca_rmsd_angstrom": None,
         "local_structure_retron_x_naxxh_context_ca_rmsd_angstrom": None,

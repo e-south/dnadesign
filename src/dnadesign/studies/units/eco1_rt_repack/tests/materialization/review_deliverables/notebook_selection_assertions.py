@@ -17,7 +17,7 @@ def assert_selection_notebook_contract(combined_text: str) -> None:
     assert "selection_funnel_summary" in combined_text
     assert "render_selection_funnel_summary" in combined_text
     assert "selection_panel_table" in combined_text
-    assert "Six Eco1 RT variants form a protein review panel" in combined_text
+    assert "Selected Eco1 RT panel" in combined_text
     assert "handoff_readiness" in combined_text
     assert "render_handoff_readiness" in combined_text
     assert "candidate_handoff.yaml is absent" in combined_text

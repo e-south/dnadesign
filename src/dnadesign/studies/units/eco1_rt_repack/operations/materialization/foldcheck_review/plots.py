@@ -121,13 +121,13 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
         and row.get("plddt") is not None
         and row.get("seq_recovery") is not None
     ]
-    sequence_identity = [_float(row.get("seq_recovery")) * 100.0 for row in valid_rows]
+    design_position_recovery = [_float(row.get("seq_recovery")) * 100.0 for row in valid_rows]
     scatter = ax.scatter(
         [_float(row.get("wt_runtime_ca_rmsd")) for row in valid_rows],
         [_float(row.get("plddt")) for row in valid_rows],
-        c=sequence_identity,
+        c=design_position_recovery,
         cmap="viridis",
-        norm=_color_norm(sequence_identity),
+        norm=_color_norm(design_position_recovery),
         s=44,
         alpha=0.88,
         edgecolors="#ffffff",
@@ -139,14 +139,14 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
     ax.set_title(title, fontsize=_TITLE_SIZE, pad=10)
     _style_scatter_axis(ax)
     colorbar = fig.colorbar(scatter, ax=ax, orientation="horizontal", fraction=0.055, pad=0.13)
-    colorbar.set_label("Sequence identity to Ec86 WT (%)", fontsize=_LEGEND_SIZE)
+    colorbar.set_label("ProteinMPNN design-position recovery (%)", fontsize=_LEGEND_SIZE)
     colorbar.ax.tick_params(labelsize=_LEGEND_SIZE)
     fig.tight_layout(rect=(0, 0.03, 1, 0.99))
     path = plot_root / "fold_metric_scatter.svg"
     alt = (
         "Scatter plot of WT-runtime C-alpha RMSD versus mean pLDDT for Eco1 "
         f"ProteinMPNN candidates. The plot contains {len(rows)} candidate points "
-        "colored by sequence identity to the Ec86 WT reference."
+        "colored by ProteinMPNN recovery at designable positions."
     )
     _save_accessible_svg(fig, path, title=title, description=alt)
     return _plot_row(
@@ -156,7 +156,7 @@ def _write_fold_metric_scatter(plot_root: Path, rows: list[dict[str, Any]]) -> d
         alt_text=alt,
         description=(
             "Shows confidence and within-run structural drift as quantitative axes, "
-            "with point color showing sequence identity to Ec86 WT."
+            "with point color showing ProteinMPNN recovery at designable positions."
         ),
         interpretation_limit="This is a structural-fidelity summary, not activity or processivity evidence.",
         data_sources=["foldcheck_review/foldcheck_candidate_ranking.parquet"],

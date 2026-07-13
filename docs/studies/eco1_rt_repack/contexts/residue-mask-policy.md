@@ -3,151 +3,95 @@ doc_id: study-eco1-rt-repack-residue-mask-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-11
 ---
 
-## Residue Mask Policy
+## Generation Policy
 
-The current mask rule is `eco1_rt_clade9_plurality25_direct_contact5a_v1`.
-Contact-risk review artifacts do not protect or release residues.
+The active ProteinMPNN input is a complete generation policy, not a set of
+mutations to combine later. Each policy declares fixed positions, open
+positions, and one allowed amino-acid alphabet for every open residue.
 
-The rule is deliberately small:
+### Shared Fixed Positions
 
-```text
-protected =
-  NAxxH / YADD / VTG
-  OR Wang/Ec86 direct substrate-contact prior
-  OR Eco1 amino acid is evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA
-  OR mapped residue is within 5 A of retained DNA/RNA
+All active policies fix:
 
-non_fixed = NOT protected
-```
+- Eco1 motif contexts `99-115`, `189-204`, and `237-251`;
+- mapped residues at or below 5 A from retained DNA/RNA;
+- Wang thumb-track positions `238`, `239`, `240`, `249`, `257`, `261`, `264`,
+  and `298`;
+- mapped residues `255-311`, covering the mapped part of the `255-320`
+  primer-recognition RNA-binding fragment;
+- positions in the declared Ec86 clade 9 conserved/core mask.
 
-Eco1's retained msDNA/msrRNA wraps broadly around the RT, so broad distance
-cutoffs such as 15-20 A overprotect the whole enzyme. This rule uses
-direct contact instead: only mapped residues within 5 A of retained DNA/RNA are
-protected by distance.
+Residues `1`, `2`, and `312-320` lack mapped 7V9U backbone coordinates and are
+not fixed-backbone design positions. RT1-RT7 intervals are annotation labels,
+not protection rules.
 
-Terminal residues `1`, `2`, and `312-320` are present in the Eco1 sequence but
-missing from the selected fixed-backbone structure. They are not protected by
-the mask policy. They should be reported as `non_fixed_missing_backbone`, which
-means they are unprotected but cannot be mutated by fixed-backbone ProteinMPNN
-until coordinates are supplied or handled separately.
+### Open Sets
 
-### Protected Sources
+The peripheral shell contains mapped, unprotected positions more than 5 A and
+at or below 10 A from retained DNA/RNA.
 
-| Source | Policy |
-| --- | --- |
-| NAxxH `105-109` | protected |
-| YADD `195-198` | protected |
-| VTG `243-245` | protected |
-| Wang/Ec86 direct substrate-contact priors | protected |
-| >=25% WT plurality in the Ec86 clade 9 MSA | protected |
-| mapped residue within 5 A of retained DNA/RNA | protected |
-| terminal missing-backbone residues `1`, `2`, `312-320` | `non_fixed_missing_backbone`; not protected, not directly fixed-backbone ProteinMPNN mutable until coordinates exist |
+| Policy | Open positions | Requested sequences |
+| --- | --- | ---: |
+| `distal_scaffold_repack_v1` | 25 distal scaffold positions | 336 |
+| `near_dna_rna_acid_free_v1` | 59 peripheral positions | 336 |
+| `combined_near_acid_free_plus_distal_v1` | 59 peripheral plus 25 distal positions | 336 |
 
-RT1-RT7 intervals remain annotation and review labels. They do not blanket
-hard-fix residues under this rule.
+The combined policy asks ProteinMPNN to design distal and peripheral positions
+jointly. The policies produce complete sequences, not mutation bins. Policy
+identity is provenance and does not rank candidate quality. The downstream
+selection contract retains two distal, three peripheral, and three combined
+sequences as explicit experimental contrasts.
 
-### Current Counts
+### Amino-Acid Alphabets
 
-Applying the current rule gives this row-level classification:
+Peripheral residues are represented in ProteinMPNN's public `omit_AA_jsonl`
+input. The v3 requests also use global `--omit_AAs C`.
 
-| Class | Count |
-| --- | ---: |
-| `non_fixed` mapped residues | 123 |
-| `non_fixed_missing_backbone` terminal residues | 11 |
-| evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA | 106 |
-| within 5 A retained DNA/RNA | 120 |
-| NAxxH / YADD / VTG | 12 |
-| Wang/Ec86 direct substrate-contact priors | 8 |
+- Distal positions use the broad standard alphabet without cysteine.
+- Peripheral positions allow MSA-observed alternatives without new D/E or new
+  P/G substitutions.
+- An open WT cysteine is omitted. C233 is therefore forced to change in the
+  proximal policies.
 
-Total unprotected positions: `134`. Directly fixed-backbone ProteinMPNN mutable
-positions from the current 7V9U backbone: `123`.
+The peripheral rule prevents clear acidic regressions. It does not assert that
+positive charge improves binding or function.
 
 ### Evidence Roles
 
-The method rationale is intentionally plain:
+- Wang and 7V9U define retained DNA/RNA geometry, direct contacts, and the
+  electropositive-surface prior.
+- Inouye 1999 supports the C-terminal 91-residue primer-template recognition
+  context; Inouye 2004 supports the `255-320` RNA-binding fragment.
+- Mestre supplies the Ec86 clade source set used for observed alternatives and
+  conservation.
+- Tao supports the constraint-first fixed-backbone generation and structural
+  review pattern, not the Eco1 distance shells or functional claims.
+- Simon supplies motif and region annotation grammar.
 
-- Tao supplies the fixed-backbone RT redesign method prior and homolog-MSA
-  WT-plurality conservation rule.
-- Mestre supplies the Ec86 clade/type source ontology for homolog panels.
-- Wang supplies the Eco1/Ec86 cryo-EM structure and specific RT-msDNA/msrRNA
-  substrate-contact priors.
-- Simon supplies RT-region and motif annotation grammar.
-- Inouye et al. 1999 and Inouye et al. 2004 supply Ec86 C-terminal/thumb
-  primer-RNA recognition context. They justify keeping thumb and C-terminal
-  review axes visible, but they do not turn thumb-domain mutation into a
-  conservative default.
+ESMC, SAE, contact-risk plots, and RT1-RT7 tracks are review context. They do
+not change fixed or open positions.
 
-Evidence-review artifacts explain the structure context but are not mask inputs.
-WT ESMC masked-marginal entropy and substitution LLRs are also review-only
-model check evidence under this policy; they do not protect or release
-residues unless a future mask policy explicitly promotes them.
+### Materialized Contract
 
-### Generation Policies
-
-The active generation path uses complete ProteinMPNN policies. A policy is the
-whole command contract: fixed positions, open positions, and any residue-level
-alphabet rule. Mutations are not combined across outputs from separate policies.
-
-The current primary policies are:
-
-- `distal_scaffold_repack_v1`
-- `near_dna_rna_acid_free_v1`
-- `combined_near_acid_free_plus_distal_v1`
-
-All three policies use the same protected set: motif contexts, direct retained
-DNA/RNA contacts, Wang thumb-track positions, conserved/core positions, and the
-C-terminal/thumb primer-RNA recognition context. `distal_scaffold_repack_v1`
-opens distal scaffold positions only. `near_dna_rna_acid_free_v1` opens the
-near retained DNA/RNA shell outside direct contacts and uses acid-free
-near-region chemistry rules. `combined_near_acid_free_plus_distal_v1` opens the
-union of those two sets in one upstream ProteinMPNN run.
-
-The active v2 pool contains 1007 generated candidate rows. The selection funnel
-retains 855 preservation-pass rows, 335 chemistry/support-pass rows, and six
-selected protein hypotheses. The selected six currently all come from
-`distal_scaffold_repack_v1`; near and combined rows did not pass the current
-chemistry/support gate. The panel therefore supports conservative distal
-scaffold repacking only. It is not evidence for processivity improvement,
-strand-displacement improvement, or direct thumb-track tuning.
-
-### Implementation Contract
-
-Study-local mask row algebra lives in
-`src/dnadesign/studies/units/eco1_rt_repack/operations/masking/`. The
-`mask_set` materializer should write one row-level artifact for this rule.
-Wang/Ec86 direct-contact priors must come from the study authority surface, not
-a hard-coded list inside the materializer.
-
-Expected `mask_set.yaml` row shape:
-
-```text
-canonical_position
-wt_aa
-design_position
-has_backbone_coordinates
-motif_protected
-wang_ec86_direct_contact_prior
-wt_plurality_frequency
-wt_plurality_aa
-min_distance_to_retained_dna_rna_angstrom
-protected
-non_fixed
-non_fixed_missing_backbone
-protection_reasons
-```
+`generation_policy_manifest.yaml`, `generation_policy_positions.parquet`, and
+`generation_policy_alphabets.parquet` are materialized under
+`outputs/thread/generation_policies_v3/`. Each ProteinMPNN request carries the
+policy id, policy version, policy-manifest hash, fixed positions, open
+positions, global omissions, and any residue-specific omission sidecar required
+by the policy.
 
 ### Fail-Fast Rules
 
-- Missing `mask_set.yaml` blocks thread execution.
-- Every protected residue must name at least one protection source.
-- `non_fixed` must equal `NOT protected`.
-- Residues `1`, `2`, and `312-320` must be
-  `non_fixed_missing_backbone`, not protected.
-- Missing-backbone residues must not be emitted as directly fixed-backbone
-  ProteinMPNN mutable positions until coordinates exist.
-- No RT1-RT7 interval may blanket hard-fix residues.
-- Wang/Ec86 direct-contact priors must be explicit study-owned records before
-  they protect residues.
+- A candidate must be one complete ProteinMPNN output from one policy.
+- Missing or mismatched v3 policy hashes block downstream ingestion.
+- Every protected position must name at least one reason.
+- Fixed and open positions must be disjoint.
+- Every peripheral open position must have one residue-level alphabet.
+- Global cysteine omission and any forced open-WT-cysteine change must remain
+  explicit.
+- New cysteine and peripheral D/E, P, or G must be absent from allowed
+  alternatives.
+- Missing-backbone positions must not appear in ProteinMPNN open positions.

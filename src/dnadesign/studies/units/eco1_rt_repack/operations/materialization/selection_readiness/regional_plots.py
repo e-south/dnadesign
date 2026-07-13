@@ -26,16 +26,16 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.re
     save_accessible_svg,
 )
 
-from ..shared.design_class_mask_annotations import add_rt_annotation_context
 from ..shared.rt_annotation_context import RTAnnotationContext
+from ..shared.rt_plot_annotations import add_rt_annotation_context
 from .plot_support import (
     canonical_mutations,
-    class_label,
     matrix_text_color,
     mutation_category,
     ordered_panel_rows,
     parse_mutation,
     plot_row,
+    policy_label,
     position_tick_indices,
     short_candidate,
     tie_break_trace,
@@ -50,6 +50,8 @@ from .review_axes import (
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+_C_TERMINAL_BOUNDARY_REVIEW_POSITIONS = frozenset(range(230, 255))
+
 
 def build_regional_mutation_burden_matrix(
     *,
@@ -63,7 +65,8 @@ def build_regional_mutation_burden_matrix(
         "Catalytic or direct contact",
         "Near retained DNA/RNA region",
         "Thumb-contact track",
-        "C-terminal primer-RNA recognition region",
+        "Designable C-terminal boundary 230-254",
+        "Fixed C-terminal context 255-311",
         "Distal scaffold",
     ]
     ordered_panel = ordered_panel_rows(panel_rows)
@@ -77,15 +80,23 @@ def build_regional_mutation_burden_matrix(
         if candidate is None:
             raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
         counts = _regional_counts_from_panel_trace(panel_row)
+        boundary_count = sum(
+            int(parse_mutation(mutation)["position"]) in _C_TERMINAL_BOUNDARY_REVIEW_POSITIONS
+            for mutation in canonical_mutations(candidate.get("canonical_mutations"))
+        )
         if counts is None:
-            counts = [0, 0, 0, 0, 0]
+            counts = [0, 0, 0, 0, 0, 0]
             for mutation in canonical_mutations(candidate.get("canonical_mutations")):
                 parsed = parse_mutation(mutation)
                 position = int(parsed["position"])
                 counts[_regional_bucket_index(position, residue_by_position.get(position, {}))] += 1
-                if position in C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS:
+                if position in _C_TERMINAL_BOUNDARY_REVIEW_POSITIONS:
                     counts[3] += 1
-        row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
+                if position in C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS:
+                    counts[4] += 1
+        else:
+            counts.insert(3, boundary_count)
+        row_labels.append(f"{_short_group_label(panel_row)}  {short_candidate(candidate_id)}")
         matrix.append(counts)
     return region_labels, row_labels, matrix
 
@@ -104,7 +115,6 @@ def write_selected_substitutions_across_rt_plot(
     candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
     ordered_residues = sorted(mask_residues, key=lambda row: int(row["canonical_position"]))
     positions = [int(row["canonical_position"]) for row in ordered_residues]
-    residue_letters = [str(row.get("wt_aa") or "") for row in ordered_residues]
     position_index = {position: index for index, position in enumerate(positions)}
     missing_columns = {
         index
@@ -125,10 +135,10 @@ def write_selected_substitutions_across_rt_plot(
             if position in position_index:
                 values[position_index[position]] = mutation_category(str(parsed["wt"]), str(parsed["alt"]))
         matrix.append(values)
-        row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
     if not matrix:
         raise ValueError("selected-substitution plot requires selected candidates")
-    fig, ax = plt.subplots(figsize=(12.2, max(3.8, 0.5 * len(matrix) + 2.0)))
+    fig, ax = plt.subplots(figsize=(18.2, 5.75))
     cmap = ListedColormap(
         [
             (247 / 255.0, 245 / 255.0, 239 / 255.0, 0.62),
@@ -147,22 +157,15 @@ def write_selected_substitutions_across_rt_plot(
         add_rt_annotation_context(ax, positions, row_count=len(matrix), context=rt_annotation_context)
     ax.imshow(matrix, aspect="auto", interpolation="nearest", cmap=cmap, norm=norm, zorder=2)
     ax.set_yticks(list(range(len(row_labels))))
-    ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
+    ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.2)
     tick_positions = position_tick_indices(len(positions))
     ax.set_xticks(tick_positions)
-    ax.set_xticklabels([str(positions[index]) for index in tick_positions], fontsize=9.6)
-    ax.set_xlabel("Residue position", fontsize=LABEL_SIZE, labelpad=8)
-    top_axis = ax.secondary_xaxis("top")
-    letter_tick_positions = list(range(len(positions)))
-    top_axis.set_xticks(letter_tick_positions)
-    top_axis.set_xticklabels([residue_letters[index] for index in letter_tick_positions], fontsize=2.8)
-    for tick_label in top_axis.get_xticklabels():
-        tick_label.set_fontfamily("DejaVu Sans Mono")
-    top_axis.tick_params(length=0, pad=4)
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=58)
+    ax.set_xticklabels([str(positions[index]) for index in tick_positions], fontsize=11.2)
+    ax.set_xlabel("Eco1 RT residue position", fontsize=LABEL_SIZE + 0.5, labelpad=8)
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=56)
     handles = [
         Patch(facecolor="#f7f5ef", edgecolor="#d8dee4", label="WT retained"),
         Patch(facecolor="#66c2a5", edgecolor="#ffffff", label="Changed"),
@@ -176,19 +179,19 @@ def write_selected_substitutions_across_rt_plot(
     fig.legend(
         handles=handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=4,
+        bbox_to_anchor=(0.5, 0.035),
+        ncol=8,
         frameon=False,
         fontsize=LEGEND_SIZE,
         columnspacing=1.0,
         handletextpad=0.45,
     )
-    fig.subplots_adjust(left=0.28, right=0.985, top=0.68, bottom=0.28)
+    fig.subplots_adjust(left=0.18, right=0.985, top=0.79, bottom=0.24)
     path = plot_root / "selection_selected_substitutions_across_rt.svg"
     alt = (
-        "Heatmap of selected Eco1 RT candidates by residue position. Colored cells mark designed substitutions "
-        "grouped by chemistry class; off-white cells retain WT amino acid identity. Display bands mark audited "
-        "RT1-RT7 intervals and motif-anchor neighborhoods when annotation sources are available."
+        "Single-axis heatmap of selected Eco1 RT candidates from residue 1 through 320. Colored cells mark designed "
+        "substitutions grouped by chemistry class; off-white cells retain WT amino acid identity. Display bands "
+        "mark audited RT1-RT7 intervals and motif-anchor neighborhoods when annotation sources are available."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -223,12 +226,20 @@ def write_regional_mutation_burden_plot(
         candidate_rows=candidate_rows,
         mask_residues=mask_residues,
     )
-    fig, ax = plt.subplots(figsize=(8.6, 7.2))
-    image = ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlOrBr")
+    fig, ax = plt.subplots(figsize=(10.4, 8.1))
+    ax.imshow(matrix, aspect="equal", interpolation="nearest", cmap="YlOrBr")
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(region_labels))))
-    ax.set_xticklabels(region_labels, fontsize=LABEL_SIZE - 1, rotation=22, ha="right")
+    display_region_labels = [
+        "Fixed\nmotifs +\ncontacts",
+        "Peripheral\n5-10 Å\nshell",
+        "Wang\nthumb\ntrack",
+        "Boundary\n230-254",
+        "Fixed\n255-311",
+        "Distal\nscaffold",
+    ]
+    ax.set_xticklabels(display_region_labels, fontsize=9.5, ha="center", linespacing=1.0)
     max_count = max((max(values) for values in matrix), default=0)
     for row_index, values in enumerate(matrix):
         for col_index, value in enumerate(values):
@@ -238,21 +249,18 @@ def write_regional_mutation_burden_plot(
                 str(value),
                 ha="center",
                 va="center",
-                fontsize=9.4,
+                fontsize=10.8,
                 color=matrix_text_color(float(value), max_value=float(max_count)),
             )
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    cbar = fig.colorbar(image, ax=ax, shrink=0.8, pad=0.02)
-    cbar.set_label("Mutation count", fontsize=11)
-    cbar.ax.tick_params(labelsize=10)
-    fig.subplots_adjust(left=0.32, right=0.94, top=0.88, bottom=0.25)
+    fig.subplots_adjust(left=0.25, right=0.98, top=0.90, bottom=0.21)
     path = plot_root / "selection_regional_mutation_burden.svg"
     alt = (
         "Heatmap of selected Eco1 RT candidates by mutation count in catalytic/contact, near retained DNA/RNA, "
-        "thumb-track, C-terminal primer-RNA recognition, and distal regions."
+        "thumb-track, designable residues 230-254, fixed residues 255-311, and distal regions."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -262,8 +270,8 @@ def write_regional_mutation_burden_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Summarizes selected substitutions by RT region so the panel can be read as regional review context "
-            "rather than an activity ranking. The C-terminal column is an overlapping review context."
+            "Summarizes selected substitutions by RT region rather than as an activity ranking. The designable "
+            "230-254 boundary and fixed 255-311 context are overlapping review columns."
         ),
         interpretation_limit=(
             "Regional mutation burden is not a functional predictor. A zero thumb-contact-track count should not be "
@@ -306,7 +314,7 @@ def _regional_bucket_index(position: int, residue: dict[str, object]) -> int:
     distance = _retained_na_distance(residue)
     if distance is not None and distance <= NA_FACING_DISTANCE_ANGSTROM:
         return 1
-    return 4
+    return 5
 
 
 def _is_catalytic_or_direct_contact(residue: dict[str, object]) -> bool:
@@ -325,3 +333,12 @@ def _retained_na_distance(residue: dict[str, object]) -> float | None:
         if value is not None:
             return float(value)
     return None
+
+
+def _short_group_label(panel_row: dict[str, object]) -> str:
+    contrast_id = str(panel_row.get("design_group_id") or "")
+    return {
+        "distal_scaffold_repack": "distal",
+        "peripheral_shell_repack": "peripheral",
+        "combined_peripheral_and_distal_repack": "combined",
+    }.get(contrast_id, policy_label(str(panel_row.get("policy_id") or "")))

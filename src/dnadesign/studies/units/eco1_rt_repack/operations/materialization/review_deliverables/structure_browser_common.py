@@ -12,23 +12,24 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
+from Bio.PDB.MMCIF2Dict import MMCIF2Dict
 
 from dnadesign.thread.structure_views.models import STANDARD_AMINO_ACID_RESIDUE_NAMES
+from dnadesign.thread.structure_views.styles import DNA_COLOR, MOLECULE_CLASS_COLORS, RNA_COLOR
 
 REFERENCE_STRUCTURE_RELATIVE_PATH = "structures/ec86kit_chain_a_backbone_reference.pdb"
 REFERENCE_ALL_ATOM_RELATIVE_PATH = "structures/ec86kit_protomer1_all_atom_reference.cif"
 REFERENCE_BROWSER_PDB_RELATIVE_PATH = "structures/ec86kit_protomer1_all_atom_reference.pdb"
 REFERENCE_COLOR = "#F7F3EA"
-PROTEIN_CLASS_COLOR = "#005AB5"
-DNA_CLASS_COLOR = "#C58A00"
-RNA_CLASS_COLOR = "#D6604D"
+PROTEIN_CLASS_COLOR = MOLECULE_CLASS_COLORS["protein"]
+DNA_CLASS_COLOR = DNA_COLOR
+RNA_CLASS_COLOR = RNA_COLOR
 RESIDUE_CATEGORY_HIGHLIGHT_COLOR = "#C00000"
 CANDIDATE_PASS_COLOR = "#0072B2"
 CANDIDATE_LOW_CONFIDENCE_COLOR = "#6A3D9A"
@@ -72,42 +73,28 @@ def stage_browser_reference_structure(
     repo_root: Path,
     reference_backbone_path: Path,
 ) -> BrowserReferenceStructure:
-    """Stage the all-atom Ec86 reference in a py3Dmol-compatible PDB form."""
+    """Regenerate the browser PDB from the complete all-atom Ec86 mmCIF."""
 
     staged_all_atom_path = reference_backbone_path.parent / Path(REFERENCE_ALL_ATOM_RELATIVE_PATH).name
     staged_browser_pdb_path = reference_backbone_path.parent / Path(REFERENCE_BROWSER_PDB_RELATIVE_PATH).name
-    if staged_browser_pdb_path.exists():
-        return BrowserReferenceStructure(
-            local_path=staged_browser_pdb_path,
-            structure_format="pdb",
-            display_label="Ec86/7V9U all-atom reference",
-            source_status="existing_py3dmol_pdb_reference",
-            source_path=staged_all_atom_path if staged_all_atom_path.exists() else staged_browser_pdb_path,
-        )
-    if staged_all_atom_path.exists():
-        _write_browser_pdb_from_mmcif(source_path=staged_all_atom_path, target_path=staged_browser_pdb_path)
-        return BrowserReferenceStructure(
-            local_path=staged_browser_pdb_path,
-            structure_format="pdb",
-            display_label="Ec86/7V9U all-atom reference",
-            source_status="normalized_existing_all_atom_mmcif_for_py3dmol",
-            source_path=staged_all_atom_path,
-        )
-    source_path = _resolve_ec86kit_model_source(repo_root)
-    if not source_path.exists():
-        raise FileNotFoundError(
-            "Ec86 all-atom reference mmCIF is required for browser side-chain rendering. "
-            f"Expected source from study provenance: {source_path}"
-        )
-    staged_all_atom_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source_path, staged_all_atom_path)
+    source_status = "regenerated_browser_pdb_from_all_atom_mmcif"
+    if not staged_all_atom_path.exists():
+        source_path = _resolve_ec86kit_model_source(repo_root)
+        if not source_path.exists():
+            raise FileNotFoundError(
+                "Ec86 all-atom reference mmCIF is required for browser rendering. "
+                f"Expected source from study provenance: {source_path}"
+            )
+        staged_all_atom_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_path, staged_all_atom_path)
+        source_status = "staged_all_atom_mmcif_and_regenerated_browser_pdb"
     _write_browser_pdb_from_mmcif(source_path=staged_all_atom_path, target_path=staged_browser_pdb_path)
     return BrowserReferenceStructure(
         local_path=staged_browser_pdb_path,
         structure_format="pdb",
         display_label="Ec86/7V9U all-atom reference",
-        source_status="staged_and_normalized_from_ec86kit_model_ref",
-        source_path=source_path,
+        source_status=source_status,
+        source_path=staged_all_atom_path,
     )
 
 
@@ -171,54 +158,81 @@ def _write_browser_pdb_from_mmcif(*, source_path: Path, target_path: Path) -> No
     """Write a PDB text that keeps protein residues on the existing browser-selection numbering."""
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
+    atom_site = MMCIF2Dict(str(source_path))
+    required_columns = (
+        "_atom_site.group_PDB",
+        "_atom_site.id",
+        "_atom_site.type_symbol",
+        "_atom_site.label_atom_id",
+        "_atom_site.label_alt_id",
+        "_atom_site.label_comp_id",
+        "_atom_site.label_asym_id",
+        "_atom_site.Cartn_x",
+        "_atom_site.Cartn_y",
+        "_atom_site.Cartn_z",
+        "_atom_site.auth_asym_id",
+        "_atom_site.auth_seq_id",
+        "_atom_site.pdbx_PDB_ins_code",
+        "_atom_site.occupancy",
+        "_atom_site.B_iso_or_equiv",
+    )
+    missing_columns = [column for column in required_columns if column not in atom_site]
+    if missing_columns:
+        raise ValueError(f"Missing mmCIF atom-site columns in {source_path}: {', '.join(missing_columns)}")
+    column_lengths = {column: len(atom_site[column]) for column in required_columns}
+    if len(set(column_lengths.values())) != 1:
+        raise ValueError(f"Inconsistent mmCIF atom-site column lengths in {source_path}: {column_lengths}")
+
     lines: list[str] = []
     protein_residue_number_by_key: dict[tuple[str, str, str], int] = {}
-    for raw_line in source_path.read_text(encoding="utf-8").splitlines():
-        stripped = raw_line.strip()
-        if not stripped.startswith(("ATOM ", "HETATM ")):
-            continue
-        try:
-            parts = shlex.split(stripped)
-        except ValueError:
-            continue
-        if len(parts) < 18:
-            continue
-        line = _mmcif_atom_parts_to_pdb_line(parts, protein_residue_number_by_key=protein_residue_number_by_key)
-        if line:
-            lines.append(line)
+    source_atom_row_count = next(iter(column_lengths.values()))
+    for row_index in range(source_atom_row_count):
+        lines.append(
+            _mmcif_atom_row_to_pdb_line(
+                atom_site,
+                row_index=row_index,
+                protein_residue_number_by_key=protein_residue_number_by_key,
+            )
+        )
     if not lines:
         raise ValueError(f"No ATOM/HETATM rows could be converted from {source_path}")
     target_path.write_text("\n".join(lines) + "\nEND\n", encoding="utf-8")
 
 
-def _mmcif_atom_parts_to_pdb_line(
-    parts: list[str],
+def _mmcif_atom_row_to_pdb_line(
+    atom_site: dict[str, list[str]],
     *,
+    row_index: int,
     protein_residue_number_by_key: dict[tuple[str, str, str], int],
 ) -> str:
-    group = "HETATM" if parts[0] == "HETATM" else "ATOM"
+    def value(column: str) -> str:
+        return str(atom_site[column][row_index])
+
+    group = "HETATM" if value("_atom_site.group_PDB") == "HETATM" else "ATOM"
     try:
-        serial = int(parts[1])
-        x_coord = float(parts[9])
-        y_coord = float(parts[10])
-        z_coord = float(parts[11])
-        occupancy = float(parts[15])
-        b_factor = float(parts[16])
-    except (TypeError, ValueError):
-        return ""
-    atom_name = _pdb_atom_name(parts[3], parts[2])
-    alt_loc = _pdb_optional_char(parts[4])
-    residue_name = str(parts[5])[:3].upper()
-    chain_id = _pdb_optional_char(parts[12] if len(parts) > 12 else parts[6])
+        serial = int(value("_atom_site.id"))
+        x_coord = float(value("_atom_site.Cartn_x"))
+        y_coord = float(value("_atom_site.Cartn_y"))
+        z_coord = float(value("_atom_site.Cartn_z"))
+        occupancy = float(value("_atom_site.occupancy"))
+        b_factor = float(value("_atom_site.B_iso_or_equiv"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid numeric atom-site value at row {row_index + 1}") from exc
+    atom_name = _pdb_atom_name(value("_atom_site.label_atom_id"), value("_atom_site.type_symbol"))
+    alt_loc = _pdb_optional_char(value("_atom_site.label_alt_id"))
+    residue_name = value("_atom_site.label_comp_id")[:3].upper()
+    chain_id = _pdb_optional_char(value("_atom_site.auth_asym_id") or value("_atom_site.label_asym_id"))
+    auth_seq_id = value("_atom_site.auth_seq_id")
+    insertion_code_value = value("_atom_site.pdbx_PDB_ins_code")
     residue_number = _browser_pdb_residue_number(
         residue_name=residue_name,
         chain_id=chain_id,
-        auth_seq_id=str(parts[13] if len(parts) > 13 else parts[8]),
-        insertion_code=str(parts[14] if len(parts) > 14 else ""),
+        auth_seq_id=auth_seq_id,
+        insertion_code=insertion_code_value,
         protein_residue_number_by_key=protein_residue_number_by_key,
     )
-    insertion_code = _pdb_optional_char(parts[14] if len(parts) > 14 else "")
-    element = str(parts[2]).strip().upper()[:2]
+    insertion_code = _pdb_optional_char(insertion_code_value)
+    element = value("_atom_site.type_symbol").strip().upper()[:2]
     return (
         f"{group:<6}{serial:5d} {atom_name}{alt_loc}{residue_name:>3} {chain_id}"
         f"{residue_number:4d}{insertion_code}   {x_coord:8.3f}{y_coord:8.3f}{z_coord:8.3f}"

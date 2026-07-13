@@ -14,6 +14,7 @@ from __future__ import annotations
 from importlib import import_module
 from pathlib import Path
 
+import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
@@ -58,11 +59,14 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
     mask_structure_browser.write_mask_structure_browser_manifest(
         panel_root=tmp_path / "review_deliverables" / "structure_browser",
         mask_set_path=mask_set_path,
-        design_classes_root=tmp_path / "design_classes",
         reference_structure_path=reference_path,
         reference_structure_format="pdb",
         mask_residues=mask_residues,
         rt_annotation_context=rt_annotation_context,
+        policy_position_rows=pq.read_table(
+            tmp_path / "generation_policies_v3" / "generation_policy_positions.parquet"
+        ).to_pylist(),
+        policy_positions_path=tmp_path / "generation_policies_v3" / "generation_policy_positions.parquet",
     )
 
     manifest = yaml.safe_load(
@@ -70,11 +74,11 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
             encoding="utf-8"
         )
     )
-    fixed_mask = next(
-        row for row in manifest["structures"] if row["candidate_id"] == "eco1_rt_clade9_plurality25_contact5a_v1"
+    protected_view = next(
+        row for row in manifest["structures"] if row["candidate_id"] == "active_mask_protected_positions"
     )
-    style = fixed_mask["selection_styles"][0]
+    style = protected_view["selection_styles"][0]
     assert style["source_coordinate_basis"] == "canonical_position"
     assert style["selection_coordinate_basis"] == "proteinmpnn_export_residue_number"
-    assert style["canonical_residue_numbers"] == [2, 3, 4, 5]
+    assert style["canonical_residue_numbers"] == [3, 4, 5]
     assert style["residue_numbers"] == [1, 2, 3]

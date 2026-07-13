@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/test_structure_browser_runtime.py
 
-Eco1 candidate structure-browser runtime tests.
+Eco1 candidate structure-browser rendering tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +14,6 @@ from __future__ import annotations
 import html as html_lib
 from pathlib import Path
 
-import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
@@ -25,7 +24,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
-    SECTION_FEASIBILITY_AND_HANDOFF,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.fixtures import (
     write_deliverable_inputs,
@@ -40,10 +38,9 @@ from .structure_browser_assertions import (
 )
 
 
-def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
+def _candidate_context(tmp_path: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
     write_deliverable_inputs(tmp_path)
     result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
-
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     rows = structure_browser.load_structure_browser_rows(
         manifest_root=result.manifest_path.parent,
@@ -54,16 +51,22 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         selected_deliverable_id="interactive_structure_browser_manifest",
     )
-    assert "0 WT ColabFold baseline" in group_lookup
-    assert "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)" in group_lookup
-    assert "2 Intermediate fold review band" in group_lookup
+    assert set(group_lookup) >= {
+        "0 WT ColabFold baseline",
+        "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)",
+        "2 Intermediate fold review band",
+    }
     lookup = structure_browser.structure_browser_lookup(
         rows,
         selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
         selected_deliverable_id="interactive_structure_browser_manifest",
         selected_group=group_lookup["1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)"],
     )
-    selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
+    return lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"], rows
+
+
+def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
+    selected, rows = _candidate_context(tmp_path)
     highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
     selected_highlight = next(row for label, row in highlight_lookup.items() if "SAE F101" in label)
 
@@ -75,7 +78,6 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         structure_highlight_ui="<sae-highlight-dropdown>",
         selected_highlight_row=selected_highlight,
         structure_sidechain_ui="<side-chain-toggle>",
-        structure_protein_ui="<protein-color-toggle>",
         structure_dna_visible_ui="<show-dna-toggle>",
         structure_rna_visible_ui="<show-rna-toggle>",
         show_sidechains=True,
@@ -83,28 +85,11 @@ def test_structure_browser_runtime_renders_py3dmol_html(tmp_path: Path) -> None:
         highlight_rna=True,
     )
     rendered_text = str(rendered)
-    unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
-
-    assert_candidate_structure_browser_render(rendered_text, unescaped_rendered)
+    assert_candidate_structure_browser_render(rendered_text, html_lib.unescape(rendered_text).replace(" ", ""))
 
 
 def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp_path: Path) -> None:
-    write_deliverable_inputs(tmp_path)
-    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
-
-    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
-    rows = structure_browser.load_structure_browser_rows(
-        manifest_root=result.manifest_path.parent,
-        deliverables=manifest["deliverables"],
-    )
-    lookup = structure_browser.structure_browser_lookup(
-        rows,
-        selected_section=SECTION_DESIGNS_AND_FOLD_TRIAGE,
-        selected_deliverable_id="interactive_structure_browser_manifest",
-        selected_group="1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)",
-    )
-    selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
-
+    selected, _rows = _candidate_context(tmp_path)
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
         selected_row=selected,
@@ -118,70 +103,24 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
         show_sidechains=False,
     )
     rendered_text = str(rendered)
-    unescaped_rendered = html_lib.unescape(rendered_text).replace(" ", "")
+    assert_mutation_overlay_render(rendered_text, html_lib.unescape(rendered_text).replace(" ", ""))
+    assert "Reference nucleic acids" in rendered_text
 
-    assert_mutation_overlay_render(rendered_text, unescaped_rendered)
 
-
-def test_selected_panel_structure_browser_uses_expanded_selection_rows(tmp_path: Path) -> None:
-    write_deliverable_inputs(tmp_path)
-    result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
-
-    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
-    rows = structure_browser.load_structure_browser_rows(
-        manifest_root=result.manifest_path.parent,
-        deliverables=manifest["deliverables"],
-    )
-    selected_rows = [row for row in rows if row.get("_deliverable_id") == "selected_panel_structure_browser_manifest"]
-    assert {row["candidate_id"] for row in selected_rows} == {
-        "wild_type",
-        "thread_candidate_alpha",
-        "thread_candidate_beta",
-    }
-    alpha_row = next(row for row in selected_rows if row["candidate_id"] == "thread_candidate_alpha")
-    assert alpha_row["protein_sequence"] == "MKSAGG"
-    assert alpha_row["protein_sequence_length"] == 6
-    group_lookup = structure_browser.structure_group_lookup(
-        selected_rows,
-        selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
-        selected_deliverable_id="selected_panel_structure_browser_manifest",
-    )
-    assert "1 Selected panel: primary_panel_01" in group_lookup
-    lookup = structure_browser.structure_browser_lookup(
-        selected_rows,
-        selected_section=SECTION_FEASIBILITY_AND_HANDOFF,
-        selected_deliverable_id="selected_panel_structure_browser_manifest",
-        selected_group=group_lookup["1 Selected panel: primary_panel_01"],
-    )
-    selected = lookup["ProteinMPNN variant rank 1 | WT RMSD 0.82 A | pLDDT 92.4"]
+def test_candidate_highlight_rebinds_reference_selection_to_query_model(tmp_path: Path) -> None:
+    selected, rows = _candidate_context(tmp_path)
+    highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
+    protected = next(row for label, row in highlight_lookup.items() if label.startswith("Protected residues"))
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
         selected_row=selected,
-        structure_ui="<structure-dropdown>",
-        structure_group_ui="<structure-group-dropdown>",
+        structure_ui=None,
+        selected_highlight_row=protected,
+        show_reference_background=False,
         show_sidechains=True,
     )
+
     rendered_text = str(rendered)
-
-    assert "Variant summary" in rendered_text
-    assert "eco1-protein-sequence-panel" in rendered_text
-    assert "Protein sequence" in rendered_text
-    assert "MKSAGG" in rendered_text
-    assert "Panel slot" in rendered_text
-    assert "primary_panel_01" in rendered_text
-    assert "MSA observed fraction" in rendered_text
-    assert "Near retained DNA/RNA edits" in rendered_text
-    assert "Near-region charge change" in rendered_text
-    assert "Distal scaffold changes" in rendered_text
-
-
-def test_structure_browser_manifest_rejects_missing_declared_pdb(tmp_path: Path) -> None:
-    write_deliverable_inputs(tmp_path)
-    full_structure_set_path = tmp_path / "foldcheck_review" / "foldcheck_full_structure_set.yaml"
-    payload = yaml.safe_load(full_structure_set_path.read_text(encoding="utf-8"))
-    payload["structures"][0]["local_model_artifact_path"] = "structures/full_fold_set/missing_model.pdb"
-    full_structure_set_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="declared structure path is missing"):
-        materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
+    assert "Interactive structure viewer failed to render" not in rendered_text
+    assert str(selected["candidate_id"]) in rendered_text

@@ -37,18 +37,18 @@ _POLICY_TEMPLATES: dict[str, dict[str, str]] = {
     NEAR_DNA_RNA_ACID_FREE_POLICY_ID: {
         "open_set_id": "near_dna_rna_gt5_le10_excluding_protected",
         "alphabet_rule_id": "msa_observed_acid_free_basic_polar_neutral",
-        "purpose": "Sample acid-free near retained DNA/RNA chemistry outside direct contacts.",
+        "purpose": "Sample non-acidifying near retained DNA/RNA chemistry outside direct contacts.",
     },
     COMBINED_NEAR_PLUS_DISTAL_POLICY_ID: {
         "open_set_id": "combined_near_acid_free_plus_distal",
         "alphabet_rule_id": "region_specific_near_acid_free_distal_broad",
-        "purpose": "Jointly design conservative near retained DNA/RNA chemistry and distal scaffold diversity.",
+        "purpose": "Jointly design near retained DNA/RNA chemistry and distal scaffold diversity.",
     },
 }
 
 
 def build_default_generation_policy_config() -> dict[str, Any]:
-    """Return the default v3 generation-policy config as a plain mapping."""
+    """Return the v3 generation-policy config as a plain mapping."""
 
     return {
         "generation_policy_version": GENERATION_POLICY_VERSION,
@@ -64,7 +64,7 @@ def build_default_generation_policy_config() -> dict[str, Any]:
 
 
 def validate_generation_policy_config(payload: Mapping[str, Any]) -> GenerationPolicyConfig:
-    """Validate the v3 config and reject old design-class identifiers."""
+    """Validate the v3 config and reject retired design-class identifiers."""
 
     version = payload.get("generation_policy_version")
     if version != GENERATION_POLICY_VERSION:

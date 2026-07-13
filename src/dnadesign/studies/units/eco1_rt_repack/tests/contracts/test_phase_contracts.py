@@ -67,7 +67,7 @@ def test_candidate_handoff_schema_requires_flat_sequence_csv_authority() -> None
     assert {
         "candidate_id",
         "selection_slot",
-        "design_class_id",
+        "policy_id",
         "protein_sequence",
         "sequence_hash",
         "amino_acid_length",

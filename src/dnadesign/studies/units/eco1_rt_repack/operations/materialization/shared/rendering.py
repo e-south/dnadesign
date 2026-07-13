@@ -15,6 +15,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+import matplotlib
+
 OKABE_ITO = {
     "blue": "#0072B2",
     "orange": "#E69F00",
@@ -30,6 +32,14 @@ TITLE_SIZE = 16
 LABEL_SIZE = 13.5
 TICK_SIZE = 12
 LEGEND_SIZE = 12
+
+matplotlib.rcParams.update(
+    {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "axes.unicode_minus": False,
+    }
+)
 
 
 def save_accessible_svg(fig: Any, path: Path, *, title: str, description: str, dpi: int = 180) -> None:

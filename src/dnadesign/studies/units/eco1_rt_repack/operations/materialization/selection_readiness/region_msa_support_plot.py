@@ -23,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.re
     save_accessible_svg,
 )
 
-from .plot_support import class_label, matrix_text_color, ordered_panel_rows, plot_row, short_candidate
+from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_candidate
 from .region_msa_support import REGION_MSA_SUPPORT_REGION_IDS
 from .visual_inventory import SELECTION_PLOT_PLAIN_TITLES
 
@@ -54,7 +54,7 @@ def build_selected_region_msa_support_matrix(
     unobserved_matrix: list[list[int]] = []
     for panel_row in ordered_panel_rows(panel_rows):
         candidate_id = str(panel_row["candidate_id"])
-        row_labels.append(f"{class_label(str(panel_row['design_class_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
         fractions: list[float | None] = []
         unobserved: list[int] = []
         for region_id in REGION_MSA_SUPPORT_REGION_IDS:
@@ -92,10 +92,10 @@ def write_regionwise_msa_support_plot(
         dtype=float,
     )
     masked_values = np.ma.masked_invalid(plot_values)
-    fig, ax = plt.subplots(figsize=(8.6, 7.2))
+    fig, ax = plt.subplots(figsize=(8.6, 11.7))
     cmap = plt.get_cmap("YlGnBu").copy()
     cmap.set_bad("#d0d7de")
-    image = ax.imshow(masked_values, aspect="equal", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=1.0)
+    ax.imshow(masked_values, aspect="auto", interpolation="nearest", cmap=cmap, vmin=0.0, vmax=1.0)
     ax.set_yticks(list(range(len(row_labels))))
     ax.set_yticklabels(row_labels, fontsize=LABEL_SIZE - 0.5)
     ax.set_xticks(list(range(len(region_labels))))
@@ -106,20 +106,23 @@ def write_regionwise_msa_support_plot(
                 text = "no edits"
                 color = "#24292f"
             else:
-                text = f"{value:.0%}\n{unobserved[row_index][col_index]} unobs."
+                missing_count = unobserved[row_index][col_index]
+                if missing_count == 0:
+                    text = f"{value:.0%} observed\nall edits seen"
+                else:
+                    suffix = "edit" if missing_count == 1 else "edits"
+                    text = f"{value:.0%} observed\n{missing_count} {suffix} not seen"
                 color = matrix_text_color(value, max_value=1.0)
             ax.text(col_index, row_index, text, ha="center", va="center", fontsize=8.2, color=color)
     ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    cbar = fig.colorbar(image, ax=ax, shrink=0.78, pad=0.02)
-    cbar.set_label("Observed in matching MSA set", fontsize=10.5)
-    cbar.ax.tick_params(labelsize=9.5)
-    fig.subplots_adjust(left=0.31, right=0.94, top=0.88, bottom=0.25)
+    fig.subplots_adjust(left=0.31, right=0.96, top=0.90, bottom=0.27)
     path = plot_root / "selection_regionwise_msa_support.svg"
     alt = (
-        "Heatmap of selected Eco1 RT candidates showing natural-sequence support for designed substitutions "
+        "Heatmap of selected Eco1 RT candidates showing the fraction of designed substitutions observed in "
+        "the clade-9 natural-sequence alignment "
         "within catalytic/direct-contact, near retained DNA/RNA, thumb-contact, C-terminal primer-RNA recognition, "
         "and distal regions."
     )
@@ -131,14 +134,14 @@ def write_regionwise_msa_support_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Shows whether selected substitutions in each review region are observed in the matching natural-sequence "
-            "set. The C-terminal primer-RNA recognition region is an overlapping context. Cells with no mutations "
-            "are labeled as no edits rather than scored. Zero unobserved proximal substitutions is part of the "
-            "chemistry/support gate."
+            "Shows the fraction of selected substitutions in each review region that also occur in the clade-9 "
+            "alignment. The C-terminal primer-RNA recognition region is an overlapping context. Cells with no "
+            "mutations are labeled as no edits rather than scored. The peripheral alphabet limits substitutions "
+            "to observed alternatives; this plot audits that generation contract."
         ),
         interpretation_limit=(
-            "The proximal observed-support rule is a conservative screen. Region-wise MSA support is not functional "
-            "proof and is not a composite selection score."
+            "Observed substitutions are a sequence prior, not functional proof. Region-wise MSA support is not a "
+            "composite selection score."
         ),
         render_mode="wide_visual",
     )

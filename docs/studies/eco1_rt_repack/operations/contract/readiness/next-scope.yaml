@@ -13,9 +13,7 @@ next_scope:
       - foldcheck_runtime
     phase3_foldcheck_report:
       - foldcheck_runtime
-      - assembly_feasibility
     phase4_downstream_promotion:
-      - assembly_feasibility
       - candidate_handoff
       - downstream_rt_lnrna_handoff
   runtime_phase_groups: []

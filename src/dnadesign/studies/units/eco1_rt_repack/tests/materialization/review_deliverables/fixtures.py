@@ -22,10 +22,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_cl
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
     ALL_SPECS,
 )
-from dnadesign.thread.candidates.proteinmpnn import write_candidate_table
-from dnadesign.thread.foldcheck import sequence_hash
 
 from .biohub_sae_fixtures import write_biohub_esmc_sae_outputs
+from .candidate_pool_fixtures import write_candidate_pool, write_generation_policy_positions, write_reference_pdb
 from .conservation_fixtures import write_conservation_inputs
 from .esmc_fixtures import write_wt_mutation_scoring_outputs
 from .foldcheck_fixtures import write_foldcheck_review_manifest
@@ -40,14 +39,21 @@ def write_deliverable_inputs(output_root: Path) -> None:
     write_conservation_inputs(output_root)
     _write_mask_set(output_root / "mask_set.yaml")
     _write_design_class_mask_sets(output_root / "design_classes")
-    _write_candidate_table(output_root / "candidate_table.parquet")
-    _write_candidate_table(output_root / "design_classes" / "candidate_pool.parquet", include_design_classes=True)
-    _write_reference_pdb(output_root / "proteinmpnn_request" / "chain_a_backbone.pdb")
+    write_candidate_pool(output_root / "candidate_table.parquet")
+    write_candidate_pool(output_root / "design_classes" / "candidate_pool.parquet", include_design_classes=True)
+    write_candidate_pool(
+        output_root / "generation_policies_v3" / "candidate_pool.parquet",
+        include_generation_policies=True,
+    )
+    write_generation_policy_positions(output_root / "generation_policies_v3" / "generation_policy_positions.parquet")
+    write_reference_pdb(output_root / "proteinmpnn_request" / "chain_a_backbone.pdb")
     write_foldcheck_review_manifest(output_root / "foldcheck_review")
     write_foldcheck_review_manifest(output_root / "design_classes" / "foldcheck_review")
+    write_foldcheck_review_manifest(output_root / "generation_policies_v3" / "foldcheck_review")
     write_wt_mutation_scoring_outputs(output_root)
     write_biohub_esmc_sae_outputs(output_root)
     write_selection_readiness_manifest(output_root / "design_classes" / "selection")
+    write_selection_readiness_manifest(output_root / "generation_policies_v3" / "selection")
 
 
 def _write_mask_set(
@@ -138,57 +144,3 @@ def _write_design_class_mask_sets(design_classes_root: Path) -> None:
             selected_conservation_positions=conservation_positions,
             selected_contact_positions=contact_positions,
         )
-
-
-def _write_candidate_table(path: Path, *, include_design_classes: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    rows = []
-    design_class_ids = [spec.design_class_id for spec in ALL_SPECS]
-    for rank, (candidate_id, score, global_score, seq_recovery, temperature, mutation_count) in enumerate(
-        [
-            ("thread_candidate_alpha", 1.1, 1.6, 0.72, 0.1, 2),
-            ("thread_candidate_beta", 1.4, 1.9, 0.55, 0.3, 3),
-        ],
-        start=1,
-    ):
-        sequence = "MKSAYL"[: 6 - mutation_count] + "G" * mutation_count
-        rows.append(
-            {
-                "candidate_id": candidate_id,
-                "source_sample_id": f"sample-{rank}",
-                "backend_run_id": "proteinmpnn-fixture",
-                "request_hash": "sha256:" + "4" * 64,
-                "sequence_hash": sequence_hash(sequence),
-                "sequence": sequence,
-                "score": score,
-                "global_score": global_score,
-                "seq_recovery": seq_recovery,
-                "seed": 101,
-                "temperature": temperature,
-                "sample_index": rank,
-                "duplicate_sample_count": 1,
-                "mutation_count": mutation_count,
-                "mutable_mutation_count": mutation_count,
-                "protected_mutation_count": 0,
-                "outside_mutable_positions": [],
-                "canonical_mutations": [f"A{position}G" for position in range(1, mutation_count + 1)],
-                "status": "accepted",
-                "rank": rank,
-            }
-        )
-        if include_design_classes:
-            rows[-1]["design_class_id"] = design_class_ids[rank - 1]
-            rows[-1]["mask_policy_id"] = design_class_ids[rank - 1]
-            rows[-1]["class_priority"] = rank - 1
-    write_candidate_table(path, rows, request_hash="sha256:" + "4" * 64)
-
-
-def _write_reference_pdb(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = []
-    for index in range(1, 7):
-        atom_prefix = f"ATOM  {index:5d}  CA  ALA A{index:4d}"
-        coords = f"{float(index):8.3f}{0.0:8.3f}{0.0:8.3f}"
-        atom_suffix = "  1.00  0.00           C"
-        lines.append(f"{atom_prefix}    {coords}{atom_suffix}")
-    path.write_text("\n".join(lines) + "\nEND\n", encoding="utf-8")

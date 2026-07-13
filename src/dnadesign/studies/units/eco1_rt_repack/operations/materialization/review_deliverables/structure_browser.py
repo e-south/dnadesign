@@ -20,13 +20,18 @@ import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
-    SECTION_FEASIBILITY_AND_HANDOFF,
+    SECTION_PANEL_SELECTION,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     file_hashes,
     make_deliverable_row,
 )
 
+from .molecular_scene_contract import (
+    REFERENCE_MODEL_ID,
+    molecular_visual_contract,
+    reference_complex_molecule_styles,
+)
 from .structure_browser_common import (
     CANDIDATE_LOW_CONFIDENCE_COLOR,
     CANDIDATE_PASS_COLOR,
@@ -109,11 +114,7 @@ def write_interactive_structure_browser_manifest(
         sequences=sequences,
         selection=selection,
         triage=triage,
-        mutations_by_candidate=_mutation_rows_by_candidate(
-            candidate_table_path,
-            query_start_residue=query_start_residue,
-            reference_start_residue=reference_start_residue,
-        ),
+        mutations_by_candidate=_mutation_rows_by_candidate(candidate_table_path),
         esmc_scores_by_candidate=_esmc_scores_by_candidate(candidate_preference_table_path),
         selected_candidate_ids=set(selection),
     )
@@ -152,10 +153,12 @@ def write_interactive_structure_browser_manifest(
         "viewer_contract": "dnadesign.thread.structure_views",
         "backend_kind": "browser_structure_view",
         "default_backend": "py3dmol",
+        "visual_contract": molecular_visual_contract(),
+        "protein_surface_default": False,
         "path_policy": "paths_relative_to_this_manifest",
         "source_tables": source_tables,
         "reference": {
-            "model_id": "ec86kit_7v9u_reference",
+            "model_id": REFERENCE_MODEL_ID,
             "display_label": _reference_display_label(reference_structure_path, reference_structure_format),
             "local_path": relative_path(reference_structure_path, manifest_path.parent),
             "structure_format": reference_structure_format,
@@ -207,8 +210,9 @@ def write_selected_panel_structure_browser_manifest(
     triage_table_path: Path,
     foldcheck_fasta_path: Path | None = None,
     candidate_preference_table_path: Path | None = None,
+    source_table_prefix: str = "foldcheck_review",
 ) -> dict[str, Any]:
-    """Write the selected-six structure-browser manifest from expanded fold-check outputs."""
+    """Write the selected-panel structure-browser manifest from the active selection root."""
 
     return write_interactive_structure_browser_manifest(
         panel_root=panel_root,
@@ -224,19 +228,17 @@ def write_selected_panel_structure_browser_manifest(
         triage_table_path=triage_table_path,
         manifest_file_name=SELECTED_PANEL_STRUCTURE_BROWSER_MANIFEST_FILE_NAME,
         deliverable_id="selected_panel_structure_browser_manifest",
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
-        title="Selected Eco1 panel structures can be inspected one at a time",
+        section=SECTION_PANEL_SELECTION,
+        title="Selected Eco1 protein hypotheses can be inspected one at a time",
         alt_text=(
-            "Manifest for interactive browser review of WT and the selected primary-panel Eco1 "
-            "ColabFold structure models."
+            "Manifest for interactive browser review of WT and the eight selected Eco1 ColabFold structure models."
         ),
         description=(
-            "Lists WT and the selected primary-panel variants from the expanded fold-check structure set. "
-            "The side summary shows fold metrics, mutation count, MSA support, chemistry near retained DNA/RNA or "
-            "thumb-track, and "
-            "selection context beside the py3Dmol viewer."
+            "Lists WT and the eight selected sequences from the active fold-check structure set. The side summary "
+            "shows fold metrics, mutation count, MSA support, chemistry "
+            "near retained DNA/RNA or the thumb track, and selection context beside the py3Dmol viewer."
         ),
-        source_table_prefix="design_classes/foldcheck_review",
+        source_table_prefix=source_table_prefix,
     )
 
 
@@ -292,13 +294,9 @@ def _ranking_by_candidate(path: Path) -> dict[str, dict[str, Any]]:
 
 def _mutation_rows_by_candidate(
     path: Path | None,
-    *,
-    query_start_residue: int,
-    reference_start_residue: int,
 ) -> dict[str, dict[str, Any]]:
     if path is None or not path.exists():
         return {}
-    offset = int(query_start_residue) - int(reference_start_residue)
     rows = pq.read_table(path, columns=["candidate_id", "canonical_mutations"]).to_pylist()
     mutations_by_candidate: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -313,7 +311,9 @@ def _mutation_rows_by_candidate(
         mutations_by_candidate[candidate_id] = {
             "canonical_mutations": canonical_mutations,
             "canonical_positions": sorted(set(canonical_positions)),
-            "query_residue_numbers": sorted({position + offset for position in canonical_positions}),
+            # ColabFold models contain the canonical 320-aa RT, so model residue
+            # numbers and canonical Eco1 positions are identical.
+            "query_residue_numbers": sorted(set(canonical_positions)),
         }
     return mutations_by_candidate
 
@@ -360,6 +360,7 @@ def _structure_rows(
                 "local_path": relative_path(local_path, manifest_root),
                 "structure_format": "pdb",
                 "color": _structure_color(candidate_id, rank_row),
+                "molecule_styles": reference_complex_molecule_styles(include_protein_surface=False),
                 "review_rank": nullable_int(rank_row.get("review_rank")),
                 "review_class": str(rank_row.get("review_class") or ""),
                 "plddt": nullable_float(rank_row.get("plddt")),
@@ -367,7 +368,8 @@ def _structure_rows(
                     row.get("wt_runtime_ca_rmsd") or rank_row.get("wt_runtime_ca_rmsd")
                 ),
                 "cryoem_mapped_ca_rmsd": nullable_float(rank_row.get("cryoem_mapped_ca_rmsd")),
-                "sequence_identity_percent": nullable_float(row.get("sequence_identity_percent")),
+                "full_sequence_identity_percent": nullable_float(row.get("full_sequence_identity_percent")),
+                "design_position_recovery_percent": nullable_float(row.get("design_position_recovery_percent")),
                 "protein_sequence": str(sequence_row.get("protein_sequence") or ""),
                 "protein_sequence_hash": str(sequence_row.get("sequence_hash") or ""),
                 "protein_sequence_length": nullable_int(sequence_row.get("amino_acid_length")),
@@ -423,6 +425,7 @@ def _selection_payload(selection_row: dict[str, Any], triage_row: dict[str, Any]
         return {}
     return {
         "selection_slot": str(selection_row.get("selection_slot") or ""),
+        "selection_rank": nullable_int(selection_row.get("selection_rank")),
         "selection_reason": str(selection_row.get("selection_reason") or ""),
         "nearest_selected_distance_aa": nullable_int(selection_row.get("nearest_selected_distance_aa")),
         "selection_support_alt_observed_fraction": nullable_float(
@@ -452,7 +455,9 @@ def _structure_group(candidate_id: str, rank_row: dict[str, Any], selection_row:
         return "0 WT ColabFold baseline"
     selection_slot = str(selection_row.get("selection_slot") or "")
     if selection_slot:
-        return f"1 Selected panel: {selection_slot}"
+        selection_rank = nullable_int(selection_row.get("selection_rank")) or 0
+        candidate_label = candidate_id.removeprefix("thread_candidate_")
+        return f"{selection_rank} Selected hypothesis: {candidate_label}"
     review_class = str(rank_row.get("review_class") or "")
     if review_class in {"strong_fold_preserved", "good_fold_preserved"}:
         return "1 Passing fold triage (CA RMSD <= 2.0 A; pLDDT >= 90)"

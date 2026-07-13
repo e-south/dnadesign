@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/design_class_mask_annotations.py
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/rt_plot_annotations.py
 
 RT annotation span drawing for Eco1 sequence-position plots.
 
@@ -24,13 +24,11 @@ _TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
 _CONTEXT_FILL = "#e7d4ee"
 _CORE_INTERVAL_FILL = "#d7ecf5"
 _MOTIF_FILL = "#f4d7bd"
-_CONTEXT_TEXT = "#6f4c7d"
-_CORE_INTERVAL_TEXT = "#28566a"
-_MOTIF_TEXT = "#8a4a11"
-_RT_SPAN_LABEL_SIZE = 7.0
-_CONTEXT_SPAN_ALPHA = 0.30
-_CORE_INTERVAL_SPAN_ALPHA = 0.30
-_MOTIF_SPAN_ALPHA = 0.42
+_ANNOTATION_TEXT = "#111111"
+_RT_SPAN_LABEL_SIZE = 11.2
+_CONTEXT_SPAN_ALPHA = 0.42
+_CORE_INTERVAL_SPAN_ALPHA = 0.42
+_MOTIF_SPAN_ALPHA = 0.58
 _CONTEXT_LABEL_OFFSET_POINTS = 32.0
 _CORE_INTERVAL_LABEL_OFFSET_POINTS = 22.0
 _MOTIF_LABEL_OFFSET_POINTS = 12.0
@@ -44,6 +42,8 @@ def add_rt_annotation_context(
     row_count: int,
     context: RTAnnotationContext,
 ) -> None:
+    """Draw validated RT context spans above a sequence-position plot."""
+
     position_to_index = {position: index for index, position in enumerate(positions)}
     for feature in context.features_for_track(_TRACK_CONTEXT):
         _add_context_span(
@@ -52,7 +52,7 @@ def add_rt_annotation_context(
             position_to_index=position_to_index,
             row_count=row_count,
             fill_color=_CONTEXT_FILL,
-            text_color=_CONTEXT_TEXT,
+            text_color=_ANNOTATION_TEXT,
             alpha=_CONTEXT_SPAN_ALPHA,
             label_offset_points=_CONTEXT_LABEL_OFFSET_POINTS,
         )
@@ -63,7 +63,7 @@ def add_rt_annotation_context(
             position_to_index=position_to_index,
             row_count=row_count,
             fill_color=_CORE_INTERVAL_FILL,
-            text_color=_CORE_INTERVAL_TEXT,
+            text_color=_ANNOTATION_TEXT,
             alpha=_CORE_INTERVAL_SPAN_ALPHA,
             label_offset_points=_CORE_INTERVAL_LABEL_OFFSET_POINTS,
         )
@@ -74,7 +74,7 @@ def add_rt_annotation_context(
             position_to_index=position_to_index,
             row_count=row_count,
             fill_color=_MOTIF_FILL,
-            text_color=_MOTIF_TEXT,
+            text_color=_ANNOTATION_TEXT,
             alpha=_MOTIF_SPAN_ALPHA,
             label_offset_points=_MOTIF_LABEL_OFFSET_POINTS,
         )

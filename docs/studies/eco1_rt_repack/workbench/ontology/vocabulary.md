@@ -20,7 +20,7 @@
 | `MsaExemplarRows` | Study-owned explicit aligned FASTA row selections used to render local motif windows; these rows ground visualization only and are not the denominator for plurality. |
 | `MsaPanelSpec` | Study-owned display contract for all-record overview and plurality/gap histogram panels; this controls figure sidecars, not conservation scoring. |
 | `ManualMaskAuthority` | Study-owned mask ontology and generated runtime artifact. It records audited motif anchors, RT1-RT7 annotation/review spans, and Wang/Ec86 substrate-contact priors. RT1-RT7 spans do not blanket hard-fix residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
-| `C-terminal primer-RNA recognition region` | Eco1/Ec86 C-terminal/thumb context motivated by Ec86 primer-RNA recognition studies. In the current 7V9U-backed fixed-backbone scope, mapped residues `255-311` can be reviewed directly; canonical residues `312-320` are missing backbone and cannot be sampled by fixed-backbone ProteinMPNN in this run. |
+| `C-terminal primer-RNA recognition region` | Eco1/Ec86 context motivated by primer-template and primer-RNA recognition studies. The active generation policies fix mapped residues `255-311`; residues `230-254` remain designable and are reviewed as exact substitutions, while canonical residues `312-320` lack backbone coordinates in the current 7V9U-backed scope. |
 | `MaskRowAlgebra` | Study-local executable contract for composing protected, non-fixed mapped, and non-fixed missing-backbone rows under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. Implemented under `operations/masking/`, not inside a runtime writer. |
 | `EvidenceReviewArtifacts` | Contact-risk and contact-geometry review artifacts that explain structure context. They do not protect or release residues under `eco1_rt_clade9_plurality25_direct_contact5a_v1`. |
 | `ResidueMaskSet` | Generic mutable/fixed/protected/unresolved mask contract. |
@@ -30,12 +30,9 @@
 | `ThreadSample` | Raw backend output sequence with backend provenance and scores. |
 | `ThreadCandidate` | Deduplicated fixed-backbone design candidate with provenance. |
 | `FoldCheckReport` | Computational structural QA report for candidate sequences. |
-| `AssemblyFeasibilityReport` | Study-owned computational report for mutation windows, parent distance, synthesis tier, blockers, and feasibility status. It informs purchase or bounded-window decisions; it is not a generic `thread` economic policy. |
 | `CandidateHandoff` | RT-only candidate evidence bundle with source artifacts, selection policy, and candidate rows. It does not create an RT-lnRNA construct subject. |
 | `RtLnrnaCandidateAcceptance` | Downstream accept/reject record for RT-only candidate handoffs before any construct subject exists. |
 | `mask_source` | A named reason that fixes or protects a residue. |
-| `parent_haplotype_id` | Identifier for a bounded coding-window segment derived from one accepted full-protein parent. |
-| `nearest_parent_id` | Identifier for the accepted full-protein candidate closest to another sequence under the declared feasibility distance rule. |
 
 ### Naming Rules
 

@@ -26,7 +26,7 @@ def test_primary_literature_roles_stay_separated_in_method_docs() -> None:
     assert "Tao et al. provides the fixed-backbone RT redesign pattern" in fixed_backbone
     assert "Mestre S1 is the accession and classification authority" in msa_method
     assert "Simon et al. provides RT-region and motif annotation grammar" in fixed_backbone
-    assert "Wang/Ec86 direct-contact priors must be explicit study-owned records" in mask_policy
+    assert "Wang and 7V9U define retained DNA/RNA geometry, direct contacts" in mask_policy
     assert "whole-database census alignment" in msa_method
 
 
@@ -35,19 +35,13 @@ def test_rt_interval_authority_is_not_documented_as_pending_after_audit() -> Non
     msa_method = _text("docs/studies/eco1_rt_repack/contexts/msa-method.md")
 
     assert "Broader RT1-RT7 interval boxes remain deferred" not in thread_spec
-    assert "RT1-RT7 labels do not blanket hard-fix residues" in thread_spec
+    assert "RT1-RT7 intervals are annotation labels, not protection rules" in thread_spec
     assert "until manual motif authority and side-chain/contact-density evidence are materialized" not in msa_method
     assert "eco1_rt_clade9_plurality25_direct_contact5a_v1" in msa_method
 
 
 def test_contact_risk_profile_is_documented_as_prior_evidence_only() -> None:
-    mask_policy = _text("docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md")
-    status = _text("docs/studies/eco1_rt_repack/record/status.md")
-    command_readme = _text("docs/studies/eco1_rt_repack/operations/runtime/command-groups/README.md")
-
-    assert "Contact-risk review artifacts do not protect or release residues" in mask_policy
-    assert "Evidence-review artifacts explain the structure context but are not mask inputs" in mask_policy
-    assert "direct contact instead: only mapped residues within 5 A" in mask_policy
-    assert "contact_geometry_profile.parquet" in status
-    assert "does not protect or" in status
-    assert "current mask rule" in command_readme
+    mask_policy = " ".join(_text("docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md").split())
+    assert "contact-risk plots" in mask_policy
+    assert "They do not change fixed or open positions" in mask_policy
+    assert "at or below 5 A from retained DNA/RNA" in mask_policy

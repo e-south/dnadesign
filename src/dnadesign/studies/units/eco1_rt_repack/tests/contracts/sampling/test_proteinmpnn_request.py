@@ -56,24 +56,6 @@ def test_proteinmpnn_request_validator_rejects_canonical_position_leakage(tmp_pa
     assert "eco1_rt.sampling.proteinmpnn_fixed_positions_mismatch" in {issue.check_id for issue in issues}
 
 
-def test_proteinmpnn_request_validator_rejects_missing_cysteine_omit_policy(tmp_path: Path) -> None:
-    materialize_upstream_artifacts(tmp_path)
-    materialize_mask_set(repo_root=repo_root(), output_root=tmp_path)
-    materialize_thread_plan(repo_root=repo_root(), output_root=tmp_path)
-    result = materialize_proteinmpnn_request(repo_root=repo_root(), output_root=tmp_path)
-    manifest = _load_yaml(result.request_manifest_path)
-    manifest["omit_aas"] = []
-    result.request_manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
-
-    issues = validate_proteinmpnn_request_content(
-        result.request_manifest_path,
-        repo_root=repo_root(),
-        output_root=tmp_path,
-    )
-
-    assert "eco1_rt.sampling.proteinmpnn_omit_aas_mismatch" in {issue.check_id for issue in issues}
-
-
 def test_proteinmpnn_request_validator_rejects_rehashed_wrong_fixed_sidecar(tmp_path: Path) -> None:
     materialize_upstream_artifacts(tmp_path)
     materialize_mask_set(repo_root=repo_root(), output_root=tmp_path)

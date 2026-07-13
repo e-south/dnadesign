@@ -27,9 +27,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root.")
     parser.add_argument("--output-root", type=Path, default=None, help="Override study thread output root.")
     parser.add_argument(
+        "--selection-root",
+        type=Path,
+        default=None,
+        help="Override the selection-readiness artifact root linked into the review notebook.",
+    )
+    parser.add_argument(
         "--render-chimerax-png",
         action="store_true",
         help="Opt in to launching ChimeraX to render the optional mask-context PNG.",
+    )
+    parser.add_argument(
+        "--render-communication-chimerax",
+        action="store_true",
+        help=("Opt in to the communication-facing ChimeraX protected-evidence and selected-surface movies."),
     )
     return parser
 
@@ -41,7 +52,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = materialize_review_deliverables(
         repo_root=args.repo_root,
         output_root=args.output_root,
+        selection_root=args.selection_root,
         render_chimerax_png=args.render_chimerax_png,
+        render_communication_chimerax=args.render_communication_chimerax,
     )
     print(f"review_deliverable_manifest: {result.manifest_path}")
     print(f"review_deliverable_notebook: {result.notebook_path}")

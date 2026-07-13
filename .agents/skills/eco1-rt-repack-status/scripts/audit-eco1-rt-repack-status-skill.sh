@@ -151,6 +151,7 @@ expected_materialization_primitives = {
     "selection_readiness",
     "source_sequences",
     "thread_plan",
+    "twist_handoff",
 }
 observed_materialization_primitives = {
     path.name
@@ -171,7 +172,7 @@ if observed_materialization_helpers != expected_materialization_helper_packages:
         "materialization shared helpers must stay in declared helper packages, observed "
         f"{sorted(observed_materialization_helpers)}"
     )
-expected_shared_files = {"__init__.py", "design_class_mask_annotations.py", "rendering.py", "rt_annotation_context.py"}
+expected_shared_files = {"__init__.py", "rendering.py", "rt_annotation_context.py", "rt_plot_annotations.py"}
 observed_shared_files = {path.name for path in (materialization_root / "shared").glob("*.py")}
 if observed_shared_files != expected_shared_files:
     problems.append(f"materialization/shared file set drifted, observed {sorted(observed_shared_files)}")
@@ -620,7 +621,6 @@ require_file "$STUDY_ROOT/operations/contract/readiness/checks/mask_contract.yam
 require_file "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
 require_file "$STUDY_ROOT/operations/contract/readiness/checks/candidate_handoff.yaml"
 require_file "$STUDY_ROOT/operations/contract/readiness/checks/foldcheck_runtime.yaml"
-require_file "$STUDY_ROOT/operations/contract/readiness/checks/assembly_feasibility.yaml"
 require_file "$STUDY_ROOT/operations/contract/readiness/checks/downstream_rt_lnrna_handoff.yaml"
 require_file "$STUDY_ROOT/operations/contract/schemas/eco1-rt-profile.schema.yaml"
 require_file "$STUDY_ROOT/operations/contract/schemas/thread-artifact-chain.schema.yaml"
@@ -697,7 +697,7 @@ require_pattern 'structure_authority' "skill names structure authority readiness
 require_pattern 'mask_contract' "skill names mask contract readiness gate"
 require_pattern 'sampling_plan' "skill names sampling plan readiness gate"
 require_pattern 'foldcheck_runtime' "skill names fold-check readiness gate"
-require_pattern 'assembly_feasibility' "skill names assembly feasibility readiness gate"
+require_pattern 'diversity-seeking experimental panel' "skill states the measurable study premise"
 require_pattern 'implementation-roadmap' "skill names implementation roadmap surface"
 require_pattern 'msa-method' "skill names MSA method surface"
 require_pattern 'Do not use for another study or for family-level routing' "skill rejects family-level routing"
@@ -705,6 +705,8 @@ require_pattern 'Do not generalize it to another study' "skill guardrail rejects
 require_pattern 'ec86kit target sequence hash' "skill guardrail rejects silent MSA target drift"
 require_pattern 'currently exposes generic ProteinMPNN' "skill keeps thread scope limited to implemented thread mechanics"
 require_pattern 'rt_lnrna_sponging_construct_triage' "skill names downstream RT-lnRNA route boundary"
+require_pattern 'molecular-structure-visualization' "skill routes renderer-neutral molecular scenes"
+require_pattern '0\.65.*35%' "skill declares the surface alpha and ChimeraX transparency mapping"
 require_pattern 'No OPS provider is registered' "route matrix documents record-only status" "$REFERENCE_DIR/route-matrix.md"
 require_pattern 'Tao et al\. 2026' "external source table records Tao method prior" "$REFERENCE_DIR/external-sources.md"
 require_pattern 'Mestre et al\. 2020' "external source table records Mestre source ontology prior" "$REFERENCE_DIR/external-sources.md"
@@ -754,6 +756,7 @@ require_pattern 'operations/materialization/candidate_table/' "study surfaces ro
 require_pattern 'operations/materialization/foldcheck_report/' "study surfaces route Eco1 fold-check report wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/foldcheck_review/' "study surfaces route Eco1 fold-check review wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/review_deliverables/' "study surfaces route Eco1 review deliverables wrapper" "$REFERENCE_DIR/study-surfaces.md"
+require_pattern 'chain-matched nucleotide representations' "study surfaces preserve chain colors across nucleotide representations" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/biohub_esmc_sae_profile/' "study surfaces route Eco1 Biohub ESMC wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/biohub_esmc_wt_mutation_scoring/' "study surfaces route Eco1 WT ESMC mutation-scoring wrapper" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'operations/materialization/sae_window_summary/' "study surfaces route Eco1 SAE window summary wrapper" "$REFERENCE_DIR/study-surfaces.md"
@@ -761,7 +764,7 @@ require_pattern 'src/dnadesign/thread/adapters/proteinmpnn/' "study surfaces rou
 require_pattern 'src/dnadesign/thread/adapters/colabfold/' "study surfaces route generic ColabFold output normalizer" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/adapters/biohub_esmc/' "study surfaces route generic Biohub ESMC adapter" "$REFERENCE_DIR/study-surfaces.md"
 require_pattern 'src/dnadesign/thread/candidates/' "study surfaces route generic candidate-table builder" "$REFERENCE_DIR/study-surfaces.md"
-require_pattern 'not a hidden run-all pipeline' "command-group README rejects hidden run-all execution" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
+require_pattern 'command writes one declared artifact boundary' "command-group README declares one artifact boundary per command" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
 require_pattern 'conservation_provider_sources' "pipeline records provider-source command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'conservation_roster_cache' "pipeline records roster-cache command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'conservation_source_sufficiency' "pipeline records source-sufficiency command lane" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
@@ -770,19 +773,30 @@ require_pattern 'contact_risk_profile' "pipeline records contact-risk command la
 require_pattern 'materialized_simple_mask_set' "sampling readiness gates thread_plan behind validated simple mask" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
 require_pattern 'required_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1' "sampling readiness records simple mask policy id" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
 require_pattern 'non_fixed_missing_backbone' "sampling readiness records terminal missing-backbone class" "$STUDY_ROOT/operations/contract/readiness/checks/sampling_plan.yaml"
-require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.thread_plan' "pipeline records thread-plan materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request' "pipeline records ProteinMPNN request materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest' "pipeline records ProteinMPNN sample-ingest materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table' "pipeline records candidate-table materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies' "pipeline records v3 generation-policy materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'generation_policy_candidate_pool' "pipeline records policy-provenance candidate-pool materialization" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness' "pipeline records current panel-selection materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'generation_policies_v3' "pipeline routes active outputs through generation policy v3" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report' "pipeline records fold-check report materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review' "pipeline records fold-check review materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables' "pipeline records review deliverables materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
+require_pattern 'PROTEIN_SURFACE_OPACITY = 0\.65' "generic structure-view style fixes protein surface alpha" "$REPO_ROOT/src/dnadesign/thread/structure_views/styles.py"
+MOLECULAR_SCENE_CONTRACT="$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/molecular_scene_contract.py"
+MASK_STRUCTURE_BROWSER="$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/mask_structure_browser.py"
+MASK_CHIMERAX_RECIPE="$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/mask_tracks.py"
+require_pattern '"opacity": PROTEIN_SURFACE_OPACITY' "Eco1 molecular scenes consume the shared surface alpha" "$MOLECULAR_SCENE_CONTRACT"
+require_pattern 'nucleotides #1/D,E,F ladder' "Eco1 ChimeraX scenes use ladder nucleotide display" "$MOLECULAR_SCENE_CONTRACT"
+require_pattern 'color #1/D \{DNA_COLOR\} target acf' "Eco1 ChimeraX scenes color DNA nucleotide representations" "$MOLECULAR_SCENE_CONTRACT"
+require_pattern 'color #1/E,F \{RNA_COLOR\} target acf' "Eco1 ChimeraX scenes color RNA nucleotide representations" "$MOLECULAR_SCENE_CONTRACT"
+require_pattern 'protein_surface_default": False' "mask-basis browser starts with the protein surface off" "$MASK_STRUCTURE_BROWSER"
+require_pattern 'reference_complex_molecule_styles' "mask-basis browser declares protein, DNA, and RNA styles" "$MASK_STRUCTURE_BROWSER"
+require_pattern 'chimerax_reference_complex_style_commands' "mask ChimeraX recipe consumes the shared complex style" "$MASK_CHIMERAX_RECIPE"
+require_pattern '_existing_render_is_current' "mask ChimeraX still rejects stale unprovenanced renders" "$MASK_CHIMERAX_RECIPE"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_sae_profile' "pipeline records Biohub ESMC materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.biohub_esmc_wt_mutation_scoring' "pipeline records WT ESMC mutation-scoring materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'dnadesign.studies.units.eco1_rt_repack.operations.materialization.sae_window_summary' "pipeline records SAE window materializer command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
 require_pattern 'phase1_thread_contract' "pipeline records Phase 1 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'phase2_real_backend_ingest' "pipeline records Phase 2 validation command" "$STUDY_ROOT/operations/runtime/command-groups/pipeline.yaml"
-require_pattern 'presence-only check' "command-group README documents Phase 1 hash closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
+require_pattern 'policy version and manifest hash' "command-group README documents policy-provenance closure" "$STUDY_ROOT/operations/runtime/command-groups/README.md"
 require_absent 'argparse' "contact-risk pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_risk/pipeline.py"
 require_absent 'argparse' "manual mask pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/manual_mask_authority/pipeline.py"
 require_absent 'argparse' "mask-set pipeline keeps CLI parsing out of pipeline" "$REPO_ROOT/src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/mask_set/pipeline.py"

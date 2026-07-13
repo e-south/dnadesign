@@ -22,7 +22,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_CONSTRAINT_EVIDENCE,
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
-    SECTION_FEASIBILITY_AND_HANDOFF,
+    SECTION_PANEL_SELECTION,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
     write_manifest,
@@ -44,18 +44,9 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     stale_linear_mask_track = tmp_path / "review_deliverables" / "mask_structure_context" / "linear_mask_tracks.svg"
     stale_linear_mask_track.parent.mkdir(parents=True, exist_ok=True)
     stale_linear_mask_track.write_text("<svg>retired baseline-only mask track</svg>\n", encoding="utf-8")
-    stale_planned_handoff = tmp_path / "review_deliverables" / "feasibility_and_handoff" / "planned.md"
-    stale_planned_handoff.parent.mkdir(parents=True, exist_ok=True)
-    stale_planned_handoff.write_text(
-        "# Feasibility and RT-only handoff remain planned\n\n"
-        "The review bundle stops before synthesis feasibility and downstream handoff.\n",
-        encoding="utf-8",
-    )
-
     result = materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
 
-    assert not stale_linear_mask_track.exists()
-    assert not stale_planned_handoff.exists()
+    assert stale_linear_mask_track.exists()
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_id"] == "eco1_rt.review_deliverables"
@@ -76,43 +67,30 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_structure_overlay_panel"]["status"] == "linked_existing"
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
     assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
-    assert deliverables["mask_structure_browser_manifest"]["title"] == "The Ec86 structure maps each fixed-mask rule"
+    assert deliverables["mask_structure_browser_manifest"]["title"] == (
+        "The Ec86 structure maps the active mask evidence"
+    )
     assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
     assert deliverables["interactive_structure_browser_manifest"]["title"] == (
         "Folded candidates can be inspected one at a time"
     )
     assert deliverables["selected_panel_structure_browser_manifest"]["status"] == "rendered"
     assert deliverables["selected_panel_structure_browser_manifest"]["title"] == (
-        "Selected structures can be inspected one at a time"
+        "Selected protein hypotheses can be inspected one at a time"
     )
     assert deliverables["wt_esmc_entropy_by_position"]["status"] == "linked_existing"
     assert deliverables["wt_esmc_entropy_by_position"]["section"] == SECTION_CONSTRAINT_EVIDENCE
     assert deliverables["msa_plurality_vs_esmc_entropy"]["status"] == "rendered"
-    assert deliverables["proteinmpnn_score_mutation_burden"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
-    assert deliverables["proteinmpnn_score_mutation_burden"]["role"] == "review_only"
-    assert deliverables["proteinmpnn_residue_frequency_heatmap"]["role"] == "manuscript_facing"
-    assert deliverables["proteinmpnn_residue_frequency_heatmap"]["artifact_kind"] == (
-        "proteinmpnn_residue_frequency_bundle"
-    )
-    assert len(deliverables["proteinmpnn_residue_frequency_heatmap"]["evidence_summary"]["design_class_views"]) == 6
+    assert "proteinmpnn_score_mutation_burden" not in deliverables
+    assert "proteinmpnn_residue_frequency_heatmap" not in deliverables
+    assert deliverables["proteinmpnn_policy_proposal_spread"]["status"] == "rendered"
+    assert deliverables["proteinmpnn_policy_residue_frequency"]["status"] == "rendered"
     assert "proteinmpnn_variant_similarity_heatmap" not in deliverables
-    assert deliverables["design_class_mask_overview"]["section"] == SECTION_CONSTRAINT_EVIDENCE
-    assert deliverables["design_class_mask_overview"]["role"] == "manuscript_facing"
-    assert deliverables["design_class_mask_overview"]["render_mode"] == "compact_wide_visual"
-    assert deliverables["expanded_proteinmpnn_fold_validation"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
-    assert deliverables["expanded_proteinmpnn_fold_validation"]["role"] == "manuscript_facing"
-    assert deliverables["foldcheck_review_review_class_counts"]["status"] == "rendered"
-    assert deliverables["foldcheck_review_review_class_counts"]["role"] == "manuscript_facing"
-    assert deliverables["foldcheck_review_review_class_counts"]["title"] == (
-        "Each fixed mask keeps foldable candidates"
-    )
-    assert deliverables["foldcheck_review_review_class_counts"]["source_tables"] == [
-        "design_classes/candidate_pool.parquet",
-        "design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet",
-    ]
-    assert deliverables["foldcheck_review_review_class_counts"]["evidence_summary"]["design_class_count"] == 6
+    assert "design_class_mask_overview" not in deliverables
+    assert "expanded_proteinmpnn_fold_validation" not in deliverables
+    assert "foldcheck_review_review_class_counts" not in deliverables
     assert deliverables["interactive_structure_browser_manifest"]["section"] == SECTION_DESIGNS_AND_FOLD_TRIAGE
-    assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selected_panel_structure_browser_manifest"]["section"] == SECTION_PANEL_SELECTION
     for browser_id in (
         "mask_structure_browser_manifest",
         "interactive_structure_browser_manifest",
@@ -124,19 +102,21 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
         )
         for field in ("title", "alt_text", "description", "interpretation_limit"):
             assert str(browser_payload.get(field) or "").strip()
-    assert deliverables["selection_design_class_gate_counts"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
-    assert deliverables["selection_design_class_gate_counts"]["status"] == "linked_existing"
-    assert deliverables["selection_primary_panel_sankey"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
-    assert deliverables["selection_primary_panel_sankey"]["status"] == "linked_existing"
+    assert "selection_design_class_gate_counts" not in deliverables
+    assert "selection_design_class_contrast" not in deliverables
+    assert "selection_premise_alignment" not in deliverables
+    assert deliverables["selection_hypothesis_panel_flow"]["section"] == SECTION_PANEL_SELECTION
+    assert deliverables["selection_hypothesis_panel_flow"]["status"] == "linked_existing"
     assert "selection_class_local_percentiles" not in deliverables
-    assert deliverables["selection_six_sequence_distance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
-    assert deliverables["selection_six_sequence_distance"]["status"] == "linked_existing"
-    assert deliverables["selection_selected_substitutions_across_rt"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_mutation_set_dissimilarity"]["section"] == SECTION_PANEL_SELECTION
+    assert deliverables["selection_mutation_set_dissimilarity"]["status"] == "linked_existing"
+    assert deliverables["selection_selected_substitutions_across_rt"]["section"] == SECTION_PANEL_SELECTION
     assert deliverables["selection_selected_substitutions_across_rt"]["status"] == "linked_existing"
-    assert deliverables["selection_regional_mutation_burden"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_regional_mutation_burden"]["section"] == SECTION_PANEL_SELECTION
     assert deliverables["selection_regional_mutation_burden"]["status"] == "linked_existing"
-    assert deliverables["selection_na_facing_chemistry_balance"]["section"] == SECTION_FEASIBILITY_AND_HANDOFF
+    assert deliverables["selection_na_facing_chemistry_balance"]["section"] == SECTION_PANEL_SELECTION
     assert deliverables["selection_na_facing_chemistry_balance"]["status"] == "linked_existing"
+    assert deliverables["selection_local_structure_threshold_sensitivity"]["role"] == "review_only"
     assert deliverables["selection_funnel_summary"]["artifact_kind"] == "selection_funnel_summary"
     assert deliverables["selection_funnel_summary"]["status"] == "linked_existing"
     assert deliverables["selection_panel_table"]["artifact_kind"] == "selection_panel_table"
@@ -157,12 +137,12 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
 
 def test_review_deliverables_require_canonical_selection_manifest(tmp_path: Path) -> None:
     write_deliverable_inputs(tmp_path)
-    (tmp_path / "design_classes" / "selection" / "selection_readiness_manifest.yaml").unlink()
+    (tmp_path / "generation_policies_v3" / "selection" / "selection_readiness_manifest.yaml").unlink()
 
     try:
         materialize_review_deliverables(repo_root=Path.cwd(), output_root=tmp_path, render_chimerax_png=False)
     except FileNotFoundError as exc:
-        assert "design_classes/selection/selection_readiness_manifest.yaml" in str(exc)
+        assert "generation_policies_v3/selection/selection_readiness_manifest.yaml" in str(exc)
     else:  # pragma: no cover - pytest assertion path
         raise AssertionError("review deliverables should require the panel-selection manifest")
 

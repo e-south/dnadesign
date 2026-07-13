@@ -31,7 +31,7 @@ def assert_chimerax_context_scripts(
         manifest_path,
         deliverables["mask_structure_context_script"]["path"],
     ).read_text(encoding="utf-8")
-    assert "eco1_rt_clade9_plurality25_direct_contact5a_v1" in chimerax_text
+    assert "active_eco1_rt_protected_residue_mask" in chimerax_text
     assert "set bgColor white" in chimerax_text
     assert "camera ortho" in chimerax_text
     assert '2dlabels text "Ec86 reference"' in chimerax_text

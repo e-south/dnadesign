@@ -25,11 +25,10 @@ def candidate_handoff_payload() -> dict[str, object]:
         "source_artifacts": {
             "candidate_table": "candidate_table.parquet",
             "foldcheck_report": "foldcheck_report.parquet",
-            "foldcheck_review": "design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet",
-            "feasibility_report": "design_classes/selection/feasibility_report.parquet",
-            "candidate_triage_table": "design_classes/selection/candidate_triage_table.parquet",
-            "candidate_selection_panel": "design_classes/selection/candidate_selection_panel.parquet",
-            "candidate_handoff_sequences": "design_classes/selection/candidate_handoff_sequences.csv",
+            "foldcheck_review": "generation_policies_v3/foldcheck_review/foldcheck_candidate_ranking.parquet",
+            "candidate_triage_table": "generation_policies_v3/selection/candidate_triage_table.parquet",
+            "candidate_selection_panel": "generation_policies_v3/selection/candidate_selection_panel.parquet",
+            "candidate_handoff_sequences": "generation_policies_v3/selection/candidate_handoff_sequences.csv",
             "upstream_artifact_hashes": {"candidate_selection_panel": "sha256:" + "1" * 64},
         },
         "selection_policy": {"eligibility_rule": "fixture", "sae_acceptance_gate": False},
@@ -40,7 +39,6 @@ def candidate_handoff_payload() -> dict[str, object]:
                 "candidate_handoff_sequence_csv_hash": "sha256:" + "b" * 64,
                 "eligible_for_handoff": True,
                 "foldcheck_status": "accepted",
-                "feasibility_status": "feasible",
                 "selection_slot": 1,
             }
         ],

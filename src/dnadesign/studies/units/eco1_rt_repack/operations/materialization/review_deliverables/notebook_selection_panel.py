@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import html
-import json
 from pathlib import Path
 from typing import Any
 
@@ -26,18 +25,33 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
         return mo.md(f"Selection panel table unavailable: `{table_path}`")
     selected_columns = [
         "selection_slot",
+        "selection_rank",
+        "design_group_id",
+        "within_group_rank",
         "candidate_id",
+        "policy_id",
         "fold_review_class",
-        "feasibility_status",
         "mutation_count_total",
-        "nearest_selected_distance_aa",
-        "selection_reason",
-        "tie_break_trace_json",
+        "mean_plddt",
+        "within_group_nearest_mutated_position_jaccard_distance",
+        "within_group_nearest_exact_substitution_jaccard_distance",
+        "selection_support_alt_observed_fraction",
+        "nucleic_acid_facing_mutation_count",
+        "nucleic_acid_facing_charge_delta",
+        "nucleic_acid_facing_basic_gain_count",
+        "nucleic_acid_facing_basic_loss_count",
+        "nucleic_acid_facing_acidic_gain_count",
+        "thumb_contact_track_mutation_count",
+        "c_terminal_primer_rna_recognition_mutation_count",
+        "wang_alpha1_r13_review_status",
+        "wang_alpha1_mutation_count",
     ]
     parquet_file = pq.ParquetFile(table_path)
-    available_columns = [column for column in selected_columns if column in parquet_file.schema.names]
-    rows = parquet_file.read(columns=available_columns).to_pylist()
-    title = html.escape(str(row.get("title") or "Six Eco1 RT variants form a protein review panel"))
+    missing_columns = [column for column in selected_columns if column not in parquet_file.schema.names]
+    if missing_columns:
+        raise ValueError(f"Selection panel table is missing notebook columns: {', '.join(missing_columns)}")
+    rows = parquet_file.read(columns=selected_columns).to_pylist()
+    title = html.escape(str(row.get("title") or "Selected Eco1 RT panel"))
     return mo.vstack(
         [
             mo.Html(f"<h3 style='margin:0 0 0.35rem 0; font-size:1.08rem;'>{title}</h3>"),
@@ -48,44 +62,33 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
 
 
 def _display_row(row: dict[str, Any]) -> dict[str, object]:
-    trace = _parse_trace(row.get("tie_break_trace_json"))
     return {
         "slot": str(row.get("selection_slot") or ""),
+        "selection rank": _int_or_none(row.get("selection_rank")),
+        "design group": str(row.get("design_group_id") or ""),
+        "within-group rank": _int_or_none(row.get("within_group_rank")),
         "candidate": str(row.get("candidate_id") or "").removeprefix("thread_candidate_"),
+        "policy": str(row.get("policy_id") or ""),
         "fold": str(row.get("fold_review_class") or ""),
-        "feasibility": str(row.get("feasibility_status") or ""),
-        "mutations": _int_or_none(row.get("mutation_count_total") or trace.get("mutation_count_total")),
-        "pLDDT": _round_or_none(trace.get("mean_plddt")),
-        "WT RMSD A": _round_or_none(trace.get("wt_runtime_ca_rmsd")),
-        "cryoEM RMSD A": _round_or_none(trace.get("cryoem_mapped_ca_rmsd")),
-        "nearest selected distance": row.get("nearest_selected_distance_aa"),
-        "nearest mutation-position distance": _round_or_none(
-            trace.get("nearest_selected_mutation_position_jaccard_distance")
-            or row.get("nearest_selected_mutation_position_jaccard_distance")
+        "mutations": _int_or_none(row.get("mutation_count_total")),
+        "pLDDT": _round_or_none(row.get("mean_plddt")),
+        "within-policy mutation-position distance": _round_or_none(
+            row.get("within_group_nearest_mutated_position_jaccard_distance")
         ),
-        "nearest exact-substitution distance": _round_or_none(
-            trace.get("nearest_selected_mutation_token_jaccard_distance")
-            or row.get("nearest_selected_mutation_token_jaccard_distance")
+        "within-policy exact-substitution distance": _round_or_none(
+            row.get("within_group_nearest_exact_substitution_jaccard_distance")
         ),
-        "MSA observed fraction": _round_or_none(trace.get("selection_support_alt_observed_fraction")),
-        "unobserved MSA changes": _int_or_none(trace.get("selection_support_unobserved_mutation_count")),
-        "near retained DNA/RNA edits": _int_or_none(trace.get("nucleic_acid_facing_mutation_count")),
-        "near-region charge change": _int_or_none(trace.get("nucleic_acid_facing_charge_delta")),
-        "near-region chemistry warnings": _int_or_none(trace.get("nucleic_acid_facing_chemistry_warning_count")),
-        "Wang thumb-track edits": _int_or_none(trace.get("thumb_contact_track_mutation_count")),
-        "C-terminal primer-RNA edits": _int_or_none(trace.get("c_terminal_primer_rna_recognition_mutation_count")),
-        "reason": str(row.get("selection_reason") or ""),
+        "MSA observed fraction": _round_or_none(row.get("selection_support_alt_observed_fraction")),
+        "peripheral DNA/RNA edits": _int_or_none(row.get("nucleic_acid_facing_mutation_count")),
+        "peripheral charge change": _int_or_none(row.get("nucleic_acid_facing_charge_delta")),
+        "basic gains": _int_or_none(row.get("nucleic_acid_facing_basic_gain_count")),
+        "basic losses": _int_or_none(row.get("nucleic_acid_facing_basic_loss_count")),
+        "acidic gains": _int_or_none(row.get("nucleic_acid_facing_acidic_gain_count")),
+        "Wang thumb-track edits": _int_or_none(row.get("thumb_contact_track_mutation_count")),
+        "residues 255-311 edits": _int_or_none(row.get("c_terminal_primer_rna_recognition_mutation_count")),
+        "R13": str(row.get("wang_alpha1_r13_review_status") or ""),
+        "alpha-1 mutations": _int_or_none(row.get("wang_alpha1_mutation_count")),
     }
-
-
-def _parse_trace(value: object) -> dict[str, object]:
-    if not value:
-        return {}
-    try:
-        loaded = json.loads(str(value))
-    except json.JSONDecodeError:
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
 
 
 def _round_or_none(value: object) -> float | None:

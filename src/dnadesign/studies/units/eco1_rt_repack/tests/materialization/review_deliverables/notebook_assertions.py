@@ -80,21 +80,28 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "selected_deliverable(" in notebook_text
     assert "sections: list[str] = []" in runtime_text
     assert 'sorted({str(row["section"])' not in notebook_text
-    assert "Repacking Eco1 reverse transcriptase for structured-template assays" in combined_text
-    assert "Tao-style mask evidence" in combined_text
-    assert "repack the remaining designable residues" in combined_text
-    assert "Mestre-derived clade 9" in combined_text
-    assert "active mask uses" in combined_text
-    assert "sequence export" in combined_text
-    assert "flat CSV" in combined_text
-    assert "WT ESMC" in combined_text
-    assert "not mask inputs or acceptance gates" in combined_text
-    assert "Biohub ESMC" in combined_text
-    assert "SAE features annotate" in combined_text
-    assert "review set" in combined_text
+    assert "Eco1 reverse transcriptase sequence hypotheses" in combined_text
+    assert "This study compares WT Eco1 RT with complete ProteinMPNN-designed sequences" in combined_text
+    assert "near DNA/RNA" in combined_text
+    assert "combined near DNA/RNA plus distal" in combined_text
+    assert "C233" in combined_text
+    assert "fixed motif neighborhoods" in combined_text
+    assert "exact NAxxH, YADD, and VTG" in combined_text
+    assert "anchors are 105-109, 195-198, and 243-245" in combined_text
+    assert "mutations are never combined" in combined_text
+    assert "across policies" in combined_text
+    assert "experimental comparisons, not quality tiers" in combined_text
+    assert "N-terminal-enriched distant-repacking control" in combined_text
+    assert "not a direct strand-displacement hypothesis" in combined_text
+    assert "Select eight sequences" in combined_text
+    assert "first-order" not in combined_text
+    assert "alpha-1/R13 states remain visible" in combined_text
+    assert "R13 is reported but does not filter or rank rows" in combined_text
+    assert "safe mutation" not in combined_text
+    assert "ESMC and" in combined_text
+    assert "SAE are optional model checks" in combined_text
     assert "alignments and ESMC" not in combined_text
-    assert "ProteinMPNN proposes variants" in combined_text
-    assert "unprotected" in combined_text
+    assert "Each ProteinMPNN output is one complete sequence" in combined_text
     assert "review surface follows" not in combined_text
     assert "The notebook follows" not in combined_text
     assert "Generated non-image artifact" not in combined_text
@@ -102,7 +109,7 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert 'dnadesign.eco1_rt_repack.review_deliverables"' not in notebook_text
     assert "For this section" not in combined_text
     assert "does not rerun ProteinMPNN" not in combined_text
-    assert "This study asks" not in combined_text
+    assert "This study compares" in combined_text
     assert "review surface" not in combined_text
     assert "Eco1/Ec86 is a retron reverse transcriptase with a cryoEM-supported scaffold.\\n" not in combined_text
     assert "ProteinMPNN samples the mutable canvas. ColabFold checks\\n" not in combined_text
@@ -119,7 +126,6 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "if secondary_controls:" in notebook_text
     assert "control_rows.append(" in notebook_text
     assert 'secondary_controls,\n                justify="start"' in notebook_text
-    assert "design_class_ui=None" in notebook_text
     assert "feature_ui=None" in notebook_text
     assert "structure_ui=None" in notebook_text
     assert 'widths="equal"' in notebook_text
@@ -156,11 +162,11 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "mask_structure_context_orientation_template" not in notebook_text
     assert "structure_overlay_skipped" not in notebook_text
     assert "render_deliverable_artifact(" in runtime_text
-    assert "proteinmpnn_residue_frequency_bundle" in runtime_text
-    assert "is_residue_frequency_bundle_deliverable" in notebook_text
-    assert "residue_frequency_class_ui = review_dropdown" in notebook_text
-    assert "render_residue_frequency_bundle(" in notebook_text
-    assert 'label="Fixed-mask design class"' in notebook_text
+    assert "proteinmpnn_policy_residue_frequency_bundle" in runtime_text
+    assert "is_policy_residue_frequency_deliverable" in notebook_text
+    assert "policy_frequency_ui" in notebook_text
+    assert "render_policy_frequency_bundle(" in notebook_text
+    assert 'label="Generation policy"' in notebook_text
     assert "design_class_ui = mo.ui.dropdown" not in runtime_text
     assert "render_interpretation_note(" not in combined_text
     assert "<strong>Interpretation limit:</strong>" not in combined_text

@@ -17,8 +17,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
+    SELECTION_POLICY_ID,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     SELECTION_PLOT_PLAIN_TITLES,
@@ -39,8 +43,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
     plot_root.mkdir(parents=True, exist_ok=True)
     panel_rows = [
         panel_row(
-            slot="primary_panel_01",
-            design_class_id=ALL_SPECS[-1].design_class_id,
+            slot="selected_hypothesis_01",
+            policy_id=COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
             candidate_id="thread_candidate_alpha",
             mutation_count=2,
             msa_fraction=0.75,
@@ -48,8 +52,8 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
             chemistry_warnings=0,
         ),
         panel_row(
-            slot="primary_panel_02",
-            design_class_id=ALL_SPECS[-1].design_class_id,
+            slot="selected_hypothesis_02",
+            policy_id=NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
             candidate_id="thread_candidate_beta",
             mutation_count=3,
             msa_fraction=0.6,
@@ -60,7 +64,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
     pq.write_table(pa.Table.from_pylist(panel_rows), selection_root / "candidate_selection_panel.parquet")
     pq.write_table(
         pa.Table.from_pylist(selection_trace_rows()),
-        selection_root / "primary_panel_selection_trace.parquet",
+        selection_root / "hypothesis_panel_selection_trace.parquet",
     )
     write_handoff_sequence_csv(selection_root / "candidate_handoff_sequences.csv", panel_rows)
     pq.write_table(
@@ -77,25 +81,23 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         write_svg(plot_root / f"{plot_id}.svg", plot_id=plot_id, title=title)
     payload = {
         "schema_id": "eco1_rt.selection_readiness_manifest",
-        "schema_version": 1,
+        "schema_version": 3,
         "status": "materialized",
-        "selection_policy_id": "eco1_rt_primary_conservative_panel_v1",
+        "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
-            "Select primary conservative candidates globally after preservation and chemistry/support gates. "
-            "Do not use ESMC or SAE as positive selection evidence."
+            "Select policy-defined hypotheses by within-group mutation-set distance. Design groups define "
+            "experimental comparisons, not quality tiers. Do not use ESMC or SAE as selection evidence."
         ),
-        "sae_window_policy": "SAE windows are retained for review evidence and are not panel-selection inputs.",
-        "esmc_policy": "ESMC additive LLR rows are retained for review and are not panel-selection tie-breaks.",
         "path_policy": "paths_relative_to_selection_manifest",
         "artifacts": {
             "candidate_triage_table": "candidate_triage_table.parquet",
-            "primary_panel_selection_trace": "primary_panel_selection_trace.parquet",
+            "hypothesis_panel_selection_trace": "hypothesis_panel_selection_trace.parquet",
             "candidate_selection_panel": "candidate_selection_panel.parquet",
             "candidate_handoff_sequences": "candidate_handoff_sequences.csv",
         },
         "row_counts": {
             "candidate_triage_table": 2,
-            "primary_panel_selection_trace": 4,
+            "hypothesis_panel_selection_trace": len(SELECTION_FUNNEL_STAGES),
             "candidate_selection_panel": 2,
             "candidate_handoff_sequences": 2,
         },
@@ -105,6 +107,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         },
         "selection_funnel_stages": SELECTION_FUNNEL_STAGES,
         "selected_candidate_ids": ["thread_candidate_alpha", "thread_candidate_beta"],
+        "panel_coverage": {"selected_panel_size": 2},
         "panel_tie_break_order": PANEL_TIE_BREAK_ORDER,
         "handoff_readiness": {
             "handoff_kind": "rt_only_candidate_handoff",

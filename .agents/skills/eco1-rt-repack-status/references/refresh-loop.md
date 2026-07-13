@@ -12,8 +12,8 @@ Use this loop when updating or reporting the Eco1 RT repack scaffold.
 6. Report whether each named artifact is planned, fixture-backed, or
    materialized.
 7. For blockers, report the smallest failing gate: structure authority, mask
-   contract, sampling plan, fold-check runtime, assembly feasibility,
-   candidate handoff, or downstream handoff.
+   contract, sampling plan, fold-check runtime, candidate handoff, or
+   downstream handoff.
 8. If changing source or tests, confirm the semantic package layout before
    status reporting: `operations/contracts/`, `operations/materialization/`,
    `tests/contracts/`, and `tests/materialization/`.

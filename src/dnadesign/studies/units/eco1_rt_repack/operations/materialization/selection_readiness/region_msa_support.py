@@ -15,10 +15,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
-)
-
 from .review_axes import (
     C_TERMINAL_PRIMER_RNA_RECOGNITION_POSITIONS,
     CLADE9_PROFILE_ID,
@@ -32,6 +28,7 @@ from .review_axes import (
     _parse_mutations,
     _profile_support,
 )
+from .selection_policy_context import resolve_selection_policy_context
 
 
 @dataclass(frozen=True)
@@ -100,7 +97,6 @@ def build_region_msa_support_rows(
             alignment_path=subtype_alignment_path,
         ),
     }
-    profile_by_class = {spec.design_class_id: spec.conservation_profile_id for spec in ALL_SPECS}
     contact_by_position = {int(row["canonical_position"]): row for row in contact_geometry_rows}
     mask_by_position = {int(row["canonical_position"]): row for row in mask_residues}
     rows: list[dict[str, object]] = []
@@ -108,10 +104,8 @@ def build_region_msa_support_rows(
         if str(candidate.get("status")) != "accepted":
             continue
         candidate_id = str(candidate["candidate_id"])
-        class_id = str(candidate["design_class_id"])
-        profile_id = profile_by_class.get(class_id)
-        if profile_id is None:
-            raise ValueError(f"Unknown Eco1 design class id for region-wise MSA support: {class_id}")
+        policy_context = resolve_selection_policy_context(candidate)
+        profile_id = policy_context.support_profile_id
         mutations = _parse_mutations(candidate.get("canonical_mutations"), candidate_id=candidate_id)
         mutations_by_region = {spec.region_id: [] for spec in REGION_MSA_SUPPORT_SPECS}
         for mutation in mutations:
@@ -129,7 +123,9 @@ def build_region_msa_support_rows(
             rows.append(
                 {
                     "candidate_id": candidate_id,
-                    "design_class_id": class_id,
+                    "policy_id": policy_context.policy_id,
+                    "selection_support_policy_id": policy_context.policy_id,
+                    "selection_support_policy_source": policy_context.source_field,
                     "selection_support_profile_id": profile_id,
                     "region_id": spec.region_id,
                     "region_label": spec.label,

@@ -16,6 +16,9 @@ from typing import Any
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
+    DEFAULT_GENERATION_POLICIES_ROOT,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.handoff_readiness import (
     normalize_handoff_readiness,
 )
@@ -23,32 +26,42 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     SELECTION_PLOT_METADATA,
 )
 
-from .constants import SECTION_FEASIBILITY_AND_HANDOFF
+from .constants import SECTION_PANEL_SELECTION
 from .manifest import file_hashes, make_deliverable_row
 
-_SELECTION_MANIFEST_RELATIVE_PATH = Path("design_classes/selection/selection_readiness_manifest.yaml")
+_SELECTION_MANIFEST_RELATIVE_PATH = (
+    Path(DEFAULT_GENERATION_POLICIES_ROOT.name) / "selection/selection_readiness_manifest.yaml"
+)
 _PANEL_TABLE_ARTIFACT_KEY = "candidate_selection_panel"
 _HANDOFF_SEQUENCE_CSV_ARTIFACT_KEY = "candidate_handoff_sequences"
 _FUNNEL_SUMMARY_DELIVERABLE_ID = "selection_funnel_summary"
 _PANEL_TABLE_DELIVERABLE_ID = "selection_panel_table"
 _HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID = "selection_handoff_sequences"
 _HANDOFF_READINESS_DELIVERABLE_ID = "selection_handoff_readiness"
+_TWIST_HANDOFF_DELIVERABLE_ID = "twist_full_cds_handoff"
 
 
-def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
+def linked_selection_readiness_rows(output_root: Path, *, selection_root: Path | None = None) -> list[dict[str, Any]]:
     """Return review-manifest rows for materialized panel-selection plots."""
 
-    manifest_path = output_root / _SELECTION_MANIFEST_RELATIVE_PATH
+    manifest_path = (
+        (selection_root / "selection_readiness_manifest.yaml")
+        if selection_root is not None
+        else output_root / _SELECTION_MANIFEST_RELATIVE_PATH
+    )
     if not manifest_path.exists():
         raise FileNotFoundError(manifest_path)
     loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML mapping at {manifest_path}")
     rows: list[dict[str, Any]] = []
-    rows.append(_funnel_summary_row(manifest_path=manifest_path, loaded=loaded))
-    rows.append(_panel_table_row(manifest_path=manifest_path, loaded=loaded))
-    rows.append(_handoff_sequence_csv_row(manifest_path=manifest_path, loaded=loaded))
-    rows.append(_handoff_readiness_row(manifest_path=manifest_path, loaded=loaded))
+    rows.append(_funnel_summary_row(output_root=output_root, manifest_path=manifest_path, loaded=loaded))
+    rows.append(_panel_table_row(output_root=output_root, manifest_path=manifest_path, loaded=loaded))
+    rows.append(_handoff_sequence_csv_row(output_root=output_root, manifest_path=manifest_path, loaded=loaded))
+    twist_handoff_path = manifest_path.parent.parent / "twist_handoff/twist_handoff_manifest.yaml"
+    if twist_handoff_path.exists():
+        rows.append(_twist_handoff_row(output_root=output_root, manifest_path=twist_handoff_path))
+    rows.append(_handoff_readiness_row(output_root=output_root, manifest_path=manifest_path, loaded=loaded))
     for plot in loaded.get("plots", []):
         if not isinstance(plot, dict):
             raise ValueError(f"Expected panel-selection plot row mappings in {manifest_path}")
@@ -62,11 +75,11 @@ def linked_selection_readiness_rows(output_root: Path) -> list[dict[str, Any]]:
             raise FileNotFoundError(f"Panel-selection visual declared rendered but missing: {plot_path}")
         row = make_deliverable_row(
             deliverable_id=plot_id,
-            section=SECTION_FEASIBILITY_AND_HANDOFF,
+            section=SECTION_PANEL_SELECTION,
             artifact_kind=str(plot.get("artifact_kind") or "svg"),
             status=linked_status,
             path=plot_path,
-            source_tables=[str(source) for source in plot.get("data_sources", [])],
+            source_tables=_plot_source_tables(output_root=output_root, manifest_path=manifest_path, plot=plot),
             input_hashes={
                 **{str(key): str(value) for key, value in dict(plot.get("input_hashes") or {}).items()},
                 **file_hashes({"selection_readiness_manifest": manifest_path, "linked_plot": plot_path}),
@@ -94,7 +107,7 @@ def _selection_plot_metadata(*, plot_id: str, plot: dict[str, Any]) -> dict[str,
     return metadata
 
 
-def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+def _funnel_summary_row(*, output_root: Path, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     artifacts = loaded.get("artifacts") or {}
     if not isinstance(artifacts, dict):
         raise ValueError(f"Expected artifacts mapping in {manifest_path}")
@@ -107,26 +120,32 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
         input_paths["candidate_selection_panel"] = _resolve_manifest_path(manifest_path, panel_value)
     return make_deliverable_row(
         deliverable_id=_FUNNEL_SUMMARY_DELIVERABLE_ID,
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        section=SECTION_PANEL_SELECTION,
         artifact_kind="selection_funnel_summary",
         status="linked_existing",
         path=manifest_path,
         source_tables=[
-            "design_classes/selection/selection_readiness_manifest.yaml",
-            "design_classes/selection/candidate_triage_table.parquet",
-            "design_classes/selection/candidate_selection_panel.parquet",
+            _source_table_label(output_root=output_root, path=manifest_path),
+            _source_table_label(output_root=output_root, path=manifest_path.parent / "candidate_triage_table.parquet"),
+            _source_table_label(
+                output_root=output_root,
+                path=manifest_path.parent / "candidate_selection_panel.parquet",
+            ),
         ],
         input_hashes=file_hashes(input_paths),
-        alt_text="Selection-funnel summary table with row counts, gate counts, selected IDs, and policy notes.",
+        alt_text=(
+            "Selection-flow summary from complete sequences through local-geometry review and three design groups "
+            "to eight selected sequences."
+        ),
         description=(
-            "Shows the accepted candidate pool, preservation gate, chemistry/support gate, and global selection "
-            "stage from selection_readiness_manifest.yaml."
+            "Shows complete sequences, the local-geometry screen, the distal, peripheral, and combined groups, "
+            "and the final eight-sequence panel."
         ),
         interpretation_limit=(
             "ESMC and SAE are review annotations, not panel-selection evidence. The summary does not establish "
             "activity, strand displacement, or structured-template readthrough."
         ),
-        title="Panel selection keeps fold checks separate from activity claims",
+        title="Selection flow and panel summary",
         role="manuscript_facing",
         render_mode="table",
         evidence_summary={
@@ -137,7 +156,7 @@ def _funnel_summary_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[
     )
 
 
-def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+def _panel_table_row(*, output_root: Path, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     artifacts = loaded.get("artifacts") or {}
     if not isinstance(artifacts, dict):
         raise ValueError(f"Expected artifacts mapping in {manifest_path}")
@@ -154,32 +173,33 @@ def _panel_table_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str
     }
     return make_deliverable_row(
         deliverable_id=_PANEL_TABLE_DELIVERABLE_ID,
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        section=SECTION_PANEL_SELECTION,
         artifact_kind="selection_panel_table",
         status="linked_existing",
         path=table_path,
-        source_tables=["design_classes/selection/candidate_selection_panel.parquet"],
+        source_tables=[_source_table_label(output_root=output_root, path=table_path)],
         input_hashes={
             **manifest_hashes,
             **file_hashes({"selection_readiness_manifest": manifest_path, "selection_panel_table": table_path}),
         },
-        alt_text="Compact table of the selected Eco1 primary-panel variants.",
+        alt_text="Compact table of eight selected Eco1 RT sequence hypotheses.",
         description=(
-            "Lists the selected primary-panel variants with feasibility, fold, sequence-distance, MSA-support, "
-            "mutation-geography, and local-chemistry fields. Design class is retained as context, not as a quota."
+            "Lists complete sequence hypotheses with design group, selection rank, R13 annotation, fold metrics, "
+            "within-group mutation-set distance, regional MSA support, mutation "
+            "geography, and peripheral DNA/RNA chemistry."
         ),
         interpretation_limit=(
             "The table records the proposed computational panel. It does not establish activity, strand "
             "displacement, or structured-template readthrough."
         ),
-        title="Selected Eco1 RT variants form a primary protein review panel",
+        title="Eight selected Eco1 RT sequences",
         role="manuscript_facing",
         render_mode="table",
         skip_reason="",
     )
 
 
-def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+def _handoff_sequence_csv_row(*, output_root: Path, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     artifacts = loaded.get("artifacts") or {}
     if not isinstance(artifacts, dict):
         raise ValueError(f"Expected artifacts mapping in {manifest_path}")
@@ -196,22 +216,25 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
     }
     return make_deliverable_row(
         deliverable_id=_HANDOFF_SEQUENCE_CSV_DELIVERABLE_ID,
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        section=SECTION_PANEL_SELECTION,
         artifact_kind="candidate_handoff_sequence_csv",
         status="linked_existing",
         path=table_path,
         source_tables=[
-            "design_classes/selection/candidate_handoff_sequences.csv",
-            "design_classes/selection/candidate_selection_panel.parquet",
+            _source_table_label(output_root=output_root, path=table_path),
+            _source_table_label(
+                output_root=output_root,
+                path=manifest_path.parent / "candidate_selection_panel.parquet",
+            ),
         ],
         input_hashes={
             **manifest_hashes,
             **file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff_sequences": table_path}),
         },
-        alt_text="Flat CSV table of selected mapped RT-chain protein sequences and explicit non-DNA status fields.",
+        alt_text="Flat CSV table of selected canonical 320-aa RT protein sequences and explicit non-DNA status fields.",
         description=(
-            "Lists selected mapped_rt_chain_protein sequences with sequence hashes, selection slots, feasibility "
-            "state, and explicit non-DNA, non-codon-optimized, and not-screened status fields."
+            "Lists selected canonical_rt_protein sequences with mapped-source hashes, selection slots, and explicit "
+            "non-DNA, non-codon-optimized, and not-screened status fields."
         ),
         interpretation_limit=(
             "This CSV is a protein-sequence handoff table. It is not an E. coli codon-optimized DNA design and it has "
@@ -224,7 +247,7 @@ def _handoff_sequence_csv_row(*, manifest_path: Path, loaded: dict[str, Any]) ->
     )
 
 
-def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
+def _handoff_readiness_row(*, output_root: Path, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, Any]:
     readiness = _normalized_handoff_readiness(manifest_path=manifest_path, loaded=loaded)
     handoff_path = _resolve_manifest_path(manifest_path, str(readiness["candidate_handoff_path"]))
     handoff_file_present = bool(readiness["candidate_handoff_file_present"])
@@ -240,11 +263,11 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
         handoff_state = "absent"
     return make_deliverable_row(
         deliverable_id=_HANDOFF_READINESS_DELIVERABLE_ID,
-        section=SECTION_FEASIBILITY_AND_HANDOFF,
+        section=SECTION_PANEL_SELECTION,
         artifact_kind="handoff_readiness",
         status="linked_existing",
         path=manifest_path,
-        source_tables=["design_classes/selection/selection_readiness_manifest.yaml"],
+        source_tables=[_source_table_label(output_root=output_root, path=manifest_path)],
         input_hashes=file_hashes({"selection_readiness_manifest": manifest_path, "candidate_handoff": handoff_path}),
         alt_text="Checklist for RT-only candidate-handoff readiness.",
         description=(
@@ -261,6 +284,37 @@ def _handoff_readiness_row(*, manifest_path: Path, loaded: dict[str, Any]) -> di
     )
 
 
+def _twist_handoff_row(*, output_root: Path, manifest_path: Path) -> dict[str, Any]:
+    loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict) or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff":
+        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff at {manifest_path}")
+    sequence_count = len(list(loaded.get("sequences") or []))
+    return make_deliverable_row(
+        deliverable_id=_TWIST_HANDOFF_DELIVERABLE_ID,
+        section=SECTION_PANEL_SELECTION,
+        artifact_kind="twist_handoff_manifest",
+        status="linked_existing",
+        path=manifest_path,
+        source_tables=[_source_table_label(output_root=output_root, path=manifest_path)],
+        input_hashes=file_hashes({"twist_handoff_manifest": manifest_path}),
+        alt_text=(
+            f"Twist handoff summary for {sequence_count} full-length Eco1 RT CDS designs, with mutation labels and "
+            "sequence-quality checks."
+        ),
+        description=(
+            "Lists the exact 963-bp CDS designs, compact amino-acid substitutions, GenBank files, sequence hashes, "
+            f"and restriction-site checks for all {sequence_count} selected hypotheses."
+        ),
+        interpretation_limit=(
+            "The sequences are ready for a vendor complexity check and quote. Cloning remains blocked until "
+            "assembly flanks and junctions are declared."
+        ),
+        title="Twist full-CDS handoff",
+        role="manuscript_facing",
+        render_mode="table",
+    )
+
+
 def _normalized_handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]) -> dict[str, object]:
     raw = loaded.get("handoff_readiness") or {}
     if not isinstance(raw, dict):
@@ -271,3 +325,17 @@ def _normalized_handoff_readiness(*, manifest_path: Path, loaded: dict[str, Any]
 def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else manifest_path.parent / path
+
+
+def _source_table_label(*, output_root: Path, path: Path) -> str:
+    try:
+        return str(path.relative_to(output_root))
+    except ValueError:
+        return str(path)
+
+
+def _plot_source_tables(*, output_root: Path, manifest_path: Path, plot: dict[str, Any]) -> list[str]:
+    labels: list[str] = []
+    for source in plot.get("data_sources", []):
+        labels.append(str(source))
+    return labels

@@ -18,7 +18,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 
 
-def test_local_structure_review_summary_requires_all_regions_available() -> None:
+def test_local_structure_review_summary_does_not_gate_on_distal_review_only_region() -> None:
     rows = [
         {
             "candidate_id": "candidate_a",
@@ -32,9 +32,10 @@ def test_local_structure_review_summary_requires_all_regions_available() -> None
 
     summary = build_local_structure_review_by_candidate(rows)["candidate_a"]
 
-    assert summary["local_structure_gate_status"] == "unavailable"
-    assert summary["local_structure_unavailable_region_count"] == 1
-    assert "distal_scaffold_control:model_structure_missing" in summary["local_structure_gate_failure_reasons_json"]
+    assert summary["local_structure_gate_status"] == "passed"
+    assert summary["local_structure_unavailable_region_count"] == 0
+    assert summary["local_structure_distal_scaffold_control_ca_rmsd_angstrom"] is None
+    assert summary["local_structure_gate_failure_reasons_json"] == "[]"
 
 
 def test_local_structure_review_summary_fails_threshold_excess() -> None:

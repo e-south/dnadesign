@@ -19,12 +19,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.aligner.msa import load_fasta_records
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes.specs import (
-    ALL_SPECS,
+
+from .selection_policy_context import (
+    CLADE9_PROFILE_ID,
+    SUBTYPE_PROFILE_ID,
+    resolve_selection_policy_context,
 )
 
-CLADE9_PROFILE_ID = "ec86_clade9_conservation_v1"
-SUBTYPE_PROFILE_ID = "ec86_iia3_cluster42_1_conservation_v1"
 TARGET_ROW_ID = "eco1_rt_ec86kit_reference"
 RARE_RESIDUE_FREQUENCY = 0.01
 NA_FACING_DISTANCE_ANGSTROM = 10.0
@@ -79,24 +80,22 @@ def build_review_axis_by_candidate(
     }
     contact_by_position = {int(row["canonical_position"]): row for row in contact_geometry_rows}
     mask_by_position = {int(row["canonical_position"]): row for row in mask_residues}
-    profile_by_class = {spec.design_class_id: spec.conservation_profile_id for spec in ALL_SPECS}
-
     axes: dict[str, dict[str, object]] = {}
     for candidate in candidate_rows:
         if str(candidate.get("status")) != "accepted":
             continue
         candidate_id = str(candidate["candidate_id"])
         mutations = _parse_mutations(candidate.get("canonical_mutations"), candidate_id=candidate_id)
-        class_id = str(candidate["design_class_id"])
-        if class_id not in profile_by_class:
-            raise ValueError(f"Unknown Eco1 design class id for review-axis selection: {class_id}")
-        selected_profile_id = profile_by_class[class_id]
+        policy_context = resolve_selection_policy_context(candidate)
+        selected_profile_id = policy_context.support_profile_id
         clade9 = _natural_support(mutations, profile_support[CLADE9_PROFILE_ID])
         subtype = _natural_support(mutations, profile_support[SUBTYPE_PROFILE_ID])
         selected = clade9 if selected_profile_id == CLADE9_PROFILE_ID else subtype
         axes[candidate_id] = {
             **_prefix("clade9", clade9),
             **_prefix("subtype", subtype),
+            "selection_support_policy_id": policy_context.policy_id,
+            "selection_support_policy_source": policy_context.source_field,
             "selection_support_profile_id": selected_profile_id,
             "selection_support_alt_observed_fraction": selected["alt_observed_fraction"],
             "selection_support_alt_frequency_mean": selected["alt_frequency_mean"],
@@ -201,7 +200,6 @@ def _mutation_geography(
             acidic_gain += int(mutation.wt_aa not in _ACIDIC and mutation.alt_aa in _ACIDIC)
             proline_glycine_gain += int(mutation.wt_aa not in _PROLINE_GLYCINE and mutation.alt_aa in _PROLINE_GLYCINE)
     warnings = basic_loss + acidic_gain + proline_glycine_gain
-    chemistry_compatible = charge_delta >= 0 and acidic_gain <= basic_gain
     return {
         "catalytic_or_direct_contact_mutation_count": catalytic_or_direct,
         "nucleic_acid_facing_mutation_count": na_facing,
@@ -214,8 +212,6 @@ def _mutation_geography(
         "nucleic_acid_facing_acidic_gain_count": acidic_gain,
         "nucleic_acid_facing_proline_glycine_gain_count": proline_glycine_gain,
         "nucleic_acid_facing_chemistry_warning_count": warnings,
-        "nucleic_acid_facing_chemistry_compatible": chemistry_compatible,
-        "nucleic_acid_facing_chemistry_gate_status": "passed" if chemistry_compatible else "incompatible",
     }
 
 

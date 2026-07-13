@@ -41,7 +41,6 @@ _EXPECTED_ARTIFACT_ORDER = (
     "sample_table",
     "candidate_table",
     "foldcheck_report",
-    "feasibility_report",
     "candidate_triage_table",
     "candidate_selection_panel",
     "candidate_handoff_sequences",
@@ -63,10 +62,7 @@ _REQUIRED_ARTIFACT_INVARIANTS = {
     "fixture_artifacts_cannot_satisfy_materialized_handoff": (
         "thread.artifact_chain.missing_fixture_boundary_invariant"
     ),
-    "no_candidate_handoff_without_foldcheck_and_feasibility_reports": (
-        "thread.artifact_chain.missing_handoff_gate_invariant"
-    ),
-    "no_candidate_handoff_without_foldcheck_feasibility_triage_selection_and_sequence_reports": (
+    "no_candidate_handoff_without_foldcheck_triage_selection_and_sequence_reports": (
         "thread.artifact_chain.missing_selection_handoff_gate_invariant"
     ),
 }

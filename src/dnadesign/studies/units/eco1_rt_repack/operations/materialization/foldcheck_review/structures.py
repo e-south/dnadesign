@@ -26,6 +26,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.models import PanelEntry
 from dnadesign.thread.adapters.proteinmpnn.hashing import sha256_uri
 
+_CANONICAL_RT_LENGTH = 320
+
 
 def stage_structure_panel(
     *,
@@ -202,7 +204,8 @@ def _stage_model_entry(
         copy_status=copy_status,
         source_model_artifact_hash=source_hash,
         display_label=_display_label(row, candidate_id=candidate_id),
-        sequence_identity_percent=_sequence_identity_percent(row, candidate_id=candidate_id),
+        full_sequence_identity_percent=_full_sequence_identity_percent(row, candidate_id=candidate_id),
+        design_position_recovery_percent=_design_position_recovery_percent(row, candidate_id=candidate_id),
         proteinmpnn_rank=_optional_int(row.get("proteinmpnn_rank")),
         wt_runtime_ca_rmsd=_optional_float(row.get("wt_runtime_ca_rmsd")),
     )
@@ -297,9 +300,18 @@ def _display_label(row: Mapping[str, Any], *, candidate_id: str) -> str:
     return f"ProteinMPNN variant {short_id}"
 
 
-def _sequence_identity_percent(row: Mapping[str, Any], *, candidate_id: str) -> float | None:
+def _full_sequence_identity_percent(row: Mapping[str, Any], *, candidate_id: str) -> float | None:
     if candidate_id == "wild_type":
         return 100.0
+    mutation_count = row.get("mutation_count")
+    if mutation_count is None:
+        return None
+    return 100.0 * (_CANONICAL_RT_LENGTH - int(mutation_count)) / _CANONICAL_RT_LENGTH
+
+
+def _design_position_recovery_percent(row: Mapping[str, Any], *, candidate_id: str) -> float | None:
+    if candidate_id == "wild_type":
+        return None
     seq_recovery = row.get("seq_recovery")
     return None if seq_recovery is None else float(seq_recovery) * 100.0
 

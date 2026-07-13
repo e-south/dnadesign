@@ -22,6 +22,7 @@ import pyarrow.parquet as pq
 from numpy.typing import NDArray
 
 from .local_structure_regions import (
+    LOCAL_STRUCTURE_GATE_REGION_IDS,
     LOCAL_STRUCTURE_REGION_IDS,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
     LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_NOTE,
@@ -30,6 +31,7 @@ from .local_structure_regions import (
     local_structure_region_specs,
     position_spec,
 )
+from .selection_policy_context import resolve_selection_policy_context
 
 COORDINATE_SCOPE = "mapped_rt_chain_ca_after_global_fit"
 MIN_GLOBAL_ALIGNMENT_CA = 3
@@ -62,16 +64,13 @@ def build_local_structure_region_rows(
         mapped_positions=mapped,
         contact_geometry_rows=contact_geometry_rows,
     )
-    design_class_by_candidate = {
-        str(row["candidate_id"]): str(row.get("design_class_id") or "")
-        for row in candidate_rows
-        if row.get("candidate_id")
-    }
+    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
     reference_ca = _reference_ca_by_mapped_position(reference_backbone_path, mapped_positions=mapped)
     rows: list[dict[str, object]] = []
     for fold_row in sorted(fold_review_rows, key=lambda row: str(row.get("candidate_id") or "")):
         candidate_id = str(fold_row["candidate_id"])
-        design_class_id = str(fold_row.get("design_class_id") or design_class_by_candidate.get(candidate_id, ""))
+        policy_source = {**candidate_by_id.get(candidate_id, {}), **fold_row}
+        policy_id = resolve_selection_policy_context(policy_source).policy_id
         source_model_path = _resolve_model_path(
             candidate_id=candidate_id,
             model_artifact_path=_optional_model_path(fold_row.get("model_artifact_path")),
@@ -81,7 +80,7 @@ def build_local_structure_region_rows(
             rows.extend(
                 _status_rows(
                     candidate_id=candidate_id,
-                    design_class_id=design_class_id,
+                    policy_id=policy_id,
                     region_specs=region_specs,
                     status="reference_structure_missing",
                     status_reason=str(reference_backbone_path),
@@ -94,7 +93,7 @@ def build_local_structure_region_rows(
             rows.extend(
                 _status_rows(
                     candidate_id=candidate_id,
-                    design_class_id=design_class_id,
+                    policy_id=policy_id,
                     region_specs=region_specs,
                     status="model_structure_missing",
                     status_reason=str(
@@ -111,7 +110,7 @@ def build_local_structure_region_rows(
             rows.extend(
                 _status_rows(
                     candidate_id=candidate_id,
-                    design_class_id=design_class_id,
+                    policy_id=policy_id,
                     region_specs=region_specs,
                     status="insufficient_alignment_overlap",
                     status_reason=(
@@ -133,7 +132,7 @@ def build_local_structure_region_rows(
             rows.append(
                 _metric_row(
                     candidate_id=candidate_id,
-                    design_class_id=design_class_id,
+                    policy_id=policy_id,
                     spec=spec,
                     reference_ca=reference_ca,
                     candidate_ca=aligned_candidate,
@@ -149,7 +148,7 @@ def build_local_structure_review_by_candidate(
 ) -> dict[str, dict[str, object]]:
     """Summarize local-structure rows into a candidate-level gate contract."""
 
-    required_regions = set(LOCAL_STRUCTURE_REGION_IDS)
+    required_regions = set(LOCAL_STRUCTURE_GATE_REGION_IDS)
     rows_by_candidate: dict[str, list[Mapping[str, Any]]] = {}
     for row in local_structure_rows:
         candidate_id = str(row.get("candidate_id") or "")
@@ -161,27 +160,32 @@ def build_local_structure_review_by_candidate(
         missing_regions = sorted(required_regions - set(rows_by_region))
         unavailable_reasons = [f"{region_id}:missing_metric_row" for region_id in missing_regions]
         available_values: list[float] = []
+        gated_available_values: list[float] = []
         threshold_failures: list[str] = []
         per_region_fields: dict[str, object] = {}
         for region_id in LOCAL_STRUCTURE_REGION_IDS:
             row = rows_by_region.get(region_id)
             status = "" if row is None else str(row.get("status") or "")
             value = None if row is None else row.get("local_ca_rmsd_angstrom")
-            per_region_fields[f"local_structure_{region_id}_ca_rmsd_angstrom"] = None if value is None else float(value)
+            per_region_fields[f"local_structure_{region_id}_ca_rmsd_angstrom"] = (
+                float(value) if status == "available" and value is not None else None
+            )
             if status == "available" and value is not None:
                 numeric_value = float(value)
                 available_values.append(numeric_value)
-                threshold = float(
-                    (row or {}).get("local_ca_rmsd_threshold_angstrom")
-                    or LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
-                )
+                if region_id in required_regions:
+                    gated_available_values.append(numeric_value)
+                threshold_value = (row or {}).get("local_ca_rmsd_threshold_angstrom")
+                if threshold_value is None:
+                    continue
+                threshold = float(threshold_value)
                 if (
                     str(row.get("local_ca_rmsd_threshold_status") or "") == "threshold_exceeded"
                     or numeric_value > threshold
                 ):
                     threshold_failures.append(f"{region_id}:local_ca_rmsd {numeric_value:.3f} > {threshold:.3f}")
                 continue
-            if row is not None:
+            if row is not None and region_id in required_regions:
                 unavailable_reasons.append(f"{region_id}:{status or 'missing_status'}")
         if unavailable_reasons:
             gate_status = "unavailable"
@@ -199,7 +203,12 @@ def build_local_structure_review_by_candidate(
             "local_structure_unavailable_region_count": len(unavailable_reasons),
             "local_structure_threshold_failed_region_count": len(threshold_failures),
             "local_structure_threshold_policy_id": LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID,
-            "local_structure_max_ca_rmsd_angstrom": round(max(available_values), 3) if available_values else None,
+            "local_structure_max_gated_ca_rmsd_angstrom": (
+                round(max(gated_available_values), 3) if gated_available_values else None
+            ),
+            "local_structure_max_all_region_ca_rmsd_angstrom": (
+                round(max(available_values), 3) if available_values else None
+            ),
             "local_structure_mean_ca_rmsd_angstrom": round(sum(available_values) / len(available_values), 3)
             if available_values
             else None,
@@ -211,7 +220,7 @@ def build_local_structure_review_by_candidate(
 def _metric_row(
     *,
     candidate_id: str,
-    design_class_id: str,
+    policy_id: str,
     spec: LocalStructureRegionSpec,
     reference_ca: Mapping[int, NDArray[np.float64]],
     candidate_ca: Mapping[int, NDArray[np.float64]],
@@ -225,7 +234,7 @@ def _metric_row(
     ]
     base = _base_row(
         candidate_id=candidate_id,
-        design_class_id=design_class_id,
+        policy_id=policy_id,
         spec=spec,
         n_reference_ca=len(reference_positions),
         n_candidate_ca=len(candidate_positions),
@@ -265,7 +274,7 @@ def _metric_row(
 def _status_rows(
     *,
     candidate_id: str,
-    design_class_id: str,
+    policy_id: str,
     region_specs: Sequence[LocalStructureRegionSpec],
     status: str,
     status_reason: str,
@@ -278,7 +287,7 @@ def _status_rows(
         {
             **_base_row(
                 candidate_id=candidate_id,
-                design_class_id=design_class_id,
+                policy_id=policy_id,
                 spec=spec,
                 n_reference_ca=len(
                     [position for position in spec.positions if reference_ca and position in reference_ca]
@@ -310,7 +319,7 @@ def _status_rows(
 def _base_row(
     *,
     candidate_id: str,
-    design_class_id: str,
+    policy_id: str,
     spec: LocalStructureRegionSpec,
     n_reference_ca: int,
     n_candidate_ca: int,
@@ -320,7 +329,7 @@ def _base_row(
 ) -> dict[str, object]:
     return {
         "candidate_id": candidate_id,
-        "design_class_id": design_class_id,
+        "policy_id": policy_id,
         "region_id": spec.region_id,
         "region_label": spec.label,
         "region_role": spec.role,
@@ -342,6 +351,8 @@ def _base_row(
 
 def _threshold_status(*, region_id: str, local_ca_rmsd: float) -> str:
     threshold = LOCAL_STRUCTURE_RMSD_THRESHOLDS_ANGSTROM[region_id]
+    if threshold is None:
+        return "review_only"
     return "passed" if float(local_ca_rmsd) <= threshold else "threshold_exceeded"
 
 
@@ -428,6 +439,7 @@ def _resolve_model_path(*, candidate_id: str, model_artifact_path: Path | None, 
 
 
 __all__ = [
+    "LOCAL_STRUCTURE_GATE_REGION_IDS",
     "COORDINATE_SCOPE",
     "LOCAL_STRUCTURE_REGION_IDS",
     "LOCAL_STRUCTURE_RMSD_THRESHOLD_POLICY_ID",

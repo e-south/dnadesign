@@ -314,7 +314,7 @@ def write_msa_plurality_mask_panel(
         f"{len(records)}-record {panel_profile.profile_id} alignment. The first row is {target_id}; "
         "the remaining rows use source record labels with clade row or node identifiers and provider "
         f"accessions. Vertical markings show columns passing the 25 percent WT-plurality rule in the "
-        f"{panel_profile.scope_label} profile, the 50 percent design-class threshold cue, and current "
+        f"{panel_profile.scope_label} profile, a 50 percent conservation comparison cue, and current "
         "protected mask positions. Display-only background bands mark audited RT context spans, RT intervals, "
         f"and motif anchors. {subtype_note}"
     )

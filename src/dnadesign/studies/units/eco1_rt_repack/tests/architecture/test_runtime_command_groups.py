@@ -38,25 +38,20 @@ _EXECUTABLE_LANES = {
     "manual_mask_authority",
     "mask_contract",
     "contact_risk_profile",
-    "design_class_requests",
-    "design_class_candidate_pool",
     "generation_policy_requests",
-    "sampling_plan",
-    "sample_ingest",
-    "candidate_table",
-    "foldcheck_request",
+    "generation_policy_candidate_pool",
+    "generation_policy_foldcheck_request",
     "foldcheck_report",
-    "assembly_feasibility",
+    "foldcheck_review",
     "candidate_triage_table",
     "candidate_selection_panel",
+    "twist_full_cds_handoff",
+    "review_deliverables",
     "phase0_contract_validation",
     "phase1_contract_validation",
-    "phase2_contract_validation",
 }
 _EXTERNAL_LANES = {
     "colabfold_scc_smoke",
-    "design_class_proteinmpnn_scc_array",
-    "design_class_proteinmpnn_scc_smoke",
     "generation_policy_proteinmpnn_scc_array",
     "generation_policy_proteinmpnn_scc_smoke",
 }
@@ -75,14 +70,14 @@ def _pipeline() -> dict[str, object]:
 
 
 def test_runtime_command_group_readme_is_no_longer_placeholder() -> None:
-    text = (repo_root() / _README).read_text(encoding="utf-8")
+    text = " ".join((repo_root() / _README).read_text(encoding="utf-8").split())
 
     assert "placeholder route" not in text
-    assert "not a hidden run-all pipeline" in text
-    assert "simple clade9-plurality-25/direct-contact-5 A" in text
-    assert "### Rerun Ladder" in text
-    assert "### Source-Role Guardrails" in text
-    assert "Tao is the masking-method prior" in text
+    assert "Each command writes one declared artifact boundary" in text
+    assert "generation_policies_v3" in text
+    assert "### 6. Select The Panel" in text
+    assert "### Source Roles" in text
+    assert "Tao supports constraint-first fixed-backbone RT redesign" in text
 
 
 def test_pipeline_names_sequential_executable_lanes() -> None:
@@ -113,12 +108,10 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
 
     assert by_id["conservation_alignments"]["owner"] == "eco1_rt_repack"
     assert by_id["conservation_visualizations"]["owner"] == "aligner.msa"
-    assert by_id["sampling_plan"]["owner"] == "eco1_rt_repack"
-    assert by_id["sample_ingest"]["owner"] == "thread"
-    assert by_id["foldcheck_request"]["owner"] == "eco1_rt_repack"
+    assert by_id["generation_policy_requests"]["owner"] == "eco1_rt_repack"
+    assert by_id["generation_policy_candidate_pool"]["owner"] == "eco1_rt_repack"
+    assert by_id["generation_policy_foldcheck_request"]["owner"] == "eco1_rt_repack"
     assert by_id["colabfold_scc_smoke"]["owner"] == "bu_scc_runtime"
-    assert by_id["design_class_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
-    assert by_id["design_class_proteinmpnn_scc_array"]["owner"] == "bu_scc_runtime"
     assert by_id["generation_policy_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
     assert by_id["generation_policy_proteinmpnn_scc_array"]["owner"] == "bu_scc_runtime"
     assert by_id["foldcheck_report"]["owner"] == "thread"
@@ -126,13 +119,10 @@ def test_pipeline_preserves_study_aligner_thread_boundaries() -> None:
     assert by_id["biohub_esmc_sae_profile"]["owner"] == "thread"
     assert by_id["biohub_esmc_6b_wt_mutation_scoring"]["owner"] == "permuter"
     assert by_id["biohub_esmc_wt_mutation_scoring"]["owner"] == "permuter"
-    assert by_id["assembly_feasibility"]["owner"] == "eco1_rt_repack"
     assert by_id["candidate_handoff"]["owner"] == "thread"
+    assert by_id["twist_full_cds_handoff"]["owner"] == "eco1_rt_repack"
     assert by_id["mask_contract"]["owner"] == "eco1_rt_repack"
     assert by_id["contact_risk_profile"]["owner"] == "eco1_rt_repack"
-    assert by_id["design_class_requests"]["owner"] == "eco1_rt_repack"
-    assert by_id["design_class_candidate_pool"]["owner"] == "eco1_rt_repack"
-    assert by_id["generation_policy_requests"]["owner"] == "eco1_rt_repack"
     assert "pixi" in by_id["conservation_alignments"]["command"]["argv"]
     assert "dnadesign.aligner.msa.visualization" in by_id["conservation_visualizations"]["command"]["argv"]
 

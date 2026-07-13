@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -21,10 +22,15 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
     resolve_manifest_path,
 )
 from dnadesign.thread.structure_views import (
+    NUCLEIC_ACID_RIBBON_THICKNESS,
+    NUCLEIC_ACID_RIBBON_WIDTH,
+    PROTEIN_SURFACE_OPACITY,
     StructureViewModel,
     StructureViewMoleculeStyle,
     StructureViewSelectionStyle,
     StructureViewSpec,
+    filter_structure_text_by_molecule_classes,
+    molecule_classes_in_structure_text,
     render_structure_view_html,
     summarize_structure_atom_content,
 )
@@ -37,7 +43,6 @@ from .notebook_structure_dashboard import (
 )
 from .structure_browser_common import (
     DNA_CLASS_COLOR,
-    PROTEIN_CLASS_COLOR,
     REFERENCE_COLOR,
     RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
     RNA_CLASS_COLOR,
@@ -46,7 +51,6 @@ from .structure_browser_common import (
 _STRUCTURE_VIEW_WIDTH = 760
 _STRUCTURE_VIEW_HEIGHT = 520
 _MOLECULE_CLASS_COLORS = {
-    "protein": PROTEIN_CLASS_COLOR,
     "dna": DNA_CLASS_COLOR,
     "rna": RNA_CLASS_COLOR,
 }
@@ -69,15 +73,15 @@ def render_structure_browser(
     structure_background_ui: Any | None = None,
     structure_mutation_ui: Any | None = None,
     structure_sidechain_ui: Any | None = None,
-    structure_protein_ui: Any | None = None,
+    structure_surface_ui: Any | None = None,
     structure_dna_visible_ui: Any | None = None,
     structure_rna_visible_ui: Any | None = None,
     show_reference_background: bool = True,
     show_mutation_differences: bool = False,
     show_sidechains: bool = True,
+    show_protein_surface: bool = False,
     show_dna: bool = True,
     show_rna: bool = True,
-    highlight_protein: bool = False,
     highlight_dna: bool = False,
     highlight_rna: bool = False,
 ) -> Any:
@@ -93,8 +97,8 @@ def render_structure_browser(
         return mo.md("Interactive structure browsing is skipped because a selected PDB path is missing.")
     reference_format = str(reference.get("structure_format") or "pdb")
     query_format = str(selected_row.get("structure_format") or "pdb")
-    reference_text = reference_path.read_text(encoding="utf-8")
-    query_text = query_path.read_text(encoding="utf-8")
+    reference_text = _read_structure_text(reference_path)
+    query_text = _read_structure_text(query_path)
     reference_atom_content = summarize_structure_atom_content(reference_text, structure_format=reference_format)
     alignment_status = "raw_coordinates"
     browser_mapped_ca_rmsd: float | None = None
@@ -110,7 +114,7 @@ def render_structure_browser(
         )
         if not alignment_reference_path.exists():
             return mo.md("Interactive structure alignment is skipped because the alignment reference PDB is missing.")
-        alignment_reference_text = alignment_reference_path.read_text(encoding="utf-8")
+        alignment_reference_text = _read_structure_text(alignment_reference_path)
         try:
             query_text, browser_mapped_ca_rmsd = align_pdb_text_to_reference_ca(
                 query_text=query_text,
@@ -126,28 +130,53 @@ def render_structure_browser(
         None if not query_text else summarize_structure_atom_content(query_text, structure_format=query_format)
     )
     query_model_id = str(selected_row.get("source_candidate_id") or selected_row["candidate_id"])
-    selection_styles = _selection_styles(selected_row)
+    reference_model_id = str(reference.get("model_id") or "reference")
+    selection_styles = _selection_styles(selected_row, show_sidechains=show_sidechains)
     selected_highlight_selection_styles = ()
     if selected_highlight_row is not None and selected_highlight_row is not selected_row:
-        selected_highlight_selection_styles = _selection_styles(selected_highlight_row)
+        selected_highlight_selection_styles = _selection_styles(
+            selected_highlight_row,
+            show_sidechains=show_sidechains,
+            model_id_override=query_model_id if view_mode != "reference_selection" else reference_model_id,
+        )
     mutation_selection_styles = ()
     if show_mutation_differences and view_mode != "reference_selection":
-        mutation_selection_styles = _mutation_selection_styles(selected_row, model_id=query_model_id)
-    residue_interest_overlay_active = bool(
-        selection_styles or selected_highlight_selection_styles or mutation_selection_styles
-    )
+        mutation_selection_styles = _mutation_selection_styles(
+            selected_row,
+            model_id=query_model_id,
+            show_sidechains=show_sidechains,
+        )
     reference_model = StructureViewModel(
-        model_id=str(reference.get("model_id") or "reference"),
+        model_id=reference_model_id,
         structure_text=reference_text,
         structure_format=reference_format,
         label=str(reference.get("display_label") or "Reference"),
         color=str(reference.get("color") or "#d8d8d8"),
         opacity=0.82,
-        show_sidechains=show_sidechains and reference_atom_content.has_sidechain_atoms,
+        show_sidechains=False,
     )
     models = []
     if view_mode == "reference_selection" or show_reference_background:
         models.append(reference_model)
+    elif show_dna or show_rna:
+        visible_nucleic_classes = tuple(
+            molecule_class for molecule_class, is_visible in (("dna", show_dna), ("rna", show_rna)) if is_visible
+        )
+        models.append(
+            StructureViewModel(
+                model_id=reference_model_id,
+                structure_text=filter_structure_text_by_molecule_classes(
+                    reference_text,
+                    structure_format=reference_format,
+                    visible_molecule_classes=visible_nucleic_classes,
+                ),
+                structure_format=reference_format,
+                label="Reference nucleic acids",
+                color=str(reference.get("color") or "#d8d8d8"),
+                opacity=0.82,
+                show_sidechains=False,
+            )
+        )
     if view_mode != "reference_selection":
         models.append(
             StructureViewModel(
@@ -155,14 +184,8 @@ def render_structure_browser(
                 structure_text=query_text,
                 structure_format=query_format,
                 label=str(selected_row.get("display_label") or selected_row["candidate_id"]),
-                color=REFERENCE_COLOR
-                if residue_interest_overlay_active
-                else str(selected_row.get("color") or PROTEIN_CLASS_COLOR),
-                show_sidechains=(
-                    show_sidechains and query_atom_content.has_sidechain_atoms
-                    if query_atom_content is not None
-                    else False
-                ),
+                color=REFERENCE_COLOR,
+                show_sidechains=False,
             )
         )
     selection_styles += selected_highlight_selection_styles + mutation_selection_styles
@@ -176,7 +199,8 @@ def render_structure_browser(
                 models=tuple(models),
                 molecule_styles=_molecule_styles(
                     models,
-                    highlight_protein=highlight_protein,
+                    row=selected_row,
+                    show_protein_surface=show_protein_surface,
                     highlight_dna=highlight_dna,
                     highlight_rna=highlight_rna,
                 ),
@@ -208,7 +232,6 @@ def render_structure_browser(
         show_sidechains=show_sidechains,
         show_dna=show_dna,
         show_rna=show_rna,
-        highlight_protein=highlight_protein,
         highlight_dna=highlight_dna,
         highlight_rna=highlight_rna,
     )
@@ -227,7 +250,7 @@ def render_structure_browser(
             structure_background_ui if view_mode != "reference_selection" else None,
             structure_mutation_ui if view_mode != "reference_selection" else None,
             structure_sidechain_ui,
-            structure_protein_ui,
+            structure_surface_ui if has_declared_protein_surface(selected_row) else None,
             structure_dna_visible_ui,
             structure_rna_visible_ui,
         )
@@ -258,6 +281,19 @@ def render_structure_browser(
     )
 
 
+def _read_structure_text(path: Path) -> str:
+    """Read structure text with an mtime-keyed notebook cache."""
+
+    stat = path.stat()
+    return _read_structure_text_cached(str(path), stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=128)
+def _read_structure_text_cached(path: str, mtime_ns: int, size: int) -> str:
+    del mtime_ns, size
+    return Path(path).read_text(encoding="utf-8")
+
+
 def _structure_browser_title(row: dict[str, Any]) -> str:
     label = str(row.get("display_label") or row.get("candidate_id") or "")
     return label
@@ -285,31 +321,44 @@ def _structure_browser_interpretation_limit(row: dict[str, Any]) -> str:
 
 
 def _camera_memory_key(row: dict[str, Any]) -> str:
-    deliverable_id = str(row.get("_deliverable_id") or "structure_browser")
-    return f"eco1-rt-repack:{deliverable_id}:camera-v2"
+    if str(row.get("structure_view_mode") or "") == "reference_selection":
+        return "eco1-rt-repack:reference-complex:camera-v5"
+    return "eco1-rt-repack:candidate-folds:camera-v5"
 
 
 def _molecule_styles(
     models: list[StructureViewModel],
     *,
-    highlight_protein: bool,
+    row: dict[str, Any],
+    show_protein_surface: bool,
     highlight_dna: bool,
     highlight_rna: bool,
 ) -> tuple[StructureViewMoleculeStyle, ...]:
     enabled = {
-        "protein": highlight_protein,
         "dna": highlight_dna,
         "rna": highlight_rna,
     }
     labels = {
-        "protein": "Protein",
         "dna": "DNA",
         "rna": "RNA",
     }
-    styles: list[StructureViewMoleculeStyle] = []
+    styles = _declared_molecule_styles(
+        row,
+        model_ids={model.model_id for model in models},
+        show_protein_surface=show_protein_surface,
+    )
+    declared_model_classes = {(style.model_id, style.molecule_class) for style in styles}
     for model in models:
+        present_molecule_classes = molecule_classes_in_structure_text(
+            model.structure_text,
+            structure_format=model.structure_format,
+        )
         for molecule_class, is_enabled in enabled.items():
-            if not is_enabled:
+            if (
+                not is_enabled
+                or molecule_class not in present_molecule_classes
+                or (model.model_id, molecule_class) in declared_model_classes
+            ):
                 continue
             styles.append(
                 StructureViewMoleculeStyle(
@@ -322,6 +371,67 @@ def _molecule_styles(
     return tuple(styles)
 
 
+def _declared_molecule_styles(
+    row: dict[str, Any],
+    *,
+    model_ids: set[str],
+    show_protein_surface: bool,
+) -> list[StructureViewMoleculeStyle]:
+    styles: list[StructureViewMoleculeStyle] = []
+    for item in row.get("molecule_styles") or []:
+        if not isinstance(item, dict):
+            continue
+        model_id = str(item.get("model_id") or "")
+        if model_id not in model_ids:
+            continue
+        if (
+            not show_protein_surface
+            and str(item.get("molecule_class") or "") == "protein"
+            and str(item.get("style") or "") == "surface"
+        ):
+            continue
+        molecule_class = str(item.get("molecule_class") or "protein")
+        style = str(item.get("style") or "")
+        color = str(item.get("color") or REFERENCE_COLOR)
+        opacity = float(item.get("opacity", 1.0))
+        if molecule_class == "protein" and style == "surface" and opacity != PROTEIN_SURFACE_OPACITY:
+            raise ValueError(
+                f"Eco1 protein surfaces must use alpha {PROTEIN_SURFACE_OPACITY:.2f}; observed {opacity:.2f}"
+            )
+        expected_nucleic_color = {"dna": DNA_CLASS_COLOR, "rna": RNA_CLASS_COLOR}.get(molecule_class)
+        if expected_nucleic_color is not None and color != expected_nucleic_color:
+            raise ValueError(
+                f"Eco1 {molecule_class.upper()} representations must use {expected_nucleic_color}; observed {color}"
+            )
+        styles.append(
+            StructureViewMoleculeStyle(
+                molecule_class=molecule_class,  # type: ignore[arg-type]
+                model_id=model_id,
+                label=str(item.get("label") or "Molecule"),
+                color=color,
+                opacity=opacity,
+                style=style,  # type: ignore[arg-type]
+                radius=float(item.get("radius", 0.18)),
+                width=float(item.get("width", NUCLEIC_ACID_RIBBON_WIDTH)),
+                thickness=float(item.get("thickness", NUCLEIC_ACID_RIBBON_THICKNESS)),
+            )
+        )
+    return styles
+
+
+def has_declared_protein_surface(row: dict[str, Any] | None) -> bool:
+    """Return whether a structure scene declares a toggleable protein surface."""
+
+    if row is None:
+        return False
+    return any(
+        isinstance(item, dict)
+        and str(item.get("molecule_class") or "") == "protein"
+        and str(item.get("style") or "") == "surface"
+        for item in row.get("molecule_styles") or []
+    )
+
+
 def _hidden_molecule_classes(*, show_dna: bool, show_rna: bool) -> tuple[str, ...]:
     hidden: list[str] = []
     if not show_dna:
@@ -331,7 +441,12 @@ def _hidden_molecule_classes(*, show_dna: bool, show_rna: bool) -> tuple[str, ..
     return tuple(hidden)
 
 
-def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle, ...]:
+def _selection_styles(
+    row: dict[str, Any],
+    *,
+    show_sidechains: bool,
+    model_id_override: str = "",
+) -> tuple[StructureViewSelectionStyle, ...]:
     styles: list[StructureViewSelectionStyle] = []
     for item in row.get("selection_styles") or []:
         if not isinstance(item, dict):
@@ -339,18 +454,24 @@ def _selection_styles(row: dict[str, Any]) -> tuple[StructureViewSelectionStyle,
         styles.append(
             StructureViewSelectionStyle(
                 selection_id=str(item.get("selection_id") or ""),
-                model_id=str(item.get("model_id") or ""),
+                model_id=model_id_override or str(item.get("model_id") or ""),
                 label=str(item.get("label") or ""),
                 residue_numbers=tuple(int(value) for value in item.get("residue_numbers") or []),
                 color=str(item.get("color") or RESIDUE_CATEGORY_HIGHLIGHT_COLOR),
                 opacity=float(item.get("opacity", 1.0)),
                 residue_scope=str(item.get("residue_scope") or "protein"),  # type: ignore[arg-type]
+                show_sidechains=show_sidechains,
             )
         )
     return tuple(styles)
 
 
-def _mutation_selection_styles(row: dict[str, Any], *, model_id: str) -> tuple[StructureViewSelectionStyle, ...]:
+def _mutation_selection_styles(
+    row: dict[str, Any],
+    *,
+    model_id: str,
+    show_sidechains: bool,
+) -> tuple[StructureViewSelectionStyle, ...]:
     residue_numbers = tuple(int(value) for value in row.get("mutation_residue_numbers") or [])
     if not residue_numbers:
         return ()
@@ -361,5 +482,6 @@ def _mutation_selection_styles(row: dict[str, Any], *, model_id: str) -> tuple[S
             label="Candidate differences",
             residue_numbers=residue_numbers,
             color=RESIDUE_CATEGORY_HIGHLIGHT_COLOR,
+            show_sidechains=show_sidechains,
         ),
     )

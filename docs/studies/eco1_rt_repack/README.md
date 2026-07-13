@@ -3,70 +3,74 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-13
 first_hop: routes/README.md
 status_surface: record-only
-preflight_surface: planned-contract-checks
+preflight_surface: runtime-and-contract-checks
 ---
 
 ## Eco1 RT Repack Study
 
-This study is the checked-in planning and contract surface for Eco1
-reverse-transcriptase fixed-backbone redesign.
+This directory owns the Eco1/Ec86 RT fixed-backbone sequence-design record.
+Start with `routes/README.md`. Use `record/status.md` for current counts and
+selected candidates, and `record/datasets.yaml` for artifact locations.
 
-Eco1 is the first anchor/profile. The reusable ontology is fixed-backbone
-protein sequence design, not Eco1 and not reverse transcriptases in general.
+### Premise
 
-Use `routes/README.md` first. Current state is in `record/status.md`; source and
-artifact posture are in `record/datasets.yaml`; machine-readable planning
-surfaces are under `operations/`; durable rationale and policy live in
-`contexts/`; design-set meaning and provenance live in `workbench/`.
+This study asks whether complete ProteinMPNN-designed Eco1/Ec86 RT sequences
+can keep declared catalytic, direct-contact, Wang thumb-track, and mapped
+residues 255-311 fixed, preserve local C-alpha backbone geometry, and introduce
+MSA-observed, non-acidifying substitutions in the declared peripheral
+nucleic-acid-facing shell for a mutation-set-diverse experimental panel. Final
+selection reports R13 and other alpha-1 substitutions without treating them as
+functional gates.
 
-### Motivation And Funnel
+The output is a set of protein hypotheses for testing. It is not evidence of
+improved activity, affinity, processivity, strand displacement, or safety.
 
-Eco1/Ec86 has a cryoEM-supported RT/RNA/DNA structure that anchors this
-fixed-backbone repacking study. The biological motivation is to prepare
-fold-preserved reverse-transcriptase protein variants for downstream assays
-that can test processivity, strand displacement, and structured-template
-readthrough. The computational funnel does not claim those functions; it
-selects a bounded protein sequence panel for review and handoff.
+### Method
 
-The method starts from the selected Ec86 cryoEM scaffold. The study defines
-fixed and mutable positions using catalytic motifs, Wang/Ec86 direct-contact
-priors, retained DNA/RNA proximity, selected MSA/profile context from Mestre,
-and RT motif/region grammar from Simon. Tao supports the constraint-first
-redesign and structural-filtering pattern; it does not define an Eco1 activity
-score. Different conservation and proximity thresholds define design classes.
-ProteinMPNN samples protein sequences at the unprotected positions for each
-design class. ColabFold predictions then remove poor fold-model candidates.
-The remaining pool is triaged by MSA support, localized mutation geography,
-C-terminal/thumb local structure, near retained DNA/RNA or thumb-track
-chemistry, mutation-set nonredundancy, and model-check annotations that are
-kept out of the acceptance gate.
+1. Use `7V9U` to define Eco1 residue numbering and retained DNA/RNA geometry.
+2. Fix the `NAxxH`, `YADD`, and `VTG` contexts, direct retained DNA/RNA contacts,
+   Wang thumb-track positions, mapped residues `255-311`, and declared
+   conserved/core positions.
+3. Generate complete sequences under one of three v3 policies: distal only,
+   peripheral only, or peripheral plus distal. Never combine mutations from
+   separate ProteinMPNN outputs.
+4. Review each ColabFold model after one global mapped C-alpha fit. Apply one
+   declared `2.5 A` local RMSD cutoff to every non-distal review region.
+5. Keep passing rows in the distal, peripheral, or combined design group.
+6. Select two distal, three peripheral, and three combined sequences. Within
+   each group, minimize overlap in mutated positions first and exact
+   substitutions second; use chemistry, MSA support, and structure metrics only
+   for later ties.
 
-The current reviewer-facing endpoint is a primary conservative protein panel
-selected globally after a preservation gate and a chemistry/support gate.
-Design classes remain mask-policy context rather than quotas. Local RMSD
-thresholds are declared review cutoffs for structural preservation, not
-functional boundaries. The review notebook should let a user inspect the full
-population, the primary panel, py3Dmol structure views, and the selected protein
-sequences. The flat `candidate_handoff_sequences.csv` is the protein-sequence
-export for RT-only handoff planning; codon optimization, restriction-site
-screening, and construct subject creation remain downstream work.
+Charge events, MSA support, fold metrics, local RMSD, and mutation count are
+review fields and late tie-breakers. They are not activity scores. ESMC and SAE
+are optional model checks and do not select rows.
 
-This study intentionally separates three layers:
+The v3 global no-cysteine rule forced the open WT residue C233 to change in
+proximal-policy sequences. C233 was not protected. Its recurrence is disclosed
+as shared generation bias, not treated as functional evidence.
 
-| Layer | Owner | Examples |
-| --- | --- | --- |
-| Study biology | `eco1_rt_repack` | Eco1 structure authority, catalytic masks, retron motif protection, first candidate-batch policy. |
-| Reusable fixed-backbone mechanics | `thread` | Generic ProteinMPNN request, sample-ingest, candidate-table, ColabFold output normalization, and fold-check request/report contracts now; fold-model execution, feasibility, and handoff contracts are planned. |
-| Downstream construct realization | `rt_lnrna_sponging_construct_triage` and `construct` | Pairing an accepted RT with lnRNA/TF-sponging construct subjects. |
+### Ownership
 
-The record must fail visibly when a layer is missing. It should not hide missing
-structure authority, residue numbering, fold metrics, or downstream acceptance
-behind fallback prose.
+- `eco1_rt_repack` owns Eco1 structure, mask, chemistry, conservation, and
+  panel-selection semantics.
+- `dnadesign.thread.adapters.proteinmpnn` owns generic ProteinMPNN request and
+  sample-ingest mechanics.
+- `dnadesign.thread.candidates` owns generic candidate-table construction.
+- `dnadesign.thread.foldcheck` and
+  `dnadesign.thread.adapters.colabfold` own generic fold request and output
+  normalization contracts.
+- `dnadesign.thread.structure_views` owns the browser structure-view contract.
+- Downstream RT-lnRNA studies own construct pairing and experimental acceptance.
 
-### Directory Ontology
+Generated candidate, fold, selection, and notebook artifacts remain under the
+workspace `outputs/` tree. Do not hand-edit them; change the materializer and
+regenerate.
+
+### Canonical Surfaces
 
 ```text
 eco1_rt_repack/
@@ -80,111 +84,15 @@ eco1_rt_repack/
   contexts/
     fixed-backbone-method.md
     msa-method.md
-    implementation-roadmap.md
     residue-mask-policy.md
     fold-validation-policy.md
-    synthesis-feasibility-policy.md
     selection-hardening-dev-spec.md
     generation-policy-cleanup-dev-spec.md
   operations/
     ops.study.yaml
     contract/
-      fixtures/
-      lifecycle/
-      readiness/
-      schemas/
-      status/
-      surfaces/
     runtime/
-      command-groups/
   workbench/
     ontology/
-    design_sets/
     provenance/
-      conservation-source-discovery.md
-      conservation-sources.yaml
-      residue-numbering-policy.yaml
-      structure-sources.yaml
 ```
-
-Generated MPNN samples, fold predictions, large candidate tables, and runtime
-sidecars do not belong in this checked-in record root.
-
-### Naming Rules
-
-- Use `eco1_rt_repack` for the checked-in study id.
-- Use `eco1-rt-repack` only for human-facing slugs, skills, or dated plan
-  filenames where kebab case is already the local convention.
-- Use `eco1_rt_v1` for the first Eco1 profile id.
-- Use neutral artifact names such as `mask_set.yaml` and
-  `candidate_handoff.yaml` for reusable fixed-backbone contracts.
-- Do not encode backend names into candidate ids; backend provenance belongs in
-  candidate rows and upstream hashes.
-- Do not create `permuter__var_id` or RT-lnRNA construct-subject ids until a
-  later explicit handoff contract owns that promotion.
-
-### Implementation Boundary
-
-The current executable chain materializes structure, conservation, mask, thread
-plan, ProteinMPNN request, sample table, candidate table, fold-check request,
-fold-check reports, fold-check review bundles, local fold PDB staging, and
-selected-panel ESM Atlas lookup. The baseline batch
-`eco1_rt_p25_5a_n96_20260624` has 96 accepted ProteinMPNN samples and 96
-accepted candidate rows. The expanded design-class bundle adds five
-conservative or sensitivity classes and now contains 576 nonredundant synthetic
-candidates plus WT for fold and SAE review. These are fold-preserved,
-model-annotated candidates, not selected assay winners.
-
-The review-deliverables bundle materializes additive WT-context ESMC LLR tables
-and plots. That score compares candidate substitutions with the WT residue at
-the same positions under a WT masked-marginal context; it is not a whole-protein
-pseudo-likelihood and not an activity measurement. Whole-protein ESMC
-pseudo-likelihood is not part of the v1 primary panel.
-
-The protein review panel layer is now materialized for the expanded pool under
-`outputs/thread/design_classes/selection/`. It contains a computational
-full-gene feasibility report, a candidate triage table, and a primary panel
-selected from candidates that pass preservation and chemistry/support gates.
-The preservation gate requires strong fold, protected/contact/thumb-track
-preservation, and one declared local RMSD gate table that includes the
-C-terminal primer-RNA recognition region. The chemistry/support gate requires
-no acidic gains near retained DNA/RNA and no unobserved proximal substitutions.
-The final selection ranks mutation-set dissimilarity, basic-loss and Pro/Gly
-penalties, regional MSA support, local RMSD values inside the gate, and fold
-metrics. ESMC and SAE remain review evidence only. The review fields explain
-the panel; they are not a single combined score. The current selected panel is
-best read as a preserved protein review panel that includes one acid-free near
-retained DNA/RNA basic-gain row. It is not a processivity-improved,
-strand-displacement-improved, or direct thumb-track-tuned panel.
-
-A planned breaking cleanup is recorded in
-`contexts/generation-policy-cleanup-dev-spec.md`. That spec would replace the
-current nested distance-mask design-class story with three complete
-ProteinMPNN generation policies, require policy-version provenance, and
-regenerate the pool end to end. It is not the current runtime record.
-
-Study code under `src/dnadesign/studies/units/eco1_rt_repack/` owns Eco1
-policy and study paths. `dnadesign.thread.adapters.proteinmpnn` owns generic
-ProteinMPNN request and sample-ingest mechanics, `dnadesign.thread.candidates`
-owns generic candidate-table construction, and `dnadesign.thread.foldcheck`
-owns generic fold-check request/report contracts. `dnadesign.thread.adapters.colabfold`
-owns generic ColabFold output normalization, and
-`dnadesign.thread.adapters.esm_atlas` owns generic Atlas lookup and sparse SAE
-activation normalization. `dnadesign.thread.adapters.biohub_esmc` owns
-authenticated Biohub ESMC `/api/v1/encode` -> `/api/v1/logits` query-time SAE
-normalization for synthetic sequences that are not present in Atlas. These
-Biohub ESMC rows are model annotation only; they are not fold validation,
-processivity evidence, or candidate acceptance. Whole-protein ESMC
-pseudo-likelihood is deferred and is not required for the v1 six-variant panel.
-`dnadesign.thread.structure_predictions` owns the generic registry for
-model-predicted structures, so an Atlas/ESMFold structure and a ColabFold
-fold-check structure for the same sequence remain separate provenance records.
-`dnadesign.thread.structure_views` owns the browser-embedded structure-view
-contract used by the review notebook. Eco1 owns which structures appear in that
-notebook, and ChimeraX remains the path for publication stills and pose
-capture. `infer` may later own backend process execution if an explicit adapter
-contract is added.
-
-Fold-check execution currently means the ColabFold `colabfold_batch` CLI on BU
-SCC, installed through LocalColabFold. LocalColabFold is an environment/install
-path for the CLI, not a separate fold model or hosted API.

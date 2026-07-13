@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/generation_policies/request_materialization.py
 
-Materialize ProteinMPNN request sidecars from Eco1 RT v3 generation policies.
+Materialize ProteinMPNN request sidecars from Eco1 RT generation policies.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -74,7 +74,7 @@ def materialize_generation_policy_requests(
     temperatures: Sequence[float] = PROTEINMPNN_TEMPERATURES,
     batch_size: int = PROTEINMPNN_BATCH_SIZE,
 ) -> MaterializedGenerationPolicyRequests:
-    """Materialize one ProteinMPNN request subtree for each complete v3 policy."""
+    """Materialize one ProteinMPNN request subtree for each complete policy."""
 
     root = (repo_root or find_repo_root(Path.cwd())).expanduser().resolve()
     policy_root = _resolve_path(root, generation_policy_root or DEFAULT_GENERATION_POLICIES_ROOT)
@@ -229,7 +229,7 @@ def _materialize_one_policy_request(
         sidecar_paths["omit_AA_jsonl"] = omit_aa_path
 
     manifest_without_hash = build_request_manifest(
-        artifact_id=f"eco1_rt_generation_policies_v3.{policy_id}.proteinmpnn_request",
+        artifact_id=f"eco1_rt_generation_policies_v{GENERATION_POLICY_VERSION}.{policy_id}.proteinmpnn_request",
         created_by=REQUEST_CREATED_BY,
         profile_id="eco1_rt_v1",
         mask_policy_id=None,
@@ -258,7 +258,8 @@ def _materialize_one_policy_request(
         excluded_positions=excluded_positions,
         seed_set=list(seed_set),
         temperatures=list(temperatures),
-        batch_id=f"eco1_rt_v3_{policy_id}_n{requested_variants}",
+        omit_aas=["C"],
+        batch_id=f"eco1_rt_v{GENERATION_POLICY_VERSION}_{policy_id}_n{requested_variants}",
         num_seq_per_target=num_seq_per_target,
         batch_size=batch_size,
         expected_sample_count=requested_variants,
@@ -361,10 +362,14 @@ def _num_seq_per_target(
 def _alphabet_enforcement_note(modes: Sequence[str]) -> str:
     if "upstream_omit_AA_jsonl" in modes:
         return (
-            "This request uses public ProteinMPNN omit_AA_jsonl sidecars for residue-specific near-region "
-            "alphabet constraints and omit_AAs for the no-new-cysteine policy."
+            "This request uses ProteinMPNN's public omit_AA_jsonl input for residue-specific proximal alphabets "
+            "and the global omit_AAs option for the v3 no-cysteine rule. An open WT cysteine can therefore be "
+            "forced to change. Peripheral residues use the declared MSA-observed alphabet with no new acidic "
+            "residues."
         )
-    return "This request uses the public ProteinMPNN omit_AAs sidecar for the no-new-cysteine policy."
+    if "upstream_omit_AAs_C" in modes:
+        return "This request uses ProteinMPNN's public omit_AAs option for the v3 global no-cysteine rule."
+    raise ValueError("generation-policy requests require a declared upstream alphabet-enforcement mode")
 
 
 def _resolve_path(repo_root: Path, path: Path) -> Path:

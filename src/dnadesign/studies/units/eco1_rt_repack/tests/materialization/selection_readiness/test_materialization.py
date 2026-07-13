@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
@@ -21,6 +22,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     materialize_selection_readiness,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.sankey_plot import (
+    quantitative_flow,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness import (
     _selection_manifest_assertions as manifest_assertions,
@@ -39,7 +43,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_read
 )
 
 
-def test_selection_readiness_writes_feasibility_triage_and_primary_panel(tmp_path: Path) -> None:
+def test_selection_readiness_writes_triage_and_selected_panel_without_synthesis_claims(tmp_path: Path) -> None:
     repo_root = tmp_path
     class_root = repo_root / "outputs/thread/design_classes"
     selection_root = class_root / "selection"
@@ -47,7 +51,8 @@ def test_selection_readiness_writes_feasibility_triage_and_primary_panel(tmp_pat
     inputs = write_inputs(class_root, source_root)
     write_manual_mask_authority_source_basis(repo_root)
     _write_handoff_fixture(source_root=source_root, selection_root=selection_root)
-    retired_plot = _write_retired_plot(selection_root)
+    selection_root.mkdir(parents=True, exist_ok=True)
+    selection_root.joinpath("feasibility_report.parquet").write_text("retired\n", encoding="utf-8")
 
     result = materialize_selection_readiness(
         repo_root=repo_root,
@@ -57,14 +62,15 @@ def test_selection_readiness_writes_feasibility_triage_and_primary_panel(tmp_pat
         created_at="2026-07-02T00:00:00Z",
     )
 
-    assert result.feasibility_report_path == selection_root / "feasibility_report.parquet"
+    assert not hasattr(result, "feasibility_report_path")
+    assert not (selection_root / "feasibility_report.parquet").exists()
     assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
     assert result.local_structure_region_metrics_path == selection_root / "local_structure_region_metrics.parquet"
     assert result.local_structure_threshold_sensitivity_path == (
         selection_root / "local_structure_threshold_sensitivity.parquet"
     )
     assert result.region_msa_support_path == selection_root / "region_msa_support.parquet"
-    assert result.primary_panel_selection_trace_path == selection_root / "primary_panel_selection_trace.parquet"
+    assert result.hypothesis_panel_selection_trace_path == selection_root / "hypothesis_panel_selection_trace.parquet"
     assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
     assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
     assert result.plots_root == selection_root / "plots"
@@ -77,7 +83,6 @@ def test_selection_readiness_writes_feasibility_triage_and_primary_panel(tmp_pat
         manifest=manifest,
         triage=triage,
         panel=panel,
-        retired_plot=retired_plot,
     )
 
 
@@ -104,8 +109,48 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
     captured = capsys.readouterr()
     assert exit_code == 0
     payload = json.loads(captured.out)
+    assert "feasibility_report_path" not in payload
     assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
+    assert "near_region_charge_sensitivity_path" not in payload
+    assert "charge_sensitivity_shortlist_path" not in payload
     assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
+
+
+def test_quantitative_flow_conserves_every_transition() -> None:
+    trace = [
+        {"stage_id": "candidate_pool", "input_count": 1007, "removed_count": 0, "remaining_count": 1007},
+        {"stage_id": "local_geometry_screen", "input_count": 1007, "removed_count": 269, "remaining_count": 738},
+        {"stage_id": "design_groups", "input_count": 738, "removed_count": 0, "remaining_count": 738},
+        {
+            "stage_id": "selected_panel",
+            "input_count": 738,
+            "removed_count": 730,
+            "remaining_count": 8,
+        },
+    ]
+
+    stages, transitions = quantitative_flow(trace)
+
+    assert [stage.count for stage in stages] == [1007, 738, 738, 8]
+    assert [transition.removed_count for transition in transitions] == [269, 0, 730]
+    assert all(item.source_count == item.retained_count + item.removed_count for item in transitions)
+
+
+def test_quantitative_flow_rejects_discontinuous_trace() -> None:
+    trace = [
+        {"stage_id": "candidate_pool", "input_count": 10, "removed_count": 0, "remaining_count": 10},
+        {"stage_id": "local_geometry_screen", "input_count": 9, "removed_count": 2, "remaining_count": 7},
+        {"stage_id": "design_groups", "input_count": 7, "removed_count": 0, "remaining_count": 7},
+        {
+            "stage_id": "selected_panel",
+            "input_count": 7,
+            "removed_count": 1,
+            "remaining_count": 6,
+        },
+    ]
+
+    with pytest.raises(ValueError, match="discontinuous"):
+        quantitative_flow(trace)
 
 
 def _write_handoff_fixture(*, source_root: Path, selection_root: Path) -> None:
@@ -114,10 +159,3 @@ def _write_handoff_fixture(*, source_root: Path, selection_root: Path) -> None:
     selection_local_handoff_path = selection_root / "candidate_handoff.yaml"
     selection_local_handoff_path.parent.mkdir(parents=True, exist_ok=True)
     selection_local_handoff_path.write_text("handoff_kind: wrong_local_path\n", encoding="utf-8")
-
-
-def _write_retired_plot(selection_root: Path) -> Path:
-    retired_plot = selection_root / "plots" / "selection_panel_review_axes.svg"
-    retired_plot.parent.mkdir(parents=True, exist_ok=True)
-    retired_plot.write_text("<svg>retired selected-only scatter</svg>\n", encoding="utf-8")
-    return retired_plot

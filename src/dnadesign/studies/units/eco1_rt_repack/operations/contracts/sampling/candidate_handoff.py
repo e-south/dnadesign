@@ -43,7 +43,6 @@ _REQUIRED_SOURCE_ARTIFACTS = {
     "candidate_table",
     "foldcheck_report",
     "foldcheck_review",
-    "feasibility_report",
     "candidate_triage_table",
     "candidate_selection_panel",
     "candidate_handoff_sequences",
@@ -55,7 +54,6 @@ _REQUIRED_CANDIDATE_FIELDS = {
     "candidate_handoff_sequence_csv_hash",
     "eligible_for_handoff",
     "foldcheck_status",
-    "feasibility_status",
     "selection_slot",
 }
 _FORBIDDEN_FIELDS = {"permuter__var_id", "construct_subject_id", "downstream_target", "acceptance_summary"}

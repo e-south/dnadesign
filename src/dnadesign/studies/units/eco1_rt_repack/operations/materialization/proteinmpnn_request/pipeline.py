@@ -157,6 +157,7 @@ def materialize_proteinmpnn_request(
         excluded_positions=excluded_positions,
         seed_set=seed_set,
         temperatures=temperatures,
+        omit_aas=["C"],
         batch_id=batch_id,
         num_seq_per_target=num_seq_per_target,
         batch_size=batch_size,

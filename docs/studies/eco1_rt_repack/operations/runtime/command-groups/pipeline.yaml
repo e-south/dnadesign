@@ -262,49 +262,9 @@ lanes:
         - .
         - --phase
         - phase1_thread_contract
-  - id: sampling_plan
-    owner: eco1_rt_repack
-    status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.thread_plan
-        - --repo-root
-        - .
-  - id: proteinmpnn_request
-    owner: eco1_rt_repack
-    status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_request
-        - --repo-root
-        - .
-  - id: design_class_requests
-    owner: eco1_rt_repack
-    status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_manifest.yaml
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
-        - --repo-root
-        - .
-        - requests
   - id: generation_policy_requests
     owner: eco1_rt_repack
-    status: planned_v3_policy_requests
+    status: materialized
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_manifest.yaml
     command:
       argv:
@@ -318,7 +278,7 @@ lanes:
         - all
   - id: generation_policy_proteinmpnn_scc_smoke
     owner: bu_scc_runtime
-    status: planned_v3_smoke
+    status: completed
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
     command:
       argv:
@@ -330,7 +290,7 @@ lanes:
         - docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
   - id: generation_policy_proteinmpnn_scc_array
     owner: bu_scc_runtime
-    status: planned_v3_array
+    status: completed
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
     command:
       argv:
@@ -340,128 +300,60 @@ lanes:
         - -v
         - DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn
         - docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
-  - id: design_class_proteinmpnn_scc_smoke
-    owner: bu_scc_runtime
-    status: ready_for_scc_smoke
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/eco1_rt_clade9_plurality25_contact6a_v1/proteinmpnn_request/request_manifest.yaml
-    command:
-      argv:
-        - qsub
-        - -t
-        - "1"
-        - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn
-        - docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-  - id: design_class_proteinmpnn_scc_array
-    owner: bu_scc_runtime
-    status: pending_smoke
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/
-    command:
-      argv:
-        - qsub
-        - -t
-        - 1-5
-        - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn
-        - docs/bu-scc/jobs/eco1-proteinmpnn-design-class.qsub
-  - id: sample_ingest
-    owner: thread
-    status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.proteinmpnn_sample_ingest
-        - --repo-root
-        - .
-        - --proteinmpnn-root
-        - .var/tools/proteinmpnn
-        - --overwrite
-  - id: phase2_contract_validation
+  - id: generation_policy_candidate_pool
     owner: eco1_rt_repack
-    status: passing
-    entry: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.contract_validation
-        - --repo-root
-        - .
-        - --phase
-        - phase2_real_backend_ingest
-  - id: candidate_table
-    owner: thread
     status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/candidate_pool_manifest.yaml
     command:
       argv:
         - uv
         - run
         - python
         - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.candidate_table
-        - --repo-root
-        - .
-  - id: design_class_candidate_pool
-    owner: eco1_rt_repack
-    status: materialized_expanded_576_nonredundant
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_pool_manifest.yaml
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies
         - --repo-root
         - .
         - candidate-pool
-  - id: foldcheck_request
+  - id: generation_policy_foldcheck_request
     owner: eco1_rt_repack
     status: materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml
     command:
       argv:
         - uv
         - run
         - python
         - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_request
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies
         - --repo-root
         - .
+        - foldcheck-request
   - id: colabfold_scc_smoke
     owner: bu_scc_runtime
-    status: smoke_materialized
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
+    status: completed
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml
     command:
       argv:
         - qsub
         - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_REQUEST_MANIFEST=<v3_foldcheck_request_manifest>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
         - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
   - id: colabfold_scc_full
     owner: bu_scc_runtime
-    status: materialized_scc_full
-    entry: /project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42/
-    job_id: "6228979"
+    status: completed
+    entry: <scc_v3_colabfold_run_root>
     command:
       argv:
         - qsub
         - -P
         - dunlop
         - -v
-        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_a4948b42,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
+        - DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_REQUEST_MANIFEST=<v3_foldcheck_request_manifest>,FOLDCHECK_SEQUENCE_LIMIT=all,FOLDCHECK_RUN_ROOT=<scc_v3_colabfold_run_root>,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1'
         - docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
   - id: foldcheck_report
     owner: thread
-    status: materialized_local_full
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_report.parquet
+    status: materialized
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_report.parquet
     command:
       argv:
         - uv
@@ -471,34 +363,21 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report
         - --repo-root
         - .
+        - --output-root
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
         - --colabfold-output-root
-        - <scc_colabfold_outputs>
+        - <v3_colabfold_outputs>
         - --runtime-version
         - <colabfold_version>
-  - id: design_class_downstream_inputs
+  - id: foldcheck_review
     owner: eco1_rt_repack
-    status: materialized_expanded_576_inputs
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/downstream_inputs_manifest.yaml
+    status: materialized
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_candidate_ranking.parquet
     secondary_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/candidate_table.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/proteinmpnn_request/chain_a_backbone.pdb
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/mutation_scoring/
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
-        - --repo-root
-        - .
-        - downstream-inputs
-    notes:
-      - Does not stage a root-level mask_set.yaml because expanded rows carry multiple mask_policy_id values.
-  - id: design_class_foldcheck_review
-    owner: eco1_rt_repack
-    status: materialized_expanded_foldcheck_review
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/foldcheck_review/foldcheck_candidate_ranking.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_structure_panel.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_full_structure_set.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/review_visual_manifest.yaml
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/plots/
     command:
       argv:
         - uv
@@ -509,51 +388,7 @@ lanes:
         - --repo-root
         - .
         - --output-root
-        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes
-    runtime_policy:
-      launches_gui_by_default: false
-      gui_opt_in_flag: --render-chimerax-overlay
-  - id: design_class_esmc_sequence_preference
-    owner: eco1_rt_repack
-    status: materialized_review_only
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/design_class_esmc_sequence_preference_manifest.yaml
-    secondary_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/biohub_esmc_variant_llr_scores.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/esmc_6b_2024_12/biohub_esmc_variant_llr_scores.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/review_deliverables/biohub_esmc_sequence_scoring/esmc_candidate_preference_model_agreement.parquet
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.design_classes
-        - --repo-root
-        - .
-        - esmc-sequence-preference
-    notes:
-      - Derived from existing WT-context masked-marginal grids; no additional Biohub requests.
-      - Additive LLR is a review table, not a whole-protein likelihood, assay score, or panel selector.
-  - id: foldcheck_review
-    owner: eco1_rt_repack
-    status: materialized_local_review
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_candidate_ranking.parquet
-    secondary_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_structure_panel.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/foldcheck_full_structure_set.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/review_visual_manifest.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/structure_overlay_panel.png
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/notebooks/eco1_foldcheck_review.py
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review
-        - --repo-root
-        - .
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
     runtime_policy:
       launches_gui_by_default: false
       gui_opt_in_flag: --render-chimerax-overlay
@@ -751,38 +586,10 @@ lanes:
         - dnadesign.studies.units.eco1_rt_repack.operations.materialization.sae_window_summary
         - --repo-root
         - .
-  - id: assembly_feasibility
-    owner: eco1_rt_repack
-    status: materialized_generation_policy_v2_1007_rows
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/feasibility_report.parquet
-    secondary_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/selection_readiness_manifest.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/local_structure_region_metrics.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/near_region_charge_sensitivity.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/charge_sensitivity_shortlist.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_primary_panel_sankey.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_stratification.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_by_region.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_selected_substitutions_across_rt.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regional_mutation_burden.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_na_facing_chemistry_balance.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_near_region_charge_sensitivity.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_six_sequence_distance.svg
-    command:
-      argv:
-        - uv
-        - run
-        - python
-        - -m
-        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness
-        - --repo-root
-        - .
-        - --output-root
-        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
   - id: candidate_triage_table
     owner: eco1_rt_repack
-    status: materialized_generation_policy_v2_1007_rows
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_triage_table.parquet
+    status: materialized
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_triage_table.parquet
     command:
       argv:
         - uv
@@ -793,11 +600,11 @@ lanes:
         - --repo-root
         - .
         - --output-root
-        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
   - id: candidate_selection_panel
     owner: eco1_rt_repack
-    status: materialized_six_row_panel
-    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_selection_panel.parquet
+    status: materialized
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_selection_panel.parquet
     command:
       argv:
         - uv
@@ -808,35 +615,48 @@ lanes:
         - --repo-root
         - .
         - --output-root
-        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
+  - id: twist_full_cds_handoff
+    owner: eco1_rt_repack
+    status: materialized_quote_and_upload_ready
+    entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/twist_handoff_manifest.yaml
+    secondary_entries:
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/eco1_rt_twist_full_cds.csv
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/eco1_rt_twist_full_cds.fasta
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/genbank/
+    command:
+      argv:
+        - uv
+        - run
+        - python
+        - -m
+        - dnadesign.studies.units.eco1_rt_repack.operations.materialization.twist_handoff
+        - --repo-root
+        - .
   - id: review_deliverables
     owner: eco1_rt_repack
-    status: materialized_with_selection_links
+    status: materialized
     entry: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
     secondary_entries:
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/communication_visuals/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/plots/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_check/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_sae_interpretation/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/mask_structure_browser_manifest.yaml
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/interactive_structure_browser_manifest.yaml
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/candidate_handoff_sequences.csv
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/local_structure_region_metrics.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/near_region_charge_sensitivity.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/charge_sensitivity_shortlist.parquet
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_primary_panel_sankey.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_stratification.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_local_structure_by_region.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_selected_substitutions_across_rt.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_regional_mutation_burden.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_na_facing_chemistry_balance.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_near_region_charge_sensitivity.svg
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection/plots/selection_six_sequence_distance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_handoff_sequences.csv
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/local_structure_region_metrics.parquet
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_hypothesis_panel_flow.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_local_structure_stratification.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_local_structure_by_region.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_selected_substitutions_across_rt.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_regional_mutation_burden.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_na_facing_chemistry_balance.svg
+      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_mutation_set_dissimilarity.svg
       - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/notebooks/eco1_review_deliverables.py
-    planned_follow_on_entries:
-      - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
     command:
       argv:
         - uv
@@ -847,7 +667,7 @@ lanes:
         - --repo-root
         - .
         - --selection-root
-        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v2/selection
+        - src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection
     runtime_policy:
       launches_gui_by_default: false
       gui_opt_in_flag: --render-chimerax-png

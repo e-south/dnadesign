@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -25,18 +26,6 @@ def sequence_by_candidate(
     """Return protein-sequence payloads keyed by candidate id."""
 
     sequences: dict[str, dict[str, Any]] = {}
-    if foldcheck_fasta_path is not None and foldcheck_fasta_path.exists():
-        sequences.update(
-            {
-                candidate_id: {
-                    "protein_sequence": sequence,
-                    "sequence_hash": "",
-                    "amino_acid_length": len(sequence),
-                    "sequence_source": "foldcheck_request/input_sequences.fasta",
-                }
-                for candidate_id, sequence in read_fasta_sequences(foldcheck_fasta_path).items()
-            }
-        )
     if candidate_table_path is not None and candidate_table_path.exists():
         required_columns = {"candidate_id", "sequence", "sequence_hash"}
         if required_columns.issubset(set(pq.read_schema(candidate_table_path).names)):
@@ -51,6 +40,14 @@ def sequence_by_candidate(
                     "amino_acid_length": len(sequence),
                     "sequence_source": "candidate_table.parquet",
                 }
+    if foldcheck_fasta_path is not None and foldcheck_fasta_path.exists():
+        for candidate_id, sequence in read_fasta_sequences(foldcheck_fasta_path).items():
+            sequences[candidate_id] = {
+                "protein_sequence": sequence,
+                "sequence_hash": "sha256:" + hashlib.sha256(sequence.encode("utf-8")).hexdigest(),
+                "amino_acid_length": len(sequence),
+                "sequence_source": "foldcheck_request/input_sequences.fasta",
+            }
     return sequences
 
 

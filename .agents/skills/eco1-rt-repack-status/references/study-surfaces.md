@@ -24,7 +24,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   ownership boundaries.
 - `operations/contract/readiness/`: record-only readiness checks for profile,
   structure authority, mask contract, sampling plan, fold-check runtime,
-  assembly feasibility, candidate handoff, and downstream RT-lnRNA handoff.
+  candidate handoff, and downstream RT-lnRNA handoff.
 - `operations/contract/fixtures/thread/`: Eco1 profile and conservative-mask
   fixture stubs.
 - `operations/contract/schemas/`: profile, artifact-chain, candidate-handoff,
@@ -93,7 +93,7 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
 
 - `contexts/fixed-backbone-method.md`: computational method lane and
   ProteinMPNN/LigandMPNN posture.
-- `contexts/implementation-roadmap.md`: implementation slice order, code homes,
+- `contexts/implementation-roadmap.md`: active runtime order, owner boundaries,
   artifact inputs/outputs, and negative paths.
 - `contexts/msa-method.md`: MSA reproduction method, Tao-style conservation
   scoring rule, and T301/A301 source-mismatch handling.
@@ -101,8 +101,6 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   policy.
 - `contexts/fold-validation-policy.md`: fold-check request, runtime acceptance,
   and no-go signals.
-- `contexts/synthesis-feasibility-policy.md`: full-gene versus bounded-window
-  computational handoff policy.
 
 ## Study-Owned Source
 
@@ -217,22 +215,18 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   not copy full raw ColabFold output trees or accept candidates.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/review_deliverables/`:
   study-owned visual-deliverable wrapper. It writes
-  `review_deliverable_manifest.yaml` and a marimo notebook organized as mask
+  `review_deliverable_manifest.yaml` and a marimo notebook organized as policy
   evidence, sequence proposals and fold checks, ESMC/SAE checks, and panel
-  selection. The
-  expanded feasibility, triage, primary-panel table, and compact
-  panel-selection plots exist under `design_classes/selection/`; the
-  review notebook links those plots through the selection manifest. It
+  selection. It links selection tables and plots only when the active
+  `generation_policies_v3/selection/selection_readiness_manifest.yaml` exists. It
   includes py3Dmol structure-browser manifests for notebook inspection and keeps
   ChimeraX as the explicit manual pose/still-render path. Manifest paths are
   relative to the manifest location. It does not rerun ProteinMPNN, ColabFold,
   Biohub, Atlas, or candidate selection.
-- `src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/design_classes/`:
-  study-owned design-class expansion package. It materializes class-specific
-  mask/thread/request roots, builds the nonredundant 576-candidate pool, builds
-  the expanded WT-plus-candidate fold-check request, stages expanded downstream
-  inputs, and derives expanded additive ESMC LLR review tables from existing WT
-  grids. It does not choose assay candidates.
+  Protein-DNA-RNA scenes follow `molecular-structure-visualization`: gold DNA,
+  salmon RNA, chain-matched nucleotide representations, protein-only surfaces
+  at `0.65` alpha when shown, ChimeraX ladder display, and py3Dmol C4-prime ribbons with
+  one attached base spoke per nucleotide.
 - `src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/foldcheck/`:
   fold-check request/report contract package. It validates the request
   manifest, FASTA sequence ids, full 320-aa Eco1 sequence length, accepted
@@ -331,18 +325,15 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   pre-alignment gate package for cache/hash/accession/support and target-row
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
-- Computational feasibility, candidate triage, a primary conservative panel,
-  and audit evidence are materialized under the expanded design-class
-  selection root. The selected protein sequence CSV is present for review, but
-  RT-only `candidate_handoff.yaml` and downstream acceptance remain the
-  blockers. The current panel uses local structure, proximal MSA support,
-  mutation geography, near retained DNA/RNA chemistry, and mutation-set
-  dissimilarity after fold and feasibility gates. ESMC and SAE are recorded
-  for review only; they do not select rows. Broader
-  reusable fold-model execution and handoff mechanics are still planned; the
-  current executable `thread` surfaces are the generic ProteinMPNN adapter,
-  candidate-table package, Biohub adapter, ColabFold normalizer, and fold-check
-  contract package.
+- The active v3 policy, 1007-row candidate pool, ColabFold report, fold review,
+  `1007 -> 738 -> 335/226/177 -> 8` selection trace, selected panel, and RT-only
+  sequence export are materialized under the v3 policy hash. Selection uses one
+  non-distal local-geometry cutoff and deterministic greedy farthest-first
+  mutation-set distance. Charge is a reported design contrast, not an activity
+  score. ESMC and SAE are optional review context and do not select rows. The
+  executable generic surfaces are the ProteinMPNN adapter, candidate-table
+  package, optional model adapters, ColabFold normalizer, structure registry,
+  and fold-check contract package.
 
 ## Router Rule
 

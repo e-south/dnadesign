@@ -19,17 +19,17 @@ def _():
         evidence_deliverables,
         format_deliverable_label,
         is_interactive_structure_deliverable,
-        is_residue_frequency_bundle_deliverable,
+        is_policy_residue_frequency_deliverable,
         load_review_manifest,
+        policy_frequency_view_lookup,
         render_deliverable_details,
         render_deliverable_panel,
         render_intro,
-        render_residue_frequency_bundle,
-        residue_frequency_view_lookup,
+        render_policy_frequency_bundle,
         review_lane_lookup,
         section_deliverables,
         section_label_lookup,
-        select_residue_frequency_view,
+        select_policy_frequency_view,
         selected_deliverable,
         visual_deliverables,
     )
@@ -61,14 +61,34 @@ def _():
         )
 
     return (
-        deliverable_lookup, evidence_deliverables, format_deliverable_label, is_interactive_structure_deliverable,
-        is_residue_frequency_bundle_deliverable, is_sae_feature_heatmap_deliverable, load_review_manifest,
-        load_sae_feature_heatmap_manifest, load_structure_browser_rows, load_structure_highlight_rows, mo,
+        deliverable_lookup,
+        evidence_deliverables,
+        format_deliverable_label,
+        is_interactive_structure_deliverable,
+        is_policy_residue_frequency_deliverable,
+        is_sae_feature_heatmap_deliverable,
+        load_review_manifest,
+        load_sae_feature_heatmap_manifest,
+        load_structure_browser_rows,
+        load_structure_highlight_rows,
+        mo,
+        policy_frequency_view_lookup,
         render_deliverable_details,
-        render_deliverable_panel, render_intro, render_residue_frequency_bundle, render_sae_feature_heatmap,
-        render_structure_browser, residue_frequency_view_lookup, review_dropdown, review_lane_lookup,
-        sae_heatmap_feature_lookup, section_deliverables, section_label_lookup, select_residue_frequency_view,
-        selected_deliverable, structure_browser_lookup, structure_group_lookup, structure_highlight_lookup,
+        render_deliverable_panel,
+        render_intro,
+        render_policy_frequency_bundle,
+        render_sae_feature_heatmap,
+        render_structure_browser,
+        review_dropdown,
+        review_lane_lookup,
+        sae_heatmap_feature_lookup,
+        section_deliverables,
+        section_label_lookup,
+        select_policy_frequency_view,
+        selected_deliverable,
+        structure_browser_lookup,
+        structure_group_lookup,
+        structure_highlight_lookup,
         visual_deliverables,
     )
 
@@ -172,42 +192,41 @@ def _(deliverable_id_ui, deliverable_map, deliverable_options, selected_delivera
 
 
 @app.cell
-def _(is_residue_frequency_bundle_deliverable, residue_frequency_view_lookup, selected_visual):
-    if not is_residue_frequency_bundle_deliverable(selected_visual):
-        residue_frequency_view_map = {}
-        residue_frequency_view_options = []
+def _(is_policy_residue_frequency_deliverable, policy_frequency_view_lookup, selected_visual):
+    if not is_policy_residue_frequency_deliverable(selected_visual):
+        policy_frequency_view_map = {}
+        policy_frequency_view_options = []
     else:
-        residue_frequency_view_map = residue_frequency_view_lookup(selected_visual)
-        residue_frequency_view_options = list(residue_frequency_view_map)
-    return residue_frequency_view_map, residue_frequency_view_options
+        policy_frequency_view_map = policy_frequency_view_lookup(selected_visual)
+        policy_frequency_view_options = list(policy_frequency_view_map)
+    return policy_frequency_view_map, policy_frequency_view_options
 
 
 @app.cell
-def _(residue_frequency_view_options, review_dropdown):
-    residue_frequency_class_ui = review_dropdown(
-        residue_frequency_view_options,
-        value=residue_frequency_view_options[0] if residue_frequency_view_options else None,
-        label="Fixed-mask design class",
-        searchable=True,
+def _(policy_frequency_view_options, review_dropdown):
+    policy_frequency_ui = review_dropdown(
+        policy_frequency_view_options,
+        value=policy_frequency_view_options[0] if policy_frequency_view_options else None,
+        label="Generation policy",
     )
-    return residue_frequency_class_ui
+    return policy_frequency_ui
 
 
 @app.cell
 def _(
-    residue_frequency_class_ui,
-    residue_frequency_view_map,
-    residue_frequency_view_options,
-    select_residue_frequency_view,
+    policy_frequency_ui,
+    policy_frequency_view_map,
+    policy_frequency_view_options,
+    select_policy_frequency_view,
 ):
-    selected_residue_frequency_view = None
-    if residue_frequency_class_ui is not None and residue_frequency_class_ui.value:
-        selected_residue_frequency_view = select_residue_frequency_view(
-            selected_label=str(residue_frequency_class_ui.value),
-            lookup=residue_frequency_view_map,
-            options=residue_frequency_view_options,
+    selected_policy_frequency_view = None
+    if policy_frequency_ui is not None and policy_frequency_ui.value:
+        selected_policy_frequency_view = select_policy_frequency_view(
+            selected_label=str(policy_frequency_ui.value),
+            lookup=policy_frequency_view_map,
+            options=policy_frequency_view_options,
         )
-    return selected_residue_frequency_view
+    return selected_policy_frequency_view
 
 
 @app.cell
@@ -259,7 +278,7 @@ def _(
         if selected_visual_id == "mask_structure_browser_manifest":
             structure_group_label = "Mask evidence category"
         elif selected_visual_id == "selected_panel_structure_browser_manifest":
-            structure_group_label = "Panel slot"
+            structure_group_label = "Selected hypothesis"
         structure_group_options = list(structure_group_map)
         structure_group_ui = review_dropdown(
             structure_group_options,
@@ -364,17 +383,17 @@ def _(structure_highlight_map, structure_highlight_ui):
 def _(mo):
     structure_background_ui = mo.ui.checkbox(value=True, label="Reference background")
     structure_mutation_ui = mo.ui.checkbox(value=False, label="Mutation differences")
-    structure_sidechain_ui = mo.ui.checkbox(value=True, label="Side-chain sticks")
-    structure_protein_ui = mo.ui.checkbox(value=False, label="Protein color")
+    structure_sidechain_ui = mo.ui.checkbox(value=True, label="Highlighted side chains")
+    structure_surface_ui = mo.ui.checkbox(value=False, label="Protein surface")
     structure_dna_visible_ui = mo.ui.checkbox(value=True, label="Show DNA")
     structure_rna_visible_ui = mo.ui.checkbox(value=True, label="Show RNA")
     return (
         structure_background_ui,
         structure_dna_visible_ui,
         structure_mutation_ui,
-        structure_protein_ui,
         structure_rna_visible_ui,
         structure_sidechain_ui,
+        structure_surface_ui,
     )
 
 
@@ -383,16 +402,16 @@ def _(
     structure_background_ui,
     structure_dna_visible_ui,
     structure_mutation_ui,
-    structure_protein_ui,
     structure_rna_visible_ui,
     structure_sidechain_ui,
+    structure_surface_ui,
 ):
     show_reference_background = True
     show_mutation_differences = False
     show_sidechains = True
+    show_protein_surface = False
     show_dna = True
     show_rna = True
-    highlight_protein = False
     highlight_dna = False
     highlight_rna = False
     if structure_background_ui is not None:
@@ -401,23 +420,23 @@ def _(
         show_mutation_differences = bool(structure_mutation_ui.value)
     if structure_sidechain_ui is not None:
         show_sidechains = bool(structure_sidechain_ui.value)
+    if structure_surface_ui is not None:
+        show_protein_surface = bool(structure_surface_ui.value)
     if structure_dna_visible_ui is not None:
         show_dna = bool(structure_dna_visible_ui.value)
     if structure_rna_visible_ui is not None:
         show_rna = bool(structure_rna_visible_ui.value)
-    if structure_protein_ui is not None:
-        highlight_protein = bool(structure_protein_ui.value)
     highlight_dna = show_dna
     highlight_rna = show_rna
     return (
         highlight_dna,
-        highlight_protein,
         highlight_rna,
         show_dna,
         show_mutation_differences,
         show_reference_background,
         show_rna,
         show_sidechains,
+        show_protein_surface,
     )
 
 
@@ -468,30 +487,30 @@ def _(
     evidence_rows,
     format_deliverable_label,
     is_interactive_structure_deliverable,
-    is_residue_frequency_bundle_deliverable,
+    is_policy_residue_frequency_deliverable,
     is_sae_feature_heatmap_deliverable,
     manifest_root,
     mo,
     render_deliverable_details,
     render_deliverable_panel,
-    render_residue_frequency_bundle,
+    render_policy_frequency_bundle,
     render_sae_feature_heatmap,
     render_structure_browser,
-    residue_frequency_class_ui,
     sae_heatmap_feature_ui,
     sae_heatmap_manifest,
-    selected_residue_frequency_view,
+    policy_frequency_ui,
+    selected_policy_frequency_view,
     selected_sae_heatmap_feature,
     selected_section,
     selected_structure_highlight,
     highlight_dna,
-    highlight_protein,
     highlight_rna,
     show_dna,
     show_mutation_differences,
     show_reference_background,
     show_rna,
     show_sidechains,
+    show_protein_surface,
     structure_background_ui,
     structure_dna_visible_ui,
     structure_highlight_ui,
@@ -499,9 +518,9 @@ def _(
     selected_visual,
     structure_group_ui,
     structure_mutation_ui,
-    structure_protein_ui,
     structure_rna_visible_ui,
     structure_sidechain_ui,
+    structure_surface_ui,
     structure_ui,
     review_lane_ui,
     section_deliverables,
@@ -528,15 +547,15 @@ def _(
                     structure_background_ui=structure_background_ui,
                     structure_mutation_ui=structure_mutation_ui,
                     structure_sidechain_ui=structure_sidechain_ui,
-                    structure_protein_ui=structure_protein_ui,
+                    structure_surface_ui=structure_surface_ui,
                     structure_dna_visible_ui=structure_dna_visible_ui,
                     structure_rna_visible_ui=structure_rna_visible_ui,
                     show_reference_background=show_reference_background,
                     show_mutation_differences=show_mutation_differences,
                     show_sidechains=show_sidechains,
+                    show_protein_surface=show_protein_surface,
                     show_dna=show_dna,
                     show_rna=show_rna,
-                    highlight_protein=highlight_protein,
                     highlight_dna=highlight_dna,
                     highlight_rna=highlight_rna,
                 ),
@@ -553,15 +572,14 @@ def _(
                 ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
-        elif is_residue_frequency_bundle_deliverable(selected_visual):
-            secondary_controls.extend(control for control in (residue_frequency_class_ui,) if control is not None)
+        elif is_policy_residue_frequency_deliverable(selected_visual):
+            secondary_controls.extend(control for control in (policy_frequency_ui,) if control is not None)
             rendered = [
-                render_residue_frequency_bundle(
+                render_policy_frequency_bundle(
                     selected_visual,
                     mo=mo,
                     manifest_root=manifest_root,
-                    selected_view=selected_residue_frequency_view,
-                    design_class_ui=None,
+                    selected_view=selected_policy_frequency_view,
                 ),
                 render_deliverable_details(selected_visual, mo=mo),
             ]
@@ -578,9 +596,7 @@ def _(
         rendered.append(
             mo.vstack(
                 [
-                    mo.Html(
-                        "<h2 style='font-size:1.15rem; margin:0.2rem 0 0 0;'>Evidence tables and exports</h2>"
-                    ),
+                    mo.Html("<h2 style='font-size:1.15rem; margin:0.2rem 0 0 0;'>Evidence tables and exports</h2>"),
                     mo.accordion(evidence_panels, multiple=False, lazy=True),
                 ],
                 gap=0.25,
