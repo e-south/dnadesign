@@ -38,11 +38,11 @@ def test_policy_context_uses_generation_policy_provenance() -> None:
     assert context.source_field == "primary_policy_id"
 
 
-def test_policy_context_rejects_legacy_design_class_only_rows() -> None:
+def test_policy_context_rejects_design_class_only_rows() -> None:
     with pytest.raises(ValueError, match="generation policy"):
         resolve_selection_policy_context(
             {
-                "candidate_id": "legacy_candidate",
+                "candidate_id": "design_class_candidate",
                 "design_class_id": "eco1_rt_clade9_plurality25_contact10a_v1",
             }
         )

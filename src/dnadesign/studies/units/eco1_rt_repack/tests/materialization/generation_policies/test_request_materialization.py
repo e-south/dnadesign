@@ -132,7 +132,7 @@ def test_generation_policy_request_materialization_rejects_legacy_manifest_polic
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="legacy design-class id"):
+    with pytest.raises(ValueError, match="design-class id"):
         materialize_generation_policy_requests(repo_root=Path.cwd(), generation_policy_root=tmp_path)
 
 

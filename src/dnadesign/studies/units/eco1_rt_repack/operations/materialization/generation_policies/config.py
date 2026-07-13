@@ -76,9 +76,9 @@ def validate_generation_policy_config(payload: Mapping[str, Any]) -> GenerationP
     enabled_policies: list[GenerationPolicySpec] = []
     for policy_id, raw_policy in policy_payloads.items():
         policy_id = _require_text(policy_id, "policy_id")
-        if _looks_like_legacy_design_class_id(policy_id):
+        if _looks_like_design_class_id(policy_id):
             raise ValueError(
-                f"legacy design-class id {policy_id!r} is not valid for generation_policy_version "
+                f"design-class id {policy_id!r} is not a generation-policy id for generation_policy_version "
                 f"{GENERATION_POLICY_VERSION}; use one of: {', '.join(PRIMARY_POLICY_IDS)}"
             )
         if policy_id not in PRIMARY_POLICY_IDS:
@@ -118,7 +118,7 @@ def validate_generation_policy_config(payload: Mapping[str, Any]) -> GenerationP
     )
 
 
-def _looks_like_legacy_design_class_id(policy_id: str) -> bool:
+def _looks_like_design_class_id(policy_id: str) -> bool:
     return policy_id.startswith("eco1_rt_") and "contact" in policy_id and policy_id.endswith("_v1")
 
 

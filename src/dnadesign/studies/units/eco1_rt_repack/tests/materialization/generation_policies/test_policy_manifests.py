@@ -31,13 +31,13 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generatio
 from ._candidate_tables import write_generation_policy_source_inputs
 
 
-def test_generation_policy_config_rejects_legacy_design_class_ids() -> None:
+def test_generation_policy_config_rejects_design_class_ids() -> None:
     config = build_default_generation_policy_config()
     config["generation_policies"] = {
         "eco1_rt_clade9_plurality25_contact8a_v1": {"enabled": True, "requested_variants": 336}
     }
 
-    with pytest.raises(ValueError, match="legacy design-class id"):
+    with pytest.raises(ValueError, match="design-class id"):
         validate_generation_policy_config(config)
 
 

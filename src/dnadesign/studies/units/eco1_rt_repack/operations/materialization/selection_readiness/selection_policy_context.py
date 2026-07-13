@@ -43,7 +43,7 @@ def resolve_selection_policy_context(candidate: Mapping[str, object]) -> Selecti
     if not generation_policy_id:
         raise ValueError(
             f"Candidate {candidate_id!r} is missing generation policy provenance; "
-            "selection does not accept legacy design-class identifiers."
+            "selection requires a generation-policy identifier, not a design-class identifier."
         )
     if generation_policy_id not in _PROFILE_BY_GENERATION_POLICY_ID:
         raise ValueError(

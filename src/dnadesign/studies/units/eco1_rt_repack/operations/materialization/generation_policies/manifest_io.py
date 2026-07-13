@@ -44,8 +44,8 @@ def load_valid_generation_policy_manifest(path: Path) -> dict[str, Any]:
     for policy in policies:
         policy_map = require_mapping(policy, "generation_policies[]")
         policy_id = require_text(policy_map, "policy_id")
-        if looks_like_legacy_design_class_id(policy_id):
-            raise ValueError(f"legacy design-class id {policy_id!r} is not valid for generation-policy materialization")
+        if looks_like_design_class_id(policy_id):
+            raise ValueError(f"design-class id {policy_id!r} is not valid for generation-policy materialization")
         if policy_id not in PRIMARY_POLICY_IDS:
             raise ValueError(f"unknown generation policy id {policy_id!r}")
     observed_hash = manifest.get("policy_manifest_hash")
@@ -63,7 +63,7 @@ def resolve_recorded_path(root: Path, value: Any) -> Path:
     return path if path.is_absolute() else (root / path).resolve()
 
 
-def looks_like_legacy_design_class_id(policy_id: str) -> bool:
-    """Return True for old contact-distance design-class ids."""
+def looks_like_design_class_id(policy_id: str) -> bool:
+    """Return True for contact-distance design-class identifiers."""
 
     return policy_id.startswith("eco1_rt_") and "contact" in policy_id and policy_id.endswith("_v1")
