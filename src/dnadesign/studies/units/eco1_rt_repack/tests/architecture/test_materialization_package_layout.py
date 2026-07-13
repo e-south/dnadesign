@@ -34,6 +34,7 @@ _CLI_MATERIALIZATION_PACKAGES = {
     "selection_readiness",
     "structure_preprocessing",
     "thread_plan",
+    "twist_handoff",
 }
 _CONTACT_GEOMETRY_ROOT_FILES = {
     "__init__.py",

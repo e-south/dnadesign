@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
@@ -55,6 +56,12 @@ _MASK_INPUT_MOTIF_COLOR = "#8A4A11"
 _TRACK_CONTEXT = "retron_rt_context_spans"
 _TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
 _TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
+
+
+def read_policy_position_rows(path: Path) -> list[dict[str, Any]]:
+    """Load the generation-policy rows used to construct mask-browser views."""
+
+    return [dict(row) for row in pq.read_table(path).to_pylist()]
 
 
 def write_mask_structure_browser_manifest(

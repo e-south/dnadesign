@@ -22,8 +22,10 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     materialize_selection_readiness,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
-from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._candidate_fixtures import (
     sequence,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
     write_inputs,
 )
 

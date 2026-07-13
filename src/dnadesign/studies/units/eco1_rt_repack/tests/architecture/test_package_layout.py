@@ -47,6 +47,7 @@ _MATERIALIZATION_PRIMITIVES = {
     "structure",
     "structure_preprocessing",
     "thread_plan",
+    "twist_handoff",
 }
 _MATERIALIZATION_SUPPORT_PACKAGES = {"shared"}
 _MATERIALIZATION_SHARED_FILES = {

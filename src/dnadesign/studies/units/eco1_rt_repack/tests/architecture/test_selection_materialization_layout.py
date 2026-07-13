@@ -52,7 +52,10 @@ _SELECTION_READINESS_ROOT_FILES = {
     "mutation_distance.py",
     "mutation_distance_plot.py",
     "panel.py",
+    "panel_contract.py",
+    "panel_ranking.py",
     "panel_rows.py",
+    "panel_trace.py",
     "pipeline.py",
     "plot_support.py",
     "plots.py",
@@ -115,7 +118,7 @@ def test_selection_readiness_materializer_keeps_decision_logic_decomposed() -> N
     assert "matplotlib" not in pipeline_text
     assert "pyarrow" not in pipeline_text
     assert "build_triage_rows" in triage_text
-    assert "build_selection_panel_rows" in panel_text
+    assert "build_selected_panel_rows" in panel_text
     assert "write_selection_readiness_plots" in plots_text
     assert "load_fasta_records" in review_axes_text
     assert "csv.DictWriter" in sequence_export_text

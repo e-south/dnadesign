@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.contact_geometry.paths import (
@@ -80,7 +79,7 @@ from .constants import (
 from .esmc_model_check import write_esmc_model_check_panels
 from .manifest import file_hashes, make_deliverable_row, write_manifest
 from .mask_rows import read_mask_residues
-from .mask_structure_browser import write_mask_structure_browser_manifest
+from .mask_structure_browser import read_policy_position_rows, write_mask_structure_browser_manifest
 from .mask_tracks import write_mask_structure_context
 from .models import MaterializedReviewDeliverables
 from .msa_panel import CLADE9_MSA_PANEL, SUBTYPE_MSA_PANEL, write_msa_plurality_mask_panel
@@ -139,7 +138,7 @@ def materialize_review_deliverables(
     )
     selected_source = _selected_panel_source(out_root=out_root, selection_root=resolved_selection_root)
     policy_positions_path = selected_source.candidate_root / "generation_policy_positions.parquet"
-    policy_position_rows = [dict(row) for row in pq.read_table(policy_positions_path).to_pylist()]
+    policy_position_rows = read_policy_position_rows(policy_positions_path)
 
     mask_residues = read_mask_residues(mask_set_path)
     rt_annotation_context = load_rt_annotation_context(
